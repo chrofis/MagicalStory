@@ -1,0 +1,54 @@
+{
+  "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
+  "bugs": [
+    {
+      "id": "dog-triggers-gemini-fallback",
+      "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
+      "reportedAt": "2026-08-19",
+      "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
+      "status": "open",
+      "task": 19
+    },
+    {
+      "id": "fallback-replaces-instead-of-merging",
+      "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
+      "reportedAt": "2026-08-19",
+      "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
+      "status": "open",
+      "task": 21
+    },
+    {
+      "id": "lab-unpinned-loads-v0",
+      "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
+      "reportedAt": "2026-08-19",
+      "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
+      "status": "open",
+      "task": 23
+    },
+    {
+      "id": "experiments-route-strips-target-params",
+      "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
+      "reportedAt": "2026-08-19",
+      "source": "exp #9 stored target {storyId,pageNumber} only",
+      "status": "open",
+      "task": 23
+    },
+    {
+      "id": "garment-seeds-missing-empty-description",
+      "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
+      "reportedAt": "2026-08-19",
+      "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
+      "status": "open",
+      "task": 24
+    },
+    {
+      "id": "recolour-version-not-redetected",
+      "title": "Garment-recolour version inherited its parent's detection (fp nulled, boxes copied) instead of a fresh DINO+SoM",
+      "reportedAt": "2026-08-19",
+      "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
+      "status": "fixed",
+      "fixedIn": "98641b7b7",
+      "task": 23
+    }
+  ]
+}

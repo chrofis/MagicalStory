@@ -50,11 +50,18 @@ Spaces). Before launching any Python script, consider its memory footprint; cap 
 - Skip this for simple, obvious fixes - don't over-engineer
 - Challenge your own work before presenting it
 
-### 6. Autonomous Bug Fixing
+### 6. Autonomous Bug Fixing — ENFORCED by the pre-push gate
 - When given a bug report: just fix it. Don't ask for hand-holding
 - Point at logs, errors, failing tests -> then resolve them
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
+- **A CLEAR bug (owner-reported, or reproduced from stored evidence) goes into
+  `tasks/bugs.json` the moment it is confirmed — and `check-open-bugs.js` in the
+  pre-push hook BLOCKS every push while any entry is open.** Fix it now, flip
+  its entry to `"fixed"` (with the commit hash) in the same commit. Only clear
+  bugs belong in the registry — design questions and improvements stay on the
+  task list. Emergency escape: `PUSH_WITH_OPEN_BUGS=1 git push` (defers, never
+  dismisses).
 
 ## Task Management
 

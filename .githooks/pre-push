@@ -39,5 +39,12 @@ node "$HOOK_DIR/../scripts/admin/check-doc-drift.js" || exit 1
 # bypassed, and a bypassed gate is worse than none.
 node "$HOOK_DIR/../scripts/admin/check-doc-coupling.js" || exit 1
 
-# Gate 5: target environment must be idle (see check-push-idle.js).
+# Gate 5: no OPEN reported bugs (tasks/bugs.json). CLAUDE.md has said "just fix
+# it" since the beginning and it kept not happening — clear bugs were backlogged
+# while unrelated work shipped over them. While any registry entry is open,
+# nothing ships. Emergency escape: PUSH_WITH_OPEN_BUGS=1 (defers, never
+# dismisses — the next push is blocked again).
+node "$HOOK_DIR/../scripts/admin/check-open-bugs.js" || exit 1
+
+# Gate 6: target environment must be idle (see check-push-idle.js).
 exec node "$HOOK_DIR/../scripts/admin/check-push-idle.js" "$@"

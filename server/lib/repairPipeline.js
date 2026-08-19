@@ -1424,6 +1424,49 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
    * when nothing was changed. Every attempt writes its outcome onto the
    * mismatch entry so the record survives a container restart.
    */
+  // FRESH DINO+SoM FOR A VERSION'S OWN BYTES (owner, 2026-08-19).
+  //
+  // Every path that creates a new image version must re-detect on the new
+  // bytes. The recolour path did NOT: runGarmentRecolour returned the OLD
+  // detection with sourceImageFp nulled -- the comment said "stale" and passed
+  // it along anyway -- so the recolour version inherited its parent's boxes and
+  // names verbatim. Measured on job_1787120984020_pg71z58ba9 p7: v1's stored
+  // detection is IDENTICAL to v0's to the last decimal, fp missing, while the
+  // recolour had just swapped two boys' shirt colours -- so every consumer of
+  // v1 (entity grids, cutouts, the next round's decisions) read pre-recolour
+  // identity against post-recolour pixels.
+  //
+  // Shared by the round-repair results and the recolour results so the two
+  // paths cannot drift apart again. Builds the SAME dressed identity lines the
+  // first detection gets (buildIdentityClothingText -- covers included), plus
+  // the Visual-Bible secondaries.
+  const redetectVersionImage = async (r, roundLabel) => {
+    const orig = rawImages.find(i => i.pageNumber === r.pageNumber);
+    const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
+    const meta = r.sceneMetadata || orig?.sceneMetadata || {};
+    const clothingByName = r.sceneCharacterClothing || orig?.sceneCharacterClothing || meta.characterClothing || {};
+    const sh = getStoryHelpers();
+    const expectedCharacters = sceneChars.map(c => {
+      const name = c.name || c;
+      if (typeof c !== 'object') return { name, description: '' };
+      const clothingText = sh.buildIdentityClothingText(
+        c, clothingByName[name], artStyle, storyData?.clothingRequirements || null,
+        { label: `p${r.pageNumber} ${roundLabel} ` });
+      return { name, description: sh.buildIdentityLine(c, clothingText) };
+    });
+    expectedCharacters.push(...sh.buildSecondaryExpectedCharacters(
+      visualBible, meta, expectedCharacters.map(c => c.name),
+      { pageLabel: `PAGE ${r.pageNumber} ${roundLabel} `, extraNames: r.outlineCharacters || orig?.outlineCharacters || [] }
+    ));
+    return images().detectAllBoundingBoxes(r.imageData, {
+      expectedCharacters,
+      expectedObjects: Array.isArray(meta.objects) ? meta.objects.filter(x => typeof x === 'string') : [],
+      sceneContext: r.description || orig?.sceneDescription || null,
+      pageContext: `PAGE ${r.pageNumber} ${roundLabel}`,
+      artStyle,
+    });
+  };
+
   const runGarmentRecolour = async (img, entries, roundNum) => {
     const { fixFigureGarmentColour } = require('./garmentColourFix');
     const { crossCheckFigureIdentity, isIdentityDisputed, resolveIdentityTiebreak } = require('./figureIdentityCheck');
@@ -1559,10 +1602,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       changed++;
     }
     if (!changed) return null;
-    // Bytes changed → a detection stamped against the old bytes is stale.
-    if (detection) detection.sourceImageFp = null;
     log.info(`🎨 [GARMENT-COLOUR] p${pageNumber} round ${roundNum}: ${changed}/${attempted} garment(s) recoloured`);
-    return { imageData: current, detection, changed };
+    // NO detection returned: the bytes just changed, so the detection used for
+    // the repair is stale by construction. The caller runs a fresh DINO+SoM on
+    // the new bytes (redetectVersionImage) -- passing the old one along, even
+    // with its fp nulled, is how a recolour version shipped pre-recolour
+    // identity against post-recolour pixels.
+    return { imageData: current, detection: null, changed };
   };
 
   const { decideRepairMethod } = require('./repairLogic');
@@ -1808,6 +1854,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         })))).filter(Boolean);
 
         for (const rc of recolourResults) recolourBytes.set(rc.pageNumber, rc.imageData);
+
+        // Fresh DINO+SoM on the recoloured bytes -- same helper the round-repair
+        // results use, so a recolour version carries ITS OWN boxes, names and
+        // sourceImageFp, never its parent's.
+        const recolourDetectLimit = pLimit(4);
+        await Promise.all(recolourResults.filter(rc => !rc.bboxDetection).map(rc => recolourDetectLimit(async () => {
+          try {
+            rc.bboxDetection = await redetectVersionImage(rc, `recolour-r${round}`);
+          } catch (err) {
+            log.warn(`⚠️ [GARMENT-COLOUR] p${rc.pageNumber}: post-recolour re-detect failed (${err.message}) -- version stores no detection rather than a stale one`);
+            rc.bboxDetection = null;
+          }
+        })));
 
         if (recolourResults.length > 0) {
           log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${recolourResults.length} page(s) recoloured — evaluating as their own version(s)`);
@@ -2060,49 +2119,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // eval and entity each ran their own detection on the same new bytes,
       // and the two SoM identity calls could disagree.
       const roundDetectLimit = pLimit(8);
+      // Same identity line the first detection gets (Phase 5b-pre) -- the shared
+      // redetectVersionImage builds it (dressed lines + VB secondaries). Without
+      // it this re-detect OVERWRITES a good detection with one made from bare
+      // names (job_1786737619634_d66c7bg9g p4: expectedCharacters came back
+      // with empty descriptions).
       await Promise.all(roundSuccess.filter(r => !r.bboxDetection).map(r => roundDetectLimit(async () => {
-        const orig = rawImages.find(i => i.pageNumber === r.pageNumber);
         try {
-          const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
-          const meta = r.sceneMetadata || orig?.sceneMetadata || {};
-          // Same identity line the first detection gets (Phase 5b-pre). Without
-          // it this re-detect OVERWRITES a good detection with one made from
-          // bare names: job_1786737619634_d66c7bg9g p4 ran char-fix-round-1 and
-          // its stored expectedCharacters came back [{"name":"Emma",
-          // "description":""},{"name":"Noah","description":""}].
-          // Clothing is the PAGE's, resolved from the category — never the raw
-          // tag ('costumed:mermaid'), never a stale stored outfit.
-          const clothingByName = r.sceneCharacterClothing || orig?.sceneCharacterClothing || meta.characterClothing || {};
-          const expectedCharacters = sceneChars.map(c => {
-            const name = c.name || c;
-            if (typeof c !== 'object') return { name, description: '' };
-            // Covers carry no sceneCharacterClothing, so clothingByName is {} and
-            // this used to produce an identity line with no garment colour at all —
-            // and THIS detection is the one that lands on coverImages, overwriting
-            // the dressed one coverIterate built.
-            const sh = getStoryHelpers();
-            const clothingText = sh.buildIdentityClothingText(
-              c, clothingByName[name], artStyle, storyData?.clothingRequirements || null,
-              { label: `p${r.pageNumber} r${round} ` });
-            return { name, description: sh.buildIdentityLine(c, clothingText) };
-          });
-          // Story-invented characters are in the Visual Bible, never in
-          // sceneCharacters (the photo-backed cast) — without them the identity
-          // call gets N names for N+1 figures and hands a cast name to the
-          // invented figure (job_1786737619634_d66c7bg9g p4).
-          expectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
-            visualBible, meta, expectedCharacters.map(c => c.name),
-            { pageLabel: `PAGE ${r.pageNumber} r${round} `, extraNames: r.outlineCharacters || orig?.outlineCharacters || [] }
-          ));
-          r.bboxDetection = await images().detectAllBoundingBoxes(r.imageData, {
-            expectedCharacters,
-            expectedObjects: Array.isArray(meta.objects) ? meta.objects.filter(o => typeof o === 'string') : [],
-            sceneContext: r.description || orig?.sceneDescription || null,
-            pageContext: `PAGE ${r.pageNumber} r${round}`,
-            artStyle,
-          });
+          r.bboxDetection = await redetectVersionImage(r, `r${round}`);
         } catch (err) {
-          log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round} P${r.pageNumber}: shared detection failed (${err.message}) — eval and entity will detect independently`);
+          log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round} P${r.pageNumber}: shared detection failed (${err.message}) -- eval and entity will detect independently`);
           r.bboxDetection = null;
         }
       })));

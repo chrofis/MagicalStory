@@ -13332,3 +13332,48 @@ quiet by going blind would show up as the control getting quieter too.
 deductionClassKey, sumDeductionPoints), `server/lib/testlab.js` (eval_variance
 stage records each finding's subject + billing key)
 **Status:** ✅ active
+
+## 2026-08-19 — Every new image version gets its OWN DINO+SoM; recolour versions no longer inherit the parent's detection
+
+**Context:** `job_1787120984020_pg71z58ba9` p7 — v1 (garment-recolour) carried a
+`bboxDetection` **identical to v0's to the last decimal**, with `sourceImageFp`
+missing. `runGarmentRecolour` returned the OLD detection with its fp nulled;
+the comment said "stale" and passed it along anyway. So the recolour version
+shipped pre-recolour identity against post-recolour pixels: the recolour had
+just swapped two boys' shirt colours, and every consumer of v1 (entity grids,
+cutouts, the next round's decisions) read the old names against the new shirts.
+On from-behind pages the shirt IS the identity signal, so this is precisely the
+mechanism that swaps characters in the finished book.
+
+Also proven on the way (Lab exps #7–#10): detection is fully deterministic —
+pinned to the same bytes, the Lab reproduces production's stored detection
+byte-exactly. Every apparent "drift" was two calls seeing different bytes.
+
+**Decision:** one shared `redetectVersionImage()` in the round loop; both the
+round-repair results AND the recolour results run it on their own new bytes
+(fresh DINO+SoM, dressed identity lines via `buildIdentityClothingText`,
+VB secondaries included). `runGarmentRecolour` returns `detection: null` when
+bytes changed — a stale detection is never passed along, even fp-nulled.
+
+**Touched:** `server/lib/repairPipeline.js`,
+`tests/manual/occlusionDepth.test.js`
+**Status:** ✅ active
+
+## 2026-08-19 — Reported bugs block pushes: tasks/bugs.json + check-open-bugs gate
+
+**Context:** CLAUDE.md's "when given a bug report: just fix it" kept not
+happening — clear, owner-reported bugs were filed as backlog tasks while
+unrelated work shipped over them. A rule nobody enforces is a suggestion.
+
+**Decision:** `tasks/bugs.json` is the clear-bug registry; a bug goes in the
+moment it is confirmed (owner-reported or reproduced from stored evidence).
+`scripts/admin/check-open-bugs.js` runs in the pre-push hook and BLOCKS every
+push while any entry is open. Fixing the bug and flipping its entry to "fixed"
+(with the commit hash) in the same commit is what unblocks the tree. ONLY clear
+bugs qualify — design questions and improvements stay on the task list.
+Emergency escape `PUSH_WITH_OPEN_BUGS=1` defers but never dismisses: the next
+push is blocked again.
+
+**Touched:** `tasks/bugs.json`, `scripts/admin/check-open-bugs.js`,
+`.githooks/pre-push`, `CLAUDE.md`
+**Status:** ✅ active

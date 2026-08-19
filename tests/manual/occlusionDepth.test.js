@@ -330,10 +330,13 @@ t('the cover detector builds a real identity line, like every page path', () => 
     'the cover must not send a bare description any more');
   assert.ok(/const coverClothingByName = hintCharClothing \|\| \{\}/.test(cov),
     'the cover must use its own characterClothing map');
-  assert.ok(/buildClothingDescription\(\s*c, category, artStyleId, storyData\.clothingRequirements/.test(cov),
-    'and resolve it through clothingRequirements, the canonical source');
-  assert.ok(/getStoryHelpers\(\)\.buildCastIdentityDescription\(c, clothingText\)/.test(cov),
-    'then build the same identity line the pages build');
+  // 2026-08-18: the inline resolution moved into the SHARED chain
+  // (buildIdentityClothingText: hint -> used category -> standard -> wardrobe,
+  // ERROR when naked) so covers and pages cannot drift apart again.
+  assert.ok(/buildIdentityClothingText\(/.test(cov),
+    'the cover resolves clothing through the shared chain');
+  assert.ok(/buildIdentityLine\(c, clothingText\)/.test(cov),
+    'and builds the identity line through the shared builder (clothing never dropped)');
 });
 
 // -- A face with no person box is a missing figure ---------------------------

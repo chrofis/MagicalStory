@@ -140,7 +140,7 @@ C:*
 _local
 
 # Claude Code task tracking (local working files)
-tasks/
+tasks/*
 
 # React Email browser previews (regenerable via npx tsx scripts/preview-email.ts)
 emails-preview/
@@ -150,3 +150,6 @@ drafts/
 
 # ML model weights — never commit (auto-downloaded by ultralytics: yolo*-pose.pt, mobile_sam.pt, FastSAM-*.pt)
 *.pt
+
+# The clear-bug registry is TRACKED — the pre-push gate reads it on every clone
+!tasks/bugs.json
