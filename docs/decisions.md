@@ -553,6 +553,28 @@ considered and declined — do not re-propose without new evidence.
 **Touched:** none — this documents deliberate existing behaviour.
 **Status:** ✅ active (by design).
 
+### VB reference cells wrap to two rows so animals stay identifiable
+**Context:** A story's dog rendered as a different breed on five of six pages.
+Prose and reference were correct everywhere — the VB entry described a tan
+mixed-breed with a red collar and the reference cell drew exactly that. The
+one page that rendered it correctly was the only page with a single character
+in the scene. Grok takes max 3 reference slots: scene background, then
+characters, then VB. With 1-2 characters the VB grid owns a slot at full size;
+with 3+ the cast needs two slots and VB elements ride as a single row of cells
+appended under the last character composite (`composeCharWithVbRow`). That row
+was `cellW = W / elements.length`, so a five-entity page gave each entity a
+fifth of the width — the dog rendered ~60x60px in the finished slot, too small
+to carry breed or markings, and the model fell back to a generic prior.
+**Decision:** cells wrap over up to TWO rows (`perRow = n<=3 ? n : ceil(n/2)`).
+Measured on the affected page: the animal cell goes 60x60 → ~89x85 (about 2.1x
+the area) and the character area loses ~11% of its width.
+**Rationale:** bounded at two rows deliberately. `packReferences` normalises
+the finished slot to 1024px tall, so every pixel the strip gains is a pixel the
+avatars lose — deeper strips would trade away face identity, which matters more
+than prop identity.
+**Touched:** `server/lib/grok.js` — `composeCharWithVbRow`
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

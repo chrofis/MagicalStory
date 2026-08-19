@@ -1404,13 +1404,30 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
   const W = meta.width;
   const charHOrig = meta.height;
 
-  // Layout: keep the character at its natural size and append a VB cell row
+  // Layout: keep the character at its natural size and append VB cells
   // directly underneath. No internal padding — the final aspect-pad step in
   // packReferences adds any outer bars needed. VB cell size is driven by the
   // canvas WIDTH so cells stay large regardless of target aspect.
-  const cellW = Math.floor(W / elements.length);
+  //
+  // Cells are laid out over as many ROWS as it takes to keep each one big
+  // enough to read. A single row of N cells is W/N wide, so a five-entity page
+  // gave each entity a fifth of the width — at that size an animal's breed and
+  // markings are unreadable and the model falls back to a generic prior (a
+  // story's tan mixed-breed dog rendered as a golden retriever on every page
+  // whose cast filled the slot, and correctly only on the one page where the
+  // VB grid had a slot to itself). Capping cells per row keeps each cell at
+  // worst half the width; the strip grows downward instead of squeezing.
+  //
+  // Bounded at TWO rows on purpose: packReferences normalises the finished
+  // slot to 1024px tall, so every pixel the strip gains is a pixel the
+  // character avatars lose. Two rows roughly doubles cell width while costing
+  // the avatars about a tenth of their size; deeper strips start trading away
+  // face identity, which matters more than prop identity.
+  const perRow = elements.length <= 3 ? elements.length : Math.ceil(elements.length / 2);
+  const rowCount = Math.ceil(elements.length / perRow);
+  const cellW = Math.floor(W / perRow);
   const cellH = Math.min(cellW, Math.round(W * 0.32));
-  const finalH = charHOrig + cellH;
+  const finalH = charHOrig + cellH * rowCount;
 
   const composites = [{ input: charBuffer, left: 0, top: 0 }];
   for (let i = 0; i < elements.length; i++) {
@@ -1422,8 +1439,9 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
       const cell = await sharp(elBuf)
         .resize(cellW, cellH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
         .toBuffer();
-      const cellLeft = i * cellW;
-      composites.push({ input: cell, left: cellLeft, top: charHOrig });
+      const cellLeft = (i % perRow) * cellW;
+      const cellTop = charHOrig + Math.floor(i / perRow) * cellH;
+      composites.push({ input: cell, left: cellLeft, top: cellTop });
 
       // VB cell labels intentionally dropped — Grok knows what a bench /
       // coin / sundial / bridge looks like; the caption only ever serves to
@@ -1437,7 +1455,7 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
     }
   }
 
-  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charHOrig} + VB row ${elements.length} cells @ ${cellW}x${cellH}), target ${aspectRatio}`);
+  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charHOrig} + VB ${elements.length} cells in ${rowCount} row(s) @ ${cellW}x${cellH}), target ${aspectRatio}`);
   return sharp({ create: { width: W, height: finalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite(composites)
     .jpeg({ quality: 88 })
