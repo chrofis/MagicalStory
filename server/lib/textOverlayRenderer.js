@@ -10,6 +10,7 @@ const { createCanvas } = require('canvas');
 const sharp = require('sharp');
 const { getTextZonePolygon } = require('./textMasks');
 const { interiorPageHeightPt, DEFAULT_FORMAT } = require('../config/print');
+const { requiredFontPt } = require('../config/textRegion');
 
 const VALID_POSITIONS = ['top-left', 'top-right', 'top-full', 'bottom-left', 'bottom-right', 'bottom-full'];
 
@@ -35,6 +36,7 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     fontFamily = 'Georgia',
     pageNumber = null,
     bookFormat = DEFAULT_FORMAT,
+    languageLevel = 'standard',
   } = options;
 
   // FIXED font size — the printed book must be visually consistent across
@@ -53,9 +55,15 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   // and would shrink again if the image model's output resolution ever
   // changed. The previous constant of 11px worked out to ~7.7pt on the A4
   // trim — around two thirds of Word's 11pt, in a first-grade picture book.
-  const STORY_TEXT_PT = 12;
+  //
+  // The point size itself comes from `requiredFontPt(languageLevel)` — the
+  // same function the calm-zone pixel budget uses to decide how much quiet
+  // area a page must reserve (server/config/textRegion.js). Those two had
+  // drifted apart: the budget was re-rolling first-grade pages to fit 14pt
+  // while the renderer drew ~7.7pt into the space it won.
+  const storyTextPt = requiredFontPt(languageLevel);
   const baseFontSize = fontSizeOverride
-    || Math.round(STORY_TEXT_PT * height / interiorPageHeightPt(bookFormat));
+    || Math.round(storyTextPt * height / interiorPageHeightPt(bookFormat));
   const font = `${fontFamily}, serif`;
 
   // Polygon-area stages, smallest → largest. Same shape (rectangle for
@@ -215,6 +223,7 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
     fontFamily: options.fontFamily,
     pageNumber: options.pageNumber,
     bookFormat: options.bookFormat,
+    languageLevel,
   });
 
   // No frosted-glass halo — the text already carries a 0.85-alpha black stroke

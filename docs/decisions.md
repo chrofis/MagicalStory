@@ -442,11 +442,20 @@ picture book. On screen, where the page renders ~500px wide, it is ~5px tall
 and reads as absent. Pixels were never a stable size either: canvases vary
 within one story (1152px scenes, 1184px re-rendered page, 1222px covers), so
 "the same 11px" already printed at three different physical sizes.
-**Decision:** `server/lib/textOverlayRenderer.js` — `STORY_TEXT_PT = 12`,
-converted per canvas via `px = round(pt × imageHeightPx / interiorPageHeightPt)`.
-Owner picked 12pt from rendered 11/14/18pt candidates. The physical size is
-what's fixed now, exactly like choosing 12pt in Word; the never-shrink rule
+**Decision:** `server/lib/textOverlayRenderer.js` — the point size comes from
+`requiredFontPt(languageLevel)` (`server/config/textRegion.js`): **14pt for
+1st-grade, 12pt otherwise**, converted per canvas via
+`px = round(pt × imageHeightPx / interiorPageHeightPt)`. The physical size is
+what's fixed, exactly like choosing a point size in Word; the never-shrink rule
 above is unchanged (only the polygon grows or contracts).
+**Second source of truth removed:** `requiredFontPt` already existed and drives
+the calm-zone pixel budget — the empty-scene retry loop re-rolls a page until it
+reserves enough quiet area for text at THAT size. The renderer ignored it, so
+the budget was reserving space for 14pt on first-grade books while the renderer
+drew ~7.7pt into the space it won. Every caller now passes `languageLevel`:
+`routes/sharing.js` already did, `routes/stories.js` and both `pdf.js` call
+sites did not — so the same story rendered one step smaller in the print PDF
+and in the owner's own view than in the shared viewer.
 **Rationale:** Sizing in points is resolution-independent — it survives a
 change in image-model output resolution and equalises the per-page canvas
 differences that the pixel constant silently rendered at different sizes.

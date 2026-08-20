@@ -577,7 +577,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
 
         const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
-        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat: opts.bookFormat });
+        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat: opts.bookFormat, languageLevel: storyData?.languageLevel });
 
         // Crop the opposite side of the text so the text is never in the
         // cropped zone. Image aspect rarely matches the page aspect exactly —
@@ -814,7 +814,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
           const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
-          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat });
+          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat, languageLevel: storyData?.languageLevel });
           // Fill the full interior page incl. top AND bottom bleed. Crop the
           // opposite side from the text so the scale-to-fill overflow never
           // eats into the text zone.

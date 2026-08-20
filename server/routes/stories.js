@@ -4264,7 +4264,16 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
       return res.status(404).json({ error: 'Page image not found' });
     }
 
-    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { pageNumber });
+    // languageLevel drives the story-text point size (config/textRegion.js
+    // requiredFontPt). Without it this route rendered a first-grade book one
+    // step smaller than the shared viewer and the print PDF, which both pass it.
+    let languageLevel = 'standard';
+    try {
+      const lvlRows = await dbQuery(`SELECT data->>'languageLevel' AS lvl FROM stories WHERE id = $1`, [id]);
+      if (lvlRows.length > 0 && lvlRows[0].lvl) languageLevel = lvlRows[0].lvl;
+    } catch { /* default stays */ }
+
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { pageNumber, languageLevel });
 
     // Return overlay as base64 data URL
     const overlayBase64 = result.overlayImage.toString('base64');
