@@ -80,6 +80,15 @@
       "fixedIn": "329170a3e",
       "task": null,
       "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
+    },
+    {
+      "id": "version-detection-null-after-eval-refactor",
+      "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
+      "reportedAt": "2026-08-20",
+      "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
+      "status": "fixed",
+      "fixedIn": "1770eb63a",
+      "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
     }
   ]
 }

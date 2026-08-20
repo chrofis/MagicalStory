@@ -765,7 +765,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       ? {
           // v0 = original first generation (pre-scale-repair). No eval ran on
           // this image — eval ran on the scale-repair output, so we only carry
-          // the inputs (prompt, refs) and the image bytes.
+          // the inputs (prompt, refs) and the image bytes. NO detection stamp
+          // either: the shared detection ran on the post-scale-repair bytes,
+          // and stamping it here would pair boxes with the wrong pixels.
           imageData: img.preScaleRepairImage,
           score: null,
           finalScore: null,
@@ -785,6 +787,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           score: baseScore,
           finalScore: baseFinalScore,
           source: 'original',
+          // DIRECT detection stamp (owner-driven fix, 2026-08-20). This used to
+          // rely on ev.bboxDetection via detectionForVersion — but the eval
+          // stack no longer attaches a detection to its result, so every stored
+          // version and page came out bboxDetection:NULL while 18 DINO calls'
+          // worth of real detections were computed and thrown away. The shared
+          // Phase 5b-pre detection ran on exactly these bytes.
+          bboxDetection: img.sharedBboxDetection || img.bboxDetection || null,
           evaluation: ev || null,
           consolidatedPlan: consolidatedByPage.get(img.pageNumber) || null,
           modelId: img.modelId,

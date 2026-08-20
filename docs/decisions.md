@@ -13929,3 +13929,28 @@ rate without the confirmation eval the owner declined.
 `server/lib/scoring.js` (they bill under their own names, once per character),
 `prompts/image-semantic.txt` (rules, closed type list, worked example)
 **Status:** ✅ active on staging
+
+## 2026-08-20 — Base versions carry their own detection stamp; the eval no longer does it for them
+
+**Context:** 4-page smoke `job_1787250416967_9owpz1j3b` on staging: runMetrics
+recorded 18 DINO and 24 SAM calls, yet EVERY stored version and page had
+`bboxDetection: NULL`. `detectionForVersion` resolves `v.bboxDetection ||
+v.evaluation.bboxDetection` — leg 1 never existed for the base 'original'
+version, and the eval-stack refactor (semantic_compliance replacing the Gemini
+quality eval) stopped attaching detections to eval objects, killing leg 2
+silently. The persist mirror then copied v0's null onto the page. Real
+detections were computed and thrown away; the nulling also destroyed the diag
+that would explain the run's 4 SoM fallbacks.
+
+**Decision:** the base 'original' version is stamped directly with the shared
+Phase 5b-pre detection (computed on exactly its bytes). The scale-repair v0
+variant stays unstamped on purpose — its shared detection ran on post-repair
+bytes and would pair boxes with the wrong pixels. `detectionForVersion` keeps
+its fallback order for older data.
+
+**Open:** `som_identity_fallback: 4` in that run is unexplained — evidence was
+destroyed with the detections. With persistence restored, the next story
+carries `identity.somFailure` per page.
+
+**Touched:** `server/lib/repairPipeline.js`, `tasks/bugs.json`
+**Status:** ✅ active — validated by smoke #2 (see below or reopen)
