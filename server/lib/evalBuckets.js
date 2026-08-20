@@ -100,6 +100,11 @@ const BUCKETS = {
   // Never fires on covers, where gaze at the viewer is code-owned and intended.
   viewer_address:       { owner: 'semantic', kind: 'graded', repair: 'inpaint' },
   style_consistency:    { owner: 'quality',  kind: 'graded', repair: 'style_transfer' },
+  // A paste artefact — a hard boundary or cut-out edge where the picture does
+  // not continue. Repairs to `regen`, not `inpaint`: the seam IS the previous
+  // inpaint, so painting over it again reproduces it. Distinct from
+  // style_consistency, which owns the page's MEDIUM, not its continuity.
+  composite_seam:       { owner: 'quality',  kind: 'binary', repair: 'regen' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
   character_marking:    { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
@@ -134,6 +139,8 @@ const TYPE_TO_BUCKET = {
   missing_element: 'object_presence', object_quality: 'object_presence',
   object_count: 'object_count', count: 'object_count',
   style: 'style_consistency', style_consistency: 'style_consistency', style_drift: 'style_consistency',
+  composite_seam: 'composite_seam', seam: 'composite_seam', cutout_edge: 'composite_seam',
+  paste_edge: 'composite_seam', composite_artifact: 'composite_seam',
   composition: 'composition_textzone', position_and_scale: 'composition_textzone',
   scale: 'composition_textzone', position: 'composition_textzone', textzone: 'composition_textzone',
   rendered_text: 'rendered_text', text: 'rendered_text',

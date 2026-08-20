@@ -317,6 +317,7 @@ function deductionPoints(d) {
 // see deductionClassKey.
 const PAGE_SCOPED_BUCKETS = new Set([
   'style_consistency',  // a property of the render, never of a figure
+  'composite_seam',     // one boundary can cross several figures — still one defect
   'setting',            // owner's call: the place and the light are one charge
   'image_coherence',    // the CATASTROPHIC whole-picture gate — one per page by construction
   'rendered_text',      // text baked into the art is a page defect

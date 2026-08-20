@@ -14438,3 +14438,74 @@ the STYLE and now has two consumers; exported), `server/lib/character2x4Sheet.js
 opts), `server/lib/repairPipeline.js` (commissioned-style mode),
 `tests/manual/artStyleDescriptors.test.js` (new).
 **Status:** ✅ active
+
+---
+
+## 2026-08-21 — Scale, seams and clipping become required per-figure FIELDS, not prose rules
+
+**Context:** The owner asked how the evaluator scored a visibly broken page at 25
+without ever naming what was wrong with it. On staging
+`job_1787252581387_6sn8z0nh2` p3 v1 a character was repainted grossly out of
+scale, with a hard rectangular paste seam and a cut-out edge around the hair. The
+evaluator's six findings were key design, expression, a fist, sneakers, trousers
+and gaze. Its own P1 inventory returned `verdict: PASS`, `fixable_issues: []`,
+`rendering.issues: []`.
+
+Three separate holes, all confirmed against the stored output:
+1. **`D-21 scale` only covers everyday objects** ("an apple ≈ a fist"). There was
+   no code at all for a FIGURE out of scale with the other figures.
+2. **`zone` supplied an alibi.** The inventory filed the three figures as
+   foreground / midground / background — at three different depths a size
+   difference is correct. They stood on one ground plane. No field forced a
+   statement about relative height, so the depth reading went unchallenged.
+3. **No type existed for a composite seam** anywhere in the taxonomy.
+
+**Decision:** Follow the doctrine this repo already measured at
+`evalPipeline.js:1473` — *"A rule can be skimmed wherever it sits; a required
+output FIELD cannot."* That is the move that took the style check from firing
+ZERO times as prose to working as a required field. Apply it one level down, per
+figure rather than per image:
+
+- `figures[]` gains `height_fraction`, `same_ground_plane` and `clipped_by`.
+- `rendering` gains `composite_seam`.
+- **D-29 `scale` → MAJOR** — two figures sharing a ground plane whose heights
+  contradict EXPECTED FIGURE PROPORTIONS. Skips seated/crouching figures, figures
+  at different depths, and an empty proportions block.
+- **D-30 `composite_seam` → CRITICAL** — a boundary or cut-out edge where the
+  picture does not continue. Judges the boundary, NOT the medium; a whole page in
+  the wrong medium stays N-01, so this cannot double-charge `style_consistency`.
+- **D-12 `figure_completeness`** absorbs `clipped_by` ∉ {none, frame} rather than
+  taking a new code of its own.
+
+Both prompt sites carry the fields: `image-evaluation.txt` (which owns
+`fixable_issues`) and `image-visual-inventory.txt` (P1). P1 is required because
+`evalPipeline.js:1690` lets P1's `figures` REPLACE the evaluator's downstream —
+fields added to only one site would be stripped on every scene and cover page.
+
+Code side is severity/routing only, per the settled prompt-vs-code split:
+`composite_seam` is a new bucket (binary, repair `regen` — the seam IS the
+previous inpaint, so inpainting it again reproduces it) and is PAGE-SCOPED, since
+one boundary can cross several figures and is still one defect.
+
+**Per-figure MEDIUM was considered and deliberately EXCLUDED (owner).** It is the
+hole `style_gate` got actively wrong here — it described a photographic face as
+"loose paint washes" and returned `matches_style: true`, because one photoreal
+head averages away inside a whole-image verdict. The cause of that particular
+head was fixed separately (c16dcd2ae, artStyle now reaches character repair), so
+the owner scoped it out. If a figure-medium mismatch recurs, this is the known
+gap to reopen.
+
+**NOT YET VALIDATED.** Unit-level only: both JSON schemas parse, taxonomy
+resolves, 24/24 unit tests and the settled + taxonomy gates pass. A prompt change
+of this shape needs a corpus replay (≥3 stored pages, including clean ones, to
+check for false positives) in the Test Lab — which needs the change on staging,
+which is blocked while a story is generating. Do that before trusting it.
+
+**Known follow-up:** `scale` aliases to `composition_textzone` → `iterate_placement`.
+That repair repositions rather than resizes, so a figure-scale finding may route
+somewhere that cannot fix it. Deliberately NOT changed here — SETTLED.md carries
+a scale-repair-vs-composite verdict, and re-routing needs its own evidence.
+
+**Touched:** `prompts/image-evaluation.txt`, `prompts/image-visual-inventory.txt`,
+`server/lib/evalBuckets.js`, `server/lib/scoring.js`
+**Status:** 🟡 conditional — shipped code, validation outstanding

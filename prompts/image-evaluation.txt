@@ -138,7 +138,7 @@ If the brief named a garment and the figure is wearing something else, or too li
 **D-09 `anatomy` → CRITICAL.** Extra limbs (three arms, a third hand, extra legs); 3+ distinct items in one figure's hands. Set `rendering.extra_limbs: true`.
 **D-10 `anatomy` → MAJOR.** Six or more fingers, fused or melted fingers, a missing hand, limbs detached or joined wrongly, cross-eyes, merged or duplicated faces, features grossly misplaced.
 **D-11 `figure_completeness` → CRITICAL.** Inside the frame: a floating head with no torso, a body with no head, a missing torso, see-through body parts, a body fused into the background.
-**D-12 `figure_completeness` → MAJOR.** A missing arm or leg inside the frame; two stacked copies of one figure; a whole limb rendered as an unreadable smear; a whole figure noticeably blurrier than the rest of the page.
+**D-12 `figure_completeness` → MAJOR.** A missing arm or leg inside the frame; two stacked copies of one figure; a whole limb rendered as an unreadable smear; a whole figure noticeably blurrier than the rest of the page; a figure whose `clipped_by` is neither `none` nor `frame`.
 **D-13 `figure_completeness` → MINOR.** Slight smudging on a small region (fingers fused, soft fingertips) where the limb still reads. Normal stylised brushwork.
 
 Never fire D-11 to D-13 for a figure cropped by the frame edge, occluded by scenery or another figure, shown from behind, or drawn in consistent loose brushwork. Proportions belong to D-08 only.
@@ -167,6 +167,10 @@ Never fire D-11 to D-13 for a figure cropped by the frame edge, occluded by scen
 
 **D-27 `style_consistency`** — decided at **N-01 (b)**, not here. Do not re-evaluate the medium at this point in the list; if the page is in the wrong medium you have already reported it.
 
+**D-29 `scale` → MAJOR.** Two figures sharing a ground plane whose `height_fraction` contradicts EXPECTED FIGURE PROPORTIONS — a shorter character rendered as tall as or taller than a taller one, or a figure at least half again the height its head-to-body ratio allows. Skip when either figure has `same_ground_plane: false`, is seated or crouching, or when the block is empty.
+
+**D-30 `composite_seam` → CRITICAL.** `rendering.composite_seam` is true: a straight or jagged boundary crossing the picture, or a cut-out edge around a figure, where the background, lighting or brushwork does not continue across it. Judge the boundary, not the medium — a whole page in the wrong medium is N-01. `fix`: "Repaint the page as one continuous illustration."
+
 **D-28 `naturalness` → MODERATE.** A genuine defect a reader would notice that none of D-01..D-27 describes. Use sparingly and never as a way to report something the NEVER DEDUCT list already excuses — if no code fits and the list does not cover it, prefer to omit it.
 
 ---
@@ -185,13 +189,16 @@ Return JSON only, no other text. Emit exactly these keys.
       "clothing": "blue hoodie, dark pants",
       "action": "holding stuffed toy",
       "view": "front",
-      "items_held": ["stuffed toy"]
+      "items_held": ["stuffed toy"],
+      "height_fraction": 0.62,
+      "same_ground_plane": true,
+      "clipped_by": "none"
     }
   ],
   "matches": [
     { "figure": 1, "reference": "CharacterA", "confidence": 0.85, "face_bbox": [0.31, 0.22, 0.44, 0.38] }
   ],
-  "rendering": { "extra_limbs": false, "physics_ok": true, "issues": [] },
+  "rendering": { "extra_limbs": false, "physics_ok": true, "composite_seam": false, "issues": [] },
   "coherence_gate": { "applied": false, "reason": null },
   "style_gate": { "observed": "ink illustration", "linework": "fine varied ink with hatching", "faces": "ink lines with graphic shading, stylised features", "matches_style": true, "reason": null },
   "verdict": "PASS",
@@ -208,4 +215,4 @@ Return JSON only, no other text. Emit exactly these keys.
 }
 ```
 
-`zone` is one of `{left|center|right}-{foreground|midground|background}` — a downstream evaluator pairs figures by it. `items_held` lists every distinct object in that figure's hands. `face_bbox` is `[x1,y1,x2,y2]` normalised 0-1, omitted when no face is visible. `rendering` carries the two booleans the pipeline reads plus a plain-text `issues` list for physics detail. `character` is null for scene-level findings. Use only the `type` codes from section C — never invent one, never combine two with an underscore.
+`zone` is one of `{left|center|right}-{foreground|midground|background}` — a downstream evaluator pairs figures by it. `items_held` lists every distinct object in that figure's hands. `height_fraction` is the figure's visible height divided by the image height. `same_ground_plane` is false when the figure's feet rest at a different depth or surface from the other figures. `clipped_by` is `none`, `frame`, or the element that cuts the figure off. `face_bbox` is `[x1,y1,x2,y2]` normalised 0-1, omitted when no face is visible. `rendering` carries the booleans the pipeline reads plus a plain-text `issues` list for physics detail; `composite_seam` is true when a straight or jagged boundary crosses the picture and the rendering, lighting or background changes across it. `character` is null for scene-level findings. Use only the `type` codes from section C — never invent one, never combine two with an underscore.
