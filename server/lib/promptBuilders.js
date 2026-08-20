@@ -699,6 +699,8 @@ function buildLandmarkFidelityBlock(landmark) {
 
 **IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it.
 
+**MEDIUM (never from the photo):** The photo supplies geometry and nothing else. Every surface of the landmark is painted in the ART STYLE, with the same brushwork, edges, texture and palette as the rest of the page — no photographic detail, no lens depth of field, no camera grain. A page whose landmark reads sharper or more photographic than its sky, ground and figures is wrong.
+
 **CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the structure into them. The landmark still reads at page size: never a tiny speck against a wide cityscape.
 
 **EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`;
