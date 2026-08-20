@@ -1330,7 +1330,12 @@ async function runCharRepairStage(ctx, opts) {
     return { ...r, backend: params.backend, repairMode: `${params.backend}-insert` };
   }
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // target.versionIndex pins a stored version — repairing the ORIGINAL render
+  // rather than whatever is active is how a repair is re-run under the same
+  // conditions production saw. Null keeps the active version (previous default).
+  const pinnedVersion = Number.isFinite(Number(ctx.target?.versionIndex))
+    ? Number(ctx.target.versionIndex) : null;
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, pinnedVersion);
   // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT character's
   // avatar while still targeting charName's box. If the repair returns the original
   // character, identity is being copied from the page instead of the reference —
@@ -5838,9 +5843,26 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const partial = requested.length < Object.keys(rubric).length;
 
   const t = Date.now();
-  const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
-  if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
-  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial, only: requested, rubric });
+  // A judge draw can come back empty, truncated mid-object, or carrying a
+  // dimension key that is not in the rubric — measured repeatedly on the
+  // gemini-3.1-pro preview endpoint, at every output cap. Without a retry one
+  // bad draw makes the judge score nothing at all, which reads as "this model
+  // could not be scored" rather than "ask it again".
+  let res = null;
+  let scored = null;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
+      if (!res || !res.text || !res.text.trim()) throw new Error('judge returned empty response');
+      scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial, only: requested, rubric });
+      break;
+    } catch (err) {
+      lastErr = err;
+      log.warn(`⚠️ [SCORECARD] judge ${judge} attempt ${attempt}/3 unusable: ${err.message}`);
+    }
+  }
+  if (!scored) throw new Error(`judge ${judge} returned nothing usable in 3 attempts: ${lastErr?.message}`);
   const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge, scorerName: ev.name };
   const judgeMs = Date.now() - t;
   const judgeCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
@@ -6555,7 +6577,219 @@ async function runWriterCompareStage(target, { params = {} }) {
   };
 }
 
+/**
+ * ARC ROUNDS — plan the arc alone, then review it repeatedly, scoring after
+ * every round.
+ *
+ * The arc is ~15 lines where a beats plan is a whole book, so one review round
+ * costs cents instead of francs. That is what makes the two open questions
+ * answerable at all: does a second, third or fourth review round still add
+ * anything, and does rotating the reviewer model beat repeating one? At the
+ * BEATS level extra passes measured negative five times out of five, so the
+ * answer is not assumed here — it is measured, round by round.
+ *
+ * params.storyDetails : plan from a different idea than the story's own
+ * params.rounds       : review rounds (default 3, capped at 5)
+ * params.reviewModels : CSV, one per round, cycled — rotation is the variable
+ * params.judgeModels  : CSV of judges scoring every round (default all three)
+ * params.planModel    : arc planner (default MODEL_DEFAULTS.outline)
+ * params.variants     : ask the planner for N arcs in ONE call, score each, then
+ *   a final call that takes the best and grafts what the others did better.
+ *   Compare against sequential rounds: N drafts in one call cost roughly one
+ *   draft's input tokens, where N review rounds pay the input twice per round.
+ */
+async function runArcRoundsStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { PROMPT_TEMPLATES } = require('../services/prompts');
+  const { buildBeatsPrompt, buildArcReviewPrompt, parseArcReview, parseBeats } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const sc = require('./storyScorecard');
+
+  const { storyData: loaded } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const storyData = params.storyDetails ? { ...loaded, storyDetails: String(params.storyDetails) } : loaded;
+  const pageCount = parseInt(params.pages, 10) || (storyData.sceneImages || []).length || storyData.pages || 10;
+
+  const planModel = params.planModel || MODEL_DEFAULTS.outline;
+  const reviewModels = String(params.reviewModels || MODEL_DEFAULTS.outlineReviewModel)
+    .split(',').map(x => x.trim()).filter(Boolean);
+  const judgeModels = String(params.judgeModels || 'claude-sonnet,grok-4.6,gemini-3.1-pro')
+    .split(',').map(x => x.trim()).filter(Boolean);
+  for (const m of [planModel, ...reviewModels, ...judgeModels]) {
+    if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  }
+  // 0 is a legitimate setting — best-of-N with no sequential review is one of
+  // the two arms being compared, and `|| 3` would silently turn it into three.
+  const _r = parseInt(params.rounds, 10);
+  const rounds = Math.min(Math.max(Number.isFinite(_r) ? _r : 3, 0), 5);
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+
+  const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding'] };
+  const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
+  if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
+  const context = sc.buildBriefContext({ ...storyData, pages: pageCount });
+
+  // A judge draw can be empty, truncated, or carry a key outside the rubric —
+  // one bad draw must not read as "this round could not be scored".
+  // The judges are independent of each other, so they go concurrently — serial
+  // judging made a run 18 sequential model calls and dominated its wall clock.
+  const judgeOnce = async (judge, arcText) => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const input = `# BRIEF (the commission — context only, not scored)\n${context}\n\n===\n\n# ARC\n${arcText}`;
+        const r = await callTextModelStreaming(`${judgeTemplate}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_arc_judge' });
+        const parsed = sc.parseJudgeJson(r.text);
+        const dims = parsed?.arc?.dims || {};
+        const keys = ARC_RUBRIC.arc.filter(k => Number.isFinite(Number(dims[k])));
+        if (keys.length < ARC_RUBRIC.arc.length) throw new Error(`missing dims: ${ARC_RUBRIC.arc.filter(k => !keys.includes(k)).join(',')}`);
+        const score = Math.round((keys.reduce((s, k) => s + Number(dims[k]), 0) / keys.length) * 10) / 10;
+        return { score, dims, notes: String(parsed.arc.notes || ''), cost: costOf(r) };
+      } catch (err) {
+        log.warn(`⚠️ [ARC] judge ${judge} attempt ${attempt}/3 unusable: ${err.message}`);
+      }
+    }
+    return { score: null, error: 'no usable response in 3 attempts' };
+  };
+  const scoreArc = async (arcText) => {
+    const results = await Promise.all(judgeModels.map(j => judgeOnce(j, arcText)));
+    const per = Object.fromEntries(judgeModels.map((j, i) => [j, results[i]]));
+    const nums = results.map(x => x.score).filter(x => x != null);
+    return { per, mean: nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null };
+  };
+
+  // Round 0 — the arc as planned. The planner owns every arc rule already, so
+  // this asks the same prompt for its ARC block alone rather than duplicating
+  // those rules into a second template that would then drift.
+  let planPrompt = buildBeatsPrompt(storyData, pageCount);
+  if (!planPrompt) throw new Error('story-beats template unavailable');
+  if (promptOverride) planPrompt = promptOverride;
+  planPrompt += '\n\nOutput the ---ARC--- block only. Omit the ---BEATS--- block entirely.';
+
+  const variantCount = Math.min(Math.max(parseInt(params.variants, 10) || 0, 0), 4);
+  const trail = [];
+  let arc = null;
+
+  if (params.fromArc) {
+    // Continue a specific arc instead of planning a new one. The only way to ask
+    // what round N adds is to start every arm from the identical round N-1 text —
+    // re-planning would change the thing being reviewed as well as the reviewer.
+    arc = String(params.fromArc).trim();
+    const s = await scoreArc(arc);
+    trail.push({
+      round: 0, kind: 'given', model: null, elapsedMs: 0, cost: 0,
+      arc, changed: null, analysis: null, scores: s.per, mean: s.mean,
+    });
+    log.info(`🧭 [ARC] given arc: mean ${s.mean ?? '—'}`);
+  } else if (variantCount >= 2) {
+    // N arcs in ONE call: same brief and rules, different takes, so the input is
+    // paid once. Lettered blocks because the parser needs to split them.
+    const multiPrompt = `${planPrompt}\n\nProduce ${variantCount} different arcs for this same book, not variations of one idea — a different shape, a different thing going wrong, a different character carrying the change. Head each with ---ARC A---, ---ARC B--- and so on, in that order, and output nothing else.`;
+    const t0 = Date.now();
+    const multiRes = await callTextModelStreaming(multiPrompt, null, null, planModel, { usageLabel: 'testlab_arc_variants' });
+    const raw = multiRes.text || '';
+    const marks = [...raw.matchAll(/---\s*ARC\s+([A-Z])\s*---/gi)];
+    const variants = marks.map((m, i) => ({
+      letter: m[1].toUpperCase(),
+      arc: raw.slice(m.index + m[0].length, i + 1 < marks.length ? marks[i + 1].index : raw.length).trim(),
+    })).filter(v => v.arc);
+    if (!variants.length) throw new Error('planner returned no parseable arc variants');
+
+    // Variants are independent too: score all of them at once.
+    const variantScores = await Promise.all(variants.map(v => scoreArc(v.arc)));
+    variants.forEach((v, i) => {
+      const s = variantScores[i];
+      trail.push({
+        round: 0, kind: `variant ${v.letter}`, model: multiRes.modelId || planModel,
+        elapsedMs: Date.now() - t0, cost: i === 0 ? costOf(multiRes) : 0,
+        arc: v.arc, changed: null, analysis: null, scores: s.per, mean: s.mean,
+      });
+      log.info(`🧭 [ARC] variant ${v.letter}: mean ${s.mean ?? '—'}`);
+    });
+    const ranked = [...trail].filter(x => x.mean != null).sort((a, b) => b.mean - a.mean);
+    const winner = ranked[0] || trail[0];
+    arc = winner.arc;
+
+    // The final call: keep the winner's shape, take from the others only what
+    // they did better. Scored like any other round so "did merging help" is a
+    // number and not a claim.
+    const others = trail.filter(x => x !== winner).map((x, i) => `--- OTHER ${i + 1} ---\n${x.arc}`).join('\n\n');
+    const tf = Date.now();
+    const finalRes = await callTextModelStreaming(
+      `${planPrompt}\n\nHere is the arc to ship:\n\n${arc}\n\nHere are the other arcs written for the same book:\n\n${others}\n\nKeep the shipping arc's shape. Take from the others only what they do better — a sharper reversal, a real cost, a blocker with its own want, a character change that is a change rather than a restatement — and fold it in. Change nothing that is already working. Output the ---ARC--- block only.`,
+      null, null, planModel, { usageLabel: 'testlab_arc_merge' });
+    const merged = parseBeats(finalRes.text || '').arc || String(finalRes.text || '').trim();
+    if (merged) {
+      const s = await scoreArc(merged);
+      trail.push({
+        round: 0.5, kind: `merge (from ${winner.kind})`, model: finalRes.modelId || planModel,
+        elapsedMs: Date.now() - tf, cost: costOf(finalRes),
+        arc: merged, changed: merged !== arc, analysis: null, scores: s.per, mean: s.mean,
+      });
+      log.info(`🧭 [ARC] merge: mean ${s.mean ?? '—'} (winner was ${winner.kind} at ${winner.mean})`);
+      // Only carry the merge forward if it did not lose ground.
+      if (s.mean != null && winner.mean != null && s.mean >= winner.mean) arc = merged;
+    }
+  } else {
+    const t0 = Date.now();
+    const planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_arc_plan' });
+    const planned = parseBeats(planRes.text || '').arc || String(planRes.text || '').trim();
+    if (!planned) throw new Error('planner returned no arc');
+    const planScore = await scoreArc(planned);
+    trail.push({
+      round: 0, kind: 'plan', model: planRes.modelId || planModel,
+      elapsedMs: Date.now() - t0, cost: costOf(planRes),
+      arc: planned, changed: null, analysis: null,
+      scores: planScore.per, mean: planScore.mean,
+    });
+    arc = planned;
+  }
+  for (let r = 1; r <= rounds; r++) {
+    const model = reviewModels[(r - 1) % reviewModels.length];
+    const prompt = buildArcReviewPrompt({ ...storyData, pages: pageCount }, arc);
+    if (!prompt) throw new Error('story-arc-review template unavailable');
+    const t = Date.now();
+    let res;
+    try {
+      res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_arc_review' });
+    } catch (err) {
+      trail.push({ round: r, kind: 'review', model, error: err.message });
+      continue;
+    }
+    const { analysis, arc: revised } = parseArcReview(res.text || '');
+    const next = revised && revised.trim() ? revised.trim() : arc;
+    const changed = next !== arc;
+    arc = next;
+    const s = await scoreArc(arc);
+    trail.push({
+      round: r, kind: 'review', model: res.modelId || model,
+      elapsedMs: Date.now() - t, cost: costOf(res),
+      arc, changed, analysis: analysis.slice(0, 8000),
+      scores: s.per, mean: s.mean,
+    });
+    log.info(`🧭 [ARC] round ${r} by ${model}: mean ${s.mean ?? '—'} (${changed ? 'rewritten' : 'unchanged'})`);
+  }
+
+  const means = trail.map(x => x.mean).filter(x => x != null);
+  const best = trail.reduce((b, x) => (x.mean != null && (!b || x.mean > b.mean) ? x : b), null);
+  return {
+    stageKind: 'arc_rounds',
+    storyId: target.storyId,
+    title: storyData.title || null,
+    language: storyData.language || null,
+    pageCount,
+    planModel, reviewModels, judgeModels, rounds,
+    ideaUsed: params.storyDetails ? String(params.storyDetails) : null,
+    trail,
+    // The whole point of the stage: where the curve stops paying.
+    trajectory: means,
+    bestRound: best ? best.round : null,
+    totalCost: Number(trail.reduce((s, x) => s + (x.cost || 0), 0).toFixed(4)),
+  };
+}
+
 const STORY_STAGES = {
+  arc_rounds: runArcRoundsStage,
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
   style_check: runStyleCheckStage,

@@ -22,6 +22,8 @@
  *   --compliance-prompt <file>  quality_eval only: stage-2 compliance template
  *   --compliance-model <id>     quality_eval only: stage-2 compliance model
  *   --model <id>       consolidate only: model that applies the rules
+ *   --params <json>    stage params merged at top level, e.g.
+ *                      --params '{"beatsModel":"deepseek-v4-pro"}'
  *   --label <text>     experiment label shown in the UI
  *   --character <name> character name (char_repair only)
  *   --no-eval          skip auto-eval on image stage results
@@ -83,8 +85,15 @@ async function main() {
   let targets = [];
   if (flags.targets) {
     targets = flags.targets.split(',').map(t => {
-      const [storyId, page] = t.split(':');
-      return { storyId: storyId.trim(), pageNumber: parseInt(page, 10) };
+      // storyId:page[:versionIndex] — the optional third segment pins a stored
+      // version (target.versionIndex), so a stage can be re-run against the
+      // ORIGINAL render rather than whatever version is currently active.
+      const [storyId, page, version] = t.split(':');
+      const target = { storyId: storyId.trim(), pageNumber: parseInt(page, 10) };
+      if (version !== undefined && version !== '' && Number.isFinite(Number(version))) {
+        target.versionIndex = Number(version);
+      }
+      return target;
     });
   }
   if (flags.benchmark === 'true' || flags['benchmark-ids']) {
@@ -118,6 +127,18 @@ async function main() {
   if (flags['compliance-model']) params.complianceModel = flags['compliance-model'];
   // consolidate stage: which model applies the consolidator's rules.
   if (flags.model) params.model = flags.model;
+  // --params '<json>': merged into params at the TOP level, for the many
+  // stage-specific knobs that have no dedicated flag (beatsModel, reviewModel,
+  // bibleModel, pages, …). Without it a stage whose model key is not literally
+  // `model` could not be A/B'd from the shell at all — beats_scenes silently
+  // ran its default writer instead of the one asked for.
+  if (flags.params) {
+    let extra;
+    try { extra = JSON.parse(flags.params); }
+    catch (e) { die(`--params must be valid JSON: ${e.message}`); }
+    if (!extra || typeof extra !== 'object' || Array.isArray(extra)) die('--params must be a JSON object');
+    Object.assign(params, extra);
+  }
 
   // Style-matrix mode: expand targets × styles; each unit = empty_scene + image.
   let styles = null;
