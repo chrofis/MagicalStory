@@ -151,8 +151,19 @@ function resolveStyleRepairModelId(model) {
  */
 const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 
-function planStyleRepair(detection, storyData) {
+function planStyleRepair(detection, storyData, opts = {}) {
   const det = detection || {};
+  // COMMISSIONED-STYLE MODE (owner, 2026-08-20). When the dominant cluster is
+  // itself the wrong medium there IS no good page to aim at, and the pipeline
+  // used to skip repair entirely — leaving a whole off-medium book with no
+  // recourse (staging job_1787252581387_6sn8z0nh2 shipped a photographic back
+  // cover this way). Passing `refImage` overrides the anchor search: the caller
+  // supplies the style's own anchor asset, so every outlier is judged against
+  // what was COMMISSIONED instead of against a drifted sibling page. The
+  // repaint itself is unaffected — it has always been prompt-only (see
+  // repairPageStyle), so this changes what the GATE compares, not what is sent
+  // to the generator.
+  const { refImage = null, refLabel = null } = opts;
   const pagesByNum = new Map();
   for (const s of (storyData?.sceneImages || [])) {
     if (s && s.imageData && typeof s.pageNumber === 'number') {
@@ -171,11 +182,17 @@ function planStyleRepair(detection, storyData) {
   // dominant-cluster page — but only a real story page (≥1) that has an image.
   let anchorPage = null;
   let anchorImage = null;
-  const anchorCandidates = [];
-  if (typeof det.anchorPage === 'number') anchorCandidates.push(det.anchorPage);
-  for (const p of dominantCluster) anchorCandidates.push(p);
-  for (const p of anchorCandidates) {
-    if (p >= 1 && pagesByNum.has(p)) { anchorPage = p; anchorImage = pagesByNum.get(p); break; }
+  if (refImage) {
+    // Commissioned-style mode: the supplied reference IS the target. No page is
+    // the anchor, so anchorPage stays null and `refLabel` names it in the plan.
+    anchorImage = refImage;
+  } else {
+    const anchorCandidates = [];
+    if (typeof det.anchorPage === 'number') anchorCandidates.push(det.anchorPage);
+    for (const p of dominantCluster) anchorCandidates.push(p);
+    for (const p of anchorCandidates) {
+      if (p >= 1 && pagesByNum.has(p)) { anchorPage = p; anchorImage = pagesByNum.get(p); break; }
+    }
   }
 
   const targets = [];
@@ -194,6 +211,7 @@ function planStyleRepair(detection, storyData) {
       page,
       image: pagesByNum.get(page),
       targetRefPage: anchorPage,
+      targetRefLabel: refLabel,
       targetRefImage: anchorImage,
       severity: (o && typeof o === 'object' && o.severity) || null,
       differences: (o && typeof o === 'object' && Array.isArray(o.differences)) ? o.differences : [],

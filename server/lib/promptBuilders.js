@@ -1250,7 +1250,12 @@ function getSceneComplexityGuide(sceneCount) {
 // 2026-08-17 from 429-1249 (mean 723) after it started pushing pages through
 // the prompt-shrink pipeline.
 const AGE_LINE = 'Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.';
-const NOT_A_PHOTOGRAPH = 'Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included.';
+// The trailing clause closes a loophole the camera-fingerprint list cannot: an
+// evenly-lit photograph has no bokeh, no flare, no visible grain and no
+// camera-real fabric, so it satisfies every item above while still being a
+// photograph. Staging job_1787252581387_6sn8z0nh2 shipped exactly that — a
+// photographic family portrait under a watercolour-washed sky.
+const NOT_A_PHOTOGRAPH = 'Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph.';
 
 const ART_STYLES = {
   // Sentence-based style descriptions — work well with both Gemini and Grok Imagine.
@@ -1262,7 +1267,12 @@ const ART_STYLES = {
   steampunk: 'A steampunk graphic-novel illustration in the style of Sean Murphy: bold ink linework and graphic ink-and-wash shading, warm sepia-and-amber palette of leather and aged brass. Clearly hand-drawn, never photographic. Steampunk-ify the WORLD — brass gears, riveted copper pipes, clockwork, gauges and steam fittings woven into architecture, furniture and background, even where the setting would otherwise be plain; never on people, and characters wear exactly the clothing described. Faces: clean ink lines, stylised graphic features. ' + AGE_LINE,
   comic: 'A Franco-Belgian ligne-claire comic illustration in the style of Hergé and Peyo: clean black outlines of uniform weight, flat solid colours, bright friendly palette, dynamic composition. No halftone dots, no CMYK separation, no crosshatching, no painterly shading, never photographic. Faces: clean simple features, flat natural skin tones, readable expressions — skin and hair in their natural colours, never overlaid with coloured patches. ' + AGE_LINE,
   manga: 'A traditional Japanese manga illustration: intricate ink linework, backgrounds and scenery in monochrome ink with atmospheric screentones and dramatic lighting, while character clothing, hair and key story objects keep their natural colours (colour-spread cover style, not black-and-white interior panels). Never photographic. Faces: clean ink lines, screentone shading, large but less extreme eyes than anime, defined noses, expressive mouths. ' + AGE_LINE,
-  watercolor: 'A bold traditional watercolor painting: visible brushstrokes, wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture, edges dissolving into the paper. No hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. ' + NOT_A_PHOTOGRAPH + ' Faces: loose washes with visible brushstroke texture. ' + AGE_LINE,
+  // The intensity words are load-bearing, not decoration (2026-08-20): the
+  // 2026-08-17 compression dropped "expressive", "prominent", "strong",
+  // "throughout" and "paint-dominant", and watercolour went from 7/7 books
+  // scoring styleMatch=matches to 2/2 scoring wrong_medium. They set how much
+  // paint the model puts on; without them the render settles toward a photo.
+  watercolor: 'A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. ' + NOT_A_PHOTOGRAPH + ' Faces: loose washes with visible brushstroke texture. ' + AGE_LINE,
   oil: 'A classic oil painting on canvas in the style of John Singer Sargent: worked alla prima, strokes left visible rather than blended, impasto ridges catching the light, canvas weave in thin passages, a limited mixed palette, backgrounds in broad loose strokes while the face carries the finish. ' + NOT_A_PHOTOGRAPH + ' Proportions true to life, execution unmistakably paint. Faces: visible strokes of warm mixed pigment, defined bone structure. ' + AGE_LINE,
   lowpoly: 'A low-poly 3D illustration in the style of Monument Valley: geometric faceted forms, isometric perspective, minimalist shapes, vibrant solid colours, clean edges, retro game aesthetic. Never photographic. Faces: faceted surfaces, flat-shaded polygonal features, minimal detail — everything angular, no smooth skin. ' + AGE_LINE,
   concept: 'A digital concept-art painting in the style of Craig Mullins and Karla Ortiz — film production art in broad digital brushes: big shapes read first, brush marks visible in sky, water, ground and clothing, light STAGED for the moment (a shaft, a rim light, a silhouette). ' + NOT_A_PHOTOGRAPH + ' Proportions true to life, execution unmistakably painted. Faces: painted planes and strokes, defined bone structure — illustrated, never photographed. ' + AGE_LINE,

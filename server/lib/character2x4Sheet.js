@@ -869,17 +869,12 @@ Keep the content of Image 1 unchanged; only the art style changes. Every cell sh
 // — a strong, character-free reference painting of that medium (e.g. a watercolour
 // family group). Passed as Image 2 in styleTransferGenerate; the prompt then names
 // it. Returns a data URI, or null if no asset exists (graceful → no anchor).
+// Single definition lives in styleAnalysis.js — it is a property of the STYLE,
+// and the commissioned-style repair gate needs the same asset. Re-exported
+// through this name so the call sites below (and the vm-sliced unit test, which
+// stubs `loadStyleAnchor`) keep reading the same way.
 function loadStyleAnchor(artStyle) {
-  if (!artStyle) return null;
-  const id = String(artStyle).toLowerCase().replace(/[^a-z0-9]+/g, '');
-  for (const ext of ['jpg', 'png']) {
-    const file = path.join(ASSETS_DIR, `style-anchor-${id}.${ext}`);
-    if (fs.existsSync(file)) {
-      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-      return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
-    }
-  }
-  return null;
+  return require('./styleAnalysis').loadStyleAnchor(artStyle);
 }
 
 /**

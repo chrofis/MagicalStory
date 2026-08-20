@@ -24,6 +24,39 @@ const r2Lib = require('./r2');
 
 const getStoryHelpers = () => require('./storyHelpers');
 
+const fs = require('fs');
+const path = require('path');
+const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
+
+/**
+ * The canonical rendered example of an art style (`server/assets/
+ * style-anchor-<id>.jpg`), as a data URI. Null when the style has no asset.
+ *
+ * Lives here, not in character2x4Sheet.js where it started, because it is a
+ * property of the STYLE, and two consumers now need it: pass-2 avatar style
+ * transfer (as a reference image) and the commissioned-style repair gate (as
+ * the "what the style looks like" side of checkStyleMatch). Two copies of this
+ * loader would be two places to forget an asset.
+ *
+ * Note the anchors depict PEOPLE by design (owner, 2026-08-20) — a swatch of
+ * pigment cannot show how a style renders a face. That makes them unsafe to
+ * feed a generator as a plain reference (the figures can bleed into the output)
+ * but ideal for checkStyleMatch, which judges rendering technique of faces and
+ * figures and explicitly ignores content.
+ */
+function loadStyleAnchor(artStyle) {
+  if (!artStyle) return null;
+  const id = String(artStyle).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  for (const ext of ['jpg', 'png']) {
+    const file = path.join(ASSETS_DIR, `style-anchor-${id}.${ext}`);
+    if (fs.existsSync(file)) {
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+      return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
+    }
+  }
+  return null;
+}
+
 /**
  * Analyze the art style of an image using Gemini vision.
  * Returns a text description of the style that can be used for style transfer.
@@ -222,6 +255,7 @@ Return ONLY the JSON, no markdown fences.` }
 
 module.exports = {
   analyzeImageStyle,
+  loadStyleAnchor,
   checkStyleMatch,
   describeHeadPose,
   compareImageStyles,

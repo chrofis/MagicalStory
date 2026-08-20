@@ -14370,3 +14370,71 @@ three across would be 3:1 and pad away most of the slot.
 - `tests/manual/charSlotArrangement.test.js` — 17 assertions, both aspects, both
   input shapes, counts 1–8
 **Status:** ✅ active
+
+---
+
+## 2026-08-20 — Watercolour's descriptor regressed; and an off-medium book now repairs toward the commissioned style
+
+**Context:** The owner reported a photographic back cover on staging
+`job_1787252581387_6sn8z0nh2` (watercolour). Style DID detect it twice — the
+per-image eval emitted `style_consistency` MAJOR, and the Step-5 audit returned
+`fragmented` with all 7 images as MAJOR outliers and
+`styleMatch.verdict = wrong_medium`. It was repaired zero times.
+
+**Root cause — the descriptor, not the guard.** `c27ce542c` (2026-08-17,
+"art-style descriptors compressed and evened out") replaced watercolour's own
+anti-photo clauses with the shared `NOT_A_PHOTOGRAPH`. Lost: "never a photo with
+a filter", "no sharp photoreal rendering", "Paint-dominant", and the intensity
+words ("expressive", "Prominent", "strong", "throughout").
+
+`NOT_A_PHOTOGRAPH` bans camera FINGERPRINTS — bokeh, flare, grain, pores,
+camera-real fabric, optical blur. An evenly-lit posed portrait has none of them,
+so it satisfies every clause while still being a photograph. The shipped back
+cover is exactly that: a photographic family portrait under a watercolour sky.
+
+Measured over stored stories, watercolour books by descriptor version:
+
+| descriptor | books | styleMatch |
+|---|---|---|
+| old, long (08-08 → 08-13) | 7 | **7/7 `matches`** |
+| compressed (08-20) | 2 | **0/2 — both `wrong_medium`** |
+
+Two reasons the loss was invisible: the compression's per-style regex check
+asserted only `fully opaque` for watercolour **and was never committed** (nothing
+in `tests/` referenced `ART_STYLES`), and its re-validation covered only oil and
+concept — the styles that had been broken. Watercolour was working, so it was
+never re-tested.
+
+**Decision (owner, 2026-08-20), two parts:**
+
+1. **Close the loophole where it lives + restore what was style-specific.**
+   `NOT_A_PHOTOGRAPH` gains "No sharp photoreal rendering; a photograph with a
+   painterly filter is still a photograph" (shared by watercolor/oil/concept —
+   the hole was in the shared constant). `ART_STYLES.watercolor` gets its
+   intensity words back. The compression's regex check is now a committed test,
+   `tests/manual/artStyleDescriptors.test.js`, which fails on the regressed
+   descriptor and passes on the fixed one.
+
+2. **`wrong_medium` repairs toward the COMMISSIONED style, not toward nothing.**
+   The old blanket skip's reasoning still holds — a drifted anchor page spreads
+   the drift — but doing nothing left a whole off-medium book with no recourse.
+   `planStyleRepair(detection, storyData, { refImage, refLabel })` now accepts an
+   explicit reference that overrides the anchor search, and the pipeline supplies
+   the style's own anchor asset. Note this changes only what the accept GATE
+   compares: `repairPageStyle` has been prompt-only since 2026-08-09, so nothing
+   new is sent to the generator. `checkStyleMatch` judges rendering technique of
+   faces and figures and explicitly ignores content, which is precisely the
+   question an anchor depicting other people can answer. A style with no anchor
+   asset falls back to the old skip.
+
+   Measured on the report from that story: the old planner produced ZERO targets
+   even with the skip removed — every page was an outlier so no anchor page
+   existed. Commissioned mode produces all 3.
+
+**Touched:** `server/lib/promptBuilders.js` (NOT_A_PHOTOGRAPH, ART_STYLES.watercolor),
+`server/lib/styleAnalysis.js` (`loadStyleAnchor` moved here — it is a property of
+the STYLE and now has two consumers; exported), `server/lib/character2x4Sheet.js`
+(delegates to it, one definition), `server/lib/styleRepair.js` (planStyleRepair
+opts), `server/lib/repairPipeline.js` (commissioned-style mode),
+`tests/manual/artStyleDescriptors.test.js` (new).
+**Status:** ✅ active

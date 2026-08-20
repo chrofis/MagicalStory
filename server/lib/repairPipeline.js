@@ -2675,14 +2675,41 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // was measured against 5 stored books and read "off style" on 4 of them,
       // including two the auditor called consistent — it would have disabled
       // style-repair in practice.
+      // COMMISSIONED-STYLE MODE (owner, 2026-08-20) — supersedes the blanket
+      // skip described above. The reasoning behind that skip still holds: when
+      // the dominant cluster is the wrong medium, its anchor page WOULD spread
+      // the drift, so aiming at it is worse than doing nothing. But doing
+      // nothing left a whole off-medium book with no recourse at all — staging
+      // job_1787252581387_6sn8z0nh2 shipped a photographic back cover in a
+      // watercolour book, with the defect correctly detected twice and repaired
+      // zero times.
+      //
+      // So instead of aiming at a drifted sibling page, aim at the style's own
+      // anchor asset. The repaint was ALWAYS prompt-only (repairPageStyle sends
+      // no reference image — a content-rich reference makes the model copy the
+      // reference's people, verified 2026-08-09), so this changes only what the
+      // accept GATE compares against: checkStyleMatch judges rendering
+      // technique of faces and figures and explicitly ignores content, which is
+      // exactly what an anchor depicting other people can answer.
+      //
+      // No anchor asset for the style → fall back to the old skip, because then
+      // there is genuinely nothing trustworthy to gate against.
       const dominantOffStyle = styleConsistency.styleMatch?.verdict === 'wrong_medium';
-      if (dominantOffStyle) {
-        log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair SKIPPED — the dominant cluster is a different medium from the commissioned style ("${storyData?.artStyle}"), so its anchor page would spread the drift. ${styleConsistency.outliers?.length || 0} outlier(s) surfaced only.`);
+      const commissionedRef = dominantOffStyle
+        ? require('./styleAnalysis').loadStyleAnchor(storyData?.artStyle)
+        : null;
+      const blockedNoAnchor = dominantOffStyle && !commissionedRef;
+      if (blockedNoAnchor) {
+        log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair SKIPPED — the dominant cluster is a different medium from the commissioned style ("${storyData?.artStyle}") and that style has no anchor asset to aim at instead. ${styleConsistency.outliers?.length || 0} outlier(s) surfaced only.`);
+      } else if (dominantOffStyle) {
+        log.warn(`🎨 [UNIFIED PIPELINE] Step 5: whole book is off-medium ("${storyData?.artStyle}") — repainting ${styleConsistency.outliers?.length || 0} outlier(s) toward the COMMISSIONED style anchor, not toward a page`);
       }
-      if (!dominantOffStyle && MODEL_DEFAULTS.styleRepairProduction && (styleConsistency.outliers?.length || 0) > 0) {
+      if (!blockedNoAnchor && MODEL_DEFAULTS.styleRepairProduction && (styleConsistency.outliers?.length || 0) > 0) {
         const { planStyleRepair, repairPageStyle } = require('./styleRepair');
         const styleRepairModel = MODEL_DEFAULTS.styleRepairModel === 'grok' ? 'grok' : 'gemini';
-        const plan = planStyleRepair(styleConsistency, styleInput);
+        const plan = planStyleRepair(styleConsistency, styleInput, commissionedRef
+          ? { refImage: commissionedRef, refLabel: `commissioned-style anchor (${storyData?.artStyle})` }
+          : {});
         for (const s of plan.skipped) {
           log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair skip ${s.page}: ${s.reason}`);
         }
@@ -2725,6 +2752,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               description: prevBest.description || null,
               styleRepair: {
                 targetRefPage: target.targetRefPage,
+                // Null on the normal path; names the anchor asset in
+                // commissioned-style mode, where no page is the reference.
+                targetRefLabel: target.targetRefLabel || null,
                 severity: target.severity,
                 differences: target.differences,
                 beforeStyleMatch: rep.beforeStyleMatch || null,
@@ -2742,7 +2772,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             versions.push(newVersion);
             // COMPETE, DO NOT APPOINT — see the text-space note above.
             finalBestPerPage.set(target.page, selectBestVersion(versions));
-            log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair applied on ${pageLabel} (${styleRepairModel}, gate=${rep.passedGate === null ? 'unavailable' : 'pass'}, ref=Page ${target.targetRefPage})`);
+            log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair applied on ${pageLabel} (${styleRepairModel}, gate=${rep.passedGate === null ? 'unavailable' : 'pass'}, ref=${target.targetRefLabel || `Page ${target.targetRefPage}`})`);
           } catch (repErr) {
             log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed: ${repErr.message} — original kept`);
           }
