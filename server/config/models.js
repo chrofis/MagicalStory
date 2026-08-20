@@ -151,6 +151,9 @@ const TEXT_MODELS = {
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
+  // Judge answers are ~1KB, far under this cap — raising it does NOT fix the
+  // empty/malformed responses this model returns (measured: fails and succeeds
+  // at both 16384 and 32768). The fix is the retry in scoreArtifactsWithJudge.
   'gemini-3.1-pro': { provider: 'openrouter', modelId: 'google/gemini-3.1-pro-preview', maxOutputTokens: 16384, description: 'Gemini 3.1 Pro (Google) via OpenRouter (~$2.00/$12.00 per 1M) — neutral judge' },
   'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 16384, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 16384, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
@@ -618,7 +621,12 @@ const IMAGE_MODELS = {
     description: 'Gemini 3 Pro Image Preview - Higher quality images',
     backend: 'gemini',
     supportsThinking: true,  // Thinks by default; thinkingConfig.includeThoughts returns thought text
-    temperature: 0.5,  // Lower temp for more consistent character reproduction
+    // NO temperature, deliberately. Google deprecated sampling parameters on
+    // 2026-07-21 for Gemini 3.x: silently ignored there, HTTP 400 in a later
+    // generation. This entry declared 0.5 and Google was already discarding it,
+    // so images are unchanged — images.js `geminiSampling()` omits the block for
+    // 3.x, and a value left here would only read as a promise the API does not
+    // keep. 2.5 still honours it and keeps its 0.5.
     maxPromptLength: 30000,
     maxCharactersPerScene: 5
   },

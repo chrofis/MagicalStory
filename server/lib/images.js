@@ -227,6 +227,28 @@ function modelSupportsThinking(modelId) {
   return config?.supportsThinking === true;
 }
 
+/**
+ * The sampling block for a Gemini image request — `{}` for Gemini 3.x.
+ *
+ * Google deprecated temperature/top_p/top_k on 2026-07-21 starting with Gemini
+ * 3.6 Flash and 3.5 Flash-Lite: silently IGNORED on those models, HTTP 400 in a
+ * later generation. Sending a different NUMBER does not help — the parameter
+ * itself is what a future model rejects — so it has to be omitted.
+ *
+ * No behaviour change today: gemini-3-pro-image-preview declared temperature
+ * 0.5 and Google was already discarding it, so the rendered image is the same.
+ * What changes is that it stops being a time bomb. 2.5 still honours the
+ * parameter and keeps sending it.
+ *
+ * Spread into generationConfig: `...geminiSampling(modelId)`.
+ * See docs/decisions.md 2026-08-19 and scripts/admin/check-gemini-sampling.js.
+ */
+function geminiSampling(modelId) {
+  const id = String(IMAGE_MODELS[modelId]?.modelId || modelId || '');
+  if (/^gemini-3(\.\d+)?[-.]/.test(id)) return {};
+  return { temperature: IMAGE_MODELS[modelId]?.temperature ?? 0.8 };
+}
+
 // Helper: Get system instruction for image generation (scenes, covers, repairs)
 function getImageSystemInstruction() {
   if (!PROMPT_TEMPLATES.imageSystemInstruction) return null;
@@ -1460,7 +1482,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const apiKey = process.env.GEMINI_API_KEY;
 
   const systemInstruction = getImageSystemInstruction();
-  const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
   const geminiAspect = outputAspect;
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
@@ -1469,7 +1490,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      temperature: modelTemp,
+      ...geminiSampling(modelId),
       ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
         aspectRatio: geminiAspect
@@ -1478,7 +1499,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   };
 
   log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt (${prompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
-  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: ${geminiAspect}, Temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
+  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: ${geminiAspect}, Sampling: ${JSON.stringify(geminiSampling(modelId))}, systemInstruction: ${!!systemInstruction}`);
 
   const data = await withRetry(async () => {
     const response = await fetch(
@@ -1819,7 +1840,6 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   const systemInstruction = getImageSystemInstruction();
-  const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -1827,7 +1847,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      temperature: modelTemp,
+      ...geminiSampling(modelId),
       ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
         aspectRatio
@@ -1835,7 +1855,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }
   };
 
-  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, temperature: ${modelTemp}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
+  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, sampling: ${JSON.stringify(geminiSampling(modelId))}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
 
   // Progressive retry with sanitization on safety blocks
   // Progressive retries on safety blocks. Level 1 is a cheap local word

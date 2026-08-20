@@ -14102,3 +14102,35 @@ Three shapes worth knowing:
 - `tests/unit/trial-funnel-steps.test.ts` (server/client step-name parity)
 
 **Status:** ✅ active
+
+## 2026-08-20 — Gemini 3.x image calls omit sampling parameters
+
+**Context:** `check-gemini-sampling.js` (added 2026-08-19) warned that
+`IMAGE_MODELS.gemini-3-pro-image-preview` reached Google's native API while
+declaring `temperature: 0.5`. Google deprecated `temperature`/`top_p`/`top_k` on
+2026-07-21 starting with Gemini 3.6 Flash and 3.5 Flash-Lite — silently ignored
+on those models, HTTP 400 in a later generation.
+
+**Decision (owner: "keep it, just fix the temperature"):** the model stays
+selectable; the sampling block is omitted for Gemini 3.x. One helper,
+`geminiSampling(modelId)` in `images.js`, spread into `generationConfig` at both
+Gemini image call sites, and the now-dead `temperature` deleted from the model
+entry.
+
+**Rationale:** sending a *different number* does not help — the parameter itself
+is what a future model rejects — so it has to be absent. No behaviour change
+today: Google was already discarding the 0.5, so the rendered image is identical;
+what changes is that it stops being a time bomb. Gemini 2.5 still honours the
+parameter and keeps its 0.5, and non-Gemini backends keep the `?? 0.8` fallback,
+so only 3.x is affected. Verified: 2.5 -> `{temperature:0.5}`, 3.x -> `{}`,
+grok/flux -> `{temperature:0.8}`.
+
+**Cost note that came out of the same review:** the model is NOT a default
+anywhere — `MODEL_DEFAULTS.pageImage` and `coverImage` are both `grok-imagine`
+($0.02/img vs $0.15). It is reachable only from developer-mode dropdowns, so no
+production path spends at that rate. The `docs/plans/2026-03-08` line calling it
+the cover default is stale.
+
+**Touched:** `server/lib/images.js` (geminiSampling + both call sites and their
+log lines), `server/config/models.js`
+**Status:** ✅ active
