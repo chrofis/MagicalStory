@@ -86,9 +86,15 @@ t('secondary resolution', () => {
       ['Ida'], []).Ida.richDescription === 'Ida (secondary character). a tall guard in mail');
   check('a VB-id reference resolves and keys by the id the scene used',
     !!buildSecondaryCharacterDescriptions(VB, ['CHR001'], []).CHR001);
-  check('tracked animals resolve too',
+  // REVERSED 2026-08-19 (owner): animals are NOT expected characters. DINO
+  // detects `person`, so an animal in the expected list is a guaranteed
+  // "missing person" — it fires the undercount, routes the page to the Gemini
+  // second opinion, and hands the identity call a name no person badge can
+  // carry. Animals stay detectable through the OBJECT pass instead. This
+  // assertion is inverted on purpose; restoring it would restore that bug.
+  check('tracked animals are NOT resolved as characters (object pass owns them)',
     buildSecondaryCharacterDescriptions({ animals: [{ name: 'Floh', species: 'terrier' }] }, ['Floh'], [])
-      .Floh.richDescription.includes('creature'));
+      .Floh === undefined);
 });
 
 t('scope — never invent, never dump the whole Visual Bible', () => {
@@ -142,10 +148,13 @@ t('call sites wired (source-level — images.js hangs if required)', () => {
   // by enrichWithBoundingBoxes as sharedBboxDetection).
   check('shared pre-detection appends secondaries',
     /expectedCharacters\.push\(\.\.\.buildSecondaryExpectedCharacters\(/.test(pipeline));
+  // The storyHelpers handle is reached either through getStoryHelpers() or a
+  // hoisted local alias (`sh`). What matters is that the site appends
+  // secondaries at all, not how it names the module.
   check('repair round re-detect appends secondaries',
-    /expectedCharacters\.push\(\.\.\.getStoryHelpers\(\)\.buildSecondaryExpectedCharacters\(/.test(repair));
+    /expectedCharacters\.push\(\.\.\.(?:getStoryHelpers\(\)|sh|shBbox)\.buildSecondaryExpectedCharacters\(/.test(repair));
   check('iterate path appends secondaries',
-    /iterExpectedCharacters\.push\(\.\.\.getStoryHelpers\(\)\.buildSecondaryExpectedCharacters\(/.test(images));
+    /iterExpectedCharacters\.push\(\.\.\.(?:getStoryHelpers\(\)|sh|shBbox)\.buildSecondaryExpectedCharacters\(/.test(images));
   check('batch eval merges secondaries into characterDescriptions',
     images.includes('buildSecondaryCharacterDescriptions(')
     && images.includes('Object.assign(characterDescriptions, sceneOnly)'));

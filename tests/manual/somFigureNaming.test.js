@@ -44,14 +44,19 @@ const promptSrc = slice(
   '  const charLines = expectedCharacters.map(c => {',
   'Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;'
 );
+// sanitizeForGemini must be injected: the sliced block gained a call to it
+// (it lives in evalPipeline.js, re-exported by images.js — requiring either
+// here would pull in native deps for a string-assembly test). A pass-through
+// keeps the assertions below about the PROMPT, which is what this file tests.
 const buildSomPrompt = new Function(
-  'badges', 'expectedCharacters', '_shortGarmentPhrase',
+  'badges', 'expectedCharacters', '_shortGarmentPhrase', 'sanitizeForGemini',
   `${promptSrc}\nreturn prompt;`
 );
 const somPrompt = (planned, nBadges) => buildSomPrompt(
   Array.from({ length: nBadges }, (_, i) => ({ letter: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[i] })),
   planned,
-  (c) => (c ? String(c).slice(0, 40) : '')
+  (c) => (c ? String(c).slice(0, 40) : ''),
+  (s) => s
 );
 
 const PLANNED = [
@@ -112,12 +117,22 @@ console.log('\n── figureDetection wiring: the candidate list stays the scene
     /async function _somIdentifyFigures\(imageDataUri, dets, expectedCharacters, W, H, pageLabel = ''/.test(figureDetectionSrc));
   check('only expected names are valid answers',
     /const validNames = new Set\(expectedCharacters\.map\(c => c\.name\)\);/.test(figureDetectionSrc));
+  // The guard's WORDING changed (it now names the figure and says the whole
+  // answer is discarded); the invariant is that a name claimed twice throws the
+  // entire SoM answer away rather than keeping the first.
   check('the duplicate-name guard is untouched',
-    /SoM duplicate name .* — answer invalid/.test(figureDetectionSrc));
+    /if \(claimed\.has\(name\)\)/.test(figureDetectionSrc)
+    && /whole answer discarded, falling back to layout/.test(figureDetectionSrc));
   check('the detector opts carry no widened cast',
     !/otherCharacters/.test(figureDetectionSrc));
-  check('the undercount check counts expected characters',
-    /if \(dets\.length < expectedCharacters\.length\) \{/.test(figureDetectionSrc));
+  // Counts PEOPLE against PEOPLE since d09b29927: DINO detects `person`, so a
+  // tracked animal in expectedCharacters used to guarantee an undercount and
+  // hand every such page to the Gemini second opinion. Non-humans are filtered
+  // out first — asserting the old expectedCharacters.length form would restore
+  // that bug.
+  check('the undercount check counts people against people',
+    /const humanExpected = expectedCharacters\.filter\(/.test(figureDetectionSrc)
+    && /if \(dets\.length < humanExpected\.length\) \{/.test(figureDetectionSrc));
   check('the layout fallback assigns expected characters',
     /const chars = expectedCharacters\.map\(c => \{/.test(figureDetectionSrc));
 }

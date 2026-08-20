@@ -141,7 +141,11 @@ t('page numbers match across string/number types', () => {
 // ── Wiring ──────────────────────────────────────────────────────────────────
 t('the pipeline no longer sends a bare `c.description || \'\'`', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
-  assert.ok(/buildCastIdentityDescription\(c, clothingText\)/.test(src),
+  // dc74d34dc centralised this: buildCastIdentityDescription became the shared
+  // buildIdentityClothingText -> buildIdentityLine chain. Accept either name so
+  // the ASSERTION survives a rename; what must never come back is the bare
+  // description, which the next check pins.
+  assert.ok(/build(CastIdentityDescription|IdentityLine)\(c, clothingText\)/.test(src),
     'Phase 5b-pre must fall back to a built identity line');
   assert.ok(/buildSecondaryExpectedForPage\(/.test(src),
     'Phase 5b-pre must include page-declared secondaries');
@@ -167,8 +171,11 @@ t('resolved prose IS kept', () => {
 t('the call site resolves the category through the canonical source', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
   // clothingRequirements first — the settled canonical-source rule.
-  assert.ok(/buildClothingDescription\(c, category, artStyle, clothingRequirements/.test(src),
-    'must resolve via buildClothingDescription with clothingRequirements');
+  // Either the direct call or the shared wrapper that makes it — both resolve
+  // through clothingRequirements first (the settled canonical-source rule).
+  assert.ok(/buildClothingDescription\(c, category, artStyle, clothingRequirements/.test(src)
+    || /buildIdentityClothingText\(/.test(src),
+    'must resolve via the clothingRequirements-first chain');
   assert.ok(!/buildCastIdentityDescription\(c, clothingByName\[name\]/.test(src),
     'must NOT pass the raw category through');
 });
@@ -180,20 +187,26 @@ t('every detection call site builds a real identity line', () => {
   // job_1786737619634_d66c7bg9g p4 (char-fix-round-1) the stored
   // expectedCharacters came back [{"name":"Emma","description":""},...] —
   // a good first detection replaced by a bare-name one.
-  const files = ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/images.js'];
+  // FOUR sites since dc74d34dc — coverIterate.js joined as call site #4 ("covers
+  // arrive dressed"). A site missing here is a site that can silently overwrite
+  // a good detection with a bare-name one.
+  const files = ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/images.js',
+                 'server/lib/coverIterate.js'];
   for (const f of files) {
     const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
     assert.ok(!/description: typeof c === 'object' \? \(c\.description \|\| ''\) : ''/.test(src),
       `${f} still sends a bare description`);
-    assert.ok(/buildCastIdentityDescription\(/.test(src), `${f} must build an identity line`);
+    assert.ok(/build(CastIdentityDescription|IdentityLine)\(/.test(src), `${f} must build an identity line`);
   }
 });
 
 t('each site resolves the clothing category rather than passing the tag', () => {
-  for (const f of ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/images.js']) {
+  for (const f of ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/images.js',
+                   'server/lib/coverIterate.js']) {
     const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
-    assert.ok(/buildClothingDescription\(/.test(src), `${f} must resolve the category to prose`);
+    assert.ok(/buildClothingDescription\(/.test(src) || /buildIdentityClothingText\(/.test(src),
+      `${f} must resolve the category to prose`);
   }
 });
 
-console.log(`${pass} passed (incl. all three call sites)`);
+console.log(`${pass} passed (incl. all four call sites)`);

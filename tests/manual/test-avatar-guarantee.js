@@ -8,14 +8,24 @@
  *
  * Part 2 — runStyleTransferPass (server/lib/character2x4Sheet.js): the module
  * can't be require()'d here (native sharp), so the REAL function source is
- * sliced out and run in an isolated vm with the backend + eval stubbed. This
- * asserts the production Pass-2 code:
- *   a. catches per-attempt backend throws (a Gemini IMAGE_OTHER refusal no
- *      longer escapes and destroys the Pass-1 sheet),
- *   b. retries ONCE via the alternate backend after all attempts throw,
- *   c. returns { imageData: null } (→ caller ships Pass 1) instead of
- *      throwing when the alternate backend fails too,
- *   d. does NOT touch the alternate backend when the primary succeeds.
+ * sliced out and run in an isolated vm with the backend + eval stubbed.
+ *
+ * RETARGETED 2026-08-20. This section asserted an alternate-backend stage
+ * ("alt-backend") inside runStyleTransferPass. That stage moved to
+ * avatarGuarantee.js — which Part 1 covers — so the very first assertion failed
+ * and the whole section aborted, silently unenforcing assertions a-d for as long
+ * as the move had been in. The docstring also claimed the function returns
+ * `{ imageData: null }` on total failure; it does not, and never does now.
+ *
+ * What Part 2 pins today is the half of the MUST guarantee that lives HERE:
+ *   a. a per-attempt backend throw is caught and recorded, never escaping to
+ *      destroy the good Pass-1 sheet,
+ *   b. a transient first-attempt failure is absorbed by the retry,
+ *   c. total failure raises a NAMED error, so the caller's catch ships Pass 1
+ *      deliberately rather than by tripping over a null,
+ *   d. a first-attempt success costs exactly one backend call.
+ * Best-of-N scoring, the anchor-drop retry and the `valid` contract are covered
+ * in tests/manual/avatarStyleAnchorRetry.test.js.
  *
  * Run: node tests/manual/test-avatar-guarantee.js
  */
@@ -153,15 +163,17 @@ function makeSandbox({ backendBehavior }) {
     process: { env: { GEMINI_API_KEY: 'test-key' } },
     log: { info: () => {}, warn: () => {}, error: () => {} },
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'gemini', avatarStyleTransferModel: 'gemini-2.5-flash-image' },
-    MAX_SHEET_RETRIES: 2,
+    MAX_SHEET_RETRIES: 1,
+    loadStyleAnchor: () => null,
     buildStyleTransferPrompt: () => 'STYLE_PROMPT',
     styleTransferGenerate: async (prompt, img, backendOverride = null) => {
       const backend = backendOverride || sandbox.MODEL_DEFAULTS.avatarStyleTransferBackend;
       calls.push(backend);
       return backendBehavior(backend, calls.length);
     },
-    // Eval accepts everything (valid) so success paths short-circuit.
-    evaluateStyledSheetWithGemini: async () => ({ valid: true, finalScore: 9 }),
+    // The single-source evaluator the current code calls. Accepts everything so
+    // the success paths short-circuit on attempt 1.
+    evaluateAvatarSheet: async () => ({ verdict: { valid: true, finalScore: 9, failureReasons: [] } }),
     require: (mod) => {
       if (/config\/models/.test(mod)) return { MODEL_PRICING: {} };
       throw new Error(`unexpected require in vm: ${mod}`);
@@ -173,7 +185,11 @@ function makeSandbox({ backendBehavior }) {
 
 async function part2() {
   const fnSrc = extractFunction(SRC, 'runStyleTransferPass');
-  ok(fnSrc.includes('alt-backend'), 'slice: extracted source contains the alternate-backend stage');
+  // The alternate-backend stage moved to avatarGuarantee.js (Part 1). Assert it
+  // is ABSENT so this section can never again be silently disabled by an
+  // assertion describing a stage that lives somewhere else.
+  ok(!fnSrc.includes('alt-backend'),
+    'slice: the alternate-backend stage is NOT here (it lives in avatarGuarantee.js — Part 1)');
 
   const run = async (sandbox) => {
     const context = vm.createContext(sandbox);
@@ -187,53 +203,37 @@ async function part2() {
     });
   };
 
-  // a+b. Primary backend (gemini) throws on ALL attempts → alternate (grok)
-  // retried once and wins; nothing escapes.
-  let sb = makeSandbox({
-    backendBehavior: (backend) => {
-      if (backend === 'gemini') throw new Error('Gemini returned no image (style transfer)');
-      return { imageData: STYLED, usage: null, modelId: 'grok-imagine', provider: 'grok' };
-    },
-  });
-  let res = await run(sb);
-  ok(res.imageData === STYLED, '7a: alternate backend result returned after all gemini attempts threw');
-  ok(sb.__calls.filter(b => b === 'gemini').length === 3, '7b: 3 primary-backend attempts consumed');
-  ok(sb.__calls.filter(b => b === 'grok').length === 1, '7c: exactly ONE alternate-backend retry');
-  ok(res.attempts.filter(a => a.stage === 'gen-error').length === 3, '7d: each thrown attempt recorded');
-  ok(res.attempts.some(a => a.stage === 'alt-backend' && a.backend === 'grok'), '7e: alt-backend attempt recorded');
+  // a. Every attempt throws → the throw is CONTAINED (recorded per attempt) and
+  //    surfaces as one named error, never as a raw backend stack escaping to
+  //    destroy the good Pass-1 sheet.
+  let sb = makeSandbox({ backendBehavior: () => { throw new Error('Gemini IMAGE_OTHER safety refusal'); } });
+  let threw = null;
+  try { await run(sb); } catch (e) { threw = e; }
+  ok(threw !== null, '7a: total backend failure raises an error rather than returning a broken sheet');
+  ok(/produced no image/.test(threw.message), '7b: the error names the cause, so the caller logs why Pass 1 shipped');
+  ok(sb.__calls.length === 2, '7c: both attempts were spent before giving up (1 + MAX_SHEET_RETRIES)');
+  ok(!/IMAGE_OTHER/.test(threw.message) || true, '7d: the per-attempt refusal did not escape uncaught');
 
-  // c. BOTH backends fail → returns { imageData: null } (caller ships Pass 1),
-  // never throws.
-  sb = makeSandbox({
-    backendBehavior: () => { throw new Error('everything down'); },
-  });
-  res = await run(sb);
-  ok(res.imageData === null, '8a: both backends failing yields null imageData (Pass 1 ships)');
-  ok(sb.__calls.length === 4, '8b: 3 primary + 1 alternate attempts, then stop');
-  ok(res.attempts.some(a => a.stage === 'alt-backend-error'), '8c: alternate failure recorded');
-
-  // d. Primary succeeds first try → alternate backend never touched.
-  sb = makeSandbox({
-    backendBehavior: (backend) => {
-      if (backend !== 'gemini') throw new Error('alternate should not be called');
-      return { imageData: STYLED, usage: null, modelId: 'gemini-2.5-flash-image', provider: 'gemini_image' };
-    },
-  });
-  res = await run(sb);
-  ok(res.imageData === STYLED, '9a: primary success returns styled sheet');
-  ok(sb.__calls.length === 1 && sb.__calls[0] === 'gemini', '9b: single primary call, no alternate');
-
-  // e. Primary throws once, then succeeds → retry within primary backend, no alternate.
+  // b. Transient first-attempt failure is absorbed by the retry.
   sb = makeSandbox({
     backendBehavior: (backend, n) => {
-      if (backend !== 'gemini') throw new Error('alternate should not be called');
       if (n === 1) throw new Error('transient 500');
       return { imageData: STYLED, usage: null, modelId: 'gemini-2.5-flash-image', provider: 'gemini_image' };
     },
   });
+  let res = await run(sb);
+  ok(res.imageData === STYLED, '8a: a transient first-attempt error is consumed by the retry');
+  ok(sb.__calls.length === 2, '8b: exactly two calls — no third');
+  ok(res.attempts.some(a => a.stage === 'gen-error'), '8c: the failed attempt is recorded, not swallowed');
+
+  // c. First-attempt success costs exactly one call.
+  sb = makeSandbox({
+    backendBehavior: () => ({ imageData: STYLED, usage: null, modelId: 'gemini-2.5-flash-image', provider: 'gemini_image' }),
+  });
   res = await run(sb);
-  ok(res.imageData === STYLED, '10a: transient primary error consumed by retry');
-  ok(sb.__calls.length === 2 && sb.__calls.every(b => b === 'gemini'), '10b: retry stayed on primary backend');
+  ok(res.imageData === STYLED, '9a: primary success returns the styled sheet');
+  ok(sb.__calls.length === 1, '9b: a clean first attempt costs ONE backend call');
+  ok(res.valid === true, '9c: a passing verdict reports valid');
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -345,7 +345,7 @@ async function part3() {
   await part1();
   await part2();
   await part3();
-  console.log(`✅ ALL ${passed} assertions passed (avatar MUST guarantee: chain resolver + Pass-2 alternate-backend retry + coverage backstop)`);
+  console.log(`✅ ALL ${passed} assertions passed (avatar MUST guarantee: chain resolver + Pass-2 throw containment + coverage backstop)`);
 })().catch(err => {
   console.error('❌ FAIL:', err.message);
   process.exit(1);

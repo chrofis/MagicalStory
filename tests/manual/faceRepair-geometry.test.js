@@ -14,13 +14,19 @@
 const assert = require('assert');
 const Module = require('module');
 
-// --- Stub server/lib/images.js's computePresetAlignedExtract -----------------
-// resolveRegion lazy-requires('./images') only in the cutout branch. Intercept
-// that require so we don't load the 17k-line module (and its native deps) for a
-// geometry test. The stub reproduces a simple "bbox + pad, snapped to bounds"
+// --- Stub computePresetAlignedExtract ---------------------------------------
+// resolveRegion lazy-requires('./imageCompositing') only in the cutout branch.
+// Intercept that require so we don't load the module (and its native deps) for
+// a geometry test. The stub reproduces a simple "bbox + pad, snapped to bounds"
 // extract — enough to assert the boxInCrop round-trip.
 const path = require('path');
-const imagesPath = path.resolve(__dirname, '../../server/lib/images.js');
+// computePresetAlignedExtract lives in imageCompositing.js — it moved out of
+// images.js with the rest of the mask/edit cluster. Stubbing the old module
+// silently did nothing: the REAL extract ran, returned the real preset for a
+// 1000x1500 scene (9:20, a valid Grok preset), and the assertion below compared
+// it to the stub's declared 2:3. Keep this path pointed at the module
+// resolveRegion actually requires.
+const imagesPath = path.resolve(__dirname, '../../server/lib/imageCompositing.js');
 const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   const resolved = (() => { try { return Module._resolveFilename(request, parent); } catch { return null; } })();

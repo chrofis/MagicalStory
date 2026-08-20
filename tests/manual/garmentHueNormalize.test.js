@@ -193,8 +193,12 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   // The dispatch no longer produces a recolour image — phase (c) owns that.
   check('the dispatch has no recolour branch returning imageData',
     /if \(method === 'recolour'\) \{\s*\n\s*return \{ pageNumber, imageData: null, skipped: true \};/.test(src));
+  // Count CODE hits only. Counting raw occurrences also counted the name in
+  // comments, so documenting the function broke the test (2 -> 4 when two
+  // explanatory comments were added).
+  const codeOnly = src.split(/\r?\n/).filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
   check('and never calls runGarmentRecolour itself',
-    src.split('runGarmentRecolour').length - 1 === 2);  // the definition + the phase
+    codeOnly.split('runGarmentRecolour').length - 1 === 2);  // the definition + the phase
 
   check('a failed repair does not discard a good recolour',
     /const failed = \(error\) => \(\(recolourInput && !recolourVersioned\.has\(pageNumber\)\)/.test(src));
@@ -202,8 +206,13 @@ function rect(buf, x0, y0, x1, y1, rgb) {
     /selectBestVersion\(pageVersions\.get\(pageNumber\) \|\| \[\]\)/.test(src));
   check('an already-handled mismatch is not recoloured twice',
     /if \(m\.fixOutcome\) continue;/.test(src));
-  check('changed bytes invalidate the stamped detection',
-    /if \(detection\) detection\.sourceImageFp = null;/.test(src));
+  // SUPERSEDED 2026-08-19: nulling the fp said nothing about why, and a swap
+  // went undiagnosable for a day. The carry now RE-STAMPS the fp to the new
+  // bytes and records recolourCarried on the diag. Same invariant — the stamped
+  // fp never describes bytes that changed — stronger mechanism.
+  check('changed bytes re-stamp the detection fingerprint',
+    /carried\.sourceImageFp = images\(\)\.imageFingerprint\(current\)/.test(src)
+    && /recolourCarried:/.test(src));
 
   // ── TEST 6 ───────────────────────────────────────────────────────────────
   // The low-chroma blind spot, which is WHY the reference now gets a SAM mask.
