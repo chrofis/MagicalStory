@@ -380,8 +380,12 @@ const TRIAL_FUNNEL_STEPS = [
   'photo_selected',       // chose a file
   'photo_analyzed',       // analyze-photo returned a usable face
   'face_picked',          // resolved the multi-face modal
-  'character_saved',      // create-anonymous-account returned — a users row now exists
+  // Avatar generation starts the moment the photo is ready (a background effect
+  // in TrialCharacterStep), while the account prewarm waits for name + gender —
+  // so avatar_ready genuinely precedes character_saved. Measured on prod
+  // 2026-08-20: 2 visits reached avatar_ready with 0 accounts created.
   'avatar_ready',         // preview avatar rendered
+  'character_saved',      // create-anonymous-account returned — a users row now exists
   'character_done',       // left step 1 for the topic step
   'topic_selected',       // left the topic step
   'ideas_generated',      // ideas came back
