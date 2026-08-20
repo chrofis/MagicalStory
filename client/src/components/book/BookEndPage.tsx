@@ -62,6 +62,13 @@ const BookEndPage = React.forwardRef<HTMLDivElement, BookEndPageProps>(
   ({ storyTitle, language, needsPassword, onNavigate, onSetPassword }, ref) => {
     const lang = (language || 'en').split('-')[0].toLowerCase();
     const et = endPageText[lang] || endPageText.en;
+    // A signed-out reader who just finished someone else's story has no account
+    // yet — /stories and /create put a login wall in front of them. Send them to
+    // the trial instead, where they can make a story straight away. Same routing
+    // as the shared viewer's read-only banner.
+    const signedIn = typeof window !== 'undefined' && !!localStorage.getItem('auth_token');
+    const printPath = signedIn ? '/stories' : '/try';
+    const createPath = signedIn ? '/create?new=true' : '/try';
 
     return (
       <div ref={ref} className="w-full h-full bg-gradient-to-br from-indigo-100 to-blue-100 flex items-center justify-center p-4">
@@ -97,14 +104,14 @@ const BookEndPage = React.forwardRef<HTMLDivElement, BookEndPageProps>(
               <p className="text-gray-500 text-xs mb-4">{storyTitle}</p>
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={(e) => { e.stopPropagation(); onNavigate('/stories'); }}
+                  onClick={(e) => { e.stopPropagation(); onNavigate(printPath); }}
                   className="w-full bg-indigo-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-600 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <BookOpen className="w-4 h-4" />
                   {et.printBook}
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); onNavigate('/create?new=true'); }}
+                  onClick={(e) => { e.stopPropagation(); onNavigate(createPath); }}
                   className="w-full bg-white text-indigo-500 py-2 rounded-lg text-sm font-semibold border-2 border-indigo-200 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" />
