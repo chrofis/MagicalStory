@@ -1599,31 +1599,116 @@ async function runCharRepairStage(ctx, opts) {
   };
 }
 
-async function runEntityStage(ctx, { experimentId }) {
+/**
+ * params.repeats (1-5, default 1) — run the check N times on the SAME frozen
+ * story and report how much it disagrees with itself.
+ *
+ * WHY: entity consistency is the one evaluator eval_variance cannot see —
+ * evaluateImageQuality never runs it — so while every other judge's run-to-run
+ * spread was measured (exp768: mean 36.8 points), entity's was simply unknown,
+ * and it can charge a capped penalty against every page's finalScore.
+ *
+ * repeats=1 returns exactly what it always did, byte for byte; the variance
+ * block only appears when someone asks for repeats.
+ */
+async function runEntityStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { dbQuery, rehydrateStoryImages } = require('../services/database');
   const { runEntityConsistencyChecks } = require('./entityConsistency');
+  const { SEVERITY_POINTS, significantWords, sameConcept, capEntityPenalty } = require('./scoring');
 
+  const repeats = Math.max(1, Math.min(5, parseInt(params.repeats, 10) || 1));
+
+  // Loaded ONCE and reused by every repeat — re-reading per run would let the
+  // input drift and be mistaken for judge variance.
   const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [ctx.storyId]);
   if (rows.length === 0) throw new Error('Story not found');
   let storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
   storyData = await rehydrateStoryImages(ctx.storyId, storyData);
 
-  const t0 = Date.now();
-  const report = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
-    checkCharacters: true,
-    checkObjects: false,
-    saveGrids: false,
-  });
-  const elapsedMs = Date.now() - t0;
-
-  // Strip any embedded image data from the report before persisting.
-  const safe = JSON.parse(JSON.stringify(report, (key, value) => {
+  const stripImages = (obj) => JSON.parse(JSON.stringify(obj, (key, value) => {
     if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
     return value;
   }));
-  return { elapsedMs, report: safe };
+
+  // The signal the PIPELINE scores on: per-page penalty derived from each
+  // character's issues (repairPipeline.getEntityPenaltyAndIssues), not the
+  // report's own display score.
+  const extract = (report) => {
+    const issues = [];
+    const pagePenalty = {};
+    for (const [name, data] of Object.entries(report?.characters || {})) {
+      for (const issue of (data.issues || [])) {
+        const sev = String(issue.severity || '').toLowerCase();
+        const pts = SEVERITY_POINTS[sev] || 0;
+        const pages = issue.pages || issue.pagesToFix || (issue.pageNumber != null ? [issue.pageNumber] : []);
+        issues.push({ name, severity: sev, points: pts, pages: [...pages].sort((x, y) => x - y), description: issue.description || issue.problem || '' });
+        for (const p of pages) pagePenalty[p] = (pagePenalty[p] || 0) + pts;
+      }
+    }
+    for (const p of Object.keys(pagePenalty)) pagePenalty[p] = capEntityPenalty(pagePenalty[p]);
+    return {
+      totalIssues: report?.totalIssues ?? issues.length,
+      overallConsistent: report?.overallConsistent ?? null,
+      charactersChecked: Object.keys(report?.characters || {}).length,
+      evalFailures: Object.values(report?.characters || {}).filter(c => c.evalFailed).length,
+      issues,
+      pagePenalty,
+      penaltyTotal: Object.values(pagePenalty).reduce((s, v) => s + v, 0),
+    };
+  };
+
+  const runs = [];
+  let firstReport = null;
+  for (let i = 1; i <= repeats; i++) {
+    const t0 = Date.now();
+    const report = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
+      checkCharacters: true,
+      checkObjects: false,
+      saveGrids: false,
+    });
+    if (i === 1) firstReport = stripImages(report);
+    runs.push({ run: i, elapsedMs: Date.now() - t0, ...extract(report) });
+  }
+
+  if (repeats === 1) return { elapsedMs: runs[0].elapsedMs, report: firstReport };
+
+  // Match issues across runs by the SAME rule the ranker uses to merge findings
+  // across evaluators, so "did it find the same thing twice?" is not a second
+  // definition of sameness.
+  const concepts = [];
+  for (const r of runs) {
+    for (const f of r.issues) {
+      const words = significantWords(f.description);
+      let c = concepts.find(x => x.name === f.name && sameConcept(x.words, words) && !x.runs.includes(r.run));
+      if (!c) {
+        c = { name: f.name, words, label: f.description.slice(0, 140), severities: {}, points: [], pages: new Set(), runs: [] };
+        concepts.push(c);
+      }
+      for (const w of words) c.words.add(w);
+      c.severities[f.severity] = (c.severities[f.severity] || 0) + 1;
+      c.points.push(f.points);
+      for (const p of f.pages) c.pages.add(p);
+      c.runs.push(r.run);
+    }
+  }
+  const spread = (vals) => ({ values: vals, min: Math.min(...vals), max: Math.max(...vals), range: Math.max(...vals) - Math.min(...vals) });
+
+  return {
+    storyId: ctx.storyId, repeats,
+    issueCountSpread: spread(runs.map(r => r.issues.length)),
+    penaltySpread: spread(runs.map(r => r.penaltyTotal)),
+    evalFailureSpread: spread(runs.map(r => r.evalFailures)),
+    concepts: concepts.map(c => ({
+      character: c.name, label: c.label, seenIn: c.runs.sort((a, b) => a - b), of: repeats,
+      severities: c.severities, pages: [...c.pages].sort((a, b) => a - b),
+      verdict: c.runs.length !== repeats ? 'detection-flip'
+        : (Object.keys(c.severities).length > 1 ? 'severity-flip' : 'stable'),
+    })).sort((a, b) => a.verdict.localeCompare(b.verdict)),
+    runs: runs.map(({ issues, ...rest }) => ({ ...rest, issues })),
+    report: firstReport,
+  };
 }
 
 /**

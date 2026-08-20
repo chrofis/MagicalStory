@@ -172,6 +172,11 @@ export interface ExperimentResult {
   // eval_variance: the same image scored N times, nothing else changed.
   repeats?: number;
   okRuns?: number;
+  // entity stage with params.repeats: how much the consistency check disagrees
+  // with itself on the same frozen story.
+  issueCountSpread?: { values: number[]; min: number; max: number; range: number };
+  penaltySpread?: { values: number[]; min: number; max: number; range: number };
+  evalFailureSpread?: { values: number[]; min: number; max: number; range: number };
   consolidated?: boolean;
   scoreSpread?: EvalSpread;
   rawSpread?: EvalSpread;

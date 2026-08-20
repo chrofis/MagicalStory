@@ -134,13 +134,11 @@ export default function SharedStoryViewer() {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('notOwnerBannerDismissed') === '1';
   });
-  // Someone is signed in, just not as the story's owner. Edit/Share are hidden
-  // in that case and previously nothing said why — a reader opening their own
-  // story's link from a second account read the missing buttons as a missing
-  // feature. Anonymous visitors get no banner: they are not missing anything
-  // they had.
-  const signedInAsSomeoneElse = typeof window !== 'undefined'
-    && !!localStorage.getItem('auth_token');
+  // Anyone who is not the owner is reading, not editing: a visitor with no
+  // account (the common case) and an owner signed in with a second account
+  // (rare, mostly testing) get the same treatment. Edit/Share are hidden for
+  // both, so the banner says why and offers the way to make their own story.
+  const signedIn = typeof window !== 'undefined' && !!localStorage.getItem('auth_token');
   const menuRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<BookViewerHandle>(null);
   // Remembers the last-viewed pageList entry so reading-mode switches can
@@ -662,26 +660,41 @@ export default function SharedStoryViewer() {
         </header>
       )}
 
-      {/* Not-the-owner banner — signed in as a different account; dismissable per session */}
-      {!story.isOwner && signedInAsSomeoneElse && !notOwnerDismissed && (
+      {/* Read-only banner — every non-owner: signed out, or signed in as someone
+          else. Dismissable per session. The end page has the same call to
+          action, but only on the last page and pointing at routes that bounce a
+          signed-out reader into a login wall. */}
+      {!story.isOwner && !notOwnerDismissed && (
         <div className="bg-sky-50 border-b border-sky-200 px-4 py-2.5 flex items-center justify-between gap-3 short:hidden">
           <p className="text-sm text-sky-800 min-w-0 flex-1">
             {language === 'de'
-              ? 'Du bist mit einem anderen Konto angemeldet. Melde dich mit dem Konto an, mit dem die Geschichte erstellt wurde, um sie zu bearbeiten oder zu teilen.'
+              ? 'Lesemodus — diese Geschichte kannst du nicht bearbeiten.'
               : language === 'fr'
-                ? 'Vous êtes connecté avec un autre compte. Connectez-vous avec le compte qui a créé cette histoire pour la modifier ou la partager.'
-                : 'You are signed in with a different account. Sign in with the account that created this story to edit or share it.'}
+                ? 'Mode lecture — vous ne pouvez pas modifier cette histoire.'
+                : 'Read-only — you cannot edit this story.'}
           </p>
-          <button
-            onClick={() => {
-              sessionStorage.setItem('notOwnerBannerDismissed', '1');
-              setNotOwnerDismissed(true);
-            }}
-            aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
-            className="p-1.5 rounded-md text-sky-700 hover:bg-sky-100 transition-colors flex-shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => navigate(signedIn ? '/create?new=true' : '/try')}
+              className="bg-sky-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-sky-600 transition-colors"
+            >
+              {language === 'de'
+                ? 'Eigene Geschichte erstellen'
+                : language === 'fr'
+                  ? 'Créer votre histoire'
+                  : 'Create your own story'}
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.setItem('notOwnerBannerDismissed', '1');
+                setNotOwnerDismissed(true);
+              }}
+              aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
+              className="p-1.5 rounded-md text-sky-700 hover:bg-sky-100 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
