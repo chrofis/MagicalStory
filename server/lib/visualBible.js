@@ -1974,17 +1974,32 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
   return refs.slice(0, maxRefs);
 }
 
-function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) {
+function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, sceneObjectIds = null) {
   if (!visualBible) return [];
 
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+
+  // Ids the scene brief itself names. The page PROMPT is built from the Art
+  // Director's objects[], while these reference images were selected from the
+  // Visual Bible's own appearsInPages — two different answers to "what is on
+  // this page". When they disagree the prompt describes a prop whose reference
+  // was filtered out, and the model invents its look: a signpost specified as a
+  // white-painted board rendered brown on the page that described it without a
+  // reference, and correctly white on the page that had one.
+  const askedFor = new Set(
+    (Array.isArray(sceneObjectIds) ? sceneObjectIds : [])
+      .map(id => String(id || '').trim().toUpperCase())
+      .filter(Boolean),
+  );
 
   const relevantRefs = [];
 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
       if (!hasRef(entry)) continue;
-      if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+      const onPage = entry.appearsInPages && entry.appearsInPages.includes(pageNumber);
+      const named = entry.id && askedFor.has(String(entry.id).toUpperCase());
+      if (!onPage && !named) continue;
 
       relevantRefs.push({
         id: entry.id,

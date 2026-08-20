@@ -423,9 +423,9 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
  * Returns { visualBibleGrid, landmarkPhotos } — landmarkPhotos is what the
  * caller should pass to image generation (emptied when the plate covers it).
  */
-async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS' } = {}) {
+async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null } = {}) {
   const { getElementReferenceImagesForPage } = require('./visualBible');
-  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneObjectIds);
   // Landmarks never ride in the grid — a real photograph composited among
   // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
   // landmark reaches the image only as its own reference photo, and when a

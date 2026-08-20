@@ -3323,7 +3323,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
         const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+        // The page prompt lists the scene's objects[] (the Art Director's pick);
+        // pass the same ids so a prop the prompt describes brings its reference
+        // image even when the VB filed it under a different page.
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6, sceneMetadata?.objects || null);
         // Drop location elements when an empty scene background exists — the location
         // is already painted into the background, so a VB grid cell showing the same
         // location is redundant and wastes a reference slot.

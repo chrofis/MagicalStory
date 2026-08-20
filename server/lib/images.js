@@ -3639,6 +3639,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         hasBackground: !!sceneBackground,
         hasOtherRefs: !!useOriginalAsReference,
         logTag: 'ITERATE',
+        // Keep the grid in step with what the page prompt describes — the
+        // prompt is built from the scene's objects[], so a prop named there
+        // must bring its reference even if the VB filed it under other pages.
+        sceneObjectIds: iterateSceneMetadata?.objects || null,
       })
     : { visualBibleGrid: null, landmarkPhotos: pageLandmarkPhotos };
   const visualBibleGrid = pageRefs.visualBibleGrid;
