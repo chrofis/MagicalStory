@@ -182,6 +182,10 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     // (default 1) so none inherits the primary's face. Non-character elements
     // keep `minAppearances`. Same rule in trial (bounded by maxElements).
     characterMinAppearances = 1,
+    // Artifacts qualify on a single page too (owner, 2026-08-20). A prop with
+    // no reference is drawn from prose alone, so two renders of the same object
+    // have nothing anchoring them to each other.
+    artifactMinAppearances = 1,
     maxPerBatch = 4,
     imageModel = null,
     maxElements = null,
@@ -219,7 +223,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   const { getElementsNeedingReferenceImages, updateElementReferenceImage } = require('./visualBible');
 
   // Get elements that need reference images
-  let needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances, characterMinAppearances);
+  let needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances, characterMinAppearances, artifactMinAppearances);
 
   // Observability: how many secondary CHARACTER references we're generating.
   // These are the extra image-gen calls the "every secondary gets its own

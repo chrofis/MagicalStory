@@ -628,6 +628,38 @@ accurately.
 - `prompts/image-prompt-compliance.txt` — object-colour rule
 **Status:** ✅ active.
 
+### Every artifact gets a reference render, even on a single page
+**Context:** Reference images were generated only for elements appearing on
+2+ pages (`minAppearances = 2`) — "a one-page prop doesn't justify a reference
+render". In a shipped 18-page story that left **6 of 12 artifacts with no
+reference at all**. A prop with no reference is drawn from prose alone, so two
+renders of the same object have nothing anchoring them: a signpost specified as
+"a narrow rectangular white-painted wooden board" was declared for one page,
+described by the Art Director on a second page as well, and came out white on
+one and brown on the other.
+**Why the declared page count is not the real one:** the batched scene
+expansion shows every page's brief the entire Visual Bible (the code notes a
+per-page objects[] filter "has nothing to key on in a single call"), so the Art
+Director legitimately uses props on pages the bible never listed. Reference
+sheets are generated BEFORE that second pass, so the gate can never see the
+true usage count.
+**Decision (owner, 2026-08-20):** artifacts qualify at 1 appearance
+(`artifactMinAppearances = 1`). Locations and vehicles keep the 2-page gate.
+**Cost:** measured on the affected story — 6 → 12 artifacts referenced, two
+extra reference grids at 4 elements per grid (~$0.02-0.04 each). Trial mode is
+unchanged in cost: its `maxElements: 6` cap still bounds the total, only the
+selection changes.
+**Also fixed alongside:** `getElementReferenceImagesForPage` now accepts the
+scene's object ids, so the reference GRID follows the same list the page PROMPT
+is built from. Previously the prompt used the Art Director's objects[] and the
+grid used the bible's appearsInPages — two answers to "what is on this page",
+and a prop named by one but not the other reached the model with no reference.
+**Touched:**
+- `server/lib/visualBible.js` — `artifactMinAppearances`, scene-id-aware ref selection
+- `server/lib/referenceSheets.js` — option threading
+- `server/lib/images.js`, `storyJobPipeline.js` — pass the scene's objects[]
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

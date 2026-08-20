@@ -1809,9 +1809,15 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
  * @param {Object} visualBible - The Visual Bible object
  * @param {number} minAppearances - Min page appearances for NON-character elements (default 2)
  * @param {number} characterMinAppearances - Min page appearances for secondary characters (default 1)
+ * @param {number} artifactMinAppearances - Min page appearances for ARTIFACTS (default 1).
+ *   Props are referenced even on a single page (owner, 2026-08-20): without a
+ *   reference a prop is drawn from prose alone, so the same object rendered on
+ *   two pages has nothing anchoring it — measured on a shipped story where a
+ *   signpost specified as a white-painted board came out white on one page and
+ *   brown on another, because it was declared for one page and drawn on two.
  * @returns {Array} Elements needing reference images
  */
-function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, characterMinAppearances = 1) {
+function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, characterMinAppearances = 1, artifactMinAppearances = 1) {
   if (!visualBible) return [];
 
   const needsReference = [];
@@ -1836,7 +1842,7 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
   checkEntries(visualBible.secondaryCharacters, 'character', characterMinAppearances);
   // Artifacts, animals, vehicles keep the recurring-element gate.
   // Skip clothing (worn by characters) - they appear on character reference images
-  checkEntries(visualBible.artifacts, 'artifact');
+  checkEntries(visualBible.artifacts, 'artifact', artifactMinAppearances);
   checkEntries(visualBible.animals, 'animal');
   checkEntries(visualBible.vehicles, 'vehicle');
 
