@@ -130,6 +130,17 @@ export default function SharedStoryViewer() {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('privateStoryBannerDismissed') === '1';
   });
+  const [notOwnerDismissed, setNotOwnerDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('notOwnerBannerDismissed') === '1';
+  });
+  // Someone is signed in, just not as the story's owner. Edit/Share are hidden
+  // in that case and previously nothing said why — a reader opening their own
+  // story's link from a second account read the missing buttons as a missing
+  // feature. Anonymous visitors get no banner: they are not missing anything
+  // they had.
+  const signedInAsSomeoneElse = typeof window !== 'undefined'
+    && !!localStorage.getItem('auth_token');
   const menuRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<BookViewerHandle>(null);
   // Remembers the last-viewed pageList entry so reading-mode switches can
@@ -649,6 +660,29 @@ export default function SharedStoryViewer() {
             </Link>
           </div>
         </header>
+      )}
+
+      {/* Not-the-owner banner — signed in as a different account; dismissable per session */}
+      {!story.isOwner && signedInAsSomeoneElse && !notOwnerDismissed && (
+        <div className="bg-sky-50 border-b border-sky-200 px-4 py-2.5 flex items-center justify-between gap-3 short:hidden">
+          <p className="text-sm text-sky-800 min-w-0 flex-1">
+            {language === 'de'
+              ? 'Du bist mit einem anderen Konto angemeldet. Melde dich mit dem Konto an, mit dem die Geschichte erstellt wurde, um sie zu bearbeiten oder zu teilen.'
+              : language === 'fr'
+                ? 'Vous êtes connecté avec un autre compte. Connectez-vous avec le compte qui a créé cette histoire pour la modifier ou la partager.'
+                : 'You are signed in with a different account. Sign in with the account that created this story to edit or share it.'}
+          </p>
+          <button
+            onClick={() => {
+              sessionStorage.setItem('notOwnerBannerDismissed', '1');
+              setNotOwnerDismissed(true);
+            }}
+            aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
+            className="p-1.5 rounded-md text-sky-700 hover:bg-sky-100 transition-colors flex-shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
       {/* Private story banner — shown to owner when story is not shared; dismissable per session */}
