@@ -3143,6 +3143,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
     const beatsReviewReport = beatsResult?.beatsReviewReport || null;
+    // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
+    // back against the arc it promised.
+    const arcReviewReport = beatsResult?.arcReviewReport || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     if (refineEnabled) {
@@ -5276,6 +5279,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
+      arcReviewReport,   // drafted arc + arc-review analysis (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       sceneReviewReport, // per-page before/after from the scene review (beats mode)

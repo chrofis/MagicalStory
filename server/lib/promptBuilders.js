@@ -3971,6 +3971,30 @@ function buildBeatsReviewPrompt(inputData, beats, arc = '') {
   });
 }
 
+/** Review of the arc alone, before any page exists. Returns analysis + a corrected arc. */
+function buildArcReviewPrompt(inputData, arc) {
+  const template = PROMPT_TEMPLATES.storyArcReview;
+  if (!template) {
+    log.error('[PROMPT] storyArcReview template not loaded — arc review unavailable');
+    return null;
+  }
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: inputData.pages || (inputData.sceneImages || []).length || 10,
+    CURRENT_ARC: String(arc || '').trim(),
+  });
+}
+
+/** Parse an ---ARC--- block (analysis before it, arc after), same shape as parseBeats. */
+function parseArcReview(raw) {
+  const full = String(raw || '');
+  const marker = full.match(/---\s*ARC\s*---/i);
+  const analysis = (marker ? full.slice(0, marker.index) : full)
+    .replace(/^[\s\S]*?---\s*ANALYSIS\s*---/i, '').trim();
+  const arc = marker ? full.slice(marker.index + marker[0].length).trim() : '';
+  return { analysis, arc };
+}
+
 /**
  * Wardrobe review of the bible's clothing contract. Returns null when the
  * story has no dressed character to review — a bible that produced no usable
@@ -4922,6 +4946,8 @@ module.exports = {
   buildStoryContextFields,
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
+  buildArcReviewPrompt,
+  parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,
   parseBeats,

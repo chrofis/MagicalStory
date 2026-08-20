@@ -14245,3 +14245,60 @@ real fix.
 - `tests/manual/avatarStyleAnchorRetry.test.js` — 32 assertions against the real
   sliced function source
 **Status:** ✅ active
+
+## 2026-08-20 — The arc is drafted and reviewed BEFORE the pages exist (plan sonnet / review grok)
+
+**Context:** Beats scores had sat at ~6.2-6.6 across three full production runs and would not move.
+Judges kept naming the same faults — "tidy per-boy obstacle list", "changes only reframe standing
+traits", "the middle is a schematic confession gauntlet". Commissioned research into picture-book
+craft named both as the classic ensemble failures (roll-call structure; undifferentiated ensemble),
+and the cause was our own `---ARC---` block, which demanded `Starts / Turning point / Ends` for EACH
+main character and so mechanically produced one turning point per child.
+
+**Measured (Test Lab `arc_rounds`, exp 23-32, 8 runs = 4 cells x 2 repeats, plus 2 round-2 arms).**
+Score = mean of three judges (sonnet / grok / gemini) over an 8-dimension arc rubric.
+
+| cell | run 1 | run 2 | mean | within-cell spread |
+|---|---|---|---|---|
+| plan sonnet / review sonnet | 7.7 | 7.9 | 7.80 | 0.2 |
+| plan sonnet / review grok | 7.5 | 7.6 | 7.55 | 0.1 |
+| plan grok / review sonnet | 7.0 | 6.7 | 6.85 | 0.3 |
+| plan grok / review grok | 6.7 | 6.4 | 6.55 | 0.3 |
+
+1. **One arc review round is worth +0.9 to +1.3**, in the same direction in 5 of 5 cells, on every
+   judge individually including judges with no stake in the reviewing model. The SAME review step
+   applied to finished BEATS measured negative 5 times out of 5 (deepseek -0.6, sol -1.1, opus -0.7,
+   grok twice). Reviewing the arc works; reviewing the pages does not.
+2. **The planner is the real variable.** Sonnet-planned arcs beat grok-planned ones by ~0.9-1.0,
+   against within-cell spreads of 0.1-0.3.
+3. **The reviewer is not separable.** 7.80 vs 7.55 sits inside the noise, and the sonnet figure is
+   inflated by sonnet judging its own reviewer's output; on the neutral judge the cells are 8.65 vs
+   8.45. Grok is chosen so the reviewer never grades its own writing, matching the beats stage.
+4. **A second review round buys nothing.** From an identical arc: grok again 7.4 -> 7.4; rotating to
+   sonnet 7.7 -> 7.9 (+0.2, inside noise). One round, then stop.
+5. **Best-of-N is not the lever.** Three arcs in one call cost roughly one arc's input, but the merge
+   moved +0.3 / +0.6 / -0.1 / +0.2 and twice returned the winner unchanged.
+
+**Two noise floors, measured, and they are very different:** judging the SAME arc text three times
+spread 0.3 (7.5 / 7.7 / 7.4); GENERATING a new arc from the same config spread 2.5 (6.9 vs 4.4).
+Single-run comparisons of generated artifacts are therefore worthless, which retro-invalidates
+several single-run verdicts taken earlier the same day.
+
+**Decision:** production drafts the arc alone (sonnet), reviews it (`arcReviewModel`, grok), then
+writes the pages FROM the approved arc, which is also handed to the beats reviewer as the contract to
+check pages against. Reviewing an arc the beats were not built on would strand the correction in a
+header, so the plan call now receives the approved arc and emits only `---BEATS---`. The arc block
+itself is function-based: one shared problem, 2-3 attempts belonging to the story, each child
+carrying a function only they carry, and ONE character carrying a visible change shown by doing the
+same act differently early and late. The arc stage is wrapped in try/catch — on failure the planner
+writes the arc inline exactly as before.
+
+**Cost:** +2 text calls per story (~$0.10, ~1-2 min). **Not yet measured:** whether a better arc
+produces better BEATS. The +1.2 is an arc-score result; the downstream effect is the next experiment.
+
+**Touched:** prompts/story-beats.txt (function-based ARC block + research rules),
+prompts/story-arc-review.txt (new), prompts/story-arc-judge.txt (new), server/services/prompts.js,
+server/lib/promptBuilders.js (buildArcReviewPrompt, parseArcReview, parseBeats returns `arc`),
+server/lib/beatsPipeline.js (arc stage + arcReviewReport), storyJobPipeline.js (persist),
+server/config/models.js (arcReviewModel), server/lib/testlab.js (arc_rounds stage, judge retry,
+parallel judging, params.fromArc / storyDetails), client/src/services/testlabService.ts.

@@ -30,10 +30,14 @@ SCENE is what the illustration shows: who is present, where they are, what they 
 Requirements:
 - Each page follows causally from the one before it.
 - The main character wants something by page 1 and their situation is different by the last page.
-- Early on the want meets something that will not simply move; in the middle one try fails, costs them something or is refused, and the goal sits further away than it did; the last third earns the change.
+- One problem the whole cast shares, concrete enough to draw and clear by page 2. Two or three attempts to solve it, never four: each fails for a different reason and leaves them worse off or more pressed than the last, and the final attempt gets more pages than either earlier one. One page before the end the goal looks lost.
+- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes the obstacle; adults may comfort, permit or watch.
+- Attempts belong to the story, not to the cast list: never one attempt per character in turn. Each named child does something the others could not do as well — one causes the problem, one holds back, one tries the obvious thing, the youngest offers what only they would think of — and what the youngest does stays within a very young child's reach: noticing, holding, fetching, naming, offering, refusing.
+- One character carries the visible change, and it is shown by doing the same kind of thing differently: name the early page where they refuse, fail or need help, and the late page where they do it themselves. No beat states what anyone learned, realised or now understands.
 - No obstacle is removed in the beat that introduces it. Passing one costs something the beat names — time, a possession, a plan, help asked for, someone's comfort.
 - A deadline or cost the arc names is visible on a page: something has changed because time ran on or the price was paid, not only mentioned in passing.
-- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages.
+- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. Staying in one place is not the problem — repeating the same picture there is.
+- A character present on a page is present on the next one unless a beat says where they went. What a beat establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a beat changes it.
 - Whoever or whatever stands in the way wants something of their own, and the plan says what; they do not yield on request.
 - Reasons are grounded, not announced. A sign, an inscription or a rule stated once to license a turn is not a reason: it comes from who someone is, what a place is for, or what someone needs.
 - Every beat is visible: something happens that a picture can show. A page of pure reflection cannot be illustrated.
@@ -43,7 +47,7 @@ Requirements:
 - When an AVAILABLE LANDMARKS list is present, set key scenes AT those places — the action happens on, in, or under the landmark, not with it as distant backdrop. Pick landmarks whose real character fits the beats.
 - A page keeps its characters at one depth together. Separate a figure into the background only when the beat itself requires the separation (left behind, watching from afar, arriving in the distance) — keep such pages to the few the story needs.
 - Treat the story idea as a loose wish, not a specification: resolve what it conflates or leaves to coincidence — distinguish two things it treats as one, give every arrival a cause — and drop what earns nothing.
-- Match peril to the youngest named child in the cast: frightening is the right level, and nothing may be able to kill or injure a child — no drowning, no fall from a height. A refusal, a loss, a delay or a promise broken can carry it instead.
+- Match peril to the youngest named child in the cast: frightening is the right level, and nothing may be able to kill or injure a child — no drowning, no fall from a height. A refusal, a loss, a delay or a promise broken can carry it instead. Nobody in the story looks monstrous, and no familiar character turns frightening. When anyone is separated or lost, a later page shows the reunion and the last page shows them safe.
 - An obstacle exists for its own reasons: never shape one around a thing a character happens to carry, and never give a barrier exactly one solution that a character already holds. Where peril has to be softened, take the replacement from what the setting already contains.
 - A trait in the character details is not an introduction. A prop, pet or skill that solves a problem appears in an earlier scene with its owner, before it does the work — and anything introduced that way must later do work. Drop the introduction when you drop its purpose.
 - Use the fewest characters the STORY needs and the fewest any BEAT needs: invent no figure an existing character could be, merge two roles into one where the plot allows, and stage a beat with two people rather than three when two carry it.
@@ -55,19 +59,18 @@ Requirements:
 Only the blocks below, in this order. No preamble, no commentary.
 
 ---ARC---
-Inciting incident: p<N> — what starts it
-Rising action: p<N>-<N> — what escalates, and what each step costs
-Climax: p<N> — where the goal is won or lost
-Resolution: p<N> — what is different
+Problem: <the one thing they all want, concrete and drawable> — clear by p<N>
+Attempt 1: p<N> — <what they try> — fails because <reason>
+Attempt 2: p<N> — <what they try instead> — fails because <a different reason>, and now <what is worse>
+All seems lost: p<N> — <what makes it look finished>
+Resolved: p<N>-<N> — <what the children themselves do>
 
-### <each main character>
-Starts: <how they are on their first page>
-Turning point: p<N> — <what they do or admit that they could not before>
-Ends: <what changed>
+Who does what:
+<name> — <the function only they carry: causes it, holds back, tries the obvious thing, offers what no one else would>
+(one line per named child, no turn of their own)
 
-### <each other named character>
-Enters: p<N> — <why they arrive then>
-Role: <what they do for the story that no one already present could>
+The change: <name>, p<early> → p<late>
+<what they refuse, fail at or need help with early, and do themselves late — the same kind of act, done differently>
 
 ---BEATS---
 ## Page 1

@@ -1,0 +1,46 @@
+You are reviewing the arc of an illustrated children's book, before any page exists. The arc is the contract the pages will have to satisfy, so a fault fixed here costs nothing and a fault left here is repeated on every page.
+
+# TARGET
+
+Write the analysis and the corrected arc in ENGLISH. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
+
+Reading level: {READING_LEVEL}
+Pages: {PAGE_COUNT}
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# CURRENT ARC
+
+{CURRENT_ARC}
+
+# YOUR TASK
+
+Judge the arc as a reader who sees only this. The brief says what the book is FOR; it is never evidence that the arc works. Answer each check, then output the corrected arc.
+
+1. Shape — is there one problem the whole cast shares, clear early and concrete enough to draw? Name it, or say that the plan has several problems or none.
+2. Attempts — are there two or three attempts, never four; does each fail for a DIFFERENT reason; is the cast worse off or more pressed after each; does the final attempt carry more pages than the earlier ones? Name any attempt that fails for a reason already used, or that leaves the situation unchanged.
+3. Lost — is there a point where the goal looks finished? Name it, or add one.
+4. Who resolves it — do the children resolve it by their own act? Name any adult, rescuer, lucky arrival or accident that removes the obstacle.
+5. Roll call — is any attempt assigned to a character simply because it is their turn? Name any two children whose actions could be swapped without changing anything, and give each a function only they carry.
+6. The youngest — is what the youngest child does within a very young child's reach (noticing, holding, fetching, naming, offering, refusing)? Name anything beyond it.
+7. Change — does one character do the same kind of act differently, early and late, with both pages named? Name any change that only restates a trait, and any line that states what someone learned or realised.
+8. Blockers — does whoever stands in the way want something of their own, and does the arc say what? Name any blocker who exists only to be passed.
+9. Reasons — is any turn licensed by a sign, an inscription or a rule announced for that purpose, rather than by who someone is or what a place is for? Name each.
+10. Peril — frightening is the right level. Name anything that could kill or injure a child, anyone who looks monstrous, any familiar character who turns frightening, and any separation with no reunion and no safe last page.
+11. Cast — is any named character carrying work another could carry? Name them and say who absorbs them.
+12. Spread — do the turns fall across the book, or cluster? Name any two that sit on the same or adjacent pages without reason.
+
+# OUTPUT FORMAT
+
+Both blocks, in this order, nothing before or after.
+
+---ANALYSIS---
+<your answers to checks 1-12>
+
+---ARC---
+<the corrected arc, complete, in the same shape as the one you were given>

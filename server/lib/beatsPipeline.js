@@ -49,6 +49,8 @@ const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
+  buildArcReviewPrompt,
+  parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,
   parseBeats,
@@ -216,6 +218,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   const planModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
+  const arcReviewModel = modelOverrides.arcReviewModel || MODEL_DEFAULTS.arcReviewModel || reviewModel;
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
   const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
@@ -223,19 +226,67 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcReviewModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcReview=${arcReviewModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+
+  // ── Step 0: the arc, reviewed on its own ──────────────────────────────────
+  // The arc is ~15 lines, so a review round here costs cents and measured +0.9
+  // to +1.3 across five lab cells (exp 23-28) on every judge — while the same
+  // review applied to finished beats measured negative five times out of five.
+  // The pages are then written FROM the reviewed arc: reviewing an arc the beats
+  // were not built on would leave the correction stranded in a header.
+  await checkCancellation();
+  const basePrompt = buildBeatsPrompt(inputData, pageCount);
+  if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
+  let approvedArc = '';
+  let arcReviewReport = null;
+  let t = Date.now();
+  try {
+    await stage(1, 'Shaping the story arc...', { next: 2, ms: 30000 });
+    const arcRes = await textModels.callTextModelStreaming(
+      `${basePrompt}\n\nOutput the ---ARC--- block only. Omit the ---BEATS--- block entirely.`,
+      null, onChunk, planModel, { usageLabel: 'beats_arc_plan' });
+    const drafted = parseBeats(arcRes.text || '').arc || '';
+    if (!drafted) throw new Error('planner returned no arc');
+
+    const arcReviewPrompt = buildArcReviewPrompt(inputData, drafted);
+    if (!arcReviewPrompt) throw new Error('story-arc-review template unavailable');
+    await stage(2, 'Reviewing the story arc...', { next: 3, ms: 45000 });
+    const arcRevRes = await textModels.callTextModelStreaming(arcReviewPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_review' });
+    const { analysis, arc: revised } = parseArcReview(arcRevRes.text || '');
+    approvedArc = (revised && revised.trim()) ? revised.trim() : drafted;
+    meta.timings.arcMs = Date.now() - t;
+    arcReviewReport = {
+      model: arcRevRes.modelId || arcReviewModel,
+      planModel: arcRes.modelId || planModel,
+      durationMs: meta.timings.arcMs,
+      changed: approvedArc !== drafted,
+      drafted, analysis, prompt: arcReviewPrompt,
+    };
+    gl.info('beats_arc', `Arc drafted by ${arcRes.modelId || planModel}, reviewed by ${arcRevRes.modelId || arcReviewModel} (${arcReviewReport.changed ? 'rewritten' : 'unchanged'})`, null, {
+      changed: arcReviewReport.changed, model: arcRevRes.modelId || arcReviewModel,
+    });
+  } catch (err) {
+    // Never block a story on the arc step: without it the planner writes the
+    // arc inline exactly as it did before this stage existed.
+    log.warn(`🚨 [BEATS] Arc stage failed (${err.message}) — planning beats without a reviewed arc`);
+    gl.warn('beats_arc_failed', `Arc stage failed: ${err.message} — beats planned without a reviewed arc`);
+    approvedArc = '';
+  }
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
-  const planPrompt = buildBeatsPrompt(inputData, pageCount);
-  if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
-  let t = Date.now();
-  await stage(1, 'Planning the story beats...', { next: 3, ms: 25000 });
+  const planPrompt = approvedArc
+    ? `${basePrompt}\n\nThis arc has been reviewed and approved. Write the pages that deliver it, page by page, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---BEATS--- block only. Do not restate the arc.`
+    : basePrompt;
+  t = Date.now();
+  await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
   meta.timings.planMs = Date.now() - t;
   const plan = parseBeats(planRes.text || '', expected);
+  // The approved arc is the contract the reviewer checks the pages against.
+  if (approvedArc) plan.arc = approvedArc;
   if (plan.pages.length === 0) throw new Error('Beats planner returned no parseable beats');
   if (plan.missing.length > 0) {
     log.warn(`⚠️ [BEATS] Planner omitted page(s) ${plan.missing.join(', ')} — story will be ${plan.pages.length} pages`);
@@ -969,7 +1020,7 @@ SCENE: ${x.scene || ''}`.trim(),
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, beats, pages, scenes, rawOutline, meta, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES };

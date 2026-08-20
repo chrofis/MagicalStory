@@ -500,6 +500,11 @@ export const TESTLAB_STAGES = [
   // models (params.reviewModel CSV), iterate params.passes times, and with
   // params.scoreOutput the one evaluator scores the beats after each pass.
   { id: 'beats_review_replay', label: 'Beats review replay (prompt/model A/B, multi-pass, scored)', producesImage: false, overridable: true, storyLevel: true },
+  // Arc only — cents per round instead of francs, so "how many review rounds
+  // still pay" and "does rotating the reviewer beat repeating one" are
+  // measurable. params.variants asks for N arcs in ONE call plus a merge pass,
+  // to compare best-of-N against sequential review.
+  { id: 'arc_rounds', label: 'Arc rounds (plan the arc, review it N times / best-of-N, scored each round)', producesImage: false, overridable: true, storyLevel: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.

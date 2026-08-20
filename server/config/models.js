@@ -212,6 +212,12 @@ const MODEL_DEFAULTS = {
   // 672) — neutral judge 8.4 vs raw 5.7, while the previous default landed at
   // 5.8 (flat). See docs/decisions.md. Slower (~277s vs ~90s) for ~$0.03 more.
   outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'grok-4.6',
+  // The arc is reviewed on its own before any page is written. Measured over
+  // five lab cells (exp 23-28): one arc review round is worth +0.9 to +1.3 on
+  // every judge, where the same review applied to finished BEATS measured
+  // negative five times out of five. Plan sonnet / review grok was the best
+  // cell, and it matches what the beats stage already uses.
+  arcReviewModel: process.env.ARC_REVIEW_MODEL || 'grok-4.6',
   // The three reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the scene and wardrobe reviews too. They are
   // separate decisions with separate evidence and now separate keys.
