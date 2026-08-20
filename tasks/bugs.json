@@ -89,6 +89,15 @@
       "status": "fixed",
       "fixedIn": "1770eb63a",
       "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
+    },
+    {
+      "id": "covers-undressed-call-site-4",
+      "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
+      "reportedAt": "2026-08-20",
+      "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
+      "status": "fixed",
+      "fixedIn": "756b8e692",
+      "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
     }
   ]
 }

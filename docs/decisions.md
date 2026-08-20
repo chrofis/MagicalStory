@@ -13986,3 +13986,22 @@ carries `identity.somFailure` per page.
 
 **Touched:** `server/lib/repairPipeline.js`, `tasks/bugs.json`
 **Status:** ✅ active — validated by smoke #2 (see below or reopen)
+
+## 2026-08-20 — The gen-time identity builder joins the shared clothing chain (call site #4 of 4)
+
+**Context:** smoke #2 (`job_1787252581387_6sn8z0nh2`) validated the
+version-detection stamp — every page and cover persisted `grounding-dino` with
+fp, zero SoM fallbacks — and exposed the last unconverted identity-line
+builder: `storyJobPipeline`'s Phase 5b-pre shared detection still used the old
+`if (category)` gate. Covers carry no `sceneCharacterClothing`, so all three
+covers' figures reached the detector undressed (`"no garment colour in the
+identity line"`, seeds=0) while pages seeded fine.
+
+**Decision:** converted to `buildIdentityClothingText`/`buildIdentityLine`,
+same as coverIterate, the round redetect and the iterate path: hint →
+`clothingRequirements.used` → standard → wardrobe, ERROR when a figure would go
+out naked. Four sites, one chain, none left on the old pattern.
+
+**Touched:** `storyJobPipeline.js`, `tasks/bugs.json`
+**Status:** ✅ active — validated by code-path identity with the three proven
+sites; first real story confirms via persisted seedTraces

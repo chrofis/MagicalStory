@@ -4538,20 +4538,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // where the detector was told to look for "Lukas wearing striped
             // hoodie" on a cowboy page and tagged every figure UNKNOWN.
             const clothingByName = img.sceneCharacterClothing || sceneMetadata.characterClothing || {};
-            const { buildClothingDescription } = require('./server/lib/entityConsistency');
+            // The SHARED clothing chain, like every other identity-line builder
+            // (owner, 2026-08-20 — smoke #2 caught this as the LAST unconverted
+            // site). Covers have no sceneCharacterClothing, so the old
+            // `if (category)` gate sent every cover figure to the detector
+            // undressed: all cover seedTraces read "no garment colour in the
+            // identity line" while the pages seeded fine. The chain falls back
+            // hint -> clothingRequirements.used -> standard -> wardrobe and
+            // ERRORs when a figure would go out naked.
+            const shBbox = require('./server/lib/storyHelpers');
             const expectedCharacters = (img.sceneCharacters || []).map(c => {
               const name = c.name || c;
               if (typeof c !== 'object') return { name, description: '' };
-              let clothingText = '';
-              const category = clothingByName[name];
-              if (category) {
-                try {
-                  clothingText = buildClothingDescription(c, category, artStyle, clothingRequirements || null) || '';
-                } catch (e) {
-                  log.warn(`⚠️ [BBOX-SHARED] P${img.pageNumber} ${name}: clothing "${category}" did not resolve (${e.message}) — identity line goes without it`);
-                }
-              }
-              return { name, description: c.description || buildCastIdentityDescription(c, clothingText) };
+              const clothingText = shBbox.buildIdentityClothingText(
+                c, clothingByName[name], artStyle, clothingRequirements || null,
+                { label: `P${img.pageNumber} ` });
+              return { name, description: shBbox.buildIdentityLine(c, clothingText) };
             });
             // Story-invented characters live ONLY in the Visual Bible — never in
             // sceneCharacters, which is the user's photo-backed cast. Without them
