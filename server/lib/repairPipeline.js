@@ -1237,6 +1237,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // a head mask; null → gate falls back to a fresh /figure-mask call.
         detectionBodyMask: useFaceOnly ? null : (targetResolved.bodyMask || null),
         textPosition: pageTextPosition,
+        // The repair prompt builds an "Art style — match this medium and
+        // rendering exactly: <full descriptor>" block from this, and falls back
+        // to NOTHING when it is absent. Every production character repair ran
+        // without it: the model was told to "match the surrounding style"
+        // without ever being told what that style is, while holding a portrait
+        // reference. Measured on a shipped page, 4 of 5 full-figure repairs came
+        // back in a different rendering from the page they were painted into.
+        artStyle: storyData?.artStyle || artStyle || null,
         includeDebug: true,
       });
     } catch (err) {
