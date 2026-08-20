@@ -14313,3 +14313,60 @@ server/lib/promptBuilders.js (buildArcReviewPrompt, parseArcReview, parseBeats r
 server/lib/beatsPipeline.js (arc stage + arcReviewReport), storyJobPipeline.js (persist),
 server/config/models.js (arcReviewModel), server/lib/testlab.js (arc_rounds stage, judge retry,
 parallel judging, params.fromArc / storyDetails), client/src/services/testlabService.ts.
+
+---
+
+## 2026-08-20 — The reference slot computes its layout instead of hardcoding it per aspect
+
+**Context:** The A4 back cover of staging `job_1787252581387_6sn8z0nh2` packed three
+characters as "2 on top, 1 below" and rendered each of them **138px wide inside a
+768×1024 slot — 25.8% ink coverage**, the rest empty bars. The arrangement was
+hardcoded in `buildCharacterGroupSlot` per (character count, target aspect):
+`n=3 && targetRatio < 0.95 → composeStack(row(0,1), horizontal(2))`.
+
+That rule was correct when written, for an input that no longer exists. It assumed
+each card was a wide `[body | face]` strip (~9:8), where two rows genuinely packed
+better into a portrait slot. Production now sets `useStorySheetCells`, so
+`cropAvatarCell` feeds `cell-<pose>-headbody` strips at roughly **1:3.7**. Stacking
+two rows of those makes a ~1:7 composite that has to be crushed to fit any target.
+
+Two things fell out of the same investigation:
+- `photoType: 'cell-front-headbody'` does not match the `isGrid` test, so
+  `extractFaceAndBody` never runs on the production path. `buildVertical` and
+  `buildHorizontal` were therefore the SAME function, and the "horizontal strip
+  below" in the layout comment described nothing the code did.
+- `buildCharacterGroupSlot` returned `null` for `n > 3` and `pushCharSlot`
+  returned on it **with no log**. A 7-character story splits 4+3 across two
+  slots, so four characters silently lost their reference; an 8-character story
+  (4+4) lost every character reference.
+
+**Decision:** Replace the hardcoded branch with `chooseCardArrangement(metas, target)`.
+`pushCharSlot` pads the composite to the target aspect and scales it to a fixed
+1024 height, so the rendered size of each character is exactly
+`1024 / max(totalHeight, maxRowWidth / target)`. Compute that for every column
+count and keep the largest; ties break to the wider arrangement (a row reads as
+"separate characters", and it is what the function did before). Dimensions only —
+the losing arrangements are never rendered. The `n > 3` cap is removed (the chooser
+handles any count) and the remaining `!composed` path now logs loudly.
+
+**Measured on the real strips from that story (3 characters):**
+
+| target | before | after |
+|---|---|---|
+| A4 3:4  | 138px/char, 25.8% ink | **239px/char, 76.8% ink** |
+| square 1:1 | 277px/char, 77.6% ink | unchanged (already one row) |
+
+**Rationale:** Owner requirement was that this work for BOTH A4 and square. A
+hardcoded flip to "always one row" would satisfy today's input on both, but it
+re-commits the original mistake — baking in an assumption about card shape that
+has already changed once. Verified the chooser keeps the stack where the stack is
+genuinely right: three square 2×4 sheets at 3:4 still choose 2 columns, because
+three across would be 3:1 and pad away most of the slot.
+
+**Touched:**
+- `server/lib/grok.js` — `chooseCardArrangement` (new, exported for its test),
+  `composeStack` → `composeColumn` (N rows), `buildCharacterGroupSlot` (chooser +
+  cap removed + dead `buildHorizontal` deleted), `pushCharSlot` (loud on no-slot)
+- `tests/manual/charSlotArrangement.test.js` — 17 assertions, both aspects, both
+  input shapes, counts 1–8
+**Status:** ✅ active

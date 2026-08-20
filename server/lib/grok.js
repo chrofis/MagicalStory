@@ -705,46 +705,113 @@ async function composeRow(buffers) {
 }
 
 /**
- * Stack two rows vertically. Both rows are centered horizontally; the wider
- * row sets the composite width and the narrower row gets grey fill on the sides.
+ * Stack N rows vertically, each centered horizontally. The widest row sets the
+ * composite width; narrower rows get background fill on both sides.
+ *
+ * Was `composeStack(topRow, bottomRow)` — fixed at two rows because the only
+ * caller hardcoded a 2-on-top-1-below layout. chooseCardArrangement can now pick
+ * any row count, so this takes a list.
  */
-async function composeStack(topRow, bottomRow) {
-  const tm = await sharp(topRow).metadata();
-  const bm = await sharp(bottomRow).metadata();
-  const outW = Math.max(tm.width, bm.width);
-  const outH = tm.height + bm.height + CHAR_GAP;
-  const topX = Math.floor((outW - tm.width) / 2);
-  const botX = Math.floor((outW - bm.width) / 2);
+async function composeColumn(rows) {
+  if (rows.length === 0) return null;
+  if (rows.length === 1) return rows[0];
+  const metas = await Promise.all(rows.map(r => sharp(r).metadata()));
+  const outW = Math.max(...metas.map(m => m.width));
+  const outH = metas.reduce((a, m) => a + m.height, 0) + CHAR_GAP * (rows.length - 1);
+  const composites = [];
+  let y = 0;
+  for (let i = 0; i < rows.length; i++) {
+    composites.push({ input: rows[i], left: Math.floor((outW - metas[i].width) / 2), top: y });
+    y += metas[i].height + CHAR_GAP;
+  }
   return sharp({
     create: { width: outW, height: outH, channels: 3, background: CHAR_BG },
   })
-    .composite([
-      { input: topRow, left: topX, top: 0 },
-      { input: bottomRow, left: botX, top: tm.height + CHAR_GAP },
-    ])
+    .composite(composites)
     .jpeg({ quality: 90 })
     .toBuffer();
 }
 
 /**
- * Build a single slot image holding 1-3 characters with an aspect-aware layout.
+ * Pick how many columns to lay the character cards out in.
  *
- *   n=1:        [body | face] horizontal           (~9:8, near square)
- *   n=2:        2× [face / body] vertical stacks side-by-side  (~3:4 portrait)
- *   n=3 square: 3× vertical stacks side-by-side    (~3:2, near square)
- *   n=3 A4:     2 vertical stacks on top + 1 horizontal strip below
+ * The arrangement used to be hardcoded per character count and target aspect
+ * ("3 chars + portrait → 2 on top, 1 below"). That rule was written for the old
+ * reference shape — a wide [body | face] strip (~9:8) — where stacking two rows
+ * genuinely packed better. Production now feeds `cell-<pose>-headbody` strips
+ * from cropAvatarCell at roughly 1:3.7, and stacking two rows of THOSE makes a
+ * ~1:7 composite that has to be crushed to fit any target: measured on staging
+ * job_1787252581387_6sn8z0nh2, each character rendered 138px wide on an A4 cover
+ * instead of the 208px a single row gives (25.8% vs 58.2% ink coverage).
  *
- * Characters without an avatar-grid photoType (raw face/body/bodyNoBg) fall
- * back to the raw buffer as-is.
+ * So don't hardcode it — the caller (pushCharSlot) pads the composite to the
+ * target aspect and then scales it to 1024 height, which means the final size of
+ * each character is exactly 1024 / paddedHeight. Compute that for every column
+ * count and keep the best. This is self-correcting: tall cell strips choose a
+ * single row on both A4 and square, while square 2×4 sheets (3-across would be
+ * 3:1, badly padded) still choose the stack on A4.
+ *
+ * Dimensions only — the cards are already built, so this is arithmetic on
+ * metadata and the loser arrangements are never rendered.
+ *
+ * @param {Array<{width:number,height:number}>} metas - built card dimensions
+ * @param {number} target - target aspect as width/height
+ * @returns {{cols:number, scale:number}} winning column count + its scale factor
+ */
+function chooseCardArrangement(metas, target) {
+  const n = metas.length;
+  let best = null;
+  for (let cols = 1; cols <= n; cols++) {
+    let totalH = 0;
+    let maxW = 0;
+    const rowCount = Math.ceil(n / cols);
+    for (let i = 0; i < n; i += cols) {
+      const row = metas.slice(i, i + cols);
+      // composeRow scales every card in a row to the row's tallest card.
+      const rowH = Math.max(...row.map(m => m.height));
+      const rowW = row.reduce((a, m) => a + Math.round(m.width * rowH / m.height), 0)
+                 + CHAR_GAP * (row.length - 1);
+      totalH += rowH;
+      maxW = Math.max(maxW, rowW);
+    }
+    totalH += CHAR_GAP * (rowCount - 1);
+    // Height after padding to the target aspect — the only term that matters,
+    // since the slot is then scaled to a fixed 1024 height.
+    const paddedH = Math.max(totalH, maxW / target);
+    const scale = 1024 / paddedH;
+    // `>=` with cols ascending means ties go to the WIDER arrangement. Ties are
+    // real and common — two square cards at a square target occupy the same
+    // bounding box side by side or stacked — and a row is the better tie-break:
+    // it reads as "separate characters" rather than one tall column, and it is
+    // what this function did before the chooser existed.
+    if (!best || scale >= best.scale) best = { cols, scale };
+  }
+  return best;
+}
+
+/**
+ * Build a single slot image holding N characters, laid out so each of them
+ * renders as large as the target aspect allows.
+ *
+ *   n=1:  [body | face] horizontal card (~9:8, near square) — only one
+ *         arrangement exists, so there is nothing to choose
+ *   n>1:  one [face / body] card per character, arranged by
+ *         chooseCardArrangement — see there for why the arrangement is computed
+ *         rather than hardcoded per (count, aspect)
+ *
+ * Characters without an avatar-grid photoType fall back to the raw buffer as-is.
+ * NOTE that this is the production path today: cropAvatarCell feeds
+ * `cell-<pose>-headbody` strips, which do not match the isGrid test, so the
+ * face/body composition below is a no-op and the cards ARE the raw strips.
  *
  * @param {Buffer[]} rawBuffers
  * @param {(string|null)[]} photoTypes
  * @param {string} aspectRatio - Target slot aspect (e.g. '1:1', '3:4')
- * @returns {Promise<Buffer|null>} null if rawBuffers is empty or n > 3.
+ * @returns {Promise<Buffer|null>} null only when rawBuffers is empty.
  */
 /**
  * Pad a composed character slot to the exact target aspect using CHAR_BG (the
- * same grey already used between characters in composeRow / composeStack).
+ * same grey already used between characters in composeRow / composeColumn).
  * Grok sees this as more of the existing inter-character background, so it
  * doesn't bake "bars" into the output the way black/white padding did. After
  * this step packReferences's aspect-pad cover-crop becomes a no-op and no
@@ -780,7 +847,13 @@ async function padCharacterSlotToAspect(buffer, aspectRatio) {
 
 async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, charNames = [], options = {}) {
   const n = rawBuffers.length;
-  if (n === 0 || n > 3) return null;
+  // No upper bound. There used to be `n > 3 → null`, and pushCharSlot dropped
+  // that group with no log at all: a 7-character story splits 4+3 across two
+  // slots, so four characters lost their reference entirely, and an
+  // 8-character story (4+4) lost EVERY character reference, silently.
+  // chooseCardArrangement handles any count, so the cap has nothing left to
+  // protect (owner, 2026-08-20).
+  if (n === 0) return null;
 
   // Per-page character name set → each card gets a colour frame (not a name
   // caption) so Grok can bind card↔character without leaking the name. Same
@@ -805,39 +878,32 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
     return frameCharacterImage(composed, colorFor(i));
   };
 
-  // Helper: horizontal strip if grid, else raw — framed the same way.
-  const buildHorizontal = async (i) => {
-    const composed = parts[i] ? await composeBodyFaceHorizontal(parts[i].face, parts[i].body) : rawBuffers[i];
-    return frameCharacterImage(composed, colorFor(i));
-  };
-
   let composed;
   if (n === 1) {
     // Frame (via colorFor) when the page has >1 character total — even if this
     // slot holds just one, a sibling slot's character needs the card↔face
     // binding to stay distinct. colorFor returns null on a single-character
     // page, so frameCharacterImage leaves the card unframed (no border leak).
+    // Kept on the horizontal card: with one card there is only one arrangement,
+    // so there is nothing for chooseCardArrangement to decide, and [body | face]
+    // is the near-square shape that fits a slot best.
     const single = parts[0]
       ? await composeBodyFaceHorizontal(parts[0].face, parts[0].body)
       : rawBuffers[0];
     composed = await frameCharacterImage(single, colorFor(0));
-  } else if (n === 2) {
-    const stacks = [await buildVertical(0), await buildVertical(1)];
-    composed = await composeRow(stacks);
   } else {
-    // n === 3: aspect-aware layout choice
+    // Build every card once, measure, then lay them out in the arrangement that
+    // renders each character largest for THIS target aspect. Only the winning
+    // arrangement is composited — the rest is arithmetic on metadata.
+    const cards = [];
+    for (let i = 0; i < n; i++) cards.push(await buildVertical(i));
+    const metas = await Promise.all(cards.map(c => sharp(c).metadata()));
     const [aspW, aspH] = String(aspectRatio || '1:1').split(':').map(Number);
     const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
-    if (targetRatio >= 0.95) {
-      // Square-ish target: 3 vertical stacks side by side
-      const stacks = [await buildVertical(0), await buildVertical(1), await buildVertical(2)];
-      composed = await composeRow(stacks);
-    } else {
-      // Portrait target: 2 vertical stacks on top, horizontal strip on bottom
-      const topRow = await composeRow([await buildVertical(0), await buildVertical(1)]);
-      const bottomRow = await buildHorizontal(2);
-      composed = await composeStack(topRow, bottomRow);
-    }
+    const { cols } = chooseCardArrangement(metas, targetRatio);
+    const rows = [];
+    for (let i = 0; i < n; i += cols) rows.push(await composeRow(cards.slice(i, i + cols)));
+    composed = await composeColumn(rows);
   }
 
   // Skip the aspect-pad when caller will append a VB row underneath — the VB
@@ -1059,9 +1125,8 @@ async function packReferences(refs = {}, options = {}) {
   // picks the best shape based on count and aspect ratio):
   //
   //   1 char:     [body | face] horizontal       (near square)
-  //   2 chars:    2× [face/body] vertical stacks (near 3:4 portrait)
-  //   3 chars 1:1: 3× vertical stacks side by side (near square)
-  //   3 chars 3:4: 2 vertical stacks on top + 1 horizontal strip below
+  //   2+ chars:   one card each, arranged by chooseCardArrangement to maximise
+  //               the rendered size of each character at the target aspect
   //   4+ chars:   split at ceil(n/2), each group through the same function
   //
   // With 1–3 chars fitting in a single slot, we free up a slot compared to
@@ -1096,7 +1161,12 @@ async function packReferences(refs = {}, options = {}) {
       group.map(c => c.charName),
       { skipAspectPad: willAddVb, allCharNames: rawCharData.map(c => c.charName) },
     );
-    if (!composed) return;
+    if (!composed) {
+      // Never silent: this early return is how a whole character group used to
+      // vanish from the references with nothing in the log (the old n > 3 cap).
+      log.warn(`⚠️ ${tag} Character slot produced no image for [${group.map(c => c.charName || '?').join(', ')}] — those characters have NO reference this render`);
+      return;
+    }
     let slotBuf = composed;
     let vbCount = 0;
     if (willAddVb) {
@@ -1638,6 +1708,10 @@ module.exports = {
   extractBottomBody3Columns,
   detectMinVarianceSeparator,
   buildCharacterGroupSlot,
+  // Pure arithmetic, exported for its unit test — the layout decision is the
+  // part worth pinning, and testing it through buildCharacterGroupSlot would
+  // mean rendering every candidate just to observe which one won.
+  chooseCardArrangement,
   frameCharacterImage,
   GROK_MODELS,
 };
