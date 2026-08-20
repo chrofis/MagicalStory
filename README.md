@@ -97,8 +97,8 @@ MagicalStory/
 ├── server.js               # Express backend
 ├── email.js                # Email utilities
 ├── prompts/                # AI prompt templates
-├── docs/                   # Documentation
-└── requirements/           # Future architecture specs
+├── docs/                   # Documentation (docs/archive/ = superseded, skip it)
+└── tasks/                  # BACKLOG.md = open work, bugs.json = clear bugs
 ```
 
 ---
