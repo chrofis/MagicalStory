@@ -1,10 +1,12 @@
 /**
  * Beats-first story generation (pipelineMode: 'beats').
  *
- * Replaces the single unified Sonnet call + outline review with six staged
+ * Replaces the single unified Sonnet call + outline review with staged
  * calls, so every stage is reviewable and only the faulted pages get rewritten:
  *
- *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE
+ *   0. beats_arc_plan        Sonnet    the arc alone: problem, attempts, who does what
+ *   0b. beats_arc_review     Grok      reviews the arc before any page exists
+ *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE, FROM the approved arc
  *   2. beats_review          Grok      structural review, rewrites faulted pages
  *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
  *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
@@ -312,7 +314,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   } else {
     t = Date.now();
     try {
-      await stage(3, 'Reviewing the story beats...', { next: 18, ms: 217000 });
+      await stage(5, 'Reviewing the story beats...', { next: 18, ms: 217000 });
       const revRes = await textModels.callTextModelStreaming(reviewPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_review' });
       const parsed = parseBeats(revRes.text || '', []);
       beatsReviewAnalysis = parsed.analysis || '';
