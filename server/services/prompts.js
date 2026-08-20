@@ -20,9 +20,22 @@ const PROMPT_TEMPLATES = {};
 // repair templates read directly in images.js (imported from here).
 const REPAIR_STYLE_GUARD = 'Render the repainted area in the same illustration style as the rest of the scene — same line work, shading, and level of detail as the other figures. Do not render it more realistically or more photographically than the surrounding artwork.';
 
-/** Substitute the shared repair guard into a template string (load-time). */
+// Single source of truth for the no-lettering guard on REPAIR and EDIT prompts.
+// The base page template forbids painted text, but every prompt that repaints
+// part of a finished page — the four character-repair variants, the generic
+// illustration edit, the inpainting prompt — carried no such rule, so a repair
+// pass could add lettering the original render was forbidden to draw. Observed:
+// a shipped page acquired an English caption during a repair pass. Same
+// load-time token mechanism as the style guard above, for the same reason:
+// six parallel templates cannot be kept in sync by hand.
+const REPAIR_TEXT_GUARD = 'Add no text of any kind: no caption, watermark, label, signature, or letters, numbers and symbols on any surface in the repainted area. Object names in this prompt say what to draw — never paint a name as lettering. Lettering already present in the untouched part of the image stays exactly as it is.';
+
+/** Substitute the shared repair guards into a template string (load-time). */
 function applyRepairStyleGuard(text) {
-  return typeof text === 'string' ? text.replace(/\{REPAIR_STYLE_GUARD\}/g, REPAIR_STYLE_GUARD) : text;
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/\{REPAIR_STYLE_GUARD\}/g, REPAIR_STYLE_GUARD)
+    .replace(/\{REPAIR_TEXT_GUARD\}/g, REPAIR_TEXT_GUARD);
 }
 
 async function loadPromptTemplates() {
@@ -111,6 +124,11 @@ async function loadPromptTemplates() {
     // that locks scenes so image generation can start.
     ['storyBeats', 'story-beats.txt'],
     ['storyBeatsReview', 'story-beats-review.txt'],
+    // Arc-only review and its judge. The arc is ~15 lines where the beats are a
+    // whole book, so a review round costs cents — which is what makes "how many
+    // rounds, and with which models" answerable at all.
+    ['storyArcReview', 'story-arc-review.txt'],
+    ['storyArcJudge', 'story-arc-judge.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],

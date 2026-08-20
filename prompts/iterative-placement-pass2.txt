@@ -8,3 +8,5 @@ The added character must be:
 - In the distant background area
 - Recognizable but tiny — match the scene's art style and lighting
 - PRESERVE the entire foreground exactly as shown
+
+{REPAIR_TEXT_GUARD}

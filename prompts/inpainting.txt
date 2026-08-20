@@ -13,4 +13,6 @@ RULES:
 4. Blend edges seamlessly with surrounding area
 5. Keep the same lighting direction and shadow style
 
+{REPAIR_TEXT_GUARD}
+
 OUTPUT: The edited image with minimal changes - fix only what was requested.

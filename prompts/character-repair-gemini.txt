@@ -21,3 +21,5 @@ KEEP UNCHANGED:
 CRITICAL: The current face is WRONG. You MUST produce a visibly different result where {CHAR_NAME}'s face matches the reference. If you return the image unchanged, the repair has FAILED.
 
 Output a single corrected image.
+
+{REPAIR_TEXT_GUARD}

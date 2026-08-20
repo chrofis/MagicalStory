@@ -13,3 +13,5 @@ Face: match IMAGE 1 (face shape, eyes, hair, skin tone).
 {REPAIR_STYLE_GUARD}
 
 Every pixel outside the crosshatch in IMAGE 2 is final — copy IMAGE 2 verbatim there. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
+
+{REPAIR_TEXT_GUARD}

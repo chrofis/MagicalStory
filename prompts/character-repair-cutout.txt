@@ -18,3 +18,5 @@ The background outside the crosshatch area should stay the same.{issueContext}{t
 
 --- {charName} — everything to match ---
 Face, hair, skin tone and build: from IMAGE 1.{appearanceContext}{clothingContext}{actionContext}
+
+{REPAIR_TEXT_GUARD}
