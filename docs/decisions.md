@@ -13879,7 +13879,28 @@ camera during a declared interaction, so one defect can arrive under two codes.
 The feedback consolidator dedupes across evaluators before scoring, so this does
 not double-charge on the consolidated path; revisit if it shows up as one.
 
+**Validated** — exp773 (5 styles x 2) and exp775 (2 pages carrying a KNOWN
+camera-address defect). Both types emit and bill per character. On
+`job_1786653013328_yhzn4dv5q` p5 all four new-type concepts were STABLE 2/2 and
+the page's 30-point range came entirely from detection flips in the OLD
+catch-all types — so the new codes added signal, not churn. On
+`job_1786917840874_rur4nskfv` p1 a defect previously filed as ONE
+`action_interaction` CRITICAL now splits correctly into `emotion|emma` +
+`viewer_address|emma`.
+
+Not uniformly stable, and worth stating: `viewer_address` held 2/2 wherever it
+fired, while `emotion` flipped severity on one page and detection on another
+(`job_1786780194082_s980g4s9a` p8, 1 of 2 runs). The new types do not escape the
+base detection-flip rate measured in exp768 — they are better-typed findings,
+not more reproducible ones. At 2 repeats this is a noisy read (see the
+reliability flag added to eval_variance the same day).
+
+**Side effect:** `yhzn4dv5q` p5 was one of the four "clean by luck" pages from
+the 2026-08-19 entry, scoring 100/100/100 in exp770. It now correctly flags real
+defects. Giving the judge specific things to look for reduces the false-clean
+rate without the confirmation eval the owner declined.
+
 **Touched:** `server/lib/evalBuckets.js` (two buckets + aliases),
 `server/lib/scoring.js` (they bill under their own names, once per character),
 `prompts/image-semantic.txt` (rules, closed type list, worked example)
-**Status:** 🟡 shipped to staging, pending validation on set #14
+**Status:** ✅ active on staging
