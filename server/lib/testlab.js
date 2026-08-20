@@ -1497,12 +1497,15 @@ async function runCharRepairStage(ctx, opts) {
   }
 
   const t0 = Date.now();
-  const result = await repairCharacterFace(imageData, avatarPhoto, {
-    ...axes,
-    charName,
-    faceBbox: faceBbox || undefined,
-    bodyBbox: bbox,
-    ...(params.issueDescription ? { issueDescription: params.issueDescription } : {}),
+  // The SHARED production contract (charRepairRequest.js). Built from the same
+  // field list the unified pipeline uses, so a Lab run sends what production
+  // sends; anything this stage deliberately does differently is an override or
+  // a Lab-only mechanic below, and every one is indexed in
+  // docs/lab-divergences.md.
+  const { buildCharRepairRequest } = require('./charRepairRequest');
+  const sharedRequest = buildCharRepairRequest({
+    imageBackend: backend,
+    issueDescription: params.issueDescription || null,
     clothingDescription,
     // Face/hair/build text for the prompt. Follows refName so an identity swap
     // describes the person we actually want painted.
@@ -1511,18 +1514,28 @@ async function runCharRepairStage(ctx, opts) {
       return (typeof d === 'string' ? d : d?.richDescription) || '';
     })(),
     photoType: avatarPhotoType,
-    // Deterministic re-blend of a stored model output (Replay for the spine path).
-    ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
-    textPosition: ctx.textPosition,
-    // Same option the unified pipeline was missing: without it the repair
-    // prompt's "Art style — match this medium and rendering exactly" block is
-    // empty, so a Lab run cannot reproduce (or verify) production's styling.
     artStyle: params.artStyleOverride || ctx.artStyle || null,
+    faceBbox: faceBbox || null,
+    bodyBbox: bbox,
+    whiteoutTarget,
+    // LAB DIVERGENCE (indexed): production reuses the detection SAM silhouette;
+    // a Lab run has no detection pass, so the gate re-runs /figure-mask.
+    detectionBodyMask: null,
     protectedFaces,
     protectedBodies,
-    addStep,
+    textPosition: ctx.textPosition,
     includeDebug: true,
+  });
+  const result = await repairCharacterFace(imageData, avatarPhoto, {
+    ...sharedRequest,
+    // Lab-only MECHANICS (not behaviour deviations): the stage calls
+    // repairCharacterFace directly with resolved axes, captures per-step images,
+    // and can replay a stored model output.
+    ...axes,
+    charName,
+    addStep,
+    ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     // FULL identity swap: the prompt must NAME the reference character, or the
     // text keeps ordering the target back (exp #329: Roger's avatar + 'paint one
     // Lukas' = no change). Region/pose stay the target's.

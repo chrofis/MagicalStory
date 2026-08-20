@@ -1220,7 +1220,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     require('./runMetrics').forJob(storyData?.id || jobId).count('consistency_regen');
     let repairResult;
     try {
-      repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, {
+      // ONE contract, shared with the Test Lab stage (charRepairRequest.js).
+      // Assembling this by hand in two places is what let the Lab drift from
+      // production and hid the missing artStyle from both.
+      const { buildCharRepairRequest } = require('./charRepairRequest');
+      repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
         imageBackend: 'grok',
         issueDescription: decision.issueDescription,
         clothingDescription: clothingDesc,
@@ -1246,7 +1250,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // back in a different rendering from the page they were painted into.
         artStyle: storyData?.artStyle || artStyle || null,
         includeDebug: true,
-      });
+      }));
     } catch (err) {
       // Literal, not a bare `method`: this closure has no such binding (the
       // round runner destructures one from pageStrategies, a different scope),

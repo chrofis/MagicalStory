@@ -51,6 +51,19 @@ node "$HOOK_DIR/../scripts/admin/check-open-bugs.js" || exit 1
 # to buckets first) and fails SILENTLY — see check-taxonomy-ownership.js.
 node "$HOOK_DIR/../scripts/admin/check-taxonomy-ownership.js" || exit 1
 
+# Gate 6b: the Test Lab must SEND what production sends. repairCharacterFace had
+# its options assembled by hand in repairPipeline.js AND testlab.js; they drifted
+# in both directions and neither passed artStyle, so every production repair ran
+# without its art-style block and no Lab run could reveal it. One contract
+# (charRepairRequest.js), and every deliberate Lab deviation indexed in
+# docs/lab-divergences.md. See tests/manual/test-char-repair-parity.js.
+node "$HOOK_DIR/../tests/manual/test-char-repair-parity.js" >/dev/null || {
+  echo ""
+  echo "check-lab-parity: the Test Lab and production disagree on the char-repair contract"
+  node "$HOOK_DIR/../tests/manual/test-char-repair-parity.js"
+  exit 1
+}
+
 # Gate 7: no Gemini 3.x model on Google's NATIVE api may carry sampling params —
 # they are silently ignored there, so a repointed eval call site loses its
 # temperature:0 determinism with no error. See check-gemini-sampling.js.
