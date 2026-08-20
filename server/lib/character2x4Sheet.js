@@ -1307,9 +1307,29 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   // Downstream consumers (composite, ref attachment) get the story-style
   // sheet by default. Pass 1's realistic anchor is on `realisticImageData`
   // for inspection.
-  const finalImage = pass2?.imageData || pass1.imageData;
+  //
+  // A REJECTED styled sheet now falls back the same way a thrown one does
+  // (owner, 2026-08-20). Pass 2 previously shipped its best attempt no matter
+  // how bad — staging job_1787252581387_6sn8z0nh2 shipped a 1/10 sheet with the
+  // style anchor's three figures painted over an adult character, and reported
+  // success. A photoreal-but-correct Pass-1 sheet is recoverable downstream;
+  // a sheet showing the wrong people is not. Pass 2 stays on `passes.pass2` so
+  // the dev panel can still show what was rejected and why.
+  const styleTransferUsable = !!pass2?.imageData && pass2.valid !== false;
+  if (pass2 && !styleTransferUsable) {
+    const reasons = (pass2.finalVerdict?.failureReasons || []).join('; ') || 'no reason given';
+    log.warn(`[CHARACTER 2×4] ${character?.name} Pass 2 REJECTED after ${pass2.attempts?.length || 0} attempt(s) (score=${pass2.finalScore}/10: ${reasons}) — shipping realistic Pass 1 sheet unstyled`);
+  }
+  const finalImage = (styleTransferUsable ? pass2.imageData : null) || pass1.imageData;
   return {
     imageData: finalImage,
+    // Whether the sheet on `imageData` actually carries the story's art style.
+    // False when Pass 2 was wanted but did not ship, so callers can log/report
+    // an unstyled avatar instead of silently treating it as converted.
+    // NOT named `styled`: character objects already carry an `avatars.styled`
+    // URL elsewhere, and two different meanings under one name is how a reader
+    // ends up wiring the wrong one.
+    styleTransferShipped: wantStyleTransfer ? styleTransferUsable : true,
     realisticImageData: pass1.imageData,
     usage: composed.usage,
     prompt: pass1.prompt,
@@ -1320,11 +1340,17 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     },
     passes: { pass1, pass2 },
     // Legacy fields — kept so existing callers don't break. The styled
-    // (Pass 2) attempt history is what the dev panel renders by default.
+    // (Pass 2) attempt history is what the dev panel renders by default, and it
+    // stays pass 2's even on the unstyled fallback: the rejected attempts are
+    // exactly what the owner needs to see to know WHY the avatar is unstyled.
     attemptHistory: pass2?.attempts || pass1.attempts,
     selectedAttempt: pass2?.selectedAttempt ?? pass1.selectedAttempt,
-    finalScore: pass2?.finalScore ?? pass1.finalScore,
-    finalVerdict: pass2?.finalVerdict || pass1.finalVerdict,
+    // Score of the sheet that ACTUALLY SHIPPED. On the unstyled fallback that is
+    // Pass 1's, not the rejected Pass 2's — reporting 1/10 for a sheet we did
+    // not ship would make the caller's gate fire on the wrong image. The
+    // fallback itself is surfaced by `styleTransferShipped: false` + the warning.
+    finalScore: styleTransferUsable ? pass2.finalScore : pass1.finalScore,
+    finalVerdict: (styleTransferUsable ? pass2.finalVerdict : null) || pass1.finalVerdict,
   };
 }
 
@@ -1341,7 +1367,10 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   const styleAnchor = loadStyleAnchor(artStyle);
   // promptOverride: Test Lab A/B — full replacement for the style-transfer
   // prompt (buildStyleTransferPrompt output), this call only.
-  const prompt = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: !!styleAnchor });
+  // TWO prompts, because the retry drops the anchor (see the loop below) and the
+  // prompt must stop referring to an Image 2 that is no longer attached.
+  const promptWithAnchor = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: !!styleAnchor });
+  const promptNoAnchor = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: false });
   if (styleAnchor) log.info(`[CHARACTER 2×4] ${characterName} Pass 2 using style anchor (style-anchor-${artStyle})`);
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
@@ -1363,7 +1392,22 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   };
 
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}`);
+    // THE RETRY DROPS THE STYLE ANCHOR (2026-08-20). Every style-anchor-*.jpg
+    // asset is a finished illustration of THREE PEOPLE on white — the same
+    // shape as the sheet it is meant to restyle — so Grok sometimes blends the
+    // anchor's figures into the output instead of taking only its brushwork.
+    // Observed on staging job_1787252581387_6sn8z0nh2: an adult character's
+    // sheet came back with the anchor's boy, woman and elderly man painted
+    // across all 8 cells, scored 1/10 twice, and shipped. Re-sending the same
+    // prompt with the same anchor just re-rolls the same dice; the retry has to
+    // remove the contaminant to be worth paying for. Attempt 1 keeps the anchor
+    // (it lifts style fidelity and is clean in the large majority of runs).
+    // promptOverride is a Test Lab A/B: that run is measuring one exact prompt
+    // against one exact reference set, so the anchor-drop stays off there —
+    // changing the inputs under the experiment would corrupt its own result.
+    const anchorForAttempt = (attempt === 1 || promptOverride) ? styleAnchor : null;
+    const prompt = anchorForAttempt ? promptWithAnchor : promptNoAnchor;
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}${styleAnchor && !anchorForAttempt ? ' — anchor dropped after failed attempt' : ''}`);
     // A thrown backend call consumes ONE attempt — it must never escape this
     // loop. Previously this line was unprotected: one Gemini IMAGE_OTHER
     // safety refusal (photorealistic ADULT face on the Pass-1 sheet) threw
@@ -1374,10 +1418,10 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // same refusal). See docs/decisions.md "Styled-avatar MUST guarantee".
     let result;
     try {
-      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride, styleAnchor);
+      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride, anchorForAttempt);
     } catch (err) {
       log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${totalAttempts} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ''}`);
-      attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
+      attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message, usedAnchor: !!anchorForAttempt });
       continue;
     }
     trackUsage(result);
@@ -1387,8 +1431,8 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // first style transfer instead of scoring and retrying it.
     if (!process.env.GEMINI_API_KEY || skipQualityEval) {
       if (!process.env.GEMINI_API_KEY) log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
-      best = { result, attempt, score: 10, verdict: null };
-      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      best = { result, attempt, score: 10, verdict: null, prompt };
+      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
       break;
     }
 
@@ -1411,8 +1455,8 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       // neutrally and continue so a later attempt that DOES eval successfully
       // can win the best-of-N comparison.
       log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
-      const candidate = { result, attempt, score: 5, verdict: null };
-      attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      const candidate = { result, attempt, score: 5, verdict: null, prompt };
+      attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
       if (!best || candidate.score > best.score) best = candidate;
       continue;
     }
@@ -1431,8 +1475,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
+      usedAnchor: !!anchorForAttempt,
     });
-    const candidate = { result, attempt, score, verdict };
+    const candidate = { result, attempt, score, verdict, prompt };
     if (!best || candidate.score > best.score) best = candidate;
     if (verdict.valid) break;
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
@@ -1445,10 +1490,23 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   // and force its own retry; it was removed because it could not separate a
   // pale garment (chroma 9.8) from JPEG speckle on the white backdrop (4-8),
   // and both of its failure modes still measured "rows agree".
+  // Every attempt threw before producing pixels. Explicit, because the caller's
+  // contract below keys off `valid` — leaving this to a TypeError on
+  // `best.result` and relying on the outer catch worked, but only by accident.
+  if (!best) throw new Error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image in ${totalAttempts} attempt(s)`);
+
   const winningImage = best.result.imageData;
+  // `valid` is the caller's ship/fall-back signal (2026-08-20). It is false ONLY
+  // when the evaluator actually judged the winning sheet and rejected it — the
+  // unjudgeable paths (skipQualityEval, no Gemini key, eval threw) carry a null
+  // verdict and stay valid, preserving the fail-open behaviour those branches
+  // were written for. Without this the caller could not tell a 9/10 sheet from
+  // the 1/10 sheet that shipped with three strangers painted over the character.
+  const valid = best.verdict ? best.verdict.valid !== false : true;
 
   return {
     imageData: winningImage,
+    valid,
     selectedAttempt: best.attempt,
     finalScore: best.score,
     finalVerdict: best.verdict,
@@ -1457,7 +1515,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     provider: best.result.provider || null,
     modelId: best.result.modelId || null,
     attempts,
-    prompt,
+    // The winning attempt's own prompt — attempt 2 drops the anchor, so the two
+    // attempts no longer share one prompt string.
+    prompt: best.prompt,
     sentToGrok: best.result.sentToGrok || null,
   };
 }

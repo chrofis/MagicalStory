@@ -354,8 +354,16 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     const faceMatchScore = evalFailed ? null : (pass1Verdict?.sourceMatch?.sourceMatchScore ?? pass1Verdict?.sourceMatchScore ?? null);
     const clothingMatchScore = evalFailed ? null : (pass1Verdict?.outfit?.outfitScore ?? pass1Verdict?.outfitScore ?? null);
     const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 0;
+    // styled === false means Pass 2 was wanted but every attempt was rejected,
+    // so what shipped is the realistic Pass-1 sheet in a painted story. That is
+    // a real defect and must not read as success: this gate previously scored
+    // ONLY Pass 1's face/clothing (9/9 for a sheet whose Pass 2 came back at
+    // 1/10 with the style anchor's three figures painted over the character),
+    // so the run logged "passed" and the corruption reached the covers.
+    const styleTransferShipped = result.styleTransferShipped !== false;
     const passed = (faceMatchScore == null || faceMatchScore >= MIN_FACE_MATCH_SCORE)
-                && (clothingMatchScore == null || clothingMatchScore >= MIN_CLOTHING_MATCH_SCORE);
+                && (clothingMatchScore == null || clothingMatchScore >= MIN_CLOTHING_MATCH_SCORE)
+                && styleTransferShipped;
 
     const logEntry = {
       timestamp: new Date().toISOString(),
@@ -372,6 +380,10 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       innerOutfitScore: pass1Verdict?.outfit?.outfitScore ?? null,
       innerFinalScore: innerFinal,
       combinedScore: innerFinal,
+      // False = the shipped sheet is the realistic Pass-1 fallback, not a
+      // style-converted one. Read by the dev panel so an unstyled avatar is
+      // visible as such instead of looking like a normal pass.
+      styleTransferShipped,
       evalFailed,
       innerAttemptHistory: result.attemptHistory || null,
       passes: result.passes || null,
@@ -384,7 +396,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
       },
       output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
-      ...(passed ? {} : { warning: `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
+      ...(passed ? {} : { warning: styleTransferShipped
+        ? `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10`
+        : `style transfer REJECTED — shipped unstyled realistic sheet (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10)` }),
     };
     {
       const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
@@ -403,6 +417,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — row eval failed (${evalFailed}); sheet kept but not judged`);
     } else if (passed) {
       log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10)`);
+    } else if (!styleTransferShipped) {
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSTYLED — every style-transfer attempt was rejected; the realistic sheet ships instead so the character keeps a correct identity anchor`);
     } else {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} below threshold (face=${faceMatchScore}, clothing=${clothingMatchScore}, inner=${innerFinal}) — shipping anyway`);
     }

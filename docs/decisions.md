@@ -14185,3 +14185,63 @@ figure was stale — the real number was 35. All five were corrected.
 (new), `requirements/` → `docs/archive/requirements-2025-01/`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-08-20 — The Pass-2 retry drops the style anchor, and a rejected Pass 2 ships unstyled
+
+**Context:** Staging `job_1787252581387_6sn8z0nh2` shipped an adult character's
+2×4 sheet with three strangers painted across all eight cells. Root cause: every
+`server/assets/style-anchor-*.jpg` is a finished illustration of THREE PEOPLE
+(boy, woman, elderly man) on a white ground — the same visual format as the sheet
+it is meant to restyle — while the prompt calls it "a swatch of the painting
+technique, palette, and paper texture only". Grok blended the anchor's figures
+into the output. The Pass-2 evaluator caught it perfectly (1/10, `invalid`) on
+BOTH attempts, and the sheet shipped anyway:
+
+1. `runStyleTransferPass` returned `best.result` with no "every attempt was
+   rejected" branch, so a 1/10 sheet was indistinguishable from a 9/10 one.
+2. `convertAvatarToStyle`'s `passed` gate read only Pass-1's face/clothing scores
+   (9/9 here — Pass 1 was fine), so the run logged `success: true` with no
+   warning. `innerFinalScore: 1` was recorded and gated nothing.
+3. The existing retry re-sent the identical prompt with the identical anchor, so
+   it reproduced the same contamination — a paid call that could not help.
+
+**Decision:** Two changes, both owner-directed (2026-08-20).
+- **Attempt 2 drops the anchor.** Attempt 1 still sends it (it lifts style
+  fidelity and is clean in the large majority of runs — the other four characters
+  in the same story took the same anchor and came out fine). When the evaluator
+  rejects attempt 1, attempt 2 re-runs with the sheet ALONE and the no-anchor
+  prompt variant, removing the only source of foreign figures. Test Lab
+  `promptOverride` runs are exempt: an A/B is measuring one exact prompt against
+  one exact reference set, and mutating the inputs mid-experiment corrupts its
+  own result.
+- **A rejected Pass 2 falls back to the realistic Pass-1 sheet**, exactly as a
+  thrown Pass 2 already did. `runStyleTransferPass` now returns `valid`;
+  `generateCharacter2x4Sheet` returns `styleTransferShipped` and reports the
+  score of the sheet that ACTUALLY shipped; `convertAvatarToStyle` folds
+  `styleTransferShipped` into `passed`.
+
+**Rationale:** A photoreal-but-correct sheet is recoverable downstream — style
+repair and the scene render both work from it. A sheet showing the wrong people
+is not: it propagates into every page reference and every cover. `valid` is false
+ONLY when the evaluator actually judged and rejected the winner; the unjudgeable
+paths (`skipQualityEval`, missing `GEMINI_API_KEY`, eval threw) carry a null
+verdict and stay valid, preserving the fail-open behaviour those branches exist
+for — the trial must never lose its styled sheet to an eval outage.
+
+This is containment, not a cure: attempt 1 still ships a leak whenever it happens
+to blend cleanly enough to score ≥6. **Replacing all 13 anchor assets with
+genuinely figure-free swatches is tracked as separate open work** and remains the
+real fix.
+
+**Touched:**
+- `server/lib/character2x4Sheet.js` — `runStyleTransferPass` (anchor-drop retry,
+  `promptWithAnchor`/`promptNoAnchor`, per-attempt `usedAnchor`, `valid`, explicit
+  throw when no attempt produced pixels); `generateCharacter2x4Sheet` (fallback +
+  `styleTransferShipped` + shipped-sheet `finalScore`)
+- `server/lib/styledAvatars.js` — `passed` gate, log entry, warning text
+- `server/lib/compositeCastBuilder.js` — sibling lazy-gen path logs the unstyled case
+- `tests/manual/avatarStyleAnchorRetry.test.js` — 32 assertions against the real
+  sliced function source
+**Status:** ✅ active
