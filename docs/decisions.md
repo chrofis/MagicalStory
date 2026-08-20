@@ -14134,3 +14134,54 @@ the cover default is stale.
 **Touched:** `server/lib/images.js` (geminiSampling + both call sites and their
 log lines), `server/config/models.js`
 **Status:** ✅ active
+
+---
+
+## 2026-08-20 — `tasks/BACKLOG.md` is the single index of open work, and it is TRACKED
+
+**Context:** Open items were written into whatever document a session happened
+to be editing. A sweep on 2026-08-20 found **~184 live open items across ~40
+files**, plus ~240 more in superseded ones (`requirements/` from 2025-01,
+`docs/archive/`) that a sweep cannot tell apart from live work. Answering "what
+is open?" cost a full agent pass over the repo. Worse: `tasks/*` is gitignored,
+so `tasks/todo.md` — the shared scratch filename every session writes its plan
+into — was untracked. One session's trial-funnel plan overwrote another
+session's eval-variance backlog and git had no copy. Only the fragment still in
+a live context could be recovered; the head of that file is gone.
+
+**Decision:** four parts.
+1. `tasks/BACKLOG.md` is the index: one line per open item, each ending in a
+   `→ file:line` pointer. Source documents keep their long-form detail. Closing
+   an item means ticking it in both places.
+2. It is **tracked** — a `!tasks/BACKLOG.md` exception in `.gitignore`, the same
+   reasoning that already exempts `tasks/bugs.json`. Session scratch plans stay
+   ignored; durable state does not.
+3. Per-session plans go in `tasks/<topic>-<date>.md`, never the bare `todo.md`.
+   A shared filename with no history is a shredder.
+4. `requirements/` moved to `docs/archive/requirements-2025-01/`, and
+   `docs/archive/README.md` states that the whole directory is out of the search
+   path. That removes ~240 phantom items from every future sweep.
+
+`scripts/admin/check-backlog-index.js` runs in the pre-push hook and **warns,
+never blocks**, when a pushed file gains `- [ ]` items that BACKLOG.md does not
+point at.
+
+**Rationale:** the check is per-FILE, not per-item, on purpose. Matching an
+index line to its source line needs text comparison that drifts the moment
+anyone rewords either side, and a check that cries wolf gets bypassed — the same
+reasoning `check-doc-coupling.js` states for its own narrowness. It also does
+not block, because task hygiene is never a good reason to fail a push while a
+real fix waits.
+
+An index that lies is worse than no index, so it was verified against the tree
+before landing rather than transcribed: **four items in the recovered backlog
+had already shipped** (B3 `viewer_address` and B4 `emotion` own types, B5's gaze
+contradiction, D1's Test Lab heartbeat) and the "259 commits ahead of master"
+figure was stale — the real number was 35. All five were corrected.
+
+**Touched:** `tasks/BACKLOG.md` (new), `tasks/eval-variance-backlog.md`
+(recovered), `scripts/admin/check-backlog-index.js` (new), `.githooks/pre-push`,
+`.gitignore`, `CLAUDE.md` (Task Management section), `docs/archive/README.md`
+(new), `requirements/` → `docs/archive/requirements-2025-01/`.
+
+**Status:** ✅ active

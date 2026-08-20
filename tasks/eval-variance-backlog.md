@@ -8,22 +8,22 @@ finding was that the score carries roughly 26 points of run-to-run noise.
 
 ## B. Finding taxonomy (one prompt change across three templates + one validation run)
 
+**Verified against the tree 2026-08-20: B3, B4 and B5 shipped after this list was written.**
+Only B1/B2 remain.
+
 - [ ] **B1. Clothing findings carry no `subject`.** Clothing is the largest producer of
       deductions, so per-character billing degrades to per-page: two characters' clothing
       problems collapse into one charge.
 - [ ] **B2. Objects have no subject either.** Only 11% of `object_presence` and 3% of
       `setting` findings carry one, so distinct objects merge. Owner accepted this merge for
       now (2026-08-19); a `subject` field closes it properly.
-- [ ] **B3. `viewer_address` has no type.** Posing for the camera instead of engaging the
-      task: 89 findings across 43 pages in 19 of the last 40 stories, filed inconsistently as
-      `action_interaction` (often CRITICAL) or `naturalness` (MAJOR/MODERATE). Owner wants it
-      as its own category. Needs a bucket in `evalBuckets.js` first, then a line in
-      `BUCKET_BILLING_CATEGORY`. NOT the pose-mirror SETTLED rule (that is left/right and
-      stays a non-deduction). Must never fire on covers.
-- [ ] **B4. `emotion` has no type** — aliased to `naturalness` in `evalBuckets`.
-- [ ] **B5. The evaluator prompts contradict each other on gaze.** `image-semantic.txt` line 46
-      says per-figure gaze drift is NEVER a deduction; `action_interaction` deducts CRITICAL
-      for exactly that. Whichever way B3 goes, these two must agree.
+- [x] **B3. `viewer_address` has its own type** — `evalBuckets.js:101` + `:188`.
+      Done 2026-08-20, `docs/decisions.md` "emotion and viewer_address become their own types".
+- [x] **B4. `emotion` has its own type** — `evalBuckets.js:91` + `:179`. Same entry. The
+      gross-only rule in `image-semantic.txt` is untouched: this adds a code, not a deduction.
+- [x] **B5. The gaze contradiction is gone.** `image-semantic.txt:46` and `:89` now agree —
+      flag only when two characters declared as interacting are turned fully away from each
+      other; per-figure gaze drift is never a deduction.
 
 ## C. Scoring + repair decisions
 
@@ -39,9 +39,10 @@ finding was that the score carries roughly 26 points of run-to-run noise.
 
 ## D. Test Lab tooling + method
 
-- [ ] **D1. Zombie experiment rows block every push for up to 2h.** A container restart kills
-      the in-process loop and leaves `status='running'`; the busy probe then refuses all
-      pushes. Cost an hour on exp747. A heartbeat on the experiment row kills the class.
+- [x] **D1. Zombie experiment rows** — fixed 2026-08-19. A running experiment writes
+      `heartbeat_at` every 30s starting before its first stage call; the reaper and the busy
+      probe count only rows fresh within 5 minutes. `docs/decisions.md` "A dead Test Lab run
+      must not block every push (heartbeat)".
 - [ ] **D2. Range over 3 samples is a noisy estimator.** exp769's two apparent regressions
       (pixar 40→55, control 10→40) may be sampling, not effect. Validation runs comparing
       before/after need more repeats or a better statistic than min-max range.
@@ -52,7 +53,8 @@ finding was that the score carries roughly 26 points of run-to-run noise.
 
 ## Open decisions for the owner
 
-- [ ] Approve the B1–B4 prompt change (subject + emotion + viewer_address).
+- [ ] Approve the B1–B2 prompt change (a `subject` field on clothing and object findings).
+      B3/B4 already shipped.
 - [ ] C1 targeted confirmation eval — yes/no, given A1's caveat.
 - [ ] Whether any of this goes to master.
 

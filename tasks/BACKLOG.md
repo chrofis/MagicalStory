@@ -86,13 +86,14 @@ Full detail for this whole section: `tasks/eval-variance-backlog.md` (recovered 
 after `tasks/todo.md` was overwritten; the head of the original, including the A-section noise
 measurement, is lost).
 
-- [ ] **B1–B4 — one prompt change across three templates + one validation run.** Clothing and
-      object findings carry no `subject` (so per-character billing degrades to per-page);
-      `viewer_address` has no type (89 findings, 43 pages, 19 of the last 40 stories, filed
-      inconsistently); `emotion` is aliased to `naturalness`
-      → `tasks/eval-variance-backlog.md`  **needs owner approval before coding**
-- [ ] B5 — `image-semantic.txt:46` and the `action_interaction` type contradict each other on
-      gaze; whichever way B3 goes, they must agree → `tasks/eval-variance-backlog.md`
+- [ ] **B1–B2 — add a `subject` field to clothing and object findings.** Without it,
+      per-character billing degrades to per-page: two characters' clothing problems collapse
+      into one charge. Only 11% of `object_presence` and 3% of `setting` findings carry a
+      subject today → `tasks/eval-variance-backlog.md`
+      **needs owner approval before coding** (classification is the prompt's job)
+- [x] B3 `viewer_address` + B4 `emotion` own types — **done 2026-08-20**
+      (`evalBuckets.js:91,101`; `docs/decisions.md:13936`)
+- [x] B5 gaze contradiction — **resolved**; `image-semantic.txt:46` and `:89` now agree
 - [ ] C1 — repair/redo is near a coin flip on mid pages (`shouldRedo` fires below 50 while the
       score carries ~26 pts of noise) → `tasks/eval-variance-backlog.md`
       **needs a yes/no from the owner**
@@ -166,9 +167,8 @@ measurement, is lost).
 
 ## Test Lab tooling
 
-- [ ] D1 — zombie experiment rows block every push for up to 2h. A container restart leaves
-      `status='running'` and the busy probe then refuses all pushes (cost an hour on exp747).
-      A heartbeat on the experiment row kills the class → `tasks/eval-variance-backlog.md`
+- [x] D1 — zombie experiment rows blocking pushes — **fixed 2026-08-19** (30s `heartbeat_at`,
+      5-minute freshness on the reaper and the busy probe; `docs/decisions.md:13844`)
 - [ ] D2 — range over 3 samples is a noisy estimator; validation runs need more repeats or a
       better statistic → `tasks/eval-variance-backlog.md`
 - [ ] E1 — a Lab→story link opens as plain admin, missing owner/impersonation rights. Root
@@ -209,7 +209,7 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
-- [ ] Approve the B1–B4 evaluator prompt change → `tasks/eval-variance-backlog.md`
+- [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
 - [ ] C1 targeted confirmation eval — yes or no → `tasks/eval-variance-backlog.md`
 - [ ] Trial: generate the 2×4 costumed sheet eagerly or lazily?
       → `tasks/story-scoped-avatars-plan.md:89`
