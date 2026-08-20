@@ -153,3 +153,12 @@ drafts/
 
 # The clear-bug registry is TRACKED — the pre-push gate reads it on every clone
 !tasks/bugs.json
+
+# The backlog index is TRACKED for the same reason bugs.json is: it must survive.
+# tasks/* is ignored so per-session scratch plans stay local — correct, but it
+# also meant tasks/todo.md was untracked, and every session wrote its plan into
+# that one shared filename. On 2026-08-20 one session's plan overwrote another's
+# backlog and git had no copy to recover from. The index and the recovered
+# backlog are durable state, not scratch.
+!tasks/BACKLOG.md
+!tasks/eval-variance-backlog.md

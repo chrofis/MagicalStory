@@ -65,11 +65,28 @@ Spaces). Before launching any Python script, consider its memory footprint; cap 
 
 ## Task Management
 
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
+**`tasks/BACKLOG.md` is the single index of open work — read it at session start, and add to
+it the moment you find something.** One line per item with a `→ file:line` pointer; the detail
+stays in the source document. Closing an item means ticking it in BOTH places. This exists
+because open items used to be written into whatever doc a session happened to be editing:
+a 2026-08-20 sweep found ~184 live items across ~40 files, and a backlog was lost outright when
+`tasks/todo.md` — untracked, and used as a shared scratch filename by every session — was
+overwritten. `check-backlog-index.js` warns at push time (never blocks) when a file gains open
+items the index does not point at.
+
+Which file does a new item go in?
+- **A clear, reproduced bug** → `tasks/bugs.json`. It blocks every push while open. Fix it now.
+- **Anything else open** (improvement, unbuilt feature, unrun experiment, deferred decision)
+  → a line in `tasks/BACKLOG.md`, plus the detail wherever it belongs.
+- **A plan for the work you are doing right now** → `tasks/<topic>-<date>.md`, never the bare
+  `todo.md`, and index it. Two sessions both writing `todo.md` destroy each other's notes.
+- **Superseded material** → `docs/archive/` (see its README). Sweeps skip that directory.
+
+1. **Plan First**: Write the plan to `tasks/<topic>-<date>.md` with checkable items
 2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
+3. **Track Progress**: Mark items complete as you go, in the plan AND in `tasks/BACKLOG.md`
 4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review to `tasks/todo.md`
+5. **Document Results**: Add a review to the plan file
 6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
 
 ## Important Rules
