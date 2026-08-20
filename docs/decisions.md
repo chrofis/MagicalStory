@@ -584,6 +584,25 @@ than prop identity.
 **Touched:** `server/lib/grok.js` — `composeCharWithVbRow`
 **Status:** ✅ active.
 
+### Overlay stroke adapts to the background under the glyphs
+**Context:** Story text renders as white glyphs with a fixed black stroke
+(0.85 alpha, 32% of font size). On a pale calm zone — an overcast sky, a
+sunlit stone wall — that leaves white-on-white and the text reads as a smudge.
+The calm zone is selected for CALM, never for darkness (see the settled
+text-zone rule), so a bright zone is a normal, correct outcome that the
+renderer has to cope with rather than a defect to repair.
+**Decision:** measure the background luminance under the rendered glyphs and
+strengthen the stroke as it brightens — >165: alpha 1.0 / width 42%; >120:
+0.92 / 36%; otherwise the previous 0.85 / 32%. Measured via the text layer's
+own alpha as the weight, then re-rendered once if a boost applies.
+**Why alpha-weighted, not the polygon box:** a corner text zone is a triangle,
+so its bounding box averages in a large area the text never covers. Measured on
+a real page, the box gave 106/255 ("dark", stroke unchanged) while the pixels
+actually behind the glyphs were 219/255. Weighting by glyph alpha reads the
+surface the text truly sits on.
+**Touched:** `server/lib/textOverlayRenderer.js`
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

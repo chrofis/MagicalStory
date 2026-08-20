@@ -37,7 +37,22 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     pageNumber = null,
     bookFormat = DEFAULT_FORMAT,
     languageLevel = 'standard',
+    zoneLuminance = null,
   } = options;
+
+  // White text carries a black stroke for legibility. On a dark zone a light
+  // stroke is plenty; on a pale one (an overcast sky, a sunlit stone wall) the
+  // default stroke leaves white-on-white and the text reads as a smudge — the
+  // calm zone is chosen for CALM, not for darkness, so a pale zone is a normal
+  // outcome, not a defect to repair. Thicken and solidify the stroke as the
+  // zone gets brighter. 0-255 scale; null (unknown) keeps the old values.
+  const strokeStrength = (zoneLuminance == null)
+    ? { alpha: 0.85, widthFactor: 0.32 }
+    : zoneLuminance > 165
+      ? { alpha: 1, widthFactor: 0.42 }
+      : zoneLuminance > 120
+        ? { alpha: 0.92, widthFactor: 0.36 }
+        : { alpha: 0.85, widthFactor: 0.32 };
 
   // FIXED font size — the printed book must be visually consistent across
   // pages. Text never shrinks; only the polygon area grows or contracts.
@@ -128,7 +143,7 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   for (const { scale, shape } of stages) {
     const check = fitsAtStage(shape);
     if (check.fits) {
-      const result = renderStage(width, height, text, shape, textPosition, baseFontSize, baseFontSize, font, /*forceOnFinal=*/false);
+      const result = renderStage(width, height, text, shape, textPosition, baseFontSize, baseFontSize, font, /*forceOnFinal=*/false, strokeStrength);
       console.log(`[TEXT-OVERLAY] Rendered at ${baseFontSize}px, stage ${scale.toFixed(2)}×, pos=${textPosition}, page=${pageNumber}, words=${check.placed}/${check.total}, img=${width}x${height}`);
       return result.buffer;
     }
@@ -143,7 +158,7 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
   const overflow = fitsAtStage(maxStage);
   const preview = text.replace(/\s+/g, ' ').trim().slice(0, 80);
   console.error(`[TEXT-OVERLAY] OVERFLOW: position=${textPosition}, page=${pageNumber}, placed=${overflow.placed}/${overflow.total} words at fixed=${baseFontSize}px on max stage (2.5×). Shorten the text. Preview: "${preview}"`);
-  const result = renderStage(width, height, text, maxStage, textPosition, baseFontSize, baseFontSize, font, /*forceOnFinal=*/true);
+  const result = renderStage(width, height, text, maxStage, textPosition, baseFontSize, baseFontSize, font, /*forceOnFinal=*/true, strokeStrength);
   return result.buffer;
 }
 
@@ -153,7 +168,7 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
  * @param {boolean} forceOnFinal - If true, force render at min font even on overflow
  *   (used for the biggest stage so we always return something).
  */
-function renderStage(width, height, text, clipPath, textPosition, baseFontSize, _minFontSize, font, forceOnFinal) {
+function renderStage(width, height, text, clipPath, textPosition, baseFontSize, _minFontSize, font, forceOnFinal, strokeStrength = { alpha: 0.85, widthFactor: 0.32 }) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
@@ -178,7 +193,7 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
   // fit this region, the caller escalates to a larger rectangle (stages 1-4
   // in renderTextOverlay). Only the final forced stage draws if still
   // doesn't fit.
-  const fits = tryRenderText(ctx, text, scanlines, baseFontSize, font, align, polyTop, polyBottom, isTop, width, !!forceOnFinal);
+  const fits = tryRenderText(ctx, text, scanlines, baseFontSize, font, align, polyTop, polyBottom, isTop, width, !!forceOnFinal, strokeStrength);
 
   return { buffer: canvas.toBuffer('image/png'), fits, fontSize: baseFontSize };
 }
@@ -217,7 +232,7 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
 
   // Step 3: Render text-only transparent PNG (no backdrop). Its alpha channel
   // is also the source mask for the frosted halo below.
-  const textLayer = renderTextOverlay(width, height, text, polygon, {
+  let textLayer = renderTextOverlay(width, height, text, polygon, {
     textPosition,
     fontSize: options.fontSize,
     fontFamily: options.fontFamily,
@@ -225,6 +240,47 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
     bookFormat: options.bookFormat,
     languageLevel,
   });
+
+  // Step 3b: the stroke has to work against what is actually BEHIND the glyphs.
+  // Measure the background luminance weighted by the text layer's own alpha —
+  // not the polygon's bounding box, which on a corner triangle averages in a
+  // large area the text never covers (a dark cave floor under text sitting on
+  // a pale wall reads as "dark zone" and the stroke stays thin).
+  // A pale zone is a legitimate outcome: the zone is picked for CALM, not for
+  // darkness, so white glyphs on it need a stronger stroke rather than a repair.
+  try {
+    const glyphAlpha = await sharp(textLayer).ensureAlpha().extractChannel('alpha')
+      .raw().toBuffer({ resolveWithObject: true });
+    const bg = await sharp(imageBuffer).resize(glyphAlpha.info.width, glyphAlpha.info.height, { fit: 'fill' })
+      .removeAlpha().raw().toBuffer();
+    let weight = 0;
+    let lumSum = 0;
+    const px = glyphAlpha.data;
+    for (let i = 0; i < px.length; i++) {
+      const a = px[i];
+      if (a < 32) continue;                      // skip transparent + faint edges
+      const o = i * 3;
+      lumSum += a * (0.299 * bg[o] + 0.587 * bg[o + 1] + 0.114 * bg[o + 2]);
+      weight += a;
+    }
+    if (weight > 0) {
+      const zoneLuminance = lumSum / weight;
+      console.log(`[TEXT-OVERLAY] Background under glyphs: ${Math.round(zoneLuminance)}/255`);
+      if (zoneLuminance > 120) {
+        textLayer = renderTextOverlay(width, height, text, polygon, {
+          textPosition,
+          fontSize: options.fontSize,
+          fontFamily: options.fontFamily,
+          pageNumber: options.pageNumber,
+          bookFormat: options.bookFormat,
+          languageLevel,
+          zoneLuminance,
+        });
+      }
+    }
+  } catch (err) {
+    console.log(`[TEXT-OVERLAY] Background measurement unavailable (${err.message}) — default stroke`);
+  }
 
   // No frosted-glass halo — the text already carries a 0.85-alpha black stroke
   // (~32% of font size in width) drawn underneath the white fill, which
@@ -567,7 +623,7 @@ function buildScanlineMap(polygon, imageHeight) {
  * @param {boolean} [force=false] - Render even if text doesn't fit
  * @returns {boolean} Whether all text fit within the polygon
  */
-function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyTop, polyBottom, isTop, canvasWidth, force = false) {
+function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyTop, polyBottom, isTop, canvasWidth, force = false, strokeStrength = { alpha: 0.85, widthFactor: 0.32 }) {
   const lineHeight = Math.round(fontSize * 1.45);
   const minLineWidth = 60;
 
@@ -609,8 +665,8 @@ function tryRenderText(ctx, text, scanlines, fontSize, fontFamily, _align, polyT
     ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
-    ctx.lineWidth = Math.max(2.5, fontSize * 0.32);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.lineWidth = Math.max(2.5, fontSize * strokeStrength.widthFactor);
+    ctx.strokeStyle = `rgba(0, 0, 0, ${strokeStrength.alpha})`;
     ctx.strokeText(line.text, drawX, line.y);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(line.text, drawX, line.y);
