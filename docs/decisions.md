@@ -660,6 +660,49 @@ and a prop named by one but not the other reached the model with no reference.
 - `server/lib/images.js`, `storyJobPipeline.js` — pass the scene's objects[]
 **Status:** ✅ active.
 
+### Repair/edit prompts share one no-lettering guard; figure height is observed
+Two findings from a systematic audit of the bug class "a contract exists but is
+not enforced at every consumer" (the shape behind the VB-id leak, the caption
+that scored 100, and the object-colour blind spot).
+
+**1. No-lettering guard on repair and edit prompts.** The base page template
+forbids painted text; the prompts that repaint part of a FINISHED page did not.
+Of the six main repair/edit templates, five had no lettering rule at all and
+`illustration-edit` had a one-line version of its own; four more templates read
+directly by `images.js` were likewise unguarded. This is the path where the
+defect was actually observed — a shipped page acquired an English caption
+during a repair pass, not during the original render.
+Fix: `REPAIR_TEXT_GUARD` beside the existing `REPAIR_STYLE_GUARD` in
+`server/services/prompts.js`, substituted at load time into any template
+carrying the token. The style guard exists precisely because that guard had
+already drifted across the parallel repair templates; ten hand-maintained
+copies would drift the same way. `style-transfer` is excluded on purpose — it
+restyles an existing render and must not strip lettering that legitimately
+exists in the source.
+
+**2. Declared figure height is now observable.** `buildImagePrompt` injects a
+HEIGHT ORDER line ("<A> (shortest) -> <B> (slightly taller) -> ..."), and
+nothing verified it: the vision inventory reported "Relative size" for OBJECTS
+only, the text-only compliance stage could emit `scale` with no figure-size
+data, and the image-seeing evaluator judges height only as an AGE signal
+(D-08), skipped when a figure sits, kneels, is cropped, occluded or small. Two
+same-age characters at the wrong relative height were unflaggable. Owner
+confirms seeing this in shipped stories.
+Fix: the inventory ranks each figure among those standing at the SAME distance
+(with `cannot tell` for sitting/kneeling/cropped/depth-separated figures), and
+compliance reports `scale` at most MAJOR only on a plain contradiction —
+adjacent names, `roughly equal` and `cannot tell` never deduct.
+**Validation (3 stored pages):** a standing group of six produced a real
+ranking that separated adults from children; four children seated on bicycles
+returned `cannot tell` for every figure (the skip condition working); a
+standing group seen from behind produced a full shortest-to-tallest ordering.
+**Checked and cleared in the same audit:** `figure_completeness` (covered by
+D-11/12/13), object `scale` (D-21), the repair threshold (config-driven, not
+duplicated) and the `3:4` literals (legitimate preset tables).
+**Touched:** `server/services/prompts.js`, the ten repair/edit templates,
+`prompts/image-vision-inventory.txt`, `prompts/image-prompt-compliance.txt`
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL
