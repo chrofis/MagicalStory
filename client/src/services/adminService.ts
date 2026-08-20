@@ -42,6 +42,26 @@ export interface TrialFunnel {
   unclaimed: TrialFunnelUnclaimedEntry[];
 }
 
+/** One step of the /try funnel, in canonical order (see trial_events). */
+export interface TrialStepFunnelEntry {
+  step: string;
+  /** Only some visitors pass through (e.g. the multi-face modal) — never counted as a loss. */
+  optional: boolean;
+  visits: number;
+  /** % of the visits that reached step 1 (landing). */
+  pctOfFirst: number;
+  /** % of the PREVIOUS step — the "which click loses them" number. */
+  pctOfPrev: number;
+  droppedFromPrev: number;
+}
+
+export interface TrialStepFunnel {
+  days: number;
+  source: string;
+  steps: TrialStepFunnelEntry[];
+  totalVisits: number;
+}
+
 export interface AdminUser {
   id: string;
   username: string;
@@ -485,6 +505,10 @@ export const adminService = {
 
   async getTrialFunnel(days = 30): Promise<TrialFunnel> {
     return api.get<TrialFunnel>(`/api/admin/trial-funnel?days=${days}`);
+  },
+
+  async getTrialStepFunnel(days = 30, source = 'all'): Promise<TrialStepFunnel> {
+    return api.get<TrialStepFunnel>(`/api/admin/trial-step-funnel?days=${days}&source=${source}`);
   },
 
   // Token Usage Analytics

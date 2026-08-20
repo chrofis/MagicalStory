@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
+import { trackTrialStep } from '@/utils/trialFunnel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -237,6 +238,7 @@ export default function TrialIdeasStep({
       };
 
       onIdeasGenerated([parseIdea(streamingIdeas[0].text), parseIdea(streamingIdeas[1].text)]);
+      trackTrialStep('ideas_generated');
       setHasGenerated(true);
     }
   }, [streamingIdeas, onIdeasGenerated]);

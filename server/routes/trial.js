@@ -152,7 +152,7 @@ router.get('/admin-bypass-token', authenticateToken, (req, res) => {
 
 // ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 
-const { trialAvatarLimiter, jobStatusLimiter } = require('../middleware/rateLimit');
+const { trialAvatarLimiter, jobStatusLimiter, trialEventLimiter } = require('../middleware/rateLimit');
 
 // Global daily trial counter — in-memory cache backed by DB persistence
 // In-memory for fast cap checks, synced to DB for history across deploys
@@ -362,6 +362,219 @@ async function getTrialFunnel(days = 30) {
       trialMultiStory: 0,
       unclaimed: [],
     };
+  }
+}
+
+// ─── Per-step trial funnel (trial_events) ───────────────────────────────────
+//
+// The canonical step order. `getTrialStepFunnel` reports in exactly this order,
+// and the event endpoint rejects anything not in this list — the whole point of
+// the table is that steps are a closed set that groups, not free text.
+//
+// Everything up to and including `avatar_ready` happens BEFORE an anonymous
+// account exists, which is the stretch that was previously invisible.
+const TRIAL_FUNNEL_STEPS = [
+  'landing',              // /try mounted (includes bots; intro_start is the first human click)
+  'intro_start',          // pressed "Let's start" on the intro screen
+  'consent_given',        // ticked the photo/AI consent box (gates the upload)
+  'photo_selected',       // chose a file
+  'photo_analyzed',       // analyze-photo returned a usable face
+  'face_picked',          // resolved the multi-face modal
+  'character_saved',      // create-anonymous-account returned — a users row now exists
+  'avatar_ready',         // preview avatar rendered
+  'character_done',       // left step 1 for the topic step
+  'topic_selected',       // left the topic step
+  'ideas_generated',      // ideas came back
+  'idea_selected',        // picked one
+  'create_clicked',       // pressed create — navigates to /trial-generation
+  'generation_started',   // the job was accepted
+  'generation_completed', // the story finished
+  'email_submitted',      // gave an email (the lead)
+];
+const TRIAL_FUNNEL_STEP_SET = new Set(TRIAL_FUNNEL_STEPS);
+
+// Steps only SOME visitors legitimately pass through. They're reported like any
+// other, but they can't be the baseline for the step after them — the
+// face-selection modal appears only when a photo has 2+ faces, so a run of
+// single-face photos would otherwise read as "everyone was lost at face_picked"
+// and drive the next step's rate to 0%.
+const OPTIONAL_TRIAL_STEPS = new Set(['face_picked']);
+
+// Crawlers hit /try and would otherwise inflate `landing`. Not a security
+// control — a bot that wants in can lie — just noise reduction so the top of
+// the funnel stays readable.
+const BOT_UA_RE = /bot|crawl|spider|slurp|headless|lighthouse|preview|monitor|curl|wget|python-requests/i;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Trim to a column's width, or NULL for empty. Keeps the insert total. */
+function _trim(value, max) {
+  if (value === undefined || value === null) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  return s.slice(0, max);
+}
+
+/**
+ * Record one funnel step for one visit.
+ *
+ * Idempotent per (visit_id, step) — a remount, a back-button return or a retried
+ * photo upload re-fires the event and the unique index absorbs it, so each step
+ * counts one visitor once.
+ *
+ * @param {object} event - { visitId, step, utm*, referrer, language, device, userId, meta }
+ * @returns {Promise<boolean>} true if a row was written (false = duplicate or no DB)
+ */
+async function recordTrialEvent(event) {
+  const { getPool } = require('../services/database');
+  const pool = getPool();
+  if (!pool) return false;
+
+  const result = await pool.query(
+    `INSERT INTO trial_events
+       (visit_id, step, utm_source, utm_medium, utm_campaign, referrer, language, device, user_id, meta)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (visit_id, step) DO NOTHING`,
+    [
+      event.visitId,
+      event.step,
+      _trim(event.utmSource, 60),
+      _trim(event.utmMedium, 60),
+      _trim(event.utmCampaign, 80),
+      _trim(event.referrer, 500),
+      _trim(event.language, 10),
+      _trim(event.device, 20),
+      event.userId || null,
+      event.meta ? JSON.stringify(event.meta).slice(0, 2000) : null,
+    ]
+  );
+
+  // Back-fill the pre-account rows of this visit the first time we learn who it
+  // is. Without this the landing/consent/photo rows stay anonymous forever and
+  // the trail can't be joined to the user's story.
+  if (event.userId) {
+    await pool.query(
+      'UPDATE trial_events SET user_id = $1 WHERE visit_id = $2 AND user_id IS NULL',
+      [event.userId, event.visitId]
+    );
+  }
+
+  return result.rowCount > 0;
+}
+
+/**
+ * POST /api/trial/event — record one funnel step.
+ *
+ * Unauthenticated by design: the first events fire before any account exists.
+ * If a trial session token happens to be present we resolve the user id from it
+ * server-side; a client-supplied user id is never trusted.
+ *
+ * Always answers 204, even on a bad step — this is fire-and-forget beacon
+ * traffic from a page that is often mid-unload, and no measurement failure may
+ * ever surface to a visitor.
+ */
+router.post('/event', trialEventLimiter, async (req, res) => {
+  res.status(204).end();
+
+  try {
+    const { visitId, step } = req.body || {};
+    if (!UUID_RE.test(String(visitId || '')) || !TRIAL_FUNNEL_STEP_SET.has(step)) return;
+
+    const ua = String(req.headers['user-agent'] || '');
+    if (BOT_UA_RE.test(ua)) return;
+
+    // user_id from the session token only — never from the body.
+    let userId = null;
+    const token = (req.headers['authorization'] || '').split(' ')[1];
+    if (token) {
+      try {
+        const decoded = verifyToken(token);
+        if (decoded?.anonymous && decoded.userId) userId = decoded.userId;
+      } catch { /* expired or not a session token — stays anonymous */ }
+    }
+
+    await recordTrialEvent({
+      visitId,
+      step,
+      utmSource: req.body.utmSource,
+      utmMedium: req.body.utmMedium,
+      utmCampaign: req.body.utmCampaign,
+      referrer: req.body.referrer,
+      language: req.body.language,
+      device: /mobile|android|iphone|ipad/i.test(ua) ? 'mobile' : 'desktop',
+      userId,
+      meta: req.body.meta && typeof req.body.meta === 'object' ? req.body.meta : null,
+    });
+  } catch (err) {
+    log.warn(`[TRIAL FUNNEL] Failed to record event: ${err.message}`);
+  }
+});
+
+/**
+ * Per-step trial funnel: how many distinct visits reached each step.
+ *
+ * `source` buckets on the landing UTMs:
+ *   paid    — utm_medium/​source says an ad brought them (this is the ads question)
+ *   organic — arrived with some other referrer/UTM
+ *   direct  — no attribution at all
+ *
+ * Drop-off is expressed against the PREVIOUS step, not against landing, because
+ * the question is "which click loses them", not "what fraction of the top".
+ *
+ * @param {number} days - lookback window
+ * @param {string} source - all | paid | organic | direct
+ */
+async function getTrialStepFunnel(days = 30, source = 'all') {
+  const empty = { days, source, steps: [], totalVisits: 0 };
+  try {
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+    if (!pool) return empty;
+
+    const clauses = ["created_at >= NOW() - ($1 || ' days')::INTERVAL"];
+    if (source === 'paid') {
+      clauses.push("(utm_medium IN ('cpc','ppc','paid','search') OR utm_source IN ('google','bing','meta','facebook'))");
+    } else if (source === 'organic') {
+      clauses.push("utm_source IS NOT NULL AND utm_medium IS DISTINCT FROM 'cpc' AND utm_source NOT IN ('google','bing','meta','facebook')");
+    } else if (source === 'direct') {
+      clauses.push('utm_source IS NULL');
+    }
+
+    const { rows } = await pool.query(
+      `SELECT step, COUNT(DISTINCT visit_id)::int AS visits
+         FROM trial_events
+        WHERE ${clauses.join(' AND ')}
+        GROUP BY step`,
+      [String(days)]
+    );
+
+    const byStep = new Map(rows.map((r) => [r.step, r.visits]));
+    const first = byStep.get(TRIAL_FUNNEL_STEPS[0]) || 0;
+
+    let prev = null;
+    const steps = TRIAL_FUNNEL_STEPS.map((step) => {
+      const visits = byStep.get(step) || 0;
+      const optional = OPTIONAL_TRIAL_STEPS.has(step);
+      // A step can legitimately exceed its predecessor (an event lost to a
+      // closed tab, a resumed visit), so clamp the rate rather than report >100%.
+      const fromPrev = prev === null ? 100 : prev === 0 ? 0 : Math.min(100, Math.round((visits / prev) * 1000) / 10);
+      const entry = {
+        step,
+        optional,
+        visits,
+        pctOfFirst: first === 0 ? 0 : Math.min(100, Math.round((visits / first) * 1000) / 10),
+        pctOfPrev: fromPrev,
+        // Skipping an optional step is not a loss — only mandatory steps can lose people.
+        droppedFromPrev: prev === null || optional ? 0 : Math.max(0, prev - visits),
+      };
+      if (!optional) prev = visits;
+      return entry;
+    });
+
+    return { days, source, steps, totalVisits: first };
+  } catch (err) {
+    log.warn(`[TRIAL FUNNEL] Failed to compute step funnel: ${err.message}`);
+    return empty;
   }
 }
 
@@ -2749,6 +2962,8 @@ module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;
 module.exports.getTrialStatsHistory = getTrialStatsHistory;
 module.exports.getTrialFunnel = getTrialFunnel;
+module.exports.getTrialStepFunnel = getTrialStepFunnel;
+module.exports.TRIAL_FUNNEL_STEPS = TRIAL_FUNNEL_STEPS;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;

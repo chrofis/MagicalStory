@@ -144,6 +144,20 @@ const storyIdeasLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Trial funnel event limiter. One real trial run emits ~16 events, and a
+// visitor who reloads or navigates back mints them again, so the cap has to
+// leave honest usage untouched while bounding a script that tries to forge a
+// funnel. Writes are ON CONFLICT DO NOTHING on (visit_id, step), so the damage
+// a flood can do is bounded anyway — this mostly protects the DB from the
+// write volume.
+const trialEventLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,
+  message: { error: 'Too many events.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /** Reset trial-related stores from this module */
 function resetTrialMiddlewareStores() {
   trialAvatarStore.resetAll();
@@ -160,6 +174,7 @@ module.exports = {
   imageRegenerationLimiter,
   jobStatusLimiter,
   trialAvatarLimiter,
+  trialEventLimiter,
   storyIdeasLimiter,
   resetTrialMiddlewareStores,
 };

@@ -12,7 +12,7 @@ const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING } = require('../../config/models');
-const { getTrialStats, getTrialStatsHistory, getTrialFunnel } = require('../trial');
+const { getTrialStats, getTrialStatsHistory, getTrialFunnel, getTrialStepFunnel } = require('../trial');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -785,6 +785,24 @@ router.get('/trial-funnel', authenticateToken, requireAdmin, async (req, res) =>
   } catch (err) {
     console.error('❌ [ADMIN] Error fetching trial funnel:', err);
     res.status(500).json({ error: 'Failed to load trial funnel' });
+  }
+});
+
+// GET /api/admin/trial-step-funnel - Per-step /try funnel from trial_events.
+// Where the trial-funnel route above starts at "a trial account exists", this
+// one starts at "someone opened /try" and shows which click loses them.
+router.get('/trial-step-funnel', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Trial step funnel requires database mode' });
+    }
+    const days = parseInt(req.query.days) || 30;
+    const source = ['all', 'paid', 'organic', 'direct'].includes(req.query.source) ? req.query.source : 'all';
+    const funnel = await getTrialStepFunnel(days, source);
+    res.json(funnel);
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching trial step funnel:', err);
+    res.status(500).json({ error: 'Failed to load trial step funnel' });
   }
 });
 

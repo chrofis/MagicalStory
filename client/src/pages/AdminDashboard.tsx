@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob, type ActivityFeed } from '@/services';
+import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type TrialStepFunnel, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob, type ActivityFeed } from '@/services';
 import {
   Users,
   BookOpen,
@@ -60,6 +60,8 @@ export default function AdminDashboard() {
   const [trialStats, setTrialStats] = useState<TrialStats | null>(null);
   const [trialHistory, setTrialHistory] = useState<TrialStatsHistoryEntry[]>([]);
   const [trialFunnel, setTrialFunnel] = useState<TrialFunnel | null>(null);
+  const [trialStepFunnel, setTrialStepFunnel] = useState<TrialStepFunnel | null>(null);
+  const [stepFunnelSource, setStepFunnelSource] = useState<'all' | 'paid' | 'organic' | 'direct'>('all');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [userSearch, setUserSearch] = useState('');
@@ -121,21 +123,32 @@ export default function AdminDashboard() {
     if (stats) return; // Already loaded
     setIsLoadingStats(true);
     try {
-      const [statsData, trialData, historyData, funnelData] = await Promise.all([
+      const [statsData, trialData, historyData, funnelData, stepFunnelData] = await Promise.all([
         adminService.getStats(),
         adminService.getTrialStats().catch(() => null),
         adminService.getTrialStatsHistory(14).catch(() => []),
         adminService.getTrialFunnel(30).catch(() => null),
+        adminService.getTrialStepFunnel(30, 'all').catch(() => null),
       ]);
       setStats(statsData);
       if (trialData) setTrialStats(trialData);
       setTrialHistory(historyData);
       if (funnelData) setTrialFunnel(funnelData);
+      if (stepFunnelData) setTrialStepFunnel(stepFunnelData);
     } catch (err) {
       console.error('Failed to load stats:', err);
     } finally {
       setIsLoadingStats(false);
     }
+  };
+
+  // Re-fetch the step funnel when the traffic filter changes. Kept out of
+  // fetchStats (which is once-only, guarded on `stats`) because this one has to
+  // re-run on every source switch.
+  const selectStepFunnelSource = async (source: 'all' | 'paid' | 'organic' | 'direct') => {
+    setStepFunnelSource(source);
+    const data = await adminService.getTrialStepFunnel(30, source).catch(() => null);
+    if (data) setTrialStepFunnel(data);
   };
 
   // Fetch token promo status
@@ -952,6 +965,86 @@ export default function AdminDashboard() {
                       </tbody>
                     </table>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Trial Step Funnel — inside /try, before an account exists.
+                The card above starts at "a trial account exists"; this one
+                starts at "someone opened /try" and shows which click loses them. */}
+            {trialStepFunnel && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-orange-600" />
+                      {texts.trialStepFunnel}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">{texts.trialStepFunnelSubtitle}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {([
+                      ['all', texts.trialStepFunnelSourceAll],
+                      ['paid', texts.trialStepFunnelSourcePaid],
+                      ['organic', texts.trialStepFunnelSourceOrganic],
+                      ['direct', texts.trialStepFunnelSourceDirect],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => selectStepFunnelSource(key)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+                          stepFunnelSource === key
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {trialStepFunnel.totalVisits === 0 ? (
+                  <p className="text-sm text-gray-500 italic">{texts.trialStepFunnelEmpty}</p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-gray-500">
+                            <th className="pb-2 pr-4">{texts.trialStepFunnelColStep}</th>
+                            <th className="pb-2 pr-4 text-right">{texts.trialStepFunnelColVisits}</th>
+                            <th className="pb-2 pr-4 text-right">{texts.trialStepFunnelColOfPrev}</th>
+                            <th className="pb-2 text-right">{texts.trialStepFunnelColDropped}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trialStepFunnel.steps.map((row) => (
+                            <tr key={row.step} className="border-b border-gray-100">
+                              <td className="py-1.5 pr-4">
+                                <div className="flex items-center gap-2">
+                                  <span className={row.optional ? 'text-gray-400 italic' : 'text-gray-700'}>
+                                    {row.step.replace(/_/g, ' ')}
+                                  </span>
+                                  {/* Bar width is share of the top of the funnel,
+                                      so the shape of the drop-off is visible at a glance. */}
+                                  <span className="hidden md:block h-2 rounded bg-indigo-200" style={{ width: `${row.pctOfFirst}%`, maxWidth: '240px' }} />
+                                </div>
+                              </td>
+                              <td className="py-1.5 pr-4 text-right font-mono">{row.visits.toLocaleString()}</td>
+                              <td className={`py-1.5 pr-4 text-right font-mono ${!row.optional && row.pctOfPrev < 50 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                                {row.optional ? '—' : `${row.pctOfPrev}%`}
+                              </td>
+                              <td className="py-1.5 text-right font-mono text-gray-600">
+                                {row.droppedFromPrev > 0 ? `−${row.droppedFromPrev}` : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">{texts.trialStepFunnelBotNote}</p>
+                  </>
                 )}
               </div>
             )}

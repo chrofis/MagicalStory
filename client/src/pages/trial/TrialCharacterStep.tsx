@@ -6,6 +6,7 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import type { CharacterData } from '../TrialWizard';
 import { defaultStrengths } from '@/constants/traits';
 import type { Language } from '@/types/story';
+import { trackTrialStep } from '@/utils/trialFunnel';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
@@ -259,6 +260,15 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const hasConsented = !!characterData.consentGiven;
   const canUpload = hasConsented || consentChecked;
 
+  // Shared by the click and keyboard handlers on the consent row. Stamps the
+  // funnel only on the tick, not the untick — this checkbox gates the photo
+  // upload, so "did they ever consent" is the funnel question.
+  const toggleConsent = () => {
+    const next = !consentChecked;
+    if (next) trackTrialStep('consent_given');
+    setConsentChecked(next);
+  };
+
   // Keep a ref to the latest characterData so async callbacks don't use stale closures
   const characterDataRef = useRef(characterData);
   useEffect(() => { characterDataRef.current = characterData; }, [characterData]);
@@ -349,6 +359,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         const result = await response.json();
         if (response.ok && result.avatarImage) {
           avatarPhotoKeyRef.current = facePhotoKey;
+          trackTrialStep('avatar_ready');
           onAvatarGenerated?.(result.avatarImage);
         }
       } catch {
@@ -412,6 +423,10 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       (err as unknown as { status: number }).status = accountResponse.status;
       throw err;
     }
+    // Fires on the PREWARM too (the moment the form first goes valid), not only
+    // when the user presses Next — that's the honest meaning of "a users row now
+    // exists". `character_done` is the one that means they moved on.
+    trackTrialStep('character_saved');
     return {
       sessionToken: accountResult.sessionToken,
       characterId: accountResult.characterId || accountResult.charId,
@@ -547,6 +562,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       }
 
       if (result.success) {
+        // A usable photo either way — the multi-face branch just needs one more
+        // click (face_picked) before it yields a face.
+        trackTrialStep('photo_analyzed', { multipleFaces: !!result.multipleFacesDetected });
         if (result.multipleFacesDetected) {
           // Show face selection UI
           setDetectedFaces(result.faces || []);
@@ -606,6 +624,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   const handleFileSelect = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
+    trackTrialStep('photo_selected');
 
     const reader = new FileReader();
     reader.onloadend = async () => {
@@ -625,6 +644,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   const handleFaceSelect = (faceId: string) => {
     if (originalImageData && cachedFacesData) {
+      trackTrialStep('face_picked');
       analyzePhoto(originalImageData, faceId, cachedFacesData);
     }
   };
@@ -728,7 +748,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 tabIndex={0}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).tagName !== 'A') {
-                    setConsentChecked(!consentChecked);
+                    toggleConsent();
                   }
                 }}
                 onKeyDown={(e) => {
@@ -737,7 +757,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                   if ((e.target as HTMLElement).tagName === 'A') return;
                   if (e.key === ' ' || e.key === 'Enter') {
                     e.preventDefault();
-                    setConsentChecked(!consentChecked);
+                    toggleConsent();
                   }
                 }}
                 className="flex items-start gap-3 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"

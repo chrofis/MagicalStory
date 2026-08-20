@@ -8,6 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
+import { trackTrialStep } from '@/utils/trialFunnel';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -356,6 +357,7 @@ export default function TrialGenerationPage() {
 
         setJobId(data.jobId);
         storage.setItem('trial_gen_job_id', data.jobId);
+        trackTrialStep('generation_started');
         setPageState('generating');
       } catch {
         setPageState('failed');
@@ -466,6 +468,7 @@ export default function TrialGenerationPage() {
       storyCompletionFiredRef.current = true;
       trackTrialStoryCompleted();
       trackEvent('trial_completed');
+      trackTrialStep('generation_completed');
     }
   }, [pageState]);
 
@@ -514,6 +517,7 @@ export default function TrialGenerationPage() {
       setEmailLinked(true);
       trackEmailLead();
       trackEvent('trial_email_lead');
+      trackTrialStep('email_submitted');
     } catch {
       setAuthError(t.error);
     } finally {

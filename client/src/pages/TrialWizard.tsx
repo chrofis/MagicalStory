@@ -9,6 +9,7 @@ import TrialTopicStep from './trial/TrialTopicStep';
 import TrialIdeasStep from './trial/TrialIdeasStep';
 import { trackTrialPageVisit } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
+import { trackTrialStep } from '@/utils/trialFunnel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -239,7 +240,7 @@ export default function TrialWizard() {
   // User location (IP-based, for landmark personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null>(null);
 
-  useEffect(() => { trackTrialPageVisit(); trackEvent('trial_landing'); }, []);
+  useEffect(() => { trackTrialPageVisit(); trackEvent('trial_landing'); trackTrialStep('landing'); }, []);
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -325,6 +326,10 @@ export default function TrialWizard() {
 
   const goNext = () => {
     const nextIndex = currentStepIndex + 1;
+    // Stamp the step being LEFT here rather than inside each step component —
+    // one place, and it can't drift out of sync with the actual navigation.
+    if (currentStep === 'character') trackTrialStep('character_done');
+    if (currentStep === 'topic') trackTrialStep('topic_selected');
     // Always show topic step — user should be able to change topic and select art style
     // even when coming from theme page with pre-selected category/topic
     if (nextIndex < STEPS.length) {
@@ -346,8 +351,16 @@ export default function TrialWizard() {
     setSelectedIdeaIndex(null);
   }, []);
 
+  // Wrapped rather than passing setSelectedIdeaIndex straight down: the ideas
+  // step selects from two different places, and this keeps the stamp in one.
+  const handleSelectIdea = useCallback((index: number) => {
+    trackTrialStep('idea_selected');
+    setSelectedIdeaIndex(index);
+  }, []);
+
   const handleCreate = useCallback(() => {
     if (selectedIdeaIndex === null || !sessionToken || !characterId) return;
+    trackTrialStep('create_clicked');
     const selectedIdea = generatedIdeas[selectedIdeaIndex];
     const finalStoryInput = {
       ...storyInput,
@@ -537,7 +550,7 @@ export default function TrialWizard() {
               <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">{intro.step3Title}</h2>
               <p className="text-gray-600 text-base md:text-lg mb-4">{intro.step3Desc}</p>
               <button
-                onClick={() => setShowIntro(false)}
+                onClick={() => { trackTrialStep('intro_start'); setShowIntro(false); }}
                 className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-600 transition-colors mb-4"
               >
                 {intro.cta}
@@ -596,7 +609,7 @@ export default function TrialWizard() {
                 generatedIdeas={generatedIdeas}
                 onIdeasGenerated={handleIdeasGenerated}
                 selectedIdeaIndex={selectedIdeaIndex}
-                onSelectIdea={setSelectedIdeaIndex}
+                onSelectIdea={handleSelectIdea}
                 onBack={goBack}
                 onCreate={handleCreate}
                 sessionToken={sessionToken}

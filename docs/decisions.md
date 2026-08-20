@@ -14048,3 +14048,57 @@ out naked. Four sites, one chain, none left on the old pattern.
 **Touched:** `storyJobPipeline.js`, `tasks/bugs.json`
 **Status:** ✅ active — validated by code-path identity with the three proven
 sites; first real story confirms via persisted seedTraces
+
+## 2026-08-20 — The /try funnel is measured server-side (trial_events), not in GA4
+
+**Context:** "How far does a visitor get in the trial?" could not be answered.
+The instrumentation was two points at opposite ends — GA4 `trial_landing` on
+`/try` mount and `trial_completed` at the end — plus `trial_daily_stats`
+(a daily cap counter for avatars/stories) and `getTrialFunnel()` (post-story:
+claimed, logged in, multi-story). Everything between landing and the preview
+avatar was invisible: the intro screen, the consent tick, the photo upload, the
+multi-face modal, the character form. That is exactly where the 2026-06-17
+cross-browser probe located the friction, and it is why June's 79 paid clicks →
+0 trial conversions could never be diagnosed.
+
+**Decision:** A `trial_events` table plus `POST /api/trial/event`. A `visit_id`
+(uuid) is minted client-side into localStorage on `/try` load; each of the 16
+canonical steps is stamped once per visit (`UNIQUE (visit_id, step)`,
+`ON CONFLICT DO NOTHING`). Landing UTMs ride along so the funnel splits
+paid/organic/direct. `user_id` is resolved from the trial session token
+server-side — never from the request body — and back-fills the visit's earlier
+anonymous rows the first time it is known. `getTrialStepFunnel()` reports counts
+and drop-off in canonical order; the admin dashboard renders it under the
+existing Trial Funnel card. `trial_daily_stats` KEEPS its role as the cap
+counter and is not funnel truth.
+
+**Rationale:** GA4 is lost to ad blockers and consent denial precisely among the
+bouncing visitors this is meant to count, and its events cannot be joined to the
+`users`/`stories` rows — so a GA4-only funnel would be both undercounted and
+unjoinable. Server-side events are exact, survive the tab closing (sendBeacon),
+and join to the story the visitor eventually made. Cost is one small table and a
+204-only endpoint.
+
+Three shapes worth knowing:
+- `landing` includes crawlers (a bot UA filter drops the obvious ones); the
+  first step that requires a human click is `intro_start`.
+- `character_saved` fires on the account PREWARM — the moment the form first
+  goes valid, before "Next" — because that is when the `users` row appears.
+  `character_done` is the step that means they moved on.
+- `face_picked` is OPTIONAL (only photos with 2+ faces reach the modal), so it
+  can never be the baseline for the next step's rate; otherwise a run of
+  single-face photos reads as "everyone was lost at face_picked".
+
+**Touched:**
+- `migrations/024_trial_events.sql` (table + unique index)
+- `server/routes/trial.js` (`TRIAL_FUNNEL_STEPS`, `OPTIONAL_TRIAL_STEPS`,
+  `recordTrialEvent`, `POST /event`, `getTrialStepFunnel`)
+- `server/routes/admin/analytics.js` (`GET /api/admin/trial-step-funnel`)
+- `server/middleware/rateLimit.js` (`trialEventLimiter`)
+- `client/src/utils/trialFunnel.ts` (visit id, attribution, beacon)
+- `client/src/pages/TrialWizard.tsx`, `pages/trial/*.tsx`,
+  `pages/TrialGenerationPage.tsx` (the 16 call sites)
+- `client/src/pages/AdminDashboard.tsx` + `pages/admin/translations.ts` (card)
+- `tests/unit/trial-funnel-steps.test.ts` (server/client step-name parity)
+
+**Status:** ✅ active
