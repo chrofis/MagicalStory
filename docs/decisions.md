@@ -14230,10 +14230,21 @@ paths (`skipQualityEval`, missing `GEMINI_API_KEY`, eval threw) carry a null
 verdict and stay valid, preserving the fail-open behaviour those branches exist
 for — the trial must never lose its styled sheet to an eval outage.
 
-This is containment, not a cure: attempt 1 still ships a leak whenever it happens
-to blend cleanly enough to score ≥6. **Replacing all 13 anchor assets with
-genuinely figure-free swatches is tracked as separate open work** and remains the
-real fix.
+**The anchors KEEP their figures (owner, 2026-08-20).** The obvious "cure" —
+regenerating all 13 assets as figure-free brushwork swatches — was considered and
+REJECTED. A swatch of paper texture and pigment does not tell the model how the
+style renders a *face*, a *hand*, or an *age*, which is the single hardest thing
+to hold across a book. The figures are the useful part of the anchor; losing them
+to dodge a blend failure would trade a rare, now-detected defect for a constant
+one. So the anchor-drop retry above is the PERMANENT mitigation, not a stopgap:
+attempt 1 gets the full anchor's benefit, and the only run that loses it is one
+the evaluator has already rejected.
+
+Residual risk, accepted: attempt 1 still ships a leak whenever it blends cleanly
+enough to score ≥6. The Pass-2 evaluator's `soloScore` / "Single Subject — No
+Other People" check is what stands between that and the page references, and it
+caught this case at 1/10 — so the containment rests on that check staying sharp,
+not on the asset being safe.
 
 **Touched:**
 - `server/lib/character2x4Sheet.js` — `runStyleTransferPass` (anchor-drop retry,
