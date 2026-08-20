@@ -1515,6 +1515,10 @@ async function runCharRepairStage(ctx, opts) {
     ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
     textPosition: ctx.textPosition,
+    // Same option the unified pipeline was missing: without it the repair
+    // prompt's "Art style — match this medium and rendering exactly" block is
+    // empty, so a Lab run cannot reproduce (or verify) production's styling.
+    artStyle: params.artStyleOverride || ctx.artStyle || null,
     protectedFaces,
     protectedBodies,
     addStep,
