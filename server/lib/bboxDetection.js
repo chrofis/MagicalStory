@@ -308,13 +308,24 @@ function bboxPairsWith(detection, imageData) {
 /**
  * Detection stored on an image VERSION (owner decision 2026-07-31:
  * "detection is part of every image version" — covers AND pages, exactly
- * like grokRefImages are stored per version). Single resolution rule used
- * by every version-entry writer:
- *   1. v.bboxDetection — a detection stamped directly on the version
- *      (e.g. the final-assembly fresh-bbox refresh, regen/iterate results)
- *      always wins: it was computed on this version's own bytes.
- *   2. v.evaluation.bboxDetection — the eval-time detection attached when
- *      the version was scored.
+ * like grokRefImages are stored per version).
+ *
+ * ONE WRITER (owner, 2026-08-20: "why do we have two sites that write the
+ * box — that is shitty design"). Every path that CREATES a version stamps
+ * v.bboxDetection at creation, from the detection computed on that version's
+ * own bytes: base v0 from the Phase 5b-pre shared detection, round repairs
+ * from redetectVersionImage, recolours via the explicit geometry carry.
+ * The eval is NEVER a detection writer again — that side channel was born as
+ * a convenience (the eval attached the boxes it happened to use), became a
+ * load-bearing contract nobody wrote down, and died silently in the
+ * semantic_compliance refactor: a whole story persisted with every detection
+ * NULL while 18 DINO calls' worth of results were thrown away.
+ *
+ * Resolution order:
+ *   1. v.bboxDetection — the canonical stamp. All new writes land here.
+ *   2. v.evaluation.bboxDetection — READ-ONLY legacy fallback for stories
+ *      persisted before 2026-08-20. No code writes it any more; do not add a
+ *      writer.
  *   3. null — version never had a detection (the dev endpoint's refresh
  *      button re-detects on demand).
  */
