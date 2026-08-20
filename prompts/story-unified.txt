@@ -778,7 +778,7 @@ Example: `- CharacterC (center-left foreground): costumed, holds: ART005, priori
 ONLY main characters: {MAIN_CHARACTER_NAMES}
 
 Mood: [one phrase]
-Objects: [LOC### + 1-2 ART### refs that define the cover's visual identity]
+Objects: [LOC### + the story's central ANI### when it has one + 1-2 ART### refs that define the cover's visual identity]
 Characters:
 - [MainChar1] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 - [MainChar2] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]

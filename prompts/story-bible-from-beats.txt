@@ -88,6 +88,7 @@ Each cover is a structured spec, not prose. The fields are the spec.
 - `holds` is exactly one ART### from `Objects:`, or the word `nothing`.
 - `priority` is `essential | normal | low`.
 - `Mood` is one phrase of 2-5 words.
+- When the story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists that `ANI###` in `Objects:` right after the LOC, and the creature appears in the cover scene.
 - No perspective or depth on covers — every figure faces the viewer and is fully visible. If the cast does not fit, drop the least essential character instead of hiding them.
 
 Title Page: only {MAIN_CHARACTER_NAMES}.
