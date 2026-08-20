@@ -603,6 +603,31 @@ surface the text truly sits on.
 **Touched:** `server/lib/textOverlayRenderer.js`
 **Status:** ✅ active.
 
+### The vision inventory reports object colour, so compliance can judge it
+**Context:** A story's central prop rendered in a completely different colour
+(iridescent pink/blue where prompt, Visual Bible and reference cell all said
+deep forest-green) and no finding was raised — the page scored 60 on unrelated
+grounds. Not a scoring problem: Stage 1 (`image-vision-inventory.txt`) asked
+only four things about each object — what it is, position, grounded, relative
+size — and never its colour, while the same file DOES ask for garment colours
+on figures. That is why clothing-colour findings appear routinely and object
+colour findings never did: Stage 2 is text-only and can compare only what the
+inventory reported. Same structural blindness as the painted-lettering gap.
+**Decision (owner-approved 2026-08-20):** Stage 1 reports each object's
+dominant colour, second colour and apparent material, or `cannot tell at this
+size`. Stage 2 reports `object_presence` (at most MAJOR) when a named object's
+colour clearly differs from ORIGINAL_PROMPT; a different shade of the same
+colour, and anything the inventory could not read, are not findings.
+**Validation:** run against 4 stored pages — the wrong-colour prop came back as
+its own entry, "a small, multi-colored object (blue, purple, pink, green)",
+which is exactly the comparison Stage 2 needs; the correct-colour controls
+(creature "predominantly green" on two pages, a signpost "brown wood") reported
+accurately.
+**Touched:**
+- `prompts/image-vision-inventory.txt` — colour/material on the object block
+- `prompts/image-prompt-compliance.txt` — object-colour rule
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

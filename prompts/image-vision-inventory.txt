@@ -18,6 +18,7 @@ For EACH human figure:
 
 For EACH notable object, animal, or vehicle:
 - What it is
+- Colour and material: the dominant colour, any second colour, and what it looks made of (wood, metal, cloth, stone, scale, fur). Say `cannot tell at this size` when it is too small to read
 - Position in frame
 - Is it grounded properly or floating?
 - Relative size
