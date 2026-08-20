@@ -80,6 +80,25 @@ const BUCKETS = {
   // correctly-specified story it should never fire, so a non-zero count is a
   // signal that the CLOTHING contract failed upstream, not just a page defect.
   nudity:               { owner: 'quality',  kind: 'binary', repair: 'regen' },
+  // The beat's feeling contradicted. Previously aliased into `naturalness`, so
+  // "how much of our tax is emotion?" was unanswerable and the per-character
+  // billing could not separate it from every other catch-all finding. This adds
+  // a CODE, not a new deduction: the gross-only rule in image-semantic.txt is
+  // unchanged (a neutral/mild expression still satisfies the beat, at most one
+  // emotion finding per page, never CRITICAL) and image-evaluation's N-03
+  // non-deduction stands. Repair is an inpaint — a face repaint fixes an
+  // expression; a full regen is the expensive wrong answer.
+  emotion:              { owner: 'semantic', kind: 'graded', repair: 'inpaint' },
+  // Posing for the camera instead of engaging the scene — the owner's
+  // "position / facing" (2026-08-19). Measured over the last 40 stories, 89
+  // findings across 43 pages in 19 stories describe exactly this, filed
+  // inconsistently as action_interaction (often CRITICAL) or naturalness
+  // (MAJOR/MODERATE). It ALREADY deducts; it had no name, so it could be
+  // neither capped nor counted, and it inflated action_interaction — the single
+  // largest source of mergeable findings (199 extras).
+  // NOT the pose-mirror rule on SETTLED.md: left/right stays a non-deduction.
+  // Never fires on covers, where gaze at the viewer is code-owned and intended.
+  viewer_address:       { owner: 'semantic', kind: 'graded', repair: 'inpaint' },
   style_consistency:    { owner: 'quality',  kind: 'graded', repair: 'style_transfer' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
@@ -152,9 +171,21 @@ const TYPE_TO_BUCKET = {
   extra_objects: 'object_presence', unauthorized_objects: 'object_presence',
   setting: 'setting', environment: 'setting', background: 'setting',
   background_placement: 'setting', lighting: 'setting', weather: 'setting',
-  // Expression nuance is a documented non-deduction; if one still arrives it is
-  // a naturalness note, never a structural defect.
-  expression: 'naturalness', emotion: 'naturalness',
+  // Emotion has its own bucket since 2026-08-19 (owner). The rules that make
+  // expression nuance a NON-DEDUCTION are unchanged and live where they belong,
+  // in the prompts (image-evaluation N-03; image-semantic's gross-only rule,
+  // one per page, never CRITICAL). This only decides where a finding that DOES
+  // arrive is grouped and repaired — cost still comes from its severity.
+  expression: 'emotion', emotion: 'emotion',
+  // Posing for the camera instead of engaging the scene. DELIBERATELY NOT
+  // wired to `camera_facing`: that alias was merged into action_interaction on
+  // 2026-08-09 after measuring that 12 of 31 of its findings were left/right
+  // mirrors and the other 19 all named a target — it was an axis category.
+  // viewer_address is a different question (is the figure addressing the camera
+  // when the beat or a declared interaction needs their attention?), so it is a
+  // new type, not a revival. Re-pointing camera_facing here would reverse that
+  // merge.
+  viewer_address: 'viewer_address',
   // entity-consistency-check.txt emits its own closed vocabulary; map it here so
   // cross-page consistency findings route like everything else.
   garment_colour: 'garment_colour', garment_color: 'garment_colour',

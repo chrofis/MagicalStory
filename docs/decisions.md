@@ -13813,3 +13813,54 @@ ONE commission; the 3-story corpus check is still not run.
 **Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt,
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
+
+## 2026-08-20 — `emotion` and `viewer_address` become their own types
+
+Owner asked for per-character billing categories: clothing, identity, action /
+interaction, position / facing, and emotion (2026-08-19). Three existed. These
+are the other two.
+
+**`emotion`** was aliased into `naturalness`, so "how much of our deduction tax
+is emotion?" was unanswerable and it could not be capped or billed separately
+from every other catch-all. This adds a CODE, not a deduction: the gross-only
+rule in `image-semantic.txt` is untouched (a neutral/mild expression still
+satisfies the beat, at most one per page, never CRITICAL) and
+`image-evaluation.txt` N-03 still makes expression nuance a non-deduction for
+the quality judge. The worked example in the semantic template was retyped from
+`naturalness` to `emotion` — models copy examples closely, so leaving it would
+have fought the rule.
+
+**`viewer_address`** is the owner's "position / facing": *"If the emotion is not
+happy. Or if they have a declared interaction that needs their attention."* A
+figure addressing the camera is a defect in exactly those two cases and is
+otherwise fine. Measured over the last 40 stories, **89 findings across 43 pages
+in 19 stories** already describe this, filed inconsistently as
+`action_interaction` (often CRITICAL) or `naturalness` (MAJOR/MODERATE) — so it
+already deducted, it just had no name, could not be capped or counted, and was
+inflating `action_interaction`, the largest single source of mergeable findings
+(199 extras).
+
+This NARROWS, does not delete, the never-deduct gaze line in the semantic
+template: head angle and "not directly at" remain non-deductions; only viewer
+address under those two conditions is now a finding.
+
+**NOT a revival of `camera_facing`.** That alias was merged into
+`action_interaction` on 2026-08-09 after measuring that 12 of its 31 findings
+were left/right mirrors and the other 19 all named a target — it was an axis
+category. `viewer_address` asks a different question, so it is a new type and
+`camera_facing` still routes to `action_interaction`. Left/right pose mirrors
+remain a non-deduction (SETTLED). Neither type fires on covers, where gaze at
+the viewer is code-owned and intended.
+
+**Scoped to the SEMANTIC evaluator only** — it owns the beat context and it sees
+the image. The blind compliance judge keeps routing facing to
+`action_interaction`, and quality keeps N-03. Known overlap: `image-evaluation`
+D-18 still fires `action_interaction` when three or more characters face the
+camera during a declared interaction, so one defect can arrive under two codes.
+The feedback consolidator dedupes across evaluators before scoring, so this does
+not double-charge on the consolidated path; revisit if it shows up as one.
+
+**Touched:** `server/lib/evalBuckets.js` (two buckets + aliases),
+`server/lib/scoring.js` (they bill under their own names, once per character),
+`prompts/image-semantic.txt` (rules, closed type list, worked example)
+**Status:** 🟡 shipped to staging, pending validation on set #14

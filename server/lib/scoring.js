@@ -363,18 +363,13 @@ const BUCKET_BILLING_CATEGORY = {
   figure_completeness: 'build',
 };
 
-// Billing categories the evaluators cannot yet emit. Listed so the intent is
-// recorded and so the day a prompt starts emitting the code, it bills per
-// character instead of silently landing in `naturalness`:
-//   emotion        — currently aliased to naturalness in evalBuckets.
-//   viewer_address — the owner's "position / facing": posing for the camera
-//     instead of engaging the task. Measured over the last 40 stories, 89
-//     findings across 43 pages in 19 stories describe exactly this, filed
-//     inconsistently as action_interaction (often CRITICAL) or naturalness.
-//     NOT the pose-mirror rule on SETTLED.md — that is left/right and stays a
-//     non-deduction — and it must never fire on covers, where gaze at the
-//     viewer is code-owned and intended.
-// Adding either means a new bucket in evalBuckets.js FIRST, then a line above.
+// `emotion` and `viewer_address` are now real buckets in evalBuckets.js and are
+// absent from the table above ON PURPOSE — each bills under its own name, once
+// per character, which is exactly what the owner asked for ("another category
+// action / interaction. Another one position / facing. And one emotion").
+// Merging them into anything would undo the separation they were created for:
+// viewer_address exists precisely because it was hiding inside
+// action_interaction, the largest source of mergeable findings.
 
 /**
  * The billing identity of a finding: what class of defect, on whom.
