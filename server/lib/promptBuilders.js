@@ -613,10 +613,23 @@ function buildSecondaryExpectedCharacters(visualBible, sceneMetadata, knownNames
 }
 
 /**
- * Build the calm-zone paragraph that gets injected into image prompts.
+ * Build the open-area paragraph that gets injected into image prompts.
  * Story text is rendered in WHITE, so the zone must be a saturated, high-contrast
  * surface — not pale, not pure black, not a box. Uses Sonnet's textZoneDescription
  * when available; falls back to a generic surface list otherwise.
+ *
+ * ASKS FOR CONTENT, NEVER FOR A TREATMENT (2026-08-21). This paragraph used to
+ * end "Keep this area calm — gentle gradient, minimal texture, low contrast".
+ * Grok reads that flatness vocabulary as an instruction to paint a slab: on
+ * job_1787262655143 p4 it rendered the requested upper-right ~10% as a flat
+ * blue-grey panel over the whole right THIRD, full height, with a hard vertical
+ * seam — while the same prompt's "no split screens, panel keylines" ban lost, as
+ * negative instructions do against positive ones. Note "painted continuously
+ * through the same scene material" was ALREADY present and did not prevent it,
+ * so the fix is removing the flatness words, not adding more continuity words.
+ * Low clutter is still requested — by naming what occupies the area and by
+ * keeping faces and high-contrast detail out of it, which is what actually
+ * matters for legibility.
  *
  * @param {string} textPosition - e.g. 'top-right', 'bottom-full'
  * @param {string|null} textZoneDescription - Sonnet's 5–15 word description
@@ -645,10 +658,10 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct, op
   const displacement = displacementDesc[textPosition] || 'away from this area';
   const surface = textZoneDescription && String(textZoneDescription).trim()
     ? String(textZoneDescription).trim()
-    : 'a calm continuous expanse of the surrounding scene material (sky, wall, water, foliage, or ground)';
-  let body = `**COMPOSITION — CALM ZONE:** Render the ${corner} of the image (roughly ${areaPct}) as: ${surface}. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong ${displacement}.`;
+    : 'an uninterrupted expanse of the surrounding scene material (sky, wall, water, foliage, or ground)';
+  let body = `**COMPOSITION — OPEN AREA:** In the ${corner} of the image (roughly ${areaPct}) the scene continues as ${surface}, the same paint carrying through it with no edge, band or panel where it meets the rest of the picture. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong ${displacement}.`;
   if (isEmptyScene) {
-    body += ' If a layout reference image is attached, the slightly darker grey region marks this calm zone.';
+    body += ' If a layout reference image is attached, the slightly darker grey region marks this area.';
   }
   return body;
 }
