@@ -14586,3 +14586,89 @@ it, despite both blocks being in the evaluator's inputs.
 **Related:** the fame-ranking defect found while scoping this (landmark_index
 `score` is anti-correlated with fame; Grossmünster ranks 599/600 and is never
 offered) is tracked separately and NOT addressed here.
+
+## 2026-08-21 — Fable review of the restructured planning system: 24 findings, all fixed
+
+**Context:** After the arc/page-plan restructure (arc = the full story with no pages; beats =
+the division into pages), an independent hostile review by a fresh-context agent found 24
+defects across 4 severity tiers. All fixed the same day. The highlights that would have bitten:
+
+1. **Two-era contradiction (A1):** `story-beats.txt` still carried the old "one shared problem,
+   2-3 attempts, one per child in turn" rules next to the new challenge/budget design; the arc
+   judge scored both eras at once. The challenge era is now the only voice, and the arc judge's
+   `shape`/`attempts` dims read against the computed allowance.
+2. **Page numbers demanded inside the page-free arc (A2):** the shape block said "name the page
+   each character joins" and the change rule named pages — both ride in the arc-only call, which
+   forbids page numbers. Both now speak in early/late terms; pages belong to the PAGE PLAN.
+3. **The budget could overrun the book (A3):** a 12-page book priced out at 13 pages and printed
+   "0 secondary moments" next to "one moment each". Majors now clamp until the sum fits, the
+   challenge count derives from the same clamped number, and the moments line adapts to the
+   computed count (A4 — one authority).
+4. **Two parser holes (F1, F2):** `parseArcReview` had no lookahead, so a reviewer emitting
+   ---ARC--- before ---ANALYSIS--- poisoned the approved arc with the whole analysis; `parseBeats`
+   let a section emitted after the beats be absorbed into the last page's SCENE. Both now stop at
+   the next ---SECTION--- marker; unit-tested both directions.
+5. **Judges scored against data they never got (C1):** `fit`/`difficulty`/`subject` reference cast
+   ages and the allowance, but `buildBriefContext` passed names only. It now includes ages and
+   appends the computed STORY SHAPE (lazy require, no cycle).
+6. **A zero-filled judge skeleton counted as a score (C2):** the arc-judge validation accepted any
+   finite number; it now requires 1-10. `ARC_RUBRIC` moved into `storyScorecard.js`, the declared
+   single home of rubrics.
+7. **The beats reviewer never saw the page plan it checks (B1):** `{PAGE_PLAN}` now flows through
+   `buildBeatsReviewPrompt` from both production and the Lab; check 6c reads the plan against the
+   beats; a plan stored after a rewrite carries a staleness note (E1). New checks: the arc's
+   Closed list must be delivered by pages (E2), and the subject may not decay to a hint where the
+   shape requires it on the page (E3). The arc reviewer gained the topic guide (E4) and the arc
+   format a Blocker slot (B2).
+8. Tier 3/4: SCENE-vs-ILLUSTRATION precedence stated (illustration > scene > beat); the
+   commission's replace-licence explicitly spent upstream of the text stage; cast-variety rules
+   deduplicated with the PAGE PLAN as authority; banners, a leaked example and justification
+   prose removed.
+
+**Also this session — challenge catalogue wired into idea generation (owner request):**
+`prompts/challenge-catalogue.txt` holds 395 catalogued trials (Thompson Motif-Index H-chapter,
+Propp, ATU; browsable at `docs/challenge-catalogue.html`). `buildIdeasPromptContext` samples ~40
+per call — filtered by the cast's youngest age, peril excluded for young casts, spread across all
+30 categories with the five AI-default categories (stream/boulder/gate/guard/storm live there)
+capped at one pick each. Cost measured: ~900 tokens, ~$0.003 per idea call. First live idea drew
+its threat from the deception/trust category instead of the usual five.
+
+**Touched:** prompts/story-beats.txt, story-arc-review.txt, story-arc-judge.txt,
+story-beats-review.txt, story-text-from-beats.txt, generate-story-idea-single.txt,
+generate-story-ideas.txt, challenge-catalogue.txt (new); server/lib/promptBuilders.js,
+storyScorecard.js, testlab.js, beatsPipeline.js; server/routes/storyIdeas.js;
+docs/challenge-catalogue.html (new).
+
+## 2026-08-21 — Garment seed = blob interior point, and garment dots double as cross-figure negatives
+
+**Context.** Owner review of the final SAM cutouts on `job_1787262655143_s9zb960muni`
+(Lab experiments #46/#47) found figures whose torso/shirt was missing from the mask
+despite a correctly-coloured garment seed being reported: p7 Levin kept 26k px and
+lost only 2k to occlusion — the shirt was simply never claimed. The SENT TO SAM
+overlay showed why: the "top red" dot sat on Kiaan's HAND, which crosses Levin's
+chest. `_colourSeedPoints` returned the CENTROID of the largest matching-colour
+blob, and the centroid of a non-convex blob (a shirt wrapped around a crossing
+arm) falls outside the blob. Same failure on p1 Kiaan, p4 Levin, backCover Levin.
+
+**Decision.**
+- The seed dot is the blob's **interior point** — the max-chamfer-distance pixel,
+  i.e. the middle of the largest solid patch of that colour — never the centroid.
+  It is guaranteed to land on matching pixels.
+- The SAM prompt build in `computeFigureMasks` is now **three passes** (build all
+  prompts → exchange negatives → call SAM) so that every figure's garment
+  positives are handed to every OTHER figure whose box contains them as negative
+  points (`role: 'other-garment'`, rendered "not my <colour>" in the overlay).
+  Faces already worked this way; garments could not, because seeds were computed
+  inside the same loop that immediately called SAM per figure.
+- A cross negative within 15px of one of the receiving figure's own positives is
+  skipped — a contradictory point pair; that shared-region case is exactly what
+  the interior-point fix resolves.
+
+**Rationale.** A positive on the neighbour's skin makes SAM *include* the
+neighbour and drop the split-off shirt; the interior point makes the positive
+unambiguous, and the exchanged negatives give SAM an explicit "these pixels
+belong to someone else" it previously only had for faces.
+
+**Touched files.** `server/lib/figureDetection.js` (`_colourSeedPoints`,
+`_blobInteriorPoint`, 3-pass prompt build), `server/lib/bboxDetection.js`
+(overlay label). Bug registry: `garment-seed-off-colour-centroid`.

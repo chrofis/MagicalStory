@@ -17,7 +17,13 @@ const crypto = require('crypto');
 // scores sat flat across passes while real fixes landed.
 const RUBRIC = {
   beats:       ['arc', 'pacing', 'emotion', 'causality', 'themeFit',
-                'stakes', 'illustratable', 'repetition', 'castVariety', 'looseThreads'],
+                'stakes', 'illustratable', 'repetition', 'castVariety', 'looseThreads',
+                // Added 2026-08-21 (owner): length-appropriate complexity, single
+                // focus, staggered entrances, difficulty vs reading level, and
+                // whether the thing the book is ABOUT is actually on the page.
+                // None of these existed, so every earlier beats score was blind
+                // to them — numbers before this date are on a different scale.
+                'fit', 'focus', 'entrances', 'difficulty', 'subject'],
   scene:       ['clarity', 'variety', 'grounding', 'setting', 'composition'],
   storyText:   ['language', 'readability', 'voice', 'alignment', 'dialogue'],
   visualBible: ['completeness', 'wardrobe', 'world', 'anchors', 'consistency'],
@@ -45,13 +51,27 @@ const RUBRIC_V1 = {
 // depending on who ran it — and a sonnet-judged table was silently compared
 // against a gemini-judged one. Each scorer is named after its judge.
 // 1.x are frozen legacy rows (judge not pinned) — kept so old scores stay readable.
+// The 10-dimension beats rubric that generations 1.2 through 3.x were scored on.
+// Their stored scores mean what they meant; a rubric change makes a NEW version
+// rather than redefining an old one.
+const RUBRIC_V3 = {
+  ...RUBRIC,
+  beats: ['arc', 'pacing', 'emotion', 'causality', 'themeFit',
+          'stakes', 'illustratable', 'repetition', 'castVariety', 'looseThreads'],
+};
+
+// Rubric for the arc-only judge (story-arc-judge.txt). Lives here, not in the
+// stage that uses it: this module declares itself the one home of rubrics, and a
+// second copy in testlab.js already drifted once.
+const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding', 'fit', 'focus', 'entrances', 'difficulty'] };
+
 const EVALUATORS = {
   '1.0': { name: 'legacy 1.0', promptKey: 'storyScorecardJudge', rubric: RUBRIC_V1, judge: null },
   '1.1': { name: 'legacy 1.1 (harsh)', promptKey: 'storyScorecardJudgeV1_1', rubric: RUBRIC_V1, judge: null },
-  '1.2': { name: 'legacy 1.2 (10-dim beats)', promptKey: 'storyScorecardJudgeV1_2', rubric: RUBRIC, judge: null },
-  '2.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'claude-sonnet' },
-  '2.2': { name: 'grok', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'grok-4.6' },
-  '2.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
+  '1.2': { name: 'legacy 1.2 (10-dim beats)', promptKey: 'storyScorecardJudgeV1_2', rubric: RUBRIC_V3, judge: null },
+  '2.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC_V3, judge: 'claude-sonnet' },
+  '2.2': { name: 'grok', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC_V3, judge: 'grok-4.6' },
+  '2.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC_V3, judge: 'gemini-3.1-pro' },
   // Generation 3 = premise-aware. 2.x judged the artifacts with no brief, so a
   // judge could not tell a commissioned premise from a plot hole: on the
   // moon-landing stories two judges independently reported the child-crew
@@ -59,14 +79,23 @@ const EVALUATORS = {
   // storyDetails ("ROLES: <child>: <historical figure>"). A new generation
   // rather than an edit to 2.x, because changing what a judge sees changes every
   // score it produces — 2.x rows stay comparable among themselves.
-  '3.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC, judge: 'claude-sonnet' },
-  '3.2': { name: 'grok', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC, judge: 'grok-4.6' },
-  '3.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
+  '3.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC_V3, judge: 'claude-sonnet' },
+  '3.2': { name: 'grok', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC_V3, judge: 'grok-4.6' },
+  '3.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC_V3, judge: 'gemini-3.1-pro' },
+  // Generation 4 = shape-aware. 3.x had no dimension for any of the things that
+  // decide whether a book fits its format: complexity against length, one
+  // character owning the arc, staggered entrances, difficulty against reading
+  // level, and whether the subject the book is named for is actually on the
+  // page. A judge blind to those scored a dragon story 9.0 while its dragon was
+  // eyes in the dark. New generation, not an edit, for the same reason as 3.x.
+  '4.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV4', rubric: RUBRIC, judge: 'claude-sonnet' },
+  '4.2': { name: 'grok', promptKey: 'storyScorecardJudgeV4', rubric: RUBRIC, judge: 'grok-4.6' },
+  '4.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV4', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
 };
 // back-compat shapes for anything that read these directly
 const EVALUATOR_PROMPT_KEYS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.promptKey]));
 const EVALUATOR_RUBRICS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.rubric]));
-const DEFAULT_EVALUATOR_VERSION = '3.1'; // prompt gen 3 (premise-aware), judged by sonnet
+const DEFAULT_EVALUATOR_VERSION = '4.1'; // prompt gen 4 (shape-aware), judged by sonnet
 const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
 
 function resolveEvaluator(version) {
@@ -186,9 +215,23 @@ function buildBriefContext(d = {}) {
     d.languageLevel ? `Reading level: ${d.languageLevel}` : null,
     d.pages ? `Pages: ${d.pages}` : null,
     Array.isArray(d.characters) && d.characters.length
-      ? `Cast: ${d.characters.map(c => c && c.name).filter(Boolean).join(', ')}` : null,
+      // Ages included: the shape-aware dims (fit, difficulty, subject) are
+      // scored against the cast's ages — without them the judge grades against
+      // facts it has to invent.
+      ? `Cast: ${d.characters.map(c => c && (c.age ? `${c.name} (${c.age})` : c.name)).filter(Boolean).join(', ')}` : null,
     d.storyDetails ? `\nCommissioned idea:\n${String(d.storyDetails).slice(0, 3000)}` : null,
   ].filter(Boolean);
+  // The computed allowance the artifacts were written under, so `fit` is judged
+  // against the real budget rather than a guess. Lazy require: promptBuilders
+  // does not require this module, so there is no cycle.
+  try {
+    const { buildStoryShapeSection } = require('./promptBuilders');
+    const pages = parseInt(d.pages, 10) || (Array.isArray(d.sceneImages) ? d.sceneImages.length : 0);
+    if (pages) {
+      const shape = buildStoryShapeSection(d, pages);
+      if (shape) lines.push(`\n${shape}`);
+    }
+  } catch { /* judge context degrades to the plain brief */ }
   return lines.length ? lines.join('\n') : '';
 }
 
@@ -256,7 +299,7 @@ function parseJudgeJson(text) {
 }
 
 module.exports = {
-  RUBRIC, RUBRIC_V1, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
+  RUBRIC, RUBRIC_V1, ARC_RUBRIC, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
   buildJudgeInput, buildJudgeInputFromArtifacts, buildBriefContext, provenanceOf,
   scoreFromDims, parseJudgeJson,
   EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS, EVALUATORS,

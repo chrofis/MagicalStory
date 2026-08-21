@@ -197,6 +197,59 @@ ${teachingGuide}`
 ${adventureGuideContent}`
     : '';
 
+  // A sample of the challenge catalogue (prompts/challenge-catalogue.txt), so the
+  // generator stops reaching for the same five obstacles (a stream, a boulder, a
+  // locked gate, a refusing guard, a storm — catalogue ids 29, 1, 67, 78, 51).
+  // Filtered by the cast's ages, peril-free when a young child is in the cast,
+  // and sampled ACROSS categories with the five AI-default categories (A, C, D,
+  // F, G) capped, so variety comes from the sample itself. ~40 entries is ~900
+  // tokens (~$0.003/call); a fresh sample per call varies a customer's stories.
+  let challengeCatalogueSection = '';
+  try {
+    const rawCat = await fs.readFile(path.join(__dirname, '../../prompts', 'challenge-catalogue.txt'), 'utf-8');
+    const ages = (characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
+    const youngest = ages.length ? Math.min(...ages) : 8;
+    const bands = youngest <= 5 ? ['3'] : youngest <= 8 ? ['3', '6'] : ['6', '9'];
+    const entries = rawCat.split('\n')
+      .filter(l => l && !l.startsWith('#'))
+      .map(l => l.split('|'))
+      .filter(f => f.length >= 6)
+      .filter(f => bands.some(b => f[4].startsWith(b)))
+      .filter(f => youngest > 5 || f[5].trim() !== '1');
+    const byCat = new Map();
+    for (const f of entries) {
+      if (!byCat.has(f[1])) byCat.set(f[1], []);
+      byCat.get(f[1]).push(`- ${f[2]} (tests: ${f[3]})`);
+    }
+    const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
+    const picked = [];
+    const cats = [...byCat.keys()].sort(() => Math.random() - 0.5);
+    let round = 0;
+    while (picked.length < 40 && round < 8) {
+      for (const c of cats) {
+        if (picked.length >= 40) break;
+        const cap = DEFAULT_ZONE.has(c) ? 1 : 2; // the default zone gets one pick, ever
+        const used = picked.filter(x => x.cat === c).length;
+        if (used >= cap * (DEFAULT_ZONE.has(c) ? 1 : round + 1)) continue;
+        const pool = byCat.get(c);
+        if (!pool.length) continue;
+        const i = Math.floor(Math.random() * pool.length);
+        picked.push({ cat: c, line: pool.splice(i, 1)[0] });
+      }
+      round++;
+    }
+    if (picked.length) {
+      challengeCatalogueSection = [
+        '## CHALLENGE IDEAS (a sample from a catalogue of classic trials)',
+        'When the story needs an obstacle, prefer one of these — or one in their spirit — over the usual stream, boulder, locked gate, refusing guard or storm. Pick what fits the characters and the world; vary the kind.',
+        '',
+        ...picked.map(x => x.line),
+      ].join('\n');
+    }
+  } catch (err) {
+    log.warn(`[IDEAS] challenge catalogue unavailable: ${err.message}`);
+  }
+
   // Calculate story length category for output length limits
   const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 6 sentences max per idea' :
                               pages <= 20 ? 'MEDIUM (11-20 pages) - 8 sentences max per idea' :
@@ -244,6 +297,7 @@ ${adventureGuideContent}`
     USER_LOCATION_INSTRUCTION: userLocationInstruction,
     AVAILABLE_LANDMARKS: availableLandmarksSection,
     STORY_LENGTH_CATEGORY: storyLengthCategory,
+    CHALLENGE_CATALOGUE: challengeCatalogueSection,
     LANGUAGE_INSTRUCTION: languageInstruction,
     ...extraReplacements,
   });

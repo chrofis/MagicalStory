@@ -127,6 +127,7 @@ async function loadPromptTemplates() {
     // Arc-only review and its judge. The arc is ~15 lines where the beats are a
     // whole book, so a review round costs cents — which is what makes "how many
     // rounds, and with which models" answerable at all.
+    ['storyScorecardJudgeV4', 'story-scorecard-judge-v4.txt'],
     ['storyArcReview', 'story-arc-review.txt'],
     ['storyArcJudge', 'story-arc-judge.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and

@@ -1,4 +1,4 @@
-You are reviewing the arc of an illustrated children's book, before any page exists. The arc is the contract the pages will have to satisfy, so a fault fixed here costs nothing and a fault left here is repeated on every page.
+You are reviewing the arc of an illustrated children's book, before any page exists. The arc is the whole story before it is cut into pages. It contains no page numbers, and you do not add any: what lands on which page is decided later.
 
 # TARGET
 
@@ -10,9 +10,13 @@ Characters: {CHARACTER_NAMES}
 
 {STORY_BRIEF}
 
-# CHARACTER DETAILS
+# CHARACTER DETAILS (source of truth for who these children are: never contradict a trait, never invent one)
 
 {CHARACTER_DETAILS}
+
+{STORY_GUIDE_SECTION}
+
+{STORY_SHAPE}
 
 # CURRENT ARC
 
@@ -22,25 +26,26 @@ Characters: {CHARACTER_NAMES}
 
 Judge the arc as a reader who sees only this. The brief says what the book is FOR; it is never evidence that the arc works. Answer each check, then output the corrected arc.
 
-1. Shape — is there one problem the whole cast shares, clear early and concrete enough to draw? Name it, or say that the plan has several problems or none.
-2. Attempts — are there two or three attempts, never four; does each fail for a DIFFERENT reason; is the cast worse off or more pressed after each; does the final attempt carry more pages than the earlier ones? Name any attempt that fails for a reason already used, or that leaves the situation unchanged.
-3. Lost — is there a point where the goal looks finished? Name it, or add one.
-4. Who resolves it — do the children resolve it by their own act? Name any adult, rescuer, lucky arrival or accident that removes the obstacle.
-5. Roll call — is any attempt assigned to a character simply because it is their turn? Name any two children whose actions could be swapped without changing anything, and give each a function only they carry.
+1. Shape — is there one main challenge the focus character must face, coming from who they are rather than from the setting? Name it, or say the arc has several or none.
+2. Challenges — does the focus character have the number the budget allows, in rising order, each one harder because the last was not clean? Name any challenge that repeats an earlier one's reason, or that costs nothing to meet.
+3. Budget — count the challenges and moments against the allowance in the STORY SHAPE. Name what must be cut or added for the story to fit the book.
+4. Moments — does every other named character have their own moment, doing what only they would do? Name any who has none, any who has more than the budget allows, and any two whose moments could be swapped.
+5. Who resolves it — do the children resolve it themselves? Name any adult, rescuer, lucky arrival or accident that removes the obstacle.
 6. The youngest — is what the youngest child does within a very young child's reach (noticing, holding, fetching, naming, offering, refusing)? Name anything beyond it.
-7. Change — does one character do the same kind of act differently, early and late, with both pages named? Name any change that only restates a trait, and any line that states what someone learned or realised.
-8. Blockers — does whoever stands in the way want something of their own, and does the arc say what? Name any blocker who exists only to be passed.
-9. Reasons — is any turn licensed by a sign, an inscription or a rule announced for that purpose, rather than by who someone is or what a place is for? Name each.
-10. Peril — frightening is the right level. Name anything that could kill or injure a child, anyone who looks monstrous, any familiar character who turns frightening, and any separation with no reunion and no safe last page.
-11. Cast — is any named character carrying work another could carry? Name them and say who absorbs them.
-12. Spread — do the turns fall across the book, or cluster? Name any two that sit on the same or adjacent pages without reason.
+7. Change — does the focus character do the same kind of act differently, once early and once late? Name the two, name any change that only restates a trait, and any line that states what someone learned.
+8. Threads — does the number of lines of action match the book's length, and do they meet? Name a second thread that is really a detour, or a long book running on one line.
+9. Joining and parting — does the arc say who starts, who arrives later and why then, and who is separated and where they return? Name anyone who is simply present from the start with no reason.
+10. Blockers — does whoever stands in the way want something of their own? Name any blocker who exists only to be passed.
+11. Reasons and closure — is any turn licensed by a sign, an inscription or a rule announced for the purpose? Name every object, question or promise opened and where it closes; anything that cannot be closed is cut.
+12. Subject and peril — is the thing the book is about present as the STORY SHAPE requires, rather than hinted at offstage? Frightening is the right level: name anything that could kill or injure a child, anyone who looks monstrous, and any separation with no reunion and no safe ending.
+13. Flow — does the shape run opening, building, relief and ending without a stretch where nothing tightens? Name where it sags or where two turns crowd together.
 
 # OUTPUT FORMAT
 
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to checks 1-12>
+<your answers to checks 1-13>
 
 ---ARC---
 <the corrected arc, complete, in the same shape as the one you were given>

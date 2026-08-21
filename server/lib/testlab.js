@@ -3229,7 +3229,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let review = null;
   let finalBeats = planParsed.pages;
   if (!params.skipReview) {
-    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages, planParsed.arc);
+    const tlPagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
+    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages, planParsed.arc, tlPagePlan);
     if (!reviewPrompt) throw new Error('story-beats-review template unavailable');
     const t1 = Date.now();
     const revRes = await callTextModelStreaming(reviewPrompt, null, null, reviewModel, { usageLabel: 'testlab_beats_review' });
@@ -6063,7 +6064,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
     const t = Date.now();
     let res;
-    try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats, storedArc), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
+    try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats, storedArc, ''), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
     finally { PROMPT_TEMPLATES.storyBeatsReview = orig; }
     assertReviewerResponded(res, model);
     const out = res.text || '';
@@ -6116,7 +6117,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
       const passes = [];
       let convergedAtPass = null;
       for (let p = 1; p <= passCount; p++) {
-        const prompt = buildBeatsReviewPrompt(storyData, beats, storedArc);
+        const prompt = buildBeatsReviewPrompt(storyData, beats, storedArc, '');
         const t = Date.now();
         const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
         assertReviewerResponded(res, model);
@@ -6642,7 +6643,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
   const rounds = Math.min(Math.max(Number.isFinite(_r) ? _r : 3, 0), 5);
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
 
-  const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding'] };
+  const { ARC_RUBRIC } = sc;
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
   if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
   const context = sc.buildBriefContext({ ...storyData, pages: pageCount });
@@ -6658,7 +6659,9 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
         const r = await callTextModelStreaming(`${judgeTemplate}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_arc_judge' });
         const parsed = sc.parseJudgeJson(r.text);
         const dims = parsed?.arc?.dims || {};
-        const keys = ARC_RUBRIC.arc.filter(k => Number.isFinite(Number(dims[k])));
+        // 1-10 only: a judge echoing the prompt's zero-filled skeleton must not
+        // average in as a real score.
+        const keys = ARC_RUBRIC.arc.filter(k => { const n = Number(dims[k]); return Number.isFinite(n) && n >= 1 && n <= 10; });
         if (keys.length < ARC_RUBRIC.arc.length) throw new Error(`missing dims: ${ARC_RUBRIC.arc.filter(k => !keys.includes(k)).join(',')}`);
         const score = Math.round((keys.reduce((s, k) => s + Number(dims[k]), 0) / keys.length) * 10) / 10;
         return { score, dims, notes: String(parsed.arc.notes || ''), cost: costOf(r) };

@@ -1,20 +1,24 @@
 You score the ARC of a generated children's book — the shape the pages will have to deliver, written before any page exists. Judge only what is given. An arc is not a book: do not credit or deduct for prose, illustration or page-level detail, and do not assume a page will fix what the arc leaves out.
 
-Score each dimension 1-10 and be demanding. Anchor the scale: a competent but unremarkable arc lands at 5-6; 7 is good; 8 or above is reserved for a shape a discerning editor would call strong; 3-4 is weak; 1-2 is broken. Deduct for a middle where nothing goes wrong, attempts that fail for the same reason twice, one attempt handed to each character in turn, an adult or an accident removing the obstacle, blockers who exist only to be passed, reasons announced rather than grounded, and character change that restates a trait instead of altering it. Do not award high scores for a tidy list of stages. Add one short note naming what drove the score.
+Score each dimension 1-10 and be demanding. Anchor the scale: a competent but unremarkable arc lands at 5-6; 7 is good; 8 or above is reserved for a shape a discerning editor would call strong; 3-4 is weak; 1-2 is broken. Deduct for a middle where nothing goes wrong, challenges that fail for the same reason twice, one challenge dealt to each character in turn, an adult or an accident removing the obstacle, blockers who exist only to be passed, reasons announced rather than grounded, and character change that restates a trait instead of altering it. Do not award high scores for a tidy list of stages. Add one short note naming what drove the score.
 
 ## arc
-- shape: one shared problem, concrete and drawable, clear early
-- attempts: two or three, never four; each fails for a different reason; the cast is worse off after each; the last attempt is the longest
+- shape: one main challenge the focus character must face, concrete and clear early, coming from who they are rather than from the setting
+- attempts: the challenges match the allowance the brief states for this length, in rising order; each fails or costs for a different reason and leaves the cast worse off
 - lost: a point before the end where the goal looks finished
 - agency: the children resolve it themselves — no adult, rescuer, lucky arrival or accident removes the obstacle
 - ensemble: each named child carries a function only they carry; no attempt is assigned by turn, and no two children's actions could be swapped
 - change: one character does the same kind of act differently early and late, both points named; a restated trait is not a change, and the change is never stated outright
 - blockers: whoever stands in the way wants something of their own, and the arc says what
 - grounding: turns follow from who someone is or what a place is for, never from a sign or rule announced for the purpose
+- fit: the challenges and moments match the allowance the brief states for this length — a short book runs one line with few challenges, a long one carries a second thread that meets the first; neither padded nor crammed
+- focus: ONE character owns the challenges and the visible change; the others have moments, not arcs of their own, and the resolution belongs to whoever carried the difficulty
+- entrances: the arc says who starts, who joins later and why then, and who is separated and where they return; the whole cast is not simply present from the start
+- difficulty: the challenge level matches the reading level, lowered when the focus character is very young; the simplest level is always simple
 
-A BRIEF section may precede the arc: the commission, including the topic and the roles the characters were cast in. It is context, never scored. It is a premise, not a specification — an arc that invents what the brief left open is doing its job, and anything the brief asks for is intended by design.
+A BRIEF section may precede the arc: the commission, including the page count, the reading level, the ages of the cast, and the roles they were cast in. Judge fit, focus and difficulty against it. It is context, never scored. It is a premise, not a specification — an arc that invents what the brief left open is doing its job, and anything the brief asks for is intended by design.
 
 Output strict JSON only, no text around it:
 {
-  "arc": {"dims": {"shape": 0, "attempts": 0, "lost": 0, "agency": 0, "ensemble": 0, "change": 0, "blockers": 0, "grounding": 0}, "notes": ""}
+  "arc": {"dims": {"shape": 0, "attempts": 0, "lost": 0, "agency": 0, "ensemble": 0, "change": 0, "blockers": 0, "grounding": 0, "fit": 0, "focus": 0, "entrances": 0, "difficulty": 0}, "notes": ""}
 }

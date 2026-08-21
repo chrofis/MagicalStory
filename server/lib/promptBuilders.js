@@ -3879,6 +3879,99 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
  * PSYCHOLOGICAL character profile the refiner gets. Extracted so beats, the
  * beats review and text refinement can never describe the same book differently.
  */
+/**
+ * The story's SHAPE, computed rather than left to the model: how many threads a
+ * book this long carries, how many challenges its focus character gets, who that
+ * focus character is, and how hard the story may be.
+ *
+ * getSceneComplexityGuide() has encoded the length thresholds since the unified
+ * days, but only the idea generator ever received it — the beats planner got the
+ * page count as a bare label and treated a 5-page board book like a 25-page one.
+ *
+ * Owner rules (2026-08-21): at most two main characters (or half the cast,
+ * whichever is smaller); difficulty follows the reading level, lowered when the
+ * focus character is very young; the simplest level is always simple.
+ */
+function buildStoryShapeSection(inputData, pageCount) {
+  const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
+  const chars = inputData.characters || [];
+  const declaredMain = inputData.mainCharacters || [];
+
+  // At most 2, or half the cast when the cast is small. Older first: a 3-year-old
+  // carries a moment, not a book.
+  const cap = Math.max(1, Math.min(2, Math.floor(chars.length / 2) || 1));
+  const mains = chars
+    .filter(c => declaredMain.includes(c.id))
+    .sort((a, b) => (parseInt(b.age, 10) || 0) - (parseInt(a.age, 10) || 0))
+    .slice(0, cap);
+  const focus = mains[0] || chars[0] || null;
+  const others = chars.filter(c => c !== focus);
+
+  // The page budget is arithmetic, so code does it and the arc only fills it in.
+  // A major challenge is worth 2-3 pages, a secondary character's moment 1-2, and
+  // the opening and ending take 2 each. Asking a model to keep that sum straight
+  // is how you get a rushed ending: it discovers the overrun at the last page.
+  const openingPages = pages <= 10 ? 1 : 2;
+  const endingPages = pages <= 10 ? 1 : 2;
+  const perMajor = pages <= 10 ? 2 : 3;
+  // Clamped so the stated budget can never exceed the book: a 12-page book at
+  // 3x3 majors plus covers priced out at 13 pages and told the model both
+  // "0 secondary moments" and "one moment each" in adjacent lines.
+  let majors = pages <= 10 ? 2 : pages <= 20 ? 3 : 4;
+  while (majors > 1 && openingPages + endingPages + majors * perMajor > pages) majors--;
+  const majorPages = majors * perMajor;
+  const spare = pages - openingPages - endingPages - majorPages;
+  // Whatever is left pays for the secondary characters' moments, at ~2 pages each.
+  const moments = Math.max(0, Math.floor(spare / 2));
+
+  const threads = pages <= 10
+    ? 'One storyline. No subplot, no second party doing something else.'
+    : pages <= 20
+      ? 'One main storyline plus ONE secondary strand that meets it before the end.'
+      : 'Two strands that run apart and meet: the cast is not in one place for the whole book.';
+
+  const challenges = `exactly ${majors}`;
+
+  const level = String(inputData.languageLevel || 'standard').toLowerCase();
+  const focusAge = parseInt(focus?.age, 10) || 0;
+  const simplest = level.includes('1st') || level.includes('early') || pages <= 10;
+  const difficulty = simplest
+    ? 'Simplest level: every challenge is one a small child solves by trying, asking or noticing. Nothing frightening beyond a moment.'
+    : (focusAge && focusAge <= 5)
+      ? 'The focus character is very young, so the challenges stay simple even at this reading level: no long plans, no reasoning a small child could not follow.'
+      : 'The reading level allows real difficulty: a setback that lasts, a choice with a cost, a darker middle — still resolved.';
+
+  // What the book is ABOUT has to be on the page. A dragon story for the
+  // youngest readers shows a dragon — whole, friendly, and early. Withholding
+  // the subject behind eyes in the dark or a sound offstage is a technique for
+  // longer books and older readers; in a picture book it just means the thing
+  // the child was promised never turns up.
+  const subjectName = String(inputData.storyTopic || inputData.storyTheme || '').trim();
+  const subject = !subjectName ? '' : simplest
+    ? `Subject: the ${subjectName} is what this book is about. It appears in full view early, stays present through the story, and looks friendly and fun — never suggested by eyes in the dark, a shadow, a rumble or a sound offstage, and never frightening to look at.`
+    : `Subject: the ${subjectName} is what this book is about and drives the ending. It may be withheld or hinted at for part of the book, but it is seen and it matters.`;
+
+  return [
+    '# STORY SHAPE (fixed by length and reading level — not yours to change)',
+    '',
+    `Pages: ${pages}. Threads: ${threads}`,
+    subject,
+    `Focus character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — carries the challenges and the one visible change; the ending belongs to them.`,
+    `Challenges for the focus character: ${challenges}.`,
+    `Page budget — this is what ${pages} pages buys, already counted for you: opening ${openingPages}, ` +
+      `${majors} major challenge${majors === 1 ? '' : 's'} at ${pages <= 10 ? 2 : 3} pages each (${majorPages}), ` +
+      `${moments} secondary moment${moments === 1 ? '' : 's'} at about 2 pages each, ending ${endingPages}. ` +
+      'Write that many and no more: a challenge you add is a page taken from another one.',
+    others.length
+      ? (moments > 0
+        ? `Everyone else — ${others.map(c => c.name).join(', ')} — shares the ${moments} secondary moment${moments === 1 ? '' : 's'} the budget allows: at most one each, doing what only they would do. Not a challenge of their own, not an arc.`
+        : `Everyone else — ${others.map(c => c.name).join(', ')} — appears inside the focus character's challenges; the budget has no room for separate moments.`)
+      : '',
+    'Entrances: say who is there at the start, and who joins later and why then. They do not all arrive at once.',
+    difficulty,
+  ].filter(Boolean).join('\n');
+}
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const loc = inputData.userLocation;
@@ -3941,7 +4034,19 @@ function buildStoryContextFields(inputData) {
     LANGUAGE_NOTE: getLanguageNote(language),
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
-    STORY_BRIEF: brief,
+    // Every injected block states its own standing. Without this the brief
+    // arrived as bare text and each stage guessed: the planner was told to treat
+    // it as a loose wish, the judge scored it as a commission, and the reviewer
+    // was told it proves nothing — three readings of one input, none declared.
+    // Owner ruling (2026-08-21): subject and world bind, mechanics do not.
+    STORY_BRIEF: [
+      '# THE COMMISSION',
+      '',
+      'What this names is binding: the subject the book is about, the world it happens in, and who is in it. The book delivers those.',
+      'How the story gets there is not binding: any obstacle, object or trick the idea suggests may be replaced by something the story needs more. Dropping one of those is not a fault.',
+      '',
+      brief,
+    ].join('\n'),
     STORY_GUIDE_SECTION: guideSection,
     CHARACTER_DETAILS: characterDetails,
     MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
@@ -3958,12 +4063,13 @@ function buildBeatsPrompt(inputData, pageCount) {
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
-function buildBeatsReviewPrompt(inputData, beats, arc = '') {
+function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '') {
   const template = PROMPT_TEMPLATES.storyBeatsReview;
   if (!template) {
     log.error('[PROMPT] storyBeatsReview template not loaded — beats review unavailable');
@@ -3975,6 +4081,8 @@ function buildBeatsReviewPrompt(inputData, beats, arc = '') {
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
+    STORY_SHAPE: buildStoryShapeSection(inputData, beats.length),
+    PAGE_PLAN: String(pagePlan || '').trim() || '(the planner emitted no page plan — check 6c falls back to the beats alone)',
     CURRENT_BEATS: current,
     CURRENT_ARC: String(arc || '').trim() || '(the planner authored no arc)',
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
@@ -3991,6 +4099,7 @@ function buildArcReviewPrompt(inputData, arc) {
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: inputData.pages || (inputData.sceneImages || []).length || 10,
+    STORY_SHAPE: buildStoryShapeSection(inputData, inputData.pages || (inputData.sceneImages || []).length || 10),
     CURRENT_ARC: String(arc || '').trim(),
   });
 }
@@ -4001,7 +4110,11 @@ function parseArcReview(raw) {
   const marker = full.match(/---\s*ARC\s*---/i);
   const analysis = (marker ? full.slice(0, marker.index) : full)
     .replace(/^[\s\S]*?---\s*ANALYSIS\s*---/i, '').trim();
-  const arc = marker ? full.slice(marker.index + marker[0].length).trim() : '';
+  // Lookahead to the next section marker: a reviewer that emits ---ARC--- first
+  // and ---ANALYSIS--- second must not have the analysis absorbed into the arc.
+  const arc = marker
+    ? (full.slice(marker.index + marker[0].length).match(/^([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/) || [, ''])[1].trim()
+    : '';
   return { analysis, arc };
 }
 
@@ -4119,8 +4232,15 @@ function parseBeats(raw, expectedPages = []) {
   while ((m = re.exec(body)) !== null) marks.push({ page: parseInt(m[1], 10), headStart: m.index, bodyStart: re.lastIndex });
 
   const pages = [];
+  // The last page's chunk must stop at the next ---SECTION--- marker, not at the
+  // end of the response: a section emitted AFTER the beats (a reordered PAGE
+  // PLAN, a stray postscript) would otherwise be absorbed into that page's SCENE.
+  const trailing = body.search(/\n---\s*[A-Z][A-Z ]*---/);
+  const bodyEnd = trailing >= 0 && marks.length && trailing > marks[marks.length - 1].bodyStart
+    ? trailing
+    : body.length;
   for (let i = 0; i < marks.length; i++) {
-    const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    const end = i + 1 < marks.length ? marks[i + 1].headStart : bodyEnd;
     const chunk = body.slice(marks[i].bodyStart, end);
     // BEAT runs until SCENE; SCENE until the end of the chunk.
     const beat = (chunk.match(/BEAT\s*:\s*([\s\S]*?)(?=\n\s*SCENE\s*:|$)/i) || [])[1];
@@ -4957,6 +5077,7 @@ module.exports = {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
+  buildStoryShapeSection,
   parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,

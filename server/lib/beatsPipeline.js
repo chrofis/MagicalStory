@@ -280,7 +280,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
   const planPrompt = approvedArc
-    ? `${basePrompt}\n\nThis arc has been reviewed and approved. Write the pages that deliver it, page by page, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---BEATS--- block only. Do not restate the arc.`
+    ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
     : basePrompt;
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
@@ -289,6 +289,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const plan = parseBeats(planRes.text || '', expected);
   // The approved arc is the contract the reviewer checks the pages against.
   if (approvedArc) plan.arc = approvedArc;
+  // The page plan decides shot and cast size per page BEFORE any page is written.
+  // It sits ahead of ---BEATS---, so every beats parser ignores it.
+  const pagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
+  if (pagePlan) log.info(`📐 [BEATS] page plan: ${pagePlan.split('\n').filter(Boolean).length} line(s)`);
   if (plan.pages.length === 0) throw new Error('Beats planner returned no parseable beats');
   if (plan.missing.length > 0) {
     log.warn(`⚠️ [BEATS] Planner omitted page(s) ${plan.missing.join(', ')} — story will be ${plan.pages.length} pages`);
@@ -307,7 +311,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // unmeasurable: the log says "3 pages rewritten" and nothing says WHAT.
   // Stays null only when the review never ran (missing template or a throw).
   let beatsReviewReport = null;
-  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages, plan.arc);
+  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages, plan.arc, pagePlan);
   if (!reviewPrompt) {
     log.warn('⚠️ [BEATS] story-beats-review template unavailable — beats shipped unreviewed');
     gl.warn('beats_review_failed', 'Review template unavailable — beats shipped unreviewed');
@@ -343,6 +347,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // The arc the planner committed to, and the contract this review judged
         // the pages against. Stored so a plan can be read back against it.
         arc: plan.arc || '',
+        pagePlan,
         pages: beatsDiffs,
         // Same dev-mode inspection as the scene review (owner request
         // 2026-08-09): the exact prompt, and EVERY beat as sent — not only the
@@ -1003,6 +1008,10 @@ SCENE: ${x.scene || ''}`.trim(),
     // with a lookahead to the next section, so a block ahead of it is invisible
     // to them and readable in the outline view.
     ...(plan.arc ? ['---ARC---', plan.arc, ''] : []),
+    // The plan was written before the review; when the review rewrote pages the
+    // stored plan describes a book that no longer exists page-for-page. Say so
+    // in the transcript rather than letting a reader trust a stale map.
+    ...(pagePlan ? ['---PAGE PLAN---', (beatsReviewReport?.changedPages?.length ? '(written before the beats review; rewritten pages may no longer match it)\n' : '') + pagePlan, ''] : []),
     '---BEATS---',
     beats.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n'),
     '',

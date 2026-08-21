@@ -1,0 +1,420 @@
+# Challenge catalogue — typical trials in children's adventure stories.
+# Source: docs/challenge-catalogue.html (Thompson Motif-Index H-chapter, Propp, ATU, TV Tropes; 2026-08-21).
+# Format: id|category|challenge|what it tests|age band|peril (1 = unsuitable for the youngest band)
+# Categories: A=Physical barriers & terrain; B=Height, depth, reach & scale; C=Water & crossing; D=Weather & natural forces; E=Darkness, light & the senses; F=Locks, doors, thresholds & containers; G=Gatekeepers, permission & social barriers; H=Riddles, knowledge & puzzles; I=Impossible, absurd & paradoxical tasks; J=Speed & time pressure; K=Endurance, tedium & repetition; L=Herding & controlling the uncontrollable; M=Resource scarcity & provisioning; N=Repair, restore & make good; O=Navigation & being lost; P=Pursuit, escape & stealth; Q=Deception, trickery & trust; R=Identity, recognition & proof; S=Negotiation with creatures; T=Cooperation & teamwork; U=Rules, taboos & prohibitions; V=Moral choice & temptation; W=Fear & internal obstacles; X=Loss, sacrifice & letting go; Y=Transformation & the body; Z=Communication & language; AA=Contests & performance; BB=Tools, machines & making; CC=Systems, crowds & bureaucracy; DD=Care & rescue of others
+1|A|A fallen tree lies across the only path|problem-framing, teamwork|3–5|0
+2|A|A thorn hedge has grown over the entrance|patience, tool use|6–8|0
+3|A|A gap in the ground is one step too wide to jump|risk judgement|6–8|0
+4|A|The wall is smooth with nothing to grip|lateral thinking|6–8|0
+5|A|The bridge has lost some of its planks|sequencing, care|6–8|0
+6|A|The opening is too narrow for everyone to fit through|who goes, who waits|3–5|0
+7|A|Deep mud grips the feet and holds them|persistence, mutual pulling|3–5|0
+8|A|Loose stones slide you back down for every step up|perseverance|6–8|0
+9|A|Identical passages branch and rebranch|systematic method|6–8|0
+10|A|A cliff must be got down, not up|nerve, planning|9–12|1
+11|A|A glassy, frictionless slope defeats climbing|invention over effort|6–8|0
+12|A|The doorway is the wrong size for the traveller|adaptation|3–5|0
+13|A|A dense crowd stands between you and the goal|politeness vs. urgency|3–5|0
+14|A|The ground where the path was has simply gone|acceptance, re-planning|6–8|0
+15|A|A surface that swallows whatever stands on it|hazard reading|9–12|1
+16|A|Two moving masses close the only gap rhythmically|timing under threat|9–12|1
+17|B|The wanted thing is stuck up in a tree|ingenuity, asking for help|3–5|0
+18|B|The shelf is above the reach of everyone present|stacking, cooperation|3–5|0
+19|B|Something has fallen into a gap too narrow for a hand|tool improvisation|3–5|0
+20|B|The thing is visible behind glass but not reachable|frustration tolerance|3–5|0
+21|B|The handle is above the height of the one who must open it|asking, improvising|3–5|0
+22|B|The object is far too heavy for one person|recruiting help|3–5|0
+23|B|The load is too heavy to lift but could be rolled or slid|physics reasoning|6–8|0
+24|B|The hero is now too big for the entrance they used before|change over time|3–5|0
+25|B|The thing is drifting away on water, just out of reach|speed of thought|3–5|0
+26|B|What is needed is at the bottom of a heap of other things|sorting, patience|3–5|0
+27|B|The goal lies at the bottom of deep water|limits, delegation|9–12|1
+28|B|A thing must be got down from a height without breaking it|care under pressure|6–8|0
+29|C|Open water with no crossing at all|route-finding|6–8|0
+30|C|A crossing that only exists at certain hours (tide, sluice, lock)|waiting, timing|6–8|0
+31|C|One stepping stone in the line is missing|reach, courage, help|3–5|0
+32|C|The boat leaks faster than it can be baled|triage, teamwork|6–8|0
+33|C|The one who keeps the crossing wants payment first|negotiation|6–8|0
+34|C|Something carried must arrive completely dry|care, ingenuity|3–5|0
+35|C|Water is rising while the work is unfinished|pressure, prioritising|9–12|1
+36|C|The current is stronger than any swimmer|knowing your limits|9–12|1
+37|C|A frozen surface that may or may not hold|judgement, caution|9–12|1
+38|C|The goal is visible directly across an uncrossable gap|deferring gratification|3–5|0
+39|C|The route is flooded and the detour is very long|acceptance of setback|6–8|0
+40|C|A waterfall blocks the way upstream|finding another route|9–12|1
+41|D|Fog erases every landmark at once|staying calm, roping together|6–8|0
+42|D|Wind carries away the thing being carried|chasing, recovering|3–5|0
+43|D|Heat and no shade|rationing, rest|6–8|0
+44|D|Snow has covered every mark that showed the way|memory, alternate cues|6–8|0
+45|D|The daylight is running out|pace, decisiveness|3–5|0
+46|D|Rain has made the load twice as heavy|endurance, sharing weight|6–8|0
+47|D|Hail forces an unplanned stop|making the best of it|3–5|0
+48|D|The season is wrong: the river is dry, or frozen solid|adaptation|6–8|0
+49|D|The spring everyone relies on has stopped flowing|diagnosis, service|6–8|0
+50|D|Loose snow or rock above the path may come down|hazard awareness|9–12|1
+51|D|A storm strands the party|shelter, morale|6–8|1
+52|D|Fire spreading across the route|evacuation, warning others|9–12|1
+53|E|Too dark to see the way forward|courage, feeling ahead|3–5|0
+54|E|The lamp, torch or candle is burning down|rationing|6–8|0
+55|E|Glare or reflected light makes looking impossible|shielding, angle|6–8|0
+56|E|Something must be found by touch alone|sensory attention|3–5|0
+57|E|Movement must be silent|self-control|3–5|0
+58|E|A sound must be identified without seeing its source|inference|3–5|0
+59|E|The way must be followed by smell or sound instead of sight|sensory substitution|6–8|0
+60|E|One of the party cannot see or hear and must be guided|empathy, clear instruction|6–8|0
+61|E|What looks like the goal turns out to be an illusion of light|scepticism|6–8|0
+62|E|The familiar place is unrecognisable in the dark|perception vs. reality|3–5|0
+63|E|A moving beam or reflection must be caught|playful impossibility|3–5|0
+64|E|Complete silence must be held for a long stretch|endurance of stillness|6–8|0
+65|F|A lock whose key is lost or somewhere unreachable|search, substitution|6–8|0
+66|F|A container that simply will not open|strength, then cleverness|3–5|0
+67|F|A door that opens only for the right kind of person|self-knowledge|6–8|0
+68|F|A knot pulled far too tight|patience, dexterity|3–5|0
+69|F|The door shuts and latches behind you|consequence, resourcefulness|6–8|0
+70|F|An opening that appears only at one moment of the day|waiting, punctuality|6–8|0
+71|F|The thing is sealed inside ice, wax or resin|patience, method|6–8|0
+72|F|A mechanism that needs two people acting at once|coordination, trust|6–8|0
+73|F|A lid too heavy or too stuck for the one who must open it|leverage|3–5|0
+74|F|The entrance requires becoming smaller than you are|humility, transformation|6–8|0
+75|F|The mechanism is complete but for one missing part|scavenging, matching|6–8|0
+76|F|Whatever is opened must be left exactly as it was found|discipline, memory|9–12|0
+77|G|A keeper who wants something in return before passing|trade, generosity|3–5|0
+78|G|A keeper who refuses everyone because that is the rule|arguing well, respect|6–8|0
+79|G|Someone is asleep across the way and must not be woken|stealth, kindness|3–5|0
+80|G|A helper who insists on doing it their own very slow way|patience, tact|3–5|0
+81|G|An official who needs the correct paper, token or stamp|procedure|9–12|0
+82|G|A line of others waiting, which must not be jumped|fairness vs. urgency|3–5|0
+83|G|Someone else got there first and holds the claim|negotiation, grace|6–8|0
+84|G|A guardian who is testing kindness, not strength or wit|character over ability|6–8|0
+85|G|A gate that will only admit one named person, who is not you|advocacy|9–12|0
+86|G|Permission must come from someone a long way off|messaging, delay|6–8|0
+87|G|The keeper has lost their own means of opening it|helping the obstacle|6–8|0
+88|G|Others are let through and you specifically are not|unfairness, composure|6–8|0
+89|G|Someone insists on coming along who should not|saying no kindly|3–5|0
+90|G|A doorkeeper who judges by appearance|prejudice, proving worth|9–12|0
+91|H|A riddle whose answer is an ordinary everyday thing|reframing|6–8|0
+92|H|A password that must be discovered before it can be spoken|listening, deduction|6–8|0
+93|H|Three questions must be answered before passing|composure under quizzing|6–8|0
+94|H|A pair of informants, one of whom always lies|logic|9–12|0
+95|H|Instructions written in a script nobody present can read|seeking expertise|6–8|0
+96|H|A map with a piece torn out of the middle|inference, risk|6–8|0
+97|H|A rhyme or song that secretly encodes the route|pattern-spotting|3–5|0
+98|H|A "how many / how far" question that must be answered exactly|estimating|6–8|0
+99|H|A being who must be called by its true, hidden name|observation, secrecy|6–8|0
+100|H|Someone else's dream or memory must be reconstructed|interviewing|9–12|0
+101|H|One item must be picked out of many identical ones|close attention|3–5|0
+102|H|A single symbol must be interpreted correctly|inference from little|6–8|0
+103|H|The answer exists but only one creature knows it, and it is far away|quest-within-quest|6–8|0
+104|H|A long sequence must be repeated back in order|memory|3–5|0
+105|H|A question whose only correct response is to refuse to answer|integrity, wit|9–12|0
+106|H|What everyone "knows" about the obstacle turns out to be wrong|checking sources|9–12|0
+107|I|Build something out of a material it cannot be built from|spotting the trick|6–8|0
+108|I|Carry water in a vessel full of holes|lateral solution|3–5|0
+109|I|Bring fruit or flowers out of season|resourcefulness, seasons|3–5|0
+110|I|Wash something white that was never white|refusing a false premise|6–8|0
+111|I|Mend a thing shattered past mending|substitution, honesty|6–8|0
+112|I|Get a large object through a much smaller neck|change of state|6–8|0
+113|I|Count something that cannot be counted|estimating, cheek|6–8|0
+114|I|Arrive neither walking nor riding|rule-bending wit|6–8|0
+115|I|Arrive neither dressed nor undressed|literal-mindedness as a weapon|6–8|0
+116|I|Arrive neither by day nor by night|finding the third option|6–8|0
+117|I|Do the chore and also not do it|paradox play|6–8|0
+118|I|Eat the food and return it whole|cleverness|6–8|0
+119|I|Bring a present that is also not a present|wit|6–8|0
+120|I|Bring your best friend, worst enemy and greatest comfort at once|insight into people|9–12|0
+121|I|Straighten a curled hair, or split one|futility, knowing when to stop|6–8|0
+122|I|Catch a sound, or bottle a noise|imagination|3–5|0
+123|I|Sell the animal and keep it too|loophole reasoning|9–12|0
+124|I|Bring something that only ever grows, and something that only shrinks|abstraction|9–12|0
+125|I|Fill a sack with truths (or with lies)|concept over object|9–12|0
+126|I|Fetch "nothing" and bring it back|playing with language|6–8|0
+127|I|Set an equally impossible counter-task in reply|turning the tables|9–12|0
+128|I|Reduce the demand to absurdity until it collapses|argument|9–12|0
+129|J|It must be finished before the sun goes down|pacing|3–5|0
+130|J|A mixed heap must be sorted before morning|method, help from unlikely allies|3–5|0
+131|J|Arrive before the door is shut for the day|urgency|3–5|0
+132|J|A rival is racing for the same thing|competition, sportsmanship|6–8|0
+133|J|A melting, burning or draining thing is the clock|visible pressure|6–8|0
+134|J|The thing to be saved is wilting as you travel|care under time|6–8|0
+135|J|The errand may only be made in one trip|planning, load-out|6–8|0
+136|J|News must reach someone before they act on wrong information|stakes of delay|6–8|0
+137|J|The ceremony or gathering starts at a fixed hour|deadlines|3–5|0
+138|J|The work undoes itself faster than it is done|futility, changing method|6–8|0
+139|J|The thing passes by only once and must be caught then|readiness|6–8|0
+140|J|You must be back before you are missed|secrecy, self-imposed deadline|6–8|0
+141|K|The flock must be carried across one at a time|patience, dull persistence|3–5|0
+142|K|A pond must be emptied with a very small cup|scale of effort|6–8|0
+143|K|Every slip returns you to the starting point|resilience|6–8|0
+144|K|An enormous number of tiny things must be gathered|stamina, delegation|3–5|0
+145|K|The burden grows heavier with each step|grit, knowing when to set down|6–8|0
+146|K|Something must be kept alight all night|shift-taking, duty|6–8|0
+147|K|A watch must be kept without sleeping|vigilance|6–8|0
+148|K|Everyone else has already stopped; you have not|quiet determination|6–8|0
+149|K|Something must be held up until help arrives|physical endurance, trust|6–8|0
+150|K|A long walk with nothing to mark progress|boredom tolerance|3–5|0
+151|K|The task must be repeated until it is done right|craftsmanship|3–5|0
+152|K|A whole day without saying the forbidden word|self-control|3–5|0
+153|L|Creatures that scatter the moment they are gathered|strategy over force|3–5|0
+154|L|Something that will not stop wriggling while carried|grip, humour|3–5|0
+155|L|Small ones must be kept together in a busy place|responsibility|3–5|0
+156|L|An object that rolls away every time it is set down|sequencing|3–5|0
+157|L|An animal that refuses to go the way it must|persuasion, empathy|3–5|0
+158|L|Something that keeps switching itself back on|cause-finding|6–8|0
+159|L|The pile grows faster than it is cleared|system change|6–8|0
+160|L|A full vessel must be carried without a drop spilling|steadiness|3–5|0
+161|L|A companion who cannot stop talking when quiet is needed|tact|3–5|0
+162|L|A secret must be kept from someone who keeps asking|loyalty|6–8|0
+163|L|The helper hides at exactly the wrong moment|contingency|3–5|0
+164|L|Something fragile must survive rough ground|protection, packing|3–5|0
+165|M|There is not enough food for everyone|sharing, fairness|3–5|0
+166|M|There is one of the thing and two who need it|negotiation|3–5|0
+167|M|The right tool is missing and something else must serve|improvisation|3–5|0
+168|M|The payment is short by a very little|ingenuity, honesty|6–8|0
+169|M|The water runs out before the destination|rationing|6–8|1
+170|M|Shoes or clothing wear through mid-journey|repair, endurance|6–8|0
+171|M|The last of something must be spent now or saved for later|foresight|6–8|0
+172|M|Many must be fed from very little|stretching, generosity|6–8|0
+173|M|The lamp oil, fuel or charge is nearly gone|prioritising|6–8|0
+174|M|What is needed exists, but it belongs to someone else|asking, ethics|3–5|0
+175|M|Some of the supplies must be abandoned|choosing what matters|6–8|0
+176|M|One shared resource, and everyone wants it at the same moment|turn-taking|3–5|0
+177|N|Something broken must be mended before its owner notices|honesty vs. fear|3–5|0
+178|N|A torn thing must be patched well enough to hold|craft|3–5|0
+179|N|Something spilled must be gathered up again|care, thoroughness|3–5|0
+180|N|A mess must be cleared before someone comes home|time, teamwork|3–5|0
+181|N|A dying plant or garden must be revived|nurture, patience|3–5|0
+182|N|A stopped spring or well must be made to flow|diagnosis|6–8|0
+183|N|A machine is complete but for one part that must be sourced|hunting, matching|6–8|0
+184|N|Everything must be put back exactly as it was|memory, precision|6–8|0
+185|N|The one who caused the damage must be the one to undo it|responsibility|3–5|0
+186|N|A broken promise must be repaid in actions, not words|restitution|6–8|0
+187|N|Something shared is damaged and no one will say who did it|truth, group trust|6–8|0
+188|N|What is rebuilt must be stronger than what stood before|learning from failure|9–12|0
+189|O|Every direction looks exactly the same|method over instinct|6–8|0
+190|O|The markers left behind have been removed or eaten|contingency, calm|6–8|0
+191|O|The map does not match the ground in front of you|trusting evidence|6–8|0
+192|O|Directions were given by someone who did not really know|verifying|6–8|0
+193|O|The landmark used for steering is hidden from here|alternate cues|6–8|0
+194|O|You have been walking in a circle|noticing, admitting|6–8|0
+195|O|The group has been separated and must reunite|rendezvous thinking|6–8|0
+196|O|The shortcut turns out to be the long way|humility|3–5|0
+197|O|The place seems to rearrange itself between visits|unreliable world|6–8|0
+198|O|A fork in the path with no information at all|deciding without certainty|3–5|0
+199|O|The way back must be retraced exactly|reverse memory|6–8|0
+200|O|You arrive at the right place at the wrong time|timing, waiting|3–5|0
+201|P|Something is following and gaining|nerve, speed|6–8|1
+202|P|Open ground must be crossed without being seen|timing, nerve|6–8|0
+203|P|The hiding place is about to be looked in|stillness|6–8|0
+204|P|A chasing game where being caught means starting over|play stakes only|3–5|0
+205|P|No trace may be left behind|thoroughness|6–8|0
+206|P|A single noise gives the position away|self-control|6–8|0
+207|P|A distraction must be created to slip past|planning, teamwork|6–8|0
+208|P|A chase through a crowded, breakable place|agility, consequence|6–8|1
+209|P|The way out closes behind you as you go|commitment|9–12|1
+210|P|Someone is searching through your belongings|presence of mind|9–12|1
+211|P|A snare or tangle must be escaped from|composure|9–12|1
+212|P|The pursuer must be lured the wrong way|cunning|9–12|1
+213|Q|An offer that is far too generous to be honest|scepticism|6–8|0
+214|Q|A guide who gives the wrong directions on purpose|verification|6–8|1
+215|Q|A disguise that must be seen through|observation|6–8|0
+216|Q|Someone is impersonating a person you trust|identity cues|9–12|1
+217|Q|Someone else claims credit for what you did|injustice, patience|6–8|0
+218|Q|A promise obtained under false pretences|fairness of contracts|9–12|0
+219|Q|A bargain whose real price is only revealed later|reading terms|9–12|0
+220|Q|A trap that looks exactly like the reward|impulse control|6–8|1
+221|Q|Something true must be argued when it sounds unbelievable|credibility|6–8|0
+222|Q|A small untruth is growing and must be stopped|confession|3–5|0
+223|Q|A trick must be turned back on the one who set it|cunning, justice|6–8|0
+224|Q|A test arrives disguised as an ordinary request for help|consistent character|6–8|0
+225|Q|Two witnesses give conflicting accounts|judgement|9–12|0
+226|Q|Innocence must be proved when everything points at you|composure, evidence|9–12|0
+227|R|Who you are must be proved with no proof to hand|ingenuity|6–8|0
+228|R|Two halves of a token must be matched|keepsakes, patience|3–5|0
+229|R|You must be recognised by someone who has forgotten you|shared memory|6–8|0
+230|R|You must be picked out from others dressed identically|distinctiveness|3–5|0
+231|R|A mark on the body reveals who someone really is|observation|6–8|0
+232|R|A found object must be returned to its true owner|diligence|3–5|0
+233|R|Someone is mistaken for someone else, with consequences|clearing things up|6–8|0
+234|R|A name or title must be earned before it is used|achievement|6–8|0
+235|R|The one who is hiding must be found among many|systematic search|3–5|0
+236|R|A friend has been changed and must be recognised anyway|loyalty, love|6–8|0
+237|R|The claim needs a witness who has gone away|finding another route to truth|9–12|0
+238|R|An object must be shown not to have been stolen|evidence, reputation|9–12|0
+239|S|A creature is on the path for reasons of its own|curiosity before force|3–5|0
+240|S|A creature that must be fed before it will help|give-to-get|3–5|0
+241|S|A frightened animal must be calmed before it can be moved|gentleness|3–5|0
+242|S|An animal must be returned to where it belongs|responsibility|3–5|0
+243|S|An animal's meaning must be understood without words|attention|3–5|0
+244|S|A creature holds the needed thing and wants to keep it|trade|3–5|0
+245|S|A creature will help only in exchange for a promise|keeping one's word|6–8|0
+246|S|A nest or swarm must be passed without disturbing it|care, restraint|3–5|0
+247|S|A creature helped earlier turns up to repay the kindness|reciprocity|3–5|0
+248|S|A creature must be talked out of eating something (or someone)|persuasion|6–8|1
+249|S|A flock or swarm must be steered a different way|indirect control|6–8|0
+250|S|A lonely creature will not let the party leave|compassion vs. duty|6–8|0
+251|S|Something wild must be captured alive, not harmed|restraint|6–8|1
+252|S|Milk, feather or token must be taken from a dangerous animal|nerve, guile|9–12|1
+253|T|The job needs more hands than are present|recruiting|3–5|0
+254|T|Two who must work together do not like each other|tolerance|6–8|0
+255|T|A relay where each can only do one part|interdependence|3–5|0
+256|T|Someone must be trusted to catch or hold|trust|3–5|0
+257|T|A signal must be agreed before the group splits|forethought|6–8|0
+258|T|The plan requires a skill nobody in the group has|learning, asking outside|6–8|0
+259|T|Only the smallest member can fit and do it|everyone has a use|3–5|0
+260|T|The group cannot agree which way to go|decision-making|6–8|0
+261|T|Someone must be persuaded to join in|invitation|3–5|0
+262|T|Help must be asked for by the one who hates asking|pride|6–8|0
+263|T|One member is slower and will not be left behind|inclusion|3–5|0
+264|T|The reward must be divided in a way all accept|fairness|3–5|0
+265|U|There is exactly one thing you were told not to do|temptation|3–5|0
+266|U|There is one place you must not go into|obedience vs. curiosity|3–5|0
+267|U|A gift arrives with a condition attached|terms, memory|3–5|0
+268|U|You must not look back / must not look at it|discipline|6–8|0
+269|U|A condition expires at a set hour and the effect ends|watching the clock|3–5|0
+270|U|You must not speak until a certain thing has happened|self-control|6–8|0
+271|U|You must not eat or accept anything in this place|resisting|6–8|0
+272|U|The rule turns out to be wrong and following it causes harm|moral reasoning|9–12|0
+273|U|The rule protects someone else, not you|unselfishness|6–8|0
+274|U|Doing right requires breaking the rule|conscience|9–12|0
+275|U|Having broken the rule, you must say so|confession|3–5|0
+276|U|Everyone else ignores the rule; you are deciding alone|integrity|6–8|0
+277|V|Keep the found treasure or return it|honesty|3–5|0
+278|V|Tell the truth knowing it costs you something|courage|3–5|0
+279|V|Stop to help and lose the race|values ranking|6–8|0
+280|V|An offer to go home comfortably and abandon the quest|commitment|6–8|0
+281|V|The easy route harms someone who is not present|consequence|9–12|0
+282|V|The last of something must be shared or kept|generosity|3–5|0
+283|V|Someone unpopular must be stood up for|moral courage|6–8|0
+284|V|A promise has become very inconvenient to keep|reliability|6–8|0
+285|V|Blame that is only partly yours must be accepted|maturity|9–12|0
+286|V|The available shortcut is simply cheating|integrity|6–8|0
+287|V|Revenge is possible; so is forgiveness|mercy|9–12|0
+288|V|The prize turns out to be worthless once won|what actually matters|6–8|0
+289|V|A personal want must be given up for the group's need|selflessness|6–8|0
+290|V|Two people both need you and only one can be helped|tragic choice|9–12|0
+291|W|The dark place must be entered anyway|courage|3–5|0
+292|W|The height must be climbed despite the fear of it|facing fear|3–5|0
+293|W|The water must be entered despite the fear of it|facing fear|3–5|0
+294|W|You must speak or perform in front of others|nerve|3–5|0
+295|W|Something new must be tried, and it may go wrong|risk tolerance|3–5|0
+296|W|Somebody has to go first|initiative|3–5|0
+297|W|A stranger must be asked for help|social courage|3–5|0
+298|W|Homesickness makes you want to turn back|perseverance|3–5|0
+299|W|A mistake must be admitted out loud|humility|3–5|0
+300|W|Anger must be governed before it does damage|self-regulation|3–5|0
+301|W|Nothing can be done but wait|patience|3–5|0
+302|W|A friend's success has to be celebrated, not envied|generosity of spirit|6–8|0
+303|W|The night must be spent somewhere unfamiliar|adaptability|3–5|0
+304|W|The thing that failed last time must be attempted again|resilience|3–5|0
+305|W|You believe you are too small or too young for this|self-belief|3–5|0
+306|W|A genuinely frightening place must be stayed in|mastering fear|9–12|1
+307|X|A treasured possession must be given up as the price|sacrifice|6–8|0
+308|X|A friend must be left behind for now|separation|3–5|0
+309|X|Something outgrown must be handed on to another|growing up|3–5|0
+310|X|A favourite thing is lost and will not be found|grief in miniature|3–5|0
+311|X|A place must be left for the last time|farewell|6–8|0
+312|X|A secret must be given away in order to save someone|priorities|9–12|0
+313|X|Your own creation must be broken to release what is inside|non-attachment|6–8|0
+314|X|A cared-for creature must be returned to the wild|love as letting go|3–5|0
+315|X|Second place must be accepted with grace|humility|3–5|0
+316|X|You must stand aside and let someone else do it|ego|6–8|0
+317|X|A goodbye that cannot be postponed any longer|acceptance|6–8|0
+318|X|A loss caused by someone else must be forgiven|grace|9–12|0
+319|Y|Turned into something else and needing to turn back|identity|6–8|0
+320|Y|Shrunk or grown to entirely the wrong size|scale, perspective|3–5|0
+321|Y|A sense or ability is temporarily gone|compensation|6–8|0
+322|Y|You are wearing somebody else's shape|empathy|6–8|0
+323|Y|A hurt limits what can be done|adaptation|6–8|1
+324|Y|The body is simply too tired or too clumsy today|limits|3–5|0
+325|Y|A disguise becomes harder and harder to keep up|strain of pretending|6–8|0
+326|Y|You must move like a different creature to get through|imitation|3–5|0
+327|Y|An enchantment strengthens the longer it is left|urgency|9–12|1
+328|Y|A visible change everyone remarks on|self-consciousness|6–8|0
+329|Y|You must stay perfectly still and pass for an object|stillness, nerve|3–5|0
+330|Y|A new name or new look must be accepted by everyone else|social change|6–8|0
+331|Z|No shared language with the one who could help|gesture, patience|3–5|0
+332|Z|Something complicated must be explained to someone very small|simplifying|6–8|0
+333|Z|A message must be delivered word-perfect|precision, memory|3–5|0
+334|Z|The message gets garbled as it passes down a chain|fidelity, checking|3–5|0
+335|Z|You must be heard over noise or across distance|carrying, signalling|3–5|0
+336|Z|A signal system must be invented without words|abstraction|6–8|0
+337|Z|Someone will not listen no matter how you say it|persistence, other tactics|6–8|0
+338|Z|A real apology has to be made|sincerity|3–5|0
+339|Z|An interruption must be made politely at the right moment|timing, manners|3–5|0
+340|Z|Something must be written and the one who can write is absent|workaround|6–8|0
+341|Z|A promise made must be explained to a third person|representing others|6–8|0
+342|Z|A question must be asked without revealing why|discretion|9–12|0
+343|AA|A race entered with a handicap|effort against odds|6–8|0
+344|AA|A fairground game that cannot actually be won|seeing the con|6–8|0
+345|AA|A trial of strength that must be won by cleverness|brains over brawn|6–8|0
+346|AA|The rival in the contest is a friend|sportsmanship|6–8|0
+347|AA|An audition or tryout must be got through|nerve, preparation|6–8|0
+348|AA|You prepared thoroughly — for the wrong thing|improvisation|6–8|0
+349|AA|The judge is not impartial|injustice, dignity|9–12|0
+350|AA|The requirement grows every time you meet it|recognising bad faith|9–12|0
+351|AA|The prize is needed, not wanted|motivation|9–12|0
+352|AA|A prop or instrument fails during the performance|recovery|6–8|0
+353|AA|Someone must be made to laugh|playfulness, reading people|3–5|0
+354|AA|Someone silent must be brought to speak|gentleness, ingenuity|6–8|0
+355|BB|The tool is the wrong size for the hands using it|adaptation|3–5|0
+356|BB|The mechanism does exactly the opposite of what is wanted|diagnosis|6–8|0
+357|BB|Something must be built with no instructions|design|6–8|0
+358|BB|The device needs power or fuel that is not there|substitution|6–8|0
+359|BB|The vehicle will not start|troubleshooting|3–5|0
+360|BB|What was built will not hold the weight|iteration after failure|6–8|0
+361|BB|Two parts that do not fit must be made to fit|modification|6–8|0
+362|BB|The invention works far better than intended|unintended consequences|6–8|0
+363|BB|Something built for adults must be operated by a child|reach, ingenuity|6–8|0
+364|BB|The repair needs a specialist who lives far away|journey, or self-reliance|6–8|0
+365|BB|The rope is too short, or not strong enough|knots, doubling, rethinking|6–8|0
+366|BB|Something heavy must be moved without lifting it|levers, rollers, physics|6–8|0
+367|CC|A rule that makes no sense but blocks everything|arguing with a system|9–12|0
+368|CC|Everyone wants the same thing at the same moment|coordination|6–8|0
+369|CC|One small item lost in a place of thousands|systematic search|6–8|0
+370|CC|A queue that never seems to move|patience, or a better idea|6–8|0
+371|CC|A group decision already made must be reopened|persuasion at scale|9–12|0
+372|CC|A misunderstanding has already spread to many people|correction, reputation|9–12|0
+373|CC|A tradition quietly excludes someone|challenging custom|9–12|0
+374|CC|The permit needed requires a different permit first|circular systems|9–12|0
+375|CC|A public statement must be publicly corrected|humility in front of others|9–12|0
+376|CC|The place is too crowded to find your own party|rendezvous, keeping calm|3–5|0
+377|DD|A smaller one must be carried or minded the whole way|responsibility|3–5|0
+378|DD|Someone is stuck and must be freed|problem-solving, calm|3–5|0
+379|DD|Someone is ill and the remedy is far away|quest with a purpose|6–8|0
+380|DD|Someone is lost and must be found|search, hope|3–5|0
+381|DD|Someone frightened must be reassured before anything else|comfort|3–5|0
+382|DD|Someone hurt whose pride must be protected as well|tact|6–8|0
+383|DD|Someone who badly needs help refuses it|patience, dignity of others|6–8|0
+384|DD|Someone left in charge is out of their depth|stepping up|6–8|0
+385|DD|Someone is trapped by a promise they made|helping without shaming|9–12|0
+386|DD|A creature or plant will die without daily care|commitment|3–5|0
+387|DD|Someone has run away and must be persuaded back|understanding first|6–8|0
+388|DD|Someone cannot speak for themselves and needs an advocate|justice|6–8|0
+389|DD|A rescue party must be sent for while others hold on|division of roles|6–8|0
+390|DD|Help must be summoned from a distance with no means to call|signalling|6–8|0
+391|DD|The one being rescued is the one who caused the trouble|forgiveness in action|6–8|0
+392|DD|Two who need help are in opposite directions|triage|9–12|0
+393|DD|The rescue works but the rescuer is now stuck|reversal|6–8|0
+394|DD|Everyone assumes someone else is dealing with it|initiative|6–8|0
+395|DD|The person to be helped does not know they need help|care without patronising|6–8|0
+`.trim();
+
+const ENTRIES = RAW.split("\n").map(l=>{
+  const [n,cat,txt,tests,age,warn]=l.split("|");
+  return {n:+n,cat,txt,tests,age,warn:warn==="1"};
+});
+
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const ageCls = a => a==="3–5"?"a35":a==="6–8"?"a68":"a912";
+
+const out=document.getElementById("out"), toc=document.getElementById("toc");
+toc.innerHTML = CATS.map(([k,t])=>`<a href="#c${k}">${k}. ${t}</a>`).join("");
+out.innerHTML = CATS.map(([k,t,src])=>{
+  const items = ENTRIES.filter(e=>e.cat===k).map(e=>`
+    <li data-age="${e.age}" data-warn="${e.warn?1:0}" data-s="${esc((e.txt+" "+e.tests).toLowerCase())}">
+      <span class="n">${e.n}</span>
+      <span class="txt">${esc(e.txt)} — <span class="tests">${esc(e.tests)}</span></span>
+      <span class="badges"><span class="age ${ageCls(e.age)}">${e.age}</span>${e.warn?'<span class="warn">⚠</span>':''}</span>
+    </li>`).join("");
+  return `<section id="c${k}"><h2><span class="key">${k}</span>${t}</h2>
+    ${src?`<p class="src">${src}</p>`:""}<ul>${items}</ul></section>
