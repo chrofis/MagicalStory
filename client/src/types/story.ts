@@ -932,6 +932,21 @@ export interface TokenUsage {
  * Shared shape so the dev-mode diff panels (beats review, scene review, text
  * refine) render from one contract instead of three near-copies.
  */
+/**
+ * The arc stage's record: the arc as first drafted, the reviewer's analysis
+ * (with its fix ledger), and whether the review rewrote it. The APPROVED arc
+ * itself travels on beatsReviewReport.arc and in the outline transcript.
+ */
+export interface ArcReviewReport {
+  model?: string | null;
+  planModel?: string | null;
+  durationMs?: number;
+  changed?: boolean;
+  drafted?: string;
+  analysis?: string;
+  prompt?: string | null;
+}
+
 export interface ReviewDiffReport {
   model?: string | null;
   durationMs?: number;
@@ -942,6 +957,10 @@ export interface ReviewDiffReport {
   namedButNotRewritten?: number[];
   /** The exact prompt this reviewer received — dev-mode inspection. */
   prompt?: string | null;
+  /** Beats review only: the approved arc the pages were written from. */
+  arc?: string;
+  /** Beats review only: the page plan (may predate the review's rewrites). */
+  pagePlan?: string;
   /** Every brief as SENT, including the ones the reviewer left alone. */
   briefsIn?: { pageNumber: number; brief: string }[];
   /** The mechanical clothing-fault block handed to the reviewer, if any. */
@@ -986,6 +1005,7 @@ export interface SavedStory {
   /** Per-page before/after from the parallel text-refine pass (dev mode diff). */
   textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
   /** Per-page before/after from the beats review (beats pipeline, dev-mode diff). */
+  arcReviewReport?: ArcReviewReport | null;
   beatsReviewReport?: ReviewDiffReport | null;
   /** Per-page before/after from the scene review (beats pipeline, dev-mode diff). */
   sceneReviewReport?: ReviewDiffReport | null;

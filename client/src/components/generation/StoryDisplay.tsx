@@ -200,6 +200,7 @@ interface StoryDisplayProps {
   /** Per-page before/after from the parallel text-refine pass (dev mode). */
   textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
   /** Per-page before/after from the beats review (beats pipeline, dev mode). */
+  arcReviewReport?: import('../../types/story').ArcReviewReport | null;
   beatsReviewReport?: ReviewDiffReport | null;
   /** Per-page before/after from the scene review (beats pipeline, dev mode). */
   sceneReviewReport?: ReviewDiffReport | null;
@@ -372,6 +373,7 @@ export function StoryDisplay({
   outlineReview,
   tokenUsage,
   textRefineReport,
+  arcReviewReport,
   beatsReviewReport,
   sceneReviewReport,
   storyTextPrompts = [],
@@ -2804,6 +2806,40 @@ export function StoryDisplay({
 
             return (
               <>
+                {(arcReviewReport || (beatsReviewReport as any)?.arc) && (
+                  <details key="arc-review" className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                      {language === 'de' ? 'Story-Arc (Entwurf → geprüft)' : language === 'fr' ? "Arc de l'histoire (brouillon → validé)" : 'Story arc (draft → approved)'}
+                      {arcReviewReport?.model ? ` · ${arcReviewReport.planModel || ''} → ${arcReviewReport.model}${arcReviewReport.changed ? ' · rewritten' : ' · unchanged'}` : ''}
+                    </summary>
+                    <div className="space-y-3 px-3 pb-3 text-xs">
+                      {(beatsReviewReport as any)?.arc && (
+                        <div>
+                          <div className="mb-1 font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Geprüfter Arc' : 'Approved arc'}</div>
+                          <pre className="whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{(beatsReviewReport as any).arc}</pre>
+                        </div>
+                      )}
+                      {(beatsReviewReport as any)?.pagePlan && (
+                        <details>
+                          <summary className="cursor-pointer font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Seitenplan' : 'Page plan'}</summary>
+                          <pre className="mt-1 whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{(beatsReviewReport as any).pagePlan}</pre>
+                        </details>
+                      )}
+                      {arcReviewReport?.drafted && (
+                        <details>
+                          <summary className="cursor-pointer font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Erster Entwurf' : 'First draft'}</summary>
+                          <pre className="mt-1 whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{arcReviewReport.drafted}</pre>
+                        </details>
+                      )}
+                      {arcReviewReport?.analysis && (
+                        <details>
+                          <summary className="cursor-pointer font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Analyse des Reviewers (mit Fix-Ledger)' : 'Reviewer analysis (with fix ledger)'}</summary>
+                          <pre className="mt-1 whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{arcReviewReport.analysis}</pre>
+                        </details>
+                      )}
+                    </div>
+                  </details>
+                )}
                 {renderDiffPanel(
                   beatsReviewReport,
                   'beats-review',

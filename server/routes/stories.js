@@ -402,6 +402,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'outlineReview', data::jsonb->'outlineReview',
             'tokenUsage', data::jsonb->'tokenUsage',
             'textRefineReport', data::jsonb->'textRefineReport',
+            'arcReviewReport', data::jsonb->'arcReviewReport',
             'beatsReviewReport', data::jsonb->'beatsReviewReport',
             'sceneReviewReport', data::jsonb->'sceneReviewReport',
             'storyTextPrompts', data::jsonb->'storyTextPrompts',

@@ -382,6 +382,7 @@ export default function StoryWizard() {
   const [outlineReview, setOutlineReview] = useState<{ model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null>(null); // Split-review metadata (dev mode)
   const [tokenUsage, setTokenUsage] = useState<any>(null); // Per-function model/token ledger (dev mode)
   const [textRefineReport, setTextRefineReport] = useState<any>(null); // Per-page refine before/after (dev mode)
+  const [arcReviewReport, setArcReviewReport] = useState<any>(null); // Arc draft + review analysis (dev mode)
   const [beatsReviewReport, setBeatsReviewReport] = useState<any>(null); // Per-page beats-review before/after (dev mode)
   const [sceneReviewReport, setSceneReviewReport] = useState<any>(null); // Per-page scene-review before/after (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
@@ -1114,6 +1115,7 @@ export default function StoryWizard() {
             setOutlineReview((fullMeta as any).outlineReview || null);
             setTokenUsage((fullMeta as any).tokenUsage || null);
             setTextRefineReport((fullMeta as any).textRefineReport || null);
+            setArcReviewReport((fullMeta as any).arcReviewReport || null);
             setBeatsReviewReport((fullMeta as any).beatsReviewReport || null);
             setSceneReviewReport((fullMeta as any).sceneReviewReport || null);
             setStoryTextPrompts(fullMeta.storyTextPrompts || []);
@@ -4235,6 +4237,7 @@ export default function StoryWizard() {
           setOutlineReview((status.result as any).outlineReview || null);
           setTokenUsage((status.result as any).tokenUsage || null);
           setTextRefineReport((status.result as any).textRefineReport || null);
+          setArcReviewReport((status.result as any).arcReviewReport || null);
           setBeatsReviewReport((status.result as any).beatsReviewReport || null);
           setSceneReviewReport((status.result as any).sceneReviewReport || null);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
@@ -4806,6 +4809,7 @@ export default function StoryWizard() {
               outlineReview={outlineReview}
               tokenUsage={tokenUsage}
               textRefineReport={textRefineReport}
+              arcReviewReport={arcReviewReport}
               beatsReviewReport={beatsReviewReport}
               sceneReviewReport={sceneReviewReport}
               storyTextPrompts={storyTextPrompts}
