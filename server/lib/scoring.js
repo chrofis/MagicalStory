@@ -153,8 +153,19 @@ const MAX_SEVERITY_TYPES = {
 // The sanctioned shape is above: the evaluator emits a TYPE, and code adjusts
 // what that type may COST. If a class of finding is mis-scored, give it a type
 // in the prompts and a ceiling here — never a pattern over its wording.
+// catastrophic raised 50 -> 60 (owner, 2026-08-21). At 50 a page whose ONLY
+// defect was catastrophic scored exactly 100-50 = 50, and the redo gate fires on
+// `< 50` — so the single severity that means "cannot be published" landed one
+// point the wrong side of the boundary and shipped. Measured over 627 stored
+// pages: every OTHER catastrophic page carried 6-24 further findings and was
+// already deep below the gate (-77, 13, -55, -145), so only the otherwise-clean
+// page collided. It happened once in 304 production pages — job_1787262655143
+// p8 shipped with reference-image miniatures pasted along its bottom edge.
+// 60 also states the severity honestly: such a page now reads 40, not 50.
+// Ranking is unaffected — pick-best uses RANK_SEVERITY_WEIGHT below, a
+// deliberately separate calibration.
 const SEVERITY_POINTS = {
-  catastrophic: 50,
+  catastrophic: 60,
   critical:     25,
   major:        15,
   moderate:      5,
@@ -863,8 +874,40 @@ const SCORE_THRESHOLDS = {
  * @param {object} version
  * @returns {boolean}
  */
+/**
+ * Does this version carry a finding that CHARGES catastrophic?
+ *
+ * Gated on what the finding COSTS, not on what it claims. A type with a ceiling
+ * (accessory, unverified_absence — see MAX_SEVERITY_TYPES) that calls itself
+ * catastrophic is an evaluator over-claiming, which is the whole reason those
+ * ceilings exist; it must not force a full redo. deductionPoints() applies both
+ * the ceiling and ZERO_POINT_TYPES, so comparing against the catastrophic point
+ * value asks the right question with no second rule to keep in sync.
+ */
+function hasCatastrophic(version) {
+  const bd = version?.scoreBreakdown;
+  const lists = bd
+    ? [bd.visual?.issues, bd.semantic?.issues, bd.threeStage?.issues]
+    : [version?.fixableIssues, version?.semanticResult?.semanticIssues || version?.semanticResult?.issues];
+  for (const list of lists) {
+    for (const issue of (list || [])) {
+      if (deductionPoints({ type: issue?.type, severity: issue?.severity }) >= SEVERITY_POINTS.catastrophic) return true;
+    }
+  }
+  return false;
+}
+
 function shouldRedo(version) {
   if (!version) return false;
+  // CATASTROPHIC ALWAYS REDOES, whatever the arithmetic says (owner,
+  // 2026-08-21). "Cannot be published" is not a scoring question. The score
+  // route alone had already failed once: at 50 points a page whose only defect
+  // was catastrophic scored exactly 50 against a `< 50` gate and shipped
+  // (job_1787262655143 p8, reference-image miniatures along the bottom edge).
+  // Raising the points to 60 fixes today's numbers, but the gate itself has
+  // moved 80 -> 60 -> 50 already, so a pure-number fix is one threshold edit
+  // away from silently colliding again. This makes it independent of both.
+  if (hasCatastrophic(version)) return true;
   const score = computeFinalScore(version);
   if (score != null && score < SCORE_THRESHOLDS.REDO) return true;
   const issues = Array.isArray(version.fixableIssues) ? version.fixableIssues.length : 0;

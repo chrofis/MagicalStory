@@ -14723,3 +14723,46 @@ fallbacks cannot drift apart.
 **Touched:** `server/lib/landmarkPhotos.js`, `migrations/025_landmark_fame.sql`,
 `scripts/admin/backfill-landmark-fame.js`
 **Status:** ✅ active
+
+## 2026-08-21 — CATASTROPHIC always redoes, and costs 60
+
+**Context:** page 8 of `job_1787262655143_s9zb960muni` (production, "Das Ei im
+Wurzelnest") shipped carrying a CATASTROPHIC `image_coherence` finding —
+*"small boxed miniatures at the bottom, which appear to be reference pictures"*,
+i.e. reference images leaking into the artwork, which D-01 defines as "cannot be
+published". It never entered repair: one finding at 50 points scored exactly
+`100 − 50 = 50`, and the redo gate fires on `finalScore < 50`. One point the
+wrong side of the boundary.
+
+**Measured over 627 stored pages (last 40 stories, both environments):** the
+collision needs the page to be otherwise CLEAN. Production had 1 catastrophic
+page — this one. Staging had 4, and every one carried 6–24 further findings, so
+they sat at −77, 13, −55 and −145 and the gate fired normally. So this is rare
+(1 in 304 production pages) but it selects for exactly the worst outcome: the
+page whose only defect is an unpublishable one.
+
+**Decision (owner):** both halves.
+1. `SEVERITY_POINTS.catastrophic` 50 → **60**, so such a page reads 40 rather
+   than 50 — the number now states the severity honestly.
+2. `shouldRedo()` returns true whenever the version carries a finding that
+   CHARGES catastrophic, regardless of score.
+
+**Why both, rather than the points alone:** the points fix is an arithmetic
+coincidence. `SCORE_THRESHOLDS.REDO` has already moved 80 → 60 → 50; the next
+edit to it silently reintroduces the collision. "Cannot be published" should not
+be a scoring question at all.
+
+**Why "charges" rather than "claims":** the check gates on
+`deductionPoints(...) >= SEVERITY_POINTS.catastrophic`, so a type with a ceiling
+(`accessory`, `unverified_absence` — MAX_SEVERITY_TYPES) that calls itself
+CATASTROPHIC does NOT force a full regenerate. Those ceilings exist precisely
+because those evaluators over-claim; honouring the claim here would hand them a
+redo button. Verified: accessory-claiming-catastrophic scores 95 and does not
+redo; image_coherence and nudity score 40 and do.
+
+**Not affected:** pick-best ranking, which uses the deliberately separate
+`RANK_SEVERITY_WEIGHT` table (catastrophic 50) — see the three-tables note above
+`SEVERITY_POINTS`.
+
+**Touched:** `server/lib/scoring.js` (SEVERITY_POINTS, hasCatastrophic, shouldRedo)
+**Status:** ✅ active
