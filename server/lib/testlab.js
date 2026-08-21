@@ -1461,15 +1461,13 @@ async function runCharRepairStage(ctx, opts) {
   // re-blend is gone. That re-blend was the testlab↔prod divergence — it stacked
   // a SECOND samUnionBlend on TOP of the production repair's own composite, so
   // the lab never saw what prod actually ships. Now both use the one spine.
-  const { repairCharacterFace, legacyFlagsToAxes } = require('./faceRepair');
-  const axes = legacyFlagsToAxes({
-    useBlended: modeFlags.useBlended || null,
-    useCutout: modeFlags.useCutout || null,
-    useFullScene: modeFlags.useFullScene || null,
-    whiteoutTarget,
-    hasFaceBbox: faceBbox?.length === 4,
-    model: backend,
-  });
+  // Axes are NOT resolved here. The stage calls the same entry point the story
+  // pipeline calls (images.repairCharacterMismatch), which owns bbox validation,
+  // the face-box union expansion — "if a separate face box pokes outside the
+  // body box, expand the body box so the treatment mask doesn't miss half the
+  // face" — the char_repair_run metric, and legacyFlagsToAxes itself. Resolving
+  // axes here meant the Lab skipped all of that and repaired a different region
+  // than production would have.
 
   // Intermediates saved as tl_step versions so the UI shows the full chain. The
   // spine emits its SAM round-1/2 views through this addStep (threaded into
@@ -1527,13 +1525,15 @@ async function runCharRepairStage(ctx, opts) {
     textPosition: ctx.textPosition,
     includeDebug: true,
   });
-  const result = await repairCharacterFace(imageData, avatarPhoto, {
+  const { repairCharacterMismatch } = require('./images');
+  const result = await repairCharacterMismatch(imageData, avatarPhoto, bbox, charName, {
     ...sharedRequest,
-    // Lab-only MECHANICS (not behaviour deviations): the stage calls
-    // repairCharacterFace directly with resolved axes, captures per-step images,
-    // and can replay a stored model output.
-    ...axes,
-    charName,
+    // The A/B knob: legacy mode flags are what production's adapter reads to
+    // pick the method, so forcing a mode here goes through the SAME resolution
+    // production uses instead of bypassing it.
+    ...modeFlags,
+    // Lab-only MECHANICS (not behaviour deviations): per-step image capture and
+    // deterministic replay of a stored model output.
     addStep,
     ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     // FULL identity swap: the prompt must NAME the reference character, or the

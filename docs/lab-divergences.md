@@ -37,8 +37,15 @@ up as a value rather than as a difference buried in a 7,000-line file.
 | call | divergence | why | experiment | status |
 |---|---|---|---|---|
 | `char_repair` | `detectionBodyMask: null` | production reuses the SAM silhouette produced by its detection pass; a Lab stage run has no detection pass, so the blend gate re-runs `/figure-mask` on the same pixels | n/a — structural, not a behaviour test | `testing` |
-| `char_repair` | calls `repairCharacterFace` with resolved `axes`; production calls `repairCharacterMismatch` with `whiteoutTarget` and lets it resolve them | the Lab must be able to force a specific method (`blended` / `cutout` / `fullscene`) for A/B runs; production picks the method from the finding | method A/B runs (#784 face vs #785 full-figure) | `testing` |
+| `char_repair` | forces a method via the legacy mode flags (`useBlended` / `useCutout` / `useFullScene`) | production picks the method from the finding; a Lab A/B has to pin one. The flags are read by production's own adapter, so the choice still flows through `legacyFlagsToAxes` rather than around it | method A/B runs (#784 face vs #785 full-figure) | `testing` |
 | `char_repair` | Lab-only mechanics: `addStep`, `reuseCandidate`, `promptName`, `blurStrength`, `r2Prompt`, `blurFace` | step capture, deterministic replay, and A/B knobs — instrumentation, not behaviour | ongoing | `testing` |
+
+## Resolved
+
+| call | was | fixed by |
+|---|---|---|
+| `char_repair` | called `repairCharacterFace` directly with locally resolved axes, bypassing production's adapter — and with it the bbox validation, the **face-box union expansion** (a face box poking outside the body box expands the body box so the mask does not miss half the face) and the `char_repair_run` metric. The Lab could therefore repair a different REGION than production would. | the stage now calls `images.repairCharacterMismatch`, the same entry point the story pipeline calls |
+| `char_repair` | neither caller passed `artStyle` | one shared contract (`charRepairRequest.js`) + parity test |
 
 ## Adding a divergence
 
