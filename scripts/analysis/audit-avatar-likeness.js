@@ -80,21 +80,27 @@ async function toBase64(url) {
   return b64;
 }
 
-const QUADRANTS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+// The 2x2 sheet is: top row = HEAD views (front, 3/4), bottom row = FULL BODY
+// (front, profile). Only the top row is a face comparison — in a full-body cell
+// the head is a small fraction of a 360x640 crop, so whatever ArcFace returns
+// there is dominated by torso and background, not identity. Bottom cells are
+// therefore excluded; --all-cells re-enables them for inspection only.
+const HEAD_QUADRANTS = ['top-left', 'top-right'];
+const ALL_QUADRANTS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+const QUADRANTS = process.argv.includes('--all-cells') ? ALL_QUADRANTS : HEAD_QUADRANTS;
 
 /**
  * Compare the source photo against all four cells of an avatar sheet.
  *
- * The four cells are VIEWS, not repeats: front headshot, 3/4 headshot,
- * full-body front, full-body profile. ArcFace is frontal-biased and cannot
- * embed a pure side profile — that cell lands at ~0.03 no matter how good the
- * likeness is (measured: a sheet whose other three cells scored 0.70/0.81/0.79
- * still had 0.028 on the profile). So the MIN across cells is meaningless here
- * even though the LLM judge uses min: the judge understands that a profile is
- * supposed to look like a profile.
+ * Only the two HEAD cells are compared (see QUADRANTS). Two separate traps live
+ * in the bottom row: the head is tiny inside a 360x640 full-body crop, and the
+ * profile view cannot be embedded by a frontal-biased model at all (measured
+ * 0.028 on a sheet whose head cells scored 0.79 and 0.70).
  *
- * The reportable statistic is therefore BEST — the strongest-matching view.
- * `min` is retained per-cell for inspection but never banded or summarised.
+ * MIN across cells is therefore meaningless here even though the LLM judge uses
+ * one — the judge understands that a profile is supposed to look like a profile.
+ * The reportable statistic is BEST across the head views, with `second` as the
+ * corroborating view.
  */
 async function compareSheet(photoB64, sheetB64) {
   const cells = [];
@@ -112,8 +118,10 @@ async function compareSheet(photoB64, sheetB64) {
   }
   const ok = cells.filter(c => typeof c.sim === 'number');
   const sims = ok.map(c => c.sim);
+  const winner = ok.length ? ok.reduce((a, b) => (b.sim > a.sim ? b : a)) : null;
   return {
     cells,
+    bestQuadrant: winner?.q || null,
     best: sims.length ? Math.max(...sims) : null,
     // Second-best: guards against a single lucky cell. A genuinely good sheet
     // has at least two frontal-ish views matching.
@@ -261,6 +269,9 @@ async function comparePageFaces(photoB64, pageB64) {
 
   // ── HTML report (opened locally, never published) ─────────────────────────
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  // Raw results, so a curated view (best/average/worst buckets) can be built
+  // without paying for the ArcFace pass again.
+  fs.writeFileSync(OUT.replace(/\.html$/, '.json'), JSON.stringify(results, null, 2));
   const rowsHtml = results.map(r => `
     <tr>
       <td><b>${r.name}</b>${r.isDemo ? ' <small>[demo]</small>' : ''}<br><small>${ch(new Date(r.createdAt))}</small></td>
