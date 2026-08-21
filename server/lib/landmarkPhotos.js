@@ -2314,7 +2314,19 @@ const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_sitelinks DESC NULLS
 const D_KM = `(6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
         cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude))))`;
 const DISTANCE_PENALTY_PER_KM = 2;
-const FAME_MINUS_DISTANCE_SQL = `(coalesce(fame_sitelinks, 0) - ${DISTANCE_PENALTY_PER_KM} * ${D_KM}) DESC`;
+// ONE score, not a tier ladder. A hard class tier cannot hold both facts at
+// once: a school is not a landmark, but the federal parliament building is.
+// Bundeshaus types as `Building` and Zürich Hauptbahnhof as `Station` — both
+// correct — and a tier put them below a two-language-edition chapel. So the
+// class is worth a BONUS instead: enough to lift a small parish church over an
+// equally obscure office block, not enough to bury a national icon. Fame and
+// distance then settle it, and a not-a-place is pushed out of reach entirely.
+const CLASS_BONUS = 6;
+const FAME_MINUS_DISTANCE_SQL = `(
+  coalesce(fame_sitelinks, 0)
+  - ${DISTANCE_PENALTY_PER_KM} * ${D_KM}
+  + CASE ${LANDMARK_CLASS_SQL} WHEN 2 THEN ${CLASS_BONUS} WHEN 0 THEN -1000 ELSE 0 END
+) DESC`;
 
 // The story's OWN town wins before anything else. Distance alone is too fragile
 // for this: a "city centre" coordinate can sit 3km off, which is enough to drop
@@ -2355,7 +2367,7 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
               cos(radians(longitude) - radians($2)) +
               sin(radians($1)) * sin(radians(latitude))
             )) <= $6
-      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
+      ORDER BY ${SAME_CITY_SQL}, ${FAME_MINUS_DISTANCE_SQL}, score DESC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 

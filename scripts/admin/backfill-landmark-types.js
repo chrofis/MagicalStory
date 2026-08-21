@@ -69,7 +69,13 @@ const TYPE_RULES = [
   [/\b(valley|gorge|ravine)\b/i,                           'Valley'],
   // Not places at all — these exist so the ranker can demote them explicitly
   // instead of inferring from a missing type.
-  [/\b(festival|championship|competition|tournament|conference|congress|exhibition|ceremony)\b/i, 'Event'],
+  // `race` matters here: a road bicycle race would otherwise hit the `road`
+  // rule below and be typed Infrastructure, which is how a cycling
+  // championship ended up offered as a place to set a scene.
+  // Trailing `s?` is load-bearing: Wikidata's class is "UCI Road World
+  // ChampionshipS", and \bchampionship\b cannot match a plural, so it fell
+  // through to the `road` rule and a bicycle race was typed Infrastructure.
+  [/\b(festival|championship|competition|tournament|conference|congress|exhibition|ceremony|race|regatta|marathon|game)s?\b/i, 'Event'],
   [/\b(battle|siege|war|campaign|revolt|uprising)\b/i,     'Event'],
   [/\b(accident|disaster|crash|incident|fire|flood|earthquake)\b/i, 'Event'],
   [/\b(company|enterprise|business|brand|corporation|bank|chain)\b/i, 'Organisation'],
@@ -199,8 +205,7 @@ async function main() {
   console.log(`  no rule matched (got ${FALLBACK_TYPE}): ${unresolved.length}`);
   if (revalidateAll) {
     console.log(`  existing types CHANGED: ${changed.length}`);
-    console.log('
-  sample changes:');
+    console.log('\n  sample changes:');
     changed.slice(0, 25).forEach(c => console.log(`    ${String(c.name).slice(0, 34).padEnd(36)} ${c.from} -> ${c.to}`));
   }
   if (!dryRun) console.log(`  rows written: ${written}`);
