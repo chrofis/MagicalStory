@@ -57,7 +57,6 @@ async function cropCell(sheetUrl, quadrant, outFile) {
     process.exit(1);
   }
 
-  fs.mkdirSync(CROPS, { recursive: true });
   const mid = Math.floor(all.length / 2);
   const buckets = [
     { title: `Best ${N}`, note: 'Strongest head-view match.', rows: all.slice(0, N) },
@@ -65,27 +64,14 @@ async function cropCell(sheetUrl, quadrant, outFile) {
     { title: `Worst ${N}`, note: 'Weakest match — the ones a parent would call "fehlende Ähnlichkeit".', rows: all.slice(-N).reverse() },
   ];
 
-  for (const b of buckets) {
-    for (const r of b.rows) {
-      try {
-        const f = path.join(CROPS, `${slug(r.name)}-${r.sheet.bestQuadrant}.jpg`);
-        const dim = await cropCell(r.sheetUrl, r.sheet.bestQuadrant, f);
-        r._crop = path.relative(DIR, f).replace(/\\/g, '/');
-        r._dim = dim;
-        const pf = path.join(CROPS, `${slug(r.name)}-photo.jpg`);
-        fs.writeFileSync(pf, await fetchBuf(r.photoUrl));
-        r._photo = path.relative(DIR, pf).replace(/\\/g, '/');
-      } catch (e) {
-        console.error(`  crop failed for ${r.name}: ${e.message}`);
-      }
-    }
-  }
-
+  // The audit already wrote the exact crops it embedded. Showing anything else
+  // would be showing something other than what was measured.
   const card = (r) => `
   <div class="card ${band(r.sheet.best)}">
     <div class="pair">
-      <figure><img src="${r._photo || r.photoUrl}"><figcaption>source photo</figcaption></figure>
-      <figure><img src="${r._crop || ''}"><figcaption>avatar · ${r.sheet.bestQuadrant}</figcaption></figure>
+      <figure><img src="${r.sheet.srcCrop}"><figcaption>source face${r.sheet.srcDetected ? '' : ' (uncropped)'}</figcaption></figure>
+      <figure><img src="${(r.sheet.cells.find(c => c.q === r.sheet.bestQuadrant) || {}).crop || ''}"><figcaption>avatar face · ${r.sheet.bestQuadrant}</figcaption></figure>
+      <figure><img src="${r.sheetUrl}"><figcaption>full sheet</figcaption></figure>
     </div>
     <div class="meta">
       <b>${r.name}</b>

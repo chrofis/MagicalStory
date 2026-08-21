@@ -48,6 +48,8 @@ const WITH_PAGES = args.includes('--pages');
 const INCLUDE_DEMO = args.includes('--include-demo');
 const DB = arg('db', 'prod');
 const OUT = arg('out', path.join(__dirname, 'test-output', 'avatar-likeness-audit.html'));
+const CROPS = path.join(path.dirname(OUT), 'likeness-crops');
+fs.mkdirSync(CROPS, { recursive: true });
 
 const CONN = DB === 'staging' ? process.env.STAGING_DATABASE_URL : process.env.DATABASE_URL;
 
@@ -102,16 +104,38 @@ const QUADRANTS = process.argv.includes('--all-cells') ? ALL_QUADRANTS : HEAD_QU
  * The reportable statistic is BEST across the head views, with `second` as the
  * corroborating view.
  */
-async function compareSheet(photoB64, sheetB64) {
+/** Cut the face out of an image (optionally a sheet cell) — explicit, never implicit. */
+async function faceCrop(imageB64, quadrant) {
+  const r = await py('/extract-face', { image: imageB64, ...(quadrant ? { quadrant } : {}), size: 256 });
+  return { face: r.face || null, detected: !!r.faceDetected };
+}
+
+/** Embed an ALREADY-CROPPED face. extract_face:false — no re-detection, no fallback. */
+async function embedFace(faceDataUri) {
+  const r = await py('/face-embedding', { image: faceDataUri, extract_face: false });
+  return Array.isArray(r.embedding) ? r.embedding : null;
+}
+
+const cosine = (a, b) => {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+};
+
+async function compareSheet(photoB64, sheetB64, photoEmb, saveCrop) {
   const cells = [];
   for (const q of QUADRANTS) {
     try {
-      const r = await py('/compare-identity', { image1: photoB64, image2: sheetB64, quadrant2: q });
-      if (r.success && typeof r.similarity === 'number') {
-        cells.push({ q, sim: r.similarity, same: r.same_person, conf: r.confidence });
-      } else {
-        cells.push({ q, sim: null, err: r.error || 'no face detected' });
-      }
+      // Crop the face FIRST. If none is found, that is an outcome in its own
+      // right — never a score. Letting the embedder fall back to the whole cell
+      // is what made every earlier run meaningless (a profile cell "beat" a
+      // frontal headshot because it was really comparing hoodie and backdrop).
+      const { face, detected } = await faceCrop(sheetB64, q);
+      if (!detected || !face) { cells.push({ q, sim: null, err: 'no face in cell' }); continue; }
+      const emb = await embedFace(face);
+      if (!emb) { cells.push({ q, sim: null, err: 'embed failed' }); continue; }
+      const file = saveCrop ? saveCrop(q, face) : null;
+      cells.push({ q, sim: cosine(photoEmb, emb), crop: file });
     } catch (e) {
       cells.push({ q, sim: null, err: e.message.slice(0, 90) });
     }
@@ -195,7 +219,32 @@ async function comparePageFaces(photoB64, pageB64) {
       process.stdout.write(`  ${c.name} … `);
       try {
         const [photoB64, sheetB64] = await Promise.all([toBase64(photoUrl), toBase64(sheetUrl)]);
-        const sheet = await compareSheet(photoB64, sheetB64);
+
+        // Source side: photos.face IS already a face crop — the production
+        // pipeline's own, made when the photo was uploaded. Re-detecting on it
+        // can only degrade it, and does: on one character the Haar fallback
+        // "found" a face inside the thumbnail and returned nose-and-mouth with
+        // the eyes cut off, scoring her avatar 0.028 when the avatar was fine.
+        // Only photos.original (a full photo) needs detection.
+        const usingThumb = !!c.photos?.face;
+        const src = usingThumb ? { face: null, detected: true } : await faceCrop(photoB64);
+        const srcFace = (!usingThumb && src.detected && src.face)
+          ? src.face
+          : `data:image/jpeg;base64,${photoB64}`;
+        const photoEmb = await embedFace(srcFace);
+        if (!photoEmb) { console.log('source photo could not be embedded — skipped'); continue; }
+
+        const slug = String(c.name).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+        const srcFile = path.join(CROPS, `${slug}-source.jpg`);
+        fs.writeFileSync(srcFile, Buffer.from(srcFace.split(',')[1], 'base64'));
+
+        const sheet = await compareSheet(photoB64, sheetB64, photoEmb, (q, face) => {
+          const f = path.join(CROPS, `${slug}-${q}.jpg`);
+          fs.writeFileSync(f, Buffer.from(face.split(',')[1], 'base64'));
+          return path.relative(path.dirname(OUT), f).replace(/\\/g, '/');
+        });
+        sheet.srcCrop = path.relative(path.dirname(OUT), srcFile).replace(/\\/g, '/');
+        sheet.srcDetected = src.detected;
 
         let pages = null;
         if (WITH_PAGES) {
