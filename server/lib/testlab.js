@@ -1464,6 +1464,17 @@ async function runCharRepairStage(ctx, opts) {
     if (fb?.length === 4 || bb?.length === 4) protectedNames.push(n);
   }
 
+  // LAB DIVERGENCE (indexed): protectTargetFace adds the TARGET's own face box
+  // to the protected set, so a body repaint keeps the original head pixels
+  // instead of repainting them. Tests the two-pass idea — fix the body first,
+  // then the face — against the measured failure where a full-figure repaint
+  // returns a head in the wrong medium and proportion 7 times in 8. Production
+  // does not have this option yet; promote or reject per docs/lab-divergences.md.
+  if (params.protectTargetFace && faceBbox?.length === 4) {
+    protectedBodies.push(faceBbox);
+    protectedNames.push(`${charName}'s own face (protected)`);
+  }
+
   // Route through the unified spine (server/lib/faceRepair.js). Legacy
   // repairMode flags + whiteoutTarget + backend → axes via legacyFlagsToAxes;
   // the spine blends INTERNALLY through samUnionBlend, so the old post-hoc
