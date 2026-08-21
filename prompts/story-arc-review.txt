@@ -24,19 +24,19 @@ Characters: {CHARACTER_NAMES}
 
 # YOUR TASK
 
-Judge the arc as a reader who sees only this. The brief says what the book is FOR; it is never evidence that the arc works. Answer each check, then output the corrected arc.
+Judge the arc as a reader who sees only this. A fault you name must change the arc: end your analysis with a line per named fault — the fault, then what the corrected arc does about it, or the reason it stands. A named fault with neither is a failed review. The brief says what the book is FOR; it is never evidence that the arc works. Answer each check, then output the corrected arc.
 
-1. Shape — is there one main challenge the focus character must face, coming from who they are rather than from the setting? Name it, or say the arc has several or none.
-2. Challenges — does the focus character have the number the budget allows, in rising order, each one harder because the last was not clean? Name any challenge that repeats an earlier one's reason, or that costs nothing to meet.
+1. Shape — is there one main challenge the main character(s) must face, coming from who they are rather than from the setting? Name it, or say the arc has several or none.
+2. Challenges — do the main character(s) have the number the budget allows between them, in rising order, each one harder because the last was not clean? Name any challenge that repeats an earlier one's reason, or that costs nothing to meet.
 3. Budget — count the challenges and moments against the allowance in the STORY SHAPE. Name what must be cut or added for the story to fit the book.
 4. Moments — does every other named character have their own moment, doing what only they would do? Name any who has none, any who has more than the budget allows, and any two whose moments could be swapped.
-5. Who resolves it — do the children resolve it themselves? Name any adult, rescuer, lucky arrival or accident that removes the obstacle.
+5. Who resolves it — do the children resolve it themselves? Name any adult, rescuer, lucky arrival or accident that removes the obstacle. Whoever receives or resolves the ending is established before the final third: a receiver who first appears at the handover is rewritten, not kept.
 6. The youngest — is what the youngest child does within a very young child's reach (noticing, holding, fetching, naming, offering, refusing)? Name anything beyond it.
-7. Change — does the focus character do the same kind of act differently, once early and once late? Name the two, name any change that only restates a trait, and any line that states what someone learned.
+7. Change — does one of the main characters do the same kind of act differently, once early and once late? Name the two, name any change that only restates a trait, and any line that states what someone learned.
 8. Threads — does the number of lines of action match the book's length, and do they meet? Name a second thread that is really a detour, or a long book running on one line.
 9. Joining and parting — does the arc say who starts, who arrives later and why then, and who is separated and where they return? Name anyone who is simply present from the start with no reason.
 10. Blockers — does whoever stands in the way want something of their own? Name any blocker who exists only to be passed.
-11. Reasons and closure — is any turn licensed by a sign, an inscription or a rule announced for the purpose? Name every object, question or promise opened and where it closes; anything that cannot be closed is cut.
+11. Reasons and closure — is any turn licensed by a sign, an inscription or a rule announced for the purpose? Name every object, question or promise opened and where it closes; anything that cannot be closed is cut. Name anything impossible in space or time as written — a thing followed, found or known before it exists, someone in two places, an act that cannot be done while holding what they hold.
 12. Subject and peril — is the thing the book is about present as the STORY SHAPE requires, rather than hinted at offstage? Frightening is the right level: name anything that could kill or injure a child, anyone who looks monstrous, and any separation with no reunion and no safe ending.
 13. Flow — does the shape run opening, building, relief and ending without a stretch where nothing tightens? Name where it sags or where two turns crowd together.
 

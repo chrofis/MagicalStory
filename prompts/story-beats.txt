@@ -40,7 +40,7 @@ SCENE is what the illustration shows: who is present, where they are, what they 
 Requirements:
 - Each page follows causally from the one before it.
 - The main character wants something by page 1 and their situation is different by the last page.
-- The focus character faces the challenges the STORY SHAPE allows, each met at a cost and each harder because the last was not clean. Near the end the goal looks lost before it is won.
+- The main character(s) face the challenges the STORY SHAPE allows, each met at a cost and each harder because the last was not clean. Near the end the goal looks lost before it is won.
 - The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes the obstacle; adults may comfort, permit or watch.
 - Challenges belong to the story, never dealt out one per character in turn. Each other named child keeps to the moments the shape allows, doing what only they would do, and what the youngest does stays within a very young child's reach: noticing, holding, fetching, naming, offering, refusing.
 - One character carries the visible change, shown by doing the same kind of thing differently: once early, refusing, failing or needing help, and once late, doing it themselves. No beat states what anyone learned, realised or now understands.
@@ -70,9 +70,9 @@ Only the blocks below, in this order. No preamble, no commentary.
 
 ---ARC---
 World: <where this happens and what is true about it that matters>
-Main challenge: <what the focus character must face — it comes from who they are, not from the setting>
+Main challenge: <what the main character(s) must face — it comes from who they are, not from the setting>
 
-Challenges of <focus character>:
+Challenges of <the main character, or the two of them>:
 1. <the challenge> — <how they meet it, and what it costs them>
 2. <the next one, harder, and failing to solve the first is why it exists>
 (one entry per challenge the budget allows, in the order they happen)

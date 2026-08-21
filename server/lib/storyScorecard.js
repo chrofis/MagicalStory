@@ -23,9 +23,17 @@ const RUBRIC = {
                 // whether the thing the book is ABOUT is actually on the page.
                 // None of these existed, so every earlier beats score was blind
                 // to them — numbers before this date are on a different scale.
-                'fit', 'focus', 'entrances', 'difficulty', 'subject'],
+                'fit', 'focus', 'entrances', 'difficulty', 'subject',
+                // The listener test applies at plan level too (owner, 2026-08-21):
+                // this run's beats carried a heard-once logic break (navigating by a
+                // trail the dragon is leaving behind them) that causality at 6-7
+                // failed to name.
+                'sense', 'engaging'],
   scene:       ['clarity', 'variety', 'grounding', 'setting', 'composition'],
-  storyText:   ['language', 'readability', 'voice', 'alignment', 'dialogue'],
+  // The listener test (owner, 2026-08-21): a book is read aloud to a child, so
+  // the text is judged as a listening experience, not as prose craft. Old craft
+  // dims are frozen into RUBRIC_V1/RUBRIC_V3 below so 1.x-3.x rows keep meaning.
+  storyText:   ['language', 'sense', 'engaging', 'ageFit', 'alignment'],
   visualBible: ['completeness', 'wardrobe', 'world', 'anchors', 'consistency'],
 };
 
@@ -35,6 +43,7 @@ const RUBRIC = {
 const RUBRIC_V1 = {
   ...RUBRIC,
   beats: ['arc', 'pacing', 'emotion', 'causality', 'themeFit'],
+  storyText: ['language', 'readability', 'voice', 'alignment', 'dialogue'],
 };
 
 // Evaluator version — BUMP when the rubric dims or the judge prompt change so
@@ -58,12 +67,13 @@ const RUBRIC_V3 = {
   ...RUBRIC,
   beats: ['arc', 'pacing', 'emotion', 'causality', 'themeFit',
           'stakes', 'illustratable', 'repetition', 'castVariety', 'looseThreads'],
+  storyText: ['language', 'readability', 'voice', 'alignment', 'dialogue'],
 };
 
 // Rubric for the arc-only judge (story-arc-judge.txt). Lives here, not in the
 // stage that uses it: this module declares itself the one home of rubrics, and a
 // second copy in testlab.js already drifted once.
-const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding', 'fit', 'focus', 'entrances', 'difficulty'] };
+const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding', 'fit', 'focus', 'entrances', 'difficulty', 'sense', 'engaging'] };
 
 const EVALUATORS = {
   '1.0': { name: 'legacy 1.0', promptKey: 'storyScorecardJudge', rubric: RUBRIC_V1, judge: null },

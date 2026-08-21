@@ -14,10 +14,12 @@ Score each dimension 1-10 and be demanding. Anchor the scale: a competent but un
 - castVariety: cast size per scene is manageable and varies page to page; framing varies (establishing view, distant figures, close-up)
 - looseThreads: every question a beat raises is answered later; every resolving object, ally, or rescue has a stated origin or in-world licence; no character is singled out without a reason
 - fit: the number of challenges and character moments matches what a book this length can carry — not padded with filler pages, not crammed
-- focus: one character owns the challenges and the visible change, and the ending belongs to them; the others have moments, not arcs
+- focus: the main characters the brief names (at most two) own the challenges, one of them carries the visible change, and the ending belongs to them; the others have moments, not arcs
 - entrances: characters join across the book rather than all being present at the start, and each arrival has a reason
 - difficulty: the challenges suit the reading level and the age of the character carrying them; the simplest level stays simple
 - subject: the thing the book is about is present and appears as the age band requires — for the youngest, seen whole and early rather than hinted at offstage
+- sense: heard once, the plan holds — nothing relies on a fact no beat established, nobody knows what they could not know, nothing contradicts an earlier beat
+- engaging: a child wants the next page — each beat gives something to feel or wonder, and the plan is a story someone tells, not a report
 
 ## scene — the illustration briefs
 - clarity: one unambiguous, renderable moment per page
@@ -26,12 +28,13 @@ Score each dimension 1-10 and be demanding. Anchor the scale: a competent but un
 - setting: world detail rich and consistent across pages
 - composition: copy-space / calm-zone awareness and a clear focal point
 
-## storyText — the child-facing prose
+## storyText — the child-facing prose, judged as a LISTENING experience
+The book is read aloud to a child at the stated reading level. Score what that child hears.
 - language: grammar and orthography correct; Swiss German uses ss (never the eszett ligature) and «guillemets»
-- readability: vocabulary and sentence length fit the target age
-- voice: warm, engaging narration, not flat or generic
+- sense: heard once, the story makes sense — events follow, nothing happens twice or out of order, nobody knows what they could not know, nothing contradicts what the child just heard
+- engaging: the child wants the next page — something to feel or wonder on every page, dialogue that sounds like people, warmth; a flat or somber report scores low
+- ageFit: words the child already knows, sentences a listener can hold, and challenges and feelings a child that age recognises — not an adult's interiority in a small body
 - alignment: the text matches what its page depicts
-- dialogue: natural, character-appropriate dialogue
 
 ## visualBible — the entity and consistency spec
 - completeness: all characters and key entities present with physical traits
@@ -46,8 +49,8 @@ Some runs include only a subset of the four artifacts below. Score only those pr
 
 Output strict JSON only, no text around it:
 {
-  "beats": {"dims": {"arc": 0, "pacing": 0, "emotion": 0, "causality": 0, "themeFit": 0, "stakes": 0, "illustratable": 0, "repetition": 0, "castVariety": 0, "looseThreads": 0, "fit": 0, "focus": 0, "entrances": 0, "difficulty": 0, "subject": 0}, "notes": ""},
+  "beats": {"dims": {"arc": 0, "pacing": 0, "emotion": 0, "causality": 0, "themeFit": 0, "stakes": 0, "illustratable": 0, "repetition": 0, "castVariety": 0, "looseThreads": 0, "fit": 0, "focus": 0, "entrances": 0, "difficulty": 0, "subject": 0, "sense": 0, "engaging": 0}, "notes": ""},
   "scene": {"dims": {"clarity": 0, "variety": 0, "grounding": 0, "setting": 0, "composition": 0}, "notes": ""},
-  "storyText": {"dims": {"language": 0, "readability": 0, "voice": 0, "alignment": 0, "dialogue": 0}, "notes": ""},
+  "storyText": {"dims": {"language": 0, "sense": 0, "engaging": 0, "ageFit": 0, "alignment": 0}, "notes": ""},
   "visualBible": {"dims": {"completeness": 0, "wardrobe": 0, "world": 0, "anchors": 0, "consistency": 0}, "notes": ""}
 }

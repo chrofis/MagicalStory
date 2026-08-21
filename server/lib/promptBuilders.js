@@ -3905,7 +3905,7 @@ function buildStoryShapeSection(inputData, pageCount) {
     .sort((a, b) => (parseInt(b.age, 10) || 0) - (parseInt(a.age, 10) || 0))
     .slice(0, cap);
   const focus = mains[0] || chars[0] || null;
-  const others = chars.filter(c => c !== focus);
+  const others = chars.filter(c => !mains.includes(c));
 
   // The page budget is arithmetic, so code does it and the arc only fills it in.
   // A major challenge is worth 2-3 pages, a secondary character's moment 1-2, and
@@ -3956,8 +3956,10 @@ function buildStoryShapeSection(inputData, pageCount) {
     '',
     `Pages: ${pages}. Threads: ${threads}`,
     subject,
-    `Focus character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — carries the challenges and the one visible change; the ending belongs to them.`,
-    `Challenges for the focus character: ${challenges}.`,
+    mains.length >= 2
+      ? `Main characters: ${mains.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ')} — at most two carry a book. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
+      : `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — carries the challenges and the one visible change; the ending belongs to them.`,
+    `Challenges: ${challenges} between the main character${mains.length >= 2 ? 's' : ''}.`,
     `Page budget — this is what ${pages} pages buys, already counted for you: opening ${openingPages}, ` +
       `${majors} major challenge${majors === 1 ? '' : 's'} at ${pages <= 10 ? 2 : 3} pages each (${majorPages}), ` +
       `${moments} secondary moment${moments === 1 ? '' : 's'} at about 2 pages each, ending ${endingPages}. ` +

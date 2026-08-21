@@ -30,7 +30,7 @@ One line per page — the story beat each brief must depict.
 
 # YOUR TASK
 
-Answer each check, naming pages. Then rewrite only the pages a check faulted.
+Answer each check, naming pages. Then rewrite only the pages a check faulted. A fault you name must change a page: end your analysis with a line per named fault — the fault, then the page(s) your rewrite fixes it on, or the reason it stands. A named fault with neither is a failed review.
 
 0. **Mechanical clothing faults — not optional.** If a MECHANICAL CLOTHING FAULTS section appears
 above, every page it lists is faulted. These were found by exact comparison against the story's

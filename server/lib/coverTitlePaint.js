@@ -25,7 +25,15 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
-const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, _bandPct = 30) => `The image is a book title on a plain flat white background. Repaint each letter IN PLACE - same position, same size, same words, same line breaks - so the lettering looks hand-painted: visible brush texture in every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour and refine the letterforms and weight; never move, rescale or re-arrange the letters, and never re-set the title in a layout of your own.${strictEmptyPage ? '\nThe output is the same flat white background and the repainted lettering, nothing more: no paper sheet, no paper edges, no surface, no shadow, no photograph, no people, no scenery, no border, no frame, no second copy of the title.' : ''}
+// `lines` carries the title as TEXT, not only as pixels. Without it the model
+// has to read the words off the guide image, and the moment it is told to stop
+// tracing that image it starts guessing at them — measured on the real plate for
+// job_1787001865052: strong hand-lettering, but "der Drache" came back as "die
+// Sprache". The words in writing are what let the letterforms be free.
+const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, _bandPct = 30, lines = null) => `The image is a book title on a plain flat white background. It is a spelling and layout guide, not artwork to preserve: it fixes which words appear, their order, and the line breaks.${Array.isArray(lines) && lines.length ? `\nThe title reads, one line per line:\n${lines.map(l => `  ${l}`).join('\n')}\nEvery word above appears exactly once, spelled exactly as written, on its own line.` : ''}
+Letter the title again by hand inside that same block: brush-drawn strokes with visible texture and pigment pooling at the stroke edges, uneven weight, letters sitting slightly off a shared baseline and varying in size the way hand-lettering does. Draw every letter yourself — do not trace, outline or recolour the shapes in the guide, and do not leave the result looking like a typeface.
+Keep every letter of every word, spelled and ordered exactly as the guide shows, on the same lines. Do not add or drop words, re-arrange the lines, or set the title in a layout of your own.
+Every letter sits fully inside the canvas with clear space at all four edges. Nothing touches or crosses an edge, and no letter is cut off — if a line would not fit, draw it smaller.${strictEmptyPage ? '\nThe output is the same flat white background and the lettering, nothing more: no paper sheet, no paper edges, no surface, no shadow, no photograph, no people, no scenery, no border, no frame, no second copy of the title.' : ''}
 The second image is a colour and style reference only - take the palette and the lettering medium from it; the outlined rectangle on it marks where this lettering sits on the cover. Do not copy, include or reproduce any part of the second image in the output.${styleTxt ? ` Paint the lettering in the medium of: ${styleTxt}` : ''}`;
 
 
@@ -215,13 +223,13 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     // isolating its effect in the Lab, not for production use.
     const refs = [`data:image/jpeg;base64,${plateBuf.toString('base64')}`];
     if (opts.sceneRef !== false) refs.push(`data:image/jpeg;base64,${sceneBuf.toString('base64')}`);
-    result = await editWithGrok(PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct), refs,
+    result = await editWithGrok(PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct, spec?.lines), refs,
       { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: presetName, resolution: '1k' });
   } else {
     const { loadPromptTemplates } = require('../services/prompts');
     await loadPromptTemplates();
     result = await editImageWithPrompt(
-      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct),
+      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct, spec?.lines),
       opts.model || 'gemini-2.5-flash-image',
       [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], opts.artStyle);
   }

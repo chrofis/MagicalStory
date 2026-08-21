@@ -42,20 +42,30 @@ function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').
 // ---------------------------------------------------------------------------
 // fonts (open-license, bundled in fonts/) — family names must match the TTF name tables
 // ---------------------------------------------------------------------------
+// Title faces. Owner pick, 2026-08-18: Fredoka, Baloo 2 and Bungee are OUT —
+// on a painted cover a geometric/slab face reads as a UI typeface, and the
+// repaint pass can only recolour it, never re-shape it. The hand faces
+// (Caveat, Kalam, Patrick Hand, Gochi Hand) were bundled but reserved for
+// dedications; they give the lettering a hand-made skeleton before Grok
+// touches it. `adv` measured per face and scaled by the ~1.13 the original
+// entries carry for side bearings; rounded UP, since over-estimating width
+// shrinks the type (safe) while under-estimating overflows the block.
 const FONTS = {
-  fredoka:   { family: 'Fredoka',      weight: 600, upper: false, adv: 0.56, depth: 6, sw: 8 },
-  baloo:     { family: 'Baloo 2',      weight: 800, upper: false, adv: 0.58, depth: 6, sw: 8 },
   luckiest:  { family: 'Luckiest Guy', weight: 400, upper: true,  adv: 0.60, depth: 6, sw: 8 },
-  bungee:    { family: 'Bungee',       weight: 400, upper: true,  adv: 0.62, depth: 6, sw: 8 },
   titan:     { family: 'Titan One',    weight: 400, upper: false, adv: 0.60, depth: 6, sw: 9 },
   lilita:    { family: 'Lilita One',   weight: 400, upper: true,  adv: 0.50, depth: 6, sw: 8 },
   chewy:     { family: 'Chewy',        weight: 400, upper: false, adv: 0.56, depth: 7, sw: 9 },
   shrikhand: { family: 'Shrikhand',    weight: 400, upper: false, adv: 0.58, depth: 7, sw: 9 },
   pacifico:  { family: 'Pacifico',     weight: 400, upper: false, adv: 0.52, depth: 7, sw: 9 },
+  caveat:    { family: 'Caveat',       weight: 600, upper: false, adv: 0.44, depth: 7, sw: 9 },
+  kalam:     { family: 'Kalam',        weight: 400, upper: false, adv: 0.53, depth: 7, sw: 9 },
+  patrick:   { family: 'Patrick Hand', weight: 400, upper: false, adv: 0.45, depth: 7, sw: 9 },
+  gochi:     { family: 'Gochi Hand',   weight: 400, upper: false, adv: 0.51, depth: 7, sw: 9 },
 };
 const DEAL = [
-  ['fredoka', 'arch'], ['baloo', 'tilt'], ['luckiest', 'straight'], ['bungee', 'straight'],
-  ['titan', 'archdown'], ['lilita', 'tilt'], ['chewy', 'arch'], ['shrikhand', 'straight'], ['pacifico', 'tilt'],
+  ['luckiest', 'straight'], ['titan', 'archdown'], ['lilita', 'tilt'], ['chewy', 'arch'],
+  ['shrikhand', 'straight'], ['pacifico', 'tilt'], ['caveat', 'arch'], ['kalam', 'tilt'],
+  ['patrick', 'straight'], ['gochi', 'archdown'],
 ];
 // dedication fonts — varied scripts / hands / elegant italic
 const WFONTS = [

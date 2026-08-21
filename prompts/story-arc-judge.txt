@@ -11,8 +11,10 @@ Score each dimension 1-10 and be demanding. Anchor the scale: a competent but un
 - change: one character does the same kind of act differently early and late, both points named; a restated trait is not a change, and the change is never stated outright
 - blockers: whoever stands in the way wants something of their own, and the arc says what
 - grounding: turns follow from who someone is or what a place is for, never from a sign or rule announced for the purpose
+- sense: heard once, the story holds — nothing relies on a fact the arc never established, and nothing contradicts what came before
+- engaging: a child would lean in — something to feel or wonder at every turn, not a tidy report of events
 - fit: the challenges and moments match the allowance the brief states for this length — a short book runs one line with few challenges, a long one carries a second thread that meets the first; neither padded nor crammed
-- focus: ONE character owns the challenges and the visible change; the others have moments, not arcs of their own, and the resolution belongs to whoever carried the difficulty
+- focus: the main characters the brief names (at most two) own the challenges, ONE of them carries the visible change, and the resolution belongs to them; everyone else has moments, not arcs
 - entrances: the arc says who starts, who joins later and why then, and who is separated and where they return; the whole cast is not simply present from the start
 - difficulty: the challenge level matches the reading level, lowered when the focus character is very young; the simplest level is always simple
 
@@ -20,5 +22,5 @@ A BRIEF section may precede the arc: the commission, including the page count, t
 
 Output strict JSON only, no text around it:
 {
-  "arc": {"dims": {"shape": 0, "attempts": 0, "lost": 0, "agency": 0, "ensemble": 0, "change": 0, "blockers": 0, "grounding": 0, "fit": 0, "focus": 0, "entrances": 0, "difficulty": 0}, "notes": ""}
+  "arc": {"dims": {"shape": 0, "attempts": 0, "lost": 0, "agency": 0, "ensemble": 0, "change": 0, "blockers": 0, "grounding": 0, "fit": 0, "focus": 0, "entrances": 0, "difficulty": 0, "sense": 0, "engaging": 0}, "notes": ""}
 }

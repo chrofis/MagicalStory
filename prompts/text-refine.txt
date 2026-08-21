@@ -24,7 +24,7 @@ Characters: {CHARACTER_NAMES}
 
 What each page's illustration shows. The picture is already drawn from this and cannot change.
 
-**You may rewrite how a page READS. You may never change what HAPPENS on it.** Do not add, remove, reorder or reverse an event, an action or an outcome. If a page's illustration shows a character helping to work a cork free, the cork comes free — you may not write it as still sealed. If a character is doing something in the outline, the prose may name it, describe it differently, or leave it unsaid, but it must never state the opposite. A reader sees the words and the picture together on one page.
+You may rewrite how a page READS; you may never change what HAPPENS on it. Do not add, remove, reorder or reverse an event, an action or an outcome. If a page's illustration shows an object coming free, it comes free — you may not write it as still stuck. If a character is doing something in the outline, the prose may name it, describe it differently, or leave it unsaid, but it must never state the opposite. A reader sees the words and the picture together on one page.
 
 These outlines describe rendering as well as events — appearance, clothing, position in frame, expression, camera. **None of that is the prose's business.** Take the EVENTS from here and ignore the staging; never narrate where someone stands, what they are wearing or how they are framed.
 
@@ -50,7 +50,7 @@ Work in two steps.
 
 Step 1 — write the analysis. Answer every check below in full, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
 
-Step 2 — rewrite the pages your analysis found problems on. A page no check flagged stays exactly as it is.
+Step 2 — rewrite the pages your analysis found problems on. A page no check flagged stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review.
 
 Where a check tells you to emit a fix in FIXES REQUIRED, apply that fix directly in the rewritten page instead. A page also counts as flagged if it contradicts its scene outline or still carries a dash from the rule above.
 

@@ -2275,35 +2275,46 @@ const NON_PLACE_CATEGORIES = "(Gemeinde|Municipalit|Commune|Comune|Bezirk|Distri
 // boost at all and so scored 0, which is why the most famous landmarks in each
 // city were never offered. Untyped rows now sit in class 2 by default and are
 // ranked on fame like any other landmark.
-// `type` is now filled for every row (backfill-landmark-types.js, from the
-// Wikidata P31 claim), so these lists decide the class outright instead of the
-// ranker inferring one for the 983 rows that used to have none.
+// WHAT COUNTS AS A BACKDROP — an ALLOW-list, not a deny-list.
+//
+// landmark_index is a scrape of everything geo-tagged near a city: embassies,
+// nuclear regulators, schools, stadiums, motorway tunnels, plane crashes,
+// administrative regions. Excluding junk by pattern was a losing game — each
+// new category had to be discovered in a shipped list first, and anything not
+// yet named defaulted to "landmark". Inverting it makes the default safe:
+// a row has to BE one of the known backdrop kinds to rank at the top.
+//
+//   2  a place a children's-book scene can be set: a church, a castle, a
+//      museum, a bridge, a tower, a square, a fountain, a park.
+//   1  real but weak — an ordinary building, a station, a road, a lake, a
+//      mountain. Still offered, never at the top. Anything untyped or
+//      unrecognised lands here rather than being promoted on faith.
+//   0  not a place at all: a municipality, an event, an organisation.
+const BACKDROP_TYPES = "'Cathedral','Church','Abbey','Monastery','Castle','Palace','Museum','Bridge','Tower','Fountain','Square','Theatre','Park','Monument','Library'";
+const NON_PLACE_TYPES = "'City','Village','Event','Organisation','Other'";
 const LANDMARK_CLASS_SQL = `(CASE
-  WHEN coalesce(type,'x') IN ('City','Village','Station','Event','Organisation','Other')
+  WHEN coalesce(type,'x') IN (${NON_PLACE_TYPES})
     OR coalesce(array_to_string(categories,' '),'') ~* '${NON_PLACE_CATEGORIES}' THEN 0
-  WHEN coalesce(type,'x') IN ('River','Lake','Mountain','Forest','Valley','Glacier','Island','Nature reserve','Infrastructure') THEN 1
-  ELSE 2 END)`;
+  WHEN coalesce(type,'x') IN (${BACKDROP_TYPES}) THEN 2
+  ELSE 1 END)`;
 
 // Fame (Wikipedia language editions, migration 025) ranks WITHIN a class.
 // `score` stays as the tie-break so rows not yet backfilled still order
 // sensibly among themselves.
+// City-name lookups have no distance to spend, so they rank on class then fame.
 const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
 
-// Fame alone is not enough on the proximity path: fame is a GLOBAL measure, so
-// a nearby city's landmarks outrank the town the story is actually set in. Rank
-// inside tight proximity bands so a story gets its own town first.
-//
-// The bands have to be tight. An 8km first band put Baden's own Stadtturm
-// (0.16km), Holzbrücke (0.37km) and Ruine Stein (0.06km) in the same bucket as
-// an abbey 6.7km away in the NEXT town, and fame then decided — so the
-// neighbouring town's abbey won and Baden's landmarks never appeared. 3km keeps
-// a town's own centre together and pushes the next town down a band.
+// Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
+// synagogue 7km away in another village (5 language editions) beat the town's
+// own bridge 400m from the centre (3 editions), and the neighbouring village's
+// bridge outranked it too. Distance was only the final tiebreak, so it never
+// got a say. Charge for distance instead — each km costs the equivalent of two
+// language editions, which localises small-town lists hard while leaving a
+// genuinely famous landmark a few km out still on top in a city.
 const D_KM = `(6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
         cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude))))`;
-const DISTANCE_TIER_SQL = `(CASE
-  WHEN ${D_KM} <= 8 THEN 0
-  WHEN ${D_KM} <= 16 THEN 1
-  ELSE 2 END) ASC`;
+const DISTANCE_PENALTY_PER_KM = 2;
+const FAME_MINUS_DISTANCE_SQL = `(coalesce(fame_sitelinks, 0) - ${DISTANCE_PENALTY_PER_KM} * ${D_KM}) DESC`;
 
 // The story's OWN town wins before anything else. Distance alone is too fragile
 // for this: a "city centre" coordinate can sit 3km off, which is enough to drop
@@ -2344,7 +2355,7 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
               cos(radians(longitude) - radians($2)) +
               sin(radians($1)) * sin(radians(latitude))
             )) <= $6
-      ORDER BY ${SAME_CITY_SQL}, ${DISTANCE_TIER_SQL}, ${LANDMARK_RANK_SQL}, distance_km ASC
+      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 

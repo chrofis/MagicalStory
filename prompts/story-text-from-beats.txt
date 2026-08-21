@@ -48,7 +48,7 @@ Work in two steps.
 
 Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it.
 
-Step 2 — write the pages, fixing what the analysis found.
+Step 2 — write the pages, fixing what the analysis found. A problem the analysis names must change the page it names.
 
 {DO_NOT_WRITE_SECTION}
 
