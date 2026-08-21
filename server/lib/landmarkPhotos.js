@@ -2286,20 +2286,31 @@ const LANDMARK_CLASS_SQL = `(CASE
 // sensibly among themselves.
 const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
 
-// Fame alone is not enough on the proximity path: a nearby town sits inside the
-// same radius as a major city, and the city's landmarks are far more famous. A
-// Baden story was offered Zürich Hauptbahnhof, Grossmünster, Kunsthaus and
-// Fraumünster — all ~21km away — ahead of Baden's own Holzbrücke and Stadtturm.
-// Rank inside distance BANDS first, so a story gets its own town's landmarks and
-// reaches for the big city's only once the local ones run out.
+// Fame alone is not enough on the proximity path: fame is a GLOBAL measure, so
+// a nearby city's landmarks outrank the town the story is actually set in. Rank
+// inside tight proximity bands so a story gets its own town first.
+//
+// The bands have to be tight. An 8km first band put Baden's own Stadtturm
+// (0.16km), Holzbrücke (0.37km) and Ruine Stein (0.06km) in the same bucket as
+// an abbey 6.7km away in the NEXT town, and fame then decided — so the
+// neighbouring town's abbey won and Baden's landmarks never appeared. 3km keeps
+// a town's own centre together and pushes the next town down a band.
+const D_KM = `(6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
+        cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude))))`;
 const DISTANCE_TIER_SQL = `(CASE
-  WHEN (6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
-        cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) <= 8 THEN 0
-  WHEN (6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
-        cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) <= 16 THEN 1
+  WHEN ${D_KM} <= 8 THEN 0
+  WHEN ${D_KM} <= 16 THEN 1
   ELSE 2 END) ASC`;
 
-async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30) {
+// The story's OWN town wins before anything else. Distance alone is too fragile
+// for this: a "city centre" coordinate can sit 3km off, which is enough to drop
+// a cathedral out of a tight band while a minor church nearer the given point
+// stays in. Matching nearest_city is robust to that. Diacritics are folded the
+// same way the city-name lookups below fold them, so "Zurich" matches "Zürich".
+const SAME_CITY_SQL = `(CASE WHEN $7 <> '' AND LOWER(translate(nearest_city,
+  'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $7 THEN 1 ELSE 0 END) DESC`;
+
+async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30, city = '') {
   const pool = getPool();
   if (!pool) {
     log.warn('[LANDMARK-INDEX] Database not available');
@@ -2330,9 +2341,9 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
               cos(radians(longitude) - radians($2)) +
               sin(radians($1)) * sin(radians(latitude))
             )) <= $6
-      ORDER BY ${DISTANCE_TIER_SQL}, ${LANDMARK_RANK_SQL}, distance_km ASC
+      ORDER BY ${SAME_CITY_SQL}, ${DISTANCE_TIER_SQL}, ${LANDMARK_RANK_SQL}, distance_km ASC
       LIMIT $5
-    `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm]);
+    `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 
     log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
     return result.rows;
@@ -2426,7 +2437,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // with undefined coords and wasted 3 DB queries per missed city.
     if (result.rows.length === 0 && typeof latitude === 'number' && typeof longitude === 'number') {
       for (const radiusKm of [20, 50, 100]) {
-        const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit);
+        const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit, city);
         if (nearby.length > 0) {
           log.info(`[LANDMARK-INDEX] Proximity fallback: "${city}" → ${nearby.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
           return nearby;
