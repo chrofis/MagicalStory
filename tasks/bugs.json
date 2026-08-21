@@ -143,6 +143,15 @@
    "status": "fixed",
    "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
    "note": "new saveCoverData(storyId, coverType, coverData): jsonb_set on {coverImages,<type>} only, imageVersions bytes to story_images, R2 offload + strip; refresh-bbox cover branch uses it with full-save fallback."
+  },
+  {
+   "id": "repair-reference-full-sheet",
+   "title": "Char-repair reference = FULL 2x4 avatar sheet: extractFaceAndBody only matches the legacy tall format (aspect 1.5-2.0), square sheets (1.0) silently skip the crop",
+   "reportedAt": "2026-08-21",
+   "source": "owner question + exp #53: Max deterministically rejected on 2 pages (bg diff 95/79, 3 internal retries ~1% apart = sheet copied); local repro: cropToFrontColumn(1024x1024 sheet) returns input bytes unchanged for ALL characters",
+   "status": "fixed",
+   "note": "char-fix (and the Lab stage) now crop the pose-matched cell via the shared resolveCellPose/cropAvatarCell chain — cropSheetCell divides by grid geometry, so SQUARE 1024x1024 sheets crop correctly (verified: front/profile/back all yield ~256x607 cells from the failing sheet). Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793).",
+   "fixedIn": "30099b228"
   }
  ]
 }

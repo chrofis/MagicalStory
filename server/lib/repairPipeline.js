@@ -1150,8 +1150,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing`);
     }
     const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
-    const avatarPhoto = styledAvatar || getFacePhoto(character);
-    const avatarPhotoType = styledAvatar
+    let avatarPhoto = styledAvatar || getFacePhoto(character);
+    let avatarPhotoType = styledAvatar
       ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`)
       : 'face';
     if (!avatarPhoto) {
@@ -1166,6 +1166,35 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox });
     const useFaceOnly = repairAxes.faceOnly;
     const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
+
+    // Pick the sheet CELL matching the figure's declared facing — the same
+    // resolveCellPose/cropAvatarCell chain every generation path uses (page,
+    // cover, iterate, regeneration; storyAvatars.js: "never inline a copy").
+    // Char repair was the one consumer still sending the RAW 2x4 sheet, whose
+    // top row is four close-up heads: a full-figure repaint copied its head
+    // scale from those (measured: 1/5 clean with the sheet, 6/6 with body
+    // cells — Lab #785 vs #792/#793). Body repair gets the pose-matched body
+    // cell; face repair gets the face cell stacked above it.
+    if (styledAvatar) {
+      try {
+        const { resolveCellPose } = require('./storyAvatars');
+        const { cropAvatarCell } = require('./sceneComposite');
+        const metaChars = img.sceneMetadata?.fullData?.characters
+          || img.sceneMetadata?.characters || img.sceneCharacters || [];
+        const sc = (Array.isArray(metaChars) ? metaChars : []).find(c =>
+          ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === charName.toLowerCase());
+        const pf = resolveCellPose(sc || {});
+        const { body, stacked } = await cropAvatarCell(styledAvatar,
+          { pose: pf.pose, includeFace: useFaceOnly, stack: useFaceOnly });
+        const cell = useFaceOnly ? (stacked || body) : body;
+        if (cell) {
+          avatarPhoto = cell;
+          avatarPhotoType = `${avatarPhotoType}+cell-${pf.pose}${useFaceOnly ? '-stacked' : ''}`;
+        }
+      } catch (err) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: cell crop failed (${err.message}) — sending the full sheet`);
+      }
+    }
 
     // Protection list: same helper, iterated over sceneCharacters so
     // protection draws from the same source as the target lookup. If a
