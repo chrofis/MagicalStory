@@ -14766,3 +14766,38 @@ redo; image_coherence and nudity score 40 and do.
 
 **Touched:** `server/lib/scoring.js` (SEVERITY_POINTS, hasCatastrophic, shouldRedo)
 **Status:** ✅ active
+
+## 2026-08-21 — Number(null)=0: unpinned Lab loads were pinned to v0; covers get an atomic save
+
+**Context.** Task #26: every Lab bbox run reported `loadedFrom: {unrecorded: true}`
+and never emitted the "loaded active version" line. Local repro with traced DB
+calls showed `getStoryImage(..., 0)` invoked directly — no `getActiveVersion` at
+all. `loadActivePageImage`'s default is `versionIndex = null`, and the pin parse
+was `Number.isFinite(Number(versionIndex))` — but `Number(null) === 0`, so the
+DEFAULT was read as "pinned v0". Every unpinned Lab load since the loadedFrom
+feature shipped detected on v0, never the active version. This is also the root
+cause of the 2026-08-19 "detected on v0 although activeVersion=2" mystery that
+the loadedFrom feature was built to observe: the observer and the observed bug
+were the same line. Separately, task #28: the refresh-bbox cover branch saved
+the WHOLE story document, so a batch that refreshed a scene page immediately
+before a cover had the cover's doc snapshot (read at request start) overwrite
+the scene's still-in-flight per-page save — measured on p18 of
+job_1787262655143_s9zb960muni.
+
+**Decision.**
+- `loadActivePageImage` and the `loadedFrom` reader treat `null`/`undefined`/`''`
+  as "load the ACTIVE version"; only a real number pins. (`0` still pins to v0
+  when passed explicitly.)
+- New `saveCoverData(storyId, coverType, coverData)` in services/database.js —
+  the cover mirror of `saveScenePageData`: version bytes to story_images, R2
+  offload + strip, then `jsonb_set(data, {coverImages,<type>})`. The
+  refresh-bbox cover branch uses it (awaited), with full-save fallback only
+  when the cover key is missing.
+
+**Rationale.** A loader whose default silently pins to v0 makes every Lab
+comparison against "the reader-facing image" a lie; a cover save that rewrites
+the whole document cannot coexist with per-page atomic saves.
+
+**Touched files.** `server/lib/testlab.js`, `server/services/database.js`,
+`server/routes/regeneration.js`. Bugs: `lab-unpinned-loads-v0`,
+`cover-save-clobbers-scene-page`.

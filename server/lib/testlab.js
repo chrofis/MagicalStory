@@ -195,7 +195,13 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   _lastPageLoad = null;
   const { getActiveVersion, getStoryImage } = require('../services/database');
   const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
-  const pinned = Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null;
+  // null/undefined/'' mean "load the ACTIVE version". Number(null) is 0, so
+  // the old isFinite(Number(versionIndex)) turned the DEFAULT into pinned v0:
+  // every unpinned Lab load silently detected on v0, which is both the
+  // loadedFrom={unrecorded} symptom AND the 2026-08-19 "detected on v0
+  // although activeVersion=2" mystery (bug lab-unpinned-loads-v0).
+  const pinned = (versionIndex == null || versionIndex === '') ? null
+    : (Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null);
   // A Lab step image is written with is_test = true, and getStoryImage filters
   // those out — so an intermediate has to come through loadTestImage, which
   // does not.
@@ -1097,8 +1103,11 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // Which bytes this run actually tested — exp #7/#9 could not answer that,
   // and 'null' must be impossible: an unrecorded load is itself a finding.
   const _load = getLastPageLoad();
-  const loadedFrom = Number.isFinite(Number(params.versionIndex))
-    ? { pinned: Number(params.versionIndex) }
+  // Same null-guard as the loader: Number(null)===0 must not read as "pinned 0".
+  const _pinnedParam = (params.versionIndex == null || params.versionIndex === '') ? null
+    : (Number.isFinite(Number(params.versionIndex)) ? Number(params.versionIndex) : null);
+  const loadedFrom = _pinnedParam !== null
+    ? { pinned: _pinnedParam }
     : (_load && _load.storyId === ctx.storyId && String(_load.pageNumber) === String(ctx.pageNumber)
       ? { ..._load } : { unrecorded: true });
   const expectedCharacters = buildExpectedCharacters(ctx);

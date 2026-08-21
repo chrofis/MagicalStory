@@ -20,7 +20,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
+const { saveStoryData, saveScenePageData, saveCoverData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Shared repair logic
@@ -4646,18 +4646,19 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const identifiedCount = bboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
     log.info(`✅ [REFRESH-BBOX] Page ${pageNumber}: ${figCount} figures (${identifiedCount} identified), ${objCount} objects, ${fixTargets.length} fix targets`);
 
-    // COVERS: await the save BEFORE responding (owner goal run, 2026-08-21).
-    // All three covers live in ONE story document. The old shape responded
-    // first and saved the whole doc in background, so a caller iterating
-    // covers sequentially had call N+1 read the doc BEFORE call N's save
-    // landed — N+1's full-doc save then clobbered N's detection. Measured:
-    // trial 1 refreshed -1/-2/-3 in order and frontCover's detection vanished
-    // while backCover (last writer) survived. Scene pages keep the background
-    // save: saveScenePageData is per-page atomic, so sequential pages cannot
-    // clobber each other.
+    // COVERS: atomic per-cover save, awaited (bug cover-save-clobbers-scene-page,
+    // 2026-08-21). The first shape saved the whole doc in background and
+    // sequential covers clobbered each other; awaiting the full-doc save fixed
+    // cover-vs-cover but still clobbered the PRECEDING scene page whose
+    // background save was in flight (measured: batch refreshed p18 then the
+    // covers — p18's fresh detection was erased). saveCoverData jsonb_sets
+    // {coverImages,<coverType>} only, so it can touch no scene page at all.
     if (isCover) {
-      try { await saveStoryData(id, storyData); }
-      catch (err) { log.error('Failed to save bbox refresh (cover):', err.message); }
+      const coverTypeForSave = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' }[String(pageNumber)];
+      try {
+        const ok = await saveCoverData(id, coverTypeForSave, scene);
+        if (!ok) await saveStoryData(id, storyData);
+      } catch (err) { log.error('Failed to save bbox refresh (cover):', err.message); }
       res.json({ bboxDetection, bboxOverlayImage, fixTargets });
     } else {
       res.json({ bboxDetection, bboxOverlayImage, fixTargets });

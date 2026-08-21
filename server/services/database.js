@@ -2157,6 +2157,59 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
 }
 
 /**
+ * Atomic single-cover save — the cover mirror of saveScenePageData
+ * (bug cover-save-clobbers-scene-page, 2026-08-21). The refresh-bbox cover
+ * branch used to save the WHOLE story document: its doc snapshot was read at
+ * request start, so it clobbered any scene page whose per-page background save
+ * was still in flight (measured: a batch refreshed p18 then the covers, and
+ * the first cover's full-doc save erased p18's fresh detection). jsonb_set on
+ * {coverImages,<coverType>} touches nothing but this cover.
+ * Returns false when the cover key does not exist (caller falls back).
+ */
+async function saveCoverData(storyId, coverType, coverData) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+  const dataForStorage = JSON.parse(JSON.stringify(coverData));
+
+  // Version bytes → story_images (cover rows: image_type = coverType, NULL page)
+  if (Array.isArray(dataForStorage.imageVersions)) {
+    for (let i = 0; i < dataForStorage.imageVersions.length; i++) {
+      const version = dataForStorage.imageVersions[i];
+      if (version.imageData && !version._rehydrated && !version._alreadySaved) {
+        await saveStoryImage(storyId, coverType, null, version.imageData, {
+          qualityScore: version.finalScore ?? version.qualityScore ?? version.score,
+          generatedAt: version.generatedAt,
+          versionIndex: dbIndexFor(version, i, coverType),
+        });
+      }
+      delete version.imageData;
+      delete version._rehydrated;
+      delete version._alreadySaved;
+    }
+  }
+  // Top-level bytes live in story_images already (or are rehydrated copies).
+  delete dataForStorage.imageData;
+
+  // Same R2 offload + strip the full save runs, scoped to this one cover.
+  const wrapped = { coverImages: { [coverType]: dataForStorage } };
+  await extractInlineImagesToR2(storyId, wrapped);
+  stripInlineImagesFromStoryData(wrapped);
+
+  const result = await dbQuery(
+    `UPDATE stories
+     SET data = jsonb_set(data, ARRAY['coverImages', $2], $3::jsonb)
+     WHERE id = $1 AND data->'coverImages' ? $2`,
+    [storyId, coverType, JSON.stringify(wrapped.coverImages[coverType])]
+  );
+  if ((result.rowCount ?? 0) === 0) {
+    console.warn(`⚠️ [SAVE-COVER] ${coverType} not present in coverImages for story ${storyId}, falling back to full save`);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Create the stories row EARLY, before any image is written (owner, 2026-08-15).
  *
  * story_images.story_id references stories.id, and the row used to appear only
@@ -3367,6 +3420,7 @@ module.exports = {
   buildStoryMetadata,
   saveStoryData,
   saveScenePageData,
+  saveCoverData,
   stripInlineImagesFromStoryData,
   extractInlineImagesToR2,
   upsertStory,

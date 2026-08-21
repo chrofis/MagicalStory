@@ -125,6 +125,24 @@
    "status": "fixed",
    "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
    "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
+  },
+  {
+   "id": "lab-unpinned-loads-v0",
+   "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
+   "reportedAt": "2026-08-21",
+   "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
+   "status": "fixed",
+   "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+   "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
+  },
+  {
+   "id": "cover-save-clobbers-scene-page",
+   "title": "refresh-bbox cover branch saved the WHOLE story doc, clobbering the preceding scene page in-flight save",
+   "reportedAt": "2026-08-21",
+   "source": "trial-3 batch on job_1787262655143_s9zb960muni: p18 refreshed then covers; p18 detection erased (sam=0/4), single-page rerun clean",
+   "status": "fixed",
+   "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+   "note": "new saveCoverData(storyId, coverType, coverData): jsonb_set on {coverImages,<type>} only, imageVersions bytes to story_images, R2 offload + strip; refresh-bbox cover branch uses it with full-save fallback."
   }
  ]
 }
