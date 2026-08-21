@@ -2275,10 +2275,13 @@ const NON_PLACE_CATEGORIES = "(Gemeinde|Municipalit|Commune|Comune|Bezirk|Distri
 // boost at all and so scored 0, which is why the most famous landmarks in each
 // city were never offered. Untyped rows now sit in class 2 by default and are
 // ranked on fame like any other landmark.
+// `type` is now filled for every row (backfill-landmark-types.js, from the
+// Wikidata P31 claim), so these lists decide the class outright instead of the
+// ranker inferring one for the 983 rows that used to have none.
 const LANDMARK_CLASS_SQL = `(CASE
-  WHEN coalesce(type,'x') IN ('City','Village','Station')
+  WHEN coalesce(type,'x') IN ('City','Village','Station','Event','Organisation','Other')
     OR coalesce(array_to_string(categories,' '),'') ~* '${NON_PLACE_CATEGORIES}' THEN 0
-  WHEN coalesce(type,'x') IN ('River','Lake','Mountain','Forest','Valley','Glacier','Island','Nature reserve') THEN 1
+  WHEN coalesce(type,'x') IN ('River','Lake','Mountain','Forest','Valley','Glacier','Island','Nature reserve','Infrastructure') THEN 1
   ELSE 2 END)`;
 
 // Fame (Wikipedia language editions, migration 025) ranks WITHIN a class.
