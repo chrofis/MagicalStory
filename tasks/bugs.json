@@ -98,6 +98,24 @@
       "status": "fixed",
       "fixedIn": "756b8e692",
       "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
+    },
+    {
+      "id": "refresh-bbox-strips-dino",
+      "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
+      "reportedAt": "2026-08-21",
+      "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
+      "status": "fixed",
+      "fixedIn": "4b6492a8e",
+      "note": "refine skipped for /dino/ backends; cover saves awaited before response."
+    },
+    {
+      "id": "silent-detection-failures-no-alert",
+      "title": "21 DINO detection failures shipped a degraded story with zero alerting",
+      "reportedAt": "2026-08-21",
+      "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
+      "status": "fixed",
+      "fixedIn": "4b6492a8e",
+      "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
     }
   ]
 }

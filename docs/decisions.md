@@ -14509,3 +14509,30 @@ a scale-repair-vs-composite verdict, and re-routing needs its own evidence.
 **Touched:** `prompts/image-evaluation.txt`, `prompts/image-visual-inventory.txt`,
 `server/lib/evalBuckets.js`, `server/lib/scoring.js`
 **Status:** 🟡 conditional — shipped code, validation outstanding
+
+## 2026-08-21 — refresh-bbox: no Gemini refine on DINO detections; cover saves are awaited
+
+**Context:** owner goal — story `job_1787262655143_s9zb960muni` (generated
+during the 2026-08-20 analyzer outage, `dino_detect_fail: 21`, 16 of 18 pages
+silently on the Gemini bbox with no SAM) must reach 100% DINO+SAM+identity via
+re-detection. Trial 1 hit `POST /refresh-bbox` for all 21 pages/covers: every
+call succeeded, every persisted figure came back STRIPPED (sam 0/N, seeds
+undefined) and frontCover lost its detection entirely.
+
+**Two defects in the endpoint:**
+1. The auto-refine second pass — built for Gemini's sloppy boxes — rebuilt each
+   named figure as `{name, boxes, _source:'refined'}`, dropping samApplied /
+   garmentSeeds / seedTrace, and its `{...spread}` killed the non-enumerable
+   `_gdinoMasks` (the forbidden pattern from the module header). Now skipped
+   whenever `detectionBackend` matches /dino/.
+2. Cover saves were fire-and-forget full-document writes AFTER the response, so
+   sequential cover refreshes clobbered each other (frontCover lost, backCover
+   as last writer survived). Cover saves are now awaited before responding;
+   scene pages keep the background save (per-page atomic, no clobber).
+
+**Also in this deploy:** a story that accumulates `dino_detect_fail >= 3`
+records a customer-severity `failure_log` entry at save time — 21 silent
+detection failures shipped a degraded book with no trace anywhere a human looks.
+
+**Touched:** `server/routes/regeneration.js`, `server/services/database.js`
+**Status:** ✅ active

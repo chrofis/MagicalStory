@@ -1762,6 +1762,26 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
     if (Object.keys(runMetrics).length > 0) {
       storyData.runMetrics = { ...(storyData.runMetrics || {}), ...runMetrics };
     }
+    // A DEGRADED STORY IS A RECORDED FAILURE (owner, 2026-08-21). Story
+    // job_1787262655143_s9zb960muni shipped with dino_detect_fail=21 — sixteen
+    // of eighteen pages silently on the Gemini bbox with no SAM, no garment
+    // seeds and fallback identity — and NOTHING recorded it anywhere a human
+    // looks. The silent per-page fallback is deliberate resilience; a story
+    // where detection failed repeatedly is not resilience, it is a degraded
+    // product, and it goes in the failure log where the daily email reads it.
+    // Threshold 3: one-off analyzer hiccups (cold start) stay internal noise.
+    const df = Number(storyData.runMetrics?.dino_detect_fail || 0);
+    if (df >= 3 && !storyData._dinoFailRecorded) {
+      storyData._dinoFailRecorded = true;   // once per story, not per save
+      require('../lib/failureLog').recordFailure({
+        kind: 'story_degraded_detection',
+        severity: 'customer',
+        fingerprint: 'dino-detect-fail',
+        storyId,
+        summary: `${df} DINO detection failure(s) during generation — pages fell back to the Gemini bbox without SAM masks or garment seeds`,
+        detail: { dino_detect_fail: df, sam_calls: storyData.runMetrics?.sam_calls ?? null, dino_calls: storyData.runMetrics?.dino_calls ?? null },
+      });
+    }
   } catch { /* metrics must never fail a save */ }
 
   // Clone so we can strip inline image bytes without mutating the caller's

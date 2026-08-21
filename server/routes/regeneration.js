@@ -4526,10 +4526,19 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
     }
 
-    // Auto-refine: send overlay back to vision model for a second pass
-    // This significantly improves face box accuracy
+    // Auto-refine: send overlay back to vision model for a second pass.
+    // GEMINI DETECTIONS ONLY (owner goal run, 2026-08-21). The refine was built
+    // for Gemini's sloppy 2-pass boxes; DINO+SAM boxes are mask-derived and
+    // tight, and the refine actively DESTROYS them: it rebuilds each named
+    // figure as {name, boxes, _source:'refined'}, dropping samApplied,
+    // garmentSeeds, maskPx, seedTrace — and the {...spread} below kills the
+    // non-enumerable _gdinoMasks (the exact pattern the bboxDetection module
+    // header forbids). Measured: trial 1 re-detected all 21 pages of
+    // job_1787262655143_s9zb960muni perfectly and persisted every figure
+    // stripped bare — sam=0/…, seeds undefined — because of this block.
+    const skipRefine = /dino/.test(bboxDetection?.detectionBackend || '');
     const mainChars = (bboxDetection?.figures || []).filter(f => f.name && f.name !== 'UNKNOWN');
-    if (bboxOverlayImage && mainChars.length > 0) {
+    if (bboxOverlayImage && mainChars.length > 0 && !skipRefine) {
       try {
         log.info(`🔄 [REFRESH-BBOX] Auto-refining ${mainChars.length} characters...`);
         const figuresSummary = mainChars.map((f, i) => {
@@ -4637,12 +4646,21 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const identifiedCount = bboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
     log.info(`✅ [REFRESH-BBOX] Page ${pageNumber}: ${figCount} figures (${identifiedCount} identified), ${objCount} objects, ${fixTargets.length} fix targets`);
 
-    res.json({ bboxDetection, bboxOverlayImage, fixTargets });
-
-    // Save to DB in background
+    // COVERS: await the save BEFORE responding (owner goal run, 2026-08-21).
+    // All three covers live in ONE story document. The old shape responded
+    // first and saved the whole doc in background, so a caller iterating
+    // covers sequentially had call N+1 read the doc BEFORE call N's save
+    // landed — N+1's full-doc save then clobbered N's detection. Measured:
+    // trial 1 refreshed -1/-2/-3 in order and frontCover's detection vanished
+    // while backCover (last writer) survived. Scene pages keep the background
+    // save: saveScenePageData is per-page atomic, so sequential pages cannot
+    // clobber each other.
     if (isCover) {
-      saveStoryData(id, storyData).catch(err => log.error('Failed to save bbox refresh:', err.message));
+      try { await saveStoryData(id, storyData); }
+      catch (err) { log.error('Failed to save bbox refresh (cover):', err.message); }
+      res.json({ bboxDetection, bboxOverlayImage, fixTargets });
     } else {
+      res.json({ bboxDetection, bboxOverlayImage, fixTargets });
       saveScenePageData(id, pageNumber, scene).catch(err => {
         log.error('Failed to save bbox refresh atomically, falling back:', err.message);
         saveStoryData(id, storyData).catch(err2 => log.error('Fallback save failed:', err2.message));
