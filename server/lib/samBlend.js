@@ -438,7 +438,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true, gateFaceDetail = true, faceDetailRatioMax = 1.6 }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -836,40 +836,6 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // never faced this gate) route through here in production.
   if (gateIou && iou < iouThreshold) {
     throw fail(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.`);
-  }
-
-  // FACE-DETAIL gate: the failure the IoU gate cannot see. A repaint that
-  // copies a close-up reference cell keeps the figure's extent (IoU passes)
-  // but renders the head at reference scale and detail — measured across 17
-  // runs of one page: candidate/original face-region Laplacian stdev was
-  // 0.92-1.01x on every clean repair and 1.9-2.8x on every broken one, with
-  // no overlap. Gate rejects the spike; the throw classifies as blend_gate,
-  // so the spine redraws (up to REPAIR_ATTEMPTS). Skipped when there is no
-  // face box (back view, undetected face) or the region is too small or too
-  // flat to measure.
-  if (gateFaceDetail && Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
-    try {
-      const fl = Math.max(0, Math.round(faceBoxInCrop[0]));
-      const ft = Math.max(0, Math.round(faceBoxInCrop[1]));
-      const fw = Math.min(cropW - fl, Math.round(faceBoxInCrop[2] - faceBoxInCrop[0]));
-      const fh = Math.min(cropH - ft, Math.round(faceBoxInCrop[3] - faceBoxInCrop[1]));
-      if (fw > 24 && fh > 24) {
-        const LAP = { width: 3, height: 3, kernel: [0, -1, 0, -1, 4, -1, 0, -1, 0] };
-        const detail = async (buf) => {
-          const region = await sharp(buf).extract({ left: fl, top: ft, width: fw, height: fh }).greyscale().toBuffer();
-          const conv = await sharp(region).convolve(LAP).toBuffer();
-          return (await sharp(conv).stats()).channels[0].stdev;
-        };
-        const [origDetail, candDetail] = await Promise.all([detail(originalCropBuf), detail(candidateCropBuf)]);
-        if (origDetail > 2 && candDetail / origDetail > faceDetailRatioMax) {
-          throw fail(`Repainted head carries ${(candDetail / origDetail).toFixed(1)}x the original face-region detail (${candDetail.toFixed(1)} vs ${origDetail.toFixed(1)}) — reference-scale head copied into the figure. Redraw.`);
-        }
-        log.debug(`[SAM-BLEND] face-detail gate: orig ${origDetail.toFixed(1)}, candidate ${candDetail.toFixed(1)}, ratio ${(origDetail > 0 ? candDetail / origDetail : 0).toFixed(2)} (max ${faceDetailRatioMax})`);
-      }
-    } catch (err) {
-      if (err.partialResult) throw err; // the gate's own rejection
-      log.warn(`[SAM-BLEND] face-detail gate skipped (${err.message})`);
-    }
   }
 
   // Disagreement visualization: red = old-only, green = new-only.

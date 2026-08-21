@@ -706,15 +706,21 @@ duplicated) and the `3:4` literals (legitimate preset tables).
 ### Char-repair follow-ups: face-detail gate, aspect-snapped insert crops, garment_colour split
 Three fixes from the char-repair investigation (owner: "list the follow ups and fix them").
 
-**1. Face-detail gate** (`server/lib/samBlend.js`, in `samUnionBlend` beside the
-IoU gate). The IoU gate cannot see the measured failure mode: a repaint that
-copies a close-up reference cell keeps the figure's extent (IoU passes, and the
-silhouette HEIGHT is byte-identical — measured across all 11 stored runs) but
-renders the head at reference scale. Candidate/original face-region Laplacian
-stdev separated every run with no overlap: 0.92–1.01x on clean repairs,
-1.9–2.8x on broken ones. Gate default `faceDetailRatioMax = 1.6`, throws as
-`blend_gate` (retryable, so the spine redraws), skips when no face box (back
-view) or region <24px. Validated 4/4 against stored good/bad repairs.
+**1. Face-detail gate — BUILT, DISPROVEN, REVERTED (same day).** Four
+formulations were measured against all 16 stored good/bad runs of the
+motivating page: (a) candidate/original Laplacian in the DINO face box —
+overlaps (clean up to 1.28, broken from 1.26; the shipped 1.6 threshold missed
+a broken run at 1.57); (b) the candidate's own head/body ratio — razor-thin
+(1.15 vs 1.20); (c) the same on the BLENDED final with DINO boxes — overlaps
+and inverts (the enlarged head escapes the original face box); (d) silhouette
+head-band width old vs new — identically 1.00 on every run, because
+`registerCandidate` RESCALES the model output onto the original silhouette
+before masks compare, so mask geometry is equalised by construction. The
+page-space metric that separated finals perfectly (0.65–0.78 vs 1.98–2.78)
+does not survive translation into the blend's coordinate space. Verdict: no
+cheap pixel gate at the blend detects this defect; it is prevented at the
+SOURCE instead (pose-matched reference cell, in production, 10/10 clean). Do
+not rebuild this gate without a metric validated on multiple pages.
 
 **2. Insert-path crops snap to a supported Grok aspect** (`testlab.js`
 qwen/grok insert, body mode). The call sent a fixed '3:4' whatever the crop's
