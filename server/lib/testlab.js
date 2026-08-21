@@ -1435,6 +1435,35 @@ async function runCharRepairStage(ctx, opts) {
       log.warn(`[TESTLAB] styled avatar lookup failed for ${charName} (${err.message}) — using page reference photo`);
     }
   }
+
+  // LAB DIVERGENCE (indexed): referenceCells crops the 2x4 avatar sheet before
+  // it is sent. The sheet's TOP row is four close-up heads (head ~40% of the
+  // cell) and the bottom row is four full-body views (head ~1/6 of the figure).
+  // A full-figure repaint copies identity from the sheet and inherits head
+  // SCALE from the dominant close-ups — measured: every failed repair is a
+  // near-duplicate of the others (~1% apart), i.e. the same cell copied, with
+  // an oversized head. 'body4' sends the body row only, 'body1' a single body
+  // view. Production still sends the whole sheet; promote or reject per
+  // docs/lab-divergences.md.
+  if (params.referenceCells && params.referenceCells !== 'full' && avatarPhoto) {
+    try {
+      const sharpRC = require('sharp');
+      const r2RC = require('./r2');
+      const rcBuf = Buffer.from(r2RC.stripDataUriPrefix(avatarPhoto), 'base64');
+      const rcMeta = await sharpRC(rcBuf).metadata();
+      const W = rcMeta.width, H = rcMeta.height;
+      const region = params.referenceCells === 'body1'
+        ? { left: 0, top: Math.round(H / 2), width: Math.round(W / 4), height: Math.round(H / 2) }
+        : { left: 0, top: Math.round(H / 2), width: W, height: Math.round(H / 2) };
+      const cropped = await sharpRC(rcBuf).extract(region).jpeg({ quality: 92 }).toBuffer();
+      avatarPhoto = `data:image/jpeg;base64,${cropped.toString('base64')}`;
+      avatarPhotoType = `${avatarPhotoType}+${params.referenceCells}`;
+      log.info(`[TESTLAB] referenceCells=${params.referenceCells}: sheet ${W}x${H} -> ${region.width}x${region.height}`);
+    } catch (err) {
+      log.warn(`[TESTLAB] referenceCells crop failed (${err.message}) — sending the full sheet`);
+    }
+  }
+
   const clothingDescription = (() => {
     // Follows the REFERENCE character: during an identity swap the prompt must
     // not keep demanding the TARGET's outfit, or the model is told to paint the
