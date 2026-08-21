@@ -2238,6 +2238,28 @@ async function getLandmarkPhotoOnDemand(landmark) {
  * @param {number} limit - Maximum results (default 30)
  * @returns {Promise<Array>}
  */
+// LANDMARK RANKING (2026-08-21). The legacy `score` is base + a type-based
+// `boost_amount` (+100 Church/Tower/Bridge), which turned out close to
+// anti-correlated with fame: of 600 candidates around Zurich, Grossmünster
+// ranked 599th and Zürich Hauptbahnhof 121st, so neither was ever inside the
+// LIMIT 30 handed to the writer, while a guild house with 4 Wikipedia language
+// editions topped the list. Both of those rank last for the same reason — their
+// `type` is NULL, so they earn no boost at all.
+//
+// `fame_sitelinks` (Wikipedia language editions, migration 025) is the fame
+// signal. Two things ride in front of it:
+//   - non-places SINK rather than being filtered out. A municipality has many
+//     language editions and would otherwise outrank every real landmark, but
+//     removing them outright could leave a thin city with nothing at all, so
+//     they are demoted and stay available as a last resort.
+//   - `score` remains the tie-break, so rows not yet backfilled still order
+//     sensibly among themselves.
+const NON_PLACE_CATEGORIES = "(Gemeinde|Municipalit|Commune|Comune|Bezirk|District|Ort im Kanton|Kreis |Accident|Flugunfall|Battle|Bataille|Schlacht|Gefecht|Unternehmen|Hotelkette)";
+const IS_A_PLACE_SQL = `(CASE WHEN coalesce(type,'x') NOT IN ('City','Village','Station')
+   AND coalesce(array_to_string(categories,' '),'') !~* '${NON_PLACE_CATEGORIES}'
+  THEN 1 ELSE 0 END)`;
+const LANDMARK_RANK_SQL = `${IS_A_PLACE_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
+
 async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30) {
   const pool = getPool();
   if (!pool) {
@@ -2261,7 +2283,7 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
       FROM landmark_index
       WHERE latitude BETWEEN $1 - $3 AND $1 + $3
         AND longitude BETWEEN $2 - $4 AND $2 + $4
-      ORDER BY score DESC, distance_km ASC
+      ORDER BY ${LANDMARK_RANK_SQL}, distance_km ASC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit]);
 
@@ -2317,7 +2339,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     let result = await pool.query(`
       SELECT * FROM landmark_index
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
-      ORDER BY score DESC, name ASC
+      ORDER BY ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
 
@@ -2327,7 +2349,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       result = await pool.query(`
         SELECT * FROM landmark_index
         WHERE TRIM(REPLACE(LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
-        ORDER BY score DESC, name ASC
+        ORDER BY ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [inputNorm, limit]);
       if (result.rows.length > 0) {
@@ -2342,7 +2364,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
         SELECT * FROM landmark_index
         WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
            OR LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) LIKE $1 || ',%'
-        ORDER BY score DESC, name ASC
+        ORDER BY ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [firstWord, limit]);
       if (result.rows.length > 0) {

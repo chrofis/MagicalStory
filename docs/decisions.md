@@ -14672,3 +14672,54 @@ belong to someone else" it previously only had for faces.
 **Touched files.** `server/lib/figureDetection.js` (`_colourSeedPoints`,
 `_blobInteriorPoint`, 3-pass prompt build), `server/lib/bboxDetection.js`
 (overlay label). Bug registry: `garment-seed-off-colour-centroid`.
+
+---
+
+## 2026-08-21 — Landmark selection ranks by fame, not by the legacy score
+
+**Context:** `landmark_index.score` is base + a type-based `boost_amount` (+100
+for Church/Tower/Bridge). Measured against Wikidata sitelinks it is close to
+anti-correlated with fame. Selection does `ORDER BY score DESC LIMIT 30` over a
+20km radius, so the ranking decides what the story writer may even choose:
+
+| landmark | score | sitelinks | rank of 600 (Zurich) |
+|---|---|---|---|
+| Zunfthaus zur Haue | 135 | 4 | top of the list |
+| Zürich Hauptbahnhof | 85 | 33 | 121 — never offered |
+| Grossmünster | 0 | 30 | **599 — never offered** |
+
+The reason the two famous ones ranked last is that their `type` is NULL, so they
+earn no boost. They were penalised for missing metadata while obscure entries
+were promoted by a type boost. `type` is unreliable generally — the index
+contains a battle typed `Castle` and municipalities typed `Mountain`.
+
+**Decision:** rank by `fame_sitelinks` (migration 025, backfilled to 4762/4764 =
+99.96%), with two terms in front of it:
+
+```
+(is-a-place) DESC, fame_sitelinks DESC NULLS LAST, score DESC
+```
+
+- **Non-places SINK, they are not filtered out.** A municipality has many
+  language editions and would otherwise outrank every real landmark, so
+  settlements (`City`/`Village`/`Station`) and rows whose `categories` name a
+  municipality, district, battle, air accident or company are demoted. They are
+  deliberately NOT excluded: a hard filter could leave a thin city with nothing,
+  and they remain available as a last resort.
+- **`score` stays as the tie-break**, so rows not yet backfilled still order
+  sensibly among themselves. Nothing about `score` or `boost_amount` changed.
+
+**Measured after (top of the offered list):**
+- Zurich: Zürichsee, Hauptbahnhof, **Grossmünster (3rd, was 599th)**, Cabaret
+  Voltaire, Kunsthaus, Landesmuseum, Fraumünster
+- Bern: Wankdorf, University of Bern, Nationalbank, Bundeshaus,
+  Nationalbibliothek, Berner Altstadt, **Zytglogge (was score 0)**
+- Luzern: Vierwaldstättersee, Kapellbrücke, Löwendenkmal
+
+**Applied at all four query sites** in `getIndexedLandmarks*` through one shared
+`LANDMARK_RANK_SQL` constant, so the proximity path and the three city-name
+fallbacks cannot drift apart.
+
+**Touched:** `server/lib/landmarkPhotos.js`, `migrations/025_landmark_fame.sql`,
+`scripts/admin/backfill-landmark-fame.js`
+**Status:** ✅ active
