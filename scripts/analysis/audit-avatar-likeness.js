@@ -45,6 +45,7 @@ const arg = (name, dflt) => {
 };
 const LIMIT = parseInt(arg('limit', '15'), 10);
 const WITH_PAGES = args.includes('--pages');
+const INCLUDE_DEMO = args.includes('--include-demo');
 const DB = arg('db', 'prod');
 const OUT = arg('out', path.join(__dirname, 'test-output', 'avatar-likeness-audit.html'));
 
@@ -83,9 +84,17 @@ const QUADRANTS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 
 /**
  * Compare the source photo against all four cells of an avatar sheet.
- * Mirrors how the LLM judge scores it (`sourceMatchScore` = LOWEST of the four
- * cells, per prompts/sheet-2x4-evaluation.txt) so the two numbers are directly
- * comparable — we report the same min, plus the max and the detection failures.
+ *
+ * The four cells are VIEWS, not repeats: front headshot, 3/4 headshot,
+ * full-body front, full-body profile. ArcFace is frontal-biased and cannot
+ * embed a pure side profile — that cell lands at ~0.03 no matter how good the
+ * likeness is (measured: a sheet whose other three cells scored 0.70/0.81/0.79
+ * still had 0.028 on the profile). So the MIN across cells is meaningless here
+ * even though the LLM judge uses min: the judge understands that a profile is
+ * supposed to look like a profile.
+ *
+ * The reportable statistic is therefore BEST — the strongest-matching view.
+ * `min` is retained per-cell for inspection but never banded or summarised.
  */
 async function compareSheet(photoB64, sheetB64) {
   const cells = [];
@@ -102,10 +111,14 @@ async function compareSheet(photoB64, sheetB64) {
     }
   }
   const ok = cells.filter(c => typeof c.sim === 'number');
+  const sims = ok.map(c => c.sim);
   return {
     cells,
-    min: ok.length ? Math.min(...ok.map(c => c.sim)) : null,
-    max: ok.length ? Math.max(...ok.map(c => c.sim)) : null,
+    best: sims.length ? Math.max(...sims) : null,
+    // Second-best: guards against a single lucky cell. A genuinely good sheet
+    // has at least two frontal-ish views matching.
+    second: sims.length > 1 ? sims.sort((a, b) => b - a)[1] : null,
+    worst: sims.length ? Math.min(...sims) : null,
     detected: ok.length,
   };
 }
@@ -144,17 +157,23 @@ async function comparePageFaces(photoB64, pageB64) {
   }
 
   const pool = new Pool({ connectionString: CONN, ssl: { rejectUnauthorized: false } });
+  // Demo-family characters are generated portraits, not real photographs, so
+  // an avatar built from one is an easy case and will flatter the numbers.
+  // They are labelled, and excluded entirely unless --include-demo is passed.
   const { rows } = await pool.query(
-    `SELECT id, user_id, created_at, data
-       FROM characters
-      WHERE data->'characters' IS NOT NULL
-      ORDER BY created_at DESC
+    `SELECT c.id, c.user_id, c.created_at, c.data, u.email, u.is_trial
+       FROM characters c
+       JOIN users u ON u.id = c.user_id
+      WHERE c.data->'characters' IS NOT NULL
+      ORDER BY c.created_at DESC
       LIMIT $1`,
-    [LIMIT * 3]
+    [LIMIT * 8]
   );
 
   const results = [];
   for (const row of rows) {
+    const isDemo = /^(demo|test)[-.]|@example\./i.test(row.email || '');
+    if (isDemo && !INCLUDE_DEMO) continue;
     for (const c of row.data.characters || []) {
       if (results.length >= LIMIT) break;
       const photoUrl = c.photos?.face || c.photos?.original;
@@ -172,24 +191,34 @@ async function comparePageFaces(photoB64, pageB64) {
 
         let pages = null;
         if (WITH_PAGES) {
+          // Page bytes live in story_images (R2 URL in image_url), NOT in
+          // stories.data.sceneImages — those entries carry metadata only.
+          // We take the HIGHEST version_index per page: these stories carry no
+          // activeVersion pin, and repairs append, so the last version is the
+          // one a reader ends up seeing. Labelled "latest" rather than
+          // "active" because that is what it actually is.
           const st = await pool.query(
-            `SELECT data->'sceneImages' AS si FROM stories
-              WHERE user_id = $1 AND data ? 'sceneImages'
-              ORDER BY created_at DESC LIMIT 1`,
+            `SELECT DISTINCT ON (si.page_number) si.page_number, si.image_url
+               FROM story_images si
+               JOIN stories s ON s.id = si.story_id
+              WHERE s.user_id = $1
+                AND si.image_type = 'scene'
+                AND si.image_url IS NOT NULL
+              ORDER BY si.page_number, si.version_index DESC
+              LIMIT 3`,
             [row.user_id]
           );
-          const scenes = (st.rows[0]?.si || []).slice(0, 3);
           const perPage = [];
-          for (const s of scenes) {
-            const url = s.imageUrl || s.imageData;
-            if (!url) continue;
-            perPage.push({ page: s.pageNumber, ...(await comparePageFaces(photoB64, await toBase64(url))) });
+          for (const s of st.rows) {
+            perPage.push({ page: s.page_number, ...(await comparePageFaces(photoB64, await toBase64(s.image_url))) });
           }
           pages = perPage;
         }
 
-        results.push({ name: c.name, userId: row.user_id, createdAt: row.created_at, photoUrl, sheetUrl, llm, sheet, pages });
-        console.log(sheet.min == null ? 'no face detected in any cell' : `arcface min=${sheet.min.toFixed(3)} max=${sheet.max.toFixed(3)} (llm ${llm ?? '-'}/10)`);
+        results.push({ name: c.name, userId: row.user_id, createdAt: row.created_at, isDemo, email: row.email, photoUrl, sheetUrl, llm, sheet, pages });
+        console.log(sheet.best == null
+          ? 'no face detected in any cell'
+          : `arcface best=${sheet.best.toFixed(3)} 2nd=${sheet.second?.toFixed(3) ?? '-'} (llm ${llm ?? '-'}/10)`);
       } catch (e) {
         console.log(`FAILED — ${e.message.slice(0, 80)}`);
       }
@@ -204,26 +233,29 @@ async function comparePageFaces(photoB64, pageB64) {
   }
 
   // ── Summary ───────────────────────────────────────────────────────────────
-  const scored = results.filter(r => r.sheet.min != null);
-  const mins = scored.map(r => r.sheet.min).sort((a, b) => a - b);
-  const med = mins.length ? mins[Math.floor(mins.length / 2)] : null;
+  const scored = results.filter(r => r.sheet.best != null);
+  const bests = scored.map(r => r.sheet.best).sort((a, b) => a - b);
+  const med = bests.length ? bests[Math.floor(bests.length / 2)] : null;
 
   console.log(`\n${'─'.repeat(78)}`);
   console.log(`Characters audited: ${results.length}   scored: ${scored.length}   no-face: ${results.length - scored.length}`);
+  console.log(`Demo/test accounts: ${results.filter(r => r.isDemo).length}   real users: ${results.filter(r => !r.isDemo).length}`);
   if (med != null) {
-    console.log(`ArcFace cosine (worst cell): min ${mins[0].toFixed(3)}  median ${med.toFixed(3)}  max ${mins[mins.length - 1].toFixed(3)}`);
+    console.log(`ArcFace cosine (BEST view): min ${bests[0].toFixed(3)}  median ${med.toFixed(3)}  max ${bests[bests.length - 1].toFixed(3)}`);
     const bands = {};
-    mins.forEach(m => { bands[band(m)] = (bands[band(m)] || 0) + 1; });
+    bests.forEach(m => { bands[band(m)] = (bands[band(m)] || 0) + 1; });
     console.log(`Bands: ${JSON.stringify(bands)}`);
   }
   const withLlm = scored.filter(r => typeof r.llm === 'number');
   if (withLlm.length) {
     const llmAvg = withLlm.reduce((a, r) => a + r.llm, 0) / withLlm.length;
-    const arcAvg = withLlm.reduce((a, r) => a + r.sheet.min, 0) / withLlm.length;
-    console.log(`LLM judge mean ${llmAvg.toFixed(1)}/10  vs  ArcFace mean ${arcAvg.toFixed(3)} cosine`);
-    console.log('Disagreements (LLM >= 8 but ArcFace weak/poor):');
-    const bad = withLlm.filter(r => r.llm >= 8 && r.sheet.min < 0.45);
-    console.log(bad.length ? bad.map(r => `  ${r.name}: llm ${r.llm}/10, arcface ${r.sheet.min.toFixed(3)}`).join('\n') : '  none');
+    const arcAvg = withLlm.reduce((a, r) => a + r.sheet.best, 0) / withLlm.length;
+    console.log(`LLM judge mean ${llmAvg.toFixed(1)}/10  vs  ArcFace mean ${arcAvg.toFixed(3)} cosine (best view)`);
+    console.log('Disagreements (LLM >= 8 but ArcFace weak/poor on its BEST view):');
+    const bad = withLlm.filter(r => r.llm >= 8 && r.sheet.best < 0.45);
+    console.log(bad.length
+      ? bad.map(r => `  ${r.name}${r.isDemo ? ' [demo]' : ''}: llm ${r.llm}/10, arcface ${r.sheet.best.toFixed(3)}`).join('\n')
+      : '  none');
   }
   console.log('─'.repeat(78));
 
@@ -231,11 +263,11 @@ async function comparePageFaces(photoB64, pageB64) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   const rowsHtml = results.map(r => `
     <tr>
-      <td><b>${r.name}</b><br><small>${ch(new Date(r.createdAt))}</small></td>
+      <td><b>${r.name}</b>${r.isDemo ? ' <small>[demo]</small>' : ''}<br><small>${ch(new Date(r.createdAt))}</small></td>
       <td><img src="${r.photoUrl}"></td>
       <td><img src="${r.sheetUrl}" class="sheet"></td>
-      <td class="${r.sheet.min == null ? 'poor' : band(r.sheet.min)}">
-        ${r.sheet.min == null ? 'no face detected' : `min <b>${r.sheet.min.toFixed(3)}</b><br>max ${r.sheet.max.toFixed(3)}<br><small>${r.sheet.detected}/4 cells</small>`}
+      <td class="${r.sheet.best == null ? 'poor' : band(r.sheet.best)}">
+        ${r.sheet.best == null ? 'no face detected' : `best <b>${r.sheet.best.toFixed(3)}</b><br>2nd ${r.sheet.second?.toFixed(3) ?? '—'}<br><small>worst ${r.sheet.worst.toFixed(3)} (profile view)</small>`}
       </td>
       <td>${r.llm == null ? '—' : `${r.llm}/10`}</td>
       <td><small>${r.sheet.cells.map(c => `${c.q}: ${c.sim != null ? c.sim.toFixed(3) : (c.err || '—')}`).join('<br>')}</small></td>
@@ -256,10 +288,13 @@ async function comparePageFaces(photoB64, pageB64) {
 <h1>Avatar likeness audit — ArcFace vs. the LLM judge</h1>
 <div class="note">
  ArcFace cosine is style-invariant and independent of the pipeline's own scoring.
- <b>min</b> is the worst of the four sheet cells — the same statistic the LLM judge
- reports as <code>sourceMatchScore</code>, so the two columns are directly comparable.
+ The four sheet cells are <b>views</b> (front headshot, ¾ headshot, full-body front,
+ full-body profile). ArcFace cannot embed a pure side profile, so that cell lands near
+ 0.03 however good the likeness is — <b>the worst-cell figure is noise here</b>, even
+ though the LLM judge's <code>sourceMatchScore</code> is a min. The reportable number is
+ <b>best</b>, the strongest-matching view, with <b>2nd</b> as the guard against one lucky cell.
  Bands (strong ≥0.60, good ≥0.45, weak ≥0.30, poor) rank characters; they are not a
- same-person verdict, since photo-vs-illustration sits below DeepFace's photo-only threshold.
+ same-person verdict.
  Generated ${ch(new Date())} · db=${DB} · ${results.length} characters.
 </div>
 <table>
