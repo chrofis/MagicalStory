@@ -26,6 +26,10 @@ const https = require('https');
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+// --revalidate-all also re-derives types that are already set. The existing
+// values are not trustworthy: a railway station is typed Castle, a bridge is
+// typed Church, a hotel is typed Tower.
+const revalidateAll = args.includes('--revalidate-all');
 const limitArg = args.find(a => a.startsWith('--limit='));
 const limit = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
 const QIDS_PER_QUERY = 200;
@@ -129,8 +133,8 @@ function sparql(query) {
 }
 
 async function main() {
-  let q = `SELECT id, name, wikidata_qid FROM landmark_index
-           WHERE type IS NULL AND wikidata_qid IS NOT NULL ORDER BY id`;
+  let q = `SELECT id, name, type AS old_type, wikidata_qid FROM landmark_index
+           WHERE wikidata_qid IS NOT NULL ${revalidateAll ? '' : 'AND type IS NULL'} ORDER BY id`;
   if (limit) q += ` LIMIT ${limit}`;
   const { rows } = await pool.query(q);
   console.log(`Untyped rows with a QID: ${rows.length}${dryRun ? '  (DRY RUN — no writes)' : ''}\n`);
@@ -168,6 +172,7 @@ async function main() {
 
   const counts = {};
   const unresolved = [];
+  const changed = [];
   let written = 0;
   for (const [qid, landmarkRows] of byQid) {
     const labels = classLabels.get(qid);
@@ -177,8 +182,11 @@ async function main() {
       type = FALLBACK_TYPE;
     }
     counts[type] = (counts[type] || 0) + landmarkRows.length;
-    if (!dryRun) {
-      for (const r of landmarkRows) {
+    for (const r of landmarkRows) {
+      if (revalidateAll && r.old_type && r.old_type !== type) {
+        changed.push({ name: r.name, from: r.old_type, to: type });
+      }
+      if (!dryRun && r.old_type !== type) {
         await pool.query('UPDATE landmark_index SET type = $1 WHERE id = $2', [type, r.id]);
         written++;
       }
@@ -189,6 +197,12 @@ async function main() {
   Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([t, n]) => console.log(`  ${t.padEnd(16)} ${n}`));
   console.log(`\n  total typed : ${Object.values(counts).reduce((a, b) => a + b, 0)}`);
   console.log(`  no rule matched (got ${FALLBACK_TYPE}): ${unresolved.length}`);
+  if (revalidateAll) {
+    console.log(`  existing types CHANGED: ${changed.length}`);
+    console.log('
+  sample changes:');
+    changed.slice(0, 25).forEach(c => console.log(`    ${String(c.name).slice(0, 34).padEnd(36)} ${c.from} -> ${c.to}`));
+  }
   if (!dryRun) console.log(`  rows written: ${written}`);
   if (unresolved.length) {
     console.log('\n  sample unresolved (name -> wikidata classes):');
