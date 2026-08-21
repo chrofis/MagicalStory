@@ -80,7 +80,7 @@ It must be detailed enough to illustrate without additional context.
 Output all sections in this exact order. Do not skip any.
 
 ---TITLE---
-TITLE: [A creative, specific title in {LANGUAGE}]
+TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHARACTER_NAME}]
 
 ---VISUAL BIBLE---
 ```json

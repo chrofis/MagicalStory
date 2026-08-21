@@ -14801,3 +14801,63 @@ the whole document cannot coexist with per-page atomic saves.
 **Touched files.** `server/lib/testlab.js`, `server/services/database.js`,
 `server/routes/regeneration.js`. Bugs: `lab-unpinned-loads-v0`,
 `cover-save-clobbers-scene-page`.
+
+## 2026-08-21 — The story title must carry the main character's name (all four title paths)
+
+**Context.** Trial feedback from the owner: "der Kindername weg". The name was
+never missing from the story body — the last seven trial stories in prod all
+contain it. It was missing from the TITLE. Three of those seven had no child
+name in the title, including the most recent (child "Liana" → "Das schönste
+Stück"); the others were "Secrets Beneath the Waves" and "Les Dessins Cachés du
+Beau-Rivage". The cause was deliberate: the unified prompts ask for five title
+candidates spread across five angles, of which only angle 1 is
+character-focused, and `outlineParser/unified.js` then picks one of the five by
+stable hash. So roughly one title in five was guaranteed to carry the name and
+the rest only did by accident. The beats text prompt and the trial prompt each
+emit a single title with no name requirement at all.
+
+**Decision.** Every title path now requires the main character's name.
+- Both unified templates: all five candidates must contain at least one of
+  `{MAIN_CHARACTER_NAMES}`. The VARY-ANGLE list is retained but now varies what
+  the name is *paired* with (verb/stake, location, object, emotion, pivotal
+  moment) rather than whether the name appears.
+- `story-text-from-beats.txt` (the live beats pipeline): folded into the
+  existing title rule — story language, contains the main character's name,
+  does not spoil the ending.
+- `story-trial.txt`: the TITLE line now names `{MAIN_CHARACTER_NAME}`.
+
+Output format is unchanged (`TITLE_CANDIDATES: 1..5`), so no parser was touched.
+
+**Rationale.** The variety rule was written to stop the model converging on one
+iconic phrase, and that intent is preserved — but for a personalised book the
+cover is the personalisation, and a parent seeing someone else's title on their
+child's book reads it as the product failing. The owner was shown the
+trade-off (2 of 5 / 3 of 5 / all 5 / trial-only, plus a code-side biased pick)
+and chose all five, accepting the risk that titles become more formulaic. If
+they do, the fix is to relax to 3-of-5, not to revert to the old free-for-all.
+
+**Touched files.** `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/story-trial.txt`.
+
+## 2026-08-21 — Character trait minimums relaxed to 2 strengths / 1 flaw
+
+**Context.** Same trial feedback round: the owner found the character
+questionnaire "z.T. etwas zu übereifrig und heikel was private Informationen
+betrifft", for the child and for family members. The full wizard demanded a
+minimum of 3 strengths and 2 flaws per character, with the counts rendered in
+red until met — and the flaw list includes items like "Lügnerisch", "Faul",
+"Egoistisch", which a parent is being asked to attach to a real child and to
+real relatives.
+
+**Decision.** Minimums drop to 2 strengths and 1 flaw. The Konflikte /
+Herausforderungen section had no minimum and still has none. The trial's own
+trait row was already optional and is unchanged.
+
+**Rationale.** The owner chose the smallest change that reduces the demand
+without removing the trait signal the story generator uses. Dropping the
+minimums to zero was not chosen — some trait input measurably shapes the story.
+
+**Touched files.** `client/src/components/character/CharacterForm.tsx` (the
+`canSaveCharacter` gate at :686 is the only enforcement — there is no
+server-side minimum), `client/src/constants/translations.ts` (four locales).

@@ -337,7 +337,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     applyEdit: 'Apply Edit',
     // Validation messages
     passwordMinChars: 'Minimum 8 characters',
-    selectStrengthsFlaws: 'Please select at least 3 strengths and 2 flaws',
+    selectStrengthsFlaws: 'Please select at least 2 strengths and 1 flaw',
     fillAllFields: 'Please fill in all fields',
     networkError: 'Network error. Please check your connection and try again.',
     operationTimeout: 'The operation timed out. Please try again.',
@@ -511,7 +511,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     applyEdit: 'Änderung anwenden',
     // Validation messages
     passwordMinChars: 'Mindestens 8 Zeichen',
-    selectStrengthsFlaws: 'Bitte mindestens 3 Stärken und 2 Schwächen wählen',
+    selectStrengthsFlaws: 'Bitte mindestens 2 Stärken und 1 Schwäche wählen',
     fillAllFields: 'Bitte alle Felder ausfüllen',
     networkError: 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.',
     operationTimeout: 'Die Anfrage ist abgelaufen. Bitte erneut versuchen.',
@@ -685,7 +685,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     applyEdit: 'Appliquer la Modification',
     // Validation messages
     passwordMinChars: 'Minimum 8 caractères',
-    selectStrengthsFlaws: 'Veuillez sélectionner au moins 3 forces et 2 défauts',
+    selectStrengthsFlaws: 'Veuillez sélectionner au moins 2 forces et 1 défaut',
     fillAllFields: 'Veuillez remplir tous les champs',
     networkError: 'Erreur réseau. Veuillez vérifier votre connexion et réessayer.',
     operationTimeout: "L'opération a expiré. Veuillez réessayer.",
@@ -859,7 +859,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     applyEdit: 'Applica la modifica',
     // Validation messages
     passwordMinChars: 'Minimo 8 caratteri',
-    selectStrengthsFlaws: 'Seleziona almeno 3 punti di forza e 2 punti deboli',
+    selectStrengthsFlaws: 'Seleziona almeno 2 punti di forza e 1 punto debole',
     fillAllFields: 'Compila tutti i campi',
     networkError: 'Errore di rete. Controlla la connessione e riprova.',
     operationTimeout: 'L\'operazione è scaduta. Riprova.',

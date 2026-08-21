@@ -547,21 +547,23 @@ For EACH of the {PAGES} pages:
 ---TITLE---
 Now that you have written and analyzed the full story, propose 5 distinct title candidates. The server picks one at random — your job is to make every option strong enough to ship, with genuinely different angles.
 
+Every candidate contains at least one of these names: {MAIN_CHARACTER_NAMES}.
+
 Each candidate must:
 - Be SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
-- Reference a unique element: a character name, location, object, or pivotal moment from the story
+- Pair the name with a unique element: a location, object, pivotal moment, or stake from the story
 - Create curiosity or intrigue
 - Avoid clichés like "The [Adjective] [Noun]" patterns
 - Work well in {LANGUAGE}
 
-VARY ANGLE — each of the 5 must hit a different facet:
-1. character-focused (a name + a verb or stake)
-2. location/setting-focused
-3. object/artifact-focused
-4. emotion/relationship-focused
-5. pivotal-moment or unexpected-detail focused
+VARY ANGLE — each of the 5 pairs the name with a different facet:
+1. a verb or stake
+2. location/setting
+3. object/artifact
+4. emotion/relationship
+5. pivotal moment or unexpected detail
 
-Do not produce 5 variations of the same iconic phrase. If your first candidate is the most-obvious-line-from-the-source (the iconic object or deed every reader would name first), the other 4 must come from totally different angles — a side character, a quiet moment, a setting nobody else would name.
+Do not produce 5 variations of the same iconic phrase. Vary what the name is paired with, not whether the name appears.
 
 TITLE_CANDIDATES:
 1. [first candidate]

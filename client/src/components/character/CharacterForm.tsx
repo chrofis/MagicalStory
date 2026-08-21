@@ -686,9 +686,9 @@ export function CharacterForm({
   const canSaveCharacter =
     character.name &&
     character.traits?.strengths &&
-    character.traits.strengths.length >= 3 &&
+    character.traits.strengths.length >= 2 &&
     character.traits?.flaws &&
-    character.traits.flaws.length >= 2;
+    character.traits.flaws.length >= 1;
 
   // Get localized traits
   const localizedStrengths = defaultStrengths[language] || defaultStrengths.en;
@@ -888,7 +888,7 @@ export function CharacterForm({
             traits={localizedStrengths}
             selectedTraits={character.traits?.strengths || []}
             onSelect={(traits) => updateTraits('strengths', traits)}
-            minRequired={3}
+            minRequired={2}
             defaultExpanded={true}
           />
 
@@ -897,7 +897,7 @@ export function CharacterForm({
             traits={localizedFlaws}
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
-            minRequired={2}
+            minRequired={1}
             defaultExpanded={true}
           />
 
@@ -1598,7 +1598,7 @@ export function CharacterForm({
             traits={localizedStrengths}
             selectedTraits={character.traits?.strengths || []}
             onSelect={(traits) => updateTraits('strengths', traits)}
-            minRequired={3}
+            minRequired={2}
           />
 
           <TraitSelector
@@ -1606,7 +1606,7 @@ export function CharacterForm({
             traits={localizedFlaws}
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
-            minRequired={2}
+            minRequired={1}
           />
 
           <TraitSelector

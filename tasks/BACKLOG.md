@@ -36,6 +36,13 @@ Last full sweep: **2026-08-20**.
 
 The first two are corroborated by more than one source, which is why they lead.
 
+- [ ] **Trial avatar likeness — owner reported the photo "nicht sehr gelungen / fehlende
+      Ähnlichkeit" vs the original (2026-08-21 trial feedback).** Not yet diagnosed: the
+      owner deleted that trial run, so there is no stored evidence to compare. Next time a
+      likeness complaint lands, capture the account/story ID first, then compare the four
+      stages (face crop → identity sheet → style transfer → page render) to localise where
+      the likeness is lost → `docs/decisions.md` (2026-08-21 title entry, same feedback round)
+
 - [ ] **Per-page art style breaks to photorealism** (showcase p5, −22). Still occurring in
       prod despite `style_repair`; three candidate causes listed in the routing doc
       → `docs/showcase-2026-08-10-findings.md:40`, `docs/image-routing.md:163`
