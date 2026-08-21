@@ -206,13 +206,53 @@ function _colourSeedPoints(rgb, W, H, box, name, yMin) {
       if (ky > y0 && hit[k - W] && !lab[k - W]) { lab[k - W] = n; st.push(k - W); }
       if (ky < y1 - 1 && hit[k + W] && !lab[k + W]) { lab[k + W] = n; st.push(k + W); }
     }
-    if (a >= DOT_MIN_PX) blobs.push({ a, cx: Math.round(sx / a), cy: Math.round(sy / a) });
+    if (a >= DOT_MIN_PX) blobs.push({ a, cx: Math.round(sx / a), cy: Math.round(sy / a), id: n });
   }
   blobs.sort((p, q) => q.a - p.a);
   const bandPx = Math.round(DOT_BAND * (box[3] - box[1]));
-  return blobs
+  const chosen = blobs
     .filter((b, i) => i === 0 || (Math.abs(b.cy - blobs[0].cy) <= bandPx && b.a >= DOT_MIN_FRAC * blobs[0].a))
     .slice(0, DOT_MAX_PER_GARMENT);
+  // THE DOT MUST LAND ON THE COLOUR (owner, 2026-08-21). The centroid of a
+  // non-convex blob falls OUTSIDE it: on p7 of job_1787262655143_s9zb960muni
+  // Levin's red shirt wraps around Kiaan's crossing hand, and the centroid of
+  // that C-shaped blob sat ON THE HAND - a positive "top red" dot on the
+  // neighbour's skin, and SAM obliged by erasing Levin's torso. Replace the
+  // centroid with the blob's interior point (max chamfer distance): the middle
+  // of the largest solid patch of that colour, guaranteed on-blob.
+  for (const b of chosen) {
+    const pt = _blobInteriorPoint(lab, b.id, W, x0, y0, x1, y1);
+    if (pt) { b.cx = pt[0]; b.cy = pt[1]; }
+  }
+  return chosen;
+}
+
+/** Max-chamfer-distance pixel of blob `id` inside the given region - the most
+ *  interior point. Region edges count as boundary so the point stays inside. */
+function _blobInteriorPoint(labArr, id, W, x0, y0, x1, y1) {
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 0 || h <= 0) return null;
+  const d = new Int32Array(w * h);
+  const INF = 1 << 28;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+    d[y * w + x] = labArr[(y + y0) * W + (x + x0)] === id ? INF : 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (!d[i]) continue;
+    let v = d[i];
+    v = Math.min(v, x > 0 ? d[i - 1] + 1 : 1);
+    v = Math.min(v, y > 0 ? d[i - w] + 1 : 1);
+    d[i] = v;
+  }
+  let best = 0, bx = -1, by = -1;
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+    const i = y * w + x; if (!d[i]) continue;
+    let v = d[i];
+    v = Math.min(v, x < w - 1 ? d[i + 1] + 1 : 1);
+    v = Math.min(v, y < h - 1 ? d[i + w] + 1 : 1);
+    d[i] = v;
+    if (v > best) { best = v; bx = x; by = y; }
+  }
+  return best > 0 ? [x0 + bx, y0 + by] : null;
 }
 
 // Local Lab conversion (the garment module's is not exported).
@@ -458,6 +498,11 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   // Order does not matter here: conflicts are settled in step 3, so no figure
   // depends on another having been masked first.
   const raw = new Array(n);
+  // Pass 1 of 3: build every figure's prompt WITHOUT calling SAM, so that
+  // pass 2 can hand each figure the other figures' garment dots as negatives
+  // (owner, 2026-08-21). The old shape computed-and-called per figure, which
+  // made cross-figure garment negatives impossible.
+  const prompts = new Array(n);
   for (let i = 0; i < n; i++) {
     const box = boxesPx[i];
     if (!Array.isArray(box) || box.length !== 4) continue;
@@ -549,6 +594,37 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       }
     }
     if (seeds) log.debug(`[SAM] ${pageLabel}figure ${i}: ${seeds} garment seed point(s)`);
+    prompts[i] = { box, own, points, labels, seeds, seedTrace, samPoints };
+  }
+
+  // Pass 2 of 3: CROSS-FIGURE GARMENT NEGATIVES (owner, 2026-08-21). A dot we
+  // placed on figure j's shirt is ground truth for everyone else: "these
+  // pixels are not yours". Faces already worked this way; garments did not,
+  // and a neighbour's torso inside my box had nothing pushing SAM off it.
+  // Skip a negative that sits within 15px of one of my own positives - that
+  // pair would be contradictory; the shared/ambiguous-region case is what the
+  // interior-point fix above already resolves.
+  for (let i = 0; i < n; i++) {
+    const P = prompts[i];
+    if (!P || !P.own) continue;
+    for (let j = 0; j < n; j++) {
+      if (j === i || !prompts[j]) continue;
+      for (const sp of prompts[j].samPoints) {
+        if (sp.role !== 'garment') continue;
+        const [gx, gy] = sp.at;
+        if (gx < P.box[0] || gx > P.box[2] || gy < P.box[1] || gy > P.box[3]) continue;
+        if (P.samPoints.some(p2 => p2.label === 1 && Math.hypot(p2.at[0] - gx, p2.at[1] - gy) < 15)) continue;
+        P.points.push([gx, gy]); P.labels.push(0);
+        P.samPoints.push({ at: [gx, gy], label: 0, role: 'other-garment', figure: j, colour: sp.colour || null });
+      }
+    }
+  }
+
+  // Pass 3 of 3: the SAM calls, prompts now final.
+  for (let i = 0; i < n; i++) {
+    const P = prompts[i];
+    if (!P) continue;
+    const { box, own, points, labels, seeds, seedTrace, samPoints } = P;
     const m = await _mobilesamMaskFull(imageDataUri, box, W, H,
       points.length ? points : null, points.length ? labels : null);
     if (!m) continue;

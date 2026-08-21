@@ -1501,7 +1501,8 @@ async function createSamInputOverlayImage(imageData, bboxDetection) {
           // glance can never confuse it with a positive.
           svg.push(`<circle cx="${px}" cy="${py}" r="13" fill="none" stroke="#ff3b30" stroke-width="4"/>`);
           svg.push(`<path d="M${px - 8},${py - 8} L${px + 8},${py + 8} M${px + 8},${py - 8} L${px - 8},${py + 8}" stroke="#ff3b30" stroke-width="4"/>`);
-          svg.push(`<text x="${px + 17}" y="${py + 5}" font-family="Arial" font-size="15" font-weight="bold" fill="#ff3b30">not me</text>`);
+          const negLbl = p.role === 'other-garment' ? `not my ${p.colour || 'garment'}` : 'not me';
+          svg.push(`<text x="${px + 17}" y="${py + 5}" font-family="Arial" font-size="15" font-weight="bold" fill="#ff3b30">${escapeXml(negLbl)}</text>`);
         } else {
           const isHead = p.role === 'face' || p.role === 'face-extra';
           const col = isHead ? '#00e05a' : '#00c8ff';

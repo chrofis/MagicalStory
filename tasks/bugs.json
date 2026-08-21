@@ -1,121 +1,130 @@
 {
-  "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
-  "bugs": [
-    {
-      "id": "dog-triggers-gemini-fallback",
-      "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
-      "reportedAt": "2026-08-19",
-      "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
-      "status": "fixed",
-      "task": 19,
-      "fixedIn": "4268015a8",
-      "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
-    },
-    {
-      "id": "fallback-replaces-instead-of-merging",
-      "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
-      "reportedAt": "2026-08-19",
-      "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
-      "status": "fixed",
-      "task": 21,
-      "fixedIn": "4268015a8",
-      "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
-    },
-    {
-      "id": "lab-unpinned-loads-v0",
-      "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
-      "reportedAt": "2026-08-19",
-      "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
-      "status": "fixed",
-      "task": 23,
-      "fixedIn": "4268015a8",
-      "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
-    },
-    {
-      "id": "experiments-route-strips-target-params",
-      "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
-      "reportedAt": "2026-08-19",
-      "source": "exp #9 stored target {storyId,pageNumber} only",
-      "status": "fixed",
-      "task": 23,
-      "fixedIn": "4268015a8",
-      "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
-    },
-    {
-      "id": "garment-seeds-missing-empty-description",
-      "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
-      "reportedAt": "2026-08-19",
-      "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
-      "status": "fixed",
-      "task": 24,
-      "fixedIn": "4268015a8",
-      "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
-    },
-    {
-      "id": "recolour-version-not-redetected",
-      "title": "Recolour version carried a stale, fp-nulled detection with no marker",
-      "reportedAt": "2026-08-19",
-      "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
-      "status": "fixed",
-      "fixedIn": "1dcdb3c09",
-      "task": 23,
-      "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
-    },
-    {
-      "id": "bbox-cache-keys-on-url-text",
-      "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
-      "reportedAt": "2026-08-19",
-      "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
-      "status": "fixed",
-      "fixedIn": "329170a3e",
-      "task": null,
-      "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
-    },
-    {
-      "id": "loadedfrom-null-on-new-code",
-      "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
-      "reportedAt": "2026-08-19",
-      "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
-      "status": "fixed",
-      "fixedIn": "329170a3e",
-      "task": null,
-      "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
-    },
-    {
-      "id": "version-detection-null-after-eval-refactor",
-      "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
-      "reportedAt": "2026-08-20",
-      "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
-      "status": "fixed",
-      "fixedIn": "1770eb63a",
-      "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
-    },
-    {
-      "id": "covers-undressed-call-site-4",
-      "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
-      "reportedAt": "2026-08-20",
-      "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
-      "status": "fixed",
-      "fixedIn": "756b8e692",
-      "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
-    },
-    {
-      "id": "refresh-bbox-strips-dino",
-      "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
-      "reportedAt": "2026-08-21",
-      "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
-      "status": "fixed",
-      "fixedIn": "4b6492a8e",
-      "note": "refine skipped for /dino/ backends; cover saves awaited before response."
-    },
-    {
-      "id": "silent-detection-failures-no-alert",
-      "title": "21 DINO detection failures shipped a degraded story with zero alerting",
-      "reportedAt": "2026-08-21",
-      "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
-      "status": "fixed",
-      "fixedIn": "4b6492a8e",
-      "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
-    }
-  ]
+ "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
+ "bugs": [
+  {
+   "id": "dog-triggers-gemini-fallback",
+   "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
+   "reportedAt": "2026-08-19",
+   "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
+   "status": "fixed",
+   "task": 19,
+   "fixedIn": "4268015a8",
+   "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
+  },
+  {
+   "id": "fallback-replaces-instead-of-merging",
+   "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
+   "reportedAt": "2026-08-19",
+   "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
+   "status": "fixed",
+   "task": 21,
+   "fixedIn": "4268015a8",
+   "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
+  },
+  {
+   "id": "lab-unpinned-loads-v0",
+   "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
+   "reportedAt": "2026-08-19",
+   "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
+   "status": "fixed",
+   "task": 23,
+   "fixedIn": "4268015a8",
+   "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
+  },
+  {
+   "id": "experiments-route-strips-target-params",
+   "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
+   "reportedAt": "2026-08-19",
+   "source": "exp #9 stored target {storyId,pageNumber} only",
+   "status": "fixed",
+   "task": 23,
+   "fixedIn": "4268015a8",
+   "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
+  },
+  {
+   "id": "garment-seeds-missing-empty-description",
+   "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
+   "reportedAt": "2026-08-19",
+   "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
+   "status": "fixed",
+   "task": 24,
+   "fixedIn": "4268015a8",
+   "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
+  },
+  {
+   "id": "recolour-version-not-redetected",
+   "title": "Recolour version carried a stale, fp-nulled detection with no marker",
+   "reportedAt": "2026-08-19",
+   "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
+   "status": "fixed",
+   "fixedIn": "1dcdb3c09",
+   "task": 23,
+   "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
+  },
+  {
+   "id": "bbox-cache-keys-on-url-text",
+   "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
+   "reportedAt": "2026-08-19",
+   "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
+   "status": "fixed",
+   "fixedIn": "329170a3e",
+   "task": null,
+   "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
+  },
+  {
+   "id": "loadedfrom-null-on-new-code",
+   "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
+   "reportedAt": "2026-08-19",
+   "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
+   "status": "fixed",
+   "fixedIn": "329170a3e",
+   "task": null,
+   "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
+  },
+  {
+   "id": "version-detection-null-after-eval-refactor",
+   "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
+   "reportedAt": "2026-08-20",
+   "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
+   "status": "fixed",
+   "fixedIn": "1770eb63a",
+   "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
+  },
+  {
+   "id": "covers-undressed-call-site-4",
+   "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
+   "reportedAt": "2026-08-20",
+   "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
+   "status": "fixed",
+   "fixedIn": "756b8e692",
+   "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
+  },
+  {
+   "id": "refresh-bbox-strips-dino",
+   "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
+   "reportedAt": "2026-08-21",
+   "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
+   "status": "fixed",
+   "fixedIn": "4b6492a8e",
+   "note": "refine skipped for /dino/ backends; cover saves awaited before response."
+  },
+  {
+   "id": "silent-detection-failures-no-alert",
+   "title": "21 DINO detection failures shipped a degraded story with zero alerting",
+   "reportedAt": "2026-08-21",
+   "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
+   "status": "fixed",
+   "fixedIn": "4b6492a8e",
+   "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
+  },
+  {
+   "id": "garment-seed-off-colour-centroid",
+   "title": "Garment seed dot = blob centroid, lands off-colour on non-convex blobs (neighbour hand) and mis-seeds SAM",
+   "reportedAt": "2026-08-21",
+   "source": "owner + job_1787262655143_s9zb960muni p7 (top-red dot on Kiaan hand crossing Levin shirt; also p1 Kiaan, backCover Levin)",
+   "status": "fixed",
+   "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
+   "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
+  }
+ ]
 }
