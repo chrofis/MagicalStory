@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const crypto = require('crypto');
 const { ch } = require('../lib/chTime');
 
 const N = parseInt((process.argv.find(a => a.startsWith('--n=')) || '--n=3').split('=')[1], 10);
@@ -66,6 +67,26 @@ async function cropCell(sheetUrl, quadrant, outFile) {
 
   // The audit already wrote the exact crops it embedded. Showing anything else
   // would be showing something other than what was measured.
+  //
+  // Crop files are keyed by a hash of the avatar URL. Verify that key is really
+  // in the path before rendering: character names are not unique (two "Mami"s),
+  // and when the filenames collided the page showed one child's face next to
+  // another child's sheet.
+  let mismatches = 0;
+  for (const b of buckets) {
+    for (const r of b.rows) {
+      const uid = crypto.createHash('md5').update(r.sheetUrl).digest('hex').slice(0, 8);
+      const cell = (r.sheet.cells || []).find(c => c.q === r.sheet.bestQuadrant);
+      if (!cell?.crop?.includes(uid) || !r.sheet.srcCrop?.includes(uid)) {
+        console.error(`  MISMATCH: ${r.name} — crop does not belong to its sheet (uid ${uid}). Re-run the audit.`);
+        mismatches++;
+      }
+    }
+  }
+  if (mismatches) {
+    console.error(`\n${mismatches} card(s) would show the wrong face. Refusing to write the report.`);
+    process.exit(1);
+  }
   const card = (r) => `
   <div class="card ${band(r.sheet.best)}">
     <div class="pair">

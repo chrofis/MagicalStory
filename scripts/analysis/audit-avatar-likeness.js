@@ -33,6 +33,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 const { ch } = require('../lib/chTime');
 
@@ -110,10 +111,23 @@ async function faceCrop(imageB64, quadrant) {
   return { face: r.face || null, detected: !!r.faceDetected };
 }
 
-/** Embed an ALREADY-CROPPED face. extract_face:false — no re-detection, no fallback. */
+/**
+ * Embed a face crop WITH detect-and-align.
+ *
+ * ArcFace compares ALIGNED faces — it does not merely resize. Skipping
+ * alignment is what produced the false negatives: a loose, tilted source
+ * thumbnail against a tight frontal avatar crop scored 0.027 for a girl whose
+ * avatar is plainly a good likeness; with alignment the same pair scores 0.613,
+ * while a genuine mismatch stays at 0.125. Alignment is what makes the number
+ * mean something.
+ *
+ * faceDetected is returned and checked by the caller — if the detector finds
+ * nothing, that is reported, never silently scored.
+ */
 async function embedFace(faceDataUri) {
-  const r = await py('/face-embedding', { image: faceDataUri, extract_face: false });
-  return Array.isArray(r.embedding) ? r.embedding : null;
+  const r = await py('/face-embedding', { image: faceDataUri, extract_face: true });
+  if (!Array.isArray(r.embedding)) return null;
+  return r.faceDetected === false ? null : r.embedding;
 }
 
 const cosine = (a, b) => {
@@ -226,15 +240,25 @@ async function comparePageFaces(photoB64, pageB64) {
         // "found" a face inside the thumbnail and returned nose-and-mouth with
         // the eyes cut off, scoring her avatar 0.028 when the avatar was fine.
         // Only photos.original (a full photo) needs detection.
-        const usingThumb = !!c.photos?.face;
-        const src = usingThumb ? { face: null, detected: true } : await faceCrop(photoB64);
-        const srcFace = (!usingThumb && src.detected && src.face)
+        // photos.face is ALREADY a tight face crop — the production pipeline's
+        // own, cut when the photo was uploaded. Running detection on it crops a
+        // SECOND time and eats into the face: measured, re-detecting dropped one
+        // character from 0.975 to 0.205 and produced a nose-and-mouth fragment
+        // with the eyes cut off for another. Symmetry of treatment is the wrong
+        // instinct here; symmetry of CONTENT (one tight face each side) is right.
+        // Only photos.original, a full photo, needs detection.
+        const src = c.photos?.face ? { face: null, detected: true } : await faceCrop(photoB64);
+        const srcFace = (!c.photos?.face && src.detected && src.face)
           ? src.face
           : `data:image/jpeg;base64,${photoB64}`;
         const photoEmb = await embedFace(srcFace);
         if (!photoEmb) { console.log('source photo could not be embedded — skipped'); continue; }
 
-        const slug = String(c.name).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+        // Names are NOT unique — two characters called "Mami" overwrote each
+        // other's crop files, so the report showed one child's face beside the
+        // other's sheet. Key the files on the avatar URL, which is unique.
+        const uid = crypto.createHash('md5').update(sheetUrl).digest('hex').slice(0, 8);
+        const slug = `${String(c.name).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${uid}`;
         const srcFile = path.join(CROPS, `${slug}-source.jpg`);
         fs.writeFileSync(srcFile, Buffer.from(srcFace.split(',')[1], 'base64'));
 
