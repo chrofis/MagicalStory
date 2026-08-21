@@ -2255,10 +2255,36 @@ async function getLandmarkPhotoOnDemand(landmark) {
 //   - `score` remains the tie-break, so rows not yet backfilled still order
 //     sensibly among themselves.
 const NON_PLACE_CATEGORIES = "(Gemeinde|Municipalit|Commune|Comune|Bezirk|District|Ort im Kanton|Kreis |Accident|Flugunfall|Battle|Bataille|Schlacht|Gefecht|Unternehmen|Hotelkette)";
-const IS_A_PLACE_SQL = `(CASE WHEN coalesce(type,'x') NOT IN ('City','Village','Station')
-   AND coalesce(array_to_string(categories,' '),'') !~* '${NON_PLACE_CATEGORIES}'
-  THEN 1 ELSE 0 END)`;
-const LANDMARK_RANK_SQL = `${IS_A_PLACE_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
+
+// A landmark has to be somewhere a scene can actually be SET — a building, a
+// square, a bridge you can stand in front of. Three classes, best first:
+//
+//   2  a built landmark (or an untyped row that is not one of the below)
+//   1  a sprawling natural feature — a river, lake or mountain range. Its
+//      stored coordinate is one arbitrary point on something tens of km long,
+//      so proximity means little: a 160km river was ranked as Baden's top
+//      landmark because one point of it passes 5.9km away, while Baden's own
+//      river is a different one entirely.
+//   0  not a place at all — a municipality, district, battle, air accident or
+//      company. These carry many Wikipedia language editions and would
+//      otherwise dominate on fame alone.
+//
+// This is the knowledge the legacy `boost_amount` held (Bridge 99, Church 75,
+// Tower 62 vs River 2, Mountain 13) and it was right to hold it. What it got
+// wrong was rows with NO type: Grossmünster, Fraumünster and Zytglogge earn no
+// boost at all and so scored 0, which is why the most famous landmarks in each
+// city were never offered. Untyped rows now sit in class 2 by default and are
+// ranked on fame like any other landmark.
+const LANDMARK_CLASS_SQL = `(CASE
+  WHEN coalesce(type,'x') IN ('City','Village','Station')
+    OR coalesce(array_to_string(categories,' '),'') ~* '${NON_PLACE_CATEGORIES}' THEN 0
+  WHEN coalesce(type,'x') IN ('River','Lake','Mountain','Forest','Valley','Glacier','Island','Nature reserve') THEN 1
+  ELSE 2 END)`;
+
+// Fame (Wikipedia language editions, migration 025) ranks WITHIN a class.
+// `score` stays as the tie-break so rows not yet backfilled still order
+// sensibly among themselves.
+const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
 
 // Fame alone is not enough on the proximity path: a nearby town sits inside the
 // same radius as a major city, and the city's landmarks are far more famous. A
