@@ -14536,3 +14536,53 @@ detection failures shipped a degraded book with no trace anywhere a human looks.
 
 **Touched:** `server/routes/regeneration.js`, `server/services/database.js`
 **Status:** ✅ active
+
+---
+
+## 2026-08-21 — Every cover gets its own real landmark; and the height rule reads the declared order
+
+**Context:** Production story `job_1787262655143_s9zb960muni` (Zurich, 4 boys aged
+5/3/3/3). Two defects reported by the owner.
+
+**A — the title page and the initial page were the same picture.** Both cover
+hints carried `LOC004` (Bahnhofplatz Zürich) while `LOC005` (Lindenhof), a second
+real landmark, sat unused. The guard added on 2026-08-16 enforces ONE backdrop
+per cover; it never enforced that the three covers differ, so each independently
+took its own `locIds[0]`. The initial page also had zero eval findings and scored
+70 — a near-duplicate cover is invisible to the evaluator.
+
+**Decision (owner):** every cover takes a DIFFERENT REAL landmark. Split by who
+can judge what:
+- **Prompt** (`story-bible-from-beats.txt`) — the writer picks each backdrop for
+  story fit, which is the only thing that can judge fit, and is told the three
+  covers take three different real landmarks, adding real landmarks to the Visual
+  Bible until there are three.
+- **Code backstop** (`outlineParser/unified.js`) — repairs a collision only: the
+  writer's choice wins when it is real and unused, otherwise the cover takes an
+  unused real landmark, then any unused LOC. An invented backdrop now logs a
+  warning naming how many real landmarks the Visual Bible declared. Code cannot
+  invent a LOC, so the prompt has to supply three; the warning makes a shortfall
+  visible instead of silent.
+
+Cross-story variance was already handled — `storyJobPipeline.js:6148` passes
+`shuffle: true` over the candidate list precisely so the model stops reaching for
+the same top-scored entries. No new randomness was needed. Supply is not a
+constraint either: even the thinnest indexed city pulls 73-383 landmarks within
+the 20km radius.
+
+**B — the height rule now reads the declared order.** D-29 originally sourced
+"who is taller" from EXPECTED FIGURE PROPORTIONS, which carries head-to-body
+ratios (1:4, 1:5), not an order. The order is in the USER_PROMPT's HEIGHT ORDER
+block. D-29 now reads that block first, with the ratio as the secondary signal
+for a lone oversized figure, and explicitly skips characters the order calls
+"similar in height" so a gentle declared gradient rendered flat does not deduct.
+Measured on the reported story: zero height or size findings existed anywhere in
+it, despite both blocks being in the evaluator's inputs.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `prompts/image-evaluation.txt`,
+`server/lib/outlineParser/unified.js`, `tests/manual/coverBackdrops.test.js` (new)
+**Status:** 🟡 conditional — code + tests done, prompt side unvalidated
+
+**Related:** the fame-ranking defect found while scoping this (landmark_index
+`score` is anti-correlated with fame; Grossmünster ranks 599/600 and is never
+offered) is tracked separately and NOT addressed here.

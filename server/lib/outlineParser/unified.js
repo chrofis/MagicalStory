@@ -367,20 +367,41 @@ class UnifiedStoryParser {
     const locs = (vb?.locations || []);
     const realLandmarkIds = locs.filter(l => l.isRealLandmark).map(l => l.id.toUpperCase());
     const isLoc = (id) => /^LOC\d+/i.test(id);
+    // EVERY cover gets a real landmark, and no two covers share one (owner,
+    // 2026-08-21). The previous rule enforced one backdrop PER cover but never
+    // that the three differ, so two covers could pick the same LOC while a
+    // second real landmark sat unused — the title page and the initial page
+    // then rendered as near-duplicates. This stays a BACKSTOP: the writer picks
+    // each backdrop for story fit (only it can judge fit), and the prompt asks
+    // for three different real landmarks. Code only repairs a collision.
+    const baseId = (id) => String(id || '').split('.')[0].toUpperCase();
+    const allLocIds = locs.map(l => l.id.toUpperCase());
+    const used = new Set();
     for (const key of ['titlePage', 'initialPage', 'backCover']) {
       const cover = this._cache.coverHints[key];
       if (!cover) continue;
       const locIds = cover.objects.filter(isLoc);
       const nonLoc = cover.objects.filter(id => !isLoc(id));
-      let backdrop = locIds[0] || null;
-      if (key === 'titlePage' && realLandmarkIds.length > 0 && !realLandmarkIds.includes((backdrop || '').split('.')[0])) {
-        const swapped = locIds.find(id => realLandmarkIds.includes(id.split('.')[0])) || realLandmarkIds[0];
-        log.info(`🏛️ [UNIFIED-PARSER] Title page backdrop ${backdrop || '(none)'} is not a real landmark — using ${swapped}`);
-        backdrop = swapped;
+      // The writer's own choice wins whenever it is real and still free.
+      let backdrop = locIds.find(id => realLandmarkIds.includes(baseId(id)) && !used.has(baseId(id)))
+                  || locIds.find(id => !used.has(baseId(id)))
+                  || null;
+      if (!backdrop || !realLandmarkIds.includes(baseId(backdrop))) {
+        const freeReal = realLandmarkIds.find(id => !used.has(id));
+        if (freeReal) {
+          log.info(`🏛️ [UNIFIED-PARSER] ${key} backdrop ${backdrop || '(none)'} is not an unused real landmark — using ${freeReal}`);
+          backdrop = freeReal;
+        } else if (!backdrop) {
+          backdrop = allLocIds.find(id => !used.has(id)) || locIds[0] || null;
+        }
+      }
+      if (backdrop && !realLandmarkIds.includes(baseId(backdrop))) {
+        log.warn(`⚠️ [UNIFIED-PARSER] ${key} falls back to invented backdrop ${backdrop} — the Visual Bible declares only ${realLandmarkIds.length} real landmark(s) for 3 covers`);
       }
       if (locIds.length > 1) {
         log.info(`🏛️ [UNIFIED-PARSER] ${key} listed ${locIds.length} backdrops (${locIds.join(', ')}) — keeping ${backdrop}`);
       }
+      if (backdrop) used.add(baseId(backdrop));
       cover.objects = [backdrop, ...nonLoc].filter(Boolean);
     }
 

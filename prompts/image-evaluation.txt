@@ -167,7 +167,7 @@ Never fire D-11 to D-13 for a figure cropped by the frame edge, occluded by scen
 
 **D-27 `style_consistency`** — decided at **N-01 (b)**, not here. Do not re-evaluate the medium at this point in the list; if the page is in the wrong medium you have already reported it.
 
-**D-29 `scale` → MAJOR.** Two figures sharing a ground plane whose `height_fraction` contradicts EXPECTED FIGURE PROPORTIONS — a shorter character rendered as tall as or taller than a taller one, or a figure at least half again the height its head-to-body ratio allows. Skip when either figure has `same_ground_plane: false`, is seated or crouching, or when the block is empty.
+**D-29 `scale` → MAJOR.** A character the USER_PROMPT's height order declares taller rendered no taller than one it declares shorter, or a figure at least half again the height its EXPECTED FIGURE PROPORTIONS ratio allows. Compare `height_fraction` only between figures with `same_ground_plane: true`; skip seated, crouching, occluded and background figures, characters the order calls similar in height, and pages where neither block is supplied.
 
 **D-30 `composite_seam` → CRITICAL.** `rendering.composite_seam` is true: a straight or jagged boundary crossing the picture, or a cut-out edge around a figure, where the background, lighting or brushwork does not continue across it. Judge the boundary, not the medium — a whole page in the wrong medium is N-01. `fix`: "Repaint the page as one continuous illustration."
 
