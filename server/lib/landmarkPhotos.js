@@ -2260,6 +2260,19 @@ const IS_A_PLACE_SQL = `(CASE WHEN coalesce(type,'x') NOT IN ('City','Village','
   THEN 1 ELSE 0 END)`;
 const LANDMARK_RANK_SQL = `${IS_A_PLACE_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
 
+// Fame alone is not enough on the proximity path: a nearby town sits inside the
+// same radius as a major city, and the city's landmarks are far more famous. A
+// Baden story was offered Zürich Hauptbahnhof, Grossmünster, Kunsthaus and
+// Fraumünster — all ~21km away — ahead of Baden's own Holzbrücke and Stadtturm.
+// Rank inside distance BANDS first, so a story gets its own town's landmarks and
+// reaches for the big city's only once the local ones run out.
+const DISTANCE_TIER_SQL = `(CASE
+  WHEN (6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
+        cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) <= 8 THEN 0
+  WHEN (6371 * acos(cos(radians($1)) * cos(radians(latitude)) *
+        cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) <= 16 THEN 1
+  ELSE 2 END) ASC`;
+
 async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30) {
   const pool = getPool();
   if (!pool) {
@@ -2283,9 +2296,17 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
       FROM landmark_index
       WHERE latitude BETWEEN $1 - $3 AND $1 + $3
         AND longitude BETWEEN $2 - $4 AND $2 + $4
-      ORDER BY ${LANDMARK_RANK_SQL}, distance_km ASC
+        -- The lat/lon box is a SQUARE around a circular radius, so its corners
+        -- reach ~41% further than radiusKm. Without this the 20km search pulled
+        -- in landmarks 20.7km away. Cut the corners off.
+        AND (6371 * acos(
+              cos(radians($1)) * cos(radians(latitude)) *
+              cos(radians(longitude) - radians($2)) +
+              sin(radians($1)) * sin(radians(latitude))
+            )) <= $6
+      ORDER BY ${DISTANCE_TIER_SQL}, ${LANDMARK_RANK_SQL}, distance_km ASC
       LIMIT $5
-    `, [latitude, longitude, latDelta, lonDelta, limit]);
+    `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm]);
 
     log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
     return result.rows;
