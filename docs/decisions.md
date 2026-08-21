@@ -703,6 +703,39 @@ duplicated) and the `3:4` literals (legitimate preset tables).
 `prompts/image-vision-inventory.txt`, `prompts/image-prompt-compliance.txt`
 **Status:** ✅ active.
 
+### Char-repair follow-ups: face-detail gate, aspect-snapped insert crops, garment_colour split
+Three fixes from the char-repair investigation (owner: "list the follow ups and fix them").
+
+**1. Face-detail gate** (`server/lib/samBlend.js`, in `samUnionBlend` beside the
+IoU gate). The IoU gate cannot see the measured failure mode: a repaint that
+copies a close-up reference cell keeps the figure's extent (IoU passes, and the
+silhouette HEIGHT is byte-identical — measured across all 11 stored runs) but
+renders the head at reference scale. Candidate/original face-region Laplacian
+stdev separated every run with no overlap: 0.92–1.01x on clean repairs,
+1.9–2.8x on broken ones. Gate default `faceDetailRatioMax = 1.6`, throws as
+`blend_gate` (retryable, so the spine redraws), skips when no face box (back
+view) or region <24px. Validated 4/4 against stored good/bad repairs.
+
+**2. Insert-path crops snap to a supported Grok aspect** (`testlab.js`
+qwen/grok insert, body mode). The call sent a fixed '3:4' whatever the crop's
+shape; a 360x934 (0.385) figure crop came back re-framed at 3:4 and every run
+died on the IoU gate (exp #781: 51/34/5%). The crop now EXPANDS to
+`closestGrokAspect` before any coordinate derives from it — same
+by-construction rule as the 1:1 face crop (360x934 → 9:20).
+
+**3. `garment_colour` split out of `clothing`** in all three evaluator prompts
+(image-evaluation D-05, image-prompt-compliance, image-semantic). D-05 fused
+"wrong MAIN colour" and "wrong TYPE" into one type, so the repair router could
+not separate them without text-matching (banned): a colour-only complaint
+("purple shorts instead of navy") forced the full-figure char-fix — the most
+destructive tool, 27 of 49 recent char-fixes scored worse than their input, and
+84% were clothing-triggered. `garment_colour` already existed as a zero-point
+type with a deterministic fixer (`garment_colour_fix`; evalBuckets owner
+'entity'). Now: `clothing` = wrong TYPE (char-fix legitimate); `garment_colour`
+= right type, wrong main colour (mechanical recolour, never a figure redo).
+Extends the settled zero-point design, does not reverse it.
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

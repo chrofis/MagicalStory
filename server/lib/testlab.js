@@ -4832,6 +4832,33 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     crop.y = Math.max(0, Math.min(H - 64, crop.y));
     crop.w = Math.min(W - crop.x, crop.w);
     crop.h = Math.min(H - crop.y, crop.h);
+    // Body mode: EXPAND the crop to the nearest supported Grok aspect BEFORE
+    // any coordinate derives from it — same by-construction rule as the 1:1
+    // face crop above. The call below otherwise sends a fixed '3:4', and Grok
+    // coerces the output to it: a tall figure crop (e.g. 0.385) came back
+    // re-framed at 3:4, the figure moved, and every run died on the IoU gate
+    // (exp #781: 51% / 34% / 5%). Widening (or heightening) toward the preset
+    // keeps the original pixels — more scene context, no reshape.
+    {
+      const { closestGrokAspect } = require('./grokAspect');
+      const target = closestGrokAspect(crop.w, crop.h);
+      const [aw, ah] = target.split(':').map(Number);
+      const targetRatio = aw / ah;
+      const ratio = crop.w / crop.h;
+      if (Math.abs(ratio - targetRatio) > 0.01) {
+        if (ratio < targetRatio) {
+          const wantW = Math.min(W, Math.round(crop.h * targetRatio));
+          crop.x = Math.max(0, Math.min(W - wantW, Math.round(crop.x - (wantW - crop.w) / 2)));
+          crop.w = wantW;
+        } else {
+          const wantH = Math.min(H, Math.round(crop.w / targetRatio));
+          crop.y = Math.max(0, Math.min(H - wantH, Math.round(crop.y - (wantH - crop.h) / 2)));
+          crop.h = wantH;
+        }
+      }
+      params._grokAspect = target;
+      log.debug(`[TESTLAB] body crop snapped to ${target}: ${crop.w}x${crop.h} at (${crop.x},${crop.y})`);
+    }
   }
 
   const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer(); // PNG: pristine original crop (model input + colour reference)
