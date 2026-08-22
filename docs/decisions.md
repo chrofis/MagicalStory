@@ -15160,3 +15160,47 @@ capability only. Page-level "which face is wrong" (character consistency) was
 tested and does NOT work as configured: ~60% of page faces would not embed and
 attribution margins fell as low as 0.002, using photorealistic references
 against stylised page art. Styled-avatar references are the fairer retest.
+
+## 2026-08-22 — borderCrop finds borders again (robust reference + cliff)
+
+**Context:** swept over 150 full-size production pages, `stripUniformBorder()`
+found **0** borders while **4** genuine ones were present — including
+`job_1787262655143` p8, which shipped to a customer with a cream margin, a red
+keyline and two boxed reference miniatures pasted in.
+
+**Two independent causes, both from identifying a border by COUNTING MATCHING
+PIXELS against one global reference colour:**
+
+1. The reference was the average of the four CORNERS. A painted border's tone
+   drifts across the page — `pg71z58ba9` p12 is `[250,247,238]` top-left against
+   `[236,232,221]` bottom-right — so one colour cannot describe it and the middle
+   of each edge fell outside tolerance. **Raising the tolerance did not fix it:**
+   measured, `tol 30` and `tol 40` both still found only 1 of the 4.
+2. A line had to be ≥95% frame-colour. Anything TOUCHING an edge stops the scan
+   dead: p8's miniatures cover ~15% of the right column, so that side measured
+   4px of border against 40px on the other three — a lopsided crop.
+
+**Decision:** per-side reference, taken as the MEDIAN over the outermost 3 lines
+(a median is unmoved by an inset covering a minority of an edge), and the border
+ends where the match rate COLLAPSES (`keepFrac 0.55`) rather than where it dips
+below a purity bar. Tolerance stays at its original tight 20 — the fix is
+structural, so nothing is loosened and the risk of cropping real art does not
+rise.
+
+**Measured on the same 150 pages:** 4 found (0 before), 0 false positives. A
+12-case regression covers it: p8 43/43/41/42 even, p12 19/22/23/20, `pv76p0rokg`
+p6 and p9 (both previously invisible), and 8 negatives still refusing — the
+one-sided blue slab (`not-four-sided`), a >12% letterbox band (`side-capped`,
+the guard that protects real skies), and six ordinary full-bleed pages.
+
+**~2.7% of production pages carry a strippable border.** Cropping is far cheaper
+than the regenerate the alternative would cost.
+
+**Not fixed by this:** p8 keeps its boxed miniatures — they sit INSIDE the crop
+line, so the page is improved, not saved. It still needs the redo that the
+2026-08-21 catastrophic change now forces. A one-sided panel (p4's calm-zone
+slab) is correctly out of scope and is handled by the prompt fix plus
+`composite_seam`.
+
+**Touched:** `server/lib/borderCrop.js`
+**Status:** ✅ active
