@@ -37,6 +37,29 @@ const ARCFACE_MIN = Number(process.env.ARCFACE_MIN_SCORE || 0.45);
 // sheet whose head cells scored 0.79 and 0.70).
 const HEAD_QUADRANTS = ['top-left', 'top-right'];
 
+/**
+ * ArcFace calls are SERIALISED across the whole process.
+ *
+ * Measured on staging: the three clothing categories are evaluated in parallel,
+ * and only one of three came back with a score — standard got 0.5905 while
+ * winter returned null for both cells and summer bailed before cells at all.
+ * Two causes, both fixed by a queue: TensorFlow is not thread-safe, and the
+ * first call pays a ~15s model load that the concurrent callers ran straight
+ * into (warmArcFace is fire-and-forget and cannot be waited on).
+ *
+ * Serialising costs nothing that matters — each embed is ~2s and the avatar
+ * generation it rides along with takes minutes — and it turns a 1-in-3 gate
+ * into a 3-in-3 one.
+ */
+let arcfaceQueue = Promise.resolve();
+function serialise(fn) {
+  const run = arcfaceQueue.then(fn, fn);
+  // Keep the chain alive even when a link rejects, or one failure would wedge
+  // every later call behind it.
+  arcfaceQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
 async function analyzerPost(endpoint, body, timeoutMs = 60000) {
   const res = await fetch(`${BASE()}${endpoint}`, {
     method: 'POST',
@@ -86,7 +109,11 @@ const cosine = (a, b) => {
  * is null and the caller must treat that as "no opinion" — never as a failure.
  * Avatar creation must not break because a quality probe is unavailable.
  */
-async function scoreAvatarLikeness(photo, sheetImage) {
+function scoreAvatarLikeness(photo, sheetImage) {
+  return serialise(() => scoreAvatarLikenessInner(photo, sheetImage));
+}
+
+async function scoreAvatarLikenessInner(photo, sheetImage) {
   try {
     const photoEmb = await embed(photo);
     if (!photoEmb) return { score: null, cells: {}, unavailable: 'no face in source photo' };

@@ -56,28 +56,32 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   if (!photos.length) throw new Error(`no photos in ${dir}`);
   console.log(`Using ${photos.length} ${FAMILY} photo(s): ${photos.join(', ')}\n`);
 
+  // Reuse EXISTING characters rather than creating any: POST /api/characters
+  // upserts the whole per-user array and returns {message, count}, so there is
+  // no single-character create to get an id from. The avatar endpoint only needs
+  // a valid characterId plus a referencePhoto, which we supply from the demo
+  // photos — so an existing row is paired with a showcase face, matched on
+  // gender so the prompt is not fighting the photo.
+  //
+  // NOTE: this OVERWRITES those characters' avatars on the smoke account. That
+  // is the account's purpose, but it is why this is not pointed at real users.
   const { characters } = await api(TOKEN, 'GET', '/api/characters');
   const results = [];
 
+  const pairs = [];
   for (const file of photos) {
-    const name = path.basename(file, path.extname(file));
+    const female = /lily|rachel|margaret/i.test(file);
+    const pick = characters.find(c => (c.gender === (female ? 'female' : 'male')) && !pairs.some(p => p.character.id === c.id));
+    if (!pick) { console.log(`  no free ${female ? 'female' : 'male'} character for ${file} — skipping`); continue; }
+    pairs.push({ file, character: pick });
+  }
+  if (!pairs.length) throw new Error('no characters available to test with');
+
+  for (const { file, character } of pairs) {
+    const name = character.name;
     const b64 = fs.readFileSync(path.join(dir, file)).toString('base64');
     const photo = `data:image/jpeg;base64,${b64}`;
-
-    // Reuse an existing character row if one matches, so the smoke test does
-    // not litter the admin account with duplicates on every run.
-    let character = characters.find(c => c.name === name);
-    if (!character) {
-      const created = await api(TOKEN, 'POST', '/api/characters', {
-        name, age: '7', gender: 'female',
-        photos: { face: photo, original: photo },
-        traits: { strengths: ['Fröhlich', 'Mutig'], flaws: ['Ungeduldig'] },
-      });
-      character = created.character || created;
-      console.log(`  created character ${name} (${character.id})`);
-    } else {
-      console.log(`  reusing character ${name} (${character.id})`);
-    }
+    console.log(`  ${name} (${character.id})  <-  ${file}`);
 
     const started = Date.now();
     const job = await api(TOKEN, 'POST', '/api/generate-clothing-avatars?async=true', {
