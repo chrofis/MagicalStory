@@ -4963,7 +4963,8 @@ ${landmarkList}
 When you use a landmark from the list (even if you rename it in your story):
 - Set "isRealLandmark": true
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
-${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story` : ''}
+${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
+- The DESCRIPTION is reference for you, not wording for the page. Never carry an abbreviation, acronym or technical term from it into the story — name the thing the way a child would say it` : ''}
 
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {

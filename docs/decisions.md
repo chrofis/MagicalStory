@@ -14900,3 +14900,46 @@ minimums to zero was not chosen — some trait input measurably shapes the story
 **Touched files.** `client/src/components/character/CharacterForm.tsx` (the
 `canSaveCharacter` gate at :686 is the only enforcement — there is no
 server-side minimum), `client/src/constants/translations.ts` (four locales).
+
+---
+
+## 2026-08-22 — Landmark descriptions carry no abbreviations, and the writer may not copy wording from them
+
+**Context:** A production story opened with *"Die zwei Brüder laufen zusammen zur
+SZU-Station"* — an unexplained acronym on page 1 of a picture book. The owner
+asked where it came from; my first answer, that the writer supplied it from its
+own knowledge of Zurich, was WRONG and I had not checked before saying it.
+
+It came from the landmark database. `buildAvailableLandmarksSection` hands the
+writer each landmark's `wikipedia_extract` verbatim, labelled `DESCRIPTION:`,
+under the instruction "incorporate it authentically into your story". The story
+used `Bahnhofplatz (Zürich)`, whose extract read:
+
+> "…darunter ein Teil der Einkaufspassage Shopville und des Tiefbahnhofs der
+> Sihltal-Zürich-Uetliberg-Bahn (SZU)."
+
+So the acronym was an INPUT, not an invention. These extracts are written for
+adult encyclopedia readers, and the prompt actively asks for their content to be
+worked into a children's book — SZU was simply the instance that got noticed.
+
+**Decision:** fix the source and guard the output.
+
+- **Source.** `scripts/admin/strip-landmark-abbreviations.js` removes the
+  parenthetical acronym while keeping the full name
+  ("Sihltal-Zürich-Uetliberg-Bahn (SZU)" → "Sihltal-Zürich-Uetliberg-Bahn"), and
+  expands the bare transit acronyms that have no parenthetical to strip (SBB,
+  ZVV, SZU, VBZ, BLS, RhB). Roman numerals are left alone — "(II)" belongs to a
+  name. 267 extracts cleaned; zero bare transit acronyms remain.
+  `wikipedia_extract` is derived data, re-fetchable from Wikipedia, so editing in
+  place loses nothing irreproducible.
+- **Output.** The landmark block now states that the DESCRIPTION is reference for
+  the writer and not wording for the page, and that no abbreviation, acronym or
+  technical term may be carried from it into the story.
+
+The prompt rule is the durable half: the database cleanup handles the acronyms
+that exist today, but every extract is adult encyclopedia register and the long
+tail of jargon cannot be enumerated.
+
+**Touched:** `scripts/admin/strip-landmark-abbreviations.js` (new),
+`server/lib/promptBuilders.js` (buildAvailableLandmarksSection)
+**Status:** ✅ active
