@@ -676,7 +676,7 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
 //   repaired_figure_blurred  the redraw lost its edge detail
 // NOT retried: invalid bbox, missing avatar, SAM unavailable — a second call
 // fails identically and costs another $0.02.
-const RETRYABLE_REJECTIONS = new Set(['blend_gate', 'style_drift', 'repaired_figure_blurred']);
+const RETRYABLE_REJECTIONS = new Set(['blend_gate', 'style_drift', 'repaired_figure_blurred', 'repair_unnatural']);
 const REPAIR_ATTEMPTS = 3;
 
 /**
@@ -695,17 +695,88 @@ const REPAIR_ATTEMPTS = 3;
  * and style gates were not counted at all and manual repairs counted nothing,
  * so nobody could say how often users hit it.
  */
+// ---------------------------------------------------------------------------
+// Repair-acceptance figure-integrity check (owner recipe, 2026-08-22).
+//
+// After a successful blend, ONE cheap vision call rates the repaired figure:
+// describe their face, describe the OTHER figures' faces, then two yes/no
+// observations (MATCH: same medium/detail as the other faces? EDGES: hard
+// cut-out boundary around the head?) mapped mechanically onto the owner's
+// enum (good / slightly off / clearly off / strongly distorted). clearly off
+// or worse rejects the repaint as 'repair_unnatural' (retryable → redraw;
+// exhausted → the original is kept).
+//
+// Why this exact shape — every part was measured on a 21-image corpus and
+// cross-checked on a second story's production repairs:
+//   - absolute judgment ("does she look natural?") flagged half the CLEAN
+//     pages (identical untouched figures rated differently run to run);
+//   - the enum alone under-graded: the judge SAW "uncanny, processed" faces
+//     and still said "slightly off" (4/9);
+//   - comparing the face to the PAGE false-fired: this house's styles
+//     legitimately render faces finer than backgrounds (5 false positives);
+//   - comparing to the OTHER FIGURES' FACES self-calibrates per style, and
+//     deriving the verdict mechanically from the two booleans spares the
+//     model the big severity claim it demonstrably ducks: 8/9 caught,
+//     0/12 false positives, Flash.
+// Skipped when the figure is alone on the page (no other faces to compare),
+// when no clothing descriptor exists to identify the figure, or on any API
+// failure — the check may only ever reject, never block a repair by erroring.
+async function checkRepairNaturalness(imageData, opts = {}) {
+  try {
+    const others = Array.isArray(opts.protectedBodies) ? opts.protectedBodies.length : 0;
+    if (others < 1) return { skipped: 'solo figure — no other faces to compare' };
+    const clothing = String(opts.clothingDescription || '').trim();
+    if (!clothing) return { skipped: 'no clothing descriptor to identify the figure' };
+    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+    if (!PROMPT_TEMPLATES.repairNaturalness) return { skipped: 'template not loaded' };
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return { skipped: 'no GEMINI_API_KEY' };
+    const desc = `the figure wearing ${clothing.split(/[.;]/)[0].slice(0, 140)}`;
+    const prompt = fillTemplate(PROMPT_TEMPLATES.repairNaturalness, { CHARACTER_DESC: desc });
+    const r2Lib = require('./r2');
+    const base64 = r2Lib.stripDataUriPrefix(imageData);
+    const body = {
+      contents: [{ parts: [{ inline_data: { mime_type: 'image/jpeg', data: base64 } }, { text: prompt }] }],
+      generationConfig: { temperature: 0 },
+    };
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
+    if (!res.ok) return { skipped: `HTTP ${res.status}` };
+    const j = await res.json();
+    const t = j?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+    if (!t) return { skipped: 'empty response' };
+    // The verdict derives from the two OBSERVATIONS, not the model's own
+    // RATING line — the mechanical mapping is the deterministic part, and
+    // RATING formatting drifts (a cross-story test lost one to markdown bold).
+    const match = (t.match(/MATCH:?\**\s*(yes|no)/i) || [])[1]?.toLowerCase() || null;
+    const edges = (t.match(/EDGES:?\**\s*(yes|no)/i) || [])[1]?.toLowerCase() || null;
+    if (!match || !edges) return { skipped: 'observations unparseable', raw: t.slice(0, 200) };
+    const bad = (match === 'no' || edges === 'yes');
+    return { checked: true, bad, match, edges, raw: t.slice(0, 300) };
+  } catch (err) {
+    return { skipped: err.message };
+  }
+}
+
 async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   const metrics = () => require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.());
   let last = null;
   for (let attempt = 1; attempt <= REPAIR_ATTEMPTS; attempt++) {
     last = await _repairCharacterFaceOnce(sceneInput, avatarInput, opts);
     if (last?.imageData) {
+      const nat = await checkRepairNaturalness(last.imageData, opts);
+      if (nat.checked && nat.bad) {
+        metrics().count('repair_reject_repair_unnatural');
+        log.info(`🧿 [FACE REPAIR] ${opts.charName || 'character'}: figure-integrity check rejected the repaint (match=${nat.match} edges=${nat.edges}) on attempt ${attempt}/${REPAIR_ATTEMPTS}`);
+        last = { ...last, imageData: null, rejectedReason: 'repair_unnatural', gateMessage: `figure-integrity: face does not match the page's other faces (match=${nat.match}, edges=${nat.edges})`, naturalness: nat };
+        continue;
+      }
+      if (nat.skipped) log.debug(`🧿 [FACE REPAIR] naturalness check skipped: ${nat.skipped}`);
       if (attempt > 1) {
         metrics().count('char_repair_retry_saved');
         log.info(`✅ [FACE REPAIR] ${opts.charName || 'character'}: accepted on attempt ${attempt}/${REPAIR_ATTEMPTS}`);
       }
-      return { ...last, attempts: attempt };
+      return { ...last, attempts: attempt, ...(nat.checked ? { naturalness: nat } : {}) };
     }
     const reason = last?.rejectedReason || null;
     if (reason) metrics().count(`repair_reject_${reason}`);
@@ -1148,6 +1219,7 @@ function legacyFlagsToAxes({ useBlended = null, useCutout = null, useFullScene =
 
 module.exports = {
   repairCharacterFace,
+  checkRepairNaturalness,
   // Deterministic pieces exposed for unit tests.
   resolveRegion,
   repairDescriptor,

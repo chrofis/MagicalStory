@@ -131,6 +131,7 @@ Sizes measured 2026-08-09.
 |---|---|---|
 | character-repair-cutout.txt | images.js `repairCharacterMismatchWithGrok` | Grok cutout repair |
 | character-repair-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok blended repair |
+| `repair-naturalness.txt` | faceRepair.js checkRepairNaturalness | post-repair figure-integrity check: MATCH/EDGES observations -> enum; clearly off rejects the repaint |
 | character-repair-body-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok body-blended repair |
 | character-repair-inpaint.txt | images.js `repairCharacterMismatchWithGrok` | Char repair via inpaint |
 | character-repair-grok-fullscene.txt | images.js `repairCharacterMismatchWithGrok` (LOCAL_PROMPTS) | Full-scene Grok repair |

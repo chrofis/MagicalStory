@@ -1,0 +1,10 @@
+In this children's book illustration, examine {CHARACTER_DESC}. Answer in exactly this order:
+1. THEIR FACE: how are their face and hair rendered?
+2. OTHER FACES: how are the OTHER figures' faces rendered on this page?
+3. MATCH: is their face rendered in the same medium and detail level as the OTHER figures' faces? yes/no
+4. EDGES: is there a hard or straight edge around their head or hair where the background stops abruptly — as if they were cut out and pasted? (a figure simply standing in front of scenery is NOT this) yes/no
+5. RATING — decided ONLY by 3 and 4:
+- MATCH yes and EDGES no -> good (or slightly off for small pose awkwardness like a stiff hand)
+- MATCH no OR EDGES yes -> clearly off
+- both wrong, or parts from different figures -> strongly distorted
+Final line: RATING: <good|slightly off|clearly off|strongly distorted>

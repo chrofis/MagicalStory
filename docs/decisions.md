@@ -765,6 +765,33 @@ broken repairs 4/5 → 0/6 measured).
 same-day suppression-theory entry).
 **Status:** ✅ floor active; detection claim retracted.
 
+### Repair-acceptance figure-integrity check (owner recipe)
+**Context:** the pasted-figure repair failure is prevented at the source
+(pose-matched reference cells) but nothing VERIFIED a repaint. Every detection
+attempt had failed: four pixel metrics, D-30 (0/18 on a 21-image corpus), and
+absolute naturalness judgments that rated pixel-identical untouched figures
+differently run to run.
+**Decision:** after each successful char-repair blend, ONE Flash vision call
+(`prompts/repair-naturalness.txt`) rates the repaired figure via two forced
+observations — MATCH (face rendered in the same medium/detail as the OTHER
+figures' faces) and EDGES (hard cut-out boundary around the head) — mapped
+mechanically onto the owner's enum (good / slightly off / clearly off /
+strongly distorted). clearly off or worse → `repair_unnatural`, a retryable
+rejection: the spine redraws, and on exhaustion the original is kept. The
+verdict derives from the two booleans, never the model's own RATING line.
+**Why each part (all measured, 21-image corpus + cross-story spot-check):**
+absolute judgment flagged half the clean pages; the enum alone under-graded
+(the judge said "uncanny, processed" and still rated slightly-off, 4/9);
+comparing to the PAGE false-fired because house styles render faces finer than
+backgrounds; comparing to the other figures' faces + mechanical mapping: 8/9
+caught, 0/12 false positives on Flash — Pro not needed. Cross-story: caught a
+real bad production repair (round scored 50), passed the shipped good one.
+**Skips, fail-open:** solo-figure pages (no other faces), missing clothing
+descriptor, API errors — the check may only reject, never error a repair away.
+**Touched:** `prompts/repair-naturalness.txt`, `server/services/prompts.js`,
+`server/lib/faceRepair.js` (checkRepairNaturalness + RETRYABLE_REJECTIONS)
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

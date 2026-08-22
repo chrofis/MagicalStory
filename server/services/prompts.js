@@ -102,6 +102,9 @@ async function loadPromptTemplates() {
     ['imageInspection', 'image-inspection.txt'],
     ['inpainting', 'inpainting.txt'],
     ['characterRepairBlended', 'character-repair-blended.txt'],
+    // Post-repair figure-integrity check (repair-acceptance): MATCH/EDGES
+    // observations -> enum rating; clearly off or worse rejects the repaint.
+    ['repairNaturalness', 'repair-naturalness.txt'],
     ['characterRepairBodyBlended', 'character-repair-body-blended.txt'],
     ['characterRepairCutout', 'character-repair-cutout.txt'],
     ['characterRepairInpaint', 'character-repair-inpaint.txt'],
