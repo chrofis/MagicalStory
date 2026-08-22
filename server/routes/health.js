@@ -29,8 +29,15 @@ router.get('/health', (req, res) => {
 // stay unauthenticated, which is what makes it actually get used.
 router.get('/health/config', (req, res) => {
   const { runtimeSnapshot } = require('../config/runtime');
+  const { ARCFACE_MIN } = require('../lib/faceIdentity');
   res.json({
     ...runtimeSnapshot(),
+    // The ArcFace avatar gate FAILS OPEN by design: if the Python service or the
+    // weights are missing, avatars still generate and the second opinion simply
+    // does nothing. That is the right behaviour and the wrong thing to have to
+    // discover by generating a paid avatar and finding no score. Reporting the
+    // threshold here makes "is the gate deployed at all" a free GET.
+    arcfaceGate: ARCFACE_MIN,
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || '(unset)',
   });
 });
