@@ -2512,6 +2512,26 @@ async function getAllIndexedLandmarks(limit = 100) {
  * @param {Object} landmark - Landmark data
  * @returns {Promise<boolean>} - Success status
  */
+// Wikipedia writes for adults; a landmark's extract is handed to the story
+// writer as DESCRIPTION and can reach a page a child reads — a production story
+// opened with "zur SZU-Station" because Bahnhofplatz's extract ends
+// "…Sihltal-Zürich-Uetliberg-Bahn (SZU)". Strip the parenthetical acronym on the
+// way IN, keeping the full name, so a newly discovered landmark cannot
+// reintroduce what the one-off cleanup removed. Roman numerals belong to names
+// and stay. This is containment, not a cure: the long tail of encyclopedia
+// jargon (UNESCO, canton codes, company forms) cannot be enumerated, which is
+// why the prompt also forbids copying wording out of a DESCRIPTION.
+const _ROMAN_NUMERAL = /^[IVXLCDM]+$/;
+function stripLandmarkAbbreviations(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/\s*\(([A-ZÄÖÜ][A-ZÄÖÜ0-9.\-]{1,7})\)/g,
+      (m, abbr) => (_ROMAN_NUMERAL.test(abbr.replace(/[.\-]/g, '')) ? m : ''))
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+}
+
 async function saveLandmarkToIndex(landmark) {
   const pool = getPool();
   if (!pool) return false;
@@ -2606,7 +2626,7 @@ async function saveLandmarkToIndex(landmark) {
       normalize(landmark.attribution6 || landmark.photo_attribution_6),
       normalize(landmark.photoDescription6 || landmark.photo_description_6),
       normalizePhotoKind(landmark.photoType6 || landmark.photo_type_6),
-      normalize(landmark.wikipediaExtract || landmark.wikipedia_extract),
+      normalize(stripLandmarkAbbreviations(landmark.wikipediaExtract || landmark.wikipedia_extract)),
       landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
       landmark.score || 0
     ]);
@@ -3384,6 +3404,7 @@ async function resolveAvailableLandmarks(location, opts = {}) {
 }
 
 module.exports = {
+  stripLandmarkAbbreviations,
   fetchLandmarkPhoto,
   resolveAvailableLandmarks,
   availableLandmarkCache,
