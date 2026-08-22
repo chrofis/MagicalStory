@@ -2142,6 +2142,11 @@ def warmup_endpoint():
         want_dino = bool(body['dino'])
     else:
         want_dino = os.environ.get('FIGURE_DETECTION_BACKEND', 'grounding-dino') == 'grounding-dino'
+    # ArcFace is OFF unless asked for: it is only needed when an avatar is about
+    # to be created (roughly weekly), and TensorFlow's footprint should never be
+    # paid by a page view, a login, or a story run that creates no avatar.
+    # Callers that know an avatar is coming send {"arcface": true}.
+    want_arcface = bool(body.get('arcface', False))
 
     def _warm():
         t0 = time.time()
@@ -2158,6 +2163,15 @@ def warmup_endpoint():
                 get_groundingdino()
             except Exception as e:
                 print(f"[WARMUP] groundingdino failed: {e}")
+        if want_arcface:
+            # Only when the caller says an avatar is coming. TensorFlow costs
+            # several hundred MB that no other endpoint needs, and a page view
+            # or a story run must not pay for it.
+            try:
+                from deepface import DeepFace
+                DeepFace.build_model('ArcFace')
+            except Exception as e:
+                print(f"[WARMUP] arcface failed: {e}")
         print(f"[WARMUP] done in {time.time() - t0:.1f}s — rss {_rss_mb()} MB")
 
     _warmup_thread = threading.Thread(target=_warm, daemon=True)
@@ -2198,6 +2212,30 @@ def release_memory_endpoint():
                 _rembg_session = None
                 rembg_remove = None
             unloaded.append('rembg')
+        # ArcFace: drop DeepFace's cached model objects (the cache is a module
+        # global created lazily inside build_model, so it may not exist yet).
+        #
+        # MEASURED, so nobody has to guess: baseline 17MB -> 346MB on `import
+        # deepface` (that is TensorFlow, before any model) -> 510MB once ArcFace
+        # is built. Clearing the cache returns ~135MB of weights and leaves
+        # ~358MB of TF runtime resident. Python cannot un-import a module and TF
+        # keeps its own allocator arenas, so malloc_trim cannot hand that back.
+        #
+        # The ONLY way to return the TF runtime is to exit the process:
+        # ?recycle=true here, or the idle recycler. Avatars are created rarely
+        # (roughly weekly), so the caller that creates one should follow it with
+        # POST /release-memory?recycle=true rather than rely on RECYCLE_RSS_MB —
+        # a 510MB ArcFace footprint on a small baseline can sit UNDER the 700MB
+        # recycle threshold and never trigger it, holding TF for days.
+        try:
+            import sys as _sys
+            if 'deepface' in _sys.modules:
+                from deepface.modules import modeling as _dfm
+                if getattr(_dfm, 'cached_models', None):
+                    _dfm.cached_models.clear()
+                    unloaded.append('arcface-weights')
+        except Exception as e:
+            print(f"[RELEASE-MEMORY] arcface unload skipped: {e}")
     _release_memory()
     after = _rss_mb()
     freed = None if (before is None or after is None) else round(before - after, 1)
