@@ -2135,9 +2135,13 @@ def detect_figures_text_endpoint():
                     out, inputs["input_ids"], threshold=box_threshold,
                     text_threshold=text_threshold, target_sizes=[pil.size[::-1]])[0]
             except TypeError:
+                # transformers 4.44-era API: the kwarg is box_threshold, not
+                # threshold (renamed in a later release). Both branches passed
+                # threshold= before 2026-08-22, so on the pinned 4.44.2 image
+                # every call 500d AFTER the model finally loaded.
                 res = processor.post_process_grounded_object_detection(
-                    out, threshold=box_threshold, text_threshold=text_threshold,
-                    target_sizes=[pil.size[::-1]])[0]
+                    out, inputs["input_ids"], box_threshold=box_threshold,
+                    text_threshold=text_threshold, target_sizes=[pil.size[::-1]])[0]
             boxes = res["boxes"].cpu().numpy() if len(res["boxes"]) else np.zeros((0, 4))
             scores = res["scores"].cpu().numpy() if len(res["scores"]) else np.zeros((0,))
             cand = []

@@ -15419,3 +15419,13 @@ is required but found 2.1.2" → every model class raised "PyTorch not found".
 Fixed by pinning `transformers>=4.44,<5`. The typing_extensions layer reorder
 stays as hardening; the repr+traceback logging is what made this findable in
 one build instead of four.
+
+**Attempt-3 addendum (same bug):** with transformers pinned to 4.44.2 the model
+finally loads — and then every call 500d on
+`post_process_grounded_object_detection(threshold=...)`: BOTH branches of the
+signature-compat try/except passed `threshold=`, a kwarg from a later
+transformers release; 4.44's API is `box_threshold` (+ positional input_ids).
+The except branch now uses the 4.44-era signature. The first-import
+`ExportOptions` transient (one failed import racing the model load, next
+attempt clean) is noted but not patched — the loader retries naturally on the
+next request.
