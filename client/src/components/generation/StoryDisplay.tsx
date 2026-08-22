@@ -2616,6 +2616,14 @@ export function StoryDisplay({
             // Full class strings, not composed — Tailwind only ships classes it
             // can find literally in the source.
             const TONES = {
+              emerald: {
+                box: 'bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4',
+                head: 'cursor-pointer text-lg font-bold text-emerald-800 hover:text-emerald-900 flex items-center gap-2 flex-wrap',
+                meta: 'text-xs font-normal text-emerald-600',
+                card: 'bg-white border border-emerald-200 rounded-lg p-3',
+                label: 'text-xs font-bold text-emerald-800 mb-1',
+                sub: 'cursor-pointer text-xs font-bold text-emerald-700 hover:text-emerald-900',
+              },
               sky: {
                 box: 'bg-sky-50 border-2 border-sky-300 rounded-xl p-4',
                 head: 'cursor-pointer text-lg font-bold text-sky-800 hover:text-sky-900 flex items-center gap-2 flex-wrap',
@@ -2806,40 +2814,46 @@ export function StoryDisplay({
 
             return (
               <>
-                {(arcReviewReport || (beatsReviewReport as any)?.arc) && (
-                  <details key="arc-review" className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/30">
-                    <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
-                      {language === 'de' ? 'Story-Arc (Entwurf → geprüft)' : language === 'fr' ? "Arc de l'histoire (brouillon → validé)" : 'Story arc (draft → approved)'}
-                      {arcReviewReport?.model ? ` · ${arcReviewReport.planModel || ''} → ${arcReviewReport.model}${arcReviewReport.changed ? ' · rewritten' : ' · unchanged'}` : ''}
-                    </summary>
-                    <div className="space-y-3 px-3 pb-3 text-xs">
+                {(arcReviewReport || (beatsReviewReport as any)?.arc) && (() => {
+                  const c = TONES.emerald;
+                  return (
+                    <details key="arc-review" className={c.box}>
+                      <summary className={c.head}>
+                        <FileText size={20} />
+                        {language === 'de' ? 'Story-Arc' : language === 'fr' ? "Arc de l'histoire" : 'Story arc'}
+                        <span className={c.meta}>
+                          [{arcReviewReport?.planModel || '—'} → {arcReviewReport?.model || '—'}
+                          {arcReviewReport ? ` · ${arcReviewReport.changed ? (language === 'de' ? 'umgeschrieben' : 'rewritten') : (language === 'de' ? 'unverändert' : 'unchanged')}` : ''}
+                          {arcReviewReport?.durationMs != null && ` · ${(arcReviewReport.durationMs / 1000).toFixed(0)}s`}]
+                        </span>
+                      </summary>
                       {(beatsReviewReport as any)?.arc && (
-                        <div>
-                          <div className="mb-1 font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Geprüfter Arc' : 'Approved arc'}</div>
-                          <pre className="whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{(beatsReviewReport as any).arc}</pre>
+                        <div className={`mt-3 ${c.card}`}>
+                          <div className={c.label}>{language === 'de' ? 'Geprüfter Arc — die ganze Geschichte, ohne Seiten' : 'Approved arc — the whole story, no pages'}</div>
+                          <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{(beatsReviewReport as any).arc}</pre>
                         </div>
                       )}
                       {(beatsReviewReport as any)?.pagePlan && (
-                        <details>
-                          <summary className="cursor-pointer font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Seitenplan' : 'Page plan'}</summary>
-                          <pre className="mt-1 whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{(beatsReviewReport as any).pagePlan}</pre>
+                        <details className={`mt-3 ${c.card}`}>
+                          <summary className={c.sub}>{language === 'de' ? 'Seitenplan — erst hier bekommt die Geschichte Seiten' : 'Page plan — where the story gets its pages'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{(beatsReviewReport as any).pagePlan}</pre>
                         </details>
                       )}
                       {arcReviewReport?.drafted && (
-                        <details>
-                          <summary className="cursor-pointer font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Erster Entwurf' : 'First draft'}</summary>
-                          <pre className="mt-1 whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{arcReviewReport.drafted}</pre>
+                        <details className={`mt-3 ${c.card}`}>
+                          <summary className={c.sub}>{language === 'de' ? 'Erster Entwurf (vor dem Review)' : 'First draft (before review)'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{arcReviewReport.drafted}</pre>
                         </details>
                       )}
                       {arcReviewReport?.analysis && (
-                        <details>
-                          <summary className="cursor-pointer font-semibold text-emerald-700 dark:text-emerald-300">{language === 'de' ? 'Analyse des Reviewers (mit Fix-Ledger)' : 'Reviewer analysis (with fix ledger)'}</summary>
-                          <pre className="mt-1 whitespace-pre-wrap rounded bg-white/70 p-2 dark:bg-black/30">{arcReviewReport.analysis}</pre>
+                        <details className={`mt-3 ${c.card}`}>
+                          <summary className={c.sub}>{language === 'de' ? 'Analyse des Reviewers (mit Fix-Ledger)' : 'Reviewer analysis (with fix ledger)'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{arcReviewReport.analysis}</pre>
                         </details>
                       )}
-                    </div>
-                  </details>
-                )}
+                    </details>
+                  );
+                })()}
                 {renderDiffPanel(
                   beatsReviewReport,
                   'beats-review',
