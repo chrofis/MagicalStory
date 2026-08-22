@@ -47,6 +47,7 @@ const arg = (name, dflt) => {
 const LIMIT = parseInt(arg('limit', '15'), 10);
 const WITH_PAGES = args.includes('--pages');
 const INCLUDE_DEMO = args.includes('--include-demo');
+const ONNX = args.includes('--onnx');
 const DB = arg('db', 'prod');
 const OUT = arg('out', path.join(__dirname, 'test-output', 'avatar-likeness-audit.html'));
 const CROPS = path.join(path.dirname(OUT), 'likeness-crops');
@@ -125,7 +126,13 @@ async function faceCrop(imageB64, quadrant) {
  * nothing, that is reported, never silently scored.
  */
 async function embedFace(faceDataUri) {
-  const r = await py('/face-embedding', { image: faceDataUri, extract_face: true });
+  // --onnx swaps the DeepFace/TensorFlow backend for onnxruntime. Same crop,
+  // same alignment, same call shape — only the embedder differs, so the two
+  // distributions are directly comparable. The weights are NOT the same
+  // checkpoint, so cosine values shift and the threshold must be recalibrated
+  // against this backend rather than carried over.
+  const endpoint = ONNX ? '/face-embedding-onnx' : '/face-embedding';
+  const r = await py(endpoint, { image: faceDataUri, extract_face: true });
   if (!Array.isArray(r.embedding)) return null;
   return r.faceDetected === false ? null : r.embedding;
 }

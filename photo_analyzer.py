@@ -3475,6 +3475,191 @@ def get_face_embedding():
         }), 500
 
 
+# ── ArcFace via onnxruntime ────────────────────────────────────────────────
+# The DeepFace path needs TensorFlow, which cannot ship here: TF>=2.16 requires
+# protobuf>=5.28 while the pinned mediapipe==0.10.9 requires protobuf<4, so
+# adding it would break face detection in production. onnxruntime is already a
+# dependency, so the same ArcFace maths runs with no framework and no conflict.
+# Weights: buffalo_l recognition (w600k_r50), ~174MB, path via ARCFACE_ONNX_MODEL.
+_arcface_onnx_session = None
+_arcface_onnx_failed = False
+
+def get_arcface_onnx_session():
+    """Lazy-load the ONNX ArcFace session. Returns None if unavailable."""
+    global _arcface_onnx_session, _arcface_onnx_failed
+    if _arcface_onnx_session is not None or _arcface_onnx_failed:
+        return _arcface_onnx_session
+    try:
+        import onnxruntime as ort
+        model_path = os.environ.get('ARCFACE_ONNX_MODEL',
+                                    os.path.join(os.path.dirname(__file__), 'arcface_w600k_r50.onnx'))
+        if not os.path.exists(model_path):
+            print(f"[ARCFACE-ONNX] weights not found at {model_path}")
+            _arcface_onnx_failed = True
+            return None
+        _arcface_onnx_session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        print(f"[ARCFACE-ONNX] loaded {os.path.basename(model_path)}")
+        return _arcface_onnx_session
+    except Exception as e:
+        print(f"[ARCFACE-ONNX] load failed: {e}")
+        _arcface_onnx_failed = True
+        return None
+
+
+# ArcFace's canonical 5-point template for a 112x112 crop (insightface).
+# Order: left eye, right eye, nose tip, left mouth corner, right mouth corner.
+ARCFACE_TEMPLATE_5PT = np.array([
+    [38.2946, 51.6963],
+    [73.5318, 51.5014],
+    [56.0252, 71.7366],
+    [41.5493, 92.3655],
+    [70.7299, 92.2041],
+], dtype=np.float32)
+
+# Face Mesh indices for those same five points.
+_MESH_5PT = {'left_eye': 33, 'right_eye': 263, 'nose': 1, 'mouth_left': 61, 'mouth_right': 291}
+_face_mesh = None
+
+def get_face_mesh():
+    """Lazy Face Mesh — needed for the 5 landmarks ArcFace aligns on."""
+    global _face_mesh
+    if _face_mesh is None and MEDIAPIPE_AVAILABLE:
+        try:
+            _face_mesh = mp.solutions.face_mesh.FaceMesh(
+                static_image_mode=True, max_num_faces=1, refine_landmarks=False,
+                min_detection_confidence=0.3)
+        except Exception as e:
+            print(f"[ARCFACE-ONNX] face mesh unavailable: {e}")
+    return _face_mesh
+
+
+def align_face_arcface(image_bgr):
+    """
+    Warp a face to ArcFace's canonical 112x112 using a 5-point similarity
+    transform. Returns None when the landmarks cannot be found, so the caller
+    can fall back explicitly rather than silently embedding a misaligned face.
+
+    This step is not optional: ArcFace compares ALIGNED faces. Feeding it a
+    plain resized bounding box scrambles the ranking — measured, an unaligned
+    ONNX path correlated with the aligned DeepFace path at only 0.258 Spearman,
+    scoring clean frontal portraits (0.789 aligned) as low as 0.240.
+    """
+    mesh = get_face_mesh()
+    if mesh is None:
+        return None
+    h, w = image_bgr.shape[:2]
+    res = mesh.process(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+    if not res.multi_face_landmarks:
+        return None
+    lm = res.multi_face_landmarks[0].landmark
+    try:
+        src = np.array([[lm[_MESH_5PT['left_eye']].x * w,   lm[_MESH_5PT['left_eye']].y * h],
+                        [lm[_MESH_5PT['right_eye']].x * w,  lm[_MESH_5PT['right_eye']].y * h],
+                        [lm[_MESH_5PT['nose']].x * w,       lm[_MESH_5PT['nose']].y * h],
+                        [lm[_MESH_5PT['mouth_left']].x * w, lm[_MESH_5PT['mouth_left']].y * h],
+                        [lm[_MESH_5PT['mouth_right']].x * w, lm[_MESH_5PT['mouth_right']].y * h]],
+                       dtype=np.float32)
+    except (IndexError, AttributeError):
+        return None
+    M, _ = cv2.estimateAffinePartial2D(src, ARCFACE_TEMPLATE_5PT, method=cv2.LMEDS)
+    if M is None:
+        return None
+    return cv2.warpAffine(image_bgr, M, (112, 112), borderValue=0.0)
+
+
+def arcface_onnx_embedding(face_bgr, aligned=False):
+    """
+    512-D embedding for a face (BGR numpy array).
+    Preprocessing is the insightface contract: RGB, 112x112, (x-127.5)/127.5.
+    Returns a normalised vector, or None when the model is unavailable.
+    """
+    sess = get_arcface_onnx_session()
+    if sess is None:
+        return None
+    img = face_bgr if aligned else cv2.resize(face_bgr, (112, 112))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
+    img = (img - 127.5) / 127.5
+    blob = np.transpose(img, (2, 0, 1))[np.newaxis, ...]
+    out = sess.run(None, {sess.get_inputs()[0].name: blob})[0][0]
+    norm = np.linalg.norm(out)
+    return (out / norm) if norm > 0 else out
+
+
+@app.route('/face-embedding-onnx', methods=['POST'])
+def face_embedding_onnx():
+    """
+    ArcFace embedding via onnxruntime — the deployable twin of /face-embedding.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "quadrant": "top-left" | null,   # Optional: crop to a 2x2 cell first
+        "extract_face": true             # Optional: detect+crop the face first
+    }
+
+    Returns: { success, embedding: [...512], faceDetected: bool }
+
+    faceDetected is reported honestly: when detection is requested and finds
+    nothing, the whole frame is NOT embedded as a silent fallback — callers
+    need to be able to tell "no face here" from "a face that scored low".
+    """
+    try:
+        data = request.get_json() or {}
+        if 'image' not in data:
+            return jsonify({"success": False, "error": "Missing 'image'"}), 400
+
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        nparr = np.frombuffer(base64.b64decode(image_data), np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        quadrant = data.get('quadrant')
+        if quadrant:
+            h, w = image.shape[:2]
+            mid_h, mid_w = h // 2, w // 2
+            qmap = {'top-left': (0, mid_h, 0, mid_w), 'top-right': (0, mid_h, mid_w, w),
+                    'bottom-left': (mid_h, h, 0, mid_w), 'bottom-right': (mid_h, h, mid_w, w)}
+            if quadrant in qmap:
+                y1, y2, x1, x2 = qmap[quadrant]
+                image = image[y1:y2, x1:x2]
+
+        face_detected = False
+        if data.get('extract_face', True):
+            box = detect_face_mediapipe(image)
+            if box:
+                face_detected = True
+                h, w = image.shape[:2]
+                pad = 0.15
+                x, y = box['x'] / 100, box['y'] / 100
+                fw, fh = box['width'] / 100, box['height'] / 100
+                y1 = int(max(0, y - fh * pad) * h)
+                x1 = int(max(0, x - fw * pad) * w)
+                y2 = int(min(1, y + fh * (1 + pad)) * h)
+                x2 = int(min(1, x + fw * (1 + pad)) * w)
+                if y2 > y1 and x2 > x1:
+                    image = image[y1:y2, x1:x2]
+            else:
+                return jsonify({"success": True, "embedding": None, "faceDetected": False})
+
+        # Align to ArcFace's canonical 112x112 before embedding. Reported back
+        # as `aligned` so a caller can tell a properly-aligned score from a
+        # fallback one instead of treating them as the same measurement.
+        warped = align_face_arcface(image)
+        emb = arcface_onnx_embedding(warped if warped is not None else image,
+                                     aligned=warped is not None)
+        if emb is None:
+            return jsonify({"success": False, "error": "ArcFace ONNX model unavailable"}), 503
+
+        return jsonify({"success": True, "embedding": emb.tolist(),
+                        "dimensions": int(emb.shape[0]), "faceDetected": face_detected,
+                        "aligned": warped is not None})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/compare-identity', methods=['POST'])
 def compare_identity():
     """

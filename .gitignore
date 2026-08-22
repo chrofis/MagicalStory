@@ -150,6 +150,8 @@ drafts/
 
 # ML model weights — never commit (auto-downloaded by ultralytics: yolo*-pose.pt, mobile_sam.pt, FastSAM-*.pt)
 *.pt
+# ArcFace ONNX recognition weights (~174MB, fetched at build/run time via ARCFACE_ONNX_MODEL)
+*.onnx
 
 # The clear-bug registry is TRACKED — the pre-push gate reads it on every clone
 !tasks/bugs.json
