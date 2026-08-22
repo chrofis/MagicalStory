@@ -76,6 +76,22 @@ RUN python3 -c "from transformers import AutoProcessor, AutoModelForZeroShotObje
     AutoModelForZeroShotObjectDetection.from_pretrained('IDEA-Research/grounding-dino-base')" \
     || echo "WARN: GroundingDINO pre-fetch failed — will download lazily at runtime if used"
 
+# deepface's import chain needs typing_extensions>=4.10 (TypeIs) while
+# tensorflow 2.13 declares <4.6, so pip refuses to resolve both from one
+# requirements file. TF runs fine against the newer one — install it separately,
+# after requirements.txt, exactly as the torch CPU build is sequenced above.
+RUN pip3 install --no-cache-dir --break-system-packages "typing_extensions>=4.12"
+
+# ArcFace recognition weights (~137MB) baked in so the first avatar check does
+# not stall on a download. DeepFace looks in $DEEPFACE_HOME/.deepface/weights.
+# NON-FATAL, same reasoning as GroundingDINO above: likeness scoring is a
+# quality gate, not a rendering dependency, so a flaky fetch must not break the
+# build — evaluate_avatar_likeness falls back to a lazy download on first use.
+ENV DEEPFACE_HOME=/app
+RUN python3 -c "from deepface import DeepFace; \
+    DeepFace.build_model('ArcFace')" \
+    || echo "WARN: ArcFace pre-fetch failed — will download lazily on first use"
+
 # Copy client package files and install dependencies
 COPY client/package*.json ./client/
 RUN cd client && npm install

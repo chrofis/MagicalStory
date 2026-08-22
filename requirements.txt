@@ -15,3 +15,28 @@ ultralytics>=8.3
 # GroundingDINO text->box figure detection (/detect-figures-text endpoint).
 # Same torch-CPU requirement. Weights are pre-downloaded in the Dockerfile.
 transformers>=4.44
+
+# ── ArcFace face-identity scoring (/face-embedding) ────────────────────────
+# An objective, local, zero-API-cost second opinion on avatar likeness. The
+# Gemini judge scores its own output and sits at 7-9/10 across the whole quality
+# range, so it cannot separate "barely recognisable" from "near-identical"; this
+# catches what it misses (measured: a teenager rendered as a ~30-year-old man,
+# passed by the judge at 7/10, scores 0.089 here — worst of 102).
+#
+# THE VERSIONS BELOW ARE A NARROW CORRIDOR — DO NOT BUMP ONE ALONE.
+#   mediapipe 0.10.9  needs protobuf <4      (and 0.10.10+ drops mp.solutions,
+#                                             which silently disables MediaPipe
+#                                             and degrades every face detection
+#                                             to a Haar cascade — no error)
+#   tensorflow 2.13   needs protobuf >=3.20.3,<5   -> 3.20.3 satisfies both
+#   tensorflow >=2.16 needs protobuf >=5.28        -> INCOMPATIBLE with mediapipe
+#   deepface's import chain needs typing_extensions >=4.10 (TypeIs), which is
+#   newer than TF 2.13's declared ceiling of <4.6. It works in practice, but the
+#   resolver refuses to install both from one file (ResolutionImpossible), so the
+#   Dockerfile upgrades typing_extensions in a SEPARATE step after this file —
+#   same sequencing trick it already uses for the torch CPU build. Adding
+#   `typing_extensions>=4.12` here instead will break the image build.
+# tensorflow-cpu, not tensorflow: no GPU on Railway, and it is ~200MB smaller.
+tensorflow-cpu==2.13.1
+protobuf==3.20.3
+deepface==0.0.97
