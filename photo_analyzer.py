@@ -358,6 +358,60 @@ def _recycle_watchdog():
 threading.Thread(target=_recycle_watchdog, daemon=True).start()
 
 
+# ── ArcFace idle recycler ──────────────────────────────────────────────────
+# TensorFlow cannot be unloaded in-process: measured, `import deepface` alone
+# costs ~346MB and clearing DeepFace's model cache returns only the ~135MB of
+# weights, leaving ~358MB of TF runtime that malloc_trim cannot hand back.
+# Exiting the process is the only way to return it.
+#
+# The general recycler above will NOT reliably do that here, because it requires
+# RSS > RECYCLE_RSS_MB (700MB). An ArcFace footprint on a small baseline can sit
+# just under that and never trigger, holding ~$1/week of resident memory for a
+# capability used roughly once a week. So ArcFace gets its own reaper that keys
+# off "was it loaded and has it gone quiet", not off total RSS.
+#
+# Same safety conditions as the general recycler: nothing in flight, no warm
+# hold. start.sh brings the process straight back and every model reloads lazily.
+_arcface_last_used = 0.0
+ARCFACE_IDLE_RECYCLE_S = int(os.environ.get('ARCFACE_IDLE_RECYCLE_S', '600'))
+
+
+def _note_arcface_used():
+    global _arcface_last_used
+    _arcface_last_used = time.time()
+
+
+def _arcface_idle_recycler():
+    while True:
+        time.sleep(30)
+        try:
+            if not RECYCLE_ENABLED or not _arcface_last_used:
+                continue
+            idle_arcface = time.time() - _arcface_last_used
+            if idle_arcface < ARCFACE_IDLE_RECYCLE_S:
+                continue
+            with _request_lock:
+                inflight = _inflight_requests
+                idle_for = time.time() - _last_request_ts
+                held = time.time() < _recycle_hold_until
+            # Do not exit mid-story: a warm hold means a user is active and the
+            # next call would pay a DINO/SAM reload we just avoided.
+            if inflight > 0 or held or idle_for < RECYCLE_IDLE_S:
+                continue
+            print(
+                f"[ARCFACE-RECYCLE] ArcFace idle {int(idle_arcface)}s, service idle "
+                f"{int(idle_for)}s, 0 in flight, rss {_rss_mb()} MB — exiting so the OS "
+                f"reclaims TensorFlow. Supervisor restarts (~10s, models reload lazily)."
+            )
+            sys.stdout.flush()
+            os._exit(0)
+        except Exception as e:
+            print(f"[ARCFACE-RECYCLE] watchdog error: {e}")
+
+
+threading.Thread(target=_arcface_idle_recycler, daemon=True).start()
+
+
 def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2):
     """
     Detect faces in illustrated/anime images using lbpcascade_animeface.
@@ -3267,6 +3321,11 @@ def get_arcface_embedding(image_path_or_array, assume_face_crop=False):
     """
     global _deepface_loaded
 
+    # Stamp every use so the ArcFace reaper knows when this went quiet. Stamped
+    # on entry, not on success: a failed call still imported TensorFlow, and it
+    # is the import that costs the memory we are trying to give back.
+    _note_arcface_used()
+
     try:
         from deepface import DeepFace
 
@@ -3611,6 +3670,9 @@ def arcface_onnx_embedding(face_bgr, aligned=False):
     Preprocessing is the insightface contract: RGB, 112x112, (x-127.5)/127.5.
     Returns a normalised vector, or None when the model is unavailable.
     """
+    # The ONNX path holds far less (no framework), but it still holds a session
+    # and weights, and the same "idle means give it back" logic applies.
+    _note_arcface_used()
     sess = get_arcface_onnx_session()
     if sess is None:
         return None

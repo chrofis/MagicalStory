@@ -15086,3 +15086,77 @@ keeping the full information that identity actually needs.
 
 **Touched files.** `server/lib/figureDetection.js` (_somIdentifyFigures rewrite,
 diag.identity carries model/attempts).
+
+## 2026-08-22 — ArcFace likeness scoring: DeepFace over ONNX, and the memory lifecycle that pays for it
+
+**Context.** Owner trial feedback (2026-08-21): the avatar photo showed
+"fehlende Ähnlichkeit". Every likeness number we already store disagreed —
+`stories.data.styledAvatarGeneration[].faceMatchScore` had a median of 8/10 over
+512 samples, and `characters.data...avatars.faceMatch.*.score` reads 9/10. Both
+are Gemini grading its own output, and measured across 102 real avatars the
+judge sits at 7-9/10 over the ENTIRE quality range: it cannot separate "barely
+recognisable" from "near-identical". It passed an avatar that renders a teenager
+as a ~30-year-old man at 7/10. Avatars are reused on every page, so one bad
+sheet costs a whole book's illustrations.
+
+**Decision.** ArcFace cosine similarity as an independent, local, zero-API-cost
+second opinion, compared photo → avatar head cells.
+
+- **DeepFace (TensorFlow), not the ONNX port.** With identical, eye-verified
+  aligned crops, ONNX (buffalo_l) scored an obviously-good likeness at 0.218 —
+  worst of 104 — where DeepFace said 0.604. On four cases checked by eye
+  DeepFace is right 3/4, ONNX 2/4. The ONNX endpoint stays in the tree
+  (`/face-embedding-onnx`) as the lighter option if a better checkpoint appears.
+- **Gate at 0.45** (owner's call). On the fixed numbers that flags 6 of 102 —
+  5 of 37 real users. Known false-positive mode: extreme expressions. One child
+  photographed mid-shout scores 0.384 with a perfectly good avatar, and
+  regenerating cannot fix him, because the problem is the SOURCE photo. Any gate
+  therefore needs a hard retry cap and must ship the best attempt regardless.
+- **Only the two HEAD cells are compared.** The bottom row is full-body: the head
+  is a small part of a 360x640 crop and one cell is a pure profile, which a
+  frontal-biased model cannot embed at all (0.028 on a sheet whose head cells
+  scored 0.79/0.70). MIN across cells is meaningless here even though the LLM
+  judge uses one — the judge understands a profile is meant to look like one.
+- **Alignment is mandatory, and no pre-crop.** ArcFace compares faces WARPED to a
+  canonical 112x112 via a 5-point similarity transform. Without it a good
+  likeness scored 0.027. Pre-cropping with /extract-face first made it worse, not
+  better: it pads 40% above the face and 5% below, which cut the mouth and chin
+  off a toddler — and the mouth corners are two of the five landmarks the warp
+  needs. Alignment runs on the full frame; detect-and-crop is only the fallback.
+
+**Memory lifecycle — the part that makes it affordable.** Measured: baseline
+17MB → 346MB on `import deepface` (TensorFlow, before any model) → 510MB with
+ArcFace built. Clearing DeepFace's cache returns ~135MB of weights and leaves
+~358MB of TF runtime; Python cannot un-import a module and TF holds allocator
+arenas malloc_trim cannot reclaim. Exiting the process is the only mechanism.
+- `/warmup` takes `{"arcface": true}` and defaults to FALSE — unlike dino it is
+  never loaded speculatively, so a page view, a login, or a story run that
+  creates no avatar pays nothing.
+- A dedicated ArcFace reaper (`ARCFACE_IDLE_RECYCLE_S`, default 600s) exits the
+  process once ArcFace has gone quiet. The general recycler will not do this: it
+  requires RSS > RECYCLE_RSS_MB (700MB), and a 510MB footprint on a small
+  baseline sits just under that and never fires — holding ~$1/week (invoice rate
+  $0.00000023148148 per MB-minute) for something used roughly weekly.
+
+**Rationale.** The existing judge is not lenient so much as low-resolution, and
+it grades itself; an independent measure is the only thing that can contradict
+it. DeepFace costs ~600MB of image and a narrow version corridor
+(mediapipe 0.10.9 needs protobuf<4, TF 2.13 needs >=3.20.3; TF>=2.16 needs
+>=5.28 and is therefore incompatible — and mediapipe 0.10.10+ drops
+mp.solutions, silently degrading ALL face detection to a Haar cascade with no
+error). That price is worth paying only because the RAM is given back; without
+the reaper the cost is permanent and the trade fails.
+
+**Touched files.** `photo_analyzer.py` (`/face-embedding-onnx`,
+`align_face_arcface`, warmup flag, ArcFace reaper, release-memory unload),
+`requirements.txt`, `Dockerfile`, `scripts/analysis/audit-avatar-likeness.js`,
+`scripts/analysis/build-likeness-buckets.js`,
+`scripts/analysis/build-onnx-vs-deepface.js`,
+`scripts/analysis/build-top-bottom.js`,
+`scripts/analysis/audit-page-face-identity.js`.
+
+**Still open.** The gate is NOT wired into avatar creation — this ships the
+capability only. Page-level "which face is wrong" (character consistency) was
+tested and does NOT work as configured: ~60% of page faces would not embed and
+attribution margins fell as low as 0.002, using photorealistic references
+against stylised page art. Styled-avatar references are the fairer retest.
