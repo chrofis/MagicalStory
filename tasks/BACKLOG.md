@@ -36,6 +36,19 @@ Last full sweep: **2026-08-20**.
 
 The first two are corroborated by more than one source, which is why they lead.
 
+- [ ] **Avatar "pick best of N" via a vision model — NEEDS LAB PROOF FIRST (owner, 2026-08-22).**
+      Today a failed avatar is regenerated and the retry replaces the original. The proposal:
+      keep all attempts, send all four options plus the source photo to a vision model and ask
+      which matches best — ideally judged on the frontal AND the side view. Do NOT wire this
+      into the pipeline before a Test Lab experiment shows the picker beats the current
+      first-valid-wins behaviour; the same judge already sits at 7-9/10 across the entire
+      quality range and may be no better at ranking than at scoring
+      → `docs/decisions.md` (2026-08-22 ArcFace entry, "Still open")
+- [ ] **Raise avatar retries from 1 to 3 — reverses a prior user direction.** The owner asked
+      for "up to 3x redo" on 2026-08-22, but `MAX_SHEET_RETRIES = 1` in character2x4Sheet.js:98
+      cites "user direction 2026-08-09". Needs an explicit reversal decision plus a cost
+      estimate (each retry is a paid Grok call per category)
+      → `server/lib/character2x4Sheet.js:98`
 - [ ] **Trial avatar likeness — owner reported the photo "nicht sehr gelungen / fehlende
       Ähnlichkeit" vs the original (2026-08-21 trial feedback).** Not yet diagnosed: the
       owner deleted that trial run, so there is no stored evidence to compare. Next time a

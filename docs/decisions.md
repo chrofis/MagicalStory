@@ -15155,8 +15155,23 @@ the reaper the cost is permanent and the trade fails.
 `scripts/analysis/build-top-bottom.js`,
 `scripts/analysis/audit-page-face-identity.js`.
 
-**Still open.** The gate is NOT wired into avatar creation — this ships the
-capability only. Page-level "which face is wrong" (character consistency) was
+**Wired into avatar creation (2026-08-22).** `server/lib/faceIdentity.js` owns
+the comparison; `server/routes/avatars.js` runs it in PARALLEL with the Gemini
+judge (it is local and free, so there is no reason to serialise) and a category
+is regenerated when EITHER rejects it. The two catch different failures: Gemini
+reads semantics (wrong clothing, wrong age), ArcFace reads face geometry and
+catches the "vaguely the same person" sheets the judge waves through at 7/10.
+Both numbers are stored side by side on `faceMatch[category]` (`score` 0-10
+opinion, `arcface` 0-1 cosine, plus per-cell values) and never merged — being
+able to see them disagree is the point. `warmArcFace()` fires at job start so
+TensorFlow loads while Grok works instead of costing ~15s inside the eval.
+
+FAILS OPEN, deliberately: a null ArcFace score (service down, no face found) is
+"no opinion" and never triggers a regeneration. The alternative — treating an
+unavailable probe as a failure — would silently double the Grok bill for every
+avatar the moment the Python service hiccups.
+
+**Still open.** Page-level "which face is wrong" (character consistency) was
 tested and does NOT work as configured: ~60% of page faces would not embed and
 attribution margins fell as low as 0.002, using photorealistic references
 against stylised page art. Styled-avatar references are the fairer retest.

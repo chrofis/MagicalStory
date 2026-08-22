@@ -17,6 +17,7 @@ const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
 const { editWithGrok } = require('../lib/grok');
+const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
 const { getFacePhoto } = require('../lib/characterPhotos');
 const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
@@ -1507,6 +1508,13 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.message = 'Generating avatars...';
     job.progress = 10;
 
+    // Tell the analyzer an avatar is coming so ArcFace loads NOW, in parallel
+    // with the Grok calls, rather than costing ~15s inside the eval step.
+    // ArcFace is opt-in on /warmup by design — nothing else should ever pay
+    // TensorFlow's ~350MB — and the analyzer's ArcFace reaper hands that memory
+    // back by exiting once this goes quiet. Fire-and-forget.
+    warmArcFace();
+
     // `referencePhoto` is the bg-removed body photo with the user's clothing
     // visible — what Grok edits to apply the seasonal outfit.
     // `facePhoto` is the separate high-res face crop the Python service
@@ -1952,9 +1960,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         // of pixels and identity signal is dilute. Falls back to referencePhoto
         // when no dedicated face crop was uploaded.
         const faceRef = facePhoto || referencePhoto;
+        // ArcFace runs alongside the Gemini judge, not after it: it is local and
+        // free, so there is no reason to serialise it. The two disagree exactly
+        // where it matters — the judge sits at 7-9/10 across the whole quality
+        // range and passed an avatar rendering a teenager as a ~30-year-old man
+        // at 7/10, which ArcFace scores worst-of-102.
         const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-          const faceMatchResult = await evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey);
-          return { category, faceMatchResult };
+          const [faceMatchResult, arcface] = await Promise.all([
+            evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey),
+            scoreAvatarLikeness(faceRef, imageData),
+          ]);
+          return { category, faceMatchResult, arcface };
         });
 
         // Wait for photo analysis + avatar evaluations in parallel
@@ -1965,9 +1981,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
         // Collect physical traits from ALL avatar evaluations for consensus voting
         const allAvatarTraits = [];
+        const arcfaceByCategory = {};
 
         // Process results for each category
-        for (const { category, faceMatchResult } of evalResults) {
+        for (const { category, faceMatchResult, arcface } of evalResults) {
+          if (arcface) {
+            arcfaceByCategory[category] = arcface;
+            log.info(
+              `🧬 [AVATAR JOB ${jobId}] ${category} arcface=${arcface.score ?? 'n/a'}`
+              + ` (gate ${ARCFACE_MIN})${arcface.unavailable ? ` — ${arcface.unavailable}` : ''}`
+            );
+          }
           if (!faceMatchResult) continue;
 
           // Store raw evaluation for dev mode debugging (first one only)
@@ -1980,7 +2004,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           results.faceMatch[category] = {
             score: faceMatchResult.score,
             details: faceMatchResult.details,
-            lpips: faceMatchResult.lpips || null
+            lpips: faceMatchResult.lpips || null,
+            // Stored next to the judge's opinion, never merged into it: they are
+            // different measurements on different scales (0-10 opinion vs 0-1
+            // cosine) and the whole point is being able to see them disagree.
+            arcface: arcfaceByCategory[category]?.score ?? null,
+            arcfaceCells: arcfaceByCategory[category]?.cells || null,
           };
 
           // Store structured clothing for this category
@@ -2065,9 +2094,18 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           log.warn(`📋 [AVATAR JOB ${jobId}] No traits from photo or avatars — skipping consensus`);
         }
 
-        // Auto-retry categories with low face scores
+        // Auto-retry categories that EITHER judge rejects. The two catch
+        // different failures: Gemini reads semantics (wrong clothing, wrong
+        // age), ArcFace reads face geometry and catches the "vaguely the same
+        // person" avatars the judge waves through at 7/10.
+        //
+        // ArcFace only ever votes when it actually has a score — a null (service
+        // down, no face found) is "no opinion" and must never trigger a
+        // regeneration, or an unavailable probe would silently double the Grok
+        // bill for every avatar.
         const lowScoreCategories = Object.entries(results.faceMatch || {})
-          .filter(([, fm]) => fm.score != null && fm.score < MIN_BASE_AVATAR_SCORE)
+          .filter(([, fm]) => (fm.score != null && fm.score < MIN_BASE_AVATAR_SCORE)
+                           || failsArcFaceGate(fm.arcface))
           .map(([cat]) => cat);
 
         if (lowScoreCategories.length > 0) {
@@ -2077,7 +2115,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
           const retryPromises = lowScoreCategories.map(async (category) => {
             const originalScore = results.faceMatch[category].score;
-            log.debug(`🔄 [AVATAR JOB ${jobId}] Retrying ${category} (score ${originalScore}/10 < ${MIN_BASE_AVATAR_SCORE})...`);
+            const originalArc = results.faceMatch[category].arcface;
+            const why = [
+              (originalScore != null && originalScore < MIN_BASE_AVATAR_SCORE) ? `judge ${originalScore}/10 < ${MIN_BASE_AVATAR_SCORE}` : null,
+              failsArcFaceGate(originalArc) ? `arcface ${originalArc} < ${ARCFACE_MIN}` : null,
+            ].filter(Boolean).join(' + ');
+            log.debug(`🔄 [AVATAR JOB ${jobId}] Retrying ${category} (${why})...`);
 
             // Regenerate using the same helper
             const retryGen = await generateSingleAvatarForJob(category);
