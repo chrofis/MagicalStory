@@ -139,6 +139,23 @@ const MAX_SEVERITY_TYPES = {
   unverified_absence: 'minor',
 };
 
+// Types with a severity FLOOR — the cost is raised to at least this, whatever
+// the evaluator tagged. Mirror image of MAX_SEVERITY_TYPES, same contract: the
+// finding is reported untouched, only its cost changes.
+//
+// `composite_seam` (owner, 2026-08-22): a visible paste boundary is a page that
+// cannot be published — catastrophic by definition. Escalating the severity in
+// the PROMPT suppressed detection instead: with the D-30 line reading
+// CATASTROPHIC / "cannot be published", the same broken image that fired 5/6
+// at CRITICAL fired 0/3 (and 0/3 again with a forced-observation preamble) —
+// the model hesitates to make the bigger claim, and the caveat wording handed
+// it an excuse. So the model keeps the comfortable CRITICAL vocabulary and the
+// bill is raised here, per the owner's severity rule: classification belongs
+// to the prompt, code may change a severity.
+const MIN_SEVERITY_TYPES = {
+  composite_seam: 'catastrophic',
+};
+
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this
 // into some regex. This must come from the prompt. You can change a severity
 // with code, that is it."
@@ -282,9 +299,13 @@ function deductionPoints(d) {
   if (ZERO_POINT_TYPES.has(type)) return 0;
   const raw = SEVERITY_POINTS[String(d?.severity || '').toLowerCase()] || 0;
   // Ceiling by type — charge the lower of what was claimed and what the type
-  // is allowed to cost. Never raises a severity, only bounds it.
+  // is allowed to cost.
   const ceiling = MAX_SEVERITY_TYPES[type];
-  return ceiling ? Math.min(raw, SEVERITY_POINTS[ceiling] || raw) : raw;
+  let pts = ceiling ? Math.min(raw, SEVERITY_POINTS[ceiling] || raw) : raw;
+  // Floor by type — see MIN_SEVERITY_TYPES.
+  const floor = MIN_SEVERITY_TYPES[type];
+  if (floor) pts = Math.max(pts, SEVERITY_POINTS[floor] || pts);
+  return pts;
 }
 
 // ONE DEDUCTION PER CLASS (owner, 2026-08-19). A class is charged once, at its

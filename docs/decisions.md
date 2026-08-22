@@ -742,6 +742,26 @@ type with a deterministic fixer (`garment_colour_fix`; evalBuckets owner
 Extends the settled zero-point design, does not reverse it.
 **Status:** ✅ active.
 
+### composite_seam bills as catastrophic via a code floor, not prompt wording
+**Context:** Owner: a visible paste boundary (a repaired figure with a hard
+cut-out edge) is a page that cannot be published — catastrophic by definition.
+The obvious fix, rewording D-30 in `image-evaluation.txt` to CATASTROPHIC,
+SUPPRESSED detection: the same broken image that fired 5 of 6 runs at CRITICAL
+fired 0 of 3 with the "cannot be published" wording, and 0 of 3 again with a
+forced-observation preamble whose "occlusion is not a seam" caveat described
+exactly what a pasted figure looks like. The model hesitates to make the
+bigger claim; both prompt edits were reverted the same hour.
+**Decision:** the prompt keeps the CRITICAL vocabulary the model demonstrably
+uses; `scoring.js` gains `MIN_SEVERITY_TYPES` — the mirror of
+`MAX_SEVERITY_TYPES` — flooring `composite_seam` at catastrophic points
+(60). The finding is reported untouched; only its cost changes.
+**Rationale:** the owner's severity rule already draws this line —
+classification belongs to the prompt, code may change a severity. Ceilings
+existed for evaluator over-charging; this is the first floor, for evaluator
+under-claiming under loaded words.
+**Touched:** `server/lib/scoring.js` (`MIN_SEVERITY_TYPES`, `deductionPoints`)
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL
