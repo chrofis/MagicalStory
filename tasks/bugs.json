@@ -152,6 +152,15 @@
    "status": "fixed",
    "note": "char-fix (and the Lab stage) now crop the pose-matched cell via the shared resolveCellPose/cropAvatarCell chain — cropSheetCell divides by grid geometry, so SQUARE 1024x1024 sheets crop correctly (verified: front/profile/back all yield ~256x607 cells from the failing sheet). Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793).",
    "fixedIn": "30099b228"
+  },
+  {
+   "id": "active-image-no-admin-bypass",
+   "title": "PUT active-image 404s for admins on non-owned stories -> version selection silently does not save",
+   "reportedAt": "2026-08-22",
+   "source": "owner report: story opened from the Test Lab (demo-account story, admin logged in as own account); both PUT /:id/pages/:n/active-image and /:id/covers/:type/active-image checked user_id strictly while every other story route allows admin (any story) or impersonating admin",
+   "status": "fixed",
+   "fixedIn": "84e575ae8",
+   "note": "both routes now use the shared access rule (owner | admin | impersonating admin). Client swallow noted: StoryDisplay.handleSelectVersion catches and only console.errors, so the 404 was invisible."
   }
  ]
 }

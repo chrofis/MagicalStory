@@ -3848,10 +3848,17 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
 
     console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - versionIndex ${versionIndex}`);
 
-    // Verify story ownership (fast query, no data loading)
+    // Access: story owner, admin (any story), or admin impersonating — the
+    // same rule every other story route uses. Without the admin arm this
+    // endpoint 404'd for an admin viewing a Lab/smoke story, and the frontend
+    // swallowed it: picking a version silently did not save (owner report,
+    // 2026-08-22 — the demo-account story opened from the Test Lab).
+    const canWrite = req.user?.role === 'admin' || (req.user?.impersonating && req.user?.originalAdminId);
     const ownerCheck = await pool.query(
-      `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
-      [id, req.user.id]
+      canWrite
+        ? `SELECT 1 FROM stories WHERE id = $1`
+        : `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
+      canWrite ? [id] : [id, req.user.id]
     );
 
     if (ownerCheck.rows.length === 0) {
@@ -3954,10 +3961,17 @@ router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req,
 
     const pool = getPool();
 
-    // Verify story ownership (fast query, no data loading)
+    // Access: story owner, admin (any story), or admin impersonating — the
+    // same rule every other story route uses. Without the admin arm this
+    // endpoint 404'd for an admin viewing a Lab/smoke story, and the frontend
+    // swallowed it: picking a version silently did not save (owner report,
+    // 2026-08-22 — the demo-account story opened from the Test Lab).
+    const canWrite = req.user?.role === 'admin' || (req.user?.impersonating && req.user?.originalAdminId);
     const ownerCheck = await pool.query(
-      `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
-      [id, req.user.id]
+      canWrite
+        ? `SELECT 1 FROM stories WHERE id = $1`
+        : `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
+      canWrite ? [id] : [id, req.user.id]
     );
 
     if (ownerCheck.rows.length === 0) {
