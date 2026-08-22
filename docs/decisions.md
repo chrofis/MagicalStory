@@ -15410,3 +15410,12 @@ generic Lab set, not a new mechanism.
 - `tests/manual/identityAgreement.test.js` (40 assertions)
 
 **Status:** ✅ active
+
+**Correction (same day, from the new diagnostics):** the decisive failure was
+not the missing weights but `transformers>=4.44` re-resolving to **5.x**, which
+requires torch>=2.5 and *disables* our torch 2.1.2 (held by the numpy==1.24.3
+co-pin TF 2.13 needs): "[transformers] Disabling PyTorch because PyTorch >= 2.5
+is required but found 2.1.2" → every model class raised "PyTorch not found".
+Fixed by pinning `transformers>=4.44,<5`. The typing_extensions layer reorder
+stays as hardening; the repr+traceback logging is what made this findable in
+one build instead of four.
