@@ -1163,110 +1163,163 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
   // substitute for the real call: with the image attached the threshold moves,
   // and variants that pass without it block with it.
   const sanitizeForGemini = getSanitizeForGemini();
-  const charLines = expectedCharacters.map(c => {
-    // The wardrobe paragraph is STRIPPED from the identity prose and replaced by
-    // the short phrase, rather than the short phrase being appended only when
-    // "wearing" is absent — the prose nearly always carries a "Wearing:" section
-    // already, so the short phrase was in practice never used here.
+
+  // ── IDENTITY LINE VARIANTS (owner chain, 2026-08-22) ─────────────────────
+  // FULL is the default: complete identity prose with the UNABRIDGED wardrobe
+  // and real age words, unsanitized. Gemini's minor-safety filter blocks this
+  // occasionally (measured 5/5 on an adult+child page, 0/6 on child-only
+  // pages) — that is what the tier chain below is for, not a reason to strip
+  // information from every call. SANITIZED (strip Wearing → short garment
+  // phrase + sanitizeForGemini light) is the LAST tier only.
+  const posHintOf = (c) => c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
+  const fullLines = expectedCharacters.map(c => {
+    const desc = String(c.gdinoPrompt || c.description || c.name).trim().replace(/\.$/, '');
+    const clothing = typeof c.clothing === 'string' ? c.clothing.trim() : '';
+    const wearing = /\bwearing\b/i.test(desc) || !clothing ? '' : `. Wearing: ${clothing}`;
+    return `- ${c.name}: ${desc}${wearing}.${posHintOf(c)}`;
+  }).join('\n');
+  const sanitizedLines = expectedCharacters.map(c => {
     const identity = String(c.gdinoPrompt || c.description || c.name).replace(/\bWearing:[\s\S]*$/i, '').trim();
-    // The strip above removes the description's wardrobe paragraph; the short
-    // phrase must then come from SOMEWHERE. Callers should pass c.clothing, but
-    // when it is absent derive the phrase from the description's own Wearing
-    // tail instead of sending the character out undressed (bug
-    // som-identity-lines-undressed: gen-time lines had no colours and Gemini
-    // named four near-identical toddler lines by elimination).
+    // Never send a character out undressed: derive the short phrase from the
+    // description's own Wearing tail when c.clothing is absent (bug
+    // som-identity-lines-undressed).
     const wearingTail = (String(c.gdinoPrompt || c.description || '').match(/\bWearing:\s*([\s\S]*)$/i) || [])[1] || '';
     const garment = _shortGarmentPhrase(c.clothing || wearingTail);
-    // Expected position/action from the scene plan ("center-right background
-    // being led away") — often the only usable cue for occluded or partially
-    // visible figures whose clothing/hair the badge crop doesn't show. Hint
-    // only: repairs sometimes run BECAUSE a figure was painted in the wrong
-    // spot, so identity cues stay primary.
-    const posHint = c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
-    return sanitizeForGemini(`- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHint}`, 'light');
+    return sanitizeForGemini(`- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHintOf(c)}`, 'light');
   }).join('\n');
+
   const nBadges = badges.length;
   const nChars = expectedCharacters.length;
   const elimHint = nBadges === nChars
     ? `\nThere are exactly ${nBadges} badges and ${nChars} expected characters — assign each character to one badge, by elimination if needed. Only use "unknown" for a badge that is clearly an extra/background figure, not for an expected character you are merely less sure about (a preschooler among adults, an occluded figure — assign the best remaining match).`
     : `\nUse "unknown" only for a badge that is an extra/background figure matching none of the expected characters. If a badge is plausibly an expected character (right age band and gender) assign it rather than "unknown".`;
-  const prompt = `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
+  const mkPrompt = (lines) => `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
 Match each letter to one of these characters by age, gender, hair, and clothing; use the expected position/action as a supporting hint only:
-${charLines}${elimHint}
+${lines}${elimHint}
 Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
+  const fullPrompt = mkPrompt(fullLines);
+  const sanitizedPrompt = mkPrompt(sanitizedLines);
+  const markedB64 = marked.toString('base64');
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { inlineData: { mimeType: 'image/jpeg', data: marked.toString('base64') } },
-        { text: prompt },
-      ] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  // FAILURES RETURN THE EVIDENCE, NOT null (owner, 2026-08-16). Returning null
-  // from here threw away the badged image and the prompt — on the one page where
-  // identity got it wrong, the Lab had nothing to show. `nameByDet` being null
-  // is the failure signal; everything else still comes back.
-  const evidence = (reason) => ({
-    nameByDet: null, reason, prompt, badges: badges.map(b => ({ letter: b.letter, detIdx: b.detIdx, at: [b.x, b.y] })),
-    markedImage: `data:image/jpeg;base64,${marked.toString('base64')}`,
-  });
-  if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM Gemini HTTP ${res.status}`); return evidence(`Gemini HTTP ${res.status}`); }
-  const j = await res.json();
-  const text = (j?.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('') || '';
-  // WHY the text is empty, when it is. A 200 with no text is a REFUSAL or a
-  // truncation, not a parse problem, and reporting it as "answer was not JSON:"
-  // sent the p9 investigation after the wrong thing. finishReason and
-  // promptFeedback are the fields that say which.
-  const finish = j?.candidates?.[0]?.finishReason || null;
-  const blocked = j?.promptFeedback?.blockReason || null;
-  // .trim(): the first version of this guard tested `!text` and a whitespace-only
-  // body walked past it into JSON.parse, which reported it as a parse failure
-  // with nothing after the colon — the same misleading message it replaced.
-  if (!text.trim()) {
-    const why = blocked ? `prompt blocked (${blocked})` : finish ? `empty answer, finishReason=${finish}` : `empty answer and no reason: ${JSON.stringify(j).slice(0, 300)}`;
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM returned ${why}`);
-    return evidence(why);
-  }
-  let answers;
-  // Tolerate prose/fence wrapping around the JSON ("Here is the JSON…").
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON (finishReason=${finish}): ${JSON.stringify(text.slice(0, 120))}`); return evidence(`answer was not JSON (finishReason=${finish}): ${JSON.stringify(text.slice(0, 200))}`); }
-  if (!answers || typeof answers !== 'object') {
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer was not an object: ${text.slice(0, 120)}`);
-    return evidence(`answer was not an object: ${text.slice(0, 200)}`);
-  }
-
-  const validNames = new Set(expectedCharacters.map(c => c.name));
-  const nameByDet = new Map();
-  const claimed = new Set();
-  for (const b of badges) {
-    const raw = String(answers[b.letter] || '').trim();
-    if (!raw || /^unknown$/i.test(raw)) continue;
-    const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
-    if (!name) continue;
-    if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM named "${name}" twice — whole answer discarded, falling back to layout: ${JSON.stringify(answers)}`); return { ...evidence(`named "${name}" twice: ${JSON.stringify(answers)}`), answers }; }
-    claimed.add(name);
-    nameByDet.set(b.detIdx, name);
-  }
-  if (nameByDet.size === 0) {
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM matched no badge to an expected character — answer ${JSON.stringify(answers)} vs [${[...validNames].join(', ')}]`);
-    return { ...evidence(`no badge matched an expected character — answered ${JSON.stringify(answers)}, expected [${[...validNames].join(', ')}]`), answers };
-  }
-  const letterByDet = new Map(badges.map(b => [b.detIdx, b.letter]));
-  log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity: ${[...nameByDet.entries()].map(([i, n]) => `${letterByDet.get(i)}=${n}`).join(' ')}${dets.length > nameByDet.size ? ` (${dets.length - nameByDet.size} unknown)` : ''}`);
-  return {
-    nameByDet, answers, prompt,
-    // The badged image and the prompt ARE the identity decision. Without them a
-    // wrong name can only be argued about; with them it is visible in one look
-    // (a badge in the gap between two people, a badge on the wrong figure).
-    markedImage: `data:image/jpeg;base64,${marked.toString('base64')}`,
-    badges: badges.map(b => ({ letter: b.letter, detIdx: b.detIdx, at: [b.x, b.y] })),
+  // ── Vendor callers — each returns { text } or { fail: reason } ───────────
+  const askGemini = async (promptText) => {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ inlineData: { mimeType: 'image/jpeg', data: markedB64 } }, { text: promptText }] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) return { fail: `Gemini HTTP ${res.status}` };
+    const j = await res.json();
+    const text = (j?.candidates?.[0]?.content?.parts || []).filter(pt => !pt.thought).map(pt => pt.text || '').join('') || '';
+    if (!text.trim()) {
+      const finish = j?.candidates?.[0]?.finishReason || null;
+      const blocked = j?.promptFeedback?.blockReason || null;
+      return { fail: blocked ? `prompt blocked (${blocked})` : finish ? `empty answer, finishReason=${finish}` : `empty answer and no reason: ${JSON.stringify(j).slice(0, 200)}` };
+    }
+    return { text };
   };
+  const askOpenRouterQwen = async (promptText) => {
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) return { fail: 'OPENROUTER_API_KEY not set' };
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0, max_tokens: 1500,
+        messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${markedB64}` } }, { type: 'text', text: promptText }] }] }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (!res.ok) return { fail: `Qwen-VL HTTP ${res.status}` };
+    const j = await res.json();
+    if (j?.error) return { fail: `Qwen-VL error: ${String(j.error.message || j.error).slice(0, 120)}` };
+    const text = j?.choices?.[0]?.message?.content || '';
+    if (!text.trim()) return { fail: 'Qwen-VL empty answer' };
+    return { text };
+  };
+  const askHaiku = async (promptText) => {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) return { fail: 'ANTHROPIC_API_KEY not set' };
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
+        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: markedB64 } }, { type: 'text', text: promptText }] }] }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (!res.ok) return { fail: `Haiku HTTP ${res.status}` };
+    const j = await res.json();
+    if (j?.error) return { fail: `Haiku error: ${String(j.error.message).slice(0, 120)}` };
+    const text = (j?.content || []).map(c => c.text || '').join('') || '';
+    if (!text.trim()) return { fail: 'Haiku empty answer' };
+    return { text };
+  };
+
+  // ── Answer validation, shared by every tier ──────────────────────────────
+  const validNames = new Set(expectedCharacters.map(c => c.name));
+  const validate = (text) => {
+    const jsonMatch = String(text).match(/\{[\s\S]*\}/);
+    let answers;
+    try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { return { fail: `answer was not JSON: ${JSON.stringify(String(text).slice(0, 200))}` }; }
+    if (!answers || typeof answers !== 'object') return { fail: `answer was not an object: ${String(text).slice(0, 200)}` };
+    const nameByDet = new Map();
+    const claimed = new Set();
+    for (const b of badges) {
+      const raw = String(answers[b.letter] || '').trim();
+      if (!raw || /^unknown$/i.test(raw)) continue;
+      const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
+      if (!name) continue;
+      if (claimed.has(name)) return { fail: `named "${name}" twice: ${JSON.stringify(answers)}`, answers };
+      claimed.add(name);
+      nameByDet.set(b.detIdx, name);
+    }
+    if (nameByDet.size === 0) return { fail: `no badge matched an expected character — answered ${JSON.stringify(answers)}, expected [${[...validNames].join(', ')}]`, answers };
+    return { nameByDet, answers };
+  };
+
+  // ── The chain (owner, 2026-08-22): full Gemini → full Qwen-VL → full Haiku
+  // → sanitized Gemini. A validation failure (blocked, non-JSON, duplicate
+  // names, nothing matched) advances to the next tier; the old behaviour
+  // (single sanitized Gemini call, whole-answer discard on any dupe) survives
+  // only as the last tier.
+  const tiers = [
+    { id: 'gemini-full', prompt: fullPrompt, call: askGemini },
+    { id: 'qwen-vl-full', prompt: fullPrompt, call: askOpenRouterQwen },
+    { id: 'haiku-full', prompt: fullPrompt, call: askHaiku },
+    { id: 'gemini-sanitized', prompt: sanitizedPrompt, call: askGemini },
+  ];
+  const attempts = [];
+  const evidence = (reason, promptUsed) => ({
+    nameByDet: null, reason, prompt: promptUsed || fullPrompt, attempts,
+    badges: badges.map(b => ({ letter: b.letter, detIdx: b.detIdx, at: [b.x, b.y] })),
+    markedImage: `data:image/jpeg;base64,${markedB64}`,
+  });
+  for (const tier of tiers) {
+    let r;
+    try { r = await tier.call(tier.prompt); } catch (e) { r = { fail: `threw: ${e.message}` }; }
+    if (r.fail) {
+      attempts.push({ tier: tier.id, fail: r.fail });
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM tier ${tier.id} failed (${r.fail}) — trying next tier`);
+      continue;
+    }
+    const v = validate(r.text);
+    if (v.fail) {
+      attempts.push({ tier: tier.id, fail: v.fail, answers: v.answers });
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM tier ${tier.id} answer rejected (${v.fail}) — trying next tier`);
+      continue;
+    }
+    const letterByDet = new Map(badges.map(b => [b.detIdx, b.letter]));
+    log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity via ${tier.id}: ${[...v.nameByDet.entries()].map(([i, n]) => `${letterByDet.get(i)}=${n}`).join(' ')}${dets.length > v.nameByDet.size ? ` (${dets.length - v.nameByDet.size} unknown)` : ''}${attempts.length ? ` (after ${attempts.map(a => a.tier).join(', ')} failed)` : ''}`);
+    return {
+      nameByDet: v.nameByDet, answers: v.answers, prompt: tier.prompt, model: tier.id, attempts,
+      // The badged image and the prompt ARE the identity decision. Without them a
+      // wrong name can only be argued about; with them it is visible in one look
+      // (a badge in the gap between two people, a badge on the wrong figure).
+      markedImage: `data:image/jpeg;base64,${markedB64}`,
+      badges: badges.map(b => ({ letter: b.letter, detIdx: b.detIdx, at: [b.x, b.y] })),
+    };
+  }
+  log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM: ALL ${tiers.length} tiers failed — ${attempts.map(a => `${a.tier}: ${a.fail}`).join(' | ')}`);
+  return evidence(`all tiers failed — ${attempts.map(a => `${a.tier}: ${a.fail}`).join(' | ')}`);
 }
 
 // Binary mask → white-on-transparent PNG (same encoding /figure-mask returns).
@@ -1506,9 +1559,9 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     }
     if (som?.nameByDet) {
       nameByDet = som.nameByDet;
-      diag.identity = { method: 'som-gemini', answers: som.answers, badges: som.badges };
+      diag.identity = { method: 'som-gemini', model: som.model || null, attempts: som.attempts?.length ? som.attempts : undefined, answers: som.answers, badges: som.badges };
     } else {
-      diag.identity = { method: 'layout-fallback', somFailure: som?.reason || 'SoM produced no answer', answers: som?.answers, badges: som?.badges };
+      diag.identity = { method: 'layout-fallback', somFailure: som?.reason || 'SoM produced no answer', attempts: som?.attempts, answers: som?.answers, badges: som?.badges };
     }
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — masks run unseeded; layout fallback below`);

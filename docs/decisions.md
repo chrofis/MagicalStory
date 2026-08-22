@@ -15057,3 +15057,32 @@ the long tail generally.
 
 **Touched:** `scripts/admin/rewrite-landmark-extracts.js` (new)
 **Status:** ✅ active
+
+## 2026-08-22 — Identity model chain: FULL lines by default, sanitized Gemini demoted to last tier
+
+**Context.** The Wearing-strip + sanitize existed on EVERY identity call because
+of Gemini's minor-safety filter, measured 5/5 blocked on an adult+child page.
+A 6-vendor × 6-page A/B (vendor-report.html, 2026-08-22) showed (a) with decent
+lines all vendors answer identically (35/36 unanimous), (b) FULL unsanitized
+lines were NOT blocked on any child-only page, (c) Gemini is the cheapest and
+fastest ($0.0002-4/call vs Qwen $0.001, Haiku $0.002, GPT-4o-mini $0.004,
+Grok 4 $0.005). Owner directive: full information by default; degrade through
+vendors, not through information.
+
+**Decision.** `_somIdentifyFigures` runs a tier chain:
+1. **Gemini 2.5 Flash, FULL lines** (unabridged wardrobe, real age words, unsanitized)
+2. **Qwen2.5-VL-72B via OpenRouter, FULL lines**
+3. **Claude Haiku 4.5, FULL lines**
+4. **Gemini, sanitized+stripped lines** (the entire pre-chain behaviour, now the last resort)
+
+A tier fails on: HTTP error, safety block, empty/non-JSON answer, duplicate
+names, or nothing matched — and the next tier runs. The winning tier is
+recorded as `identity.model`, failed attempts as `identity.attempts` (visible in
+Lab payloads). Missing vendor keys skip their tier gracefully.
+
+**Rationale.** The duplicate-name whole-answer discard and the always-stripped
+lines each caused real shipped mix-ups; a chain degrades through providers while
+keeping the full information that identity actually needs.
+
+**Touched files.** `server/lib/figureDetection.js` (_somIdentifyFigures rewrite,
+diag.identity carries model/attempts).
