@@ -1,5 +1,7 @@
 flask==3.0.0
-flask-cors==4.0.0
+# 4.0.1, not 4.0.0: deepface requires flask-cors>=4.0.1 and pip refuses the
+# whole file otherwise (ResolutionImpossible — it failed two staging builds).
+flask-cors==4.0.1
 waitress==3.0.0
 opencv-python-headless==4.8.1.78
 pillow==10.1.0
@@ -36,7 +38,11 @@ transformers>=4.44
 #   Dockerfile upgrades typing_extensions in a SEPARATE step after this file —
 #   same sequencing trick it already uses for the torch CPU build. Adding
 #   `typing_extensions>=4.12` here instead will break the image build.
-# tensorflow-cpu, not tensorflow: no GPU on Railway, and it is ~200MB smaller.
-tensorflow-cpu==2.13.1
+# tensorflow, NOT tensorflow-cpu, however tempting the 187MB-vs-480MB wheel is:
+# deepface requires the distribution named `tensorflow`, and tensorflow-cpu does
+# NOT declare Provides-Dist: tensorflow (checked on PyPI). Pinning -cpu therefore
+# leaves deepface's requirement unsatisfied and pip installs the full tensorflow
+# ON TOP of it — ~667MB of duplicated TensorFlow instead of 480MB.
+tensorflow==2.13.1
 protobuf==3.20.3
 deepface==0.0.97
