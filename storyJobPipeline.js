@@ -4564,7 +4564,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // near-identical face-prose lines were named by elimination
               // (measured: hpv76p0rokg p3 v0 — red kid named Julian in 4/4
               // gen-time calls, correct in 6/6 Lab calls whose builder sets it).
-              return { name, description: shBbox.buildIdentityLine(c, clothingText), clothing: clothingText };
+              // position: the scene plan's placement prose ("centre foreground") —
+              // the SoM prompt uses it as a hint and the layout fallback derives
+              // xTarget/depth from it. Was never passed (owner, 2026-08-22): on the
+              // p1 crowd page the fallback ran with xTarget null and preferred
+              // mid-depth pedestrians over the foreground kids.
+              return { name, description: shBbox.buildIdentityLine(c, clothingText), clothing: clothingText,
+                position: sceneMetadata?.characterPositions?.[name] || c.position || null };
             });
             // Story-invented characters live ONLY in the Visual Bible — never in
             // sceneCharacters, which is the user's photo-backed cast. Without them

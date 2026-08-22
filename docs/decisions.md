@@ -15204,3 +15204,29 @@ slab) is correctly out of scope and is handled by the prompt fix plus
 
 **Touched:** `server/lib/borderCrop.js`
 **Status:** ✅ active
+
+## 2026-08-22 — Crowd-page naming: floor, duplicate resolution, positions passed, gender tiebreaker removed
+
+**Context.** hpv76p0rokg p1: the story-sanctioned station crowd produced 9 tiny
+person boxes beside the 2 real kids. SoM named the kids correctly but also
+duped their names onto two slivers; the duplicate guard discarded the WHOLE
+answer; the layout fallback (no floor, no positions passed, femaleness pass
+misreading both toddler boys at +0.6 cost) then named two 1.3k-px background
+pedestrians "Levin"/"Julian" while the real kids shipped UNKNOWN.
+
+**Decision (owner).**
+- **Duplicate names are resolved, never discarded**: the strongest claimant
+  keeps the name (face-paired first, then DINO score); others go unknown.
+- **Naming floor in the layout fallback**: only face-paired boxes, or score
+  ≥ 0.45, or ≥ 3% of the frame may receive a character name. Deliberately
+  permissive — a real person can arrive with only a face box or only a body
+  box; rather let a random extra in than throw a real person away. If nothing
+  qualifies, everything stays eligible.
+- **Positions are passed**: the generation call site now forwards the scene
+  plan's placement prose (characterPositions) so xTarget/depth terms work.
+- **The gender tiebreaker is REMOVED** (femaleness DINO pass, _genderFromText,
+  cost term): owner — "we do not need it".
+
+**Touched files.** `server/lib/figureDetection.js` (validate/dupe resolution,
+fallback floor, cost fn, dead code removed), `storyJobPipeline.js` (position
+field). Task #29.

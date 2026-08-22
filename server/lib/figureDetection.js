@@ -1261,16 +1261,30 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     let answers;
     try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { return { fail: `answer was not JSON: ${JSON.stringify(String(text).slice(0, 200))}` }; }
     if (!answers || typeof answers !== 'object') return { fail: `answer was not an object: ${String(text).slice(0, 200)}` };
-    const nameByDet = new Map();
-    const claimed = new Set();
+    // DUPLICATE NAMES ARE RESOLVED, NOT DISCARDED (owner, 2026-08-22). The old
+    // guard threw the WHOLE answer away when a name appeared twice — on the p1
+    // crowd page the two correct claims (the real kids) died with the two
+    // sliver guesses. Now the strongest claimant keeps the name: face-paired
+    // box first, then DINO score.
+    const claims = new Map();
     for (const b of badges) {
       const raw = String(answers[b.letter] || '').trim();
       if (!raw || /^unknown$/i.test(raw)) continue;
       const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
       if (!name) continue;
-      if (claimed.has(name)) return { fail: `named "${name}" twice: ${JSON.stringify(answers)}`, answers };
-      claimed.add(name);
-      nameByDet.set(b.detIdx, name);
+      if (!claims.has(name)) claims.set(name, []);
+      claims.get(name).push(b.detIdx);
+    }
+    const nameByDet = new Map();
+    for (const [name, idxs] of claims) {
+      let win = idxs[0];
+      if (idxs.length > 1) {
+        win = idxs.slice().sort((a, b2) =>
+          ((dets[b2]?.face ? 1 : 0) - (dets[a]?.face ? 1 : 0))
+          || ((dets[b2]?.score || 0) - (dets[a]?.score || 0)))[0];
+        log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM named "${name}" on ${idxs.length} badges (det ${idxs.join(',')}) — kept det${win} (face-paired/score), others unknown`);
+      }
+      nameByDet.set(win, name);
     }
     if (nameByDet.size === 0) return { fail: `no badge matched an expected character — answered ${JSON.stringify(answers)}, expected [${[...validNames].join(', ')}]`, answers };
     return { nameByDet, answers };
@@ -1408,20 +1422,11 @@ function _isChildFromText(t) {
   return /\b(girl|boy|child|kid|toddler|baby|preschooler|kindergartner|schoolboy|schoolgirl)\b/i.test(String(t || ''));
 }
 
-// Character gender from the identity prose ('f' | 'm' | null). Layout alone
-// cannot separate two adults with identical position prose — gender can.
-function _genderFromText(t) {
-  const s = String(t || '');
-  if (/\b(woman|girl|female|mother|mom|grandma|grandmother|lady|aunt|sister)\b/i.test(s)) return 'f';
-  if (/\b(man|boy|male|father|dad|grandpa|grandfather|uncle|brother)\b/i.test(s)) return 'm';
-  return null;
-}
 
 /**
- * Deterministic name→box matching from the intended scene layout + gender.
- * chars: [{name, xTarget|null, depthRank, isChild, gender}]; dets: [{cx, h,
- * bottom, femaleNorm}] (normalized; femaleNorm 0..1 from the generic
- * "woman . girl" DINO pass). Brute-force min-cost injective assignment.
+ * Deterministic name→box matching from the intended scene layout.
+ * chars: [{name, xTarget|null, depthRank, isChild}]; dets: [{cx, h, bottom}]
+ * (normalized). Brute-force min-cost injective assignment.
  */
 function _assignFiguresByLayout(chars, dets) {
   const N = chars.length, M = dets.length;
@@ -1441,10 +1446,9 @@ function _assignFiguresByLayout(chars, dets) {
     else k += 0.3 * Math.abs(0.5 - dets[j].cx);
     k += 0.25 * Math.abs(c.depthRank - detDepth[j]) / 2;
     if (ageMix) k += 0.3 * (c.isChild ? (1 - detSizePct[j]) : detSizePct[j]);
-    // Gender: the tiebreaker layout can't provide (two adults, no L/R prose).
-    if (c.gender && dets[j].femaleNorm != null) {
-      k += 0.6 * (c.gender === 'f' ? (1 - dets[j].femaleNorm) : dets[j].femaleNorm);
-    }
+    // Gender term REMOVED (owner, 2026-08-22): the femaleness pass misread both
+    // curly-haired toddler boys on hpv76p0rokg p1 (+0.6 cost on exactly the
+    // right boxes) and handed their names to background pedestrians.
     return k;
   };
   let best = null, bestCost = Infinity, second = Infinity;
@@ -1517,20 +1521,9 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   diag.pairing = await _pairFacesGlobally(persons, faces, W, H, pageLabel, imageDataUri);
   diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3), fromFace: p.fromFace || undefined, bodyFromCrop: p.bodyFromCrop || undefined }));
 
-  // Stage 1c — femaleness pass is LAZY (owner, 2026-08-10): it only feeds the
-  // layout-fallback tiebreaker, and SoM identity succeeds on virtually every
-  // page — running "woman . girl" up front wasted a full DINO forward pass per
-  // page. It now runs inside the fallback branch, only when SoM failed.
-  let femaleBoxes = [];
-  const loadFemaleBoxes = async () => {
-    const gdet = await _gdinoDetect(imageDataUri, [{ name: 'female', text: 'woman . girl' }]);
-    if (gdet?.figures?.[0]) femaleBoxes = _collectNmsBoxes(gdet.figures[0], GDINO_PERSON_NMS_IOU);
-    diag.femaleBoxes = femaleBoxes.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
-  };
-  const femaleNormFor = (personBox) => {
-    const s = Math.max(0, ...femaleBoxes.filter(f => _boxIouXyxy(f.box, personBox) > 0.6).map(f => f.score));
-    return Math.min(1, s / 0.45);
-  };
+  // (The femaleness DINO pass and gender tiebreaker were REMOVED 2026-08-22 —
+  // owner decision after the pass misread two toddler boys and handed their
+  // names to background pedestrians on hpv76p0rokg p1.)
 
   // Stage 1d — IDENTITY BEFORE MASKING (owner, 2026-08-16).
   //
@@ -1762,7 +1755,6 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // left is the deterministic fallback for when SoM returned nothing.
   if (!nameByDet) {
     require('./runMetrics').forJob(_metricsJobId()).count('som_identity_fallback');
-    await loadFemaleBoxes(); // gender tiebreaker only needed here (lazy)
     const sh = getStoryHelpers();
     const chars = expectedCharacters.map(c => {
       const lcr = c.position ? sh.normalizePositionToLCR(c.position) : null;
@@ -1771,22 +1763,30 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
         xTarget: lcr === 'left' ? 0.18 : lcr === 'right' ? 0.82 : lcr === 'center' ? 0.5 : null,
         depthRank: _depthRankFromProse(c.position),
         isChild: _isChildFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
-        gender: _genderFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
       };
     });
-    const geo = dets.map(d => ({
-      cx: (d.bodyBox[1] + d.bodyBox[3]) / 2,
-      h: d.bodyBox[2] - d.bodyBox[0],
-      bottom: d.bodyBox[2],
-      femaleNorm: femaleNormFor(d.box),
+    // NAMING FLOOR (owner, 2026-08-22): only plausibly-main boxes may RECEIVE a
+    // character name from the geometric fallback — face-paired, or DINO score
+    // ≥ 0.45, or ≥ 3% of the frame. Deliberately permissive (a real person can
+    // arrive with only a face box or only a body box — rather let a random
+    // extra in than throw a real person away); if nothing qualifies at all,
+    // every box stays eligible. On the p1 crowd page every mis-namable sliver
+    // was faceless, ≤0.44 score and ≤0.5% of the frame.
+    const relArea = (d) => Math.max(0, d.bodyBox[2] - d.bodyBox[0]) * Math.max(0, d.bodyBox[3] - d.bodyBox[1]);
+    let eligible = dets.map((d, i) => i).filter(i => dets[i].face || (dets[i].score || 0) >= 0.45 || relArea(dets[i]) >= 0.03);
+    if (eligible.length === 0) eligible = dets.map((d, i) => i);
+    const geo = eligible.map(i => ({
+      cx: (dets[i].bodyBox[1] + dets[i].bodyBox[3]) / 2,
+      h: dets[i].bodyBox[2] - dets[i].bodyBox[0],
+      bottom: dets[i].bodyBox[2],
     }));
     const asg = _assignFiguresByLayout(chars, geo);
     nameByDet = new Map();
-    chars.forEach((c, i) => { if (asg.map[i] != null) nameByDet.set(asg.map[i], c.name); });
+    chars.forEach((c, i) => { if (asg.map[i] != null) nameByDet.set(eligible[asg.map[i]], c.name); });
     // Keep whatever the SoM stage recorded about WHY it is running — this line
     // used to overwrite it, so a fallback page said only "layout-fallback".
     diag.identity = { method: 'layout-fallback', ...(diag.identity?.method === 'layout-fallback' ? diag.identity : {}) };
-    diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, gender: c.gender, femaleNorm: asg.map[i] != null ? +(geo[asg.map[i]]?.femaleNorm ?? 0).toFixed(2) : null }));
+    diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i] != null ? eligible[asg.map[i]] : null, xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, eligibleCount: eligible.length }));
     diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
     diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;
   }
