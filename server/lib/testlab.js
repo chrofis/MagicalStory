@@ -6526,7 +6526,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   const orig = PROMPT_TEMPLATES.storyTextFromBeats;
   if (promptOverride) PROMPT_TEMPLATES.storyTextFromBeats = promptOverride;
   let prompt;
-  try { prompt = buildStoryTextFromBeatsPrompt(storyData, beats); }
+  try { prompt = buildStoryTextFromBeatsPrompt(storyData, beats, [], parseBeats(String(storyData.outline || '')).arc || ''); }
   finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
   if (!prompt) throw new Error('story-text-from-beats template unavailable');
 
@@ -6651,7 +6651,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           const briefs = String(r.text).split(/^##\s*(?:Page|Seite)\s*\d+/im).slice(1);
           arm.stages.scenes = { ...WC.scoreScenes(briefs), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'text') {
-          const r = await call(SH.buildStoryTextFromBeatsPrompt(storyData, beats), model, 'text');
+          const r = await call(SH.buildStoryTextFromBeatsPrompt(storyData, beats, [], SH.parseBeats(String(storyData.outline || '')).arc || ''), model, 'text');
           const parsed = SH.parseRefinedText(r.text);
           arm.stages.text = { ...WC.scoreText(parsed.pages || [], expectedPages, storyData.language), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         }

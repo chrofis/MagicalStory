@@ -43,7 +43,7 @@ Requirements:
 - The main character(s) face the challenges the STORY SHAPE allows, each met at a cost and each harder because the last was not clean. Near the end the goal looks lost before it is won.
 - The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes the obstacle; adults may comfort, permit or watch.
 - Challenges belong to the story, never dealt out one per character in turn. Each other named child keeps to the moments the shape allows, doing what only they would do, and what the youngest does stays within a very young child's reach: noticing, holding, fetching, naming, offering, refusing.
-- One character carries the visible change, shown by doing the same kind of thing differently: once early, refusing, failing or needing help, and once late, doing it themselves. No beat states what anyone learned, realised or now understands.
+- One character carries the visible change, shown by doing the same kind of thing differently: once early, refusing, failing or needing help, and once late, doing it themselves. No beat states what anyone learned, realised or now understands. The one exception is the stake: early in the book a character SAYS what must happen and why — spoken words are drawable, and a look is not a statement.
 - No obstacle is removed in the beat that introduces it. Passing one costs something the beat names — time, a possession, a plan, help asked for, someone's comfort.
 - A deadline or cost the arc names is visible on a page: something has changed because time ran on or the price was paid, not only mentioned in passing.
 - Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. Staying in one place is not the problem — repeating the same picture there is.
@@ -71,6 +71,7 @@ Only the blocks below, in this order. No preamble, no commentary.
 ---ARC---
 World: <where this happens and what is true about it that matters>
 Main challenge: <what the main character(s) must face — it comes from who they are, not from the setting>
+Stake, said aloud: <ONE sentence a character can say, early, that tells what must happen and why — the sentence the whole book answers>
 
 Challenges of <the main character, or the two of them>:
 1. <the challenge> — <how they meet it, and what it costs them>

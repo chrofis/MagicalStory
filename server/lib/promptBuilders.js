@@ -4346,7 +4346,7 @@ function buildDoNotWriteSection(inputData = {}) {
  *   scene briefs, post scene-review. Text is written to match the picture that
  *   will actually be drawn; see the ordering note in beatsPipeline.
  */
-function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = []) {
+function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '') {
   const template = PROMPT_TEMPLATES.storyTextFromBeats;
   if (!template) {
     log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
@@ -4368,6 +4368,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = []) {
     })
     .join('\n\n');
   return fillTemplate(template, {
+    STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
     BEATS: blocks,

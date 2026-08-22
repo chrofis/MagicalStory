@@ -20,6 +20,10 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
+# THE STORY'S ARC (what the book is about — the beats deliver it, the text says it)
+
+{STORY_ARC}
+
 # LOCKED BEATS AND ILLUSTRATIONS
 
 The commission above was already delivered by these beats. Its licence to replace mechanics was spent upstream: take nothing from it that the beats do not carry.
@@ -41,6 +45,8 @@ The illustration already shows the scene, so write what it cannot show: the inte
 Never contradict a page's SCENE line, and never mention pages, beats or illustrations.
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
 Vary sentence openings between consecutive pages.
+The arc's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
+Everything else works the other way: information neither the beats nor the pictures carry is cut, never added.
 Every word must be one a child at the reading level above already uses. Name a thing plainly instead of reaching for a rare compound or an unusual colour or material word, and keep a sentence to one idea when the word count is tight.
 The title is in the story language, contains the main character's name, and does not spoil the ending.
 

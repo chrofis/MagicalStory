@@ -14978,3 +14978,40 @@ the class.
 **Touched files.** `storyJobPipeline.js`, `server/lib/figureDetection.js`.
 Bug: `som-identity-lines-undressed`. Open follow-up: sceneCharacters carry no
 `physical.hair`, so gen lines still lack the Hair cue the Lab lines have.
+
+## 2026-08-22 — The main stake must be SAID, and the text stage receives the arc
+
+**Context:** In the first full production run of the arc pipeline, the story's entire premise —
+the dragon is lost and must get home to the Alps — reached the reader nowhere until p18 asserted
+it. Owner: "the main story is an open ending and not stated in the text anywhere. How can the
+main part be missed." Forensics: the arc HAD it but filed it in the World paragraph (context);
+the beats compressed it to "he looks lost"; the beats reviewer CAUGHT it ("home never opens")
+and its fix-ledger was satisfied by inserting the single word "lost" into one beat — the ledger
+verifies that a named page changed, not that the change carries the meaning; and the text stage
+was structurally unable to recover it, because it receives beats + illustration briefs ONLY and
+its rules forbid adding what they don't carry. Two of our own rules made the stake illegal to
+state anywhere: "every beat is visible" and "no beat states what anyone realised" — the main
+stake of a story is pure information, whose one legitimate carrier for a listening child is a
+character SAYING it.
+
+**Owner ruling:** the main stake must be clearly stated in the text — early, in words a small
+child knows, and repeated. Saying it plainly beats leaving it unsaid, even unsupported by the
+picture. Everything else keeps the old direction: minor information the beats don't carry is
+cut, never added. Asymmetry by design.
+
+**Decision (minimal):**
+1. The ARC gains one line: `Stake, said aloud:` — one sentence a character can say, early, that
+   tells what must happen and why.
+2. The no-stated-realisations rule gains its one exception: the stake is spoken, early — spoken
+   words are drawable; a look is not a statement. Beats-review check 2 names the page where it
+   is said and rewrites the earliest fitting page when none does.
+3. `buildStoryTextFromBeatsPrompt` now receives the approved arc (`{STORY_ARC}`), and the text
+   template carries the stake rule verbatim. text-refine gets the same as a safety net.
+
+**Also verified against the same run:** the text refine IS applied — all 4 pages the refiner
+changed are byte-identical to what the story displays. And the scoring-harness bug from tonight
+(empty artifact judged; sonnet fabricated placeholder scores, grok/gemini refused) is guarded in
+the scratchpad scorer; the same guard still needs porting into scoreArtifactsWithJudge.
+
+**Touched:** prompts/story-beats.txt, story-beats-review.txt, story-text-from-beats.txt,
+text-refine.txt; server/lib/promptBuilders.js, beatsPipeline.js, testlab.js.

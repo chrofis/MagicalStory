@@ -36,7 +36,7 @@ These outlines describe rendering as well as events — appearance, clothing, po
 
 # YOUR TASK
 
-Find the pages that are weak and rewrite only those. A page that already works stays as it is. The story must still deliver the brief above.
+Find the pages that are weak and rewrite only those. If no early page states plainly what must happen and why, rewrite the earliest fitting page so a character says it. A page that already works stays as it is. The story must still deliver the brief above.
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
