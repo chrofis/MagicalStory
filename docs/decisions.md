@@ -15015,3 +15015,45 @@ the scratchpad scorer; the same guard still needs porting into scoreArtifactsWit
 
 **Touched:** prompts/story-beats.txt, story-beats-review.txt, story-text-from-beats.txt,
 text-refine.txt; server/lib/promptBuilders.js, beatsPipeline.js, testlab.js.
+
+---
+
+## 2026-08-22 — Landmark descriptions rewritten by model to drop acronyms; UNESCO and NASA stay
+
+**Context:** `wikipedia_extract` reaches the story writer as DESCRIPTION, so an
+acronym in it can land on a page a child reads (a production story opened with
+"zur SZU-Station"). The mechanical strip only removes the parenthetical form
+"Full Name (ABBR)". A full scan then showed **435 rows / 693 occurrences** still
+carrying bare acronyms — UCI, SNCF, ICAO, ZVV, KGS, ZHAW, canton codes, company
+forms. A regex cannot fix those: deleting a bare acronym leaves a sentence with
+no subject, and no lookup table covers the long tail.
+
+**Decision (owner, 2026-08-22):** rewrite the affected extracts with
+`claude-haiku-4-5`, which can rephrase rather than delete. **UNESCO and NASA are
+KEPT** — widely enough known to read as words. Every other acronym is expanded to
+its full name or the clause rewritten around it. Language, facts and length are
+preserved; Roman numerals are left alone.
+
+**Result — three passes, $0.36 total:** 435 rows → **42**, 693 occurrences → 61.
+Examples: "im KGS-Inventar" → "im Inventar der Kulturgüter von schweizerischer
+Bedeutung"; "Die ZHAW Zürcher Hochschule für Angewandte Wissenschaften" → "Die
+Zürcher Hochschule für Angewandte Wissenschaften".
+
+**What remains, and why it is left alone.** Of the 42: 19 are typed
+`Event`/`Organisation`, class 0, never offered to a writer; 18 are middle class;
+**5 are top-class backdrops**. Of those 5, one is a FALSE POSITIVE in the
+detector (`FAL`, from Trafalgar Square's pronunciation guide `trə-FAL-gər`), two
+are canton codes inside Swiss place names (Gossau ZH, Egg ZH), and two are an
+institution's own initialism (BPU, IMR). The stubborn rest are acronyms that ARE
+the name — ABB Technikerschule, FC Baden, Crédit Agricole (Suisse) SA. The model
+correctly refused to invent expansions for those, and passes returned 386 → 42 →
+20 rows fixed, so a fourth pass would mean renaming real institutions.
+
+Guards for anything new: `stripLandmarkAbbreviations` runs on the write path
+(saveLandmarkToIndex) so a newly discovered landmark cannot reintroduce the
+parenthetical form, and the landmark prompt block forbids the writer carrying any
+abbreviation out of a DESCRIPTION — which is what covers these 42 stragglers and
+the long tail generally.
+
+**Touched:** `scripts/admin/rewrite-landmark-extracts.js` (new)
+**Status:** ✅ active
