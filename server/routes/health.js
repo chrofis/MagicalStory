@@ -54,7 +54,13 @@ router.get('/health/config', (req, res) => {
 // Admin-only: this evicts models and briefly slows the next request.
 router.post('/health/release-memory', authenticateToken, requireAdmin, async (req, res) => {
   const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-  const unload = req.query.unload === 'true' ? '?unload=true' : '';
+  // Forward BOTH flags. `recycle` was previously dropped here, so the only way
+  // to reclaim a framework that cannot be unloaded in-process (TensorFlow keeps
+  // ~350MB of allocator arenas after its weights are freed) was to redeploy.
+  const flags = [];
+  if (req.query.unload === 'true') flags.push('unload=true');
+  if (req.query.recycle === 'true') flags.push('recycle=true');
+  const unload = flags.length ? `?${flags.join('&')}` : '';
   const nodeBefore = Math.round(process.memoryUsage().rss / 1024 / 1024 * 10) / 10;
   try {
     const r = await fetch(`${url}/release-memory${unload}`, { method: 'POST', signal: AbortSignal.timeout(30000) });

@@ -31,6 +31,25 @@ const BASE = () => process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
  */
 const ARCFACE_MIN = Number(process.env.ARCFACE_MIN_SCORE || 0.45);
 
+/**
+ * OFF BY DEFAULT — the gate is memory-unsafe in the shared analyzer process.
+ *
+ * Measured on staging 2026-08-22: the analyzer sat at 2336MB RSS (2079MB after a
+ * trim) once ArcFace had been used. GroundingDINO needs ~1.9GB on its own, so
+ * TensorFlow's ~350MB is enough to push DINO's load over the container limit —
+ * it then dies with an EMPTY error, retries, and crash-loops. Every
+ * /detect-figures-text call 503s (Lab experiments #799/#800), and production
+ * runs grounding-dino too, so this is not staging-only.
+ *
+ * The idle reaper does not rescue it: that requires the whole SERVICE to be
+ * idle, and during a story or a Lab run it never is, so TF stays resident.
+ *
+ * Enabling this again needs ArcFace out of the analyzer process — see
+ * docs/decisions.md 2026-08-22. Until then ARCFACE_GATE_ENABLED=true is an
+ * explicit, informed opt-in for an environment that is not running DINO.
+ */
+const GATE_ENABLED = String(process.env.ARCFACE_GATE_ENABLED || 'false').toLowerCase() === 'true';
+
 // Only the two HEAD cells of the 2x2 sheet are comparable. The bottom row is
 // full-body: the head is a small part of a 360x640 crop, and one cell is a pure
 // profile that a frontal-biased model cannot embed at all (measured 0.028 on a
@@ -110,6 +129,10 @@ const cosine = (a, b) => {
  * Avatar creation must not break because a quality probe is unavailable.
  */
 function scoreAvatarLikeness(photo, sheetImage) {
+  // Disabled means "no opinion", which the caller already treats as fail-open —
+  // so avatars generate exactly as they did before the gate existed, and no
+  // TensorFlow is ever imported into the analyzer.
+  if (!GATE_ENABLED) return Promise.resolve({ score: null, cells: {}, unavailable: 'gate disabled' });
   return serialise(() => scoreAvatarLikenessInner(photo, sheetImage));
 }
 
@@ -156,9 +179,12 @@ const failsArcFaceGate = (score) => typeof score === 'number' && score < ARCFACE
  * scoring step. Fire-and-forget; failure is not an error.
  */
 function warmArcFace() {
+  // Never warm a disabled gate: the warmup is what pulls TensorFlow into the
+  // analyzer, and that is precisely what starves GroundingDINO.
+  if (!GATE_ENABLED) return;
   analyzerPost('/warmup', { arcface: true }, 5000)
     .then(() => log.debug('[ARCFACE] warmup requested'))
     .catch((err) => log.debug(`[ARCFACE] warmup skipped: ${err.message}`));
 }
 
-module.exports = { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN };
+module.exports = { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN, GATE_ENABLED };

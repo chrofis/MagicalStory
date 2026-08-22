@@ -15268,3 +15268,39 @@ pedestrians "Levin"/"Julian" while the real kids shipped UNKNOWN.
 **Touched files.** `server/lib/figureDetection.js` (validate/dupe resolution,
 fallback floor, cost fn, dead code removed), `storyJobPipeline.js` (position
 field). Task #29.
+
+
+## 2026-08-22 — The ArcFace gate is OFF by default: TensorFlow starves GroundingDINO
+
+**Context.** Hours after the gate shipped, staging's analyzer went into a crash
+loop: six "[GDINO] Loading GroundingDINO..." attempts, each followed by
+"GroundingDINO unavailable:" with an EMPTY error — the OOM-kill signature — and
+every /detect-figures-text call 503ing (Lab experiments #799/#800). Confirmed
+rather than assumed: POST /api/health/release-memory reported the analyzer at
+2336MB RSS, and ?unload=true listed **arcface-weights** among the resident
+models, dropping it to 1862MB.
+
+**Decision.** `ARCFACE_GATE_ENABLED` (server/lib/faceIdentity.js), default
+**false**. Disabled, `scoreAvatarLikeness` returns "no opinion" — which the
+caller already treats as fail-open — and `warmArcFace` is a no-op, so
+TensorFlow is never imported into the analyzer at all and the process returns to
+its pre-change footprint. `/api/health/release-memory` now also forwards
+`recycle=true`, which it previously dropped.
+
+**Rationale.** GroundingDINO needs ~1.9GB. TensorFlow's ~350MB is enough to push
+its load past the container limit, and DINO is the DEFAULT figure detector in
+production as well as staging — so this was never a staging-only problem, it was
+an unexploded one in prod. The idle reaper cannot rescue it either: it requires
+the whole SERVICE to be idle, and during a story or a Lab run it never is, so TF
+stays resident indefinitely. A quality probe must never cost a rendering
+dependency its memory.
+
+**What re-enabling requires.** ArcFace out of the shared analyzer process — a
+short-lived worker that is spawned for avatar scoring and killed after, so its
+memory is returned by process exit rather than by a reaper that cannot fire.
+The ONNX backend (/face-embedding-onnx) is lighter but not free (~200MB session
+plus 174MB weights) and is NOT automatically safe beside a 1.9GB DINO; it also
+needs its weights added to the Dockerfile, which was never done.
+
+**Touched files.** `server/lib/faceIdentity.js`, `server/routes/health.js`,
+`tasks/bugs.json` (staging-analyzer-dino-crashloop).
