@@ -125,16 +125,30 @@ async function faceCrop(imageB64, quadrant) {
  * faceDetected is returned and checked by the caller — if the detector finds
  * nothing, that is reported, never silently scored.
  */
-async function embedFace(faceDataUri) {
-  // --onnx swaps the DeepFace/TensorFlow backend for onnxruntime. Same crop,
-  // same alignment, same call shape — only the embedder differs, so the two
-  // distributions are directly comparable. The weights are NOT the same
-  // checkpoint, so cosine values shift and the threshold must be recalibrated
-  // against this backend rather than carried over.
+/**
+ * Embed a face straight from the source image (optionally one 2x2 cell).
+ *
+ * NOTE what is NOT here: a /extract-face pre-crop. Cropping first then aligning
+ * inside the embedder was double-processing, and the pre-crop is lossy — it pads
+ * 40% above the face and 5% below, which cut the mouth and chin off one toddler
+ * entirely. The mouth corners are two of the five landmarks the alignment warp
+ * needs, so the pre-crop was destroying the very information the next step
+ * depends on. The embedder finds and aligns the face itself.
+ *
+ * --onnx swaps the DeepFace/TensorFlow backend for onnxruntime; same call shape,
+ * different checkpoint, so cosine values shift and thresholds do not carry over.
+ */
+async function embedFace(imageB64, quadrant, wantFace) {
   const endpoint = ONNX ? '/face-embedding-onnx' : '/face-embedding';
-  const r = await py(endpoint, { image: faceDataUri, extract_face: true });
+  const r = await py(endpoint, {
+    image: imageB64.startsWith('data:') ? imageB64 : `data:image/jpeg;base64,${imageB64}`,
+    ...(quadrant ? { quadrant } : {}),
+    extract_face: true,
+    ...(wantFace ? { return_face: true } : {}),
+  });
   if (!Array.isArray(r.embedding)) return null;
-  return r.faceDetected === false ? null : r.embedding;
+  if (r.faceDetected === false) return null;
+  return { emb: r.embedding, aligned: r.aligned !== false, face: r.alignedFace || null };
 }
 
 const cosine = (a, b) => {
@@ -151,12 +165,10 @@ async function compareSheet(photoB64, sheetB64, photoEmb, saveCrop) {
       // right — never a score. Letting the embedder fall back to the whole cell
       // is what made every earlier run meaningless (a profile cell "beat" a
       // frontal headshot because it was really comparing hoodie and backdrop).
-      const { face, detected } = await faceCrop(sheetB64, q);
-      if (!detected || !face) { cells.push({ q, sim: null, err: 'no face in cell' }); continue; }
-      const emb = await embedFace(face);
-      if (!emb) { cells.push({ q, sim: null, err: 'embed failed' }); continue; }
-      const file = saveCrop ? saveCrop(q, face) : null;
-      cells.push({ q, sim: cosine(photoEmb, emb), crop: file });
+      const res = await embedFace(sheetB64, q, true);
+      if (!res) { cells.push({ q, sim: null, err: 'no face in cell' }); continue; }
+      const file = (saveCrop && res.face) ? saveCrop(q, res.face) : null;
+      cells.push({ q, sim: cosine(photoEmb, res.emb), crop: file, aligned: res.aligned });
     } catch (e) {
       cells.push({ q, sim: null, err: e.message.slice(0, 90) });
     }
@@ -254,12 +266,13 @@ async function comparePageFaces(photoB64, pageB64) {
         // with the eyes cut off for another. Symmetry of treatment is the wrong
         // instinct here; symmetry of CONTENT (one tight face each side) is right.
         // Only photos.original, a full photo, needs detection.
-        const src = c.photos?.face ? { face: null, detected: true } : await faceCrop(photoB64);
-        const srcFace = (!c.photos?.face && src.detected && src.face)
-          ? src.face
-          : `data:image/jpeg;base64,${photoB64}`;
-        const photoEmb = await embedFace(srcFace);
-        if (!photoEmb) { console.log('source photo could not be embedded — skipped'); continue; }
+        // The embedder handles detection and alignment on the raw photo, so
+        // photos.face (already a tight crop) and photos.original (a full frame)
+        // both go in untouched — no second crop either way.
+        const srcRes = await embedFace(photoB64, null, true);
+        if (!srcRes) { console.log('source photo could not be embedded — skipped'); continue; }
+        const photoEmb = srcRes.emb;
+        const srcFace = srcRes.face || `data:image/jpeg;base64,${photoB64}`;
 
         // Names are NOT unique — two characters called "Mami" overwrote each
         // other's crop files, so the report showed one child's face beside the
@@ -275,7 +288,7 @@ async function comparePageFaces(photoB64, pageB64) {
           return path.relative(path.dirname(OUT), f).replace(/\\/g, '/');
         });
         sheet.srcCrop = path.relative(path.dirname(OUT), srcFile).replace(/\\/g, '/');
-        sheet.srcDetected = src.detected;
+        sheet.srcDetected = srcRes.aligned;
 
         let pages = null;
         if (WITH_PAGES) {

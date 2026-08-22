@@ -3626,36 +3626,50 @@ def face_embedding_onnx():
                 y1, y2, x1, x2 = qmap[quadrant]
                 image = image[y1:y2, x1:x2]
 
-        face_detected = False
-        if data.get('extract_face', True):
-            box = detect_face_mediapipe(image)
-            if box:
-                face_detected = True
-                h, w = image.shape[:2]
-                pad = 0.15
-                x, y = box['x'] / 100, box['y'] / 100
-                fw, fh = box['width'] / 100, box['height'] / 100
-                y1 = int(max(0, y - fh * pad) * h)
-                x1 = int(max(0, x - fw * pad) * w)
-                y2 = int(min(1, y + fh * (1 + pad)) * h)
-                x2 = int(min(1, x + fw * (1 + pad)) * w)
-                if y2 > y1 and x2 > x1:
-                    image = image[y1:y2, x1:x2]
-            else:
-                return jsonify({"success": True, "embedding": None, "faceDetected": False})
-
-        # Align to ArcFace's canonical 112x112 before embedding. Reported back
-        # as `aligned` so a caller can tell a properly-aligned score from a
-        # fallback one instead of treating them as the same measurement.
+        # Alignment needs LANDMARKS, not a pre-crop, so it runs on the full
+        # frame. Pre-cropping first is actively harmful: /extract-face pads
+        # asymmetrically (40% above the face, 5% below) to grab hair and drop
+        # shoulders, which on some faces cuts off the mouth and chin — and the
+        # mouth corners are two of the five points the warp needs. One toddler's
+        # avatar came through as a half-face for exactly this reason and scored
+        # low on both backends. Detect-and-crop is now only the fallback for
+        # when landmarks cannot be found at all.
         warped = align_face_arcface(image)
+        face_detected = warped is not None
+
+        if warped is None and data.get('extract_face', True):
+            box = detect_face_mediapipe(image)
+            if not box:
+                return jsonify({"success": True, "embedding": None,
+                                "faceDetected": False, "aligned": False})
+            face_detected = True
+            h, w = image.shape[:2]
+            pad = 0.25  # symmetric — no upward bias when we must fall back
+            x, y = box['x'] / 100, box['y'] / 100
+            fw, fh = box['width'] / 100, box['height'] / 100
+            y1 = int(max(0, y - fh * pad) * h)
+            x1 = int(max(0, x - fw * pad) * w)
+            y2 = int(min(1, y + fh * (1 + pad)) * h)
+            x2 = int(min(1, x + fw * (1 + pad)) * w)
+            if y2 > y1 and x2 > x1:
+                image = image[y1:y2, x1:x2]
+
         emb = arcface_onnx_embedding(warped if warped is not None else image,
                                      aligned=warped is not None)
         if emb is None:
             return jsonify({"success": False, "error": "ArcFace ONNX model unavailable"}), 503
 
-        return jsonify({"success": True, "embedding": emb.tolist(),
-                        "dimensions": int(emb.shape[0]), "faceDetected": face_detected,
-                        "aligned": warped is not None})
+        resp = {"success": True, "embedding": emb.tolist(),
+                "dimensions": int(emb.shape[0]), "faceDetected": face_detected,
+                "aligned": warped is not None}
+
+        # Optionally hand back the exact 112x112 that was embedded, so a report
+        # can show what was actually measured rather than a look-alike crop.
+        if data.get('return_face') and warped is not None:
+            ok, buf = cv2.imencode('.jpg', warped, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            if ok:
+                resp["alignedFace"] = "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode('utf-8')
+        return jsonify(resp)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
