@@ -16,15 +16,15 @@ Characters: {CHARACTER_NAMES}
 
 {STORY_BRIEF}
 
-# CHARACTER DETAILS
+# CHARACTER DETAILS (optional colour — use a trait where it fits a moment, never contradict one, never work through the list)
 
 {CHARACTER_DETAILS}
 
-# THE STORY'S ARC (what the book is about — the beats deliver it, the text says it)
+# THE ARC — THE CONTRACT (what the text must achieve: the stake said early and again later, the change visible at the end, nothing the arc closes left unsaid or unshown)
 
 {STORY_ARC}
 
-# LOCKED BEATS AND ILLUSTRATIONS
+# LOCKED BEATS AND ILLUSTRATIONS (given — the text matches them, page for page)
 
 The commission above was already delivered by these beats. Its licence to replace mechanics was spent upstream: take nothing from it that the beats do not carry.
 

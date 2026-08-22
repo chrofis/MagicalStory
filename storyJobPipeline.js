@@ -4907,6 +4907,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const t = byPage.get(img.pageNumber);
           if (t) img.text = t;
         }
+        // THIRD store: data.story / data.storyText are assembled from the
+        // pre-refine pages and persisted as-is, and the Lab's edit mode reads
+        // THEM — so without this rebuild the editor showed the original text
+        // while the book showed the refined one (caught by the owner on p18 of
+        // the first arc-pipeline run: "Das reicht." vs the refined ending).
+        fullStoryText = storyPages.map(page =>
+          `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
+        ).join('\n\n');
         const totalMs = refined.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
         genLog.info(
           'text_refine_complete',
