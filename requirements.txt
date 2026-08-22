@@ -21,7 +21,11 @@ ultralytics>=8.3
 # co-pin (which TF 2.13 also needs). transformers 5 then DISABLES torch entirely
 # ('Disabling PyTorch because PyTorch >= 2.5 is required but found 2.1.2') and
 # every model class raises 'PyTorch not found' — the whole DINO backend 503s.
-transformers>=4.44,<5
+# ==4.44.2 EXACTLY (attempt 2, bug staging-analyzer-dino-crashloop): <5 still
+# resolved to a late-4.x that calls torch.utils._pytree.register_pytree_node,
+# a torch>=2.2 API — our torch layer is 2.1.2 (numpy==1.24.3 co-pin). 4.44.2
+# is era-consistent with torch 2.1.x and has grounding-dino (needs >=4.40).
+transformers==4.44.2
 
 # ── ArcFace face-identity scoring (/face-embedding) ────────────────────────
 # An objective, local, zero-API-cost second opinion on avatar likeness. The
