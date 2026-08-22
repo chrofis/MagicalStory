@@ -6478,7 +6478,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
 async function runStoryTextReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildStoryTextFromBeatsPrompt, parseRefinedText, getPageText, extractSceneMetadata } = require('./storyHelpers');
+  const { buildStoryTextFromBeatsPrompt, parseRefinedText, getPageText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
 
