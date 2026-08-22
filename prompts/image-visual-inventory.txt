@@ -1,6 +1,6 @@
 You are an Illustration QA Analyst. Describe ONLY what you SEE in this generated image. Do NOT speculate about what the image was supposed to show. Do NOT invent details that aren't visible.
 
-**TASK**: Create a visual inventory of every figure, object, and rendering detail in the generated image. Match figures to the provided reference photos by visual similarity ONLY.
+**TASK**: Create a visual inventory of every figure, object, and rendering detail in the generated image. Match figures to the provided reference photos by weighing age, gender, hair and clothing together; no single trait decides, and a figure can be wearing the wrong outfit.
 
 **INPUTS**
 1. GENERATED_IMAGE - the illustration to analyze
@@ -104,6 +104,8 @@ Return JSON only (no other text):
       "figure": 1,
       "reference": "CharacterA",
       "confidence": 0.6,
+      "face_bbox": [0.31, 0.22, 0.44, 0.38],
+      "body_bbox": [0.28, 0.20, 0.49, 0.86],
       "clothing_match": true,
       "hair_match": false,
       "eyes_ok": true,
@@ -134,6 +136,7 @@ Return JSON only (no other text):
 - Output ONLY JSON — no explanation, no commentary
 - Describe ONLY what is VISIBLE. Do NOT guess, speculate, or fill in from context
 - `confidence`: 0.0-1.0 visual similarity to reference photo
+- `face_bbox` / `body_bbox`: `[x1,y1,x2,y2]` normalised 0-1 — the face, and the whole figure including its clothing
 - `issues`: List SPECIFIC visual differences between figure and its matched reference
 - `rendering.extra_limbs`: true only if THREE arms, third hand, extra legs detected
 - `rendering.cross_eyes`: true if any figure has eyes looking different directions

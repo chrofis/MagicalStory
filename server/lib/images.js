@@ -2385,6 +2385,28 @@ async function evaluateImageBatch(images, options = {}) {
         enrichedFixTargets = enrichResult.targets || [];
       }
 
+      // WHO IS WHO — reconcile the evaluator against the detector before any
+      // downstream consumer reads a name off this evaluation. This is the only
+      // point where both identities exist side by side; after it, `matches` and
+      // every per-character finding carry the detector's names. Enrichment above
+      // pairs on geometry, not names, so it is unaffected by the correction.
+      let identityAgreement = null;
+      if (qualityResult && bboxDetection?.figures?.length) {
+        const { reconcileIdentity, describeIdentityAgreement } = require('./identityAgreement');
+        identityAgreement = reconcileIdentity(qualityResult, bboxDetection.figures, {
+          alsoRename: [enrichedFixTargets],
+        });
+        if (identityAgreement?.conflicts?.length) {
+          log.warn(describeIdentityAgreement(identityAgreement, `PAGE ${img.pageNumber}: `));
+          // The disagreements ARE the corpus — the hardest images we have.
+          require('./identityCorpus').harvestIdentityConflict({
+            storyId, pageNumber: img.pageNumber, report: identityAgreement,
+          });
+        } else if (identityAgreement) {
+          log.debug(describeIdentityAgreement(identityAgreement, `PAGE ${img.pageNumber}: `));
+        }
+      }
+
       // Create bbox overlay image for dev mode display
       let bboxOverlayImage = null;
       if (bboxDetection) {
@@ -2426,6 +2448,10 @@ async function evaluateImageBatch(images, options = {}) {
         // evaluator produced it.
         styleGate: qualityResult?.styleGate ?? null,
         bboxDetection,
+        // Who-is-who agreement between this evaluation and the detection above.
+        // Kept on the record so a stored page still shows whether its names were
+        // contested, and which way they were corrected.
+        identityAgreement,
         bboxOverlayImage,
         usage: qualityResult?.usage || null,
         modelId: qualityResult?.modelId || null,

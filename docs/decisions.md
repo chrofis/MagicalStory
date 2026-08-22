@@ -15357,3 +15357,56 @@ get_groundingdino() had to re-download the weights from HuggingFace and died.
 
 **Touched files.** `Dockerfile`, `photo_analyzer.py`. Bug:
 `staging-analyzer-dino-crashloop`.
+
+## 2026-08-22 — Who-is-who: the detector wins, and every disagreement is harvested to the Lab
+
+**Context:** The evaluator and the figure detector name figures by completely
+independent routes, and they disagree far more often than anyone assumed. On
+`job_1787349305313_hpv76p0rokg`, every one of the 9 evaluations that carried
+both records disagreed about at least one name, always as a clean permutation
+of the same bodies. That matters well beyond a "wrong name" cosmetic: a
+per-character finding is applied to whichever figure the name points at, so a
+swapped identity silently sends a clothing, action or scale repair to the wrong
+child. Every per-character verdict on a contested page was suspect.
+
+**Decision:** Three parts.
+1. **Both sides now get what identity actually needs.** The evaluator and the
+   P1 visual inventory were told to match on *visual similarity* with no further
+   instruction; both now weigh age, gender, hair and clothing together, with the
+   declared position/action as a supporting hint only, and drop confidence below
+   0.5 when traits disagree. Clothing alone may never decide — a figure can be
+   wearing the wrong outfit, and letting the outfit name the figure would make a
+   wrong-outfit defect undetectable by construction.
+2. **P1's `matches` carry `face_bbox` and `body_bbox`.** P1's matches *replace*
+   the evaluator's downstream, and P1 emitted no box at all — so on 19 of 38
+   stored versions the geometry was gone and the two sides could not be compared
+   at all. The comparison is only possible because both now emit a box.
+3. **On disagreement the DETECTOR wins.** `reconcileIdentity` rewrites the
+   evaluator's names — in `matches`, in every per-character finding, in the
+   bbox-enriched fix targets, and in the findings' prose — but only when the
+   conflict is a clean permutation. If two evaluator names collapse onto one
+   detector name, renaming would place one child in two spots, so the page is
+   flagged `uncorrectable` and left exactly as the evaluator wrote it.
+   Every conflicting page is appended to the Test Lab set *Identity conflicts
+   (auto-harvested)* (stage `quality_eval`).
+
+**Rationale:** The detector works from full-body masks and per-figure identity
+lines that include clothing; the evaluator works from a face at picture-book
+scale, where four same-age children are near-identical. When they disagree the
+detector is the better-informed side. Prose is rewritten along with the
+structured name because those sentences were written by the same mistaken
+assignment — leaving them would hand a repair prompt a description naming the
+wrong child. And the disagreements are worth keeping: agreement means the image
+was easy, so sampling at random buys mostly easy pages, while the conflicts are
+precisely the hard cases both sides need to improve on. The corpus is a normal
+generic Lab set, not a new mechanism.
+
+**Touched:**
+- `server/lib/identityAgreement.js` (`checkIdentityAgreement`, `reconcileIdentity`)
+- `server/lib/identityCorpus.js` (harvest into the generic Lab set)
+- `server/lib/images.js` (`evaluateImageBatch` — the one point where both exist)
+- `server/lib/repairPipeline.js` (prefers the stored report over a re-measure)
+- `prompts/image-evaluation.txt`, `prompts/image-visual-inventory.txt`
+- `tests/manual/identityAgreement.test.js` (40 assertions)
+
+**Status:** ✅ active

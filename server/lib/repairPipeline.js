@@ -3094,6 +3094,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       bboxOverlayImage: finalEval?.bboxOverlayImage ?? null,
       figures: finalEval?.figures || [],
       matches: finalEval?.matches || [],
+      // Did the evaluator and the detector agree on WHO IS WHO? evaluateImageBatch
+      // reconciles them at the moment both exist and stores its report; prefer
+      // that one, since `matches` here already carries the corrected names and
+      // re-measuring them would only ever report agreement. The recompute is for
+      // records that never went through that path (a redetection after repair).
+      // Measured on the first story carrying both records: 15 of 17 comparable
+      // evaluations conflicted, in clean permutations of the same faces.
+      identityAgreement: finalEval?.identityAgreement || (() => {
+        try {
+          const det = freshBboxMap.get(pageNumber) || finalEval?.bboxDetection;
+          return require('./identityAgreement').checkIdentityAgreement(finalEval?.matches, det?.figures);
+        } catch { return null; }
+      })(),
       imageVersions,
       retryHistory,
       entityReport: finalEntityReport || null,

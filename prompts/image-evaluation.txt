@@ -168,7 +168,7 @@ Never fire D-11 to D-13 for a figure cropped by the frame edge, occluded by scen
 
 **D-27 `style_consistency`** — decided at **N-01 (b)**, not here. Do not re-evaluate the medium at this point in the list; if the page is in the wrong medium you have already reported it.
 
-**D-29 `scale` → MAJOR.** A character the USER_PROMPT's height order declares taller rendered no taller than one it declares shorter, or a figure at least half again the height its EXPECTED FIGURE PROPORTIONS ratio allows. Compare `height_fraction` only between figures with `same_ground_plane: true`; skip seated, crouching, occluded and background figures, characters the order calls similar in height, and pages where neither block is supplied.
+**D-29 `scale` → MAJOR.** A figure at least half again the height its EXPECTED FIGURE PROPORTIONS ratio allows. Never deduct for the height ORDER between characters; `height_order` is recorded for review only.
 
 **D-30 `composite_seam` → CRITICAL.** `rendering.composite_seam` is true: a straight or jagged boundary crossing the picture, or a cut-out edge around a figure, where the background, lighting or brushwork does not continue across it. Judge the boundary, not the medium — a whole page in the wrong medium is N-01. `fix`: "Repaint the page as one continuous illustration."
 
@@ -197,8 +197,9 @@ Return JSON only, no other text. Emit exactly these keys.
     }
   ],
   "matches": [
-    { "figure": 1, "reference": "CharacterA", "confidence": 0.85, "face_bbox": [0.31, 0.22, 0.44, 0.38] }
+    { "figure": 1, "reference": "CharacterA", "confidence": 0.85, "face_bbox": [0.31, 0.22, 0.44, 0.38], "body_bbox": [0.28, 0.20, 0.49, 0.86] }
   ],
+  "height_order": "CharacterC (shortest) -> CharacterA (similar height) -> CharacterB (taller)",
   "rendering": { "extra_limbs": false, "physics_ok": true, "composite_seam": false, "issues": [] },
   "coherence_gate": { "applied": false, "reason": null },
   "style_gate": { "observed": "ink illustration", "linework": "fine varied ink with hatching", "faces": "ink lines with graphic shading, stylised features", "matches_style": true, "reason": null },
@@ -216,4 +217,6 @@ Return JSON only, no other text. Emit exactly these keys.
 }
 ```
 
-`zone` is one of `{left|center|right}-{foreground|midground|background}` — a downstream evaluator pairs figures by it. `items_held` lists every distinct object in that figure's hands. `height_fraction` is the figure's visible height divided by the image height. `same_ground_plane` is false when the figure's feet rest at a different depth or surface from the other figures. `clipped_by` is `none`, `frame`, or the element that cuts the figure off. `face_bbox` is `[x1,y1,x2,y2]` normalised 0-1, omitted when no face is visible. `rendering` carries the booleans the pipeline reads plus a plain-text `issues` list for physics detail; `composite_seam` is true when a straight or jagged boundary crosses the picture and the rendering, lighting or background changes across it. `character` is null for scene-level findings. Use only the `type` codes from section C — never invent one, never combine two with an underscore.
+`zone` is one of `{left|center|right}-{foreground|midground|background}` — a downstream evaluator pairs figures by it. `items_held` lists every distinct object in that figure's hands. `height_fraction` is the figure's visible height divided by the image height. `same_ground_plane` is false when the figure's feet rest at a different depth or surface from the other figures. `clipped_by` is `none`, `frame`, or the element that cuts the figure off. `height_order` describes the RENDERED heights in the same shape the prompt uses — shortest first, each figure labelled `similar height`, `slightly taller`, `taller` or `noticeably taller` than the one before it. Two figures you cannot confidently separate are `similar height`. Skip figures you could not name, and figures that are seated, crouching, or on a different ground plane from the rest. `face_bbox` is `[x1,y1,x2,y2]` normalised 0-1, omitted when no face is visible. `body_bbox` is the same shape around the whole figure — head to lowest visible point, including its clothing.
+
+Fill `matches` by weighing age, gender, hair and clothing together, with each character's declared position and action as a supporting hint; no single trait decides. A character can be wearing the wrong outfit, so never let clothing alone override hair, build and age — when traits disagree, follow the majority and drop `confidence` below 0.5. `rendering` carries the booleans the pipeline reads plus a plain-text `issues` list for physics detail; `composite_seam` is true when a straight or jagged boundary crosses the picture and the rendering, lighting or background changes across it. `character` is null for scene-level findings. Use only the `type` codes from section C — never invent one, never combine two with an underscore.
