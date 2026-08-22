@@ -15331,3 +15331,29 @@ needs its weights added to the Dockerfile, which was never done.
 
 **Touched files.** `server/lib/faceIdentity.js`, `server/routes/health.js`,
 `tasks/bugs.json` (staging-analyzer-dino-crashloop).
+
+## 2026-08-22 — The DINO crash loop: a swallowed pre-fetch failure shipped an image without weights
+
+**Context.** Staging's analyzer 503'd every GroundingDINO call for hours across
+four builds, logging only "GroundingDINO unavailable: " — nothing after the
+colon (Lab exps #799–#802 all failed; the identity-fix verification was
+blocked). str() of the thrown exception is EMPTY, so logs said nothing.
+
+**Root cause.** Dockerfile layer order. requirements.txt now installs
+TensorFlow 2.13 (ArcFace), whose resolution DOWNGRADES typing_extensions below
+torch/transformers' floor. The DINO pre-fetch layer ran next, failed on
+import, and its `|| echo WARN` swallowed the failure — the image shipped
+WITHOUT the ~900MB weights. The typing_extensions>=4.12 repair layer ran only
+AFTER the pre-fetch. At runtime the import stack worked, but every
+get_groundingdino() had to re-download the weights from HuggingFace and died.
+
+**Decision.**
+- The typing_extensions upgrade layer moved BEFORE the DINO pre-fetch layer,
+  so the pre-fetch (and the runtime) see the working version and the weights
+  bake into the image again.
+- The loader's 503 path logs `repr(load_err)` + full traceback + whether the
+  weights are cached in the image. An exception with an empty str() can never
+  blind an outage again.
+
+**Touched files.** `Dockerfile`, `photo_analyzer.py`. Bug:
+`staging-analyzer-dino-crashloop`.

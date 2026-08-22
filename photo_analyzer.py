@@ -2086,8 +2086,16 @@ def detect_figures_text_endpoint():
         try:
             model, processor = get_groundingdino()
         except Exception as load_err:
-            print(f"[GDINO] GroundingDINO unavailable: {load_err}")
-            return jsonify({"success": False, "error": f"groundingdino unavailable: {load_err}"}), 503
+            # repr + traceback, not str: the crash-loop of 2026-08-22 printed
+            # "GroundingDINO unavailable: " with NOTHING after the colon
+            # (str(MemoryError()) and several import errors are empty) and the
+            # outage was undiagnosable from logs for hours.
+            import traceback as _tb
+            _tb.print_exc()
+            _cache = os.environ.get('HF_HOME', '~/.cache/huggingface')
+            _cached = os.path.isdir(os.path.join(_cache, 'hub', 'models--IDEA-Research--grounding-dino-base'))
+            print(f"[GDINO] GroundingDINO unavailable: {type(load_err).__name__}: {load_err!r} (weights cached in image: {_cached})")
+            return jsonify({"success": False, "error": f"groundingdino unavailable: {type(load_err).__name__}: {load_err!r}"}), 503
 
         import torch
         box_threshold = float(data.get('box_threshold', 0.25))

@@ -71,16 +71,24 @@ ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
 # if the pre-fetch fails, get_groundingdino() downloads it lazily on first use.
 ENV HF_HOME=/app/.hf_cache
 ENV GROUNDINGDINO_MODEL=IDEA-Research/grounding-dino-base
-RUN python3 -c "from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
-    AutoProcessor.from_pretrained('IDEA-Research/grounding-dino-base'); \
-    AutoModelForZeroShotObjectDetection.from_pretrained('IDEA-Research/grounding-dino-base')" \
-    || echo "WARN: GroundingDINO pre-fetch failed — will download lazily at runtime if used"
-
+# MUST RUN BEFORE THE DINO PRE-FETCH (bug staging-analyzer-dino-crashloop,
+# 2026-08-22): requirements.txt's TF 2.13 resolution DOWNGRADES
+# typing_extensions below torch/transformers' floor, so the pre-fetch import
+# below failed, its || WARN swallowed the failure, and the image shipped
+# WITHOUT DINO weights — every runtime load then re-downloaded ~900MB from
+# HF and died. Ordered here, both the pre-fetch and runtime see the working
+# version.
 # deepface's import chain needs typing_extensions>=4.10 (TypeIs) while
 # tensorflow 2.13 declares <4.6, so pip refuses to resolve both from one
 # requirements file. TF runs fine against the newer one — install it separately,
 # after requirements.txt, exactly as the torch CPU build is sequenced above.
 RUN pip3 install --no-cache-dir --break-system-packages "typing_extensions>=4.12"
+
+RUN python3 -c "from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
+    AutoProcessor.from_pretrained('IDEA-Research/grounding-dino-base'); \
+    AutoModelForZeroShotObjectDetection.from_pretrained('IDEA-Research/grounding-dino-base')" \
+    || echo "WARN: GroundingDINO pre-fetch failed — will download lazily at runtime if used"
+
 
 # ArcFace recognition weights (~137MB) baked in so the first avatar check does
 # not stall on a download. DeepFace looks in $DEEPFACE_HOME/.deepface/weights.
