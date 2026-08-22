@@ -742,25 +742,28 @@ type with a deterministic fixer (`garment_colour_fix`; evalBuckets owner
 Extends the settled zero-point design, does not reverse it.
 **Status:** ✅ active.
 
-### composite_seam bills as catastrophic via a code floor, not prompt wording
-**Context:** Owner: a visible paste boundary (a repaired figure with a hard
-cut-out edge) is a page that cannot be published — catastrophic by definition.
-The obvious fix, rewording D-30 in `image-evaluation.txt` to CATASTROPHIC,
-SUPPRESSED detection: the same broken image that fired 5 of 6 runs at CRITICAL
-fired 0 of 3 with the "cannot be published" wording, and 0 of 3 again with a
-forced-observation preamble whose "occlusion is not a seam" caveat described
-exactly what a pasted figure looks like. The model hesitates to make the
-bigger claim; both prompt edits were reverted the same hour.
-**Decision:** the prompt keeps the CRITICAL vocabulary the model demonstrably
-uses; `scoring.js` gains `MIN_SEVERITY_TYPES` — the mirror of
-`MAX_SEVERITY_TYPES` — flooring `composite_seam` at catastrophic points
-(60). The finding is reported untouched; only its cost changes.
-**Rationale:** the owner's severity rule already draws this line —
-classification belongs to the prompt, code may change a severity. Ceilings
-existed for evaluator over-charging; this is the first floor, for evaluator
-under-claiming under loaded words.
-**Touched:** `server/lib/scoring.js` (`MIN_SEVERITY_TYPES`, `deductionPoints`)
-**Status:** ✅ active.
+### composite_seam: catastrophic floor kept, detection claims RETRACTED
+**Context:** Owner: a visible paste boundary is a page that cannot be
+published. First analysis (same day) claimed D-30 detected the defect 5/6 at
+CRITICAL and that rewording it CATASTROPHIC suppressed detection — both claims
+rested on ONE image in batches of three.
+**Corpus test (owner challenge, same day):** 9 broken finals from four
+different experiments + 12 clean controls, each evaluated once under BOTH
+wordings (42 calls, temperature 0): **0/9 detected under either wording**,
+0/12 false positives under either. Conclusions: (1) the "wording suppresses
+detection" theory is WRONG — retracted; the earlier batch pattern was sampling
+noise. (2) D-30 seam detection does not work in practice — the vision model
+cannot reliably see these seams, consistent with the same-day failure of every
+pixel-space gate formulation.
+**Decision:** the `MIN_SEVERITY_TYPES` catastrophic floor STAYS (harmless, and
+correct whenever a finding does fire), the prompt stays at its deployed
+wording, and no further prompt tuning of D-30 without a detector that
+demonstrably works on this corpus. The effective protection against pasted
+figures is the SOURCE fix — the pose-matched reference cell (production,
+broken repairs 4/5 → 0/6 measured).
+**Touched:** `server/lib/scoring.js` (floor kept), this entry (supersedes the
+same-day suppression-theory entry).
+**Status:** ✅ floor active; detection claim retracted.
 
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
