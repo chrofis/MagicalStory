@@ -14943,3 +14943,38 @@ tail of jargon cannot be enumerated.
 **Touched:** `scripts/admin/strip-landmark-abbreviations.js` (new),
 `server/lib/promptBuilders.js` (buildAvailableLandmarksSection)
 **Status:** ✅ active
+
+## 2026-08-22 — Generation-time SoM identity lines went out with no clothing (both stories' mix-ups)
+
+**Context.** Owner reported figure mix-ups on `job_1787349305313_hpv76p0rokg` and
+insisted the original page (v0: red/yellow+dungarees/green/orange, positions
+clear) carried more than enough signal — "rerun this as often as you want, it
+will never be wrong". Correct: 6/6 Lab identity calls on those exact bytes name
+all four right (exp #56/#57), while all 4 generation-time calls consistently
+named the red kid "Julian" and the orange kid "Levin". The difference was the
+PROMPT, not the model: the stored v0 `expectedCharacters` are `{name,
+description}` only. `_somIdentifyFigures` STRIPS "Wearing:…" from the
+description (half of the measured Gemini-safety-filter workaround) and rebuilds
+the wardrobe from `c.clothing` — which the generation call site never set. The
+gen-time identity lines were four near-identical face-geometry proses (no
+shirts, no hair, no positions); Gemini assigned names by elimination,
+deterministically wrong. The Lab's `buildExpectedCharacters` sets `clothing`,
+which is why every replay was correct — including the previous story's
+"30/30 replays correct" ghost, now explained. Downstream, the garment fix acting
+on the wrong names painted half of Julian's bib orange (p3 v1, the active
+version).
+
+**Decision.**
+- The generation call site (`storyJobPipeline.js` ~4553) passes
+  `clothing: clothingText` alongside the description.
+- `_somIdentifyFigures` falls back to the description's own "Wearing:" tail
+  when `c.clothing` is absent — the strip may never destroy the only wardrobe
+  information a caller provided.
+
+**Rationale.** One builder difference between production and Lab made the Lab
+blind to the production failure; the field + fallback closes both the bug and
+the class.
+
+**Touched files.** `storyJobPipeline.js`, `server/lib/figureDetection.js`.
+Bug: `som-identity-lines-undressed`. Open follow-up: sceneCharacters carry no
+`physical.hair`, so gen lines still lack the Hair cue the Lab lines have.

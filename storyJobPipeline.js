@@ -4556,7 +4556,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const clothingText = shBbox.buildIdentityClothingText(
                 c, clothingByName[name], artStyle, clothingRequirements || null,
                 { label: `P${img.pageNumber} ` });
-              return { name, description: shBbox.buildIdentityLine(c, clothingText) };
+              // `clothing` MUST ride along as its own field (bug som-identity-lines-
+              // undressed, 2026-08-22): the SoM prompt builder STRIPS "Wearing:..."
+              // from the description (Gemini safety measure) and rebuilds the
+              // wardrobe from c.clothing — without this field every generation-time
+              // identity line went out with no shirt colours at all, and four
+              // near-identical face-prose lines were named by elimination
+              // (measured: hpv76p0rokg p3 v0 — red kid named Julian in 4/4
+              // gen-time calls, correct in 6/6 Lab calls whose builder sets it).
+              return { name, description: shBbox.buildIdentityLine(c, clothingText), clothing: clothingText };
             });
             // Story-invented characters live ONLY in the Visual Bible — never in
             // sceneCharacters, which is the user's photo-backed cast. Without them

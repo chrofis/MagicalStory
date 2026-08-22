@@ -1169,7 +1169,14 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
     // "wearing" is absent — the prose nearly always carries a "Wearing:" section
     // already, so the short phrase was in practice never used here.
     const identity = String(c.gdinoPrompt || c.description || c.name).replace(/\bWearing:[\s\S]*$/i, '').trim();
-    const garment = _shortGarmentPhrase(c.clothing);
+    // The strip above removes the description's wardrobe paragraph; the short
+    // phrase must then come from SOMEWHERE. Callers should pass c.clothing, but
+    // when it is absent derive the phrase from the description's own Wearing
+    // tail instead of sending the character out undressed (bug
+    // som-identity-lines-undressed: gen-time lines had no colours and Gemini
+    // named four near-identical toddler lines by elimination).
+    const wearingTail = (String(c.gdinoPrompt || c.description || '').match(/\bWearing:\s*([\s\S]*)$/i) || [])[1] || '';
+    const garment = _shortGarmentPhrase(c.clothing || wearingTail);
     // Expected position/action from the scene plan ("center-right background
     // being led away") — often the only usable cue for occluded or partially
     // visible figures whose clothing/hair the badge crop doesn't show. Hint

@@ -161,6 +161,15 @@
    "status": "fixed",
    "fixedIn": "84e575ae8",
    "note": "both routes now use the shared access rule (owner | admin | impersonating admin). Client swallow noted: StoryDisplay.handleSelectVersion catches and only console.errors, so the 404 was invisible."
+  },
+  {
+   "id": "som-identity-lines-undressed",
+   "title": "Gen-time SoM identity lines had NO clothing (and no hair): builder strips Wearing from description, rebuilds from c.clothing which generation never set",
+   "reportedAt": "2026-08-22",
+   "source": "owner (hpv76p0rokg mixups) + stored evidence: p3 v0 expectedCharacters = {name, description} only; gen-time answers consistently red->Julian 4/4 calls; Lab (builder sets clothing) 6/6 correct incl exp57 5x on the same v0 bytes",
+   "status": "fixed",
+   "fixedIn": "fix(identity) 2026-08-22 (same commit)",
+   "note": "storyJobPipeline gen call site now passes clothing: clothingText alongside the description; _somIdentifyFigures additionally falls back to the description own Wearing tail when c.clothing is absent, so no caller can send characters out undressed. Explains BOTH stories mixups incl. the s9zb960muni 30/30-replays-correct ghost. Remaining smaller gap: sceneCharacters carry no physical.hair, so gen lines still lack the Hair section the Lab lines have."
   }
  ]
 }
