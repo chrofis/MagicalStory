@@ -151,7 +151,7 @@ Omit entirely (do not include with `false`): pure ground/floor/path contact, lea
 
 Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side". Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
-A prop carrying writing — a map, letter, note, sign, book — keeps that writing illegible and stays angled toward the character reading it, never turned flat to the camera to show its face.
+A prop a character reads — map, letter, note, chart, page — is staged as reading: the reader's face and eyes are what the picture shows, the sheet is tilted toward them and away from the camera, and the frame carries its back or edge. Its markings stay illegible. A prop being carried rather than read stays folded, rolled or pocketed.
 
 `hands`: `true` when the character's hands are on the object. One object takes one pair of hands: a second character in contact with the same object belongs on another page, and a hand-over is drawn as the moment before or after it — one holds the object out, the other reaches.
 

@@ -68,6 +68,7 @@ The `description` is copied verbatim into image prompts, so write it as image-pr
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
 - A prop with visible writing has that writing called illegible / weathered / smudged. Never quote words to be painted, and never say text is visible without describing it that way.
+- A prop whose interest lies on its face — map, letter, note, chart, page — is described as an object: material, size, edge wear, how it folds or rolls, dominant colour. What is drawn or written on the face stays out of the description.
 
 Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
 

@@ -16567,3 +16567,52 @@ scale defect has been found to test it against.
 **Decision:** scene-expansion 12c now explicitly covers sceneIntent and all metadata fields; new 12d states the staging principle where the prose is written: a held map/letter/note/book stays angled toward its reader, face away from the camera, characters shown reading — even when the beat is what the document says; never the frame-filling focal object.
 
 **Touched files:** `prompts/scene-expansion.txt`.
+
+## 2026-08-23 — The visual bible was pointing the map at the viewer, not the lettering
+
+**Supersedes the "never model-spelled" entry above as the *complete* fix** — that entry
+stands, but it addressed only half the problem and the owner caught it.
+
+**Evidence.** The Schatzkarte in `job_1787423677246_r9llf5yi9` already said
+*"no legible text anywhere on the map, all markings are weathered symbols and curves"* —
+the lettering rule was being obeyed — and its six pages still averaged **38** against a
+story mean of 57. The damage was the rest of the VB entry:
+
+> *"the left half shows dense hand-drawn coastlines, depth-sounding marks and compass
+> rose in dark brown ink, all lines crisp; the right half is a pale wash of faded brown…"*
+
+That describes the map's **face**, and the entry was attached to pages 1–5 and 7. A face
+can only be rendered if it is presented, so every one of those pages carried a standing
+instruction to turn the map toward the camera. The evaluator caught the consequence
+three times:
+
+| page | sem | finding |
+|---|---|---|
+| 5 | 0 | `object_presence` — "holding an **unfurled** map instead of a **rolled** Schatzkarte tucked under her arm" |
+| 3 | 30 | `viewer_address` — "looking at the **viewer**, contradicting 'not looking up' and her declared interaction with the map" |
+| 7 | 20 | `viewer_address` — "looking directly at the **viewer**, not down at the chart" |
+
+Page 5 is the clearest: the brief asked for the map *rolled under her arm* and the model
+unfurled it anyway. The VB face description outranked the page's own staging.
+
+**Decision (owner, 2026-08-23):**
+1. **Visual bible** — a prop whose interest lies on its face (map, letter, note, chart,
+   page) is described as an object: material, size, edge wear, how it folds or rolls,
+   dominant colour. What is drawn or written on the face stays out of the description.
+2. **Scene brief** — the Art Director is now told how to stage a read prop, which no
+   template previously said: the reader's face and eyes are what the picture shows, the
+   sheet is tilted toward them and away from the camera, the frame carries its back or
+   edge. A prop being carried rather than read stays folded, rolled or pocketed.
+
+**Rationale:** the earlier fix removed the *words* on the prop but left the *reason the
+prop faces the camera*. Naming what is on a face is an instruction to show that face, on
+every page the entry covers — and a per-page brief cannot outvote it. Describing the
+object instead removes the pull, and the staging rule replaces "don't point it at the
+viewer" with what to draw instead.
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`.
+
+**Status:** 🟡 conditional — not yet exercised on a story. Watch `viewer_address` and
+`object_presence` on pages carrying a map, letter or note.
