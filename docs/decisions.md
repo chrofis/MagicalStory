@@ -15468,3 +15468,32 @@ text defect after the stake/acronym/dash rules landed. Owner-approved
 **Touched:** `prompts/story-beats.txt`, `prompts/story-arc-review.txt`,
 `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`.
 **Status:** ✅ active
+
+## 2026-08-23 — Pre-identity crowd prune; the face-leak filter learns close-ups and logs its drops
+
+**Context.** Crowd pages hand the identity model 12-30 letter badges for 2-5
+real cast members. The owner's audit demand ("show me every box these filters
+would cut, across many stories — would we kick out real ones?") produced 195
+figures over 58 DINO pages: a plain score<0.45 cut would delete a MAIN
+CHARACTER'S full-frame close-up (person score 0.274 — DINO's "person" wants a
+whole body), and a plain faceless<0.8% cut would delete real tiny cast
+figures (one at score 0.749). Meanwhile 21 boxes — blur blobs and a statue —
+were junk by every signal at once. Separately, the person-sized face-leak
+filter (built after exp #70, where a leaked head+torso "face" whited out a
+shirt) was found to eat REAL close-up faces (r9llf5yi9 p2 Fiona: faceBox
+null on a face that fills the frame), and its drops were never logged.
+
+**Decision (owner-driven).**
+- **Pre-identity crowd prune** (before badges, so the identity call shrinks):
+  drop person boxes that fail ALL THREE signals — no overlapping face
+  candidate, under 0.8% of the frame, DINO score < 0.45 — junk by audit
+  (21/21). Guards: any face-candidate contact makes a box untouchable, and
+  pruning never takes the count below expectedCharacters.
+- **Close-up face recovery**: the crop-based face re-detector's cap rises
+  0.15 -> 0.5 of the crop (a real close-up face is 30-60% of its person crop;
+  the exp #70 leak class ~ the whole crop still fails).
+- **The page-level leak filter logs every drop** into diag.faceLeaksDropped.
+
+**Touched files.** `server/lib/figureDetection.js`. Evidence:
+filter-audit.html (galleries incl. the 5 named boxes simple filters would
+have cut).

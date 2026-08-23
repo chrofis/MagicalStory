@@ -890,9 +890,13 @@ async function _gdinoDetect(imageDataUri, prompts) {
       // finish in ~60-100s. Genuine hangs still fall back to Gemini after this.
       signal: AbortSignal.timeout(300_000),
     }));
-    if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] /detect-figures-text HTTP ${res.status}`); return null; }
+    // COUNT EVERY FAILURE SHAPE (bug: Kapitänin Fiona shipped 33/33 failed
+    // DINO calls with dino_detect_fail=0 — the outage answered clean HTTP 503s,
+    // which this branch swallowed without counting, so the degraded-story
+    // alert never fired).
+    if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] /detect-figures-text HTTP ${res.status}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
     const j = await res.json();
-    if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); return null; }
+    if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
     return j;
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] detect failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
   finally {
@@ -1065,7 +1069,11 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
     const persons = det.figures[1] ? _collectNmsBoxes(det.figures[1], GDINO_PERSON_NMS_IOU) : [];
     const faces = _collectNmsBoxes(det.figures[0], GDINO_FACE_NMS_IOU)
       .filter(f => !persons.some(p => _boxIouXyxy(f.box, p.box) > GDINO_FACE_LEAK_IOU))
-      .filter(f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]) < 0.15 * sw * sh);
+      // 0.5, not 0.15 (owner, 2026-08-23): a genuine CLOSE-UP face fills
+      // 30-60% of its own person crop — the 0.15 cap rejected Fiona's real
+      // full-frame face on r9llf5yi9 p2 and the figure shipped faceless. The
+      // exp #70 leak class (head+torso ~ the whole crop) still fails 0.5.
+      .filter(f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]) < 0.5 * sw * sh);
     if (faces.length === 0) return null;
     const best = faces[0].box; // px in the scaled crop, score-desc
     // Back to PAGE pixel coords, then the shared production padding.
@@ -1495,7 +1503,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   const det = await _gdinoDetect(imageDataUri, [{ name: 'person', text: 'person' }]);
   if (!det || !Array.isArray(det.figures)) return null;
   const W = det.width, H = det.height;
-  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
+  let persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
   diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3) }));
   if (persons.length === 0) {
     diag.fellBack = true; diag.reason = 'no person boxes';
@@ -1509,10 +1517,50 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   let faces = [];
   const fdet = await _gdinoDetect(imageDataUri, [{ name: 'face', text: 'face' }]);
   if (fdet?.figures?.[0]) {
-    faces = _collectNmsBoxes(fdet.figures[0], GDINO_FACE_NMS_IOU)
-      .filter(f => !persons.some(p => _boxIouXyxy(f.box, p.box) > GDINO_FACE_LEAK_IOU));
+    const allFaces = _collectNmsBoxes(fdet.figures[0], GDINO_FACE_NMS_IOU);
+    faces = allFaces.filter(f => !persons.some(p => _boxIouXyxy(f.box, p.box) > GDINO_FACE_LEAK_IOU));
+    // EVERY leak-filter drop is RECORDED (owner, 2026-08-23): the filter threw
+    // away Fiona's real close-up face and nothing said so — "show me all
+    // instances this fired" had no answer because drops were never logged.
+    const dropped = allFaces.filter(f => !faces.includes(f));
+    if (dropped.length) {
+      diag.faceLeaksDropped = dropped.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
+      log.info(`[GDINO-DETECT] ${pageLabel}face-leak filter dropped ${dropped.length} person-sized face box(es): ${dropped.map(f => f.box.map(Math.round).join(',')).join(' | ')}`);
+    }
   }
   diag.faces = faces.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
+
+  // Stage 1b-1 — PRE-IDENTITY CROWD PRUNE (owner, 2026-08-23). A 12-30-badge
+  // identity call is far likelier to misname than a 5-badge one, so junk is
+  // cut BEFORE badges exist: a person box with NO overlapping face candidate,
+  // under 0.8% of the frame, and DINO score < 0.45 is a blur-blob or statue,
+  // not a cast member. Audited on 195 figures across 3 stories: 21/21 such
+  // boxes were junk; every real person had a face candidate, or size, or
+  // score (incl. the 0.274-score full-frame close-up — kept by AREA — and a
+  // 0.749 tiny crew member — kept by SCORE). Guards: a box touching any face
+  // candidate is untouchable, and pruning never takes the person count below
+  // the expected-character count.
+  {
+    const frameArea = W * H;
+    const touchesFace = (p) => faces.some(f => _boxIouXyxy(f.box, p.box) > 0.02
+      || ((f.box[0] + f.box[2]) / 2 >= p.box[0] && (f.box[0] + f.box[2]) / 2 <= p.box[2]
+        && (f.box[1] + f.box[3]) / 2 >= p.box[1] && (f.box[1] + f.box[3]) / 2 <= p.box[3]));
+    const isJunk = (p) => !touchesFace(p)
+      && ((p.box[2] - p.box[0]) * (p.box[3] - p.box[1])) < 0.008 * frameArea
+      && p.score < 0.45;
+    const junk = persons.map((p, i) => ({ p, i })).filter(x => isJunk(x.p))
+      .sort((a, b) => a.p.score - b.p.score);
+    const floor = Math.max(1, expectedCharacters.length);
+    let removable = Math.max(0, persons.length - floor);
+    const dropIdx = new Set();
+    for (const x of junk) { if (removable <= 0) break; dropIdx.add(x.i); removable--; }
+    if (dropIdx.size) {
+      diag.crowdPruned = [...dropIdx].map(i => ({ box: persons[i].box.map(Math.round), score: +persons[i].score.toFixed(3) }));
+      log.info(`[GDINO-DETECT] ${pageLabel}crowd prune: dropped ${dropIdx.size} faceless sub-0.8% low-score box(es) before identity (${persons.length} -> ${persons.length - dropIdx.size} figures, expected ${expectedCharacters.length})`);
+      persons = persons.filter((_, i) => !dropIdx.has(i));
+      diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3) }));
+    }
+  }
 
   // Stage 1b-2 — pair faces to bodies GLOBALLY, once, before anything uses it.
   // This link decides which figure SAM segments, where the identity badge goes
