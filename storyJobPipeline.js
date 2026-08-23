@@ -4129,6 +4129,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // the authoritative face/clothing reference, and this path was
                     // passing nothing, leaving identity to the pasted pixels alone.
                     visualBibleGridImage: pageData.visualBibleGrid || null,
+                    // Creatures declared on this page. The paste step only
+                    // places cast cut-outs, so a Visual Bible animal has no
+                    // way into the page unless the plate paints it — measured
+                    // 2026-08-23: a page declared a VB animal, the setting
+                    // prose said "no animals", and it vanished from the
+                    // finished image.
+                    sceneCreatures: require('./server/lib/visualBible')
+                      .resolveSceneCreatures(visualBible, fdMeta.objects || [], pageData.pageNumber),
                     usageTracker: addUsage,
                   });
                   scaleRepairResult = compRes?.imageData

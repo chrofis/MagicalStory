@@ -680,6 +680,51 @@ function englishLocationRef(loc) {
 }
 
 /**
+ * Visual Bible creatures declared for one page, as the composite plate needs
+ * them: [{ id, name, description }].
+ *
+ * A creature is NOT a cast member — it has no avatar sheet, so the composite
+ * cannot paste it, and the plate is the only place it can be painted. Callers
+ * hand the result to generateSceneComposite as `sceneCreatures`.
+ *
+ * Selection is by the page's own declared object ids first (the scene
+ * metadata's `objects[]` carries VB ids like the animal pool's), falling back
+ * to the entry's `appearsInPages` for entries the page never listed. Both are
+ * needed: a page that names the creature in its prose but omits it from
+ * objects[] still has to get it painted.
+ *
+ * Descriptions are English-only, like every other image-facing VB reference:
+ * the name is an identity anchor and stays, the visual detail comes from
+ * extractedDescription (what the model actually drew, when we have it) or the
+ * outline's description.
+ */
+function resolveSceneCreatures(visualBible, objectIds = [], pageNumber = null) {
+  if (!visualBible || typeof visualBible !== 'object') return [];
+  const animals = Array.isArray(visualBible.animals) ? visualBible.animals : [];
+  if (!animals.length) return [];
+
+  const wanted = new Set(
+    (Array.isArray(objectIds) ? objectIds : [])
+      .map(o => String(typeof o === 'string' ? o : (o?.id || o?.name || '')).toUpperCase())
+      .filter(Boolean)
+  );
+
+  const out = [];
+  for (const entry of animals) {
+    if (!entry?.id && !entry?.name) continue;
+    const byId = entry.id && wanted.has(String(entry.id).toUpperCase());
+    const byName = entry.name && wanted.has(String(entry.name).toUpperCase());
+    const byPage = pageNumber != null
+      && Array.isArray(entry.appearsInPages)
+      && entry.appearsInPages.includes(pageNumber);
+    if (!byId && !byName && !byPage) continue;
+    const description = String(entry.extractedDescription || entry.description || '').trim();
+    out.push({ id: entry.id || null, name: entry.name || 'creature', description });
+  }
+  return out;
+}
+
+/**
  * Build Visual Bible prompt section for image generation
  * Includes ALL visual bible elements (not filtered by page) with optional intro text
  */
@@ -2226,6 +2271,7 @@ module.exports = {
   buildFullVisualBiblePrompt,
   englishEntityRef,
   englishLocationRef,
+  resolveSceneCreatures,
   significantEntityTokens,
 
   // Image analysis

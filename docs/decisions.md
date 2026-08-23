@@ -15719,3 +15719,62 @@ pipeline. Nothing merges until `inventory_ab` says it is safe.
 **Also:** theme props are theme-true — the pirate adventure guide now requires a proper pirate ship (never a rowboat/lake boat, even in a modern real-world setting), and the adventure-guidelines block states the generic rule (signature theme props keep their full theme form). The writer had grounded the vessel in realistic present-day Zürichsee despite the pirate guide's "set on ships".
 
 **Touched files:** `server/services/prompts.js` (buildEmptyScenePrompt), `prompts/adventure-guides.txt` ([pirate]), `server/lib/promptBuilders.js` (adventure guidelines).
+
+---
+
+## 2026-08-23 — The composite plate paints Visual Bible creatures; the "no animals" ban is a whitelist, not a blanket
+
+**Context:** A composited page lost its dragon. Page 17 of *Das Ei im
+Wurzelnest* declares `objects: [..., "ANI001", ...]` and its interactions read
+"watching the dragon and Julian across the clearing", yet the finished image
+had no dragon in it (Lab exp 64, production).
+
+The composite has exactly two doors into an image. The **plate** paints the
+world; the **paste** places cast cut-outs and nothing else. `buildCompositeCast`
+builds the cast from `story.characters`, so a Visual Bible animal is never a
+cast member — the plate is its only way in. And the plate was told not to paint
+it: the vantage-canvas prose ends "No figures, no animals"
+(`storyJobPipeline.js:3490`), and the stratified empty-scene prompt says "no
+people, no characters, no animals" (`sceneComposite.js:3232`). Forbidden in one
+door, absent from the other, the creature fell in the hole between them.
+
+**Decision:** the plate paints the page's Visual Bible creatures, from a
+**whitelist**. `resolveSceneCreatures(visualBible, objects, pageNumber)`
+(`server/lib/visualBible.js`) returns the animal-pool entries the page declares
+— by VB id, by name, or by the entry's own `appearsInPages` — and
+`buildPlateCreatureBlock` emits them into the plate prompt with their English
+descriptions, plus an explicit override of the blanket ban sitting in the
+quoted setting prose.
+
+Owner's framing, verbatim: *"Only figures coming in through the visual bible are
+rendered. I do not want it to invent a dragon or boat or pirat on its own as it
+will not match the story. It must use what is in the visual bible and only
+that."*
+
+**Rationale:** the blanket ban is **correct when the page has no creatures** —
+it is what keeps invented figures out, and inventing a creature is worse than
+omitting one because it will not match the story. So the block is emitted only
+when the page actually declares creatures; with none, `resolveSceneCreatures`
+returns `[]`, no block is added, and the existing prose stands unchanged. The
+human cast stays out of the plate exactly as before — they are pasted, and the
+plate must remain people-free (2026-07-31 phantom-plate entry).
+
+The creature block sits INSIDE `assemble()`, so when a long prompt is trimmed
+against Grok's 8000-char cap the SETTING shrinks and the creatures survive —
+a dropped setting sentence costs detail, a dropped creature costs the creature.
+Measured on the real page: 6746 chars without, 7750 with, under the cap.
+
+**Known limit:** wired for the `uniform` strategy only — the path production
+and the Lab both use (`storyJobPipeline.js` passes `compositeStrategy:
+'uniform'`). `generateStratifiedComposite` / `buildAnchorPlatePrompt` still
+carry the blanket ban and would drop a creature. Not wired because that path is
+unreachable in production today; it must be done before stratified is ever
+enabled.
+
+**Touched:** `server/lib/visualBible.js` (`resolveSceneCreatures` + export),
+`server/lib/sceneComposite.js` (`buildPlateCreatureBlock`,
+`buildPopulatedPlatePrompt`, `sceneCreatures` option),
+`storyJobPipeline.js` (composite call site), `server/lib/testlab.js`
+(Lab parity).
+
+**Status:** ✅ active

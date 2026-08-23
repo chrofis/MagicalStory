@@ -1354,8 +1354,41 @@ function sliceBriefAtSentence(brief, maxChars) {
  * the later depopulate step can derive a self-consistent empty plate from
  * the same source.
  */
-function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt) {
+/**
+ * Creature block for a plate prompt.
+ *
+ * The plate is the ONLY door a non-human figure has into a composited page.
+ * The paste step places cast cut-outs and nothing else, so a creature the
+ * plate does not paint cannot appear at all — measured on a page whose
+ * outline declared a Visual Bible animal and whose interactions referred to
+ * it: the setting prose carried a blanket "No figures, no animals", the
+ * creature was not in the cast, and it vanished from the finished page
+ * (2026-08-23 audit, Lab exp 64).
+ *
+ * The rule is a WHITELIST, not permission to improvise: paint the Visual
+ * Bible entries named for this page, exactly as described, and invent no
+ * other figure. A creature the model makes up does not match the story.
+ *
+ * Returns '' when the page declares no creatures — the blanket ban in the
+ * setting prose is then correct and is left to stand.
+ */
+function buildPlateCreatureBlock(sceneCreatures) {
+  const list = (Array.isArray(sceneCreatures) ? sceneCreatures : [])
+    .filter(c => c && (c.name || c.description));
+  if (!list.length) return '';
+  const lines = list
+    .map(c => `- ${c.name || 'creature'}: ${String(c.description || '').trim() || 'as described in the story'}`)
+    .join('\n');
+  return `
+
+CREATURES IN THIS SCENE — paint each one, exactly as described:
+${lines}
+These creatures are part of the world plate and stay in it. If the SETTING DESCRIPTION above says to leave out figures or animals, that instruction does not apply to the creatures listed here — it exists to keep the human cast out, and they arrive separately. Paint no creature, animal or person that is not named above or drawn as a silhouette below.`;
+}
+
+function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt, sceneCreatures = []) {
   const lines = buildCastLines(cast);
+  const creatureBlock = buildPlateCreatureBlock(sceneCreatures);
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
     || 'an outdoor scene';
@@ -1390,7 +1423,8 @@ PRIORITY 1 — The setting, props, and lighting must read exactly as described. 
 
 SETTING DESCRIPTION:
 ${setting}
-${sceneIntentBlock}
+${sceneIntentBlock}${creatureBlock}
+
 PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
 
 ${lines}
@@ -2135,6 +2169,10 @@ async function generateSceneComposite(opts) {
     aspectRatio = '16:9',
     usageTracker = null,
     visualBibleGridImage = null,
+    // Visual Bible creatures declared on THIS page: [{ name, description }].
+    // The plate is their only way into the image (see buildPlateCreatureBlock),
+    // and the list is a whitelist — the model paints these and invents none.
+    sceneCreatures = [],
     // Per-call override for the phantom-pose render technique. When true,
     // step 3 renders each character in their phantom's pose via an extra
     // Grok edit call (full 2×4 sheet + cropped phantom) before pasting,
@@ -2204,7 +2242,10 @@ async function generateSceneComposite(opts) {
   // VB prop, repainted the floor) so the empty plate no longer matched
   // the silhouette plate.
   log.info(`[SCENE COMPOSITE] step 1/5 — populated plate (generate; ${cast.length} cast)`);
-  const populatedPrompt = buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt);
+  const populatedPrompt = buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt, sceneCreatures);
+  if (sceneCreatures.length) {
+    log.info(`[SCENE COMPOSITE] plate paints ${sceneCreatures.length} VB creature(s): ${sceneCreatures.map(c => c.name).join(', ')}`);
+  }
   const populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', populated.usage, 'scene_composite_populated_plate', populated.modelId);
   totalCost += populated.usage?.cost || 0;
