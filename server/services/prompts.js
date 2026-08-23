@@ -134,6 +134,12 @@ async function loadPromptTemplates() {
     ['storyScorecardJudgeV4', 'story-scorecard-judge-v4.txt'],
     ['storyArcReview', 'story-arc-review.txt'],
     ['storyArcJudge', 'story-arc-judge.txt'],
+    // Blind audits: each stage's artifact interrogated with ONLY what its
+    // audience would have, before the full-context reviewer runs. The audit
+    // names faults; the reviewer's fix ledger must answer every one.
+    ['storyArcAudit', 'story-arc-audit.txt'],
+    ['storyBeatsAudit', 'story-beats-audit.txt'],
+    ['storyTextAudit', 'story-text-audit.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],

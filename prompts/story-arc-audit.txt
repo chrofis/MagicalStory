@@ -1,0 +1,16 @@
+You are a hostile editor auditing the ARC of a children's story. You get the commission and the arc. Nothing else exists — no notes, no character sheets. Genre convention is not evidence: a rival's ship, map or knowledge earns nothing unless the arc gives it.
+
+# COMMISSION
+{STORY_BRIEF}
+
+# ARC
+{ARC}
+
+Walk the arc turn by turn and for every turn answer five questions. An empty answer must be earned, not assumed:
+1. ASSUMED: what does this turn rely on that the arc never gave — knowledge someone could not have, an ability or possession never established, especially the rival's?
+2. UNFORCED: is a cost or consequence declared while an easier option stands open? What closes the easier option — and does the arc say it?
+3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the arc never stated when it first appeared?
+4. TRANSITION: is anyone somewhere, or holding something, with no path from where the arc last put them or it?
+5. CAUSE: does anything exist in a state — open, broken, moved, known, missing — that nothing in the arc caused?
+
+List every fault, one per line, as: "FAULT: <one sentence naming the turn and the missing reason>". Do not stop at the first few — an audit that misses faults is a failed audit. If a fault has no fix inside the arc's own world, say so in the same line. After the list write one line: "FAULTS: <count>".

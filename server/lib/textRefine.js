@@ -53,12 +53,33 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let current = pages.map(p => ({ ...p }));
   const rounds = [];
 
+  // Blind audit of the text as delivered: a reader with only the back cover,
+  // the pages and what each picture shows names faults. Round 1's fix ledger
+  // must answer every one. Never blocks — a failed audit just means the
+  // refiner runs on its own checks alone.
+  let auditFindings = '';
+  const auditModel = opts.auditModel || MODEL_DEFAULTS.arcReviewModel || defaultModel;
+  try {
+    const { buildTextAuditPrompt } = require('./storyHelpers');
+    const auditPrompt = buildTextAuditPrompt(storyData, current);
+    if (auditPrompt && TEXT_MODELS[auditModel]) {
+      const t0 = Date.now();
+      const a = await callTextModelStreaming(auditPrompt, 12000, null, auditModel, { usageLabel: 'text_audit' });
+      auditFindings = String(a.text || '').trim();
+      log.info(`🔎 [TEXT-AUDIT] ${auditModel}: ${(auditFindings.match(/^FAULT:/gm) || []).length} fault(s) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    }
+  } catch (auditErr) {
+    log.warn(`⚠️ [TEXT-AUDIT] failed (${auditErr.message}) — refinement runs without audit findings`);
+  }
+
   for (let i = 0; i < roundCount; i++) {
     const modelKey = perRound[i] || defaultModel;
     if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
 
     // Built fresh from CURRENT text each round — that is the whole mechanism.
-    let prompt = buildTextRefinePrompt(storyData, current);
+    // Audit findings go to round 1 only: they were found on the delivered text,
+    // and later rounds would mis-flag pages round 1 already fixed.
+    let prompt = buildTextRefinePrompt(storyData, current, i === 0 ? auditFindings : '');
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride && i === 0) prompt = opts.promptOverride;
 
@@ -130,7 +151,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
-  return { pages: current, original, rounds, changed };
+  return { pages: current, original, rounds, changed, audit: auditFindings };
 }
 
 /**

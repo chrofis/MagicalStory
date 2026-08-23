@@ -4905,6 +4905,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         textRefineReport = {
           rounds: refined.rounds.length,
           changedPages: refined.changed,
+          audit: refined.audit || '',
           durationMs: refined.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
           model: refined.rounds[0]?.modelId || refined.rounds[0]?.modelKey || null,
           pages: refined.pages

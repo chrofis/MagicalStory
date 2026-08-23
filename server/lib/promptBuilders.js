@@ -3724,7 +3724,7 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
  * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
  * @returns {string|null} filled prompt, or null when the template is unavailable
  */
-function buildTextRefinePrompt(inputData, pages = []) {
+function buildTextRefinePrompt(inputData, pages = [], auditFindings = '') {
   const template = PROMPT_TEMPLATES.textRefine;
   if (!template) {
     log.error('[PROMPT] textRefine template not loaded — text refinement unavailable');
@@ -3835,6 +3835,7 @@ function buildTextRefinePrompt(inputData, pages = []) {
     CHARACTER_DETAILS: characterDetails,
     SCENE_OUTLINES: sceneOutlines,
     CURRENT_TEXT: currentText,
+    AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
     DO_NOT_WRITE_SECTION: doNotWriteSection,
   });
 }
@@ -4095,7 +4096,7 @@ function buildBeatsPrompt(inputData, pageCount) {
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
-function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '') {
+function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '', auditFindings = '') {
   const template = PROMPT_TEMPLATES.storyBeatsReview;
   if (!template) {
     log.error('[PROMPT] storyBeatsReview template not loaded — beats review unavailable');
@@ -4111,12 +4112,66 @@ function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '') {
     PAGE_PLAN: String(pagePlan || '').trim() || '(the planner emitted no page plan — check 6c falls back to the beats alone)',
     CURRENT_BEATS: current,
     CURRENT_ARC: String(arc || '').trim() || '(the planner authored no arc)',
+    AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
 
+/** Blind audit of the arc: the auditor sees ONLY the commission and the arc. */
+function buildArcAuditPrompt(inputData, arc) {
+  const template = PROMPT_TEMPLATES.storyArcAudit;
+  if (!template) {
+    log.error('[PROMPT] storyArcAudit template not loaded — arc audit unavailable');
+    return null;
+  }
+  return fillTemplate(template, {
+    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
+    ARC: String(arc || '').trim(),
+  });
+}
+
+/** Blind audit of the beats: the auditor sees ONLY the page plan and the beats. */
+function buildBeatsAuditPrompt(beats, pagePlan = '') {
+  const template = PROMPT_TEMPLATES.storyBeatsAudit;
+  if (!template) {
+    log.error('[PROMPT] storyBeatsAudit template not loaded — beats audit unavailable');
+    return null;
+  }
+  const current = beats
+    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .join('\n\n');
+  return fillTemplate(template, {
+    PAGE_PLAN: String(pagePlan || '').trim() || '(none)',
+    BEATS: current,
+  });
+}
+
+/**
+ * Blind audit of the finished text as the audience receives it: back cover,
+ * page prose, and what each picture shows (the DEPICTS block only — the rest
+ * of a scene brief describes intent the viewer never sees).
+ */
+function buildTextAuditPrompt(inputData, pages = []) {
+  const template = PROMPT_TEMPLATES.storyTextAudit;
+  if (!template) {
+    log.error('[PROMPT] storyTextAudit template not loaded — text audit unavailable');
+    return null;
+  }
+  const depictsOf = (brief) => {
+    const m = String(brief || '').match(/THIS IMAGE DEPICTS:\*{0,2}\s*([\s\S]*?)(?=\n\s*\n\s*(?:\*\*|#|[A-Z][A-Z ]{3,}:)|$)/);
+    return (m ? m[1] : '').trim();
+  };
+  const body = pages.map(p =>
+    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${depictsOf(p.sceneBrief) || '(no picture description)'}`
+  ).join('\n\n');
+  return fillTemplate(template, {
+    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
+    PAGES: body,
+  });
+}
+
 /** Review of the arc alone, before any page exists. Returns analysis + a corrected arc. */
-function buildArcReviewPrompt(inputData, arc) {
+function buildArcReviewPrompt(inputData, arc, auditFindings = '') {
   const template = PROMPT_TEMPLATES.storyArcReview;
   if (!template) {
     log.error('[PROMPT] storyArcReview template not loaded — arc review unavailable');
@@ -4127,6 +4182,7 @@ function buildArcReviewPrompt(inputData, arc) {
     PAGE_COUNT: inputData.pages || (inputData.sceneImages || []).length || 10,
     STORY_SHAPE: buildStoryShapeSection(inputData, inputData.pages || (inputData.sceneImages || []).length || 10),
     CURRENT_ARC: String(arc || '').trim(),
+    AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
   });
 }
 
@@ -5106,6 +5162,9 @@ module.exports = {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
+  buildArcAuditPrompt,
+  buildBeatsAuditPrompt,
+  buildTextAuditPrompt,
   buildStoryShapeSection,
   parseArcReview,
   buildClothingReviewPrompt,

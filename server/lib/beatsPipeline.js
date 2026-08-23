@@ -52,6 +52,8 @@ const {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
+  buildArcAuditPrompt,
+  buildBeatsAuditPrompt,
   parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,
@@ -252,7 +254,24 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     const drafted = parseBeats(arcRes.text || '').arc || '';
     if (!drafted) throw new Error('planner returned no arc');
 
-    const arcReviewPrompt = buildArcReviewPrompt(inputData, drafted);
+    // Blind audit: a reader with only the commission and the arc names faults.
+    // The reviewer's fix ledger must answer every one. Never blocks — a failed
+    // audit just means the review runs on its own findings alone.
+    let arcAuditFindings = '';
+    try {
+      const arcAuditPrompt = buildArcAuditPrompt(inputData, drafted);
+      if (arcAuditPrompt) {
+        await stage(2, 'Auditing the story arc...', { next: 2, ms: 90000 });
+        const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit' });
+        arcAuditFindings = String(auditRes.text || '').trim();
+        gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s)`);
+      }
+    } catch (auditErr) {
+      log.warn(`⚠️ [BEATS] Arc audit failed (${auditErr.message}) — review runs without audit findings`);
+      gl.warn('beats_arc_audit_failed', `Arc audit failed: ${auditErr.message}`);
+    }
+
+    const arcReviewPrompt = buildArcReviewPrompt(inputData, drafted, arcAuditFindings);
     if (!arcReviewPrompt) throw new Error('story-arc-review template unavailable');
     await stage(2, 'Reviewing the story arc...', { next: 3, ms: 45000 });
     const arcRevRes = await textModels.callTextModelStreaming(arcReviewPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_review' });
@@ -265,6 +284,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       durationMs: meta.timings.arcMs,
       changed: approvedArc !== drafted,
       drafted, analysis, prompt: arcReviewPrompt,
+      audit: arcAuditFindings,
     };
     gl.info('beats_arc', `Arc drafted by ${arcRes.modelId || planModel}, reviewed by ${arcRevRes.modelId || arcReviewModel} (${arcReviewReport.changed ? 'rewritten' : 'unchanged'})`, null, {
       changed: arcReviewReport.changed, model: arcRevRes.modelId || arcReviewModel,
@@ -311,7 +331,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // unmeasurable: the log says "3 pages rewritten" and nothing says WHAT.
   // Stays null only when the review never ran (missing template or a throw).
   let beatsReviewReport = null;
-  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages, plan.arc, pagePlan);
+  // Blind audit: a reader with only the page plan and the beats names faults.
+  // The reviewer's fix ledger must answer every one. Never blocks.
+  let beatsAuditFindings = '';
+  try {
+    const beatsAuditPrompt = buildBeatsAuditPrompt(plan.pages, pagePlan);
+    if (beatsAuditPrompt) {
+      await stage(4, 'Auditing the story beats...', { next: 5, ms: 120000 });
+      const auditRes = await textModels.callTextModelStreaming(beatsAuditPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_audit' });
+      beatsAuditFindings = String(auditRes.text || '').trim();
+      gl.info('beats_audit', `Beats audit by ${auditRes.modelId || reviewModel}: ${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s)`);
+    }
+  } catch (auditErr) {
+    log.warn(`⚠️ [BEATS] Beats audit failed (${auditErr.message}) — review runs without audit findings`);
+    gl.warn('beats_audit_failed', `Beats audit failed: ${auditErr.message}`);
+  }
+  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages, plan.arc, pagePlan, beatsAuditFindings);
   if (!reviewPrompt) {
     log.warn('⚠️ [BEATS] story-beats-review template unavailable — beats shipped unreviewed');
     gl.warn('beats_review_failed', 'Review template unavailable — beats shipped unreviewed');
@@ -344,6 +379,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         durationMs: meta.timings.beatsReviewMs,
         changedPages: beatsDiffs.map(r => r.pageNumber),
         analysis: beatsReviewAnalysis,
+        audit: beatsAuditFindings,
         // The arc the planner committed to, and the contract this review judged
         // the pages against. Stored so a plan can be read back against it.
         arc: plan.arc || '',

@@ -33,11 +33,15 @@ Characters: {CHARACTER_NAMES}
 
 {CURRENT_BEATS}
 
+# AUDIT FINDINGS (from a reader who saw only the page plan and the beats)
+
+{AUDIT_FINDINGS}
+
 # YOUR TASK
 
 Judge the plan as a reader who sees only these pages. The brief and character details tell you what the book is FOR; they are never evidence that a page works. A motivation that lives only in the character details and never reaches a beat is a fault to fix.
 
-Answer each check, naming pages. Then rewrite only the pages that a check found wrong. A fault you name must change a page: end your analysis with a line per named fault — the fault, then the page(s) your rewrite fixes it on, or the reason it stands. A named fault with neither is a failed review.
+Answer each check, naming pages. Then rewrite only the pages that a check found wrong. A fault you name must change a page: end your analysis with a line per named fault — the fault, then the page(s) your rewrite fixes it on, or the reason it stands. A named fault with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way: fixed on a page, or a stated reason it stands.
 
 1. Causality — for each page, does its beat follow from the page before? Name the most arbitrary transition, and anything impossible in space or time as written — a thing followed, found or known before it exists, someone in two places, an act that cannot be done while holding what they hold. Name any character who is present and then simply gone with no beat saying where, and anything a beat established about a thing — stuck, heavy, hidden, out of reach — that a later beat quietly reverses.
 2. Arc — read the committed arc against the pages. Name the page where a character says aloud what must happen and why; a look or a glance is not a statement, and if no page says it, rewrite the earliest fitting one so it does. Name every page it claims carries a turn that the beat there does not deliver, and every main character whose stated turning point or change never happens on the page. Name the page where the want first meets something that will not simply move, the page where a try fails or costs them something and the goal sits further away, and the page where the change is earned; when the arc itself names none of these, say so. Rewrite the fewest beats to deliver the arc, or to supply what neither the arc nor the pages contain.

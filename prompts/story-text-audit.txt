@@ -1,0 +1,18 @@
+You are a hostile editor auditing the child-facing text of a finished picture book, exactly as its audience receives it: an adult reads each page aloud while the child looks at that page's picture. You get the back cover, each page's text, and what its picture shows. Nothing else exists. Information in a picture counts as given; information in neither words nor pictures does not exist. Genre convention is not evidence.
+
+# BACK COVER
+{STORY_BRIEF}
+
+# THE BOOK
+{PAGES}
+
+Walk the pages in order and for every page answer five questions. An empty answer must be earned, not assumed:
+1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, an ability or possession never established, especially the rival's?
+2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it?
+3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the book never gave when it first appeared?
+4. TRANSITION: is anyone in a place, or holding something, with no shown path from where the book last put them or it?
+5. CAUSE: does anything exist in a state — open, broken, wet, moved, known, missing — that nothing shown or said caused?
+
+Also name every page whose text and picture tell different moments.
+
+List every fault, one per line, as: "FAULT: p<N> — <one sentence naming the missing reason>". Do not stop at the first few — an audit that misses faults is a failed audit. After the list write one line: "FAULTS: <count>".

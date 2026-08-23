@@ -16354,3 +16354,31 @@ resize people.
 **Touched:** `server/lib/sceneComposite.js` (`buildBlendEditPrompt` census).
 
 **Status:** ✅ active
+
+### Blind audits precede every reviewer: write → audit → review (2026-08-23)
+**Context:** Reviewers and judges read the full context (brief, arc, beats,
+notes) and silently backfilled causal holes a listener cannot fill: a finished
+story scored 8.0/7.4 packaged but 6.8/6.6 when judged blind, and a hostile
+page-by-page blind audit found 36 faults (sense 3/10) in prose every reviewer
+had passed.
+**Decision:** Each stage's artifact is first audited by a reader given ONLY
+what its audience would have: arc audit = commission + arc; beats audit = page
+plan + beats; text audit = back cover + page text + the THIS IMAGE DEPICTS
+block (what the picture actually shows, not the full brief). The audit is an
+exhaustive five-question interrogation (assumed / unforced / device /
+transition / cause), one FAULT line each. Its findings are injected into the
+existing full-context reviewer, whose fix ledger must answer every finding —
+fixed, or a stated reason it stands. Writers stay sonnet; audits and reviews
+run on the review models (grok). Audits never block: on failure the review
+runs on its own findings alone.
+**Rationale:** A model cannot un-read context, so listener-fidelity must be
+structural — separate call, starved input. Naming faults is cheaper than
+rewriting, so the audit costs less than the review it sharpens (~$0.11/story,
++1-2 min; the text audit hides inside the refine slot parallel to images).
+**Touched:** `prompts/story-arc-audit.txt`, `prompts/story-beats-audit.txt`,
+`prompts/story-text-audit.txt`, `prompts/story-arc-review.txt`,
+`prompts/story-beats-review.txt`, `prompts/text-refine.txt`,
+`server/services/prompts.js`, `server/lib/promptBuilders.js`,
+`server/lib/beatsPipeline.js`, `server/lib/textRefine.js`,
+`storyJobPipeline.js` (audit persisted in the stage reports).
+**Status:** ✅ active

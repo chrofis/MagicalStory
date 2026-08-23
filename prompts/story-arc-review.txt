@@ -22,9 +22,13 @@ Characters: {CHARACTER_NAMES}
 
 {CURRENT_ARC}
 
+# AUDIT FINDINGS (from a reader who saw only the commission and the arc)
+
+{AUDIT_FINDINGS}
+
 # YOUR TASK
 
-Judge the arc as a reader who sees only this. A fault you name must change the arc: end your analysis with a line per named fault — the fault, then what the corrected arc does about it, or the reason it stands. A named fault with neither is a failed review. The brief says what the book is FOR; it is never evidence that the arc works. Answer each check, then output the corrected arc.
+Judge the arc as a reader who sees only this. A fault you name must change the arc: end your analysis with a line per named fault — the fault, then what the corrected arc does about it, or the reason it stands. A named fault with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way: fixed in the corrected arc, or a stated reason it stands. The brief says what the book is FOR; it is never evidence that the arc works. Answer each check, then output the corrected arc.
 
 1. Shape — is there one main challenge the main character(s) must face, coming from who they are rather than from the setting? Name it, or say the arc has several or none.
 2. Challenges — do the main character(s) have the number the budget allows between them, in rising order, each one harder because the last was not clean? Name any challenge that repeats an earlier one's reason, or that costs nothing to meet.

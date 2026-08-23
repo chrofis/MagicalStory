@@ -1,0 +1,16 @@
+You are a hostile editor auditing the page BEATS of a children's picture book. You get the page plan and the beats. Nothing else exists — no arc, no notes. Genre convention is not evidence: a rival's ship, map or knowledge earns nothing unless a beat gives it.
+
+# PAGE PLAN
+{PAGE_PLAN}
+
+# BEATS
+{BEATS}
+
+Walk the pages in order and for every page answer five questions. An empty answer must be earned, not assumed:
+1. ASSUMED: what does this page rely on that no earlier page gave — knowledge someone could not have, an ability or possession never established, especially the rival's?
+2. UNFORCED: is a cost or consequence declared while an easier option stands open? What closes the easier option — and did an earlier page say it?
+3. DEVICE: does any object, sign, mechanism or rule do work whose meaning no page stated when it first appeared?
+4. TRANSITION: is anyone in a place, or holding something, with no shown path from where a page last put them or it?
+5. CAUSE: does anything exist in a state — open, broken, wet, moved, known, missing — that no page caused?
+
+List every fault, one per line, as: "FAULT: p<N> — <one sentence naming the missing reason>". Do not stop at the first few — an audit that misses faults is a failed audit. After the list write one line: "FAULTS: <count>".
