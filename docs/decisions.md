@@ -16308,3 +16308,49 @@ consistent with everything above.
 motivated it (`docs/interaction-load-2026-08-23.md`) is unchanged. Still never run
 inside a full story generation, and no image has been produced under the new rule —
 the owner deliberately scoped these runs to text.
+
+---
+
+## 2026-08-23 — The "partly hidden" blend clause is size-neutral; it must never assert full height
+
+**Context:** The blend was destroying the very depth the composite creates.
+Measured on the Kapellbrücke page (Lab exp 824, the healthiest case in the
+composite set at 2.77× depth spread): the paste step produced correct staging —
+the background character small and distant, genuinely clipped behind the bridge
+parapet — and the blend then enlarged him to near-foreground size and perched
+him on the railing. Comparing the pre-blend paste with the final frame put the
+damage unambiguously in the blend, not the plate or the paste.
+
+The cause was in the blend census. `occludedBy[name]` is set by the PASTE for
+any figure it clipped at an occluder line, and the census turned that into:
+
+> partly hidden: whatever crosses them passes IN FRONT of them. They stand
+> behind it **at full height — never sitting on it, never shrunk to a small
+> figure**.
+
+That is a SIZE instruction, emitted for a figure whose correct size is small.
+The same prompt ended with "Depths as staged: … is in the background — small
+and distant". Two contradictory instructions in one prompt; the model followed
+the wrong one.
+
+**Decision:** the clause states occlusion and nothing about scale. New wording
+says only part of them shows, that this is correct and deliberate, keep them
+exactly as they are at exactly the size they are, do not complete the hidden
+part and do not perch or seat them on the occluder.
+
+**Rationale:** the clause's original purpose — stop the model reading a
+half-body as an artefact and painting it out — is preserved. What is removed is
+the scale claim it had no business making. The flag cannot distinguish "a
+foreground figure clipped by a railing" from "a background figure clipped by a
+railing", so any wording that implies a size is wrong for half the cases; the
+staged size is already correct by the time the blend runs, and the blend's job
+is to integrate, not to re-stage.
+
+**Not** an argument for skipping the blend. The raw paste reads as pasted
+cut-outs — owner, 2026-08-23: *"we already see the raw composite and it looks
+artificial. A blend is needed"*. The blend stays; it just stops being told to
+resize people.
+
+**Touched:** `server/lib/sceneComposite.js` (`buildBlendEditPrompt` census).
+
+**Status:** ✅ active

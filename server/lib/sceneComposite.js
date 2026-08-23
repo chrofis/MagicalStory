@@ -1708,8 +1708,21 @@ function buildBlendEditPrompt(scene, cast = null) {
       if (clothing[c.name]) bits.push(`  wearing: ${clothing[c.name]}`);
       if (actions[c.name]) bits.push(`  doing: ${actions[c.name]}`);
       if (occluded[c.name]) {
-        bits.push('  partly hidden: whatever crosses them passes IN FRONT of them. They stand behind it at full height —'
-          + ' never sitting on it, never shrunk to a small figure.');
+        // SIZE-NEUTRAL on purpose. This clause used to end "at full height —
+        // never sitting on it, never shrunk to a small figure", which is a
+        // scale instruction, and the paste sets this flag for ANY figure it
+        // clipped at an occluder line — including a background figure whose
+        // correct rendering IS small. Measured on a bridge page: the distant
+        // character was clipped behind the parapet, told to stand at full
+        // height, and the blend enlarged him to near-foreground size and
+        // perched him on the railing — destroying the depth the composite
+        // exists to create, while the prompt's own closing line still said he
+        // was "in the background — small and distant". The intent was only
+        // ever to stop the model reading a half-body as a defect and painting
+        // it out, so say exactly that and leave size alone.
+        bits.push('  partly hidden: something in the scene crosses in FRONT of them, so only part of them shows.'
+          + ' That is correct and deliberate — keep them exactly as they are, at exactly the size they are.'
+          + ' Do not complete the hidden part, do not perch or seat them on the thing that crosses them.');
       }
       return bits.join('\n');
     }).join('\n');
