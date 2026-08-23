@@ -196,4 +196,17 @@ router.post('/log-error', errorLoggingLimiter, validateBody(schemas.logError), (
   }
 });
 
+// ── Analyzer presence ───────────────────────────────────────────────────────
+// The trial/create wizards send anonymous heartbeats while the user is there
+// and active; the first beat warms the analyzer's photo workers so the first
+// upload never pays a cold start, and expiry (~5 min idle, owner's spec) or an
+// explicit leave closes the session. Public by design — trial users have no
+// account; the token cap in presenceSessions bounds abuse.
+router.post('/analyzer-presence', (req, res) => {
+  const { token, surface, bye } = req.body || {};
+  const presence = require('../lib/presenceSessions');
+  const result = bye ? presence.leave(token) : presence.beat(token, String(surface || 'unknown').slice(0, 24));
+  res.json(result);
+});
+
 module.exports = router;

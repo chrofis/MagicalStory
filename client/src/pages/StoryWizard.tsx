@@ -37,6 +37,7 @@ import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationshi
 import { createLogger } from '@/services/logger';
 import { useDeveloperMode } from '@/hooks/useDeveloperMode';
 import { getAvatarCooldown, recordAvatarRegeneration } from '@/hooks/useAvatarCooldown';
+import { useAnalyzerPresence } from '@/hooks/useAnalyzerPresence';
 
 // Create namespaced logger
 const log = createLogger('StoryWizard');
@@ -122,6 +123,8 @@ const wizardHelperTexts: Record<string, Record<number, string>> = {
 };
 
 export default function StoryWizard() {
+  // Warm the photo-analyzer workers the moment the user arrives (see hook).
+  useAnalyzerPresence('wizard');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();

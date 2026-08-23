@@ -10,6 +10,7 @@ import TrialIdeasStep from './trial/TrialIdeasStep';
 import { trackTrialPageVisit } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { useAnalyzerPresence } from '@/hooks/useAnalyzerPresence';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,10 @@ const loggedInStrings: Record<string, { title: string; desc: string; goToCreate:
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function TrialWizard() {
+  // Warm the photo-analyzer workers the moment the user arrives, so the first
+  // upload never pays their cold start; the session closes ~5 min after the
+  // user goes idle or leaves.
+  useAnalyzerPresence('trial');
   const { language } = useLanguage();
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
