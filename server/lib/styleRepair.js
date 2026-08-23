@@ -272,7 +272,9 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   // is kept only as the Test Lab A/B alternate.
   const { resolveArtStyle } = require('./storyHelpers');
   const styleDesc = (artStyle && resolveArtStyle(artStyle, model)) || 'the art style of the rest of the illustration';
-  const prompt = buildStyleRepairPrompt(styleDesc);
+  // opts.promptOverride lets the Test Lab A/B the WORDING without a deploy.
+  // Production always uses buildStyleRepairPrompt; nothing else passes this.
+  const prompt = opts.promptOverride || buildStyleRepairPrompt(styleDesc);
   log.info(`🎨 [STYLE-REPAIR] repainting page toward dominant style via ${model} (${modelId})`);
   let imageData;
   let usage = null;

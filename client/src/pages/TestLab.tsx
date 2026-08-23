@@ -2203,20 +2203,26 @@ function LightboxHost() {
 
 /** Intermediate-step image strip (presentational — the card owns loading so
  * the lightbox can arrow through ORIGINAL → steps → FINAL as one sequence). */
+/** Key a step image by PAGE + version. Multi-page stages (style_repair repaints
+ * p7-p10) save every repaint as the same versionIndex on its own page, so a
+ * version-only key collided and showed one image four times. */
+export const stepKey = (s: { pageNumber?: number | null; versionIndex: number }) =>
+  `${s.pageNumber ?? 'x'}:${s.versionIndex}`;
+
 function StepsStrip({ steps, images, onOpen }: {
-  steps: { label: string; imageType: string; versionIndex: number }[];
-  images: Record<number, string>;
-  onOpen: (versionIndex: number) => void;
+  steps: { label: string; imageType: string; versionIndex: number; pageNumber?: number | null }[];
+  images: Record<string, string>;
+  onOpen: (key: string) => void;
 }) {
   return (
     <div className="mt-3">
       <div className="text-xs font-medium text-gray-500 mb-1">Pipeline steps</div>
       <div className="flex gap-3 overflow-x-auto">
         {steps.map(s => (
-          <div key={s.versionIndex} className="shrink-0 w-56">
+          <div key={stepKey(s)} className="shrink-0 w-56">
             <div className="text-[11px] text-gray-500 mb-1">{s.label}</div>
-            {images[s.versionIndex]
-              ? <img src={images[s.versionIndex]} alt={s.label} className="rounded-lg w-full cursor-zoom-in" onClick={() => onOpen(s.versionIndex)} />
+            {images[stepKey(s)]
+              ? <img src={images[stepKey(s)]} alt={s.label} className="rounded-lg w-full cursor-zoom-in" onClick={() => onOpen(stepKey(s))} />
               : <div className="text-xs text-gray-400 border rounded-lg p-6 text-center">loading…</div>}
           </div>
         ))}
@@ -2229,7 +2235,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [variantB, setVariantB] = useState<string | null>(null);
-  const [stepImgs, setStepImgs] = useState<Record<number, string>>({});
+  const [stepImgs, setStepImgs] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [promoted, setPromoted] = useState(false);
@@ -2256,8 +2262,10 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
     (async () => {
       for (const s of result.steps || []) {
         try {
-          const img = await testlabService.getTestImage(result.storyId, s.imageType, result.pageNumber ?? null, s.versionIndex);
-          if (alive) setStepImgs(prev => ({ ...prev, [s.versionIndex]: img.imageData }));
+          // s.pageNumber first: a story-level stage (style_repair) emits steps
+          // for SEVERAL pages, and result.pageNumber is undefined there.
+          const img = await testlabService.getTestImage(result.storyId, s.imageType, s.pageNumber ?? result.pageNumber ?? null, s.versionIndex);
+          if (alive) setStepImgs(prev => ({ ...prev, [stepKey(s)]: img.imageData }));
         } catch { /* placeholder stays */ }
       }
     })();
@@ -2268,7 +2276,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
   // The full inspection sequence: ORIGINAL → every pipeline step → FINAL.
   const gallery = (): { src: string; label: string }[] => [
     ...(baseline ? [{ src: baseline, label: 'ORIGINAL (baseline / active version)' }] : []),
-    ...(result.steps || []).filter(s => stepImgs[s.versionIndex]).map(s => ({ src: stepImgs[s.versionIndex], label: s.label })),
+    ...(result.steps || []).filter(s => stepImgs[stepKey(s)]).map(s => ({ src: stepImgs[stepKey(s)], label: s.label })),
     ...(variant ? [{ src: variant, label: `FINAL result (test v${result.versionIndex})` }] : []),
     ...(variantB ? [{ src: variantB, label: `Variant B (test v${result.variantVersionIndex})` }] : []),
   ];
@@ -2405,7 +2413,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
         </details>
       )}
       {!result.ok && !!result.steps?.length && (
-        <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
+        <StepsStrip steps={result.steps} images={stepImgs} onOpen={k => { const g = gallery(); const s = (result.steps || []).find(x => stepKey(x) === k); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
       )}
 
       {result.ok && result.stageKind === 'text_refine' && (
@@ -2622,7 +2630,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
           )}
 
           {!!result.steps?.length && (
-            <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
+            <StepsStrip steps={result.steps} images={stepImgs} onOpen={k => { const g = gallery(); const s = (result.steps || []).find(x => stepKey(x) === k); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
           )}
 
           {result.paintinSetup && (

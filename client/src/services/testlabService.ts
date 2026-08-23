@@ -235,7 +235,9 @@ export interface ExperimentResult {
   crop?: { x: number; y: number; w: number; h: number };
   bbox?: number[];
   faceBbox?: number[];
-  steps?: { label: string; imageType: string; versionIndex: number }[];
+  // pageNumber is per-step: a story-level stage (style_repair) emits steps for
+  // SEVERAL pages in one entry, where the entry itself has no pageNumber.
+  steps?: { label: string; imageType: string; versionIndex: number; pageNumber?: number | null }[];
   // cover_title_paintin: deterministic OCR gate on the painted title
   alignGate?: { offMaskMeanDiff: number; threshold: number; pass: boolean; verdict: string; inkCoverage?: number; reworkMean?: number };
   titleGate?: { expected: string; ocr: string | null; pass: boolean | null; error?: string | null; verdict: string };

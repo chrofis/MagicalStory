@@ -3612,7 +3612,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
  *   - detection  : optional pre-computed checkStoryStyleConsistency result
  *                  (skip re-detecting; e.g. a redo reusing the first run's audit).
  */
-async function runStyleRepairStage(target, { experimentId, params = {} }) {
+async function runStyleRepairStage(target, { experimentId, params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { checkStoryStyleConsistency } = require('./styleConsistency');
@@ -3655,7 +3655,7 @@ async function runStyleRepairStage(target, { experimentId, params = {} }) {
     for (const model of models) {
       const m0 = Date.now();
       try {
-        const rep = await repairPageStyle(tg.image, tg.targetRefImage, { model, artStyle });
+        const rep = await repairPageStyle(tg.image, tg.targetRefImage, { model, artStyle, promptOverride });
         const versionIndex = await saveTestVersion(target.storyId, 'scene', tg.page, rep.imageData, experimentId);
         perModel[model] = {
           versionIndex,
