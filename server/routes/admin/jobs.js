@@ -320,6 +320,11 @@ router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, r
     inputData.skipCovers = false;
     inputData.skipText = false;
     if (inputData.enableFullRepair === undefined) inputData.enableFullRepair = true;
+    // The job runs on the SOURCE story's account (characters live there) — which
+    // may be a real customer. The pipeline skips the story-complete email for
+    // adminRerun jobs; without this flag a rerun of a customer's story mails
+    // that customer about a story they never asked for (2026-08-23).
+    inputData.adminRerun = true;
 
     const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     await pool.query(

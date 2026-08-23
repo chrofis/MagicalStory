@@ -208,6 +208,15 @@
    "status": "fixed",
    "fixedIn": "fix(refresh-bbox) 2026-08-23 (same commit)",
    "note": "refresh-bbox cover branch now resolves each character through the shared buildIdentityClothingText chain (hint category -> clothingRequirements -> standard -> wardrobe). Separate finding kept open in #33: the entity eval MISSED Julian wearing only briefs (no trousers) on the backCover."
+  },
+  {
+   "id": "cancelled-job-persists-and-emails",
+   "title": "Cancel during repair/covers still persisted the story and emailed the customer; rerun-full emails the SOURCE story owner",
+   "reportedAt": "2026-08-23",
+   "source": "job_1787469664089_9e27p42el7l — admin rerun of a customer story cancelled at 81%; no checkCancellation after image phase, email block outside the completion guard; container restart was needed to stop the mail",
+   "status": "fixed",
+   "fixedIn": "same commit",
+   "note": "storyJobPipeline.js: checkCancellation() before avatar-persist/upsertStory; completion email now requires completionRes.rowCount>0 AND !inputData.adminRerun. server/routes/admin/jobs.js: rerun-full stamps adminRerun=true."
   }
  ]
 }

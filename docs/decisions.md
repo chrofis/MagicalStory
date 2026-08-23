@@ -15846,3 +15846,22 @@ character DESCRIPTION when building repair prompts.
 (three `cropSheetCell` sites), `storyJobPipeline.js`, `server/lib/testlab.js`.
 
 **Status:** ✅ active
+
+### Cancellation is re-checked before persistence, and the completion email requires the completed flip (2026-08-23)
+**Context:** All checkCancellation call sites sat in the text/image phases. A
+job cancelled during repair/covers ran uninterrupted through styled-avatar
+persistence, the story upsert, and the completion email — the guarded
+completed-flip skipped, but the email block sat outside that guard. Observed
+on an admin rerun of a customer's story; only a container restart prevented
+the customer email. rerun-full runs on the SOURCE story's account, so its
+completion email goes to that account's owner.
+**Decision:** checkCancellation() runs again immediately before the persist
+block. The completion email additionally requires (a) the guarded UPDATE to
+have matched (the job really flipped to completed this run) and (b) the job
+not being an admin rerun — rerun-full stamps `adminRerun: true` into
+input_data and the pipeline skips the email for it.
+**Rationale:** A cancelled job must leave no trace in the user's account and
+send nothing outward; an admin measurement must never email a customer.
+**Touched:** `storyJobPipeline.js`, `server/routes/admin/jobs.js`,
+`tasks/bugs.json` (cancelled-job-persists-and-emails).
+**Status:** ✅ active

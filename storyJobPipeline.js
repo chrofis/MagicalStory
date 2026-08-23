@@ -5397,6 +5397,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // cover-Überarbeiten / page-iterate found no usable character avatars.
     // Realistic included — exports whatever was generated (redressed
     // categories + costumes); a zero-size map is a no-op.
+    // A cancelled job must not persist into the user's account (styled avatars,
+    // story row) or email them. The last cancellation check above sits in the
+    // image phase, so a cancel landing during repair/covers used to sail
+    // straight through save + email (observed 2026-08-23 on an admin rerun of
+    // a customer's story — only a container restart stopped the mail).
+    await checkCancellation();
+
     if (inputData.characters) {
       try {
         const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
@@ -5734,8 +5741,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     log.info(`✅ [UNIFIED] Job ${jobId} completed successfully`);
 
-    // Send story completion email to customer
+    // Send story completion email to customer — ONLY when this run actually
+    // flipped the job to 'completed'. If the guarded UPDATE above matched no
+    // row the job was cancelled/failed out from under us, and mailing the
+    // user "your story is ready" for a story that was never marked done is
+    // wrong twice over. Admin reruns (rerun-full) never email: the recipient
+    // would be the SOURCE story's owner — a real customer.
     try {
+      if (completionRes.rowCount === 0) {
+        log.info(`[UNIFIED] Job ${jobId} not marked completed — skipping story-complete email`);
+        return resultData;
+      }
+      if (inputData.adminRerun) {
+        log.info(`[UNIFIED] adminRerun job ${jobId} — skipping story-complete email`);
+        return resultData;
+      }
       const userResult = await dbPool.query(
         'SELECT email, username, shipping_first_name, preferred_language, is_trial, claim_token, (trial_data IS NOT NULL) AS has_trial_data FROM users WHERE id = $1',
         [userId]
