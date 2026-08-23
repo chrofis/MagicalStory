@@ -16462,3 +16462,11 @@ intent, not measurement.
 **Status:** 🟡 conditional — unit-verified 7/7 against the real pages of
 `job_1787493968756_4fgr5nukroz` (both hand-offs flag, both one-character pages stay
 clean, legacy rows never flag). Not yet run inside a generation.
+
+## 2026-08-23: Entity names painted as lettering now deduct (rendered_text, MAJOR+)
+
+**Context:** A staging story painted an animal's name in cursive on the ground next to the animal. The stage-1 inventory's Lettering field recorded it precisely (text, surface, readable) but compliance produced NO finding: the rule excused "a string the prompt quotes", and the entity's name appears in the prompt prose — as a draw-instruction, not as text to paint. Zero deduction, no fix target, no repair.
+
+**Decision:** `image-prompt-compliance.txt` Lettering rule sharpened: a string counts as asked-for only when the prompt quotes it as text to be painted (inscription, sign, label); a character's/animal's/object's name in the prompt is an instruction to draw the entity — that name lettered onto any surface is `rendered_text` at MAJOR or higher. Validated by replay on the motivating page (finding now fires, MAJOR) + 2 clean pages (no new findings). Same principle as the repair templates' REPAIR_TEXT_GUARD ("never paint a name as lettering") — this closes the eval side.
+
+**Touched files:** `prompts/image-prompt-compliance.txt`.
