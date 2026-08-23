@@ -16515,3 +16515,47 @@ rule), `prompts/scene-expansion-all.txt` (the prop rule).
 **Status:** 🟡 conditional — not yet exercised on a story. The evaluator's
 `rendered_text` charge is untouched; it should now only fire on genuinely
 unrequested lettering, which is what D-23 is for.
+
+## 2026-08-23 — `height_order` compares only comparable figures; visible extent never compares two figures
+
+**Context:** With identity fixed, `height_order` went from 2 emissions in 30 to
+16 in 16 on `job_1787493968756_4fgr5nukroz`. Four pages then ranked Emma (age 5)
+above Noah (age 7), against the contract. Investigating showed the ranking was
+made across figures that should never have been compared:
+
+- **p7** ranked `Noah center-foreground` against `Emma right-midground` — two
+  different depths — while reporting `same_ground_plane: true` for both.
+- Both figures are cut off by the frame bottom (DINO's boxes end at exactly
+  `y = 1.000`), while the evaluator reported `clipped_by: none` for both.
+- Emma, in MIDGROUND, was given a larger `height_fraction` (0.78) than Noah in
+  FOREGROUND (0.72) — backwards for perspective, and a direct symptom of
+  comparing visible extent across depths.
+
+**Decision:** `height_order` now skips any figure that is unnamed, seated,
+crouching, on a different ground plane, **clipped by anything**, or **standing at
+a different depth** — a foreground figure and a midground one are never ranked
+against each other. Fewer than two figures survive → empty string. The
+`height_fraction` description now states outright that it measures visible
+extent, so it reflects distance and cropping as much as height and is never used
+to compare one figure against another.
+
+**Rationale:** ordering is the only height signal that can control for camera
+distance, because it asks a judgement rather than reading a number. Numbers
+cannot: visible extent conflates real height, depth and cropping. Guarding the
+ordering is therefore the whole game, and on p7 all three guards were wrong at
+once. `height_fraction` keeps exactly one legitimate use — D-29's absolute check
+of one figure against its own expected proportions, which never compares two.
+
+**Retracted:** an earlier reading of this page used DINO's head-top y to
+"prove" the render was correct and the evaluator wrong. That comparison is
+equally confounded — both boxes bottom out at the frame edge, so it compares two
+clipped extents. Neither side was proven; the page's comparability guards were
+simply broken.
+
+**Still unproven:** D-29 has never been observed firing. Nothing here changes
+that; the rule deducts on absolute proportion only, and no page with a genuine
+scale defect has been found to test it against.
+
+**Touched:** `prompts/image-evaluation.txt`
+
+**Status:** ✅ active
