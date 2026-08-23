@@ -529,13 +529,12 @@ function capComplianceIdentitySeverity(issues) {
  * @param {string} imagePrompt - The prompt used to generate the image
  * @param {string|null} sceneHint - Original scene description (may contain interaction metadata)
  * @param {Object} options
- * @param {string|null} options.qualityModelOverride - Override model for Stage 1 vision
+ * @param {Promise|null} options.inventoryPromise - The shared blind inventory for this page
  * @param {string} options.pageContext - Page context for logging (e.g., "PAGE 5")
  * @returns {Promise<Object|null>} Three-stage result or null on failure
  */
 async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {}) {
   const {
-    qualityModelOverride = null,
     pageContext = '',
     storyText = null,
     qualityFiguresPromise = null,
@@ -925,7 +924,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
       threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
         inventoryPromise: p1Promise,
-        qualityModelOverride,
         pageContext,
         storyText: fidelityRef,
         qualityFiguresPromise,

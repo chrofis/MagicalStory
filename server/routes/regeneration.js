@@ -148,7 +148,7 @@ const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing
 const { getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
-const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
+const { coverKeyToType, coverTypeToKey, coverKeyToHintKey, coverLabel } = require('../lib/coverKeys');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
