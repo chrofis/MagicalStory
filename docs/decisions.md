@@ -16470,3 +16470,48 @@ clean, legacy rows never flag). Not yet run inside a generation.
 **Decision:** `image-prompt-compliance.txt` Lettering rule sharpened: a string counts as asked-for only when the prompt quotes it as text to be painted (inscription, sign, label); a character's/animal's/object's name in the prompt is an instruction to draw the entity — that name lettered onto any surface is `rendered_text` at MAJOR or higher. Validated by replay on the motivating page (finding now fires, MAJOR) + 2 clean pages (no new findings). Same principle as the repair templates' REPAIR_TEXT_GUARD ("never paint a name as lettering") — this closes the eval side.
 
 **Touched files:** `prompts/image-prompt-compliance.txt`.
+
+## 2026-08-23 — Prop writing is never model-spelled, and the prop faces its reader
+
+**Context:** text-bearing props measurably cost pages. In `job_1787423677246_r9llf5yi9`
+the six map/chart pages averaged **38** against a story mean of 57; in staging
+`job_1787493968756_4fgr5nukroz` the seven note pages averaged **54** against 61, and
+p2 carried `rendered_text/MAJOR` — *"The text on both pieces of the note is illegible
+gibberish. The prompt explicitly states…"*. The pipeline asked Grok to spell a note,
+got scribble, and then charged the page for the scribble.
+
+The request was permitted by design: `story-unified.txt` and `story-bible-from-beats.txt`
+offered the writer a choice — *"EITHER quote the exact text … OR say illegible"* — and
+`image-evaluation.txt` D-23 exempts any string a TEXT RULES block names. So a brief
+could legitimately ask for lettering the model cannot produce.
+
+Two independent facts settled it. Externally, text rendering is model-specific and
+unreliable — Ideogram ≈90% accuracy against FLUX ≈30%, only very short quoted strings
+render dependably, and the standard children's-book advice is to generate a clean
+surface and overlay text afterwards. Internally, this repo already decided exactly
+this for covers: *"Cover title text is painted in (plate/strip pass), never
+model-spelled"* (SETTLED.md). Props never got the same treatment.
+
+**Decision (owner, 2026-08-23):** a prop's writing is always illegible / weathered /
+smudged / blurred. The "quote the exact text" branch is removed everywhere. A prop
+carrying writing also stays **angled toward the character reading it, never turned
+flat to the camera to show its face** — the composition failure the owner named:
+once a brief asks for the writing to be seen, the only way to show it is to present
+the object to the viewer, which is why these pages also collect `viewer_address`.
+
+**Rationale:** we were penalising the model for failing a request it cannot satisfy,
+and the same class of problem was already solved for covers by not asking.
+
+**A contradiction found and removed in passing:** `scene-expansion.txt` rule 12c still
+offered *"either quote the exact string to render and keep it under three words"*.
+The live beats template (`scene-expansion-all.txt`) had no surface-writing rule at
+all, which is why the note story's exact text arrived via the visual bible instead.
+12c is now marks-only and the two files agree.
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt` (12c + the prop
+rule), `prompts/scene-expansion-all.txt` (the prop rule).
+
+**Status:** 🟡 conditional — not yet exercised on a story. The evaluator's
+`rendered_text` charge is untouched; it should now only fire on genuinely
+unrequested lettering, which is what D-23 is for.

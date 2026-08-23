@@ -67,7 +67,7 @@ Every description — characters, creatures, clothing, objects — must render i
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
-- For a prop with visible writing, either quote the exact text or call it illegible / weathered / smudged. Never say text is visible without naming it.
+- A prop with visible writing has that writing called illegible / weathered / smudged. Never quote words to be painted, and never say text is visible without describing it that way.
 
 Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
 

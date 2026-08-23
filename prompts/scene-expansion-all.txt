@@ -165,6 +165,8 @@ Omit entirely (do not include with `false`): pure ground/floor/path contact, lea
 
 Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side". Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
+A prop carrying writing — a map, letter, note, sign, book — keeps that writing illegible and stays angled toward the character reading it, never turned flat to the camera to show its face.
+
 `hands`: `true` when the character's hands are on the object. One object takes one pair of hands: a second character in contact with the same object belongs on another page, and a hand-over is drawn as the moment before or after it — one holds the object out, the other reaches.
 
 `action`: required on every row. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
