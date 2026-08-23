@@ -508,10 +508,22 @@ function capComplianceIdentitySeverity(issues) {
 }
 
 /**
- * Three-stage image evaluation: vision inventory (flash-lite) + prompt compliance (Haiku).
- * Stage 1 describes the image without seeing the prompt (unbiased).
- * Stage 2 compares the vision inventory against the original prompt (text-only, no image).
- * Returns a compliance score (0-100) and fixable issues, or null on failure.
+ * The prompt-compliance judge. Compares the blind inventory against the original
+ * prompt, text-only, never seeing the image. Returns a compliance score (0-100)
+ * and fixable issues, or null on failure.
+ *
+ * THE NAME IS HISTORICAL and does not describe the function. It has never had
+ * three stages: the commit that added it (568aacce7) implemented Stage 1 (a
+ * blind vision call) and Stage 2 (this judge), counting the pre-existing quality
+ * eval as the third. Since the blind inventory became one shared call for the
+ * whole page, Stage 1 is not performed here at all — its result arrives as
+ * `inventoryPromise` — so what remains is a single stage. Kept as-is
+ * deliberately: `threeStageResult` / `threeStageScore` / `threeStage_*_tokens`
+ * are persisted on every stored version and read by the dev panel, and renaming
+ * the code without them would be worse than the current name.
+ *
+ * Do not confuse "Stage" with the STEP 1 / 1b / 2 / 3 headings inside
+ * `image-prompt-compliance.txt` — those are steps within this one stage.
  *
  * @param {string} imageData - Base64 encoded image with data URI prefix
  * @param {string} imagePrompt - The prompt used to generate the image

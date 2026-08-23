@@ -4468,13 +4468,13 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     // clothing} per character on the cover.
     if (isCover && Object.keys(expectedPositions).length === 0) {
       const coverKey2 = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' }[String(pageNumber)];
-      // coverHints stores the FRONT cover under 'titlePage' (documented quirk;
-      // memory: front-cover hint lives under key titlePage not frontCover) —
-      // the frontCover lookup found nothing, mining silently skipped, and the
-      // cover's identity lines stayed positionless AND undressed through two
-      // fix rounds (2026-08-23).
-      const hintKey = coverKey2 === 'frontCover' && !storyData?.coverHints?.frontCover ? 'titlePage' : coverKey2;
-      const charDetails = storyData?.coverHints?.[hintKey]?.characterDetails || {};
+      // coverHints is keyed by HINT KEY, not cover key — the front cover's
+      // hints live under 'titlePage' (outline vocabulary; see coverKeys.js,
+      // the single source of truth for the three cover naming schemes). The
+      // raw coverKey lookup found nothing here, mining silently skipped, and
+      // the frontCover's identity lines stayed positionless AND undressed
+      // through two fix rounds (2026-08-23).
+      const charDetails = storyData?.coverHints?.[coverKeyToHintKey(coverKey2)]?.characterDetails || {};
       for (const [name, info] of Object.entries(charDetails)) {
         if (info?.position) expectedPositions[name] = info.position;
         if (info?.clothing) expectedClothing[name] = info.clothing;
