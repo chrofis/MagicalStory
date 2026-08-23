@@ -239,7 +239,137 @@ function clearCostumedAvatarGenerationLog() {
 /**
  * Extract physical traits from a photo using Gemini vision
  */
+
+// ── 3-MODEL TRAIT REVIEW (owner, 2026-08-23) ────────────────────────────────
+// A single extractor carries systematic perception bias that resampling the
+// SAME model cannot wash out (self-consistency fixes stochastic slips only;
+// intra-model errors are correlated — measured here twice: gen-time identity
+// answered the same wrong names 4/4 at temperature 0, and Noah's hairColor
+// sat at "dark brown" for a blond child for THREE MONTHS of single-Gemini
+// extractions, poisoning every avatar prompt downstream). Cross-family
+// panels are the decorrelator (Verga et al. 2024, panel-of-judges; Zheng et
+// al. 2023 on stable single-judge bias).
+//
+// Design: Gemini's rich extraction stays the base; two cheap verifier probes
+// (Qwen2.5-VL via OpenRouter, Claude Haiku) re-read ONLY the categorical
+// perception fields. Per field, values are bucketed (blond/brown/black/red/
+// grey etc.); if BOTH verifiers agree with each other and disagree with
+// Gemini, their value wins and the override is recorded on
+// traits._traitReview. A lone dissenter never overrides; a three-way split
+// records a dispute and keeps Gemini's value. Any verifier failure degrades
+// to today's single-model behaviour. Cost: ~$0.003 per character, once at
+// creation.
+const TRAIT_REVIEW_FIELDS = ['hairColor', 'hairStyle', 'hairLength', 'eyeColor', 'skinTone', 'facialHair'];
+const _TRAIT_HEX_ON_OVERRIDE = {
+  hairColor: { blond: '#E6D3A3', brown: '#6B4A2B', black: '#2A2321', red: '#A34A2A', grey: '#9C9C9C' },
+  eyeColor: { blue: '#4A78A0', brown: '#5B3B22', green: '#4A7A50', grey: '#7A8490', hazel: '#7A5B33' },
+};
+function _traitBucket(field, value) {
+  const v = String(value || '').toLowerCase();
+  if (!v || v === 'none' && field !== 'facialHair') return null;
+  const pick = (map) => { for (const [bucket, re] of map) { if (re.test(v)) return bucket; } return null; };
+  switch (field) {
+    case 'hairColor': return pick([
+      ['blond', /blond|golden|sandy|flaxen|fair/],
+      ['red', /red|ginger|auburn|copper|strawberry/],
+      ['black', /black|jet/],
+      ['grey', /gr[ae]y|white|silver/],
+      ['brown', /brown|brunette|chestnut/],
+    ]);
+    case 'eyeColor': return pick([
+      ['blue', /blue/], ['green', /green/], ['hazel', /hazel|amber/],
+      ['grey', /gr[ae]y/], ['brown', /brown|dark/],
+    ]);
+    case 'hairStyle': return pick([
+      ['curly', /curl|coil|kink/], ['wavy', /wav/], ['straight', /straight/],
+    ]);
+    case 'hairLength': return pick([
+      ['short', /short|crop|buzz/], ['long', /long|shoulder|waist/], ['medium', /medium|mid|ear|chin/],
+    ]);
+    case 'skinTone': return pick([
+      ['light', /light|fair|pale/], ['dark', /dark|deep/], ['medium', /medium|tan|olive|brown/],
+    ]);
+    case 'facialHair': return /none|clean|no\b|^$/.test(v) ? 'none' : 'some';
+    default: return null;
+  }
+}
+async function _traitProbe(vendor, b64, mimeType) {
+  const prompt = 'Analyze this person\'s photo. Return ONLY JSON: {"hairColor": "...", "hairStyle": "straight|wavy|curly", "hairLength": "...", "eyeColor": "...", "skinTone": "...", "facialHair": "..."}. Be precise about colours (e.g. "light blonde", "dark brown").';
+  let text = '';
+  if (vendor === 'qwen') {
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) return null;
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0, max_tokens: 400,
+        messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } }, { type: 'text', text: prompt }] }] }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    text = j?.choices?.[0]?.message?.content || '';
+  } else if (vendor === 'haiku') {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) return null;
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, temperature: 0,
+        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } }, { type: 'text', text: prompt }] }] }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    text = (j?.content || []).map(c => c.text || '').join('');
+  }
+  const m = String(text).match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
+}
+async function _panelReviewTraits(imageData, traits) {
+  const b64 = stripDataUriPrefix(imageData);
+  const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ? imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+  const [qwen, haiku] = await Promise.all([
+    _traitProbe('qwen', b64, mimeType).catch(() => null),
+    _traitProbe('haiku', b64, mimeType).catch(() => null),
+  ]);
+  if (!qwen && !haiku) return; // no panel available — single-model behaviour
+  const review = {};
+  for (const field of TRAIT_REVIEW_FIELDS) {
+    const g = _traitBucket(field, traits[field]);
+    const q = qwen ? _traitBucket(field, qwen[field]) : null;
+    const h = haiku ? _traitBucket(field, haiku[field]) : null;
+    if (!q || !h) {
+      // one verifier only: flag disagreement, never override (2-agree required)
+      const lone = q || h;
+      if (lone && g && lone !== g) review[field] = { kept: traits[field], dissent: lone, verdict: 'single-dissent' };
+      continue;
+    }
+    if (q === h && g && q !== g) {
+      const newValue = (qwen && qwen[field]) || (haiku && haiku[field]);
+      review[field] = { was: traits[field], now: newValue, votes: { gemini: g, qwen: q, haiku: h }, verdict: 'overridden' };
+      traits[field] = newValue;
+      const hexField = field + 'Hex';
+      if (traits[hexField] !== undefined && _TRAIT_HEX_ON_OVERRIDE[field]) {
+        traits[hexField] = _TRAIT_HEX_ON_OVERRIDE[field][q] || null;
+      }
+      log.warn(`📸 [TRAIT-PANEL] ${field} overridden by 2-of-3 consensus: "${review[field].was}" -> "${newValue}" (gemini=${g}, qwen=${q}, haiku=${h})`);
+    } else if (g && q !== g && h !== g && q !== h) {
+      review[field] = { kept: traits[field], votes: { gemini: g, qwen: q, haiku: h }, verdict: 'three-way-dispute' };
+      log.warn(`📸 [TRAIT-PANEL] ${field} three-way dispute (gemini=${g}, qwen=${q}, haiku=${h}) — keeping Gemini's "${traits[field]}"; photo may be ambiguous`);
+    }
+  }
+  if (Object.keys(review).length) traits._traitReview = review;
+}
 async function extractTraitsWithGemini(imageData, languageInstruction = '') {
+  const res = await _extractTraitsWithGeminiOnce(imageData, languageInstruction);
+  if (res?.traits && !res._error) {
+    try { await _panelReviewTraits(imageData, res.traits); }
+    catch (e) { log.warn(`📸 [TRAIT-PANEL] review failed (${e.message}) — keeping single-model traits`); }
+  }
+  return res;
+}
+
+async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '') {
   try {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {

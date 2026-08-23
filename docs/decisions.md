@@ -16722,3 +16722,34 @@ been built before that.
 
 **Status:** ✅ active — UNVERIFIED on a real story. D-29 has never produced a
 true positive; this changes what it reads, not proof that it now works.
+
+## 2026-08-23 — Trait extraction gets a 3-model review panel (2-of-3 override)
+
+**Context.** Noah's character record carried hairColor "dark brown" (and brown
+eyes) for a golden-blond, blue-eyed child — since the 2026-05-13 single-Gemini
+extraction. Every avatar prompt since then demanded "Hair color: dark brown …
+Reproduce EXACTLY"; the fresh smoke story painted him brown, the avatar eval
+correctly scored identity 4/10 against the photo, and the advisory-only gate
+shipped it. Resampling one model cannot catch this class: intra-model
+perception errors are correlated (measured twice in this repo at temperature
+0). Cross-family panels are the decorrelator (Verga et al. 2024 panel-of-
+judges; Zheng et al. 2023 single-judge bias).
+
+**Decision.** extractTraitsWithGemini is now a wrapper: Gemini's rich
+extraction stays the base; Qwen2.5-VL and Claude Haiku re-read the six
+categorical perception fields (hairColor, hairStyle, hairLength, eyeColor,
+skinTone, facialHair). Values are bucketed; when both verifiers agree with
+each other against Gemini, their value wins (hex fields remapped) and the
+override is recorded on traits._traitReview. Lone dissent flags but never
+overrides; three-way splits keep Gemini and record a dispute (ambiguous
+photo). Verifier failure degrades to single-model behaviour. ~$0.003 per
+character, once at creation. Verified: the 3-vendor probe on Noah's photo was
+unanimously "light blonde"/blue; his record is corrected (with
+_traitCorrection annotation).
+
+**Open (related, not in this commit):** the avatar face-match gate is still
+advisory ("below threshold — shipping anyway", no retry); eval-vs-trait
+contradiction as a trait-bug signal; the smoke account's character-store row
+is 56.9 MB of JSONB for 5 characters (inline bytes vs the R2 iron rule).
+
+**Touched files.** server/routes/avatars.js.
