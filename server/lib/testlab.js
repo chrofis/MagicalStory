@@ -5745,13 +5745,24 @@ function jsonHasField(fig, key) {
 
 /** Prose arms are scored per figure BLOCK, so a field named once does not count for five figures. */
 function proseFigureBlocks(text) {
-  const lines = String(text || '').split(/\r?\n/);
+  const all = String(text || '').split(/\r?\n/);
+  // Objects, setting and lettering are bulleted in the same style as figures, so
+  // counting the whole document inflated the figure count (13 "figures" on a
+  // page with 8) and unfairly depressed the per-figure delivery rate. Take only
+  // the human-figure section.
+  const start = all.findIndex(l => /human figures?/i.test(l) && l.trim().length < 60);
+  const rest = start >= 0 ? all.slice(start + 1) : all;
+  const stop = rest.findIndex(l => /^[\s*#]*(notable\s+)?(object|animal|vehicle|setting|lettering|physics)/i.test(l) && l.trim().length < 70);
+  const lines = stop >= 0 ? rest.slice(0, stop) : rest;
   const blocks = [];
   let cur = null;
   for (const line of lines) {
-    // A figure header is a line naming a figure and little else.
-    if (/^\s*[*\-#>]*\s*(figure|person|child|adult|man|woman|boy|girl)\b[^:]{0,60}:?\s*$/i.test(line)
-        || /^\s*\*\*\s*figure\s*\d/i.test(line)) {
+    // A figure header is a NUMBERED or BULLETED line whose content is bold —
+    // `1.  **The adult in the orange vest**`, `*   **Figure 2 (left child)**`.
+    // Matching only on words like "figure"/"child" missed every one of them,
+    // because the label rule made the headers descriptive instead.
+    if (/^\s{0,4}(?:\d+[.)]|[-*•])\s+\*\*.+/.test(line)
+        || /^\s{0,4}\*\*\s*figure\s*\d/i.test(line)) {
       cur = { header: line.trim(), body: '' };
       blocks.push(cur);
     } else if (cur) {
@@ -5826,10 +5837,14 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
     },
   }];
 
+  // EVERY arm asks for raw text. runVisualInventory's parsed return keeps only
+  // {figures, objectMatches, rendering} — scoring that would have marked the
+  // unified prompt as "dropping" interactions, setting and lettering when the
+  // model had emitted all three and the plumbing discarded them.
   const ARMS = [
-    { key: 'split_p1', label: 'P1 (image-visual-inventory)', template: PROMPT_TEMPLATES.imageVisualInventory, raw: false },
-    { key: 'split_stage1', label: 'Stage 1 (image-vision-inventory)', template: PROMPT_TEMPLATES.imageVisionInventory, raw: true },
-    { key: 'unified', label: 'Unified (image-inventory-unified)', template: params.unifiedPrompt || PROMPT_TEMPLATES.imageInventoryUnified, raw: false },
+    { key: 'split_p1', label: 'P1 (image-visual-inventory)', template: PROMPT_TEMPLATES.imageVisualInventory, json: true },
+    { key: 'split_stage1', label: 'Stage 1 (image-vision-inventory)', template: PROMPT_TEMPLATES.imageVisionInventory, json: false },
+    { key: 'unified', label: 'Unified (image-inventory-unified)', template: params.unifiedPrompt || PROMPT_TEMPLATES.imageInventoryUnified, json: true },
   ];
 
   const t0 = Date.now();
@@ -5842,7 +5857,7 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
       try {
         res = await runVisualInventory(parts, modelId, apiKey, label, {
           promptOverride: arm.template,
-          raw: arm.raw,
+          raw: true,
         });
       } catch (e) {
         log.warn(`[INVENTORY-AB] ${label} failed: ${e.message}`);
@@ -5851,8 +5866,15 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
         runs.push({ arm: arm.key, armLabel: arm.label, repeat: i + 1, failed: true });
         continue;
       }
-      const parsed = arm.raw ? null : res;
-      const rawText = arm.raw ? res.rawText : null;
+      const rawText = res.rawText;
+      let parsed = null;
+      if (arm.json) {
+        try {
+          parsed = require('./storyHelpers').extractJsonFromText(rawText);
+        } catch (e) {
+          log.warn(`[INVENTORY-AB] ${label} JSON parse failed: ${e.message}`);
+        }
+      }
       runs.push({
         arm: arm.key,
         armLabel: arm.label,
@@ -5860,7 +5882,8 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
         ...scoreArm(arm.key, parsed, rawText),
         inputTokens: res.inputTokens || 0,
         outputTokens: res.outputTokens || 0,
-        output: arm.raw ? rawText : JSON.stringify(parsed, null, 2),
+        jsonParsed: arm.json ? parsed != null : null,
+        output: rawText,
       });
     }
   }

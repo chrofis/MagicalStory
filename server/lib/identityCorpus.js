@@ -60,7 +60,9 @@ async function harvestIdentityConflict({ storyId, pageNumber, report }) {
        ON CONFLICT (set_id, target_key) DO UPDATE SET label = EXCLUDED.label, params = EXCLUDED.params`,
       [
         setId,
-        JSON.stringify({ storyId, page: pageNumber }),
+        // `pageNumber` is the key the Lab runner reads (`target.pageNumber`) —
+        // a member keyed `page` loads as "Scene not found: … page undefined".
+        JSON.stringify({ storyId, pageNumber }),
         JSON.stringify({ identityAgreement: report }),
         `${storyId}:p${pageNumber}`,
         `p${pageNumber} · ${report.conflicts.length}/${report.compared} contested · ${pairs}${report.uncorrectable ? ' · uncorrectable' : ''}`,
