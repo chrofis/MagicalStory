@@ -72,6 +72,7 @@ async function loadPromptTemplates() {
     ['imageEvaluation', 'image-evaluation.txt'],
     ['imageVisualInventory', 'image-visual-inventory.txt'],
     ['imageVisionInventory', 'image-vision-inventory.txt'],
+    ['imageInventoryUnified', 'image-inventory-unified.txt'],
     ['imagePromptCompliance', 'image-prompt-compliance.txt'],
     ['imageSemantic', 'image-semantic.txt'],
     // coverImageEvaluation: removed in commit 0f408228 (May 9 2026). The

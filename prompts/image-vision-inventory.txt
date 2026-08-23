@@ -1,6 +1,7 @@
 Describe exactly what you see in this illustration. No interpretation, no guessing what was intended — only what is visible.
 
 For EACH human figure:
+- Label: a short handle built from what is visible — age group plus the main garment's colour and type (`the young boy in green`, `the woman in the red coat`). Use the same label for that figure everywhere below. Never a personal name.
 - Zone: one of `left-foreground`, `center-foreground`, `right-foreground`, `left-midground`, `center-midground`, `right-midground`, `left-background`, `center-background`, `right-background`
 - Facing direction (toward viewer, away from viewer, left, right, toward another figure)
 - Hair color, length, style
@@ -16,6 +17,9 @@ For EACH human figure:
 - Height next to the other figures: rank this figure among those standing at the same distance from the camera (shortest / middle / tallest / roughly equal to <name>). Say `cannot tell` when the figure is sitting, kneeling, crouching, cropped, or clearly nearer to or further from the camera than the others
 - Approximate age group (child/teenager/adult/elderly)
 - Standing surface: name the surface the feet / lower body rest on or in (cobblestones, floor, grass, sand, water, snow, a boat deck, inside a fountain/pond/basin, a rooftop, etc.), or "mid-air" if not touching a surface
+
+Interactions between figures:
+- One line per engaged pair, referring to both by their labels: who faces, looks at, reaches toward, holds, or touches whom, and where the contact is. Report facing, gaze, reach and contact only. Write `none` when no two figures are engaged.
 
 For EACH notable object, animal, or vehicle:
 - What it is

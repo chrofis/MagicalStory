@@ -44,7 +44,7 @@ Wrongness is a finding; absence is a guess. When the inventory NAMES the item an
 
 **PRESENCE IS AN INPUT — never your judgment.** `QUALITY_FIGURES.matches[]` already identified who is in the image (via reference-photo matching upstream). A character listed there IS present and correctly identified. You may NEVER flag such a character as missing, `missing_character`, or "no inventory figure matches" — no matter how their hair, freckles, ponytail side, clothing pattern, expression, or any appearance detail differs. Appearance differences on a present character are reported in STEP 2 as per-character issues, never as absence.
 
-For each `matches[]` entry in QUALITY_FIGURES, take the figure's zone from QUALITY_FIGURES.figures[]. Find the VISION_INVENTORY figure in the same zone (or the nearest one — do not require an exact zone match) and output a pairing `{name, zone, vision_description}` to describe how they look. Zone mismatch is a position note, not an absence.
+For each `matches[]` entry in QUALITY_FIGURES, take the figure's zone from QUALITY_FIGURES.figures[]. Find the VISION_INVENTORY figure in the same zone (or the nearest one — do not require an exact zone match) and output a pairing `{name, label, zone, vision_description}`, carrying that figure's VISION_INVENTORY label verbatim. Zone mismatch is a position note, not an absence.
 
 The ONLY case for `missing_character`: a character named in ORIGINAL_PROMPT that has NO entry in `QUALITY_FIGURES.matches[]` AND no plausibly-matching VISION figure at all. If they are in `matches[]`, they are present — stop. `missing_character` is at most MAJOR, never CRITICAL — you have not seen the image, so an absence you infer from the inputs is a report, not proof.
 
@@ -79,7 +79,7 @@ For each paired row from STEP 1 with a non-null `vision_description`:
 
 **STEP 3: INTERACTION CHECK**
 
-For each declared interaction, ask: could the inventory figure plausibly be doing this action? Don't judge pose precision, angles, or gesture nuance.
+For each declared interaction, ask: could the inventory figure plausibly be doing this action? Use VISION_INVENTORY's interaction lines, resolving each label to the name it paired with in STEP 1. Don't judge pose precision, angles, or gesture nuance.
 
 Only flag a contradiction:
 - Declared "holds X" / wears X / X in hand, inventory says hands empty or X missing → CRITICAL
@@ -148,7 +148,7 @@ Return JSON only:
     "setting_match": true
   },
   "character_compliance": [
-    {"name": "CharacterA", "clothing_match": false, "clothing_issue": "wearing modern sweatshirt instead of medieval tunic", "facing_match": false, "facing_issue": "facing away from camera but should face toward CharacterB", "severity": "CRITICAL"}
+    {"name": "CharacterA", "label": "the young boy in green", "clothing_match": false, "clothing_issue": "wearing modern sweatshirt instead of medieval tunic", "facing_match": false, "facing_issue": "facing away from camera but should face toward CharacterB", "severity": "CRITICAL"}
   ],
   "interaction_compliance": [
     {"character": "CharacterB", "object": "crossbow", "expected": "both hands gripping, arms raised", "actual": "holding crossbow at side", "match": false, "severity": "MAJOR"}

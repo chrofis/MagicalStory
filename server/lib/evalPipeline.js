@@ -72,16 +72,22 @@ const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) 
  * @param {string} pageContext - Page context for logging
  * @returns {Promise<{figures: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number}|null>}
  */
-async function runVisualInventory(parts, modelId, apiKey, pageContext) {
+async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}) {
   try {
+    // promptOverride / raw exist for the Lab inventory A/B: the SAME call
+    // machinery (retries, Grok fallback, safety settings, temperature)
+    // measuring a different template, rather than a second hand-rolled caller
+    // that drifts from this one. `raw` returns the model's text unparsed, which
+    // is the only way to measure a prose template against a JSON one.
+    const inventoryPrompt = opts.promptOverride || PROMPT_TEMPLATES.imageVisualInventory;
     const inventoryParts = [...parts];
-    inventoryParts.push({ text: PROMPT_TEMPLATES.imageVisualInventory });
+    inventoryParts.push({ text: inventoryPrompt });
 
     // Route to Grok vision API for xAI models
     const modelConfig = TEXT_MODELS[modelId];
     let p1Response;
     if (modelConfig?.provider === 'xai') {
-      p1Response = await require('./images').callGrokVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, PROMPT_TEMPLATES.imageVisualInventory);
+      p1Response = await require('./images').callGrokVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
     } else {
       p1Response = await withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
@@ -93,7 +99,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
             // Same rationale as the quality-eval budget bump — inventory (P1)
             // stage emits detailed per-figure JSON that can run long on
             // multi-character scenes.
-            generationConfig: { maxOutputTokens: 32000, temperature: 0.3 },
+            generationConfig: { maxOutputTokens: 32000, temperature: EVAL_TEMPERATURE },
             safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
           })
         });
@@ -113,7 +119,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
         if (grokFallbackModel?.provider === 'xai') {
           log.info(`🔄 [QUALITY P1] ${pageLabel}Falling back to Grok vision (${grokFallbackId}) after HTTP error...`);
           try {
-            const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, PROMPT_TEMPLATES.imageVisualInventory);
+            const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, inventoryPrompt);
             if (grokResp.ok) {
               p1Response = grokResp;
             } else {
@@ -151,7 +157,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
         if (grokFallbackModel?.provider === 'xai') {
           log.info(`🔄 [QUALITY P1] ${pageLabel}Falling back to Grok vision (${grokFallbackId})...`);
           try {
-            const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, PROMPT_TEMPLATES.imageVisualInventory);
+            const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, inventoryPrompt);
             if (grokResp.ok) {
               p1Data = await grokResp.json();
               inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
@@ -182,6 +188,8 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
       log.warn(`⚠️ [QUALITY P1] No text response`);
       return null;
     }
+
+    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens };
 
     let inventoryJson;
     try {

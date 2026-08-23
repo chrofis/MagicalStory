@@ -15651,3 +15651,53 @@ idle-unload can collide with another thread mid-initialising a torch submodule
 attempt always succeeds. Lab runs survived via their retry loop, but a single
 refresh-bbox call 503'd and silently shipped a Gemini fallback page (Fiona p1,
 twice). get_groundingdino now retries the load once after 3s.
+
+## 2026-08-23 — Blind describers: labels, a temperature pin, and an A/B on merging them
+
+**Context:** Two blind describers run on every scene page and were never designed
+as a pair. P1 (`image-visual-inventory.txt`) is the surviving half of the
+two-pass eval deleted in `e88b3cf50` (2026-02-22); the three-stage
+(`568aacce7`, 2026-04-13) rebuilt the same blind-describer → text-judge shape
+with a fresh prompt seven weeks later and shipped it *beside* the old one. No
+commit and no entry here argues for keeping both. Their fields differ: Stage 1
+is far richer on appearance (eyewear, headwear, facial hair, worn items, age,
+standing surface, lettering, setting, camera), P1 is the only one with numeric
+geometry (`height_fraction`, `same_ground_plane`, `clipped_by`) — which is what
+the D-29 scale rule reads.
+
+**Decision:** Three changes, none of which yet merges the two.
+1. **Labels.** `image-vision-inventory.txt` gives every figure a descriptive
+   handle ("the young boy in green") and an `interactions` section between those
+   labels. `image-prompt-compliance.txt` carries the label through its STEP 1
+   zone pairing so STEP 3 resolves it to a real character name. The blind side
+   still never names anyone.
+2. **P1's temperature is pinned** to `EVAL_TEMPERATURE`. It was left at 0.3.
+3. **A Lab stage, `inventory_ab`,** runs three arms on one image — P1 alone,
+   Stage 1 alone, and a unified candidate (`image-inventory-unified.txt`) —
+   scored on per-FIELD delivery across 25 fields, repeated N times. A field
+   counts for the split pair when EITHER prompt delivers it; the stage reports
+   which fields the unified arm drops against that bar.
+
+**Rationale:** Merging two prompts into one is only safe if a prompt asking for
+forty things fills them as reliably as two asking for twenty. That is an open
+question with evidence pointing both ways in this repo — the unified story call
+was measured as *not* overloaded, while `image-evaluation.txt` (36k chars) skips
+`matches` on 21 of 30 versions and emitted 0 `body_bbox` across 51 matches. So
+the merge is measured before it is made. The temperature pin closes the same gap
+the variance work closed for Stage 1: *"if that description varies, findings vary
+regardless of how deterministic the judges are"* (#403/#404) — P1 was missed
+then. `runVisualInventory` gained `promptOverride`/`raw` so every arm runs
+through the production call machinery rather than a Lab-local copy that drifts.
+
+Interactions are recorded as facing, gaze, reach and contact only — never
+direction of travel, which stays banned per the `job_1781289599516 p7` entry
+above. Whether that ban should hold is itself queued for the Lab.
+
+**Touched:**
+- `prompts/image-vision-inventory.txt`, `prompts/image-prompt-compliance.txt`
+- `prompts/image-inventory-unified.txt` (new), `server/services/prompts.js`
+- `server/lib/evalPipeline.js` (`runVisualInventory` opts + temperature)
+- `server/lib/testlab.js` (`inventory_ab`), `client/src/services/testlabService.ts`
+
+**Status:** 🟡 conditional — the unified prompt is a Lab candidate, not in the
+pipeline. Nothing merges until `inventory_ab` says it is safe.

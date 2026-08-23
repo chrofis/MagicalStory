@@ -5685,6 +5685,236 @@ async function runEmptySceneAdherenceStage(ctx, { experimentId }) {
   };
 }
 
+/**
+ * INVENTORY A/B — can ONE blind prompt deliver what TWO deliver?
+ *
+ * Two blind describers run on every page today: P1 (`image-visual-inventory`,
+ * JSON, read by code) and three-stage Stage 1 (`image-vision-inventory`, prose,
+ * read by the compliance judge). They were never a designed pair — P1 is the
+ * surviving half of a two-pass eval deleted in Feb 2026, and the three-stage
+ * rebuilt the same shape seven weeks later beside it.
+ *
+ * The open question is whether merging them costs accuracy: a prompt asking for
+ * forty things may fill fewer of them than two prompts asking for twenty. This
+ * stage measures that directly — same image, three arms, and a per-FIELD
+ * delivery rate rather than a "did it answer" pass/fail. Repeats are the point,
+ * not noise: eval judges are not deterministic even at temperature 0
+ * (docs/decisions.md, experiments #403/#404), so one run per arm proves nothing.
+ */
+
+/** Every field the union of the two prompts is supposed to produce. */
+const FIGURE_FIELDS = [
+  ['label', /label|^\s*-\s*Label/im],
+  ['zone', /zone/i],
+  ['facing', /facing/i],
+  ['hair', /hair(?!\s*:?\s*style\b)/i],
+  ['clothing', /clothing|garment/i],
+  ['eyewear', /eyewear|glasses/i],
+  ['headwear', /headwear/i],
+  ['facial_hair', /facial[_ ]hair/i],
+  ['worn_carried', /worn|carried/i],
+  ['action', /action|doing/i],
+  ['items_held', /items?[_ ]held|in each hand|hold/i],
+  ['expression', /expression/i],
+  ['age_group', /age[_ ]group|age\b/i],
+  ['standing_surface', /standing[_ ]surface|standing on|surface/i],
+  ['height_fraction', /height[_ ]fraction/i],
+  ['same_ground_plane', /same[_ ]ground[_ ]plane/i],
+  ['clipped_by', /clipped[_ ]by/i],
+  ['height_rank', /height[_ ]rank|shortest|tallest/i],
+];
+
+const DOC_FIELDS = [
+  ['interactions', /interaction/i],
+  ['objects', /object/i],
+  ['setting', /setting/i],
+  ['lettering', /letter/i],
+  ['rendering', /rendering|physics/i],
+  ['scene_summary', /scene[_ ]summary/i],
+  ['main_action', /main[_ ]action/i],
+];
+
+/** Did this JSON figure actually answer the field? An empty string has not. */
+function jsonHasField(fig, key) {
+  const v = fig?.[key];
+  if (v == null) return false;
+  if (typeof v === 'string') return v.trim().length > 0;
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+}
+
+/** Prose arms are scored per figure BLOCK, so a field named once does not count for five figures. */
+function proseFigureBlocks(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const blocks = [];
+  let cur = null;
+  for (const line of lines) {
+    // A figure header is a line naming a figure and little else.
+    if (/^\s*[*\-#>]*\s*(figure|person|child|adult|man|woman|boy|girl)\b[^:]{0,60}:?\s*$/i.test(line)
+        || /^\s*\*\*\s*figure\s*\d/i.test(line)) {
+      cur = { header: line.trim(), body: '' };
+      blocks.push(cur);
+    } else if (cur) {
+      cur.body += line + '\n';
+    }
+  }
+  return blocks;
+}
+
+function scoreArm(armKey, parsed, rawText) {
+  const isJson = parsed && Array.isArray(parsed.figures);
+  const figureCount = isJson ? parsed.figures.length : proseFigureBlocks(rawText).length;
+  const perField = {};
+
+  if (isJson) {
+    for (const [key] of FIGURE_FIELDS) {
+      const n = parsed.figures.filter(f => jsonHasField(f, key)).length;
+      perField[key] = figureCount ? n / figureCount : 0;
+    }
+    for (const [key] of DOC_FIELDS) {
+      const v = parsed[key] ?? parsed[key === 'objects' ? 'object_matches' : key];
+      perField[key] = (v == null) ? 0 : (Array.isArray(v) ? (v.length ? 1 : 0.5) : 1);
+    }
+  } else {
+    const blocks = proseFigureBlocks(rawText);
+    for (const [key, re] of FIGURE_FIELDS) {
+      const n = blocks.filter(b => re.test(b.body)).length;
+      perField[key] = blocks.length ? n / blocks.length : 0;
+    }
+    const tail = String(rawText || '');
+    for (const [key, re] of DOC_FIELDS) perField[key] = re.test(tail) ? 1 : 0;
+  }
+
+  const all = [...FIGURE_FIELDS, ...DOC_FIELDS].map(([k]) => k);
+  const delivered = all.filter(k => (perField[k] || 0) >= 0.999).length;
+  const partial = all.filter(k => (perField[k] || 0) > 0 && (perField[k] || 0) < 0.999).length;
+
+  return {
+    arm: armKey,
+    figureCount,
+    fieldsFullyDelivered: delivered,
+    fieldsPartial: partial,
+    fieldsMissing: all.length - delivered - partial,
+    fieldTotal: all.length,
+    perField,
+  };
+}
+
+/**
+ * @param params.repeats  runs per arm (default 2 — a single run cannot separate
+ *                        a prompt problem from run-to-run judge variance)
+ */
+async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { runVisualInventory } = require('./evalPipeline');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const r2 = require('./r2');
+
+  const repeats = Math.max(1, Math.min(5, params.repeats || 2));
+  const modelId = params.model || MODEL_DEFAULTS.qualityEval;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+
+  const imageDataUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  if (!imageDataUri) throw new Error(`No image for page ${ctx.pageNumber}`);
+  // The image ALONE — every arm here is a blind describer.
+  const parts = [{
+    inline_data: {
+      mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg',
+      data: r2.stripDataUriPrefix(imageDataUri),
+    },
+  }];
+
+  const ARMS = [
+    { key: 'split_p1', label: 'P1 (image-visual-inventory)', template: PROMPT_TEMPLATES.imageVisualInventory, raw: false },
+    { key: 'split_stage1', label: 'Stage 1 (image-vision-inventory)', template: PROMPT_TEMPLATES.imageVisionInventory, raw: true },
+    { key: 'unified', label: 'Unified (image-inventory-unified)', template: params.unifiedPrompt || PROMPT_TEMPLATES.imageInventoryUnified, raw: false },
+  ];
+
+  const t0 = Date.now();
+  const runs = [];
+  for (const arm of ARMS) {
+    if (!arm.template) throw new Error(`Template missing for arm ${arm.key}`);
+    for (let i = 0; i < repeats; i++) {
+      const label = `testlab-exp${experimentId}-P${ctx.pageNumber}-${arm.key}-r${i + 1}`;
+      let res = null;
+      try {
+        res = await runVisualInventory(parts, modelId, apiKey, label, {
+          promptOverride: arm.template,
+          raw: arm.raw,
+        });
+      } catch (e) {
+        log.warn(`[INVENTORY-AB] ${label} failed: ${e.message}`);
+      }
+      if (!res) {
+        runs.push({ arm: arm.key, armLabel: arm.label, repeat: i + 1, failed: true });
+        continue;
+      }
+      const parsed = arm.raw ? null : res;
+      const rawText = arm.raw ? res.rawText : null;
+      runs.push({
+        arm: arm.key,
+        armLabel: arm.label,
+        repeat: i + 1,
+        ...scoreArm(arm.key, parsed, rawText),
+        inputTokens: res.inputTokens || 0,
+        outputTokens: res.outputTokens || 0,
+        output: arm.raw ? rawText : JSON.stringify(parsed, null, 2),
+      });
+    }
+  }
+
+  // Per-arm means, and the split baseline: a field counts as delivered by the
+  // SPLIT pair if either of its two prompts delivered it. That is the number the
+  // unified arm actually has to beat.
+  const byArm = {};
+  for (const arm of ARMS) {
+    const rs = runs.filter(r => r.arm === arm.key && !r.failed);
+    if (!rs.length) { byArm[arm.key] = null; continue; }
+    const mean = k => rs.reduce((s, r) => s + (r.perField[k] || 0), 0) / rs.length;
+    const perField = {};
+    for (const [k] of [...FIGURE_FIELDS, ...DOC_FIELDS]) perField[k] = mean(k);
+    byArm[arm.key] = {
+      label: arm.label,
+      runs: rs.length,
+      figureCounts: rs.map(r => r.figureCount),
+      meanFieldsDelivered: rs.reduce((s, r) => s + r.fieldsFullyDelivered, 0) / rs.length,
+      outputTokens: Math.round(rs.reduce((s, r) => s + r.outputTokens, 0) / rs.length),
+      perField,
+    };
+  }
+
+  const allKeys = [...FIGURE_FIELDS, ...DOC_FIELDS].map(([k]) => k);
+  const splitBest = {};
+  for (const k of allKeys) {
+    splitBest[k] = Math.max(byArm.split_p1?.perField?.[k] ?? 0, byArm.split_stage1?.perField?.[k] ?? 0);
+  }
+  const uni = byArm.unified?.perField || {};
+  const regressions = allKeys.filter(k => (splitBest[k] - (uni[k] ?? 0)) > 0.25);
+  const gains = allKeys.filter(k => ((uni[k] ?? 0) - splitBest[k]) > 0.25);
+
+  return {
+    elapsedMs: Date.now() - t0,
+    page: ctx.pageNumber,
+    model: modelId,
+    repeats,
+    byArm,
+    comparison: {
+      splitBestPerField: splitBest,
+      unifiedPerField: uni,
+      // Fields the split pair delivers and the unified prompt drops — the
+      // attention-splitting hypothesis, made countable.
+      regressions,
+      gains,
+      verdict: regressions.length === 0
+        ? 'unified matches or beats the split pair on every field'
+        : `unified drops ${regressions.length} field(s) the split pair delivers: ${regressions.join(', ')}`,
+    },
+    runs,
+  };
+}
+
 const STAGE_RUNNERS = {
   empty_scene_adherence: runEmptySceneAdherenceStage,
   image: runImageStage,
@@ -5714,6 +5944,7 @@ const STAGE_RUNNERS = {
   repair_verify: runRepairVerifyStage,
   qwen_insert: runQwenInsertStage,
   garment_colour_fix: runGarmentColourFixStage,
+  inventory_ab: runInventoryAbStage,
 };
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.

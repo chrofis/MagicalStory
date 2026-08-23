@@ -444,6 +444,7 @@ export const TESTLAB_STAGES = [
   { id: 'empty_scene', label: 'Empty scene', producesImage: true, overridable: true },
   { id: 'quality_eval', label: 'Quality eval', producesImage: false, overridable: true },
   { id: 'eval_variance', label: 'Eval variance (same image × N)', producesImage: false, overridable: false },
+  { id: 'inventory_ab', label: 'Inventory A/B (split vs unified, blind)', producesImage: false, overridable: false },
   { id: 'semantic_eval', label: 'Semantic eval', producesImage: false, overridable: true },
   { id: 'bbox', label: 'Bbox detection', producesImage: false, overridable: false },
   { id: 'char_repair', label: 'Character repair', producesImage: true, overridable: false },
