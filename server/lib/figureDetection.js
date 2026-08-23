@@ -1180,18 +1180,23 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
   // information from every call. SANITIZED (strip Wearing → short garment
   // phrase + sanitizeForGemini light) is the LAST tier only.
   const posHintOf = (c) => c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
+  // DESCRIPTION FIRST in every variant (owner, 2026-08-23): gdinoPrompt is
+  // the terse DINO grounding phrase ("a preschooler little boy with light
+  // blonde hair") - fine for WHERE, starvation for WHO. On mfedxinwqd's
+  // frontCover it shadowed the rich description and Levin/Julian differed
+  // by a single word; Gemini swapped them, reasonably.
   const fullLines = expectedCharacters.map(c => {
-    const desc = String(c.gdinoPrompt || c.description || c.name).trim().replace(/\.$/, '');
+    const desc = String(c.description || c.gdinoPrompt || c.name).trim().replace(/\.$/, '');
     const clothing = typeof c.clothing === 'string' ? c.clothing.trim() : '';
     const wearing = /\bwearing\b/i.test(desc) || !clothing ? '' : `. Wearing: ${clothing}`;
     return `- ${c.name}: ${desc}${wearing}.${posHintOf(c)}`;
   }).join('\n');
   const sanitizedLines = expectedCharacters.map(c => {
-    const identity = String(c.gdinoPrompt || c.description || c.name).replace(/\bWearing:[\s\S]*$/i, '').trim();
+    const identity = String(c.description || c.gdinoPrompt || c.name).replace(/\bWearing:[\s\S]*$/i, '').trim();
     // Never send a character out undressed: derive the short phrase from the
     // description's own Wearing tail when c.clothing is absent (bug
     // som-identity-lines-undressed).
-    const wearingTail = (String(c.gdinoPrompt || c.description || '').match(/\bWearing:\s*([\s\S]*)$/i) || [])[1] || '';
+    const wearingTail = (String(c.description || c.gdinoPrompt || '').match(/\bWearing:\s*([\s\S]*)$/i) || [])[1] || '';
     const garment = _shortGarmentPhrase(c.clothing || wearingTail);
     return sanitizeForGemini(`- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHintOf(c)}`, 'light');
   }).join('\n');
