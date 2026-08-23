@@ -2336,16 +2336,28 @@ async function generateSceneComposite(opts) {
     const b = detection.results[c.name]?.bbox;
     return b && !_isPlausibleFigureBox(b, detection.results[c.name]?.head);
   });
+  // A refusal must not destroy its own evidence. Both gates below fire AFTER
+  // the plate and the depopulated plate have been generated and paid for
+  // (2 Grok calls), and until now the throw discarded them: the plate that
+  // proves WHY the composite refused existed only in memory. Callers that
+  // want to show the refusal read `err.compositeDebug` — the same debug
+  // object a successful run returns, holding whatever had been built.
+  const refuse = (message) => {
+    const err = new Error(message);
+    err.compositeDebug = debug;
+    return err;
+  };
   if (bogus.length) {
-    throw new Error('[SCENE COMPOSITE] detection returned a box that cannot be a standing figure ('
+    throw refuse('[SCENE COMPOSITE] detection returned a box that cannot be a standing figure ('
       + bogus.map(c => `${c.name} ${detection.results[c.name].bbox.width}x${detection.results[c.name].bbox.height}`).join(', ')
       + ') — scenery was keyed into a character colour, so the page keeps its original render');
   }
   if (figureBoxes.length >= 2) {
     const hs = figureBoxes.map(b => b.height);
     const spread = Math.max(...hs) / Math.min(...hs);
+    debug.depthSpread = Number(spread.toFixed(2));
     if (spread < MIN_DEPTH_SPREAD) {
-      throw new Error(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
+      throw refuse(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
         + `(needs ${MIN_DEPTH_SPREAD}x). Every character is at the same distance, so the declared foreground/background `
         + 'split is not real and there is nothing for the composite to correct — the page keeps its original render');
     }

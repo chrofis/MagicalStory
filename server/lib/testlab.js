@@ -4023,7 +4023,41 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   }
 
   const fn = strategy === 'stratified' ? generateStratifiedComposite : generateSceneComposite;
-  const res = await fn({
+  // A refused composite is a RESULT, not a void. Both abort gates fire after
+  // the plate and depopulated plate have been generated and paid for, and the
+  // Lab used to save steps only on success — so the very images that show WHY
+  // it refused were discarded, and the owner could not see the refusal. The
+  // composite attaches its partial debug to the error (err.compositeDebug);
+  // save those frames onto err.partialResult, which the runner already merges
+  // into the stored failure entry.
+  const saveAbortSteps = async (err) => {
+    const adbg = err?.compositeDebug;
+    if (!adbg) return;
+    const aborted = [];
+    for (const [key, label] of [
+      ['populatedPlate', '1 · plate with colour silhouettes (run aborted after this)'],
+      ['cleanBackground', '2 · depopulated (silhouettes removed)'],
+      ['composited', '3 · pasted (raw)'],
+    ]) {
+      const uri = adbg[key];
+      if (typeof uri !== 'string' || !uri.startsWith('data:image')) continue;
+      try {
+        const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, uri, experimentId);
+        aborted.push({ label, imageType: 'tl_step', versionIndex: v });
+      } catch (e) { log.warn(`[TESTLAB] abort step "${label}" not saved: ${e.message}`); }
+    }
+    err.partialResult = {
+      ...(err.partialResult || {}),
+      steps: aborted,
+      aborted: true,
+      depthSpread: adbg.depthSpread ?? null,
+      populatedPlatePrompt: adbg.populatedPlatePrompt || null,
+      cleanBackgroundPrompt: adbg.cleanBackgroundPrompt || null,
+    };
+  };
+  let res;
+  try {
+    res = await fn({
     compositeStrategy: strategy,
     cast, frontCast, backCast,
     scene: compositeScene,
@@ -4038,7 +4072,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
       .resolveSceneCreatures(storyData.visualBible, fd.objects || [], ctx.pageNumber),
     figureDetect: params.figureDetect === 'diff' ? 'diff' : 'dino',
     usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
-  });
+    });
+  } catch (err) {
+    await saveAbortSteps(err);
+    throw err;
+  }
   const elapsedMs = Date.now() - t0;
 
   // Every intermediate goes into the Lab as a step image. The whole point of
