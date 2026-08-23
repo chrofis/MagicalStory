@@ -15437,13 +15437,12 @@ complete page blocks, `parseRefinedText` returned zero pages, and the round was
 recorded as converged — the pipeline logged "Text refinement found nothing to
 rewrite" while pages carrying em-dashes (an automatic flag in the refine prompt)
 shipped unreviewed (job_1787423677246, p1/p12).
-**Decision:** Cap raised to 32 000 (`deepseek-v4-pro` allows 64 k out), and any
+**Decision:** Cap raised to 64 000 (the model limit; clamped to a smaller override model's own limit), and any
 round whose `output_tokens` reaches the cap throws, recording a failed round.
 The pipeline join distinguishes a failed round (`text_refine_failed`, warn)
 from a genuine nothing-to-rewrite (`text_refine_complete`, info).
 **Rationale:** Truncation and convergence are opposite outcomes; treating them
-identically hid the loss of the entire safety-net pass. Raising the cap alone
-would only move the cliff — the guard makes any future hit visible.
+identically hid the loss of the entire safety-net pass. Worst measured output is ~1 350 tokens/page, so the 25-page wizard maximum needs ~34k — 32 000 was not enough. The guard makes any future hit visible.
 **Touched:** `server/lib/textRefine.js`, `storyJobPipeline.js`,
 `tasks/bugs.json` (text-refine-truncation-silent-converge).
 **Status:** ✅ active

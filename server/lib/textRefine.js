@@ -64,12 +64,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
 
     const t0 = Date.now();
     try {
-      // 32000, raised from 16000 (2026-08-23): a 16-page run's mandatory analysis
-      // plus rewrites hit the old cap exactly, and a truncated reply parses as
-      // zero page blocks — reported as "nothing to rewrite" while dash-carrying
-      // pages shipped (job_1787423677246 p1/p12). The guard below makes any
-      // future cap hit a loud round failure instead of a silent convergence.
-      const MAX_OUT = 32000;
+      // 64000, raised from 16000 (2026-08-23): a 16-page long-text run's
+      // mandatory analysis plus rewrites hit the old cap exactly, and a
+      // truncated reply parses as zero page blocks — reported as "nothing to
+      // rewrite" while dash-carrying pages shipped (job_1787423677246 p1/p12).
+      // Worst measured rate is ~1350 output tokens/page, so a 25-page book
+      // (the wizard maximum) needs ~34k. The guard clamps to the model's own
+      // limit so a smaller override model still trips it, and makes any cap
+      // hit a loud round failure instead of a silent convergence.
+      const MAX_OUT = Math.min(64000, TEXT_MODELS[modelKey].maxOutputTokens || 64000);
       const r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel });
       const elapsedMs = Date.now() - t0;
       if ((r.usage?.output_tokens || 0) >= MAX_OUT) {
