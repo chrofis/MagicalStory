@@ -16559,3 +16559,11 @@ scale defect has been found to test it against.
 **Touched:** `prompts/image-evaluation.txt`
 
 **Status:** ✅ active
+
+## 2026-08-23: Held documents are read, not displayed (scene-expansion 12d)
+
+**Context:** A staging story staged its plot-critical note flat to the camera, frame-filling, with the sceneIntent quoting the words written on it — an exhibit shot. The angled-toward-the-reader rule existed but only inside the interactions[] field-shape section; the prose-side rule 12c (writing as pictorial marks) was violated by the metadata. Rendered result: pseudo-text painted across a note presented to the viewer, on multiple pages.
+
+**Decision:** scene-expansion 12c now explicitly covers sceneIntent and all metadata fields; new 12d states the staging principle where the prose is written: a held map/letter/note/book stays angled toward its reader, face away from the camera, characters shown reading — even when the beat is what the document says; never the frame-filling focal object.
+
+**Touched files:** `prompts/scene-expansion.txt`.
