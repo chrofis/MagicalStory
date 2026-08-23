@@ -181,6 +181,15 @@
    "fixedAt": "2026-08-22",
    "fix": "ArcFace gate is now OFF by default (ARCFACE_GATE_ENABLED, server/lib/faceIdentity.js). Confirmed the cause rather than assumed it: POST /api/health/release-memory on staging reported 2336MB RSS and unload=true listed 'arcface-weights' as resident, dropping it to 1862MB. TensorFlow's ~350MB on top of GroundingDINO's ~1.9GB exceeded the container, so DINO died on load with an empty error and crash-looped. Disabled, no TF is imported at all and the analyzer returns to its pre-change footprint. The idle reaper could not have saved it: it requires the whole SERVICE to be idle, which never happens during a Lab run or a story. Re-enabling needs ArcFace out of the shared analyzer process.",
    "fixedIn": "fix(analyzer) 2026-08-22 (same commit)"
+  },
+  {
+   "id": "text-refine-truncation-silent-converge",
+   "title": "Refiner output hit the 16k token cap; truncated reply parsed as zero rewrites and shipped as 'nothing to rewrite'",
+   "reportedAt": "2026-08-23",
+   "source": "job_1787423677246_r9llf5yi9 — text_refine usage row exactly 16000 output tokens, textRefineReport null, em-dashes shipped on p1/p12 despite the dash ban being an auto-flag",
+   "status": "fixed",
+   "fixedIn": "49ea80011",
+   "note": "server/lib/textRefine.js: cap raised 16000->32000 (deepseek-v4-pro allows 64k) and output_tokens >= cap now throws, recording a failed round instead of a silent convergence. storyJobPipeline.js join logs text_refine_failed (warn) when a round failed, distinct from a real nothing-to-rewrite."
   }
  ]
 }

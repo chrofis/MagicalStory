@@ -64,8 +64,17 @@ async function refineStoryText(storyData, pages, opts = {}) {
 
     const t0 = Date.now();
     try {
-      const r = await callTextModelStreaming(prompt, 16000, null, modelKey, { usageLabel });
+      // 32000, raised from 16000 (2026-08-23): a 16-page run's mandatory analysis
+      // plus rewrites hit the old cap exactly, and a truncated reply parses as
+      // zero page blocks — reported as "nothing to rewrite" while dash-carrying
+      // pages shipped (job_1787423677246 p1/p12). The guard below makes any
+      // future cap hit a loud round failure instead of a silent convergence.
+      const MAX_OUT = 32000;
+      const r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel });
       const elapsedMs = Date.now() - t0;
+      if ((r.usage?.output_tokens || 0) >= MAX_OUT) {
+        throw new Error(`output hit the ${MAX_OUT}-token cap — reply truncated, rewrites unusable`);
+      }
       const parsed = parseRefinedText(r.text || '', expected);
 
       // Omission is the CONTRACT: only rewritten pages come back, everything else

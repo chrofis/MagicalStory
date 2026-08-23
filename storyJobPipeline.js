@@ -4929,7 +4929,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           { rounds: refined.rounds.length, changedPages: refined.changed, durationMs: totalMs }
         );
       } else if (refined) {
-        genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
+        // "Nothing to rewrite" and "a round failed" are different outcomes — a
+        // failed round means the ORIGINAL text ships unreviewed, which must be
+        // visible in the log, not filed as a clean convergence.
+        const failedRound = (refined.rounds || []).find(r => !r.ok);
+        if (failedRound) {
+          genLog.warn('text_refine_failed', `Text refinement round ${failedRound.round} failed (${failedRound.error}) — original text kept`);
+        } else {
+          genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
+        }
       }
     }
 

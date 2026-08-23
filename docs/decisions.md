@@ -15429,3 +15429,43 @@ The except branch now uses the 4.44-era signature. The first-import
 `ExportOptions` transient (one failed import racing the model load, next
 attempt clean) is noted but not patched — the loader retries naturally on the
 next request.
+
+### Text-refine output cap is a loud failure, never a silent convergence (2026-08-23)
+**Context:** The refiner's mandatory full analysis for a 16-page story plus its
+rewrites exceeded the 16 000-token output cap. The truncated reply contained no
+complete page blocks, `parseRefinedText` returned zero pages, and the round was
+recorded as converged — the pipeline logged "Text refinement found nothing to
+rewrite" while pages carrying em-dashes (an automatic flag in the refine prompt)
+shipped unreviewed (job_1787423677246, p1/p12).
+**Decision:** Cap raised to 32 000 (`deepseek-v4-pro` allows 64 k out), and any
+round whose `output_tokens` reaches the cap throws, recording a failed round.
+The pipeline join distinguishes a failed round (`text_refine_failed`, warn)
+from a genuine nothing-to-rewrite (`text_refine_complete`, info).
+**Rationale:** Truncation and convergence are opposite outcomes; treating them
+identically hid the loss of the entire safety-net pass. Raising the cap alone
+would only move the cliff — the guard makes any future hit visible.
+**Touched:** `server/lib/textRefine.js`, `storyJobPipeline.js`,
+`tasks/bugs.json` (text-refine-truncation-silent-converge).
+**Status:** ✅ active
+
+### Arc obstacles come from the story's own world; page text is spoken-storyteller voice (2026-08-23)
+**Context:** The arc writer resolved a treasure-hunt commission with a
+picture-puzzle stone door no part of the commission established — the stock
+device that appears in many stories — and the arc reviewer's grounding check
+let it stand. Separately, page text kept arriving in caption/stage-direction
+register with sentences broken off for effect (fifth run in a row), which also
+bakes stray dashes into rendered pages.
+**Decision:** Arc writer rule + arc reviewer check 11: an obstacle must come
+from the story's own world (weather, distance, a rival, a broken/missing/
+guarded thing, a character's own flaw); mechanisms from other stories — puzzle
+doors, riddles, trick locks, tests set by no one — are rejected unless the
+commission establishes them. Text writer + refiner: every sentence completes,
+no bare fragments, storyteller-aloud voice instead of captions or stage
+directions.
+**Rationale:** Trope obstacles read as out-of-the-blue and disconnect the
+climax from the story's stakes; the register rule targets the last recurring
+text defect after the stake/acronym/dash rules landed. Owner-approved
+(AskUserQuestion, 2026-08-23).
+**Touched:** `prompts/story-beats.txt`, `prompts/story-arc-review.txt`,
+`prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`.
+**Status:** ✅ active

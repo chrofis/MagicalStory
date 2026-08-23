@@ -44,6 +44,8 @@ Do not rewrite a page for small stylistic preference. Rewrite it when it has a r
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
+Rewrite any page with a sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
+
 Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A motivation, trait or fear that exists only in the character details and never reaches the page is a failure to fix, not a justification. Never resolve a weakness by citing the brief.
 
 Work in two steps.
