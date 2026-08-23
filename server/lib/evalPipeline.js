@@ -539,6 +539,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     storyText = null,
     qualityFiguresPromise = null,
     inventoryPromise = null,          // the ONE blind inventory, shared with the figures merge
+    expectedAges = '',                // declared age per character, joined to the blind read by name
     complianceModelOverride = null,   // Stage-2 model A/B (default evalModel = qwen-plus)
     compliancePromptOverride = null,  // Stage-2 template A/B
     artStyle = null,                  // resolved style — same value the quality eval gets
@@ -634,6 +635,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       // unrequested additions (a steampunk cover's goggles drew a CRITICAL).
       ART_STYLE: artStyle || require('../services/prompts').extractArtStyle(imagePrompt),
       CLOTHING_CONTRACT: clothingContract || '',
+      EXPECTED_AGES: expectedAges || '',
       VISUAL_INVENTORY: visionText,
       QUALITY_FIGURES: qualityFiguresBlock,
       INTERACTIONS_BLOCK: interactionsBlock,
@@ -924,6 +926,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
       threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
         inventoryPromise: p1Promise,
+        expectedAges: expectedAgesBlock,
         pageContext,
         storyText: fidelityRef,
         qualityFiguresPromise,
@@ -1028,19 +1031,27 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // truth shared with avatar generation. Age words ("child"/"toddler") are
     // never sent to Gemini, only the numeric ratios, which are safety-filter
     // neutral. Empty string when no characters or none have age set.
-    let figureProportionsBlock = '';
+    // DECLARED AGES for the compliance judge. The evaluator used to receive
+    // head-to-body ratios ("- Daniel: 1:8") and check them itself. That failed
+    // twice over: it fired once in 271 versions, and that once was false —
+    // three adults all listed 1:8, and the judge read the colon as a ratio
+    // BETWEEN two of them ("Daniel is not roughly one-fifth the height of
+    // Hans") and demanded an adult be shrunk to a fifth of another adult.
+    //
+    // Age is the readable form of the same fact. The blind inventory estimates
+    // each figure's apparent age from head-to-body proportion without knowing
+    // who anyone is, identity supplies the name, and the judge compares that
+    // estimate against the number below. No notation to misread, and no
+    // cross-character comparison to invent.
+    let expectedAgesBlock = '';
     try {
-      const { getHeadBodyRatio } = getStoryHelpers();
       const lines = [];
       for (const c of (sceneCharacters || [])) {
-        if (!c?.name) continue;
-        const ratio = getHeadBodyRatio(c.age);
-        if (ratio) lines.push(`- ${c.name}: ${ratio}`);
+        const age = parseInt(c?.age, 10);
+        if (c?.name && Number.isFinite(age)) lines.push(`- ${c.name}: ${age} years old`);
       }
-      if (lines.length > 0) {
-        figureProportionsBlock = `EXPECTED FIGURE PROPORTIONS (standing, head-to-body):\n${lines.join('\n')}`;
-      }
-    } catch { /* silent — evaluator tolerates empty block */ }
+      if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
+    } catch { /* silent — the judge tolerates an empty block */ }
 
     // CLOTHING CONTRACT (owner, 2026-08-08). The evaluator used to infer the
     // outfit from ORIGINAL_PROMPT alone. When the prompt carried no clothing —
@@ -1058,7 +1069,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           originalPrompt: promptForEval,
           artStyle: artStyleForEval,
           interactionsBlock,
-          figureProportions: figureProportionsBlock,
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
           template: evalOptions.evalTemplateOverride || undefined,
@@ -1233,11 +1243,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug(`[QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
 
       // Step 1: Retry with full sanitization (strips all gender/age nouns).
-      // Go through buildEvaluationPrompt so the retry keeps the same four-block
+      // Go through buildEvaluationPrompt so the retry keeps the same block
       // contract as the primary path — a raw fillTemplate here dropped
-      // SCENE_INTENT + FIGURE_PROPORTIONS, leaving the safety-retry eval blind
-      // to scene intent and proportion expectations on exactly the pages a
-      // safety block forced us to re-run.
+      // SCENE_INTENT, leaving the safety-retry eval blind to scene intent on
+      // exactly the pages a safety block forced us to re-run. (It also dropped
+      // the figure-proportions block, which no longer exists: age is checked
+      // by the compliance judge against the blind inventory's apparent_age.)
       const fullSanitized = sanitizeForGemini(originalPrompt, 'full');
       const { buildEvaluationPrompt } = require('../services/prompts');
       const fullEvalPrompt = evaluationTemplate
@@ -1245,8 +1256,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             originalPrompt: fullSanitized,
             artStyle: artStyleForEval,
             interactionsBlock,
-            figureProportions: figureProportionsBlock,
-            sceneIntent: sceneIntentBlock,
+              sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
             template: evalOptions.evalTemplateOverride || undefined,
           })

@@ -388,7 +388,6 @@ function resolveEvalArtStyle(artStyleKey, pagePrompt = null) {
  *
  * The image-evaluation template (prompts/image-evaluation.txt) has four
  * placeholders: ORIGINAL_PROMPT, INTERACTIONS_BLOCK, SCENE_INTENT,
- * FIGURE_PROPORTIONS.
  *
  * Before this helper, images.js:1346 filled all four correctly while
  * regeneration.js:3844 (the admin re-evaluate endpoint) passed only
@@ -400,7 +399,6 @@ function resolveEvalArtStyle(artStyleKey, pagePrompt = null) {
  * @param {string} opts.originalPrompt       - The original image prompt
  * @param {string} [opts.interactionsBlock]  - Declared-interactions block
  * @param {string} [opts.sceneIntent]        - Scene intent line
- * @param {string} [opts.figureProportions]  - Figure-proportions block
  * @returns {string} Filled prompt ready for Gemini eval.
  */
 function buildEvaluationPrompt(opts = {}) {
@@ -417,7 +415,6 @@ function buildEvaluationPrompt(opts = {}) {
     // template then tells the model to skip clothing judgments entirely
     // rather than invent a contract from the theme.
     CLOTHING_CONTRACT: opts.clothingContract || '',
-    FIGURE_PROPORTIONS: opts.figureProportions || '',
     // Empty when the caller has no prompt to read a style from — the template
     // then tells the model to skip the style rule and judge normally.
     ART_STYLE: opts.artStyle || extractArtStyle(opts.originalPrompt) || '',

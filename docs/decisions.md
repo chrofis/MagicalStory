@@ -16670,3 +16670,55 @@ saying "judge it properly".
 **Touched:** `prompts/image-evaluation.txt`, `prompts/image-inventory-unified.txt`
 
 **Status:** ✅ active — supersedes the height_fraction half of the entry above.
+
+## 2026-08-23 — Scale is checked as AGE, by the blind side, joined through identity
+
+**Context:** D-29 fired **once in 271 versions** across 19 staging stories, and
+that once was false. The evaluator received head-to-body ratios:
+
+```
+EXPECTED FIGURE PROPORTIONS (standing, head-to-body):
+- Daniel: 1:8
+- Sarah:  1:8
+- Hans:   1:8
+```
+
+Three adults, all identical. `1:8` means *this figure's head is one-eighth of
+its own height*. The judge read the colon as a ratio BETWEEN two of the names on
+adjacent lines and reported *"Daniel is not roughly one-fifth the height of
+Hans"*, with the fix *"reduce Daniel's height to roughly one-fifth of Hans"* —
+which, had a repair acted on it, would have broken a correct page. The rule's
+problem was never that it was skimmed; its input was unreadable.
+
+**Decision:** the ratio block is gone. Age replaces it, and the check moves to
+where identity already lives:
+
+1. The **blind inventory** estimates `apparent_age` per figure — a number or a
+   narrow range — from head size relative to the body, limb proportion and
+   build. It does not know who anyone is, so the estimate is independent.
+2. **Identity** supplies the name, as it now does reliably.
+3. The **compliance judge** receives `EXPECTED_AGES` (`- Emma: 5 years old`) and
+   compares each paired figure's `apparent_age` against its own declared age
+   (new STEP 2b). `scale` MAJOR only for a reader-visible gap — a child drawn as
+   an adult or the reverse. Within a few years is agreement; `cannot tell`,
+   seated, clipped or different-depth figures are skipped.
+4. **D-29** in the evaluator is rewritten to the same shape: a figure drawn at an
+   age the story did not give it, judged on its own, never against another
+   figure's height.
+
+**Rationale:** head-to-body ratio and age carry the same information, but one is
+notation a judge can misparse into a comparison and the other is a plain number
+with an obvious referent. Putting the estimate on the blind side removes the
+other bias — an evaluator told a character is 5 will tend to see a 5-year-old.
+The join is only trustworthy because identity became reliable earlier today
+(17/17 pages named, 16/17 agreeing with the detector); this check could not have
+been built before that.
+
+**Touched:** `server/lib/evalPipeline.js` (ages block, wiring, dead
+`figureProportions` removed), `server/services/prompts.js` (dead
+`FIGURE_PROPORTIONS` key), `prompts/image-inventory-unified.txt` (`apparent_age`),
+`prompts/image-prompt-compliance.txt` (input 8 + STEP 2b),
+`prompts/image-evaluation.txt` (D-29 rewritten, input 7 removed)
+
+**Status:** ✅ active — UNVERIFIED on a real story. D-29 has never produced a
+true positive; this changes what it reads, not proof that it now works.

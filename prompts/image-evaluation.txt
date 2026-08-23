@@ -9,8 +9,7 @@ Report only defects a reader would notice. Rule codes (N-xx, D-xx) exist so a fi
 4. DECLARED INTERACTIONS: {INTERACTIONS_BLOCK}
 5. SCENE INTENT: {SCENE_INTENT}
 6. ART STYLE (the commissioned medium — empty if not supplied): {ART_STYLE}
-7. EXPECTED FIGURE PROPORTIONS: {FIGURE_PROPORTIONS}
-8. CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied): {CLOTHING_CONTRACT}
+7. CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied): {CLOTHING_CONTRACT}
 
 ---
 
@@ -168,7 +167,7 @@ Never fire D-11 to D-13 for a figure cropped by the frame edge, occluded by scen
 
 **D-27 `style_consistency`** — decided at **N-01 (b)**, not here. Do not re-evaluate the medium at this point in the list; if the page is in the wrong medium you have already reported it.
 
-**D-29 `scale` → MAJOR.** A figure at least half again the height its EXPECTED FIGURE PROPORTIONS ratio allows. Never deduct for the height ORDER between characters; `height_order` is recorded for review only.
+**D-29 `scale` → MAJOR.** A figure drawn at an age the story did not give it — a named child rendered as an adult, or an adult as a child. Judge each figure on its own, from head size relative to the body and limb proportion. Never deduct for the height ORDER between characters, and never for one figure's height relative to another; `height_order` is recorded for review only.
 
 **D-30 `composite_seam` → CRITICAL.** `rendering.composite_seam` is true: a straight or jagged boundary crossing the picture, or a cut-out edge around a figure, where the background, lighting or brushwork does not continue across it. Judge the boundary, not the medium — a whole page in the wrong medium is N-01. `fix`: "Repaint the page as one continuous illustration."
 
