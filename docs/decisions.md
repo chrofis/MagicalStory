@@ -16616,3 +16616,23 @@ viewer" with what to draw instead.
 
 **Status:** 🟡 conditional — not yet exercised on a story. Watch `viewer_address` and
 `object_presence` on pages carrying a map, letter or note.
+
+## 2026-08-23 — 12c/12d belong in the LIVE beats template, and only once
+
+Two sessions fixed the read-document problem in parallel on the same day. `70cb44f7a`
+added 12c (writing as pictorial marks, extended to `sceneIntent` and every metadata
+field) and 12d (a held document is read, not displayed) to `scene-expansion.txt`.
+That file is the **per-page** variant; the beats pipeline — production — runs
+`scene-expansion-all.txt`, which had neither rule, so none of it reached a real story.
+
+Both rules are now byte-identical in both files. The staging sentence that had been
+sitting in the `interactions[]` field-shape section said the same thing as 12d and is
+removed; its one distinct clause — a prop being carried rather than read stays folded,
+rolled or pocketed — is folded into 12d.
+
+**Rationale:** two rules saying the same thing in a 24k-character template dilute each
+other, which is the same reason 12c's contradictory "quote the exact string under three
+words" branch was removed earlier the same day. The two files share a rule set by
+design and their header says so: "when a rule changes here it must change there too."
+
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`.
