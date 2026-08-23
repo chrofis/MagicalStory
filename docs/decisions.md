@@ -15709,3 +15709,13 @@ easier.
 
 **Status:** 🟡 conditional — the unified prompt is a Lab candidate, not in the
 pipeline. Nothing merges until `inventory_ab` says it is safe.
+
+## 2026-08-23: Empty-scene plates get the VB vehicle description injected
+
+**Context:** Story `job_1787423677246_r9llf5yi9` ("Kapitänin Fiona und die Goldene Möwe"): the VB spec'd the crew's vessel as a 10m single-mast sailing boat with a crossed-bones square sail, and the VEH001 reference image rendered it correctly — but page 1 shipped a mastless one-man rowboat. The Art Director's `emptyScenePrompt` described the quay with only "a boat sits tied" (the scene-expansion vessel-anchor rule exists but was not followed), the plate model invented a rowboat, and the iterative-placement pass painted the characters into the plate's boat — the correct VEH001 reference and full text description were both in the page prompt and lost to the pixels already on the canvas. Entity consistency tracks only characters (objects channel empty on all 9 boat pages), so nothing caught it.
+
+**Decision:** `buildEmptyScenePrompt` (the single gate every plate passes through — page, vantage, cover plate, QC retry, iterate, Test Lab) appends a **VEHICLES** block with the full VB description of every vehicle whose `pages` include this page. Conditional wording ("any boat … in this backdrop is one of the vessels described below") so a framing without the vehicle doesn't gain one. Covers (`pageNumber` null) unaffected.
+
+**Also:** theme props are theme-true — the pirate adventure guide now requires a proper pirate ship (never a rowboat/lake boat, even in a modern real-world setting), and the adventure-guidelines block states the generic rule (signature theme props keep their full theme form). The writer had grounded the vessel in realistic present-day Zürichsee despite the pirate guide's "set on ships".
+
+**Touched files:** `server/services/prompts.js` (buildEmptyScenePrompt), `prompts/adventure-guides.txt` ([pirate]), `server/lib/promptBuilders.js` (adventure guidelines).

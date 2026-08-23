@@ -283,6 +283,24 @@ function buildEmptyScenePrompt(opts = {}) {
   if (!/\*\*SHOT:\*\*|\*\*CAMERA:\*\*/i.test(description)) {
     description = `**SHOT:** wide\n\n${description}`;
   }
+  // Append the Visual Bible description of every vehicle listed for this page.
+  // The Art Director's plate prose routinely names a vessel generically ("a
+  // boat sits tied at the quay") and the plate model invents its own — a
+  // shipped story rendered the crew's single-mast sailing boat as a mastless
+  // rowboat because the background plate drew one and the placement pass keeps
+  // the plate's pixels. Conditional wording so a plate whose framing shows no
+  // vehicle doesn't gain one.
+  if (opts.visualBible && opts.pageNumber != null) {
+    const pageVehicles = (opts.visualBible.vehicles || []).filter(v => {
+      const pages = v.pages || v.appearsInPages;
+      return Array.isArray(pages) && pages.includes(opts.pageNumber) && v.description;
+    });
+    if (pageVehicles.length > 0) {
+      const lines = pageVehicles.map(v => `- ${v.name || v.type || 'vehicle'}: ${v.description}`);
+      description += `\n\n**VEHICLES:** Any boat, ship, wagon, carriage, or other vehicle in this backdrop is one of the vessels described below — render it exactly to its description, never a generic substitute:\n${lines.join('\n')}`;
+    }
+  }
+
   const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
     STYLE_DESCRIPTION: opts.style || '',
     EMPTY_SCENE_DESCRIPTION: description,

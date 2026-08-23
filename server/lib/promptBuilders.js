@@ -4664,6 +4664,7 @@ ${cityData.research}
 - Balance action and excitement with character development
 - Include challenges that the characters must overcome
 - Historical and fantasy themes SHOULD use costumed clothing for authenticity
+- Signature theme props keep their full theme form even in a modern real-world setting: a pirate story's ship is a real pirate ship, a knight story's castle a real castle — never a scaled-down everyday stand-in
 
 ${adventureGuide ? `**THEME-SPECIFIC GUIDANCE for "${storyTheme}":**
 ${adventureGuide}` : ''}`;
