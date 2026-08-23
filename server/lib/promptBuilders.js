@@ -1455,14 +1455,14 @@ const LANGUAGE_LEVELS = {
     wordsPerPageMin: 40,
     wordsPerPageMax: 150,
     sentencesPerPage: '3-12',
-    pacing: '150 words is the UPPER LIMIT, not the target. Alternate rhythm: short pages (40-80 words, a quiet beat) interleaved with longer pages (120-150 words, a fuller scene). Avoid two long pages back-to-back — always give the reader breath between dense pages. Aim for variation like: long, short, medium, long, short.',
+    pacing: '150 words is the UPPER LIMIT, not the target. Alternate rhythm: short pages (40-80 words, a quiet beat) interleaved with longer pages (120-150 words, a fuller scene). Avoid two long pages back-to-back — always give the reader breath between dense pages. Aim for variation like: long, short, medium, long, short. Mix sentence lengths within a page: a short sentence lands because longer ones surround it; never string several short sentences in a row, and never repeat the same subject-verb opening in consecutive sentences.',
   },
   'advanced': {
     description: 'More complex vocabulary and varied sentence structure for advanced readers',
     wordsPerPageMin: 250,
     wordsPerPageMax: 300,
     sentencesPerPage: '15-20',
-    pacing: 'Every page should land at similar length (250-300 words). Do NOT alternate short and long pages at this level — consistent density creates reading momentum for advanced readers. Aim for the middle of the range on every page.',
+    pacing: 'Every page should land at similar length (250-300 words). Do NOT alternate short and long pages at this level — consistent density creates reading momentum for advanced readers. Aim for the middle of the range on every page. Mix sentence lengths within a page: a short sentence lands because longer ones surround it; never string several short sentences in a row, and never repeat the same subject-verb opening in consecutive sentences.',
   }
 };
 

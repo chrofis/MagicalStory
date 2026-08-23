@@ -46,6 +46,8 @@ Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Repla
 
 Rewrite any page with a sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
 
+Unless the reading level asks for very short sentences, rewrite any page where several short sentences run in a row or consecutive sentences open with the same subject and verb: merge some so a short sentence sits among longer ones.
+
 Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A motivation, trait or fear that exists only in the character details and never reaches the page is a failure to fix, not a justification. Never resolve a weakness by citing the brief.
 
 Work in two steps.

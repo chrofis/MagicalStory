@@ -15497,3 +15497,22 @@ null on a face that fills the frame), and its drops were never logged.
 **Touched files.** `server/lib/figureDetection.js`. Evidence:
 filter-audit.html (galleries incl. the 5 named boxes simple filters would
 have cut).
+
+### Sentence-length rhythm is a reading-level rule, set at the LANGUAGE_LEVELS chokepoint (2026-08-23)
+**Context:** Standard-level stories arrived as runs of uniform five-word
+sentences with identical subject-verb openings — correct for the earliest
+reading level, wrong above it. No rule anywhere addressed sentence length
+inside a page: the only variation rule covered openings across pages, the
+word-count and one-idea rules push toward short, and the dash ban's full-stop
+recast splits sentences further.
+**Decision:** The `standard` and `advanced` pacing strings in
+`LANGUAGE_LEVELS` (promptBuilders.js) now require mixed sentence lengths
+within a page and forbid repeated same-opening runs; `1st-grade` deliberately
+keeps uniform short sentences. The refiner flags staccato runs as a rewrite
+condition unless the reading level asks for very short sentences.
+**Rationale:** One chokepoint — `getReadingLevel` feeds both the text writer
+and the refiner, so the rule is level-aware and stated once instead of
+duplicated per prompt.
+**Touched:** `server/lib/promptBuilders.js` (LANGUAGE_LEVELS),
+`prompts/text-refine.txt`.
+**Status:** ✅ active
