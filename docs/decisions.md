@@ -16636,3 +16636,37 @@ words" branch was removed earlier the same day. The two files share a rule set b
 design and their header says so: "when a rule changes here it must change there too."
 
 **Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`.
+
+## 2026-08-23 — `height_fraction` removed: the ordering was a sort of it, 16 times out of 16
+
+**Context:** Having tightened `height_order`'s comparability guards, I checked
+whether the ordering was an independent judgement at all. It is not. On
+`job_1787493968756_4fgr5nukroz` the stated order is an **exact sort of
+`height_fraction` on all 16 multi-figure evaluations — zero divergences.** The
+model was not ranking heights; it was sorting a number and writing the result as
+prose. So the ranking inherited the number's confound in full, which is how p7
+came to rank a MIDGROUND child above a FOREGROUND one.
+
+This invalidates the reasoning in the entry above, which kept the ordering on the
+grounds that it "controls for camera distance". It can in principle; it was not
+doing so in practice.
+
+**Decision:** `height_fraction` is removed from both producers — the evaluator's
+`figures[]` and the unified blind inventory — and replaced with a stated method:
+rank by **head size relative to the body** and by **where the feet meet the
+ground**, never by how much of the frame a figure fills. `same_ground_plane` and
+`clipped_by` stay: they are the guards that decide which figures are comparable
+at all.
+
+**Rationale:** visible extent grows with nearness to the camera and shrinks with
+cropping, so it is not a height measurement and there is no way to use it as one.
+Leaving it in the output gave the model something sortable, and it sorted it
+every single time. Nothing in the server read the field — the only references
+outside the prompts were in the Lab's own field-coverage list — so removal costs
+no behaviour. Head-to-body ratio and ground contact are the cues that survive
+perspective, which is why the instruction names them specifically rather than
+saying "judge it properly".
+
+**Touched:** `prompts/image-evaluation.txt`, `prompts/image-inventory-unified.txt`
+
+**Status:** ✅ active — supersedes the height_fraction half of the entry above.
