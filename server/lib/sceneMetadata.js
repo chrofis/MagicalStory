@@ -161,17 +161,19 @@ function sanitizeInteractions(rawInteractions, characterNames) {
       ? String(i.priority).toLowerCase()
       : undefined;
     const storyRelevant = (i.storyRelevant === true || i.storyRelevant === false) ? i.storyRelevant : undefined;
-    // `contact` classifies the physical demand of the row so the scene-consistency
-    // pre-check can COUNT hands-on entries instead of pattern-matching `where`
-    // prose. Left undefined when absent or unrecognised — stories written before
-    // the field exists must not read as a violation.
-    const contact = ['hands', 'carries', 'gaze', 'none'].includes(String(i.contact || '').toLowerCase())
-      ? String(i.contact).toLowerCase()
-      : undefined;
+    // `action` groups rows into activities so the brief pre-check can COUNT
+    // distinct activities per page instead of pattern-matching `where` prose.
+    // Rows sharing a label are one action however many characters they name —
+    // measured, a page carrying two distinct actions failed 7 times out of 7
+    // while four characters sharing one action averaged 73
+    // (docs/interaction-load-2026-08-23.md). Left undefined when absent, so
+    // briefs written before the field exists never read as a violation.
+    const actionRaw = String(i.action || '').trim();
+    const action = actionRaw ? actionRaw.slice(0, 80).toLowerCase() : undefined;
     const out = { character, object, where };
     if (priority !== undefined) out.priority = priority;
     if (storyRelevant !== undefined) out.storyRelevant = storyRelevant;
-    if (contact !== undefined) out.contact = contact;
+    if (action !== undefined) out.action = action;
     kept.push(out);
   }
   if (dropped.length > 0) {

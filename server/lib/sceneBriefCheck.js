@@ -124,21 +124,24 @@ function checkPage(page, castNames = [], visualBible = null) {
     });
   }
 
-  // C — hands-on load. Measured over two stories (34 pages, 60 interaction rows,
-  // docs/interaction-load-2026-08-23.md): rows putting hands on an object the
-  // character is not already carrying fail 88%, and a second one on the same page
-  // takes the page's mean semantic score to 18. Counted from the declared
-  // `contact` field, never matched out of the `where` prose — two attempts at
-  // pattern-matching that prose produced wrong counts while this was measured.
-  // Briefs written before the field existed carry no `contact` and never flag.
+  // C — one action per page. Measured over two stories (34 pages, 60 interaction
+  // rows, docs/interaction-load-2026-08-23.md): every page declaring two distinct
+  // actions failed, 7 of 7, mean semantic 17. How many characters perform the one
+  // action does not matter — four sharing a single action averaged 73, two doing
+  // two different things averaged 20. Counted from the declared `action` labels,
+  // never matched out of the `where` prose: two attempts at pattern-matching that
+  // prose produced wrong counts while this was being measured. Briefs written
+  // before the field existed carry no labels and never flag.
   const interactions = (metadata && Array.isArray(metadata.interactions)) ? metadata.interactions : [];
-  const handsOn = interactions.filter(i => i && String(i.contact || '').toLowerCase() === 'hands');
-  if (handsOn.length > 1) {
+  const actions = [...new Set(interactions
+    .map(i => (i && String(i.action || '').trim().toLowerCase()))
+    .filter(Boolean))];
+  if (actions.length > 1) {
     findings.push({
       pageNumber: page.pageNumber,
-      type: 'interaction_hands_on_excess',
-      detail: `${handsOn.length} interactions declare contact:"hands" (${handsOn.map(i => `${String(i.character || '?').trim()}→${String(i.object || '?').trim()}`).join(', ')}); the cap is one. `
-        + `Characters acting on one object share a single fused entry; the rest watch or stand.`,
+      type: 'interaction_multiple_actions',
+      detail: `The page declares ${actions.length} separate actions (${actions.map(a => `"${a}"`).join(', ')}); a page shows one. `
+        + `Any number of characters may share the one action — give the rest of them watching or standing, or move the second action to its own page.`,
     });
   }
 
@@ -180,7 +183,7 @@ function checkScenes(pages, castNames = [], visualBible = null) {
 //     and there is no measured link to a defect — sending it would have the
 //     reviewer rewriting one page in four for nothing. Kept as a diagnostic,
 //     NOT sent. Drop or add a type here without touching the others.
-const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_hands_on_excess']);
+const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions']);
 
 /** Render findings as the {BRIEF_FINDINGS} block for scene-review.txt. */
 function renderFindingsBlock(byPage) {

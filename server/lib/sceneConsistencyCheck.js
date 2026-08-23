@@ -181,19 +181,20 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
       }
     }
 
-    // (c2) hands-on load. Measured over two stories (34 pages, 60 rows,
-    // docs/interaction-load-2026-08-23.md): rows putting hands on an object the
-    // character is not already carrying fail 88%, and a second one on the same
-    // page takes the page's mean semantic score to 18. Counting the declared
-    // `contact` field keeps this a fact — the alternative, pattern-matching the
-    // `where` prose, produced two wrong answers while the finding was measured.
-    // Rows from before the field existed have no `contact` and are not counted.
-    const handsOn = interactions.filter(i => i && String(i.contact || '').toLowerCase() === 'hands');
-    if (handsOn.length > 1) {
-      const who = handsOn.map(i => `${baseName(i.character) || '?'}→${String(i.object || '?').trim()}`).join(', ');
+    // (c2) one action per page. Measured over two stories (34 pages, 60 rows,
+    // docs/interaction-load-2026-08-23.md): every page declaring two distinct
+    // actions failed, 7 of 7, mean semantic 17, while four characters sharing a
+    // single action averaged 73 — the character count is not the problem, the
+    // number of separate activities is. Counting declared `action` labels keeps
+    // this a fact; pattern-matching the `where` prose produced two wrong answers
+    // while the finding was measured. Rows from before the field have no label.
+    const actions = [...new Set(interactions
+      .map(i => (i && String(i.action || '').trim().toLowerCase()))
+      .filter(Boolean))];
+    if (actions.length > 1) {
       issues.push({
-        type: 'interaction_hands_on_excess',
-        detail: `${handsOn.length} interactions declare contact:"hands" (${who}) — the cap is one per page; fuse the characters acting on one object into a single entry, or change the others to gaze/none`,
+        type: 'interaction_multiple_actions',
+        detail: `the page declares ${actions.length} separate actions (${actions.map(a => `"${a}"`).join(', ')}) — a page shows one; any number of characters may share it, the rest watch or stand`,
       });
     }
 

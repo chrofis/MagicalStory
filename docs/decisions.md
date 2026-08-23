@@ -15867,6 +15867,9 @@ send nothing outward; an admin measurement must never email a customer.
 **Status:** ✅ active
 
 ## 2026-08-23 — Interaction load: `contact` is declared, the hands-on cap is counted, and the reviewer is told
+🗄 **SUPERSEDED the same day** by "One action per page" below — the hands-on axis was
+wrong. Keep reading for the measurement and the plumbing, both of which carried over;
+the `contact` field and the hands-on cap never ran live and were replaced by `action`.
 
 **Context:** Measured over two production stories (34 pages, 60 interaction rows —
 `docs/interaction-load-2026-08-23.md`): `action_interaction` is 36 of 68 semantic
@@ -15999,3 +16002,69 @@ table exists.
 **Touched:** `server/routes/jobs.js` (cleanupOldCompletedJobs),
 `tasks/bugs.json` (checkpoint-reaper-destroys-forensics).
 **Status:** ✅ active
+
+## 2026-08-23 — One action per page: any number of characters may share it
+
+**Supersedes** the `contact` / hands-on-cap entry above, from earlier the same day.
+Neither the field nor the cap ever ran on a live story.
+
+**Context:** The hands-on cap was keyed on the wrong axis. Re-cut against the same
+corpus (34 pages, `docs/interaction-load-2026-08-23.md`), counting *distinct
+actions* per page and excluding gaze and standing:
+
+| distinct actions | pages | avg semantic | failed (≤50) |
+|---|---|---|---|
+| 0 | 7 | 71 | 1 / 7 |
+| 1 | 17 | 59 | 7 / 17 |
+| 2 | 7 | **17** | **7 / 7** |
+
+Every page declaring two actions failed. How many characters perform the one
+action does not matter: four characters sharing a single action averaged 73 with
+no failures, two characters doing two different things averaged 20 with 6 of 6
+failing, five doing two scored 0.
+
+So several people all pushing the same boat is fine — it is one action. What fails
+is one pushing the hull, one tying a rope and one working an oar. The hands-on cap
+also *missed* real failures for want of a hand: a page pairing "points at the
+channel" with "steers at the tiller" carries two actions and one hands-on row, and
+it scored 20.
+
+**Decision:** `interactions[]` carries an `action` label naming the activity a row
+belongs to; every row in the same activity shares the label, however many
+characters that is, and rows for characters who only watch, stand, or carry their
+own belongings have none. `sceneBriefCheck` emits `interaction_multiple_actions`
+when a page declares more than one distinct label, and the type is `REVIEWABLE`,
+so it reaches `scene-review.txt` through `{BRIEF_FINDINGS}`. `sceneConsistencyCheck`
+emits the same on the unified path. The template cap is now "one `action` label per
+page — a second activity belongs on a different page".
+
+**Rationale:** This is the owner's formulation (2026-08-23) and the data backs it
+at 7/7. It also removes the conflict the superseded entry had to accept: a cap on
+hands fired against beats that legitimately needed several people in contact,
+whereas a cap on *actions* lets those pages through unchanged — the three-person
+boat push is one action and passes. Counting declared labels keeps it a fact;
+matching contact verbs in `where` prose produced two wrong counts while this was
+being measured, and the repo bans text-matching for classification.
+
+**Where the defect is born:** the beat, not the brief. Attribution over both
+stories put roughly half the multi-action pages on beats that name several separate
+activities in their own words (Fiona p8: "Saira … shouts NOW. Facundo hauls the oar
+… and poles; … she pushes with them") and half on Art Director invention (all four
+tiller rows — no beat asks anyone to steer). `prompts/story-beats-review.txt:45`
+and `scene-review.txt` check 4 ("a page where each figure performs its own separate
+activity is a fault even when the actions share a cause") both already name this
+shape and neither changed a page. The brief-level count is the mechanical backstop;
+making the beats rule binding stays open in `tasks/BACKLOG.md`.
+
+**Touched:**
+- `prompts/scene-expansion-all.txt` (live for beats), `prompts/scene-expansion.txt`
+- `server/lib/sceneMetadata.js` — `sanitizeInteractions` passes `action` through,
+  lower-cased and length-capped; it rebuilds rows from named keys and would
+  otherwise drop it
+- `server/lib/sceneBriefCheck.js` — the finding, `REVIEWABLE`, the BRIEF FAULTS header
+- `server/lib/sceneConsistencyCheck.js` — the same finding on the unified path
+
+**Status:** 🟡 conditional — unit-verified (label survives sanitize and
+case-normalises; 5/5 cases including "three people push one boat" passing and
+"push + tie + row" flagging, plus the point-and-steer case the hands cap missed;
+legacy rows without labels never flag) but NOT yet run on a live story.
