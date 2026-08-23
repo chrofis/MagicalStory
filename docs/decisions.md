@@ -15644,3 +15644,10 @@ budget-gated in code because the model cannot be trusted to do the
 arithmetic.
 **Touched:** `server/lib/promptBuilders.js` (buildStoryShapeSection).
 **Status:** ✅ active
+
+**First-import race retry (same day):** the first DINO load after cold start or
+idle-unload can collide with another thread mid-initialising a torch submodule
+("cannot import ExportOptions from torch.onnx._internal.exporter"); the second
+attempt always succeeds. Lab runs survived via their retry loop, but a single
+refresh-bbox call 503'd and silently shipped a Gemini fallback page (Fiona p1,
+twice). get_groundingdino now retries the load once after 3s.

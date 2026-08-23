@@ -2115,11 +2115,29 @@ def get_groundingdino():
         if _gdino_model is None:
             # transformers is an optional dep — endpoint 503s if missing so Node
             # falls back to the Gemini bbox.
-            from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+            # ONE RETRY on the first-import race (2026-08-23): the first load
+            # after a cold start or idle-unload can hit a concurrent-import
+            # collision ("cannot import name 'ExportOptions' from
+            # torch.onnx._internal.exporter" — another thread is mid-way through
+            # initialising a torch submodule). The second attempt succeeds once
+            # that import settles; without the retry a single refresh-bbox call
+            # 503s and silently ships a Gemini fallback page.
             model_id = os.environ.get('GROUNDINGDINO_MODEL', 'IDEA-Research/grounding-dino-base')
-            print(f"[GDINO] Loading GroundingDINO ({model_id})...")
-            proc = AutoProcessor.from_pretrained(model_id)
-            model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
+            last_err = None
+            for _attempt in range(2):
+                try:
+                    from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+                    print(f"[GDINO] Loading GroundingDINO ({model_id})...")
+                    proc = AutoProcessor.from_pretrained(model_id)
+                    model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
+                    last_err = None
+                    break
+                except (ImportError, RuntimeError) as e:
+                    last_err = e
+                    print(f"[GDINO] load attempt {_attempt + 1} failed ({type(e).__name__}: {e!r}) — retrying in 3s")
+                    time.sleep(3)
+            if last_err is not None:
+                raise last_err
             model.eval()
             _gdino_processor = proc
             _gdino_model = model
@@ -2320,6 +2338,15 @@ def warmup_endpoint():
             print(f"[WARMUP] workers up in {time.time() - t0:.1f}s")
             return
         # Worker roles preload only what they own.
+        if ANALYZER_ROLE == 'face':
+            # /analyze does its background removal IN-PROCESS, so this worker
+            # needs its own U2-Net. Preloading it in the rembg worker warmed
+            # the wrong process — measured on staging: a fully "warmed" first
+            # upload still took 17.9s because this load happened inside it.
+            try:
+                get_rembg_session()
+            except Exception as e:
+                print(f"[WARMUP] face-rembg failed: {e}")
         if ANALYZER_ROLE == 'rembg':
             try:
                 get_rembg_session()
