@@ -5718,6 +5718,8 @@ const FIGURE_FIELDS = [
   ['expression', /expression/i],
   ['age_group', /age[_ ]group|age\b/i],
   ['standing_surface', /standing[_ ]surface|standing on|surface/i],
+  ['body_bbox', /body[_ ]bbox/i],
+  ['face_bbox', /face[_ ]bbox/i],
   ['height_fraction', /height[_ ]fraction/i],
   ['same_ground_plane', /same[_ ]ground[_ ]plane/i],
   ['clipped_by', /clipped[_ ]by/i],

@@ -15699,5 +15699,13 @@ above. Whether that ban should hold is itself queued for the Lab.
 - `server/lib/evalPipeline.js` (`runVisualInventory` opts + temperature)
 - `server/lib/testlab.js` (`inventory_ab`), `client/src/services/testlabService.ts`
 
+**Update (same day):** the unified candidate also emits `body_bbox` and
+`face_bbox` per figure. Without a box its figure list cannot be verified — you
+can read "the young boy in green" but not check that the label landed on that
+boy — and cropping each described figure out of its own box is how accuracy gets
+measured rather than assumed. It also raises the candidate to 21 per-figure
+fields against the split pair's 18, which makes the attention test harder, not
+easier.
+
 **Status:** 🟡 conditional — the unified prompt is a Lab candidate, not in the
 pipeline. Nothing merges until `inventory_ab` says it is safe.

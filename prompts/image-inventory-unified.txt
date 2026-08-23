@@ -11,6 +11,8 @@ For EACH human figure:
 - `expression`: if the face is visible, else `cannot tell at this size`
 - `age_group`: child, teenager, adult, or elderly
 - `standing_surface`: what the feet or lower body rest on or in, or `mid-air`
+- `body_bbox`: `[x1,y1,x2,y2]` normalised 0-1 around the whole figure — head to lowest visible point, including clothing and anything worn
+- `face_bbox`: the same shape around the face, or `null` when no face is visible
 - `height_fraction`: visible height divided by image height
 - `same_ground_plane`: false when the feet rest at a different depth or surface from the other figures
 - `clipped_by`: `none`, `frame`, or the element that cuts the figure off
@@ -53,6 +55,8 @@ Return JSON only, no other text. Emit exactly these keys.
       "expression": "mouth open, eyebrows raised",
       "age_group": "child",
       "standing_surface": "cobblestones",
+      "body_bbox": [0.28, 0.20, 0.49, 0.86],
+      "face_bbox": [0.31, 0.22, 0.44, 0.38],
       "height_fraction": 0.62,
       "same_ground_plane": true,
       "clipped_by": "none",
