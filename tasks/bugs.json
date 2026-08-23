@@ -220,12 +220,12 @@
   },
   {
    "id": "checkpoint-reaper-destroys-forensics",
-   "title": "Checkpoints of failed/cancelled jobs purged after 1h with no salvage — dead runs unrecoverable",
+   "title": "Checkpoint purge policy: 1h retention for failed/cancelled, no salvage path for cancelled jobs",
    "reportedAt": "2026-08-23",
-   "source": "job_1787469664089_9e27p42el7l — unified_story + story_text + 16 partial_page checkpoints survived the container kill, were recoverable for ~1h, then cleanupOldCompletedJobs (runs on every create-story) deleted them; savePartialStoryFromCheckpoints never fires for cancelled jobs (stale-sweep matches only processing)",
+   "source": "job_1787469664089_9e27p42el7l post-mortem. NOTE: this job in fact had ZERO checkpoints (never written — separate investigation running); the purge policy and missing salvage were real defects found during that investigation and would have destroyed the evidence had it existed.",
    "status": "fixed",
    "fixedIn": "same commit",
-   "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-delete (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story), checkpoint+job retention for failed/cancelled raised 1h -> 48h; completed stays 1h (finalize already deleted its checkpoints)."
+   "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-cleanup (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story); failed/cancelled checkpoints+rows NEVER auto-deleted (owner: keep the failed 1% forever); completed stays 1h."
   }
  ]
 }

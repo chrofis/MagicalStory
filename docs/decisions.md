@@ -15978,19 +15978,20 @@ support flows possible but makes targeting a customer an explicit act.
 **Touched:** `server/routes/admin/jobs.js`.
 **Status:** ✅ active
 
-### Failed/cancelled jobs keep checkpoints 48h and are salvaged before purge (2026-08-23)
+### Failed/cancelled jobs keep checkpoints FOREVER and are salvaged before any cleanup (2026-08-23)
 **Context:** Checkpoints exist so a dead run can be inspected and recovered —
 but cleanupOldCompletedJobs (fired on every create-story call) purged them for
 completed/failed/cancelled jobs after ONE hour, and the salvage path
 (savePartialStoryFromCheckpoints) only ever ran for stalled 'processing' jobs.
-A cancelled-then-killed run left a fully recoverable 16-page story (outline,
-text, all page images) in checkpoints; nothing salvaged it and the reaper
-deleted it 1h later, before anyone looked.
+A cancelled-then-killed run had ZERO checkpoints — investigation ongoing into
+why they were never written — and the 1h purge policy plus the missing
+salvage-for-cancelled path would have destroyed them unread even if written.
 **Decision:** In cleanupOldCompletedJobs: first salvage — run
 savePartialStoryFromCheckpoints for every failed/cancelled job that still has
-checkpoints and no titled story record; then retain failed/cancelled
-checkpoints and job rows 48 hours (completed stays at 1 hour — its
-checkpoints were already deleted at finalize, the story is saved).
+checkpoints and no titled story record; then failed/cancelled checkpoints and job rows are NEVER auto-deleted
+(owner: 99% of stories succeed, the failed 1% is the evidence); completed
+stays at 1 hour — its checkpoints were already deleted at finalize, the
+story is saved.
 **Rationale:** Retention shorter than one story run defeats the checkpoints'
 purpose; salvage-before-delete makes the forensic record land in stories.data
 where every tool can read it, without waiting for anyone to remember the

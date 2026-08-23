@@ -35,13 +35,13 @@ function initJobRoutes(serverDeps) {
   deps = serverDeps;
 }
 
-// Clean up old completed/failed jobs and their checkpoints.
-// Checkpoints of FAILED/CANCELLED jobs are the only forensic record of what a
-// dead run produced (the story was never persisted), so they are salvaged into
-// a partial story first and kept 48h — the 1-hour purge once destroyed a fully
-// recoverable 16-page run before anyone looked (2026-08-23). Completed jobs
-// already deleted their checkpoints at finalize; the 1-hour row cleanup here
-// only catches strays.
+// Clean up old completed jobs and their checkpoints.
+// FAILED/CANCELLED jobs and their checkpoints are NEVER auto-deleted (owner
+// 2026-08-23): they are the only forensic record of what a dead run produced,
+// 99% of stories succeed so the residue is tiny, and the 1-hour purge once
+// covered up that checkpoints weren't being written at all. They are also
+// salvaged into a partial story here. Completed jobs already deleted their
+// checkpoints at finalize; the 1-hour row cleanup below only catches strays.
 async function cleanupOldCompletedJobs() {
   if (STORAGE_MODE !== 'database') return;
   const pool = getDbPool();
@@ -75,15 +75,13 @@ async function cleanupOldCompletedJobs() {
       DELETE FROM story_job_checkpoints
       WHERE job_id IN (
         SELECT id FROM story_jobs
-        WHERE (status = 'completed' AND updated_at < NOW() - INTERVAL '1 hour')
-           OR (status IN ('failed', 'cancelled') AND updated_at < NOW() - INTERVAL '48 hours')
+        WHERE status = 'completed' AND updated_at < NOW() - INTERVAL '1 hour'
       )
     `);
 
     const jobResult = await pool.query(`
       DELETE FROM story_jobs
-      WHERE (status = 'completed' AND updated_at < NOW() - INTERVAL '1 hour')
-         OR (status IN ('failed', 'cancelled') AND updated_at < NOW() - INTERVAL '48 hours')
+      WHERE status = 'completed' AND updated_at < NOW() - INTERVAL '1 hour'
     `);
 
     if (cpResult.rowCount > 0 || jobResult.rowCount > 0) {
