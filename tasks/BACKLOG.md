@@ -55,6 +55,26 @@ The first two are corroborated by more than one source, which is why they lead.
       reviewer; this rule has only prose behind it, and prose alone moved neither writer in
       four experiments. Same treatment would apply: a declared field, a count, a finding
       → `docs/decisions.md` (2026-08-23 exp 825 entry)
+- [ ] **The brief checks run once, before the scene review — a rewrite can create a new
+      violation nobody re-checks (exp 830).** p8 was flagged for two actions; the reviewer merged
+      them into one shared action and the result has two characters gripping one wheel, which the
+      hands rule forbids. Correct fix on the flagged finding, new violation created, no second
+      pass. Re-running `checkScenes` on the rewritten briefs would catch it — either as a report
+      or as a second review round → `server/lib/beatsPipeline.js` (scene review callsite)
+- [ ] **The one-action and one-object-one-pair-of-hands rules have never produced an IMAGE.**
+      Every run this session was text-only by owner instruction (exp 818/821/825/830). The rules
+      demonstrably change the briefs; whether that changes the render is unmeasured, and the one
+      real story that ran under the action rule (`job_1787493968756_4fgr5nukroz`) scored a mean
+      61 — no better than baseline — because its remaining single actions were hand-offs
+      → `docs/decisions.md` (2026-08-23 exp 825 / one-object entries)
+- [ ] **Text-prop and VB-face rules are unverified (🟡).** Prop writing is never model-spelled,
+      a prop's VB entry describes the object not its face, and 12c/12d now live in both scene
+      templates. No story has run under any of it. Watch `viewer_address` and `object_presence`
+      on pages carrying a map, letter or note → `docs/decisions.md` (2026-08-23 entries)
+- [ ] **Owner hypothesis, untestable as built: a menu of suggested interactions may beat a
+      mandate.** `buildExactPosesBlock` emits every row as the same imperative bullet and
+      `priority` only sorts them, so "the model may pick one of five" is not a behaviour that
+      exists. Testing it needs a code change first → `server/lib/promptBuilders.js:3400`
 - [ ] **Beats still write two-action pages — the prompt rule did not fix it (exp 821).** 4 of 16
       pages carried two actions vs 5 of 16 originally; two named both outright ("Saira takes the
       wheel … Fiona lets go and steps back"). Not blocking — the brief-level check catches them
