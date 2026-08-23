@@ -215,6 +215,11 @@ function sanitizeInteractions(rawInteractions, characterNames) {
     if (priority !== undefined) out.priority = priority;
     if (storyRelevant !== undefined) out.storyRelevant = storyRelevant;
     if (action !== undefined) out.action = action;
+    // `hands` declares that this character's hands are on the object, so the
+    // brief pre-check can count pairs of hands per object without reading the
+    // `where` prose. Only an explicit true is kept: absent means "not declared",
+    // which must never read as a violation on briefs written before the field.
+    if (i.hands === true) out.hands = true;
     kept.push(out);
   }
   if (dropped.length > 0) {

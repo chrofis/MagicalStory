@@ -16407,3 +16407,58 @@ mediapipe=True/rembg_loaded=True, torch reports both False, nothing listens on
 5002.
 
 **Touched files.** `photo_analyzer.py`.
+
+## 2026-08-23 — One object, one pair of hands (the hand-off is the remaining failure)
+
+**Context:** the one-action rule shipped and worked mechanically on the first real
+story that ran under it (staging `job_1787493968756_4fgr5nukroz`):
+`interaction_multiple_actions` fired on pages 1 and 2, both landed in the scene
+review's `changedPages`, and all 10 final pages carry exactly one action with 0
+unlabelled rows of 17. **The scores did not follow** — mean semantic 61, and
+`action_interaction` was still the top failure type at 8 of 23 findings.
+
+The reason is visible in what the surviving single actions are:
+
+| page | sem | the one action |
+|---|---|---|
+| 4 | 10 | Sarah presses the tape **into Emma's closing fingers** |
+| 1 | 20 | Hans places the note **into Noah's hand**, Noah **closes his fingers** |
+| 3 | 30 | Emma holds both pieces **flat on open palms** offered toward Noah |
+
+against the same story's successes — opening the box (100), pointing at the note
+(100), finding the hat (80), tearing the note (75), holding the note (75). One
+character with one object works; **one object passing between two characters does
+not.** Counting actions fixed the count; the remaining action was itself the hard
+kind.
+
+**Decision:** interaction rows carry `hands: true` when the character's hands are
+on the object. `sceneBriefCheck` (and `sceneConsistencyCheck` on the unified path)
+count pairs of hands per object — splitting a fused `"A + B"` row, which is the
+hand-off shape — and emit `interaction_object_shared_hands`, REVIEWABLE, so the
+reviewer receives it in `{BRIEF_FINDINGS}`. The template asks for the hand-over to
+be drawn as the moment before or after it.
+
+**Rationale:** the same counted-fact mechanism that carried the action rule. Prose
+has now failed to enforce "no body-part positioning" four separate times (exp 815
+p7, exp 818 p12, exp 825 p11, and every failing page of this story), while a named
+mechanical finding worked on its first attempt.
+
+**Known conflict, deliberately left in.** A fused row where several characters push
+one large object — the owner's "everyone pushes the ship" case — flags too, because
+mechanically it is indistinguishable from a hand-off: one fused row, hands on one
+object, differing only in whether the roles are complementary. Exempting fused rows
+would exempt exactly the two measured failures (both fused). The finding is a report
+and the BRIEF FAULTS preamble tells the reviewer to judge each one, so a genuine
+crew push can survive review — the same shape of accepted conflict as the action cap.
+
+**Not measured:** there is no *successful* instance of two-plus characters touching
+one object anywhere in the corpus. The "four characters sharing one action averaged
+73" evidence comes from pages where they watch, walk or gaze. The crew-push case is
+intent, not measurement.
+
+**Touched:** `prompts/scene-expansion*.txt`, `server/lib/sceneMetadata.js`,
+`server/lib/sceneBriefCheck.js`, `server/lib/sceneConsistencyCheck.js`.
+
+**Status:** 🟡 conditional — unit-verified 7/7 against the real pages of
+`job_1787493968756_4fgr5nukroz` (both hand-offs flag, both one-character pages stay
+clean, legacy rows never flag). Not yet run inside a generation.

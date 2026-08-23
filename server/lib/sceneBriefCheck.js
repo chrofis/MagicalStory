@@ -145,6 +145,30 @@ function checkPage(page, castNames = [], visualBible = null) {
     });
   }
 
+  // D — one object, one pair of hands. Measured 2026-08-23 on
+  // job_1787493968756_4fgr5nukroz: every hand-off scored at the bottom of the
+  // book (10, 20, 30) while one-character-one-object pages scored 70–100 in the
+  // same story. Counted from the declared `hands` flag and the character names
+  // already on the row — a fused "A + B" row is two pairs of hands on one
+  // object, which is the hand-off shape. Rows without the flag never count.
+  const handRows = interactions.filter(i => i && i.hands === true);
+  const perObject = new Map();
+  for (const row of handRows) {
+    const obj = String(row.object || '').trim().toLowerCase();
+    if (!obj) continue;
+    const who = String(row.character || '').split(/\s*(?:\+|&|\band\b|,)\s*/i).map(s => s.trim()).filter(Boolean);
+    perObject.set(obj, (perObject.get(obj) || []).concat(who.length ? who : ['?']));
+  }
+  for (const [obj, who] of perObject) {
+    if (who.length < 2) continue;
+    findings.push({
+      pageNumber: page.pageNumber,
+      type: 'interaction_object_shared_hands',
+      detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once; one object takes one pair of hands. `
+        + `Draw the moment before or after the hand-over — one holds it out, the other reaches — or move the second character to watching.`,
+    });
+  }
+
   return findings;
 }
 
@@ -183,7 +207,7 @@ function checkScenes(pages, castNames = [], visualBible = null) {
 //     and there is no measured link to a defect — sending it would have the
 //     reviewer rewriting one page in four for nothing. Kept as a diagnostic,
 //     NOT sent. Drop or add a type here without touching the others.
-const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions']);
+const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands']);
 
 // Reserved `action` labels for characters who are present but not acting. They
 // are values rather than an omitted field on purpose: when the field was

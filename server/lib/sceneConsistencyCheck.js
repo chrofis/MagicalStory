@@ -200,6 +200,26 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
       });
     }
 
+    // (c3) one object, one pair of hands — see sceneBriefCheck check D. A fused
+    // "A + B" row with hands on one object is the hand-off shape, which scored
+    // 10/20/30 on every instance in job_1787493968756_4fgr5nukroz while
+    // one-character-one-object pages in the same story scored 70–100.
+    const perObj = new Map();
+    for (const row of interactions.filter(i => i && i.hands === true)) {
+      const obj = String(row.object || '').trim().toLowerCase();
+      if (!obj) continue;
+      const who = String(row.character || '')
+        .split(/\s*(?:\+|&|\band\b|,)\s*/i).map(x => x.trim()).filter(Boolean);
+      perObj.set(obj, (perObj.get(obj) || []).concat(who.length ? who : ['?']));
+    }
+    for (const [obj, who] of perObj) {
+      if (who.length < 2) continue;
+      issues.push({
+        type: 'interaction_object_shared_hands',
+        detail: `${who.length} characters (${who.join(', ')}) have hands on "${obj}" at once — one object takes one pair of hands; draw the moment before or after the hand-over, or move the second character to watching`,
+      });
+    }
+
     // (d) depth word inside position phrase vs the depth field
     for (const c of metaChars) {
       if (!c || typeof c !== 'object') continue;
