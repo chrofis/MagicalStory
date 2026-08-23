@@ -99,7 +99,16 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             // Same rationale as the quality-eval budget bump — inventory (P1)
             // stage emits detailed per-figure JSON that can run long on
             // multi-character scenes.
-            generationConfig: { maxOutputTokens: 32000, temperature: EVAL_TEMPERATURE },
+            // thinkingBudget 0, same as the quality call next door. Without it
+            // Gemini thinks dynamically and can spend the whole 32k budget
+            // there, emitting truncated JSON: measured on a 12-figure page in
+            // Lab #817, where the inventory ended mid-figure at `"id": 5` after
+            // only 1,280 visible output tokens and parsed to zero figures.
+            generationConfig: {
+              maxOutputTokens: 32000,
+              temperature: EVAL_TEMPERATURE,
+              thinkingConfig: { thinkingBudget: EVAL_THINKING_BUDGET },
+            },
             safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
           })
         });

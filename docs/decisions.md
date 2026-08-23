@@ -16087,3 +16087,29 @@ the beats rule matters more than the backstop: the backstop cannot see a lie.
 case-normalises; 5/5 cases including "three people push one boat" passing and
 "push + tie + row" flagging, plus the point-and-steer case the hands cap missed;
 legacy rows without labels never flag) but NOT yet run on a live story.
+
+## 2026-08-23 — The blind inventory call caps thinking at 0, like the quality call beside it
+
+**Context:** `runVisualInventory` sent `maxOutputTokens: 32000` with no
+`thinkingConfig`, so Gemini 2.5 Flash applied its own dynamic thinking. On a
+12-figure page in Lab experiment #817 the inventory came back truncated
+mid-figure at `"id": 5` after only **1,280 visible output tokens** — the rest of
+the budget went to thinking — and parsed to **zero** figures. The quality call
+directly below it has capped thinking since the day that trap was found:
+*"Without a cap, 2.5 Flash has been observed burning the entire budget on
+thinking (30k+) and emitting truncated JSON → MAX_TOKENS."* The inventory call
+was simply missed.
+
+**Decision:** the inventory call passes
+`thinkingConfig: { thinkingBudget: EVAL_THINKING_BUDGET }` — 0 by default, the
+same value and the same env override as the quality call.
+
+**Rationale:** the inventory is observation, not reasoning; there is nothing for
+a thinking budget to buy, and the failure it causes is silent — a truncated JSON
+parses to no figures, which reads downstream exactly like a page with no people
+on it. The richer the per-figure schema, the sooner the budget runs out, so this
+had to be fixed before any prompt with more fields ships.
+
+**Touched:** `server/lib/evalPipeline.js` (`runVisualInventory` generationConfig)
+
+**Status:** ✅ active
