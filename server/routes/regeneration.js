@@ -4476,6 +4476,14 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       if (Object.keys(expectedPositions).length > 0) {
         log.info(`📦 [REFRESH-BBOX] Cover ${coverKey2}: built expectedPositions from coverHints.characterDetails — ${Object.keys(expectedPositions).join(', ')}`);
       }
+    }
+
+    // Runs for EVERY cover — the first deploy of this resolver sat inside the
+    // positions-empty guard above, and covers with persisted positions skipped
+    // it: clothing stayed empty and the frontCover swap reproduced on the
+    // verification run itself (2026-08-23).
+    if (isCover) {
+      const coverKeyD = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' }[String(pageNumber)];
       // Whatever the hints carried (often a bare category like "standard", or
       // nothing) must leave here as WEARABLE PROSE (bug cover-identity-
       // undressed, 2026-08-23): cover identity lines went out with clothing ""
@@ -4494,7 +4502,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
         const chObj = (storyData.characters || []).find(ch => (ch.name || '').toLowerCase() === String(name).toLowerCase());
         if (!chObj) continue;
         try {
-          const txt = shCover.buildIdentityClothingText(chObj, (isCat ? existing.trim() : coverCat), storyData.artStyle, storyData.clothingRequirements || null, { label: `${coverKey2} ` });
+          const txt = shCover.buildIdentityClothingText(chObj, (isCat ? existing.trim() : coverCat), storyData.artStyle, storyData.clothingRequirements || null, { label: `${coverKeyD} ` });
           if (txt) expectedClothing[name] = txt;
         } catch (e) { log.warn(`⚠️ [REFRESH-BBOX] cover clothing resolve failed for ${name}: ${e.message}`); }
       }
