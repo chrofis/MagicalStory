@@ -566,3 +566,15 @@ the field — and make empty-input warnings fire for every evaluation type, not 
 - **Tolerant parsers hide producer drift until one strict consumer meets one odd form.** Audit contracts producer-side (the notation each prompt prescribes), not just parser-side. Found: era lost on iterate, UPPERCASE severities charging 0, wornAs missing in beats mode.
 - **"Keep every fact" + "cut 25%" is unsolvable; models pick a side.** Flash deleted facts, DeepSeek refused to shorten. Name the MAIN POINTS to keep and say them in fewer words — 0.5% → 33% compression with nothing lost.
 - **The beat states the action, not the aftermath, and never composes the frame** — scale/framing words in beats get overridden by the reference photo anyway; put the story in the pose.
+
+## 2026-08-23 — rerun-full runs on the SOURCE story's account (a real customer)
+Fired a full rerun of a customer's story to test new prompts; the job ran on
+HER account and would have emailed her at completion (story-complete email).
+Only a container restart stopped it, because cancel had no check after the
+image phase. Rules going forward:
+1. Before ANY rerun-full: check who owns the source story (`stories.user_id`
+   → users.email). If it is not an owner/admin account, STOP and ask.
+2. State scope + cost before firing any run that generates images — "rerun"
+   from the user does not imply the full pipeline.
+3. The adminRerun flag now suppresses the email, but the story still lands in
+   the source account's library — repoint stories.user_id after completion.
