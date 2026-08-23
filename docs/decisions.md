@@ -15865,3 +15865,69 @@ send nothing outward; an admin measurement must never email a customer.
 **Touched:** `storyJobPipeline.js`, `server/routes/admin/jobs.js`,
 `tasks/bugs.json` (cancelled-job-persists-and-emails).
 **Status:** ✅ active
+
+## 2026-08-23 — Interaction load: `contact` is declared, the hands-on cap is counted, and the reviewer is told
+
+**Context:** Measured over two production stories (34 pages, 60 interaction rows —
+`docs/interaction-load-2026-08-23.md`): `action_interaction` is 36 of 68 semantic
+findings, rows putting a character's hands on an external object fail 88% (14 of
+16), and the damage is multiplicative with the number of distinct pose
+instructions. Without a hands-on row, extra instructions cost nothing (page means
+70 / 74 / 70 at 1 / 2 / 3 instructions); with one, the second instruction takes
+the page to 18. Cast size drops out entirely once that is controlled for — four
+characters sharing ONE instruction average 70, four with four different
+instructions average 35.
+
+A first attempt fixed this the obvious way, by adding rules to the Art Director
+template. Test Lab **exp 815** measured it: body-part rows 15 → 10, contact verbs
+18 → 14, **zero** fused entries in either arm, mean semantic 57 vs 52 with the
+change winning 5 of 11 pages. Prose rules in a 24k-character template barely move
+the writer. The scene reviewer, by contrast, demonstrably acts on named mechanical
+faults — in the same story the `cast_unlisted` pre-check findings for p11 and p14
+both appear in the reviewer's `changedPages`.
+
+**Decision:** The cap stops being a request to the writer and becomes a counted
+fact handed to the reviewer.
+- `interactions[]` gains a `contact` field: `"hands"` (hands on something not
+  already held), `"carries"`, `"gaze"`, `"none"`.
+- `sceneBriefCheck` emits `interaction_hands_on_excess` when a page declares more
+  than one `contact: "hands"` row, and the type is in `REVIEWABLE`, so it reaches
+  `scene-review.txt` through `{BRIEF_FINDINGS}`.
+- `sceneConsistencyCheck` emits the same finding on the unified path, which feeds
+  the REVIEW HINTS block instead.
+- The template cap references the field rather than describing the condition.
+- The `{BRIEF_FINDINGS}` header widened from "BRIEF CONTRADICTIONS" to "BRIEF
+  FAULTS" — a cap violation is not a prose/metadata contradiction, and the old
+  framing invited the reviewer to dismiss it.
+
+**Rationale:** Counting a declared enum is a fact; matching contact verbs in the
+`where` prose is a guess. Two attempts at that prose matching produced wrong
+counts while this very finding was being measured ("holds Lorena's gaze" scored as
+contact on a page that scored 100; "holds the **wooden** tiller" missed because of
+the adjective), and the repo bans text-matching for classification. The writer
+fills fields reliably and ignores prose about how many rows to emit, so the field
+is where the leverage is.
+
+The alternative of enforcing in `buildExactPosesBlock` — capping what reaches the
+image model regardless of the brief — was rejected for now: it discards
+story-relevant detail without the reviewer's judgement about which row matters.
+
+**Also narrowed here:** "a vehicle under way MUST have exactly one character
+operating it" now asks for `low` priority unless the operating is the page's beat.
+The rule is kept — it is benchmark-validated (`51ab02ebd`, Lab exp 63) against a
+vehicle under way with nobody at the helm — but on a boat story it put a hands-on
+row on every sailing page, and that row failed 4 of 4.
+
+**Touched:**
+- `prompts/scene-expansion-all.txt` (live for the beats pipeline), `prompts/scene-expansion.txt`
+- `server/lib/sceneMetadata.js` — `sanitizeInteractions` whitelists and validates
+  `contact`; it rebuilds each row from named keys and would otherwise have dropped it
+- `server/lib/sceneBriefCheck.js` — the finding, `REVIEWABLE`, the block header
+- `server/lib/sceneConsistencyCheck.js` — the same finding on the unified path
+- `docs/interaction-load-2026-08-23.md` — the measurement and the exp 815 verdict
+
+**Status:** 🟡 conditional — the plumbing is unit-verified end to end (sanitize
+round-trip, 5/5 pre-check cases including fused-entry and legacy-row no-flag, the
+rendered findings block) but has NOT run on a live story. Rows written before this
+change carry no `contact` and never flag. Do not promote to master until a beats
+run shows the reviewer acting on the finding.
