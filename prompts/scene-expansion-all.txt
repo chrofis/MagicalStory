@@ -163,17 +163,17 @@ Mark `storyRelevant: true` only when the contact is the page's plot beat, identi
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail.
+Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side". Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
-**Shared objects.** When several characters use ONE object at once (carry the same basket, hold the same banner, pull the same rope), emit ONE entry: join the names with ` + ` in `character` and describe each grip in the one `where` sentence. Separate entries with the same object render as duplicate objects. Characters each using their OWN identical object keep separate entries.
+**Shared objects.** When several characters use ONE object at once, or act on ONE object together (carry the same basket, hold the same banner, pull the same rope, push the same cart), emit ONE entry: join the names with ` + ` in `character` and describe the shared action in the one `where` sentence. Separate entries with the same object render as duplicate objects. Characters each using their OWN identical object keep separate entries.
 
 `priority`: `"essential"` for the page's central action (held prop, traced line, key gesture), `"normal"` for supporting action, `"low"` for incidental gaze/pose. Optional — defaults to `"normal"`. The image generator orders EXACT POSES with essentials first.
 
 **Coverage:** every foreground/midground character should appear in `interactions[]` exactly once. If a character has no real action, give them a `priority: "low"` entry (e.g. `{character, object: "the campfire", where: "watches the campfire", storyRelevant: false, priority: "low"}`) — without it the image model defaults to a camera-facing portrait. Background characters exempt.
 
-A vehicle under way MUST have exactly one character actively operating it — declare that operation as an essential interaction for that character.
+A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's beat and `low` otherwise.
 
-Cap: 1–6 entries, 0–2 with `storyRelevant: true`.
+Cap: 1–6 entries, 0–2 with `storyRelevant: true`. At most one entry per page puts hands on an object the character is not already carrying; anyone else acting on it shares that entry, watches, or stands.
 
 Every entry must also appear in the prose as the same physical contact.
 

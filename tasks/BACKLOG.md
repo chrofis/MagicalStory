@@ -42,6 +42,19 @@ Last full sweep: **2026-08-20**.
 
 The first two are corroborated by more than one source, which is why they lead.
 
+- [ ] **Interaction load tanks pages — hands-on-object × distinct pose lines (measured
+      2026-08-23, 2 prod stories, 34 pages).** `action_interaction` is 36 of 68 semantic
+      findings. HANDS_ON rows fail 88% (14/16); with a second distinct pose instruction the
+      page average drops to 18. Cast size is not the driver. Three rules in
+      `scene-expansion.txt` that would prevent it are already violated (no body-part
+      positioning; shared object → one entry), and line 158 ("a vehicle under way MUST have
+      one character operating it") manufactures the failure — the tiller row failed 4/4.
+      Fix location (beats vs Art Director) not yet decided → `docs/interaction-load-2026-08-23.md`
+- [ ] **Beats-review "Illustratable" check is diagnostically right and behaviourally inert.**
+      It named every hard page in both stories ("a hard two-on-one tangle", "packs stuck /
+      indecision / shout / find oars") and none were rewritten into a simpler tableau
+      → `docs/interaction-load-2026-08-23.md`
+
 - [ ] **Avatar "pick best of N" via a vision model — NEEDS LAB PROOF FIRST (owner, 2026-08-22).**
       Today a failed avatar is regenerated and the retry replaces the original. The proposal:
       keep all attempts, send all four options plus the source photo to a vision model and ask
@@ -107,6 +120,12 @@ The first two are corroborated by more than one source, which is why they lead.
 ---
 
 ## Eval + scoring
+
+- [ ] **A page can fail semantics outright and never trigger a redo (measured 2026-08-23).**
+      `scoreThreshold: 50` gates on `finalScore`, computed over *consolidated* deductions, so
+      semantic 0 can land at finalScore 60 and ship first try. 9 of 34 pages across two prod
+      stories had semantic ≤50 with no regeneration; two scored a flat 0
+      → `docs/interaction-load-2026-08-23.md`
 
 Full detail for this whole section: `tasks/eval-variance-backlog.md` (recovered 2026-08-20
 after `tasks/todo.md` was overwritten; the head of the original, including the A-section noise
@@ -192,6 +211,17 @@ measurement, is lost).
 ---
 
 ## Test Lab tooling
+
+- [ ] **A running experiment cannot be cancelled.** No abort route (only `/experiments/:id/redo`)
+      and no abort signal in the run loop, so firing an N-target set commits the whole spend the
+      moment it starts — found while running exp 815 (2026-08-23), where the change was clearly
+      losing by result 4 of 14 and there was no way to stop the remaining 9
+      → `server/routes/admin/testlab.js:877`
+- [ ] **A blocked image discards the text arms too.** `scene_expansion_ab` renders inside the
+      stage, so an `IMAGE_OTHER` refusal throws before `newSceneDescriptionA/B` are stored and the
+      page loses the brief comparison as well as the image (1 of 5 in exp 815). The text-only
+      `scene_expansion` stage should gate the render for prompt-shape questions
+      → `server/lib/testlab.js` (`runSceneExpansionAbStage`)
 
 - [x] D1 — zombie experiment rows blocking pushes — **fixed 2026-08-19** (30s `heartbeat_at`,
       5-minute freshness on the reaper and the busy probe; `docs/decisions.md:13844`)
