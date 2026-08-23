@@ -15931,3 +15931,20 @@ round-trip, 5/5 pre-check cases including fused-entry and legacy-row no-flag, th
 rendered findings block) but has NOT run on a live story. Rows written before this
 change carry no `contact` and never flag. Do not promote to master until a beats
 run shows the reviewer acting on the finding.
+
+### Story gate: admin relaunch endpoints refuse customer-owned sources (2026-08-23)
+**Context:** Every existing gate protects code pushes (busy, open-bugs,
+settled). The admin relaunch endpoints (retry / rerun-text / rerun-full) had
+no equivalent: requireAdmin checks who calls, but the run executes ON the
+source story's account, and "the source is a test account" was an unstated
+assumption. It broke: a rerun of a customer's story ran to 81% on her account
+before a container restart stopped the completion email.
+**Decision:** assertSourceIsTestAccount in server/routes/admin/jobs.js: all
+three launchers 403 when the source account's role is not 'admin', naming the
+owner's email, unless the body passes allowCustomerAccount: true (deliberate
+support action, e.g. retrying a customer's own failed story).
+**Rationale:** The check belongs at the chokepoint that spends money and
+touches accounts, not in an agent's memory. The override keeps legitimate
+support flows possible but makes targeting a customer an explicit act.
+**Touched:** `server/routes/admin/jobs.js`.
+**Status:** ✅ active

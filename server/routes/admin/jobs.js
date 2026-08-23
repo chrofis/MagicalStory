@@ -73,6 +73,31 @@ router.get('/failed', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// STORY GATE: admin relaunches (retry / rerun-text / rerun-full) execute ON
+// the source story's account — its owner sees the job and the story in their
+// library. requireAdmin checks who CALLS; nothing checked whose account the
+// run lands on until a rerun of a customer's story ran to 81% on her account
+// (2026-08-23). Refuse customer-owned sources unless the caller passes
+// allowCustomerAccount: true (deliberate support action, e.g. retrying a
+// customer's own failed story for them).
+async function assertSourceIsTestAccount(pool, userId, req, res) {
+  const r = await pool.query('SELECT email, role FROM users WHERE id = $1', [userId]);
+  const owner = r.rows[0];
+  if (!owner) {
+    res.status(404).json({ error: 'Source account not found' });
+    return null;
+  }
+  if (owner.role !== 'admin' && req.body?.allowCustomerAccount !== true) {
+    res.status(403).json({
+      error: 'Source story belongs to a customer account',
+      details: `This run would execute on ${owner.email}'s account (their library, their characters). ` +
+        'Pass allowCustomerAccount: true in the body only if that is deliberate.',
+    });
+    return null;
+  }
+  return owner;
+}
+
 // POST /api/admin/jobs/:jobId/retry - Create a new job from failed job's input data
 router.post('/:jobId/retry', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -105,6 +130,8 @@ router.post('/:jobId/retry', authenticateToken, requireAdmin, async (req, res) =
 
     const inputData = originalJob.input_data;
     const userId = originalJob.user_id;
+
+    if (!(await assertSourceIsTestAccount(pool, userId, req, res))) return;
 
     // Create new job ID
     const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -237,6 +264,8 @@ router.post('/:jobId/rerun-text', authenticateToken, requireAdmin, async (req, r
 
     const userId = sourceJob.user_id; // reuse original user (matches /retry)
 
+    if (!(await assertSourceIsTestAccount(pool, userId, req, res))) return;
+
     const runs = Math.min(5, Math.max(1, parseInt(req.body?.runs, 10) || 1));
 
     const created = [];
@@ -309,6 +338,8 @@ router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, r
       };
       log.info(`[ADMIN] Full rerun: job row for ${jobId} is gone — commission rebuilt from the story record`);
     }
+
+    if (!(await assertSourceIsTestAccount(pool, sourceJob.user_id, req, res))) return;
 
     const overrides = (req.body && typeof req.body.inputOverrides === 'object' && req.body.inputOverrides)
       ? req.body.inputOverrides : {};
