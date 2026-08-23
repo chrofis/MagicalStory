@@ -3937,11 +3937,15 @@ function buildStoryShapeSection(inputData, pageCount) {
   // Whatever is left pays for the secondary characters' moments, at ~2 pages each.
   const moments = Math.max(0, Math.floor(spare / 2));
 
+  // Two strands need either a long book or a big cast in a mid-length one
+  // (owner 2026-08-23): five figures kept in one place put five in every
+  // picture, and a split is what licenses pages of one or two characters.
+  const twoStrands = pages > 20 || (pages >= 14 && chars.length >= 5);
   const threads = pages <= 10
     ? 'One storyline. No subplot, no second party doing something else.'
-    : pages <= 20
-      ? 'One main storyline plus ONE secondary strand that meets it before the end.'
-      : 'Two strands that run apart and meet: the cast is not in one place for the whole book.';
+    : twoStrands
+      ? 'Two strands that run apart and meet: the cast is not in one place for the whole book. Split the cast into two groups ONCE, let each strand carry its own pages, and bring them together before the end — never split more than once.'
+      : 'One main storyline plus ONE secondary strand that meets it before the end.';
 
   const challenges = `exactly ${majors}`;
 
@@ -3982,7 +3986,14 @@ function buildStoryShapeSection(inputData, pageCount) {
         ? `Everyone else — ${others.map(c => c.name).join(', ')} — shares the ${moments} secondary moment${moments === 1 ? '' : 's'} the budget allows: at most one each, doing what only they would do. Not a challenge of their own, not an arc.`
         : `Everyone else — ${others.map(c => c.name).join(', ')} — appears inside the focus character's challenges; the budget has no room for separate moments.`)
       : '',
-    'Entrances: say who is there at the start, and who joins later and why then. They do not all arrive at once.',
+    // Trait-showing entrance pictures are a strong recommendation, not a rule,
+    // and only when the book has room: a joiner's intro can share their moment
+    // or a challenge page, but seven figures in a ten-page book leave no room
+    // at all (owner 2026-08-23).
+    'Entrances: say who is there at the start, and who joins later and why then. They do not all arrive at once.' +
+      (pages > 10 && others.length > 0 && others.length <= Math.floor(pages / 3)
+        ? ' Where the pages allow, give each later joiner an entrance picture of their own — a page of at most two characters where their trait shows; fold it into their moment or a challenge page rather than adding pages.'
+        : ''),
     difficulty,
   ].filter(Boolean).join('\n');
 }

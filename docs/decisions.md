@@ -15624,3 +15624,23 @@ worker that dies at avatar end can never starve DINO.
 **Touched files.** photo_analyzer.py, server/lib/analyzerClient.js, server.js,
 storyJobPipeline.js, server/routes/avatars.js, server/routes/admin/testlab.js,
 tasks/analyzer-workers-2026-08-23.md.
+
+### Two strands are cast-aware; later joiners get trait-showing entrance pictures when the budget allows (2026-08-23)
+**Context:** A 16-page, 5-character story kept the whole crew in one place for
+the entire book: the length-only thread rule (two strands only above 20 pages)
+never told it to split, so most illustrations carried 4-5 figures — the
+hardest pictures to render. Meanwhile the arc had spontaneously given one
+character a solo trait-showing entrance page, which read well.
+**Decision:** `buildStoryShapeSection`: two strands when pages > 20 OR
+(pages >= 14 AND cast >= 5), with an explicit split-once-and-rejoin rule —
+never more than one split. The entrances line adds a strong recommendation
+(not a rule): each later joiner gets an entrance picture of at most two
+characters where their trait shows, folded into their moment or a challenge
+page — emitted only when pages > 10 and the joiner count fits (others <=
+pages/3), so seven figures in a ten-page book get no such demand.
+**Rationale:** A split is what licenses pages of one or two characters; big
+casts in mid-length books need it most. The entrance recommendation is
+budget-gated in code because the model cannot be trusted to do the
+arithmetic.
+**Touched:** `server/lib/promptBuilders.js` (buildStoryShapeSection).
+**Status:** ✅ active
