@@ -578,3 +578,20 @@ image phase. Rules going forward:
    from the user does not imply the full pipeline.
 3. The adminRerun flag now suppresses the email, but the story still lands in
    the source account's library — repoint stories.user_id after completion.
+
+## Never re-login per poll — cache the admin token (2026-08-23)
+
+**What happened:** every status poll and every helper script ran
+`scripts/admin/get-admin-token.js`, which logged in fresh each time. Dozens of
+logins across one session tripped the login rate limiter — `429 Too many login
+attempts, try again in 15 minutes` — and the lockout landed mid-experiment,
+blocking the next Lab run for a quarter of an hour.
+
+**Rule:** capture the token ONCE per shell and reuse it (`TOK=$(node
+scripts/admin/get-admin-token.js)` at the top of a loop, never inside it). The
+helper now caches to the OS temp dir until shortly before expiry, so repeated
+calls are free; `--no-cache` forces a fresh login.
+
+**The wider pattern:** a monitor that re-authenticates every tick is
+self-throttling. Anything a poll loop does per iteration — logging in, opening a
+DB pool, spawning node — should be hoisted out of the loop or cached.
