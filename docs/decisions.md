@@ -16056,8 +16056,27 @@ activity is a fault even when the actions share a cause") both already name this
 shape and neither changed a page. The brief-level count is the mechanical backstop;
 making the beats rule binding stays open in `tasks/BACKLOG.md`.
 
+**The beats rule was already there and half of it was wrong.** `story-beats.txt:34`
+read *"one primary action, at most one character touching one object"*. The first
+clause is contradicted by the measurement — four characters sharing one action
+averaged 73 with no failures — and it would forbid the case that works (a whole
+crew pushing one boat). It now reads: one action per page, any number of
+characters may perform it together, two characters doing different things is two
+actions. `story-beats-review.txt:45` carried the same error, listing "synchronized
+hands of two characters on one object" as inherently hard when what fails is two
+characters doing *different* things at one object; corrected to match.
+
+**Known limitation of the brief-level check.** The measurement counted distinct
+`where` sentences; the check counts distinct `action` labels. They are not the
+same, and the check is only as honest as the labels — a page emitting two rows
+that genuinely differ ("presses at the bow", "presses at the stern side", the
+shape that scored 0) passes if the writer tags both with one label. This is why
+the beats rule matters more than the backstop: the backstop cannot see a lie.
+
 **Touched:**
 - `prompts/scene-expansion-all.txt` (live for beats), `prompts/scene-expansion.txt`
+- `prompts/story-beats.txt` — the rule, with the wrong clause removed
+- `prompts/story-beats-review.txt` — the Illustratable check's matching error
 - `server/lib/sceneMetadata.js` — `sanitizeInteractions` passes `action` through,
   lower-cased and length-capped; it rebuilds rows from named keys and would
   otherwise drop it

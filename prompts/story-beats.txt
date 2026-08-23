@@ -31,7 +31,7 @@ BEAT is what happens on that page: the event, and what changes because of it. On
 
 SCENE is what the illustration shows: who is present, where they are, what they are doing. One or two sentences.
 - A single moment that can be drawn — no montages, no before-and-after, no passage of time inside one picture.
-- A SIMPLE moment: one primary action, at most one character touching one object. When several characters are present they share that one moment — the others watch or react to the same action; never parallel unrelated activities.
+- A SIMPLE moment: ONE action per page. Any number of characters may perform that one action together; everyone else watches or reacts to it. Two characters doing different things — one pushing while another ties a rope — is two actions and belongs on two pages.
 - Characters with the same goal do the same thing in the same place: a group searching stands together scanning, never split across separate spots with separate mini-actions.
 - The action at the moment it happens, never the state that follows it. Name the one condition that causes the action when the beat depends on it, and nothing else about the setting.
 - Never compose the frame — what fills it, how large something looks, where it sits; a shot type is enough.
