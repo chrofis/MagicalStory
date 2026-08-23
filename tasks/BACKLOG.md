@@ -42,25 +42,24 @@ Last full sweep: **2026-08-20**.
 
 The first two are corroborated by more than one source, which is why they lead.
 
-- [ ] **Interaction load tanks pages — hands-on-object × distinct pose lines (measured
-      2026-08-23, 2 prod stories, 34 pages).** `action_interaction` is 36 of 68 semantic
-      findings. HANDS_ON rows fail 88% (14/16); with a second distinct pose instruction the
-      page average drops to 18. Cast size is not the driver. Three rules in
-      `scene-expansion.txt` that would prevent it are already violated (no body-part
-      positioning; shared object → one entry), and line 158 ("a vehicle under way MUST have
-      one character operating it") manufactures the failure — the tiller row failed 4/4.
-      Fix location (beats vs Art Director) not yet decided → `docs/interaction-load-2026-08-23.md`
-- [ ] **Beats-review "Illustratable" check is diagnostically right and behaviourally inert —
-      and it owns HALF the hands-on failures.** Attribution over both stories (2026-08-23):
-      roughly half the hands-on rows come from beats that demand the contact in their own words
-      (Fiona p8 "Facundo hauls the oar and poles; … she pushes with them"; Drache p16 "He pushes
-      the little dragon … Julian holds the dragon's side"; Drache p12's beat literally says "flat
-      palm"), the other half the Art Director invented (all four tiller rows — no beat asks
-      anyone to steer). `story-beats-review.txt:45` already names this shape and flagged both
-      worst pages; nothing was rewritten. The Art-Director half is addressed by the `contact`
-      cap (44ff49325); this upstream half is not, and the cap fires against these pages even
-      though their briefs faithfully serve the beat (accepted, owner 2026-08-23)
+- [x] **Interaction load — FIXED 2026-08-23 (c191eef6d).** Pages declaring two distinct
+      actions failed 7/7 (mean semantic 17); four characters sharing ONE action averaged 73.
+      Cast size is not the driver. Shipped: an `action` label required on every interaction row
+      (`watching`/`standing` reserved), a mechanical count in sceneBriefCheck, and the finding
+      fed to the scene reviewer. exp 825: 3 flagged, 3 rewritten, 3 returned with one action
       → `docs/interaction-load-2026-08-23.md`, `docs/decisions.md`
+- [ ] **"No body-part positioning" is still ignored — it has no mechanical check.** Three
+      confirmations 2026-08-23 (exp 815 p7 "grips the tiller with both hands", exp 818 p12
+      "presses left hand flat against the carving", exp 825 p11 "grips the spokes with both
+      hands locked"). The action rule was fixed by counting a declared field and telling the
+      reviewer; this rule has only prose behind it, and prose alone moved neither writer in
+      four experiments. Same treatment would apply: a declared field, a count, a finding
+      → `docs/decisions.md` (2026-08-23 exp 825 entry)
+- [ ] **Beats still write two-action pages — the prompt rule did not fix it (exp 821).** 4 of 16
+      pages carried two actions vs 5 of 16 originally; two named both outright ("Saira takes the
+      wheel … Fiona lets go and steps back"). Not blocking — the brief-level check catches them
+      downstream and the reviewer rewrites — but the defect is still born in the beat
+      → `docs/decisions.md` (2026-08-23 one-action entries)
 
 - [ ] **Avatar "pick best of N" via a vision model — NEEDS LAB PROOF FIRST (owner, 2026-08-22).**
       Today a failed avatar is regenerated and the retry replaces the original. The proposal:
