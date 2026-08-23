@@ -5887,9 +5887,15 @@ async function processStoryJob(jobId) {
     log.warn(`[processStoryJob] Could not pre-load input_data for scope decision: ${e.message} — falling back to jobId scope`);
   }
   return runInCacheScope(scopeId, async () => {
+    // Analyzer session brackets the WHOLE job — the analyzer kills its model
+    // workers when the count hits zero, which is its only memory management.
+    // Begin/end are fire-and-forget; this finally runs on completion, failure
+    // and cancellation alike, so a story can never leak a session.
+    require('./server/lib/analyzerClient').sessionBegin(`story:${jobId}`);
     try {
       return await _processStoryJobImpl(jobId);
     } finally {
+      require('./server/lib/analyzerClient').sessionEnd(`story:${jobId}`);
       // Free the per-scope avatar log buckets. The buckets were captured into
       // saved story data already; the dev panel reads from the DB, not from
       // these in-memory buckets. Both clears are scope-aware (only touch this

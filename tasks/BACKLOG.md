@@ -32,6 +32,12 @@ Last full sweep: **2026-08-20**.
 
 ---
 
+## In flight
+
+- [ ] Analyzer worker architecture — session-scoped worker processes, recyclers deleted;
+      staging verification pending (photo upload, 4-page smoke, Lab experiment, RSS ~53MB idle)
+      → `tasks/analyzer-workers-2026-08-23.md`
+
 ## Image quality — unresolved render defects
 
 The first two are corroborated by more than one source, which is why they lead.

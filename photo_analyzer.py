@@ -89,40 +89,45 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 # pipelines. Anything larger is downscaled proportionally.
 MAX_IMAGE_DIM = 2048
 
-# ── Self-recycle ────────────────────────────────────────────────────────────
-# Heavy inference leaves ~1GB of memory that CANNOT be reclaimed in-process.
-# Measured on staging with every model already unloaded: a forced
-# malloc_trim(0) moved RSS from 1192.2MB to 1192.9MB — i.e. nothing. It is
-# fragmentation plus torch's own pools; glibc can only hand back a page when the
-# whole page is free, and after thousands of interleaved tensor allocations most
-# pages hold something live. Unloading models returns their weights (measured:
-# 1037MB for rembg, 740MB for GroundingDINO) but cannot defragment the rest.
-#
-# Ending the process returns 100% of it, and start.sh supervises us back up.
-# Nothing else does, which is why this exists.
-#
-# Strictly idle-gated so it can never interrupt work: zero requests in flight
-# AND nothing for RECYCLE_IDLE_S. Idle alone is not enough: a story's first
-# 7-12 minutes are text-only (writer, outline review, scene expansion) and touch
-# nothing here, so the gate would open right after /warmup and throw away the
-# models it had just loaded. /warmup therefore also holds the recycler off for
-# RECYCLE_WARM_HOLD_S. The hold expires on its own, so recycling between stories
-# still happens — that boundary is where the memory should be reclaimed.
+# ── Request accounting ──────────────────────────────────────────────────────
+# In-flight counting is what makes the worker reap safe: workers are only ever
+# killed when the session count is zero AND nothing is mid-request. The
+# RSS-threshold self-recycler and its warm-hold that lived here were deleted
+# 2026-08-23 — heavy models run in worker processes now, whose exit returns
+# everything (fragmentation and torch pools included, which malloc_trim
+# measurably could not: 1192.2MB -> 1192.9MB on staging).
 _request_lock = threading.Lock()
 _inflight_requests = 0
 _last_request_ts = time.time()
-_recycle_hold_until = 0.0
-# Below this there is nothing worth a restart — a fresh process is ~137MB.
-RECYCLE_RSS_MB = int(os.environ.get('RECYCLE_RSS_MB', '700'))
-RECYCLE_IDLE_S = int(os.environ.get('RECYCLE_IDLE_S', '180'))
-# Must cover a WHOLE story generation, not just the text prologue: /warmup fires
-# at story-start, but the models aren't needed until the repair phase 20-30 min
-# later, and this hold now also keeps the idle model-reaper from unloading them
-# (see _idle_model_reaper). 40 min covers a long multi-figure story from a single
-# story-start warm; the repair-phase warm refreshes it for anything longer. It
-# lapses on its own between stories, so idle reclaim still happens.
-RECYCLE_WARM_HOLD_S = int(os.environ.get('RECYCLE_WARM_HOLD_S', '2400'))
-RECYCLE_ENABLED = os.environ.get('RECYCLE_ENABLED', 'true').lower() == 'true'
+
+# ── Process role ─────────────────────────────────────────────────────────────
+# The analyzer runs as a lean PARENT (port 5000, pure cv2/PIL — ~53MB) that
+# proxies model endpoints to short-lived WORKER processes it spawns on demand:
+#   face    (5001)  mediapipe               ~300MB   /analyze, /extract-face
+#   rembg   (5002)  rembg/U2-Net             ~80MB   /remove-bg, /silhouette-edge
+#   torch   (5003)  SAM/pose/lpips/DINO   148MB-2GB  /figure-mask, /pose-heads,
+#                                                    /lpips, /detect-figures-text
+#   arcface (5004)  TF/deepface (+mediapipe) ~790MB  /face-embedding, /compare-identity
+# Workers die when the active-session count hits zero (see the session block),
+# which returns ALL of their memory to the OS. Python cannot un-import a module,
+# so every in-process scheme (RSS thresholds, idle reapers) was guesswork; this
+# replaces all of it with one rule. Owner direction 2026-08-23: "if a story is
+# done everything should be freed again — no arbitrary recycling."
+ANALYZER_ROLE = os.environ.get('ANALYZER_ROLE', 'parent')
+WORKER_PORTS = {'face': 5001, 'rembg': 5002, 'torch': 5003, 'arcface': 5004}
+WORKER_ENDPOINTS = {
+    # /split-grid is here because it calls detect_face_mediapipe: in a
+    # mediapipe-less parent that helper silently degrades to a Haar cascade —
+    # the exact failure mode that produced garbage likeness scores on
+    # 2026-08-22. Anything that MIGHT touch mediapipe runs where mediapipe IS.
+    # /face-embedding-onnx needs Face Mesh for alignment -> face as well.
+    'face': {'/analyze', '/extract-face', '/split-grid', '/face-embedding-onnx'},
+    'rembg': {'/remove-bg', '/silhouette-edge'},
+    'torch': {'/figure-mask', '/pose-heads', '/lpips', '/detect-figures-text'},
+    # /detect-all-faces embeds faces via DeepFace to dedupe them -> needs TF.
+    'arcface': {'/face-embedding', '/compare-identity', '/detect-all-faces'},
+}
+_ROLE_FOR_PATH = {p: role for role, paths in WORKER_ENDPOINTS.items() for p in paths}
 
 # Try to initialize MediaPipe (may fail on newer Python versions)
 mp_face_detection = None
@@ -132,6 +137,12 @@ MEDIAPIPE_TASKS_AVAILABLE = False
 mp_tasks_face_detector = None
 
 try:
+    # The parent must NOT import mediapipe: it is 299MB (measured) and was more
+    # than half of the analyzer's idle footprint, resident even when no face was
+    # ever detected. Only the roles that detect faces pay for it. arcface needs
+    # it too — Face Mesh supplies the 5 landmarks ArcFace aligns on.
+    if ANALYZER_ROLE not in ('face', 'arcface'):
+        raise ImportError('mediapipe deferred to the face/arcface workers')
     import mediapipe as mp
     # Check if legacy solutions API is available
     if hasattr(mp, 'solutions'):
@@ -315,101 +326,223 @@ def _track_request_end(exc=None):
         except Exception:
             # teardown can run without a request context in edge cases
             pass
-
-
-def _recycle_watchdog():
-    """Exit once idle and bloated; start.sh brings the process straight back.
-
-    Deliberately os._exit: we want the OS to reclaim everything, and there is
-    nothing worth flushing — models reload lazily and no state is held here.
-    """
-    while True:
-        time.sleep(30)
+    # Sessionless work (a photo upload that never becomes an avatar job) must
+    # not leave workers squatting: with no session active, workers live only as
+    # long as requests do. Event-driven — this is the whole reason there is no
+    # idle timer anywhere in this file.
+    if ANALYZER_ROLE == 'parent':
         try:
-            if not RECYCLE_ENABLED:
-                continue
-            rss = _rss_mb()
-            if rss is None or rss < RECYCLE_RSS_MB:
-                continue
-            with _request_lock:
-                inflight = _inflight_requests
-                idle_for = time.time() - _last_request_ts
-                held = time.time() < _recycle_hold_until
-            if inflight > 0 or idle_for < RECYCLE_IDLE_S or held:
-                continue
-            # Last chance for the cheap option: if a trim can get us back under
-            # the threshold, take it and skip the restart entirely.
-            _release_memory()
-            rss_after = _rss_mb()
-            if rss_after is not None and rss_after < RECYCLE_RSS_MB:
-                print(f"[RECYCLE] trim was enough ({rss} -> {rss_after} MB) — no restart needed")
-                continue
-            print(
-                f"[RECYCLE] idle {int(idle_for)}s, 0 in flight, rss {rss_after} MB "
-                f"> {RECYCLE_RSS_MB} MB and trim cannot reclaim it — exiting so the "
-                f"OS can. Supervisor will restart (~10s, models reload lazily)."
-            )
-            sys.stdout.flush()
-            os._exit(0)
-        except Exception as e:
-            print(f"[RECYCLE] watchdog error (non-fatal): {e}")
+            _maybe_reap_workers()
+        except Exception:
+            pass
 
 
-threading.Thread(target=_recycle_watchdog, daemon=True).start()
-
-
-# ── ArcFace idle recycler ──────────────────────────────────────────────────
-# TensorFlow cannot be unloaded in-process: measured, `import deepface` alone
-# costs ~346MB and clearing DeepFace's model cache returns only the ~135MB of
-# weights, leaving ~358MB of TF runtime that malloc_trim cannot hand back.
-# Exiting the process is the only way to return it.
+# ═══════════════════════════════════════════════════════════════════════════
+# Worker lifecycle — the ONLY memory-management mechanism in this service.
 #
-# The general recycler above will NOT reliably do that here, because it requires
-# RSS > RECYCLE_RSS_MB (700MB). An ArcFace footprint on a small baseline can sit
-# just under that and never trigger, holding ~$1/week of resident memory for a
-# capability used roughly once a week. So ArcFace gets its own reaper that keys
-# off "was it loaded and has it gone quiet", not off total RSS.
+# This replaced _recycle_watchdog (RSS>700MB threshold), _idle_model_reaper
+# (per-model idle timers) and _arcface_idle_recycler (2026-08-23). All three
+# were guesses about when memory was safe to reclaim, and each had a measured
+# failure: the RSS threshold never fired at 551MB resident, the ArcFace reaper
+# required a service-wide idle that never occurs during Lab runs, and none of
+# them could return TensorFlow's allocator arenas at all. Killing a process
+# returns 100%, deterministically. Owner direction: no arbitrary thresholds.
 #
-# Same safety conditions as the general recycler: nothing in flight, no warm
-# hold. start.sh brings the process straight back and every model reloads lazily.
-_arcface_last_used = 0.0
-ARCFACE_IDLE_RECYCLE_S = int(os.environ.get('ARCFACE_IDLE_RECYCLE_S', '600'))
+# Rules:
+#   - Node brackets real work with /session/begin and /session/end (refcounted;
+#     two concurrent stories never kill each other's workers).
+#   - When the count hits zero and nothing is in flight, ALL workers are killed.
+#   - A request OUTSIDE any session (e.g. a photo upload that never becomes an
+#     avatar job) spawns workers per-request: the zero-session check also runs
+#     on request completion, so they die seconds later instead of squatting.
+#   - /session/reset (Node calls it at boot) zeroes the count and kills workers,
+#     so a crashed-and-restarted Node can never leak sessions. In the container
+#     this is redundant (start.sh exits with Node, killing everything) but local
+#     dev restarts Node independently.
+#   - Workers watch the parent PID and exit if it dies, so a crashed parent
+#     cannot orphan a 2GB torch worker onto its port.
+# ═══════════════════════════════════════════════════════════════════════════
+import json
+import subprocess
+import urllib.request as _urlreq
+import urllib.error as _urlerr
 
+_workers_lock = threading.Lock()
+_workers = {}            # role -> subprocess.Popen
+_active_sessions = 0
 
 def _note_arcface_used():
-    global _arcface_last_used
-    _arcface_last_used = time.time()
+    """Stub kept for the embed paths; lifecycle is session-driven now."""
+    return None
 
 
-def _arcface_idle_recycler():
+def _worker_alive(role):
+    proc = _workers.get(role)
+    return proc is not None and proc.poll() is None
+
+
+def _worker_health_ok(role, timeout=2):
+    try:
+        with _urlreq.urlopen(f"http://127.0.0.1:{WORKER_PORTS[role]}/health", timeout=timeout) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def ensure_worker(role, wait_ready=True):
+    """Spawn (or adopt) the worker for `role`; return its base URL.
+
+    Adoption: if something already answers /health on the role's port — an
+    orphan from a previous parent that hasn't noticed the PID change yet — use
+    it rather than colliding with the port.
+    """
+    with _workers_lock:
+        if _worker_alive(role):
+            return f"http://127.0.0.1:{WORKER_PORTS[role]}"
+        if _worker_health_ok(role):
+            print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
+            return f"http://127.0.0.1:{WORKER_PORTS[role]}"
+        env = dict(os.environ)
+        env['ANALYZER_ROLE'] = role
+        env['PHOTO_ANALYZER_PORT'] = str(WORKER_PORTS[role])
+        env['ANALYZER_PARENT_PID'] = str(os.getpid())
+        print(f"[WORKERS] spawning {role} worker on :{WORKER_PORTS[role]}")
+        _workers[role] = subprocess.Popen(
+            [sys.executable, '-u', os.path.abspath(__file__)], env=env)
+    if wait_ready:
+        # Model imports gate readiness (mediapipe ~5s, TF ~15s). Poll rather
+        # than sleep so the fast workers don't pay the slow ones' budget.
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            if _worker_health_ok(role):
+                break
+            if not _worker_alive(role):
+                raise RuntimeError(f"{role} worker exited during startup")
+            time.sleep(0.5)
+        else:
+            raise RuntimeError(f"{role} worker not ready within 120s")
+    return f"http://127.0.0.1:{WORKER_PORTS[role]}"
+
+
+def kill_workers(reason):
+    """Terminate every worker. Deterministic, total reclaim — that's the point."""
+    with _workers_lock:
+        for role, proc in list(_workers.items()):
+            if proc.poll() is None:
+                print(f"[WORKERS] killing {role} worker ({reason})")
+                try:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                except Exception as e:
+                    print(f"[WORKERS] kill {role} failed: {e}")
+            _workers.pop(role, None)
+
+
+def _maybe_reap_workers():
+    """Kill workers when no session is active and nothing is in flight.
+
+    Called from session/end AND from request teardown — the latter is what
+    reaps sessionless work (photo uploads) seconds after it finishes.
+    """
+    with _request_lock:
+        # Only ever called from request TEARDOWN, after the decrement — so the
+        # finishing request is no longer counted and >0 means someone else is
+        # genuinely mid-request.
+        busy = _inflight_requests > 0
+        sessions = _active_sessions
+    if sessions == 0 and not busy and _workers:
+        kill_workers('sessions=0, idle')
+
+
+@app.route('/session/begin', methods=['POST'])
+def session_begin():
+    global _active_sessions
+    with _request_lock:
+        _active_sessions += 1
+        n = _active_sessions
+    print(f"[SESSION] begin -> {n} active")
+    return jsonify({"success": True, "active": n})
+
+
+@app.route('/session/end', methods=['POST'])
+def session_end():
+    global _active_sessions
+    with _request_lock:
+        _active_sessions = max(0, _active_sessions - 1)
+        n = _active_sessions
+    print(f"[SESSION] end -> {n} active")
+    # No reap here: the teardown hook fires _maybe_reap_workers the moment THIS
+    # request finishes, with the counter already decremented. One trigger path,
+    # no race between a route-spawned thread and the teardown accounting.
+    return jsonify({"success": True, "active": n})
+
+
+@app.route('/session/reset', methods=['POST'])
+def session_reset():
+    """Node calls this at boot: a restarted Node cannot know how many sessions
+    its predecessor left open, so the only correct count is zero."""
+    global _active_sessions
+    with _request_lock:
+        _active_sessions = 0
+    kill_workers('session reset (Node boot)')
+    return jsonify({"success": True, "active": 0})
+
+
+@app.before_request
+def _proxy_to_worker():
+    """Parent-only: forward model endpoints to their worker, spawning it first.
+
+    Bodies pass through verbatim — every endpoint keeps its exact contract, so
+    no Node caller changes. Returning a response here short-circuits the local
+    route, which is how the parent serves 22 paths while importing none of the
+    model libraries.
+    """
+    if ANALYZER_ROLE != 'parent':
+        return None
+    role = _ROLE_FOR_PATH.get(request.path)
+    if role is None:
+        return None
+    try:
+        base = ensure_worker(role)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"{role} worker unavailable: {e}"}), 503
+    try:
+        url = f"{base}{request.path}" + (f"?{request.query_string.decode()}" if request.query_string else "")
+        req = _urlreq.Request(
+            url,
+            data=request.get_data(),
+            headers={'Content-Type': request.headers.get('Content-Type', 'application/json')},
+            method=request.method,
+        )
+        with _urlreq.urlopen(req, timeout=600) as r:
+            return app.response_class(r.read(), status=r.status, mimetype='application/json')
+    except _urlerr.HTTPError as e:
+        return app.response_class(e.read(), status=e.code, mimetype='application/json')
+    except Exception as e:
+        return jsonify({"success": False, "error": f"{role} worker call failed: {e}"}), 502
+
+
+def _parent_watchdog():
+    """Worker-only: exit when the spawning parent is gone. Without this, a
+    crashed parent leaves a 2GB orphan squatting on the port, and the NEXT
+    parent adopts a worker whose lifecycle nobody owns."""
+    ppid = int(os.environ.get('ANALYZER_PARENT_PID', '0'))
+    if not ppid:
+        return
+    import psutil
     while True:
-        time.sleep(30)
-        try:
-            if not RECYCLE_ENABLED or not _arcface_last_used:
-                continue
-            idle_arcface = time.time() - _arcface_last_used
-            if idle_arcface < ARCFACE_IDLE_RECYCLE_S:
-                continue
-            with _request_lock:
-                inflight = _inflight_requests
-                idle_for = time.time() - _last_request_ts
-                held = time.time() < _recycle_hold_until
-            # Do not exit mid-story: a warm hold means a user is active and the
-            # next call would pay a DINO/SAM reload we just avoided.
-            if inflight > 0 or held or idle_for < RECYCLE_IDLE_S:
-                continue
-            print(
-                f"[ARCFACE-RECYCLE] ArcFace idle {int(idle_arcface)}s, service idle "
-                f"{int(idle_for)}s, 0 in flight, rss {_rss_mb()} MB — exiting so the OS "
-                f"reclaims TensorFlow. Supervisor restarts (~10s, models reload lazily)."
-            )
+        time.sleep(5)
+        if not psutil.pid_exists(ppid):
+            print(f"[WORKERS] parent {ppid} gone — exiting")
             sys.stdout.flush()
             os._exit(0)
-        except Exception as e:
-            print(f"[ARCFACE-RECYCLE] watchdog error: {e}")
 
 
-threading.Thread(target=_arcface_idle_recycler, daemon=True).start()
+if ANALYZER_ROLE != 'parent':
+    threading.Thread(target=_parent_watchdog, daemon=True).start()
 
 
 def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2):
@@ -1995,56 +2128,11 @@ def get_groundingdino():
     return _gdino_model, _gdino_processor
 
 
-def _idle_model_reaper():
-    """Unload idle models so we stop paying for RAM we aren't using.
-
-    Railway bills resident memory per minute, so a model nobody has touched for
-    fifteen minutes is pure cost. Each unload is followed by _release_memory():
-    gc.collect() alone frees only the Python objects while glibc keeps the
-    arenas, so RSS would never actually drop and the billing would not change —
-    the malloc_trim(0) is what hands the pages back, which is the entire point.
-    Reloading from the local weights cache on the next call is a few seconds.
-    """
-    global _gdino_model, _gdino_processor, _rembg_session, rembg_remove, _mobilesam_model
-    while True:
-        time.sleep(60)
-        now = time.time()
-
-        # While a story is warm-held (set by /warmup, refreshed at the repair
-        # phase), keep EVERY model resident. A story's text+image phase makes no
-        # analyzer calls for 10-20 min, so these idle timers would otherwise
-        # unload the models we just warmed and the repair phase would hit them
-        # cold. Reclaim only once the hold lapses — i.e. no story is running.
-        # Holding ~1.9GB for a few extra minutes is negligible; a cold reload
-        # mid-repair is the thing we are paying to avoid.
-        if now < _recycle_hold_until:
-            continue
-
-        if _mobilesam_model is not None and (now - _mobilesam_last_used) > _MOBILESAM_IDLE_UNLOAD_S:
-            print(f"[FIGURE-MASK] idle {int(now - _mobilesam_last_used)}s — unloading MobileSAM to free RAM")
-            with _mobilesam_lock:  # don't unload out from under an in-flight inference
-                _mobilesam_model = None
-            _release_memory()
-            print(f"[FIGURE-MASK] unloaded — RSS now {_rss_mb()} MB")
-
-        if _gdino_model is not None and (now - _gdino_last_used) > _GDINO_IDLE_UNLOAD_S:
-            print(f"[GDINO] idle {int(now - _gdino_last_used)}s — unloading model to free RAM")
-            _gdino_model = None
-            _gdino_processor = None
-            _release_memory()
-            print(f"[GDINO] unloaded — RSS now {_rss_mb()} MB")
-
-        if _rembg_session is not None and (now - _rembg_last_used) > _REMBG_IDLE_UNLOAD_S:
-            print(f"[REMBG] idle {int(now - _rembg_last_used)}s — unloading U2-Net to free RAM")
-            with _rembg_lock:
-                _rembg_session = None
-                rembg_remove = None
-            _release_memory()
-            print(f"[REMBG] unloaded — RSS now {_rss_mb()} MB")
-
-
-# Daemon reaper — started once; every model it watches is still lazy-loaded.
-threading.Thread(target=_idle_model_reaper, daemon=True).start()
+# The per-model idle reaper that lived here was deleted 2026-08-23 along with
+# the RSS-threshold recycler: models now live in worker PROCESSES whose death at
+# session end returns everything — weights, fragmentation, allocator arenas —
+# with no timers to tune and no warm-hold coupling. See the worker lifecycle
+# block near the top of this file.
 
 
 @app.route('/detect-figures-text', methods=['POST'])
@@ -2176,16 +2264,16 @@ def warmup_endpoint():
     middle of character repair, where it costs ~570MB and several seconds of
     latency inside the repair loop.
 
-    It also holds the recycler off for RECYCLE_WARM_HOLD_S. Idle time alone
-    would not: the caller's next minutes are text-only, so the recycler would
-    exit and drop the models this call just loaded.
 
     Returns immediately; loading happens on a background thread. Poll /health
     for the *_loaded flags. Idempotent — get_*() are no-ops when already loaded.
+
+    Parent role: warmup means "spawn the workers this session will need and let
+    each preload its own models" — the spawn happens now, during the wizard/text
+    phase, so the story's repair phase never pays a cold start. No warm-hold
+    timer: workers live until the session count hits zero, however long that is.
     """
-    global _warmup_thread, _recycle_hold_until
-    with _request_lock:
-        _recycle_hold_until = time.time() + RECYCLE_WARM_HOLD_S
+    global _warmup_thread
     if _warmup_thread is not None and _warmup_thread.is_alive():
         return jsonify({"success": True, "status": "already warming"})
 
@@ -2216,33 +2304,48 @@ def warmup_endpoint():
 
     def _warm():
         t0 = time.time()
-        try:
-            get_rembg_session()
-        except Exception as e:
-            print(f"[WARMUP] rembg failed: {e}")
-        try:
-            get_mobilesam()
-        except Exception as e:
-            print(f"[WARMUP] mobilesam failed: {e}")
-        if want_dino:
+        if ANALYZER_ROLE == 'parent':
+            # Spawn the workers this session will need; forward the SAME warmup
+            # body to each so it preloads its own models. face loads mediapipe
+            # at boot; rembg/torch preload below; arcface only when asked.
+            roles = ['face', 'rembg', 'torch'] + (['arcface'] if want_arcface else [])
+            for role in roles:
+                try:
+                    base = ensure_worker(role)
+                    req = _urlreq.Request(f"{base}/warmup", data=json.dumps(body).encode(),
+                                          headers={'Content-Type': 'application/json'}, method='POST')
+                    _urlreq.urlopen(req, timeout=10).read()
+                except Exception as e:
+                    print(f"[WARMUP] {role} worker warm failed: {e}")
+            print(f"[WARMUP] workers up in {time.time() - t0:.1f}s")
+            return
+        # Worker roles preload only what they own.
+        if ANALYZER_ROLE == 'rembg':
             try:
-                get_groundingdino()
+                get_rembg_session()
             except Exception as e:
-                print(f"[WARMUP] groundingdino failed: {e}")
-        if want_arcface:
-            # Only when the caller says an avatar is coming. TensorFlow costs
-            # several hundred MB that no other endpoint needs, and a page view
-            # or a story run must not pay for it.
+                print(f"[WARMUP] rembg failed: {e}")
+        if ANALYZER_ROLE == 'torch':
+            try:
+                get_mobilesam()
+            except Exception as e:
+                print(f"[WARMUP] mobilesam failed: {e}")
+            if want_dino:
+                try:
+                    get_groundingdino()
+                except Exception as e:
+                    print(f"[WARMUP] groundingdino failed: {e}")
+        if ANALYZER_ROLE == 'arcface':
             try:
                 from deepface import DeepFace
                 DeepFace.build_model('ArcFace')
             except Exception as e:
                 print(f"[WARMUP] arcface failed: {e}")
-        print(f"[WARMUP] done in {time.time() - t0:.1f}s — rss {_rss_mb()} MB")
+        print(f"[WARMUP] {ANALYZER_ROLE} done in {time.time() - t0:.1f}s — rss {_rss_mb()} MB")
 
     _warmup_thread = threading.Thread(target=_warm, daemon=True)
     _warmup_thread.start()
-    return jsonify({"success": True, "status": "warming", "groundingdino": want_dino})
+    return jsonify({"success": True, "status": "warming", "role": ANALYZER_ROLE, "groundingdino": want_dino})
 
 
 @app.route('/release-memory', methods=['POST'])
@@ -2265,7 +2368,13 @@ def release_memory_endpoint():
     global _mobilesam_model, _gdino_model, _gdino_processor, _rembg_session, rembg_remove
     before = _rss_mb()
     unloaded = []
-    if request.args.get('unload') == 'true':
+    # Parent role: the models live in worker processes, so "unload" means
+    # killing them — which, unlike every in-process scheme, returns 100%.
+    if ANALYZER_ROLE == 'parent' and request.args.get('unload') == 'true':
+        if _workers:
+            unloaded = [f"worker:{r}" for r in _workers]
+            kill_workers('release-memory')
+    elif request.args.get('unload') == 'true':
         if _mobilesam_model is not None:
             _mobilesam_model = None
             unloaded.append('mobilesam')
@@ -2287,12 +2396,9 @@ def release_memory_endpoint():
         # ~358MB of TF runtime resident. Python cannot un-import a module and TF
         # keeps its own allocator arenas, so malloc_trim cannot hand that back.
         #
-        # The ONLY way to return the TF runtime is to exit the process:
-        # ?recycle=true here, or the idle recycler. Avatars are created rarely
-        # (roughly weekly), so the caller that creates one should follow it with
-        # POST /release-memory?recycle=true rather than rely on RECYCLE_RSS_MB —
-        # a 510MB ArcFace footprint on a small baseline can sit UNDER the 700MB
-        # recycle threshold and never trigger it, holding TF for days.
+        # The ONLY way to return the TF runtime is to exit the process —
+        # in the worker architecture that happens at session end, when the
+        # arcface worker is killed.
         try:
             import sys as _sys
             if 'deepface' in _sys.modules:
@@ -2404,7 +2510,28 @@ def health_check():
         # the container may actually use (Railway bills per vCPU-minute), which
         # is also what the waitress thread pool is sized from.
         "cpu": _cpu_stats(),
+        "role": ANALYZER_ROLE,
     }
+    if ANALYZER_ROLE == 'parent':
+        body["active_sessions"] = _active_sessions
+        body["workers"] = {
+            role: {"port": WORKER_PORTS[role], "up": _worker_alive(role)}
+            for role in WORKER_PORTS
+        }
+    if request.args.get('probe') == 'sam' and ANALYZER_ROLE == 'parent':
+        # SAM lives in the torch worker; loading it here would put 570MB into
+        # the process that is supposed to stay at 53MB. Forward the probe.
+        try:
+            base = ensure_worker('torch')
+            with _urlreq.urlopen(f"{base}/health?probe=sam", timeout=180) as r:
+                worker_body = json.loads(r.read())
+            body["sam_probe"] = worker_body.get("sam_probe", "no answer")
+            if worker_body.get("status") == "degraded":
+                body["status"] = "degraded"
+        except Exception as e:
+            body["sam_probe"] = f"fail: torch worker: {e}"
+            body["status"] = "degraded"
+        return jsonify(body)
     if request.args.get('probe') == 'sam':
         try:
             model = get_mobilesam()
@@ -4394,8 +4521,9 @@ def _container_cpus():
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
-    print(f"[START] Photo Analyzer API starting on port {port}")
+    _default_port = WORKER_PORTS.get(ANALYZER_ROLE, 5000)
+    port = int(os.environ.get('PHOTO_ANALYZER_PORT', _default_port))
+    print(f"[START] Photo Analyzer API starting on port {port} (role={ANALYZER_ROLE})")
     print(f"   MediaPipe available: {MEDIAPIPE_AVAILABLE}")
     print(f"   Anime cascade available: {ANIME_CASCADE_AVAILABLE}")
     print("   LPIPS: checking on first request")

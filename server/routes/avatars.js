@@ -1503,6 +1503,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
   const job = avatarJobs.get(jobId);
   if (!job) return;
 
+  // Analyzer session brackets the avatar job — its model workers die when the
+  // session count hits zero (the analyzer's only memory management).
+  require('../lib/analyzerClient').sessionBegin(`avatar:${jobId}`);
   try {
     job.status = 'processing';
     job.message = 'Generating avatars...';
@@ -2597,6 +2600,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     } catch (persistErr) {
       log.error(`[AVATAR JOB ${jobId}] Failed to persist failed-status to character:`, persistErr.message);
     }
+  } finally {
+    require('../lib/analyzerClient').sessionEnd(`avatar:${jobId}`);
   }
 }
 

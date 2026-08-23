@@ -468,6 +468,10 @@ const HEARTBEAT_STALE = '5 minutes';
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
   experimentRunning = true;
+  // Analyzer session for the whole experiment — its model workers (SAM/DINO/
+  // rembg/mediapipe) stay up for the run and are killed when the session count
+  // hits zero. Fire-and-forget; the finally below always closes it.
+  require('../../lib/analyzerClient').sessionBegin(`testlab:${experimentId}`);
   // Beat immediately, then on a timer — a run that dies inside its FIRST stage
   // call (the exp747 case: 1 target, 0 results, dead for an hour) must still
   // have a heartbeat to go stale, or it looks like a row that never started.
@@ -549,6 +553,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
   } finally {
     clearInterval(heartbeat);
     experimentRunning = false;
+    require('../../lib/analyzerClient').sessionEnd(`testlab:${experimentId}`);
   }
 }
 

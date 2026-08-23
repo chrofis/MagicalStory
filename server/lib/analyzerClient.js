@@ -90,4 +90,41 @@ function ensureWarm(reason = 'user-active', { force = false } = {}) {
     .catch((err) => log.debug(`[ANALYZER] warmup skipped: ${err.message}`));
 }
 
-module.exports = { analyzerFetch, ensureWarm };
+// ── Session lifecycle ───────────────────────────────────────────────────────
+// The analyzer's heavy models live in worker processes that are killed when the
+// active-session count reaches zero — that is its ONLY memory management (the
+// RSS-threshold recycler and idle reapers were deleted 2026-08-23; owner:
+// "if a story is done everything should be freed again, no arbitrary
+// recycling"). Node brackets real work with these calls:
+//
+//   sessionBegin()  at story start / avatar-job start / Lab experiment start
+//   sessionEnd()    in the matching finally — completion AND failure paths
+//   sessionReset()  once at server boot: a restarted Node cannot know how many
+//                   sessions its predecessor left open, so the only correct
+//                   count is zero (kills any leftover workers with it)
+//
+// All fire-and-forget: a session miss never blocks or fails user work. The
+// cost of a missed END is bounded — workers linger until the next session
+// closes or the next sessionless request completes, not forever.
+
+function _sessionCall(path, reason) {
+  return analyzerFetch(path, {
+    method: 'POST',
+    signal: AbortSignal.timeout(5000),
+  }, { retries: 1, retryDelayMs: 2000 })
+    .then((r) => r.json().catch(() => null))
+    .then((j) => {
+      log.debug(`[ANALYZER] ${path} (${reason}) -> active=${j?.active ?? '?'}`);
+      return j;
+    })
+    .catch((err) => {
+      log.debug(`[ANALYZER] ${path} (${reason}) skipped: ${err.message}`);
+      return null;
+    });
+}
+
+const sessionBegin = (reason = 'work') => _sessionCall('/session/begin', reason);
+const sessionEnd = (reason = 'work') => _sessionCall('/session/end', reason);
+const sessionReset = () => _sessionCall('/session/reset', 'node-boot');
+
+module.exports = { analyzerFetch, ensureWarm, sessionBegin, sessionEnd, sessionReset };

@@ -15573,3 +15573,54 @@ filled, a rule stated in prose gets skimmed.
 **Status:** ✅ active — supersedes the merge described in the 2026-08-22
 "who-is-who" entry, whose reconciliation was starved because the eval side had
 no names or boxes to reconcile.
+
+
+## 2026-08-23 — Analyzer memory: worker processes killed at session end, all recyclers deleted
+
+**Context.** The analyzer idled at 551MB (mediapipe 299MB of it imported
+unconditionally at boot), and every reclaim mechanism was a guess: the RSS
+recycler needed >700MB and never fired at 551MB; the ArcFace reaper needed a
+service-wide idle that never occurs during Lab runs; the per-model idle timers
+were coupled to a warm-hold that had to cover whole stories. Two incidents in
+one week came from this pot. Owner: "processes that finish when they are done
+and free up everything … no arbitrary 300/500/700MB recycling that might fire
+or not."
+
+**Decision.** photo_analyzer.py runs as a lean parent (port 5000, cv2/PIL only,
+~53MB measured) plus role workers it spawns on demand and proxies to verbatim:
+face=mediapipe:5001, rembg:5002, torch(SAM/pose/lpips/DINO):5003,
+arcface(TF+mediapipe):5004. Lifecycle is ONE rule: Node brackets real work with
+/session/begin//session/end (refcounted — concurrent stories never kill each
+other's workers; wired at story start/finally, avatar job start/finally, Lab
+experiment start/finally); when the count is zero and nothing is in flight, all
+workers are killed. Two deliberate hole-closers: (1) sessionless requests (a
+photo upload that never becomes an avatar job) reap workers on request
+TEARDOWN, so nothing squats; (2) Node calls /session/reset at boot, so a
+crashed-and-restarted Node cannot leak sessions; workers also watch the parent
+PID and exit if it dies. Deleted outright: _recycle_watchdog, RECYCLE_RSS_MB/
+IDLE_S/WARM_HOLD_S, _idle_model_reaper and all *_IDLE_UNLOAD_S, the ArcFace
+reaper. /warmup now means "spawn this session's workers and let each preload";
+/release-memory on the parent kills workers.
+
+**Routing subtleties that were nearly wrong.** /split-grid calls
+detect_face_mediapipe, whose fallback in a mediapipe-less process is a SILENT
+Haar cascade — the exact degradation behind the 2026-08-22 likeness fiasco — so
+it routes to the face worker. /face-embedding-onnx needs Face Mesh → face.
+/detect-all-faces embeds via DeepFace → arcface. /health?probe=sam on the
+parent forwards to the torch worker instead of loading 570MB locally.
+
+**Verified locally.** Parent boots with mediapipe_available=false;
+begin→/remove-bg spawned the rembg worker and returned a real U2-Net cutout;
+health showed the worker up mid-session and all four dead 3s after end; a
+sessionless /analyze had its worker die seconds after the response;
+/session/reset kills everything.
+
+**Rationale.** Process exit is the only reclaim that returns weights,
+fragmentation and allocator arenas alike, deterministically. Idle cost drops
+551→~53MB per environment (~$10/month across staging+prod); a story's peak is
+unchanged. This also makes the ArcFace gate safely re-enableable later: TF in a
+worker that dies at avatar end can never starve DINO.
+
+**Touched files.** photo_analyzer.py, server/lib/analyzerClient.js, server.js,
+storyJobPipeline.js, server/routes/avatars.js, server/routes/admin/testlab.js,
+tasks/analyzer-workers-2026-08-23.md.

@@ -2508,6 +2508,13 @@ initialize().then(() => {
     log.info(`📍 URL: http://localhost:${PORT}`);
   });
 
+  // Zero the analyzer's session count. A restarted Node cannot know how many
+  // sessions its predecessor left open (crash mid-story = /session/end never
+  // sent), and a wrong count would keep model workers resident forever. In the
+  // container this is belt-and-suspenders — start.sh dies with Node — but local
+  // dev restarts Node against a long-lived analyzer. Fire-and-forget.
+  require('./server/lib/analyzerClient').sessionReset();
+
   // Staging-only: stop the container once it's provably idle so we stop paying
   // for ~1.2 GB of resident RAM per minute between test runs. Triple-gated and
   // a no-op in production — see server/lib/idleShutdown.js.
