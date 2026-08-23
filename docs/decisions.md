@@ -16113,3 +16113,36 @@ had to be fixed before any prompt with more fields ships.
 **Touched:** `server/lib/evalPipeline.js` (`runVisualInventory` generationConfig)
 
 **Status:** ✅ active
+
+## 2026-08-23 — One invalid number literal cost a whole model response
+
+**Context:** Chasing a zero-figure inventory in Lab #820 (10 normal pages,
+3–6 figures) I assumed the truncation cause found the run before. It was not.
+The response was **complete** — it ended cleanly with its closing brace and
+fence — but contained `"face_bbox": [0.35, 00.34, 0.45, 0.43]`. JSON forbids a
+leading zero, so `extractJsonFromText` returned null and four correctly
+described figures were thrown away. Downstream, a page with no figures is
+indistinguishable from a picture with nobody in it.
+
+**Decision:** `extractJsonFromText` repairs leading-zero number literals
+(`00.34` → `0.34`, `007` → `7`) and retries, as a LAST resort after every
+existing parse path has failed. The rewriter is string-aware, so `"room 007"`
+survives; `10`, `100` and `1.05` are untouched because zeros inside a number are
+valid.
+
+**Rationale:** it sits beside the doubled-brace repair already in that function —
+same class of model quirk, same fix shape. Running it only after a clean parse
+has failed means a valid document is never rewritten. The alternative, a bare
+regex over the whole text, would corrupt string content, which is why the
+scanner tracks string state and escapes.
+
+**Also corrected here:** the earlier entry blamed thinking budget for a
+truncated inventory. That diagnosis holds for the 12-figure page in #817, which
+genuinely ended mid-figure at `"id": 5`. It does NOT explain #820's failure, and
+the two must not be conflated — capping thinking did not and could not fix an
+invalid number literal.
+
+**Touched:** `server/lib/sceneMetadata.js` (`repairLeadingZeroNumbers`,
+`extractJsonFromText`), `tests/manual/jsonLeadingZeroRepair.test.js` (11 assertions)
+
+**Status:** ✅ active

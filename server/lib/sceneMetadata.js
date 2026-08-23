@@ -11,6 +11,36 @@ const { OutlineParser, extractCharacterNamesFromScene } = require('./outlinePars
  * @param {string} text - Raw text that may contain JSON
  * @returns {Object|null} Parsed JSON object or null if not found
  */
+/**
+ * Rewrite number literals with a leading zero — `00.34` → `0.34`, `007` → `7`.
+ *
+ * JSON forbids them, so a single one makes the WHOLE response unparseable and
+ * the page reads downstream as "no figures", indistinguishable from a picture
+ * with nobody in it. Measured in Lab #820: one `"face_bbox": [0.35, 00.34, ...]`
+ * cost a complete, correct 4-figure inventory.
+ *
+ * String-aware on purpose: a bare regex would also rewrite `"room 007"`.
+ */
+function repairLeadingZeroNumbers(s) {
+  // JSON's integer part is `0` or `[1-9][0-9]*`. So `0` followed by another
+  // digit is always invalid: `00.34` → `0.34`, `007` → `7`. The lookbehind
+  // keeps the regex off the trailing zero of `10` and off `1.05`.
+  const fix = chunk => chunk.replace(/(?<![\w.])(-?)0+(\d)/g, '$1$2');
+  let out = '', buf = '', inStr = false, esc = false;
+  for (const ch of s) {
+    if (inStr) {
+      out += ch;
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { out += fix(buf) + ch; buf = ''; inStr = true; continue; }
+    buf += ch;
+  }
+  return out + fix(buf);
+}
+
 function extractJsonFromText(text) {
   if (!text || typeof text !== 'string') return null;
 
@@ -109,6 +139,17 @@ function extractJsonFromText(text) {
           }
         }
       }
+    }
+  }
+
+  // Last resort: repair leading-zero number literals and retry once. Kept to
+  // the end so a response that parses cleanly never goes through the rewriter.
+  const repaired = repairLeadingZeroNumbers(jsonToParse);
+  if (repaired !== jsonToParse) {
+    const block = repaired.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    for (const candidate of [block ? block[1].trim() : null, repaired.slice(repaired.indexOf('{'))]) {
+      if (!candidate) continue;
+      try { return JSON.parse(candidate); } catch { /* try the next */ }
     }
   }
 
