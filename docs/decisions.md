@@ -16146,3 +16146,54 @@ invalid number literal.
 `extractJsonFromText`), `tests/manual/jsonLeadingZeroRepair.test.js` (11 assertions)
 
 **Status:** ✅ active
+
+## 2026-08-23 — One blind describer, not two: the unified inventory is wired in
+
+**Context:** Two prompts listed the figures on every page. P1
+(`image-visual-inventory.txt`, JSON, read by code) and three-stage Stage 1
+(`image-vision-inventory.txt`, prose, read by the compliance judge) described
+the same picture from the same bytes. They were never a designed pair: P1 is the
+surviving half of the two-pass eval deleted in `e88b3cf50` (2026-02-22), and the
+three-stage rebuilt the same blind-describer → text-judge shape seven weeks
+later in `568aacce7` and shipped it beside the old one. No commit and no entry
+here ever argued for keeping both.
+
+**Measured before wiring** (Lab #814, #816, #817, #820 — 5, 5, 20 and 10 pages):
+on normal pages the unified template matches P1 exactly on figure counts
+(32 vs 32 over 10 pages), delivers **23.9 of 27 fields against P1's 9.9**, and
+costs **15–20% fewer output tokens than the pair it replaces**. Asking one
+prompt for ~28 things did not dilute it — the split pair's own coverage was the
+weaker of the two.
+
+**Decision:** `runVisualInventory` runs `image-inventory-unified.txt` once per
+page, on the generated image alone, and its result is consumed twice — by the
+compliance judge as Stage 1, and by the figures merge. `evaluateThreeStage`
+takes `inventoryPromise` instead of making its own call, and serialises the
+inventory as JSON for the judge, which now reads `figures` (with `label`),
+`interactions`, `objects`, `setting`, `lettering` and `rendering` in one
+structure. Per page: **5 model calls → 4**.
+
+`runVisualInventory` no longer narrows its return to
+`{figures, objectMatches, rendering}` — that narrowing is what made P1's
+`scene_summary` generated-and-discarded on every page since February, and it
+would have silently dropped `interactions`, `setting` and `lettering` the moment
+the judge started reading this object.
+
+**Boxes stay the detector's.** The unified template emits `body_bbox`/`face_bbox`
+for verification only — pairing its own figures against DINO's for the identity
+agreement check and the conflict harvest — never for repair targeting. Evidence:
+on a 6-figure page DINO found all six and named five, while the prompt described
+five and merged one into a neighbour.
+
+**Kept, deliberately:** `image-visual-inventory.txt` and
+`image-vision-inventory.txt` stay on disk. Nothing in the pipeline reads them;
+they survive as the comparison arms of the Lab's `inventory_ab` stage, which is
+the evidence trail for this decision. Delete them when that stage is retired.
+
+**Touched:**
+- `server/lib/evalPipeline.js` (single launch, `evaluateThreeStage` Stage 1, widened return, default template)
+- `prompts/image-prompt-compliance.txt` (VISION_INVENTORY is JSON now)
+- `prompts/image-inventory-unified.txt` (the one blind template)
+
+**Status:** ✅ active on staging — supersedes the 🟡 conditional note in the
+"Blind describers" entry above.

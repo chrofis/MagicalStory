@@ -79,7 +79,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     // measuring a different template, rather than a second hand-rolled caller
     // that drifts from this one. `raw` returns the model's text unparsed, which
     // is the only way to measure a prose template against a JSON one.
-    const inventoryPrompt = opts.promptOverride || PROMPT_TEMPLATES.imageVisualInventory;
+    const inventoryPrompt = opts.promptOverride || PROMPT_TEMPLATES.imageInventoryUnified;
     const inventoryParts = [...parts];
     inventoryParts.push({ text: inventoryPrompt });
 
@@ -222,8 +222,19 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
 
     return {
       figures,
-      objectMatches: inventoryJson.object_matches || [],
+      // Everything the unified template produces travels with it. The narrowed
+      // return is what made P1's scene_summary generated-and-discarded on every
+      // page since February, and it would have silently dropped interactions,
+      // setting and lettering the moment the compliance judge started reading
+      // this object instead of prose.
+      interactions: inventoryJson.interactions || [],
+      objects: inventoryJson.objects || [],
+      objectMatches: inventoryJson.object_matches || inventoryJson.objects || [],
+      setting: inventoryJson.setting || null,
+      lettering: inventoryJson.lettering || [],
       rendering: inventoryJson.rendering || {},
+      sceneSummary: inventoryJson.scene_summary || null,
+      mainAction: inventoryJson.main_action || null,
       inputTokens,
       outputTokens
     };
@@ -516,6 +527,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     pageContext = '',
     storyText = null,
     qualityFiguresPromise = null,
+    inventoryPromise = null,          // the ONE blind inventory, shared with the figures merge
     complianceModelOverride = null,   // Stage-2 model A/B (default evalModel = qwen-plus)
     compliancePromptOverride = null,  // Stage-2 template A/B
     artStyle = null,                  // resolved style — same value the quality eval gets
@@ -523,11 +535,12 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
-  const visionPrompt = PROMPT_TEMPLATES.imageVisionInventory;
+  // No vision template here any more: Stage 1 is the shared blind inventory,
+  // produced by the single call in evaluateImageQuality and handed in.
   const complianceTemplate = compliancePromptOverride || PROMPT_TEMPLATES.imagePromptCompliance;
 
-  if (!visionPrompt || !complianceTemplate) {
-    log.warn(`[THREE-STAGE] ${pageLabel}Templates not loaded, skipping`);
+  if (!complianceTemplate) {
+    log.warn(`[THREE-STAGE] ${pageLabel}Compliance template not loaded, skipping`);
     return null;
   }
 
@@ -545,82 +558,35 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     }
   } catch { /* silent */ }
 
-  // --- Stage 1: Vision inventory with flash-lite (WITH image, no prompt) ---
+  // --- Stage 1: the SHARED blind inventory ---
+  // Stage 1 used to make its own call with its own prompt. It was the second
+  // blind describer on every page: P1 (JSON, read by code) and this one (prose,
+  // read by the compliance judge) listed the same figures from the same picture.
+  // They were never a designed pair - P1 is the surviving half of a two-pass
+  // eval deleted in Feb 2026 (e88b3cf50) and this stage rebuilt the same shape
+  // seven weeks later beside it (568aacce7). Both now come from ONE call whose
+  // result is passed in, so the judge and the code read the same observation.
   let visionText = null;
   let stage1Usage = { input_tokens: 0, output_tokens: 0 };
   try {
-    const visionModel = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash-lite';
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      log.warn(`[THREE-STAGE] ${pageLabel}No Gemini API key, skipping`);
+    const inventory = inventoryPromise ? await inventoryPromise : null;
+    if (!inventory) {
+      log.warn(`[THREE-STAGE] ${pageLabel}No shared inventory available, skipping`);
       return null;
     }
-
-    const base64Data = r2Lib.stripDataUriPrefix(imageData);
-    const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-
-    const parts = [
-      { inline_data: { mime_type: mimeType, data: base64Data } },
-      { text: visionPrompt }
-    ];
-
-    // Route to Grok vision for xAI models
-    const modelConfig = TEXT_MODELS[visionModel];
-    let response;
-    if (modelConfig?.provider === 'xai') {
-      response = await require('./images').callGrokVisionAPI(visionModel, modelConfig.modelId || visionModel, parts, visionPrompt);
-    } else {
-      response = await withRetry(async () => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`;
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            // Stage 1 is the blind image description every downstream compliance
-            // finding is derived from — if it varies, the findings vary no matter
-            // how deterministic the judges are. Pinned with the rest of them.
-            generationConfig: { maxOutputTokens: 4096, temperature: EVAL_TEMPERATURE },
-            safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
-          }),
-          // No timeout here froze jobs mid-eval (stuck-at-51% incident,
-          // 2026-07-07); abort feeds withRetry, then the eval is skipped.
-          signal: AbortSignal.timeout(120000)
-        });
-        // Throw on 5xx so withRetry can retry with backoff
-        if (resp.status >= 500) {
-          const err = new Error(`Gemini ${resp.status}`);
-          err.status = resp.status;
-          throw err;
-        }
-        return resp;
-      }, { maxRetries: 3, baseDelay: 2000 });
-    }
-
-    if (!response.ok) {
-      const errText = await response.text();
-      log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 API error: ${errText.substring(0, 200)}`);
-      return null;
-    }
-
-    const data = await response.json();
-    stage1Usage = {
-      input_tokens: data.usageMetadata?.promptTokenCount || 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount || 0
-    };
-
-    if (isBlockedResponse(data)) {
-      log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 blocked by safety filter`);
-      return null;
-    }
-
-    visionText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!visionText) {
-      log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 returned no text`);
-      return null;
-    }
-
-    log.info(`[THREE-STAGE] ${pageLabel}Stage 1 vision inventory: ${visionText.length} chars`);
+    stage1Usage = { input_tokens: inventory.inputTokens || 0, output_tokens: inventory.outputTokens || 0 };
+    // The judge reads JSON now rather than prose. Its figures carry the same
+    // 9-zone vocabulary it always paired on, plus the label it resolves to a
+    // real name in STEP 1.
+    visionText = JSON.stringify({
+      figures: inventory.figures || [],
+      interactions: inventory.interactions || [],
+      objects: inventory.objects || inventory.objectMatches || [],
+      setting: inventory.setting || null,
+      lettering: inventory.lettering || [],
+      rendering: inventory.rendering || {},
+    }, null, 2);
+    log.info(`[THREE-STAGE] ${pageLabel}Stage 1 shared inventory: ${(inventory.figures || []).length} figure(s), ${visionText.length} chars`);
   } catch (err) {
     log.warn(`[THREE-STAGE] ${pageLabel}Stage 1 failed: ${err.message}`);
     return null;
@@ -929,8 +895,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // can pair each named character with the blind vision inventory by zone. We expose
     // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
     if (evaluationType === 'scene' || isCover) {
+      // ONE blind inventory per page, launched here and consumed twice: by the
+      // compliance judge as Stage 1, and by the figures merge below. It used to
+      // be two calls with two prompts describing the same picture.
+      // The generated image ALONE — no reference photos, no prompt. Identity is
+      // not this call's to decide.
+      if (PROMPT_TEMPLATES.imageInventoryUnified && process.env.GEMINI_API_KEY) {
+        const invB64 = r2Lib.stripDataUriPrefix(imageData);
+        const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+        p1Promise = runVisualInventory(
+          [{ inline_data: { mime_type: invMime, data: invB64 } }],
+          qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+          process.env.GEMINI_API_KEY, pageContext
+        );
+        log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
+      }
       qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
       threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
+        inventoryPromise: p1Promise,
         qualityModelOverride,
         pageContext,
         storyText: fidelityRef,
@@ -1165,14 +1147,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
     // Covers included — the standing-surface / implausible-placement signal that
     // catches "characters in the river" lives in this inventory pass.
-    if ((evaluationType === 'scene' || isCover) && PROMPT_TEMPLATES.imageVisualInventory) {
-      log.debug(`📊 [EVAL P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
-      // The GENERATED IMAGE only — parts[0]. P1 is the prompt-blind inventory:
-      // it reports what is in the picture. It used to receive the labelled
-      // reference photos as well, which only invited it to guess at identities
-      // it has no contract for. Its job is the figure list.
-      p1Promise = runVisualInventory([parts[0]], modelId, apiKey, pageContext);
-    }
 
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });

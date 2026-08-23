@@ -4,7 +4,7 @@ You are an Illustration QA Scoring Analyst. You have NOT seen the image. Base al
 1. ORIGINAL_PROMPT: "{ORIGINAL_PROMPT}"
 2. QUALITY_FIGURES — JSON with `figures[]` (each figure has a `zone` on the 9-zone grid: `{left|center|right}-{foreground|midground|background}`) and `matches[]` mapping `figure` id → character `reference` name (from matching against reference photos). Authoritative for **who is where**.
    {QUALITY_FIGURES}
-3. VISION_INVENTORY — blind image description. Each figure has the same `zone` vocabulary plus age group, hair, clothing, facing, items held. Authoritative for **what each figure looks like**.
+3. VISION_INVENTORY — blind image description as JSON. Each figure has the same `zone` vocabulary plus `label`, age group, hair, clothing, eyewear, headwear, facial hair, worn items, facing, items held, expression and standing surface; alongside `figures` it carries `interactions`, `objects`, `setting`, `lettering` and `rendering`. Authoritative for **what each figure looks like**.
    {VISUAL_INVENTORY}
 4. DECLARED INTERACTIONS: {INTERACTIONS_BLOCK}
 5. STORY_TEXT (narrative beat as printed in the book): "{STORY_TEXT}"
