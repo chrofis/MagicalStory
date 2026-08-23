@@ -148,7 +148,7 @@ const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing
 const { getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
-const { coverKeyToType, coverTypeToKey, coverKeyToHintKey, coverLabel } = require('../lib/coverKeys');
+const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -1451,9 +1451,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           const { buildCoverReferences, enrichCoverHintWithArtifacts, narrowCoverCastToMains } = require('../lib/coverIterate');
           const { buildCoverCompositeCast } = require('../lib/compositeCastBuilder');
           const { generateSceneComposite } = require('../lib/sceneComposite');
-          const { coverKeyToHintKey, coverLabel } = require('../lib/coverKeys');
-          const hintKey = coverKeyToHintKey(coverType);
-          const coverHint = storyData.coverHints?.[hintKey] || {};
+          const { coverLabel } = require('../lib/coverKeys');
+          const coverHint = storyData.coverHints?.[coverType] || {};
           // Pull artifact prop bytes + full-VB id→name map so the cast's prop
           // references resolve (shared producer helper — same enrichment the
           // coverIterate composite path uses).
@@ -4468,13 +4467,10 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     // clothing} per character on the cover.
     if (isCover && Object.keys(expectedPositions).length === 0) {
       const coverKey2 = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' }[String(pageNumber)];
-      // coverHints is keyed by HINT KEY, not cover key — the front cover's
-      // hints live under 'titlePage' (outline vocabulary; see coverKeys.js,
-      // the single source of truth for the three cover naming schemes). The
-      // raw coverKey lookup found nothing here, mining silently skipped, and
-      // the frontCover's identity lines stayed positionless AND undressed
-      // through two fix rounds (2026-08-23).
-      const charDetails = storyData?.coverHints?.[coverKeyToHintKey(coverKey2)]?.characterDetails || {};
+      // coverHints is keyed by coverKey since the 2026-08-23 unification
+      // (parser translates the outline's "Title Page" section at its boundary;
+      // migration 025 renamed titlePage in stored stories).
+      const charDetails = storyData?.coverHints?.[coverKey2]?.characterDetails || {};
       for (const [name, info] of Object.entries(charDetails)) {
         if (info?.position) expectedPositions[name] = info.position;
         if (info?.clothing) expectedClothing[name] = info.clothing;

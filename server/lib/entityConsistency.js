@@ -19,7 +19,7 @@ const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersIn
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
-const { COVER_HINT_KEY, COVER_PAGE_NUMBERS } = require('./coverKeys');
+const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
 
@@ -740,8 +740,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             // Pull per-cover characterClothing from outline coverHints so the entity
             // collector can drive bbox detection with the actual cover cast instead
             // of falling back to the full story roster (too noisy for Gemini to ID).
-            const hintKey = COVER_HINT_KEY[coverType];
-            const coverHint = hintKey ? storyData.coverHints?.[hintKey] : null;
+            const coverHint = storyData.coverHints?.[coverType] || null;
             const characterClothing = coverHint?.characterClothing
               && Object.keys(coverHint.characterClothing).length > 0
               ? coverHint.characterClothing

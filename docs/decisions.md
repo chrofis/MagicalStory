@@ -16197,3 +16197,29 @@ the evidence trail for this decision. Delete them when that stage is retired.
 
 **Status:** ✅ active on staging — supersedes the 🟡 conditional note in the
 "Blind describers" entry above.
+
+## 2026-08-23 — Cover naming unified: coverHints keyed by coverKey, hintKey retired
+
+**Context.** Owner: "why do we have 2 names for the same thing." Three schemes
+coexisted (coverKey frontCover / hint key titlePage from the outline
+vocabulary / pipeline coverType token titlePage), coverKeys.js translating
+between them — and every raw lookup that skipped the translator was a bug.
+The latest: refresh-bbox mined coverHints.frontCover, found nothing (hints
+lived under titlePage), and the front cover's identity lines stayed
+positionless and undressed through two fix rounds.
+
+**Decision.** One name: `frontCover`. The outline parser translates the
+LLM-facing "Title Page" section at its single boundary and writes
+coverHints.frontCover (unified + legacy parsers + shared keyword map);
+migration 026 renamed the key in every stored story (prod 106, staging 122,
+zero remaining); COVER_HINT_KEY / coverKeyToHintKey deleted from coverKeys.js
+and all six consumers read coverHints[coverKey] directly; the pipeline's
+coverType token renamed titlePage→frontCover (storyJobPipeline, trial
+coverTypes) with a one-boundary normalizer for jobs queued pre-rename. The
+trial UX/API fields (titlePageImage, prepare-title) are a different concept
+and stay.
+
+**Touched files.** coverKeys.js, outlineParser/{unified,legacy,shared}.js,
+sceneMetadata.js, clothingCategories.js, coverIterate.js,
+entityConsistency.js, regeneration.js, storyJobPipeline.js, trial.js,
+migrations/026. Bug: cover-naming-two-names.

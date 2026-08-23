@@ -307,13 +307,13 @@ class OutlineParser {
 
   /**
    * Extract cover scene descriptions and clothing
-   * @returns {{titlePage: {scene: string, clothing: string|null}, initialPage: {scene: string, clothing: string|null}, backCover: {scene: string, clothing: string|null}}}
+   * @returns {{frontCover: {scene: string, clothing: string|null}, initialPage: {scene: string, clothing: string|null}, backCover: {scene: string, clothing: string|null}}}
    */
   extractCoverScenes() {
     if (this._cache.coverScenes) return this._cache.coverScenes;
 
     const coverScenes = {
-      titlePage: { scene: '', clothing: null },
+      frontCover: { scene: '', clothing: null },
       initialPage: { scene: '', clothing: null },
       backCover: { scene: '', clothing: null }
     };
@@ -335,7 +335,7 @@ class OutlineParser {
     this._cache.coverScenes = coverScenes;
 
     log.debug(`[OUTLINE-PARSER] Cover scenes extracted:`);
-    log.debug(`  Title Page: ${coverScenes.titlePage.scene.substring(0, 50) || 'none'}...`);
+    log.debug(`  Title Page: ${coverScenes.frontCover.scene.substring(0, 50) || 'none'}...`);
     log.debug(`  Initial Page: ${coverScenes.initialPage.scene.substring(0, 50) || 'none'}...`);
     log.debug(`  Back Cover: ${coverScenes.backCover.scene.substring(0, 50) || 'none'}...`);
 
@@ -343,7 +343,7 @@ class OutlineParser {
     // the parser failed to recognise the format. Don't fail silently —
     // downstream cover-expansion fills in chat-style preamble that becomes
     // the SCENE prose. Log ERROR so format drift gets caught immediately.
-    const allEmpty = !coverScenes.titlePage.scene && !coverScenes.initialPage.scene && !coverScenes.backCover.scene;
+    const allEmpty = !coverScenes.frontCover.scene && !coverScenes.initialPage.scene && !coverScenes.backCover.scene;
     if (allEmpty && this.outline && this.outline.length > 100) {
       const idx = this.outline.search(/cover\s+scene\s+hints|title\s+page|back\s+cover/i);
       const excerpt = idx >= 0 ? this.outline.slice(idx, idx + 400) : this.outline.slice(0, 400);
@@ -370,7 +370,7 @@ class OutlineParser {
    */
   _extractUnifiedCoverScenes(coverScenes) {
     const headerToKey = {
-      'title page': 'titlePage',
+      'title page': 'frontCover',
       'initial page': 'initialPage',
       'back cover': 'backCover',
     };
@@ -426,8 +426,8 @@ class OutlineParser {
     );
     if (titlePageMatch) {
       const block = titlePageMatch[1];
-      coverScenes.titlePage.scene = this._extractSceneFromBlock(block);
-      coverScenes.titlePage.clothing = this._extractClothingFromBlock(block);
+      coverScenes.frontCover.scene = this._extractSceneFromBlock(block);
+      coverScenes.frontCover.clothing = this._extractClothingFromBlock(block);
     }
 
     // Initial Page
@@ -458,7 +458,7 @@ class OutlineParser {
    * - "**Title Page Scene**\nClothing: standard\nScene content..." (block)
    */
   _extractStoryModeCoverScenes(coverScenes) {
-    const titleWords = KEYWORDS.titlePage.join('|');
+    const titleWords = KEYWORDS.frontCover.join('|');
     const backWords = KEYWORDS.backCover.join('|');
     const initialWords = KEYWORDS.initialPage.join('|');
 
@@ -501,14 +501,14 @@ class OutlineParser {
     );
 
     // Title Page Scene
-    if (!coverScenes.titlePage.scene) {
+    if (!coverScenes.frontCover.scene) {
       // Try block format first
       const blockMatch = this.outline.match(blockPatternTemplate(titleWords));
       if (blockMatch) {
         const block = blockMatch[1];
-        coverScenes.titlePage.scene = extractFromBlock(block);
-        coverScenes.titlePage.clothing = this._extractClothingFromBlock(block);
-        log.debug(`[OUTLINE-PARSER] Title Page (block format): ${coverScenes.titlePage.scene.substring(0, 60)}...`);
+        coverScenes.frontCover.scene = extractFromBlock(block);
+        coverScenes.frontCover.clothing = this._extractClothingFromBlock(block);
+        log.debug(`[OUTLINE-PARSER] Title Page (block format): ${coverScenes.frontCover.scene.substring(0, 60)}...`);
       } else {
         // Try inline format: **Title Page Scene**: description\nClothing: category
         // Stop at next section header (Title Page|Initial Page|Back Cover) or markdown header, NOT at "Clothing:"
@@ -521,10 +521,10 @@ class OutlineParser {
           const fullBlock = inlineMatch[0];
           // Extract just the scene description (first line), not the clothing
           const sceneText = inlineMatch[1].split('\n')[0];
-          coverScenes.titlePage.scene = this.cleanMarkdown(sceneText);
+          coverScenes.frontCover.scene = this.cleanMarkdown(sceneText);
           // Extract clothing from the full block (includes Clothing: line)
-          coverScenes.titlePage.clothing = this._extractClothingFromBlock(fullBlock);
-          log.debug(`[OUTLINE-PARSER] Title Page (inline format): ${coverScenes.titlePage.scene.substring(0, 60)}..., clothing: ${coverScenes.titlePage.clothing || 'none'}`);
+          coverScenes.frontCover.clothing = this._extractClothingFromBlock(fullBlock);
+          log.debug(`[OUTLINE-PARSER] Title Page (inline format): ${coverScenes.frontCover.scene.substring(0, 60)}..., clothing: ${coverScenes.frontCover.clothing || 'none'}`);
         }
       }
     }

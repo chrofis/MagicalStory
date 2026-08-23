@@ -256,14 +256,14 @@ class UnifiedStoryParser {
 
   /**
    * Extract cover scene hints with per-character clothing
-   * @returns {{titlePage: {hint: string, characterClothing: Object, characters: string[]}, ...}}
+   * @returns {{frontCover: {hint: string, characterClothing: Object, characters: string[]}, ...}}
    */
   extractCoverHints() {
     if (this._cache.coverHints !== undefined) return this._cache.coverHints;
 
     const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
     const defaults = {
-      titlePage: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
+      frontCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
       initialPage: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} },
       backCover: { hint: '', mood: '', objects: [], characterClothing: {}, characters: [], characterDetails: {} }
     };
@@ -352,7 +352,7 @@ class UnifiedStoryParser {
     };
 
     this._cache.coverHints = {
-      titlePage: extractCover('Title Page'),
+      frontCover: extractCover('Title Page'),
       initialPage: extractCover('Initial Page'),
       backCover: extractCover('Back Cover')
     };
@@ -377,7 +377,7 @@ class UnifiedStoryParser {
     const baseId = (id) => String(id || '').split('.')[0].toUpperCase();
     const allLocIds = locs.map(l => l.id.toUpperCase());
     const used = new Set();
-    for (const key of ['titlePage', 'initialPage', 'backCover']) {
+    for (const key of ['frontCover', 'initialPage', 'backCover']) {
       const cover = this._cache.coverHints[key];
       if (!cover) continue;
       const locIds = cover.objects.filter(isLoc);
@@ -405,7 +405,7 @@ class UnifiedStoryParser {
       cover.objects = [backdrop, ...nonLoc].filter(Boolean);
     }
 
-    log.debug(`[UNIFIED-PARSER] Cover hints extracted: title=${this._cache.coverHints.titlePage.hint.length > 0}, initial=${this._cache.coverHints.initialPage.hint.length > 0}, back=${this._cache.coverHints.backCover.hint.length > 0}`);
+    log.debug(`[UNIFIED-PARSER] Cover hints extracted: front=${this._cache.coverHints.frontCover.hint.length > 0}, initial=${this._cache.coverHints.initialPage.hint.length > 0}, back=${this._cache.coverHints.backCover.hint.length > 0}`);
     return this._cache.coverHints;
   }
 

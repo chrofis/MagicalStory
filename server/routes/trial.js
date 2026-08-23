@@ -2551,7 +2551,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     // Title page + back cover, no dedication page (trials store no dedication).
     // Covers render concurrently (streamCoverLimit = 3), so the back cover
     // costs one Grok call and ~no wall clock.
-    coverTypes: ['titlePage', 'backCover'],
+    coverTypes: ['frontCover', 'backCover'],
     titlePageOnly: true, // legacy flag — coverTypes above is what decides
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost

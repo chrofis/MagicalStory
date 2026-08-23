@@ -126,7 +126,7 @@ function getUsedClothingCategories(clothingRequirements, characterName) {
  *
  * Mutates `coverHints` in place.
  *
- * @param {Object|null} coverHints - { titlePage: { characterClothing }, initialPage: ..., backCover: ... }
+ * @param {Object|null} coverHints - { frontCover: { characterClothing }, initialPage: ..., backCover: ... }
  * @param {Object|null} clothingRequirements - From extractClothingRequirements()
  * @param {Object} [logger] - Optional logger for warning messages
  * @returns {{ overrides: Array<{cover, character, requested, replacedWith}> }}
@@ -210,9 +210,9 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
   // to null and every cover-side consumer skipped (observed live after the
   // no-default sweep: garment-hue refused every character on p-2/p-3).
   if (Number(pageNumber) < 0) {
-    const { COVER_PAGE_NUMBERS, coverKeyToHintKey } = require('./coverKeys');
+    const { COVER_PAGE_NUMBERS } = require('./coverKeys');
     const coverKey = Object.keys(COVER_PAGE_NUMBERS).find(k => COVER_PAGE_NUMBERS[k] === Number(pageNumber));
-    const hint = coverKey ? storyData?.coverHints?.[coverKeyToHintKey(coverKey)] : null;
+    const hint = coverKey ? storyData?.coverHints?.[coverKey] : null;
     const byChar = hint?.characterClothing;
     if (byChar && typeof byChar === 'object') {
       const lower = String(charName || '').trim().toLowerCase();

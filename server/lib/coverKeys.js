@@ -2,12 +2,18 @@
  * Cover naming domain — single source of truth for the three independent
  * mappings between cover identifiers.
  *
- *   coverKey      — the key under storyData.coverImages: 'frontCover' | 'initialPage' | 'backCover'
+ *   coverKey      — the key under storyData.coverImages AND coverHints:
+ *                   'frontCover' | 'initialPage' | 'backCover'
  *   coverType     — short form used by some routes and prompts: 'front' | 'initialPage' | 'back'
- *   hintKey       — the key under outline coverHints: 'titlePage' | 'initialPage' | 'backCover'
  *   coverLabel    — human-readable banner: 'FRONT COVER' | 'INITIAL PAGE' | 'BACK COVER'
  *
- * Note: 'initialPage' is identical across coverKey, coverType, and hintKey.
+ * The third scheme — hintKey, where the front cover's outline hints lived
+ * under 'titlePage' — was RETIRED 2026-08-23 (owner: "why do we have 2 names
+ * for the same thing"). The outline parser now writes coverHints.frontCover
+ * directly and migration 025 renamed the key in every stored story, so
+ * coverHints is keyed by coverKey like everything else. The LLM-facing
+ * outline section is still titled "Title Page" — the parser translates at
+ * that one boundary.
  */
 
 const COVER_KEYS = ['frontCover', 'initialPage', 'backCover'];
@@ -19,12 +25,6 @@ const COVER_PAGE_NUMBERS = Object.freeze({
   frontCover: -1,
   initialPage: -2,
   backCover: -3
-});
-
-const COVER_HINT_KEY = Object.freeze({
-  frontCover: 'titlePage',
-  initialPage: 'initialPage',
-  backCover: 'backCover'
 });
 
 function coverKeyToType(key) {
@@ -39,10 +39,6 @@ function coverTypeToKey(type) {
   if (type === 'initialPage') return 'initialPage';
   if (type === 'back') return 'backCover';
   return null;
-}
-
-function coverKeyToHintKey(key) {
-  return COVER_HINT_KEY[key] || null;
 }
 
 /**
@@ -62,9 +58,7 @@ function coverLabel(keyOrType) {
 module.exports = {
   COVER_KEYS,
   COVER_PAGE_NUMBERS,
-  COVER_HINT_KEY,
   coverKeyToType,
   coverTypeToKey,
-  coverKeyToHintKey,
   coverLabel,
 };

@@ -226,6 +226,15 @@
    "status": "fixed",
    "fixedIn": "same commit",
    "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-cleanup (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story); failed/cancelled checkpoints+rows NEVER auto-deleted (owner: keep the failed 1% forever); completed stays 1h."
+  },
+  {
+   "id": "cover-naming-two-names",
+   "title": "coverHints keyed by outline vocabulary (titlePage) while everything else says frontCover — third scheme (pipeline coverType titlePage) too",
+   "reportedAt": "2026-08-23",
+   "source": "owner: \"why do we have 2 names for the same thing\" — the mismatch left the frontCover identity lines undressed through two fix rounds while other covers healed",
+   "status": "fixed",
+   "fixedIn": "fix(covers) 2026-08-23 (same commit)",
+   "note": "Unified: outline parser translates the Title Page section at its boundary and writes coverHints.frontCover (unified+legacy+shared keyword map); migration 026 renamed titlePage in all stored stories (prod 106, staging 122, 0 remaining); COVER_HINT_KEY/coverKeyToHintKey retired from coverKeys.js and all 6 consumers read coverHints[coverKey] directly; pipeline coverType token titlePage renamed frontCover (storyJobPipeline + trial coverTypes) with a one-boundary legacy normalizer for queued jobs. Trial UX fields (titlePageImage etc.) are a different concept and untouched."
   }
  ]
 }

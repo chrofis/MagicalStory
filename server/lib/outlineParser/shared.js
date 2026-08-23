@@ -30,7 +30,7 @@ const KEYWORDS = {
   text: ['Text', 'Text', 'Texte'],
   story: ['Story', 'Geschichte', 'Histoire'],
   backCover: ['Back Cover', 'Rückseite', 'Quatrième de couverture'],
-  titlePage: ['Title Page', 'Titelseite', 'Page de titre'],
+  frontCover: ['Title Page', 'Titelseite', 'Page de titre'],
   initialPage: ['Initial Page', 'Einführungsseite', 'Page initiale'],
   visualBible: ['Visual Bible', 'Visuelle Bibel', 'Bible Visuelle'],
   primaryClothing: ['Primary Clothing', 'Hauptkleidung', 'Tenue principale'],

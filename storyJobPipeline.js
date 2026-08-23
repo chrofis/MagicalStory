@@ -96,11 +96,13 @@ const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
  */
 function coverTypesFor(inputData = {}) {
   if (Array.isArray(inputData.coverTypes) && inputData.coverTypes.length > 0) {
-    return inputData.coverTypes;
+    // Legacy compat: jobs queued before the 2026-08-23 naming unification
+    // carry 'frontCover' in coverTypes — normalize at this one boundary.
+    return inputData.coverTypes.map(ct => ct === 'frontCover' ? 'frontCover' : ct);
   }
   return inputData.titlePageOnly
-    ? ['titlePage']
-    : ['titlePage', 'initialPage', 'backCover'];
+    ? ['frontCover']
+    : ['frontCover', 'initialPage', 'backCover'];
 }
 
 // Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
@@ -1272,7 +1274,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             .join(', ') || inputData.characters.map(c => c.name).slice(0, 3).join(', ');
           const theme = inputData.storyTheme || inputData.storyTopic || 'adventure';
 
-          if (coverType === 'titlePage') {
+          if (coverType === 'frontCover') {
             sceneDescription = `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
           } else if (coverType === 'initialPage') {
             sceneDescription = `A warm, inviting introduction scene showing ${mainCharNames} at the beginning of their ${theme} story. A cozy atmosphere that welcomes readers into the adventure.`;
@@ -1332,14 +1334,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
         }
 
-        // The FRONT cover (coverType 'titlePage' → stored as frontCover) is a
+        // The FRONT cover (coverType 'frontCover' → stored as frontCover) is a
         // main-characters-only portrait — but ONLY for FALLBACK casts (scene-
         // text matching). Hint-derived casts pass through untouched; the
         // narrowing exists to stop the whole cast flooding a fallback cover,
         // not to veto characters the outline explicitly placed on the cover.
         // The BACK cover is deliberately a full-cast group portrait (see
         // story-unified.txt Back Cover spec) — do NOT drop non-mains there.
-        if (coverType === 'titlePage' && coverCharacters.length > 0 && !castFromHint) {
+        if (coverType === 'frontCover' && coverCharacters.length > 0 && !castFromHint) {
           const { narrowCoverCastToMains } = require('./server/lib/coverIterate');
           const narrowed = narrowCoverCastToMains(coverCharacters, {
             castFromHint: false,
@@ -1352,7 +1354,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Final fallback for title page: use main characters or all characters
-        if (coverCharacters.length === 0 && coverType === 'titlePage') {
+        if (coverCharacters.length === 0 && coverType === 'frontCover') {
           // Try isMainCharacter property first
           let mainChars = inputData.characters.filter(c => c.isMainCharacter === true);
 
@@ -1430,7 +1432,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           charactersForCover = coverCharacters.length > MAX_COVER_CHARACTERS
             ? coverCharacters.slice(0, MAX_COVER_CHARACTERS)
             : coverCharacters;
-        } else if (coverType !== 'titlePage') {
+        } else if (coverType !== 'frontCover') {
           // initialPage/backCover without scene-based characters: distribute across covers
           const allChars = inputData.characters || [];
           let mainChars = allChars.filter(c => c.isMainCharacter === true);
@@ -1514,7 +1516,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover, { language: inputData.language || 'en' });
         const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
 
-        const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+        const coverLabel = coverType === 'frontCover' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
         // Per-cover image model routing: covers always render at simple
         // complexity now (no depth/perspective allowed on covers — see story-
@@ -1550,7 +1552,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // branding are composited afterwards by server/lib/coverTypography.js).
         const textlessCovers = MODEL_DEFAULTS.appSideCoverType;
         let coverPrompt;
-        if (coverType === 'titlePage') {
+        if (coverType === 'frontCover') {
           // Front cover: include title for text rendering (skipped when textless)
           const storyTitle = streamingTitle || inputData.title || 'My Story';
           coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover, {
@@ -1599,14 +1601,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // literal signs. Resolve or drop them before the prompt ships.
         {
           const { sanitizeVbIdsInPrompt } = require('./server/lib/storyHelpers');
-          const coverPageNum = coverType === 'titlePage' ? -1 : coverType === 'initialPage' ? -2 : -3;
+          const coverPageNum = coverType === 'frontCover' ? -1 : coverType === 'initialPage' ? -2 : -3;
           coverPrompt = sanitizeVbIdsInPrompt(coverPrompt, streamingVisualBible, coverPageNum);
         }
 
         // Build cover references via the shared helper — same one iterate uses,
         // so v0 / iterate / legacy streaming all share one source of truth.
         const { buildCoverReferences } = require('./server/lib/coverIterate');
-        const coverKeyForRefs = coverType === 'titlePage' ? 'frontCover' : coverType;
+        const coverKeyForRefs = coverType === 'frontCover' ? 'frontCover' : coverType;
         const skipEmptyScene = (typeof modelOverrides.singlePassScene === 'boolean'
           ? modelOverrides.singlePassScene
           : MODEL_DEFAULTS.singlePassScene === true)
@@ -1662,7 +1664,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Save partial_cover checkpoint for progressive display. Score-less by
         // design: the score arrives with the pipeline eval, like pages.
-        const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
+        const coverKey = coverType === 'frontCover' ? 'frontCover' : coverType;
         const checkpointData = {
           type: coverKey,
           imageData: coverResult.imageData,
@@ -1670,10 +1672,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           modelId: coverResult.modelId
         };
         // Include title for frontCover so UI can transition to story display
-        if (coverType === 'titlePage' && streamingTitle) {
+        if (coverType === 'frontCover' && streamingTitle) {
           checkpointData.storyTitle = streamingTitle;
         }
-        const checkpointIndex = coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2;
+        const checkpointIndex = coverType === 'frontCover' ? 0 : coverType === 'initialPage' ? 1 : 2;
         await saveCheckpoint(jobId, 'partial_cover', checkpointData, checkpointIndex);
         log.debug(`💾 [UNIFIED] Saved ${coverKey} for progressive display`);
 
@@ -1921,7 +1923,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       onCoverScene: (coverData) => {
         // TRIAL MODE: Generate title page from the structured cover scene JSON
         if (!inputData.trialMode) return;
-        if (streamingCoverPromises.has('titlePage') || skipImages || skipCovers) return;
+        if (streamingCoverPromises.has('frontCover') || skipImages || skipCovers) return;
 
         const coverTitle = coverData.title || streamingTitle || 'My Story';
         const coverScene = coverData.scene || coverData;
@@ -2093,7 +2095,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
 
             return {
-              type: 'titlePage',
+              type: 'frontCover',
               imageData: result.imageData,
               description: sceneDescription,
               prompt: coverPrompt,
@@ -2109,7 +2111,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         })();
 
         coverPromise.catch(err => log.warn(`[TRIAL-COVER] Promise failed (will be handled when awaited): ${err.message}`));
-        streamingCoverPromises.set('titlePage', coverPromise);
+        streamingCoverPromises.set('frontCover', coverPromise);
         log.info(`[TRIAL-COVER] Started cover generation from streaming cover scene`);
       },
       onCoverHints: () => {
@@ -2775,7 +2777,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const hint = coverHints?.[coverType];
         if (hint) {
           startCoverGeneration(coverType, hint);
-        } else if (coverType === 'titlePage') {
+        } else if (coverType === 'frontCover') {
           // Trial mode: Claude may not output cover hints — use a default hint
           const mainCharNames = inputData.characters
             ?.filter(c => c.isMainCharacter)
@@ -3047,7 +3049,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         for (const result of coverResults) {
           if (result?.imageData) {
             // Map coverType to frontend expected keys
-            const storageKey = result.type === 'titlePage' ? 'frontCover' : result.type;
+            const storageKey = result.type === 'frontCover' ? 'frontCover' : result.type;
             coverImages[storageKey] = {
               imageData: result.imageData,
               description: result.description,
@@ -4273,7 +4275,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.error(`❌ [UNIFIED] Cover await failed: ${coverErr.message}`);
         }
         // Add covers to rawImages with negative page numbers
-        const { COVER_HINT_KEY } = require('./server/lib/coverKeys');
+
         for (const [coverKey, coverData] of Object.entries(coverImages)) {
           if (coverData?.imageData && COVER_PAGE_NUMBERS[coverKey] != null) {
             // Text requirements travel as STRUCTURED fields (expectedText /
@@ -4306,7 +4308,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Synthetic sceneMetadata from the outline's structured cover hint,
             // so the shared Phase 5b-pre detection and eval enrich see expected
             // character positions + objects exactly like pages do.
-            const coverHint = coverHints?.[COVER_HINT_KEY[coverKey]] || null;
+            const coverHint = coverHints?.[coverKey] || null;
             const hintCharacterPositions = {};
             if (coverHint?.characterDetails && typeof coverHint.characterDetails === 'object') {
               for (const d of Object.values(coverHint.characterDetails)) {

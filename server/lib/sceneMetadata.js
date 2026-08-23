@@ -1434,7 +1434,7 @@ function extractShortSceneDescriptions(outline) {
 /**
  * Extract cover scene descriptions and clothing from outline
  * Uses the unified OutlineParser for consistent multilingual support
- * Returns: { titlePage: { scene, clothing }, initialPage: { scene, clothing }, backCover: { scene, clothing } }
+ * Returns: { frontCover: { scene, clothing }, initialPage: { scene, clothing }, backCover: { scene, clothing } }
  */
 function extractCoverScenes(outline) {
   const parser = new OutlineParser(outline);

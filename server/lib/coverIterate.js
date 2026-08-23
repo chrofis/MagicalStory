@@ -11,7 +11,7 @@ const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
-const { coverKeyToType, coverKeyToHintKey, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
+const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 
 function getStoryHelpers() {
   return require('./storyHelpers');
@@ -476,8 +476,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const normalizedCoverType = coverKeyToType(coverKey);
 
   // Cover hints from outline — authoritative character list with per-character clothing
-  const hintKey = coverKeyToHintKey(coverKey);
-  const coverHint = storyData.coverHints?.[hintKey];
+  const coverHint = storyData.coverHints?.[coverKey];
   const hintCharClothing = coverHint?.characterClothing;
 
   let coverCharacterPhotos;
@@ -959,7 +958,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       // missed, which is why cover cut-outs had no garment colours to seed
       // SAM with and Sarah's silhouette came back full of holes.
       //
-      // The information was there all along: coverHints[hintKey]
+      // The information was there all along: coverHints[coverKey]
       // .characterClothing is the cover's own per-character category map,
       // exactly analogous to a page's perCharClothing - on
       // job_1786780194082_s980g4s9a it reads
@@ -1160,7 +1159,7 @@ async function loadLandmarkBytes(lm) {
  * @param {Object} [args.visualBible]
  * @param {string} [args.artStyle]
  * @param {string} args.sceneDescription
- * @param {Object} [args.coverHint] - storyData.coverHints[hintKey]: { objects: ['LOC###','ART###',...] }
+ * @param {Object} [args.coverHint] - storyData.coverHints[coverKey]: { objects: ['LOC###','ART###',...] }
  * @param {Object} [args.sceneMetadata] - pre-computed metadata from scene expansion. When provided, replaces the extractSceneMetadata + landmark-name-match path.
  * @param {string} [args.imageModel] - empty-scene model override
  * @param {string} [args.imageBackend] - empty-scene backend override
