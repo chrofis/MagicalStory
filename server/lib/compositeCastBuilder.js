@@ -31,7 +31,7 @@ const { slugifyCostume } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
 
 async function buildCompositeCast(pageData, inputData, deps = {}) {
-  const { userId, addUsage, log, storyCharacterAvatars = null } = deps;
+  const { userId, addUsage, log, storyCharacterAvatars = null, visualBible = null } = deps;
   if (!log) throw new Error('buildCompositeCast: deps.log is required');
 
   const metaChars = pageData.sceneMetadata?.fullData?.characters
@@ -64,7 +64,71 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
     const name = typeof sc === 'string' ? sc : (sc.name || '');
     if (!name) continue;
     const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
-    if (!character) return null;
+    if (!character) {
+      // Not a user character — a Visual Bible SECONDARY character (a story's
+      // captain, guard, antagonist). These never have an avatar sheet, and
+      // returning null here killed the WHOLE cast, so one walk-on in the
+      // background aborted the composite for every real character on the page
+      // ("composite cast is empty", measured on two production pages,
+      // 2026-08-23). They have a VB reference sheet instead; that is what the
+      // owner wants used for them.
+      // Names do not match exactly across the two sources. Scene metadata
+      // uses the short form the prose uses; the Visual Bible carries the full
+      // entry, title included — measured: a page declared "Rossa" while the
+      // VB entry was "Kapitänin Rossa", so an equality match found nothing and
+      // the page fell through. Match on the significant name tokens instead:
+      // exact first, then one name's tokens being a subset of the other's, so
+      // a title or an epithet does not break the link but two different people
+      // who merely share a word do not collide.
+      const { significantEntityTokens } = require('./visualBible');
+      const wantTokens = significantEntityTokens(name);
+      const secondaries = visualBible?.secondaryCharacters || [];
+      const vbEntry = secondaries.find(sc =>
+        (sc.name || '').toLowerCase() === String(name).toLowerCase())
+        || (wantTokens.size ? secondaries.find(sc => {
+          const have = significantEntityTokens(sc.name);
+          if (!have.size) return false;
+          const subset = (a, b) => [...a].every(t => b.has(t));
+          return subset(wantTokens, have) || subset(have, wantTokens);
+        }) : null);
+      const vbRef = vbEntry?.referenceImageUrl || vbEntry?.referenceImageData || null;
+      if (!vbRef) {
+        // No avatar AND no VB sheet — an unnamed walk-on the story never drew
+        // (measured: a "crew member" entry with referenceImageUrl null and an
+        // empty appearsInPages). Nothing can be cut out for them, so keep the
+        // existing behaviour and let the page fall through to the direct path
+        // rather than silently dropping a declared figure.
+        log.warn(`[COMPOSITE CAST] ${name}: not a story character and no Visual Bible reference sheet — falling through to the direct path`);
+        return null;
+      }
+      let vbBuf;
+      try {
+        vbBuf = /^https?:\/\//i.test(String(vbRef))
+          ? Buffer.from(await (await fetch(vbRef)).arrayBuffer())
+          : Buffer.from(stripDataUriPrefix(String(vbRef)), 'base64');
+      } catch (err) {
+        log.warn(`[COMPOSITE CAST] ${name}: Visual Bible sheet unreadable (${err.message})`);
+        return null;
+      }
+      out.push({
+        name,
+        sheetBuf: vbBuf,
+        // A VB reference is ONE image, not a 2×4 pose sheet — cropping a cell
+        // out of it returns a fragment of the figure. Consumers must use the
+        // whole buffer; see the singleImage checks in sceneComposite.
+        singleImage: true,
+        pose: 'threeQuarter',
+        flip: sc.flip === true,
+        action: actionsByChar.get(String(name).toLowerCase()) || null,
+        position: sc.position || 'in the scene',
+        depth: sc.depth || null,
+        sizeHint: sc.depth || null,
+        description: vbEntry.extractedDescription || vbEntry.description || null,
+        fromVisualBible: true,
+      });
+      log.info(`[COMPOSITE CAST] ${name}: using the Visual Bible secondary-character sheet (no avatar exists for them)`);
+      continue;
+    }
     // NO DEFAULT CLOTHING (owner, 2026-08-07) — see the sibling guard in
     // buildCoverCompositeCast. A guessed category picks the wrong avatar sheet,
     // i.e. the figure pasted into the composite wears another story's outfit.

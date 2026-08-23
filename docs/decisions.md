@@ -15801,3 +15801,48 @@ MINOR hair shade. The multi-figure/clothing blind spot needs the prompt work.
 
 **Touched files.** `server/routes/regeneration.js`. Bug:
 `cover-identity-undressed`.
+
+---
+
+## 2026-08-23 — Secondary characters enter the composite through their Visual Bible sheet
+
+**Context:** Two production pages aborted with "composite cast is empty" even
+though the gate had said go (Lab exp 64). Both had a Visual Bible SECONDARY
+character in the background — a story's captain. `compositeCastBuilder.js`
+looked every scene character up in `story.characters` and did
+`if (!character) return null`, so ONE walk-on the user never created killed the
+cast for every real character on the page, and the whole page fell back to the
+direct render.
+
+**Decision** (owner, 2026-08-23: *"These are secondary characters and have a
+visual bible element that must be used instead of avatar for secondary
+characters"*): when a scene character is not a user character, the cast builder
+falls back to the VB `secondaryCharacters` entry and uses its
+`referenceImageUrl` as the sheet, flagged `singleImage: true`.
+
+Three things that flag has to carry:
+- **It is one image, not a 2×4 pose sheet.** Every `cropSheetCell` site would
+  otherwise return a fragment of the figure — a shoulder, half a face. Three
+  call sites in `sceneComposite.js` now use the whole buffer for these.
+- **Names do not match across the two sources.** The page declared "Rossa"
+  while the VB entry was "Kapitänin Rossa", so equality found nothing.
+  Matching is on `significantEntityTokens`: exact first, then one name's
+  tokens being a subset of the other's. Measured: it links Rossa ↔ Kapitänin
+  Rossa and does NOT link either to "Rossa crew member" (neither token set is
+  a subset of the other), which is the collision guard doing its job.
+- **No sheet is still no sheet.** A walk-on with `referenceImageUrl: null` and
+  an empty `appearsInPages` (measured: "Rossa crew member") keeps today's
+  behaviour and falls through to the direct path. Silently dropping a declared
+  figure would be worse than not compositing.
+
+**Rationale:** the alternative — tightening `needsScaleRepair` so it only fires
+when every background character has an avatar — was rejected by the owner. A
+secondary character is not missing a reference; it has a different one, and the
+VB sheet is that reference. Precedent already existed a few lines away: the
+same block already falls back to `visualBible.secondaryCharacters` for the
+character DESCRIPTION when building repair prompts.
+
+**Touched:** `server/lib/compositeCastBuilder.js`, `server/lib/sceneComposite.js`
+(three `cropSheetCell` sites), `storyJobPipeline.js`, `server/lib/testlab.js`.
+
+**Status:** ✅ active

@@ -1823,7 +1823,7 @@ async function buildIdentityPack(cast, options = {}) {
   for (const c of cast) {
     if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) continue;
     let srcBuf = c.sheetBuf;
-    if (cropMode === 'body') {
+    if (cropMode === 'body' && !c.singleImage) {
       const cell = POSE_CELL[c.pose] || POSE_CELL.threeQuarter;
       try {
         srcBuf = await cropSheetCell(c.sheetBuf, cell);
@@ -2528,7 +2528,12 @@ async function generateSceneComposite(opts) {
       }
     }
     if (!usedPhantomPose) {
-      const cellBuf = await cropSheetCell(c.sheetBuf, POSE_CELL[c.pose]);
+      // A Visual Bible secondary character carries ONE reference image, not a
+      // 2×4 pose sheet — cropping a cell out of it yields a fragment of the
+      // figure (a shoulder, half a face). Use the whole buffer for those.
+      const cellBuf = c.singleImage
+        ? c.sheetBuf
+        : await cropSheetCell(c.sheetBuf, POSE_CELL[c.pose]);
       cutBuf = await removeBackground(cellBuf);
       cutBuf = await trimTransparent(cutBuf);
       if (c.flip) cutBuf = await flipHorizontal(cutBuf);
@@ -3177,7 +3182,8 @@ async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, sc
     const cellIdx = POSE_CELL[c.pose] ?? POSE_CELL.front;
     let cellBuf;
     try {
-      cellBuf = await cropSheetCell(c.sheetBuf, cellIdx);
+      // Single-image Visual Bible references have no cells to crop.
+      cellBuf = c.singleImage ? c.sheetBuf : await cropSheetCell(c.sheetBuf, cellIdx);
     } catch (err) {
       log.warn(`[SCENE COMPOSITE/SIMPLE] ${c.name}: cropSheetCell failed (${err.message}); using full sheet`);
       cellBuf = c.sheetBuf;

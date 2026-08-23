@@ -3864,7 +3864,12 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     artStyle: ctx.artStyle || storyData.artStyle,
     characters: storyData.characters || [],
     clothingRequirements: storyData.clothingRequirements || storyData.outline?.clothingRequirements || {},
-  }, { userId, log, storyCharacterAvatars: storyData.characterAvatars || null });
+  }, {
+    userId, log,
+    storyCharacterAvatars: storyData.characterAvatars || null,
+    // Lab parity: the same VB secondary-character fallback production uses.
+    visualBible: storyData.visualBible || null,
+  });
 
   if (!cast || !cast.length) throw new Error('composite cast is empty — page has no scene characters, or no story avatar sheets');
 

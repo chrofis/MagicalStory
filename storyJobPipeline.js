@@ -4101,6 +4101,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const { generateSceneComposite, buildBlendMetadata } = require('./server/lib/sceneComposite');
                   const compositeCast = await buildCompositeCast(pageData, inputData, {
                     userId, log, storyCharacterAvatars,
+                    // Secondary characters (a captain, a guard) have no avatar
+                    // sheet — the cast builder falls back to their Visual Bible
+                    // reference sheet instead of aborting the whole page.
+                    visualBible,
                   });
                   if (!compositeCast || !compositeCast.length) {
                     throw new Error('composite cast empty — falling back to the rendered page');
