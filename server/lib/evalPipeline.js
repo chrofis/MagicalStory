@@ -61,11 +61,16 @@ const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) 
 /**
  * Run P1 Visual Inventory — honest figure/age detection without seeing the original prompt.
  * Returns parsed inventory data or null on failure. No scoring, no P2 follow-up.
- * @param {Array} parts - Image + reference image parts (no text prompt)
+ *
+ * P1 does NOT name anyone. Identity needs the character contract — descriptions,
+ * the clothing requirements, declared positions — and P1 is prompt-blind by
+ * design, so it has none of it. The quality evaluator owns `matches[]`.
+ *
+ * @param {Array} parts - The generated image only (no reference photos, no text prompt)
  * @param {string} modelId - Gemini model to use
  * @param {string} apiKey - Gemini API key
  * @param {string} pageContext - Page context for logging
- * @returns {Promise<{figures: Array, matches: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number}|null>}
+ * @returns {Promise<{figures: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number}|null>}
  */
 async function runVisualInventory(parts, modelId, apiKey, pageContext) {
   try {
@@ -194,17 +199,12 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
     log.verbose(`📊 [EVAL P1] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
 
     const figures = inventoryJson.figures || [];
-    const matches = inventoryJson.matches || [];
     if (figures.length > 0) {
       log.info(`📊 [EVAL P1] Figures: ${figures.map(f => `#${f.id} ${f.hair} (${f.position})`).join('; ')}`);
-    }
-    if (matches.length > 0) {
-      log.info(`📊 [EVAL P1] Matches: ${matches.map(m => `Fig ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join('; ')}`);
     }
 
     return {
       figures,
-      matches,
       objectMatches: inventoryJson.object_matches || [],
       rendering: inventoryJson.rendering || {},
       inputTokens,
@@ -1150,7 +1150,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // catches "characters in the river" lives in this inventory pass.
     if ((evaluationType === 'scene' || isCover) && PROMPT_TEMPLATES.imageVisualInventory) {
       log.debug(`📊 [EVAL P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
-      p1Promise = runVisualInventory(parts, modelId, apiKey, pageContext);
+      // The GENERATED IMAGE only — parts[0]. P1 is the prompt-blind inventory:
+      // it reports what is in the picture. It used to receive the labelled
+      // reference photos as well, which only invited it to guess at identities
+      // it has no contract for. Its job is the figure list.
+      p1Promise = runVisualInventory([parts[0]], modelId, apiKey, pageContext);
     }
 
     // Add evaluation prompt text
@@ -1677,23 +1681,48 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           const p1Result = await p1Promise;
           if (p1Result) {
-            // Use P1's figures/matches (more honest, no prompt bias) — but only
-            // when P1 actually produced some. runVisualInventory returns
-            // `matches = inventoryJson.matches || []`, i.e. ALWAYS an array, and
-            // an empty array is truthy: `p1Result.matches || matches` therefore
-            // discarded the quality evaluator's matches unconditionally on every
-            // successful P1 pass. Compliance's "authoritative for who is where"
-            // input then came from an empty list, and it reported present
-            // characters as missing — measured 9 false absence findings worth
-            // 135 points across two stories, e.g. quality matched all five
-            // characters at 0.90 while compliance declared two of them absent.
-            if (p1Result.figures?.length) figures = p1Result.figures;
-            if (p1Result.matches?.length) matches = p1Result.matches;
+            // P1 contributes the FIGURE INVENTORY only. Identity is not P1's to
+            // decide and never was: P1 is prompt-blind by design, so it has no
+            // character descriptions, no clothing contract and no declared
+            // positions — the three things identity actually rests on. Asked to
+            // name people from a photo-vs-watercolour resemblance alone, it
+            // answered "UNMATCHED" with confidence 0 and, because a junk array
+            // is still a non-empty array, that answer replaced the evaluator's.
+            // Measured across two production stories: 12 versions where the
+            // evaluator had named every character at 0.85-0.90 stored
+            // `unmatched` / `No reference provided` instead, and every
+            // per-character check downstream — clothing, action, scale — reads a
+            // NAME, so all of them went silent on those pages.
+            // (An earlier fix here made the override conditional on a non-empty
+            // array; the array was never the problem, the ownership was.)
+            //
+            // figures[] and matches[] must come from ONE producer. `figure` ids
+            // are only meaningful inside the list that issued them, and the two
+            // producers number differently (figureIdentityCheck.js documents P1
+            // seeing 5 figures on a page where the evaluator's parse saw 3).
+            // Taking P1's inventory next to the evaluator's matches would make
+            // every `match.figure` point into the wrong list. So P1's inventory
+            // is used only where the evaluator named nobody — there is no pair
+            // to break, and an honest figure list still beats none.
+            if (p1Result.figures?.length && matches.length === 0) figures = p1Result.figures;
             p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
           }
         } catch (e) {
           log.warn(`⚠️ [QUALITY P1] Figure check failed: ${e.message}`);
         }
+      }
+
+      // A page whose figures nobody named is a page where every per-character
+      // check goes quiet — clothing, action and scale all key off a name. It
+      // used to pass silently: measured on one production story, the evaluator
+      // returned figures and an empty `matches` on 21 of 30 versions and nothing
+      // said so. Countable, not just scrollback.
+      if (figures.length > 0 && matches.length === 0) {
+        log.warn(`⚠️ [EVAL] ${pageContext}: ${figures.length} figure(s) and ZERO matches — no per-character finding can name anyone on this page`);
+        try {
+          const sid = evalOptions?.storyMeta?.storyId;
+          if (sid) require('./runMetrics').forJob(sid).count('eval_matches_missing');
+        } catch { /* metrics are best-effort */ }
       }
 
       // Release quality figures/matches to three-stage Stage 2

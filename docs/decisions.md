@@ -15520,3 +15520,56 @@ duplicated per prompt.
 **Touched:** `server/lib/promptBuilders.js` (LANGUAGE_LEVELS),
 `prompts/text-refine.txt`.
 **Status:** ✅ active
+
+## 2026-08-23 — Identity belongs to the evaluator; P1 is blind and names nobody
+
+**Context:** Two calls looked at each page and both tried to say who is who: the
+quality evaluator (sees the picture, the reference photos AND the prompt) and P1
+the visual inventory (prompt-blind by design). The merge in
+`evaluateImageQuality` kept P1's `matches` whenever they were non-empty. But P1
+has no character descriptions, no clothing contract and no declared positions —
+identity rests on exactly those — so asked to name people from a photo-vs-
+illustration resemblance alone it answered `UNMATCHED` at confidence 0, and a
+junk array is still a non-empty array. Measured on two production stories
+(`job_1787436913379_mfedxinwqd`, `job_1787423677246_r9llf5yi9`): **12 versions
+where the evaluator had named every character at 0.85–0.90 stored `unmatched` /
+`No reference provided` instead.** Page 16 of the first: evaluator said
+`Julian`, `Levin`; stored `unmatched, unmatched`. Every per-character check —
+clothing, action, and the D-29 scale rule — keys off a NAME, so all of them went
+silent on those pages. On the same story the evaluator ALSO returned figures
+with an empty `matches` on 21 of 30 versions, and nothing reported it.
+
+**Decision:**
+1. P1 never emits `matches`. Its reference-matching step, its `matches` schema
+   and the matching rules are gone from `image-visual-inventory.txt`, and it
+   refers to figures by role label and position, never by name.
+2. P1 no longer receives the reference photos — it is handed the generated image
+   alone, in production and in the Lab's visual-inventory endpoint.
+3. P1's `figures` are used only when the evaluator named nobody. `figures[]` and
+   `matches[]` must come from ONE producer: `figure` ids are meaningful only
+   inside the list that issued them, and the two producers number differently
+   (`figureIdentityCheck.js` records P1 seeing 5 figures where the evaluator's
+   parse saw 3), so mixing them would point every `match.figure` at the wrong
+   list.
+4. The evaluator's `matches` is now structurally required: exactly one entry per
+   figure, same ids and order, `reference: null` for a figure it cannot place —
+   never a missing entry — and `body_bbox` on every entry. It had emitted **0
+   `body_bbox` across 51 matches** while the schema merely showed the field.
+5. Figures with zero matches log a warning and count `eval_matches_missing`.
+
+**Rationale:** The prompt-blind second opinion is valuable for what P1 can
+actually see — ages, poses, figure counts, rendering faults — and worthless for
+what it cannot: which child is which. Splitting it that way removes the reason
+P1 ever needed the photos. Requiring one match per figure follows the same rule
+as the scale fields (`evalPipeline.js:1473`): a required output FIELD gets
+filled, a rule stated in prose gets skimmed.
+
+**Touched:**
+- `server/lib/evalPipeline.js` (merge, P1 launch, `runVisualInventory` return, missing-matches metric)
+- `server/routes/regeneration.js` (Lab visual-inventory endpoint parity)
+- `server/lib/figureIdentityCheck.js` (its documented join premise changed)
+- `prompts/image-visual-inventory.txt`, `prompts/image-evaluation.txt`
+
+**Status:** ✅ active — supersedes the merge described in the 2026-08-22
+"who-is-who" entry, whose reconciliation was starved because the eval side had
+no names or boxes to reconcile.

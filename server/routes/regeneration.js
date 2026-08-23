@@ -4357,25 +4357,12 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         return res.status(500).json({ error: 'Gemini API key not configured' });
       }
 
-      // Build parts array (image + reference images) — same structure as evaluateImageQuality
+      // Build parts array — the generated image alone
       const base64Data = r2.stripDataUriPrefix(imageData);
       const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
       const parts = [
         { inline_data: { mime_type: mimeType, data: base64Data } }
       ];
-
-      // Add reference images (compressed). Accept inline data: URI OR R2 URL.
-      for (const ref of characterPhotos) {
-        const photoSrc = ref.photoUrl || ref.photoData;
-        if (!photoSrc || typeof photoSrc !== 'string') continue;
-        const refBuf = await r2.bytesFromAnyImage(photoSrc);
-        if (!refBuf) continue;
-        const dataUri = `data:image/jpeg;base64,${refBuf.toString('base64')}`;
-        const compressed = await compressImageToJPEG(dataUri, 85, 768);
-        const compressedBase64 = r2.stripDataUriPrefix(compressed);
-        parts.push({ text: `Reference: ${ref.name}` });
-        parts.push({ inline_data: { mime_type: 'image/jpeg', data: compressedBase64 } });
-      }
 
       // Get the filled prompt for visibility
       const inventoryTemplate = PROMPT_TEMPLATES.imageVisualInventory || '';
@@ -4394,7 +4381,6 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         prompt: filledPrompt,
         rawResponse: JSON.stringify({
           figures: inventoryResult.figures,
-          matches: inventoryResult.matches,
           objectMatches: inventoryResult.objectMatches,
           rendering: inventoryResult.rendering
         }, null, 2),

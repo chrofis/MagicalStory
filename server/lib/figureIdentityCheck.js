@@ -25,17 +25,14 @@
  *
  * WHICH `matches[]` THIS JOINS ON
  * -------------------------------
- * The version's `matches` come from `evaluateImageQuality`'s return, which
- * merges two producers (evalPipeline.js, figures/matches merge in
- * evaluateImageQuality): when `runVisualInventory` (P1)
- * produced a non-empty `figures` / `matches`, P1's win; otherwise the quality
- * evaluator's own parse of its response is kept. The two number figures
- * DIFFERENTLY (P1 saw 5 figures on p14, the quality parse 3), and in the edge
- * case where P1 returns figures but no matches the two arrays can even come
- * from different producers. This module therefore NEVER joins through
- * `match.figure` / `figure.id` — the join is purely geometric, on
- * `match.face_bbox`. `evalFigures` is used only to enrich the human-readable
- * `reason`, looked up defensively by id.
+ * The version's `matches` are the quality evaluator's, always — identity is not
+ * P1's to decide, and `runVisualInventory` no longer emits matches at all. P1
+ * still supplies `figures` when the evaluator named nobody, so the two arrays
+ * can still come from different producers, and the two number figures
+ * DIFFERENTLY (P1 saw 5 figures on a page where the quality parse saw 3). This
+ * module therefore NEVER joins through `match.figure` / `figure.id` — the join
+ * is purely geometric, on `match.face_bbox`. `evalFigures` is used only to
+ * enrich the human-readable `reason`, looked up defensively by id.
  *
  * COORDINATE SYSTEMS (they differ — this is the classic silent bug)
  * ----------------------------------------------------------------
