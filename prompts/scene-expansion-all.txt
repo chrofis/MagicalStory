@@ -120,8 +120,8 @@ Then a single-line JSON object:
   "era": "present day",
   "objects": ["LOC001", "ART002"],
   "interactions": [
-    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false, "priority": "low"},
-    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "storyRelevant": true, "priority": "essential"}
+    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "contact": "carries", "storyRelevant": false, "priority": "low"},
+    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "contact": "hands", "storyRelevant": true, "priority": "essential"}
   ],
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
   "textZoneDescription": "5–15 words naming the saturated, high-contrast surface in that corner",
@@ -163,7 +163,9 @@ Mark `storyRelevant: true` only when the contact is the page's plot beat, identi
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side". Name which hand, how many hands, or where on the object they land only when the story turns on it.
+Field shape: `{character, object, where, contact, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side". Name which hand, how many hands, or where on the object they land only when the story turns on it.
+
+`contact`: `"hands"` when the character puts hands on something they were not already holding, `"carries"` when they hold or wear what is already theirs, `"gaze"` for looking or pointing at it, `"none"` for standing or moving near it.
 
 **Shared objects.** When several characters use ONE object at once, or act on ONE object together (carry the same basket, hold the same banner, pull the same rope, push the same cart), emit ONE entry: join the names with ` + ` in `character` and describe the shared action in the one `where` sentence. Separate entries with the same object render as duplicate objects. Characters each using their OWN identical object keep separate entries.
 
@@ -173,7 +175,7 @@ Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a
 
 A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's beat and `low` otherwise.
 
-Cap: 1–6 entries, 0–2 with `storyRelevant: true`. At most one entry per page puts hands on an object the character is not already carrying; anyone else acting on it shares that entry, watches, or stands.
+Cap: 1–6 entries, 0–2 with `storyRelevant: true`, at most one with `contact: "hands"` — anyone else acting on that object shares the entry, watches, or stands.
 
 Every entry must also appear in the prose as the same physical contact.
 

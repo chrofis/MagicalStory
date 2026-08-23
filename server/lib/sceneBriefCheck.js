@@ -124,6 +124,24 @@ function checkPage(page, castNames = [], visualBible = null) {
     });
   }
 
+  // C — hands-on load. Measured over two stories (34 pages, 60 interaction rows,
+  // docs/interaction-load-2026-08-23.md): rows putting hands on an object the
+  // character is not already carrying fail 88%, and a second one on the same page
+  // takes the page's mean semantic score to 18. Counted from the declared
+  // `contact` field, never matched out of the `where` prose — two attempts at
+  // pattern-matching that prose produced wrong counts while this was measured.
+  // Briefs written before the field existed carry no `contact` and never flag.
+  const interactions = (metadata && Array.isArray(metadata.interactions)) ? metadata.interactions : [];
+  const handsOn = interactions.filter(i => i && String(i.contact || '').toLowerCase() === 'hands');
+  if (handsOn.length > 1) {
+    findings.push({
+      pageNumber: page.pageNumber,
+      type: 'interaction_hands_on_excess',
+      detail: `${handsOn.length} interactions declare contact:"hands" (${handsOn.map(i => `${String(i.character || '?').trim()}→${String(i.object || '?').trim()}`).join(', ')}); the cap is one. `
+        + `Characters acting on one object share a single fused entry; the rest watch or stand.`,
+    });
+  }
+
   return findings;
 }
 
@@ -162,7 +180,7 @@ function checkScenes(pages, castNames = [], visualBible = null) {
 //     and there is no measured link to a defect — sending it would have the
 //     reviewer rewriting one page in four for nothing. Kept as a diagnostic,
 //     NOT sent. Drop or add a type here without touching the others.
-const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved']);
+const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_hands_on_excess']);
 
 /** Render findings as the {BRIEF_FINDINGS} block for scene-review.txt. */
 function renderFindingsBlock(byPage) {
@@ -176,9 +194,9 @@ function renderFindingsBlock(byPage) {
   }
   if (lines.length === 0) return '';
   return [
-    '# BRIEF CONTRADICTIONS',
+    '# BRIEF FAULTS',
     '',
-    "Each line states a disagreement between a brief's prose and its own metadata, found by exact comparison against the cast and the visual bible. A name can be mentioned without the person being in the frame, so judge each one and rewrite the pages where the contradiction is real.",
+    "Each line states either a disagreement between a brief's prose and its own metadata, found by exact comparison against the cast and the visual bible, or a declared limit the brief exceeds. A name can be mentioned without the person being in the frame, so judge each one and rewrite the pages where the fault is real.",
     '',
     ...lines,
   ].join('\n');

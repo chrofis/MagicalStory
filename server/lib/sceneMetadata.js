@@ -161,9 +161,17 @@ function sanitizeInteractions(rawInteractions, characterNames) {
       ? String(i.priority).toLowerCase()
       : undefined;
     const storyRelevant = (i.storyRelevant === true || i.storyRelevant === false) ? i.storyRelevant : undefined;
+    // `contact` classifies the physical demand of the row so the scene-consistency
+    // pre-check can COUNT hands-on entries instead of pattern-matching `where`
+    // prose. Left undefined when absent or unrecognised — stories written before
+    // the field exists must not read as a violation.
+    const contact = ['hands', 'carries', 'gaze', 'none'].includes(String(i.contact || '').toLowerCase())
+      ? String(i.contact).toLowerCase()
+      : undefined;
     const out = { character, object, where };
     if (priority !== undefined) out.priority = priority;
     if (storyRelevant !== undefined) out.storyRelevant = storyRelevant;
+    if (contact !== undefined) out.contact = contact;
     kept.push(out);
   }
   if (dropped.length > 0) {

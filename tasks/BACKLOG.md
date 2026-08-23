@@ -119,6 +119,15 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ---
 
+## Tests
+
+- [ ] **3 unit tests fail on `staging` HEAD: `tests/unit/active-version-recompute.test.ts`.**
+      `recomputeAllActiveVersions` leaves `sceneImages[0].activeVersion` undefined where the test
+      expects 1. Pre-existing (reproduced with all local changes stashed), found 2026-08-23 while
+      verifying an unrelated change. Not filed in `tasks/bugs.json` because it is undiagnosed —
+      could be the recompute path or a stale test, and a bugs.json entry blocks every push
+      → `tests/unit/active-version-recompute.test.ts:113`
+
 ## Eval + scoring
 
 - [ ] **A page can fail semantics outright and never trigger a redo (measured 2026-08-23).**

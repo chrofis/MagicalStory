@@ -181,6 +181,22 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
       }
     }
 
+    // (c2) hands-on load. Measured over two stories (34 pages, 60 rows,
+    // docs/interaction-load-2026-08-23.md): rows putting hands on an object the
+    // character is not already carrying fail 88%, and a second one on the same
+    // page takes the page's mean semantic score to 18. Counting the declared
+    // `contact` field keeps this a fact — the alternative, pattern-matching the
+    // `where` prose, produced two wrong answers while the finding was measured.
+    // Rows from before the field existed have no `contact` and are not counted.
+    const handsOn = interactions.filter(i => i && String(i.contact || '').toLowerCase() === 'hands');
+    if (handsOn.length > 1) {
+      const who = handsOn.map(i => `${baseName(i.character) || '?'}→${String(i.object || '?').trim()}`).join(', ');
+      issues.push({
+        type: 'interaction_hands_on_excess',
+        detail: `${handsOn.length} interactions declare contact:"hands" (${who}) — the cap is one per page; fuse the characters acting on one object into a single entry, or change the others to gaze/none`,
+      });
+    }
+
     // (d) depth word inside position phrase vs the depth field
     for (const c of metaChars) {
       if (!c || typeof c !== 'object') continue;
