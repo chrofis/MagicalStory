@@ -217,6 +217,15 @@
    "status": "fixed",
    "fixedIn": "same commit",
    "note": "storyJobPipeline.js: checkCancellation() before avatar-persist/upsertStory; completion email now requires completionRes.rowCount>0 AND !inputData.adminRerun. server/routes/admin/jobs.js: rerun-full stamps adminRerun=true."
+  },
+  {
+   "id": "checkpoint-reaper-destroys-forensics",
+   "title": "Checkpoints of failed/cancelled jobs purged after 1h with no salvage — dead runs unrecoverable",
+   "reportedAt": "2026-08-23",
+   "source": "job_1787469664089_9e27p42el7l — unified_story + story_text + 16 partial_page checkpoints survived the container kill, were recoverable for ~1h, then cleanupOldCompletedJobs (runs on every create-story) deleted them; savePartialStoryFromCheckpoints never fires for cancelled jobs (stale-sweep matches only processing)",
+   "status": "fixed",
+   "fixedIn": "same commit",
+   "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-delete (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story), checkpoint+job retention for failed/cancelled raised 1h -> 48h; completed stays 1h (finalize already deleted its checkpoints)."
   }
  ]
 }

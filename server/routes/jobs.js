@@ -35,26 +35,55 @@ function initJobRoutes(serverDeps) {
   deps = serverDeps;
 }
 
-// Clean up old completed/failed jobs and their checkpoints
+// Clean up old completed/failed jobs and their checkpoints.
+// Checkpoints of FAILED/CANCELLED jobs are the only forensic record of what a
+// dead run produced (the story was never persisted), so they are salvaged into
+// a partial story first and kept 48h — the 1-hour purge once destroyed a fully
+// recoverable 16-page run before anyone looked (2026-08-23). Completed jobs
+// already deleted their checkpoints at finalize; the 1-hour row cleanup here
+// only catches strays.
 async function cleanupOldCompletedJobs() {
   if (STORAGE_MODE !== 'database') return;
   const pool = getDbPool();
   if (!pool) return;
 
   try {
+    // Salvage before any checkpoint of a dead job can age out: rebuild a
+    // partial story from whatever the run left behind. Idempotent — the
+    // partial-save skips stories that already have a full save, and jobs
+    // whose checkpoints were already salvaged+deleted simply match nothing.
+    if (typeof deps.savePartialStoryFromCheckpoints === 'function') {
+      const dead = await pool.query(`
+        SELECT DISTINCT j.id FROM story_jobs j
+        JOIN story_job_checkpoints c ON c.job_id = j.id
+        WHERE j.status IN ('failed', 'cancelled')
+          AND NOT EXISTS (
+            SELECT 1 FROM stories s
+            WHERE s.id = j.id AND COALESCE(s.data->>'title', '') <> ''
+          )
+      `);
+      for (const row of dead.rows) {
+        try {
+          await deps.savePartialStoryFromCheckpoints(row.id, 'Salvaged from checkpoints before cleanup');
+        } catch (err) {
+          log.warn(`🛟 Checkpoint salvage failed for ${row.id}: ${err.message}`);
+        }
+      }
+    }
+
     const cpResult = await pool.query(`
       DELETE FROM story_job_checkpoints
       WHERE job_id IN (
         SELECT id FROM story_jobs
-        WHERE status IN ('completed', 'failed', 'cancelled')
-        AND updated_at < NOW() - INTERVAL '1 hour'
+        WHERE (status = 'completed' AND updated_at < NOW() - INTERVAL '1 hour')
+           OR (status IN ('failed', 'cancelled') AND updated_at < NOW() - INTERVAL '48 hours')
       )
     `);
 
     const jobResult = await pool.query(`
       DELETE FROM story_jobs
-      WHERE status IN ('completed', 'failed', 'cancelled')
-      AND updated_at < NOW() - INTERVAL '1 hour'
+      WHERE (status = 'completed' AND updated_at < NOW() - INTERVAL '1 hour')
+         OR (status IN ('failed', 'cancelled') AND updated_at < NOW() - INTERVAL '48 hours')
     `);
 
     if (cpResult.rowCount > 0 || jobResult.rowCount > 0) {
