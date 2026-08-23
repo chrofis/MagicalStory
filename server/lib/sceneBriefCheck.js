@@ -135,7 +135,7 @@ function checkPage(page, castNames = [], visualBible = null) {
   const interactions = (metadata && Array.isArray(metadata.interactions)) ? metadata.interactions : [];
   const actions = [...new Set(interactions
     .map(i => (i && String(i.action || '').trim().toLowerCase()))
-    .filter(Boolean))];
+    .filter(a => a && !PASSIVE_ACTIONS.has(a)))];
   if (actions.length > 1) {
     findings.push({
       pageNumber: page.pageNumber,
@@ -184,6 +184,13 @@ function checkScenes(pages, castNames = [], visualBible = null) {
 //     reviewer rewriting one page in four for nothing. Kept as a diagnostic,
 //     NOT sent. Drop or add a type here without touching the others.
 const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions']);
+
+// Reserved `action` labels for characters who are present but not acting. They
+// are values rather than an omitted field on purpose: when the field was
+// optional, exp 818 left 7 of 21 rows blank — a pointer, a speaker and a helmsman
+// among them — and each blank silently escaped the one-action count. A reserved
+// value makes "not acting" a claim the reviewer can see and disagree with.
+const PASSIVE_ACTIONS = new Set(['watching', 'standing']);
 
 /** Render findings as the {BRIEF_FINDINGS} block for scene-review.txt. */
 function renderFindingsBlock(byPage) {

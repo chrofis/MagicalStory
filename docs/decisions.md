@@ -16223,3 +16223,49 @@ and stay.
 sceneMetadata.js, clothingCategories.js, coverIterate.js,
 entityConsistency.js, regeneration.js, storyJobPipeline.js, trial.js,
 migrations/026. Bug: cover-naming-two-names.
+
+## 2026-08-23 — One action: measured on text only (exp 818, 821), and the Lab was under-testing the reviewer
+
+Follow-up to "One action per page" above. Both runs were text-only by owner
+instruction — beats and Art Director, no image generation.
+
+**exp 818 — Art Director, 7 pages.** The `action` field is emitted reliably and
+the plumbing works end to end, but the check caught **1 of 5** known failures.
+Two defects, both in the wording:
+- *goal-level labels*: p8 put "pushing the hull", "levering with an oar" and
+  "calling out" under one label, `"freeing the boat"` — which was the example
+  the template itself gave. A goal-shaped example produced goal-shaped labels.
+- *the omit clause was an escape hatch*: 7 of 21 rows carried no label, among
+  them a pointer, a speaker and a helmsman, each of which silently escaped the
+  count. p7 (point + steer) and p16 (speaker + helmsman) both passed and both
+  scored ≤20 in production.
+
+Fixed by making the field **required on every row**, with `"watching"` and
+`"standing"` as reserved values that never count as the page action, and by
+replacing the goal example with a physical-activity one stated positively (no
+counter-example — a negative example has now twice taught the banned behaviour,
+here and in exp 815). Re-verified 7/7 including replays of both escapes.
+
+**exp 821 — beats, full 16-page plan.** The corrected `story-beats.txt` rule did
+**not** fix the beat: 4 of 16 pages still carry two actions, against 5 of 16 in
+the original story — noise, not a fix. Two of them name both activities outright
+("Saira takes the wheel … Fiona lets go and steps back"; "Sarah … talks *while*
+Fiona eases the boat along the island"). Prose rules move the beats writer about
+as little as they moved the Art Director. The mechanical brief-level check is
+therefore the load-bearing part, not the prompt.
+
+**Harness defect found and fixed.** `runBeatsScenesStage` called
+`buildSceneReviewPrompt(storyData, scenes, { beats })` while production passes
+`{ clothingFindings, briefFindings, beats }`. The Lab was handing the reviewer a
+**weaker prompt than production** — exp 821 produced four two-action pages and
+its review prompt contained no BRIEF FAULTS block at all, so the finding could
+not possibly have been tested. Every prior `beats_scenes` experiment shares this
+blind spot. The stage now runs the same brief pre-check as production.
+
+**Still unmeasured:** whether the reviewer actually rewrites a page when handed
+`interaction_multiple_actions`. That is the one link the whole design rests on
+and no run has exercised it yet.
+
+**Touched:** `prompts/scene-expansion*.txt`, `server/lib/sceneBriefCheck.js`
+(reserved passive labels), `server/lib/sceneConsistencyCheck.js`,
+`server/lib/testlab.js` (`runBeatsScenesStage` brief pre-check).

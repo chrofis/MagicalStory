@@ -3463,9 +3463,36 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         .split(',').map(s => s.trim()).filter(Boolean);
       for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
       const expectedPages = okScenes.map(x => x.pageNumber);
+      // Deterministic brief pre-check → {BRIEF_FINDINGS}, exactly as production
+      // does it (beatsPipeline.js). Without this the harness handed the reviewer
+      // a WEAKER prompt than the real pipeline and could never measure whether a
+      // finding changes what it rewrites: exp 821 produced four two-action pages
+      // and the review prompt carried no BRIEF FAULTS block at all.
+      let briefFindings = '';
+      try {
+        const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
+        const vb = storyData.visualBible || null;
+        const secondaryList = Array.isArray(vb?.secondaryCharacters)
+          ? vb.secondaryCharacters : Object.values(vb?.secondaryCharacters || {});
+        const seen = new Set();
+        const castNames = [
+          ...(storyData.characters || []).map(c => c && c.name),
+          ...secondaryList.map(c => c && c.name),
+        ].filter(Boolean).filter((n) => {
+          const k = String(n).trim().toLowerCase();
+          if (!k || seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        const res = checkBriefs(okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), castNames, vb);
+        briefFindings = renderBriefBlock(res.byPage);
+        log.info(`[TESTLAB] beats_scenes brief pre-check: ${res.findings.length} finding(s), block ${briefFindings ? briefFindings.length + ' chars' : 'empty'}`);
+      } catch (bcErr) {
+        log.warn(`[TESTLAB] beats_scenes brief pre-check failed (non-fatal): ${bcErr.message}`);
+      }
       // finalBeats feeds the review's check 5 (character in beat vs brief),
       // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats });
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings });
       if (srPrompt) {
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();

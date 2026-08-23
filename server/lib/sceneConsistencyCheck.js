@@ -188,9 +188,11 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     // number of separate activities is. Counting declared `action` labels keeps
     // this a fact; pattern-matching the `where` prose produced two wrong answers
     // while the finding was measured. Rows from before the field have no label.
+    // 'watching'/'standing' are reserved labels for present-but-not-acting rows.
+    const PASSIVE = new Set(['watching', 'standing']);
     const actions = [...new Set(interactions
       .map(i => (i && String(i.action || '').trim().toLowerCase()))
-      .filter(Boolean))];
+      .filter(x => x && !PASSIVE.has(x)))];
     if (actions.length > 1) {
       issues.push({
         type: 'interaction_multiple_actions',

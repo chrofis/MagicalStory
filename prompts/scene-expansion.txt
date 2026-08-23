@@ -104,8 +104,8 @@ Then a single-line JSON object:
   "era": "present day",
   "objects": ["LOC001", "ART002"],
   "interactions": [
-    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false, "priority": "low"},
-    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "action": "climbing to the loft", "storyRelevant": true, "priority": "essential"}
+    {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "action": "standing", "storyRelevant": false, "priority": "low"},
+    {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "action": "climbing the ladder", "storyRelevant": true, "priority": "essential"}
   ],
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
   "textZoneDescription": "5–15 words naming the saturated, high-contrast surface in that corner",
@@ -149,7 +149,7 @@ Omit entirely (do not include with `false`): pure ground/floor/path contact, lea
 
 Field shape: `{character, object, where, action, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side". Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
-`action`: a short label for the activity the row belongs to ("freeing the boat", "crossing the log"). Every row taking part in the same activity carries the same label, however many characters that is. Omit it for anyone who only watches, stands, or carries what is already theirs.
+`action`: required on every row. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
 
 **Shared objects.** When several characters use ONE object at once, or act on ONE object together (carry the same basket, hold the same banner, pull the same rope, push the same cart), emit ONE entry: join the names with ` + ` in `character` and describe the shared action in the one `where` sentence. Separate entries with the same object render as duplicate objects. Characters each using their OWN identical object keep separate entries.
 
@@ -159,7 +159,7 @@ Field shape: `{character, object, where, action, storyRelevant, priority}`. `whe
 
 A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's beat and `low` otherwise.
 
-Cap: 1–6 entries, 0–2 with `storyRelevant: true`, and one `action` label per page — a second activity belongs on a different page.
+Cap: 1–6 entries, 0–2 with `storyRelevant: true`, and one `action` label per page beyond `"watching"` and `"standing"` — a second activity belongs on a different page.
 
 Every entry must also appear in the prose as the same physical contact.
 
