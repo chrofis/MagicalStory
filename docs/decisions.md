@@ -15926,6 +15926,35 @@ row on every sailing page, and that row failed 4 of 4.
 - `server/lib/sceneConsistencyCheck.js` — the same finding on the unified path
 - `docs/interaction-load-2026-08-23.md` — the measurement and the exp 815 verdict
 
+**Known conflict, accepted (owner, 2026-08-23):** the cap is absolute, and a beat
+can legitimately require several people in contact with one object — so on those
+pages the finding fires against a brief that is faithfully serving its beat.
+Attribution across both stories splits the hands-on rows roughly in half:
+
+- *the beat asked for it, the Art Director complied* — Fiona p8 ("Facundo hauls
+  the oar and poles; … she pushes with them"), Drache p16 ("He pushes the little
+  dragon from behind. Julian holds the dragon's side"), Drache p12 (the beat's own
+  words are "lays a piece on his flat palm"), Fiona p11, Fiona p12
+- *the Art Director invented it* — Fiona p4 (beat: Facundo "looks"; brief: "grips
+  the rigging"), Fiona p5 (rope post + tiller, neither in the beat), Fiona p7,
+  Fiona p16. **All four tiller rows are invention** — no beat ever asks anyone to
+  steer; the vehicle-operator rule manufactured them, and all four failed.
+
+The owner's call is to keep the cap absolute and let the reviewer weigh each
+finding against the beat, which is what the BRIEF FAULTS preamble already asks of
+it ("judge each one and rewrite the pages where the fault is real"). The rejected
+alternative was to fire only on contact the beat did not request — cheaper and
+never wrong, but it exempts Fiona p8 and Drache p16, the worst pages in both
+books. The risk being accepted: exp 815 showed the writer largely ignores prose
+rules, and handing the reviewer a fault it should sometimes refuse may teach it to
+discount the finding generally. Watch for that on the first live run.
+
+**The upstream half is not addressed here.** A beat demanding synchronized
+multi-person contact is a defect `prompts/story-beats-review.txt:45` already names
+("synchronized hands of two characters on one object") and correctly flagged on
+both Fiona p8 and Drache p16 — after which nothing was rewritten. Making that
+check binding is tracked in `tasks/BACKLOG.md`.
+
 **Status:** 🟡 conditional — the plumbing is unit-verified end to end (sanitize
 round-trip, 5/5 pre-check cases including fused-entry and legacy-row no-flag, the
 rendered findings block) but has NOT run on a live story. Rows written before this

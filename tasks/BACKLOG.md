@@ -50,10 +50,17 @@ The first two are corroborated by more than one source, which is why they lead.
       positioning; shared object → one entry), and line 158 ("a vehicle under way MUST have
       one character operating it") manufactures the failure — the tiller row failed 4/4.
       Fix location (beats vs Art Director) not yet decided → `docs/interaction-load-2026-08-23.md`
-- [ ] **Beats-review "Illustratable" check is diagnostically right and behaviourally inert.**
-      It named every hard page in both stories ("a hard two-on-one tangle", "packs stuck /
-      indecision / shout / find oars") and none were rewritten into a simpler tableau
-      → `docs/interaction-load-2026-08-23.md`
+- [ ] **Beats-review "Illustratable" check is diagnostically right and behaviourally inert —
+      and it owns HALF the hands-on failures.** Attribution over both stories (2026-08-23):
+      roughly half the hands-on rows come from beats that demand the contact in their own words
+      (Fiona p8 "Facundo hauls the oar and poles; … she pushes with them"; Drache p16 "He pushes
+      the little dragon … Julian holds the dragon's side"; Drache p12's beat literally says "flat
+      palm"), the other half the Art Director invented (all four tiller rows — no beat asks
+      anyone to steer). `story-beats-review.txt:45` already names this shape and flagged both
+      worst pages; nothing was rewritten. The Art-Director half is addressed by the `contact`
+      cap (44ff49325); this upstream half is not, and the cap fires against these pages even
+      though their briefs faithfully serve the beat (accepted, owner 2026-08-23)
+      → `docs/interaction-load-2026-08-23.md`, `docs/decisions.md`
 
 - [ ] **Avatar "pick best of N" via a vision model — NEEDS LAB PROOF FIRST (owner, 2026-08-22).**
       Today a failed avatar is regenerated and the retry replaces the original. The proposal:
