@@ -335,3 +335,4 @@ Recorded so nobody re-proposes them as gaps.
 - B → Gemini fallback option; C2; D1 → `tasks/showcase-bugs-2026-07-20.md:126`
 - `requirements/` (2025-01 pre-implementation spec, 174 items) and `docs/archive/` — both
   superseded; moved out of the search path 2026-08-20
+- [ ] Aboard-vehicle pages: if figures-on-deck placement misbehaves in production after the VB-vehicle plate injection (b6481c9e4), consider drawing vessel+crew together (AD declares aboard flag; plate excludes vehicle; buildPageCompositeRefs keeps VEH ref) — parked as too complicated for now → docs/decisions.md 2026-08-23 entry
