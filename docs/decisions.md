@@ -16269,3 +16269,42 @@ and no run has exercised it yet.
 **Touched:** `prompts/scene-expansion*.txt`, `server/lib/sceneBriefCheck.js`
 (reserved passive labels), `server/lib/sceneConsistencyCheck.js`,
 `server/lib/testlab.js` (`runBeatsScenesStage` brief pre-check).
+
+## 2026-08-23 — CONFIRMED: the reviewer acts on a named mechanical fault (exp 825)
+
+The link the whole one-action design rests on, and the first run able to test it —
+exp 821's harness never sent the reviewer any findings.
+
+**Result: 3 pages flagged `interaction_multiple_actions`, 3 rewritten, 3 came back
+with exactly one action.**
+
+| page | before | after |
+|---|---|---|
+| 9 | "sitting on the yardarm" + "pointing" | pointing |
+| 10 | "offering the scrap" + "pinning the map" | offering the scrap; the second character demoted to `watching` |
+| 11 | "steering the ship" + "pointing" | steering the ship; the second character demoted to `standing` |
+
+The reviewer reached for the reserved `watching` / `standing` labels unprompted,
+keeping both characters on the page and changing what they do — which is the
+outcome the rule wants, not the cruder fix of deleting a figure.
+
+**The required-label change also held: 0 unlabelled rows of 30**, against 7 of 21
+(exp 818) and 8 of 25 (exp 821) when the field was optional.
+
+**What this settles.** Three attempts to fix this with prose rules all failed —
+exp 815 (Art Director rules), exp 818 (optional label), exp 821 (beats rule, 4 of
+16 pages still two-action). A named mechanical finding handed to the reviewer
+worked first time, 3 for 3. For this class of defect the leverage is a counted
+fact in the review prompt, not an instruction to the writer. The beats rule stays
+as documentation of intent; it is not what enforces the outcome.
+
+**Still not fixed, and unrelated to this rule:** the "no body-part positioning"
+rule is still ignored — exp 825's surviving p11 row reads "grips the spokes of the
+helm wheel with both hands locked". Third confirmation in this session
+(exp 815 p7, exp 818 p12). It has no mechanical check behind it, which is
+consistent with everything above.
+
+**Status:** ✅ active for the action rule and the brief check. The measurement that
+motivated it (`docs/interaction-load-2026-08-23.md`) is unchanged. Still never run
+inside a full story generation, and no image has been produced under the new rule —
+the owner deliberately scoped these runs to text.
