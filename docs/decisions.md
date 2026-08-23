@@ -16382,3 +16382,28 @@ rewriting, so the audit costs less than the review it sharpens (~$0.11/story,
 `server/lib/beatsPipeline.js`, `server/lib/textRefine.js`,
 `storyJobPipeline.js` (audit persisted in the stage reports).
 **Status:** ✅ active
+
+
+## 2026-08-23 — The photo worker owns background removal too (U2-Net was loaded twice)
+
+**Context.** The first full story on the worker architecture
+(job_1787493968756_4fgr5nukroz, staging) completed cleanly — 10 pages — but its
+logs showed U2-Net loading twice: `[REMBG] U2-Net loaded — RSS now 1126.8 MB` in
+the face worker and again at `690.1 MB` in the rembg worker.
+
+**Decision.** The `face` worker owns the entire photo-upload path — face
+detection AND background removal. The separate `rembg` worker and port 5002 are
+retired.
+
+**Rationale.** `/analyze` removes the background in-process, so the face worker
+must hold its own U2-Net session (that was the fix for a "warmed" first upload
+still taking 17.9s). With both workers alive, the same ~600MB model was resident
+twice plus a second process base. Presence warms the whole photo path at once,
+so the two were never independently useful — the split cost memory and bought
+nothing.
+
+**Verified.** Querying the workers directly: face reports
+mediapipe=True/rembg_loaded=True, torch reports both False, nothing listens on
+5002.
+
+**Touched files.** `photo_analyzer.py`.

@@ -114,15 +114,24 @@ _last_request_ts = time.time()
 # replaces all of it with one rule. Owner direction 2026-08-23: "if a story is
 # done everything should be freed again — no arbitrary recycling."
 ANALYZER_ROLE = os.environ.get('ANALYZER_ROLE', 'parent')
-WORKER_PORTS = {'face': 5001, 'rembg': 5002, 'torch': 5003, 'arcface': 5004}
+WORKER_PORTS = {'face': 5001, 'torch': 5003, 'arcface': 5004}
 WORKER_ENDPOINTS = {
+    # 'face' owns the WHOLE photo-upload path — face detection AND background
+    # removal. They were separate workers until 2026-08-23, when staging showed
+    # U2-Net loading TWICE ([REMBG] U2-Net loaded at 1126.8MB in face and again
+    # at 690.1MB in rembg): /analyze removes the background in-process, so the
+    # face worker needs its own session, and a separate rembg worker then paid
+    # for a second copy of the same ~600MB model plus another process base.
+    # They are always warmed together by presence anyway, so splitting them
+    # bought nothing.
+    #
     # /split-grid is here because it calls detect_face_mediapipe: in a
     # mediapipe-less parent that helper silently degrades to a Haar cascade —
     # the exact failure mode that produced garbage likeness scores on
     # 2026-08-22. Anything that MIGHT touch mediapipe runs where mediapipe IS.
     # /face-embedding-onnx needs Face Mesh for alignment -> face as well.
-    'face': {'/analyze', '/extract-face', '/split-grid', '/face-embedding-onnx'},
-    'rembg': {'/remove-bg', '/silhouette-edge'},
+    'face': {'/analyze', '/extract-face', '/split-grid', '/face-embedding-onnx',
+             '/remove-bg', '/silhouette-edge'},
     'torch': {'/figure-mask', '/pose-heads', '/lpips', '/detect-figures-text'},
     # /detect-all-faces embeds faces via DeepFace to dedupe them -> needs TF.
     'arcface': {'/face-embedding', '/compare-identity', '/detect-all-faces'},
@@ -2326,7 +2335,7 @@ def warmup_endpoint():
             # Spawn the workers this session will need; forward the SAME warmup
             # body to each so it preloads its own models. face loads mediapipe
             # at boot; rembg/torch preload below; arcface only when asked.
-            roles = ['face', 'rembg', 'torch'] + (['arcface'] if want_arcface else [])
+            roles = ['face', 'torch'] + (['arcface'] if want_arcface else [])
             for role in roles:
                 try:
                     base = ensure_worker(role)
@@ -2339,19 +2348,14 @@ def warmup_endpoint():
             return
         # Worker roles preload only what they own.
         if ANALYZER_ROLE == 'face':
-            # /analyze does its background removal IN-PROCESS, so this worker
-            # needs its own U2-Net. Preloading it in the rembg worker warmed
-            # the wrong process — measured on staging: a fully "warmed" first
-            # upload still took 17.9s because this load happened inside it.
+            # This worker owns the whole photo path, so it loads U2-Net itself.
+            # Warming it in a separate rembg worker warmed the wrong process
+            # (a "warmed" first upload still took 17.9s) AND loaded the model
+            # twice once both existed — hence the merge.
             try:
                 get_rembg_session()
             except Exception as e:
-                print(f"[WARMUP] face-rembg failed: {e}")
-        if ANALYZER_ROLE == 'rembg':
-            try:
-                get_rembg_session()
-            except Exception as e:
-                print(f"[WARMUP] rembg failed: {e}")
+                print(f"[WARMUP] face/rembg failed: {e}")
         if ANALYZER_ROLE == 'torch':
             try:
                 get_mobilesam()
