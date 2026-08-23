@@ -4476,6 +4476,28 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       if (Object.keys(expectedPositions).length > 0) {
         log.info(`📦 [REFRESH-BBOX] Cover ${coverKey2}: built expectedPositions from coverHints.characterDetails — ${Object.keys(expectedPositions).join(', ')}`);
       }
+      // Whatever the hints carried (often a bare category like "standard", or
+      // nothing) must leave here as WEARABLE PROSE (bug cover-identity-
+      // undressed, 2026-08-23): cover identity lines went out with clothing ""
+      // and no Wearing in the prose, Gemini matched on hair alone, and the
+      // frontCover of mfedxinwqd swapped Levin/Julian (both blond curly
+      // toddlers) — which the entity eval then reported as a phantom "Levin
+      // wrong shorts" MAJOR. Resolve through the shared chain (hint ->
+      // clothingRequirements -> standard -> wardrobe), exactly like the
+      // generation scene site.
+      const shCover = require('../lib/storyHelpers');
+      const coverCat = parseClothingCategory(scene.description || '') || storyData.pageClothing?.primaryClothing || 'standard';
+      for (const name of Object.keys(expectedPositions)) {
+        const existing = expectedClothing[name];
+        const isCat = typeof existing === 'string' && /^(standard|winter|summer|costumed(:.*)?)$/i.test(existing.trim());
+        if (existing && !isCat) continue;
+        const chObj = (storyData.characters || []).find(ch => (ch.name || '').toLowerCase() === String(name).toLowerCase());
+        if (!chObj) continue;
+        try {
+          const txt = shCover.buildIdentityClothingText(chObj, (isCat ? existing.trim() : coverCat), storyData.artStyle, storyData.clothingRequirements || null, { label: `${coverKey2} ` });
+          if (txt) expectedClothing[name] = txt;
+        } catch (e) { log.warn(`⚠️ [REFRESH-BBOX] cover clothing resolve failed for ${name}: ${e.message}`); }
+      }
     }
 
     // Build character descriptions — primary characters + Visual Bible

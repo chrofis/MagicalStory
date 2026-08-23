@@ -15778,3 +15778,26 @@ enabled.
 (Lab parity).
 
 **Status:** ✅ active
+
+## 2026-08-23 — Cover refresh identity lines were the last undressed call site
+
+**Context.** mfedxinwqd's frontCover detection swapped Levin and Julian (both
+blond curly toddlers) although the painted cover matches the wardrobe canon
+exactly — the entity eval then reported a phantom "Levin wrong shorts" MAJOR
+(it judged Julian's crop under Levin's name). The persisted cover
+expectedCharacters show `clothing: ""` and no Wearing in the prose: the
+refresh-bbox cover branch mines coverHints.characterDetails, which carries
+category labels or nothing, and the category filter blanks those — so cover
+SoM lines went out with hair as the only cue.
+
+**Decision.** The cover branch resolves every character through the shared
+`buildIdentityClothingText` chain (hint category → clothingRequirements →
+standard → wardrobe), the same never-undressed guarantee the generation scene
+site got on 2026-08-22.
+
+**Also observed, kept open (#33):** the entity eval MISSED Julian wearing only
+briefs — no trousers at all — on the same story's backCover while flagging a
+MINOR hair shade. The multi-figure/clothing blind spot needs the prompt work.
+
+**Touched files.** `server/routes/regeneration.js`. Bug:
+`cover-identity-undressed`.

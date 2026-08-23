@@ -199,6 +199,15 @@
    "status": "fixed",
    "fixedIn": "fix(detection) 2026-08-23 (same commit)",
    "note": "crop-recovery cap 0.15->0.5; page-level leak-filter drops now logged in diag.faceLeaksDropped. Bundled: pre-identity crowd prune (faceless+<0.8%+score<0.45, face-contact untouchable, expected-count floor)."
+  },
+  {
+   "id": "cover-identity-undressed",
+   "title": "Cover refresh identity lines had empty clothing — coverHints deliver category labels/empties, the category filter blanks them, SoM matches on hair alone",
+   "reportedAt": "2026-08-23",
+   "source": "owner spotted wrong clothing on mfedxinwqd covers; frontCover detection swapped Levin/Julian (both blond curly); persisted expectedCharacters show clothing:\"\" and no Wearing in the prose; entity eval then reported a phantom Levin-wrong-shorts MAJOR",
+   "status": "fixed",
+   "fixedIn": "fix(refresh-bbox) 2026-08-23 (same commit)",
+   "note": "refresh-bbox cover branch now resolves each character through the shared buildIdentityClothingText chain (hint category -> clothingRequirements -> standard -> wardrobe). Separate finding kept open in #33: the entity eval MISSED Julian wearing only briefs (no trousers) on the backCover."
   }
  ]
 }
