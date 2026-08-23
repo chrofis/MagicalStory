@@ -4792,6 +4792,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null,
+          // Do the evaluator and the detector agree on WHO IS WHO. Computed in
+          // evaluateImageBatch, carried on the page record — and dropped here
+          // until this line existed: the whitelist above is the single gate on
+          // what reaches stories.data, so the record was built on every page of
+          // job_1787493968756_4fgr5nukroz and stored on none of them.
+          identityAgreement: img.identityAgreement || null,
           // textPosition is only meaningful for layouts that overlay text on
           // the image (1st-grade). For standard/advanced layouts the text is
           // rendered beside the image, so persisting a textPosition here would
