@@ -5705,8 +5705,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       });
     }
 
-    // Clean up checkpoints immediately - story is saved, no longer needed
-    await deleteJobCheckpoints(jobId);
+    // Clean up checkpoints ONLY when this run really flipped the job to
+    // completed. A job cancelled/failed out from under us keeps them: they are
+    // the forensic record, and deleting them here is exactly how a killed
+    // run's evidence vanished on 2026-08-23 (the salvage-then-keep policy in
+    // cleanupOldCompletedJobs owns their lifecycle from that point).
+    if (completionRes.rowCount > 0) {
+      await deleteJobCheckpoints(jobId);
+    }
 
     // Clear styled avatar cache to free memory
     clearStyledAvatarCache();
