@@ -149,6 +149,33 @@ Every page it named is in the failure list. The instruction "rewrite those into 
 nearest simple tableau" was not executed — the review is diagnostically accurate and
 behaviourally inert.
 
+## Attempted fix — Test Lab exp 815, INCONCLUSIVE (2026-08-23)
+
+Four changes to both Art Director templates (commit `7393ef1f7`), A/B'd on staging against
+the Fiona story: arm A = the deployed template, arm B = the edited one via `promptOverride`.
+13 targets ran (2 blocked by `IMAGE_OTHER`, 1 lost when the run was killed).
+
+| | A (deployed) | B (edited) |
+|---|---|---|
+| interaction rows | 27 | 27 |
+| rows with body-part detail | 15 | **10** |
+| rows with a contact verb | 18 | **14** |
+| rows marked `essential` | 19 | 17 |
+| fused multi-character rows | 0 | **0** |
+| mean semantic | 57 | 52 |
+
+**Verdict: the briefs change, the images do not.** Body-part detail drops by a third but 10
+violations remain; the shared-object fusion rule produced zero fused entries in either arm and
+is inert; mean semantic is flat (B wins 5 of 11) and the three controls split 1–2, so there is
+no evidence it protects good pages either. Do not promote to master on this evidence.
+
+**The dominant lesson is variance, not the verdict.** Arm A scored 100 on p7 and 0 on p12 —
+pages that scored 20 and 60 in production under the *same* template. Run-to-run noise in the
+generator and evaluator is larger than the effect being measured. Any future prompt A/B on this
+path needs repeats per page; single-page before/after comparisons here measure nothing.
+
+Not tested: the Drache story's three hands-on pages (that story is not on staging).
+
 ## Caveats
 
 - Two stories. Several cells are n=1 or n=2 and are marked as such; the HANDS_ON result
