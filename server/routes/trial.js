@@ -1865,7 +1865,10 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
           selected_face_id: selectedFaceId !== undefined ? selectedFaceId : null,
           cached_faces: cachedFaces || null
         }),
-        signal: AbortSignal.timeout(30000)
+        // 90s, not 30s: since the worker split (2026-08-23) the first photo call
+      // spawns the face worker cold — mediapipe boot plus U2-Net load is
+      // 10-25s before inference even starts. 30s raced that and lost.
+      signal: AbortSignal.timeout(90000)
       });
       if (!analyzerResponse.ok) {
         const text = await analyzerResponse.text().catch(() => '');
