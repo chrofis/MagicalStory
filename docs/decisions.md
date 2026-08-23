@@ -15507,8 +15507,12 @@ word-count and one-idea rules push toward short, and the dash ban's full-stop
 recast splits sentences further.
 **Decision:** The `standard` and `advanced` pacing strings in
 `LANGUAGE_LEVELS` (promptBuilders.js) now require mixed sentence lengths
-within a page and forbid repeated same-opening runs; `1st-grade` deliberately
-keeps uniform short sentences. The refiner flags staccato runs as a rewrite
+within a page and forbid repeated same-opening runs; `advanced` demands the
+full range — long sentences with subordinate clauses joining cause,
+consequence and feeling, medium ones for action, an occasional short one.
+`1st-grade` deliberately keeps uniform short sentences. Page openings vary
+by kind (time, place, speech, sound, action — not always a name;
+story-text-from-beats.txt). The refiner flags staccato runs as a rewrite
 condition unless the reading level asks for very short sentences.
 **Rationale:** One chokepoint — `getReadingLevel` feeds both the text writer
 and the refiner, so the rule is level-aware and stated once instead of
