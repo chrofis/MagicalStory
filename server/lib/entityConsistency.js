@@ -2314,23 +2314,27 @@ async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
   // REFERENCE FACE as cell R (owner, 2026-08-24: "add the reference avatar
   // face"). Until now the reference was added to the BODY grid only, so the one
   // image where faces are big had nothing to compare them against, and the one
-  // image holding the reference showed that face at ~60 px. The styled avatar
-  // is a 2x4 sheet whose top-left cell is the front face; cropSheetCell is the
-  // single source of truth for splitting it (edge detection, with fixed-math
-  // fallback). If the split fails we still add the whole sheet -- a small
-  // reference beats no reference.
+  // image holding the reference showed that face at ~60 px.
+  //
+  // cropAvatarCell is the single source of truth for splitting a 2x4 sheet
+  // (edge detection via the Python splitter, fixed-math fallback); its `face`
+  // is the front FACE cell. The face cell is rendered hatless, which disqualifies
+  // it as a Grok generation reference but is exactly right here — identity is
+  // the face, and every page cell wears whatever the story put on its head.
+  // Whole sheet as the fallback: a small reference beats no reference.
   if (referencePhoto) {
     try {
-      const sheet = await r2.bytesFromAnyImage(referencePhoto);
-      if (sheet) {
-        let faceCell = null;
-        try {
-          faceCell = await require('./sceneComposite').cropSheetCell(sheet, 1);
-        } catch (err) {
-          log.debug(`[ENTITY-HEAD-GRID] sheet split failed for ${entityName}: ${err.message} - using the whole sheet`);
-        }
+      let faceCell = null;
+      try {
+        const parts = await require('./sceneComposite').cropAvatarCell(referencePhoto, { pose: 'front', includeFace: true });
+        faceCell = parts?.face || null;
+      } catch (err) {
+        log.debug(`[ENTITY-HEAD-GRID] sheet split failed for ${entityName}: ${err.message} - using the whole sheet`);
+      }
+      const buffer = faceCell || await r2.bytesFromAnyImage(referencePhoto);
+      if (buffer) {
         cells.push({
-          buffer: faceCell || sheet,
+          buffer,
           letter: 'R',
           pageInfo: 'Ref',
           metadata: { isReference: true, entityName },
