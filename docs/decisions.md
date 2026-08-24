@@ -16951,3 +16951,50 @@ unrelated files, already on the backlog).
 **Touched files:** `server/lib/sceneMetadata.js`, `server/lib/promptBuilders.js`,
 `server/lib/sceneBriefCheck.js`.
 
+
+---
+
+## 2026-08-24 — Characters on one shared surface share one depth (scene-review 6c)
+
+**Context:** A production-shape story on staging (`job_1787514666616_yw9qsv1vf`)
+declared, on page 4, four characters standing on one small sailing boat:
+`foreground, bow` / `midground, deck` / `midground, deck` / `background, deck`.
+The stored `empty_scene` plate shows the whole stage is roughly four metres of
+deck — there is no background band to place the fourth character in, and the
+render correctly painted all four at comparable size.
+
+Two things went wrong downstream of that label. `needsScaleRepair` has a guard
+for exactly this case — `SHARED_VESSEL_RE` in `server/lib/scaleRepair.js:92` —
+but it only matches *"inside the / aboard the / in the boat"*; the writer said
+`deck` and `bow`, so the guard missed and the page-composite fired on four
+people standing on one hull, spending Grok calls and aborting. The wrong depth
+label also reaches `buildImagePrompt`, telling the model to paint that character
+small and distant on a surface where that is not drawable.
+
+**Decision:** Fix it at the writer, not at the gate. `prompts/scene-review.txt`
+check 6c gains one clause: characters standing on one small shared surface — a
+boat, a raft, a cart, a wagon, a sled — are all at the same depth, and a page
+marking one of them `background` is faulted and rewritten. `SHARED_VESSEL_RE`
+is deliberately left alone.
+
+**Rationale:** Owner's call (`AskUserQuestion`, 2026-08-24) between fixing the
+code gate, the prompt, both, or neither. The prompt is the source: the code gate
+only stops the composite, while the bad label still reaches the image prompt.
+6c is already the place where a `background` depth has to be earned
+(`0c039620e`, owner directive, exp #649), and it is the single live site — the
+`outline-analysis-*.txt` depth rules are not wired into the beats pipeline, and
+no other template carries this instruction. Widening `SHARED_VESSEL_RE` was
+also the wrong shape given `docs/SETTLED.md`: the composite firing rarely is the
+intended state, so the fix should reduce false triggers at the source rather
+than add regex surface.
+
+**Frequency — read this before tuning it further.** A corpus scan of the 120
+most recent stories in each environment (129 stories with scenes, 949
+multi-character pages) found this pattern **once**: the motivating page itself.
+The rule is kept because it states a geometric fact, not because a corpus showed
+a trend — one page is not evidence of a rate. Do not generalise from it, and do
+not widen it to other "shared surface" readings (a shared room, a shared path)
+without new measurement.
+
+**Touched:** `prompts/scene-review.txt` (check 6c).
+**Status:** ✅ active
