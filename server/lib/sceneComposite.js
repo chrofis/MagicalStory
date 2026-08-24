@@ -2357,6 +2357,10 @@ async function generateSceneComposite(opts) {
   // object a successful run returns, holding whatever had been built.
   const refuse = (message) => {
     const err = new Error(message);
+    // Stamped onto the debug itself, not only onto the Error: the production
+    // pipeline persists the debug and the Error is gone by then, so a stored
+    // refusal has to carry its own reason.
+    debug.abortReason = message;
     err.compositeDebug = debug;
     return err;
   };

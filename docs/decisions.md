@@ -17055,3 +17055,57 @@ improvement.
 
 **Touched:** `prompts/image-generation.txt`.
 **Status:** 🟡 conditional — shipped, awaiting a baseline render.
+
+---
+
+## 2026-08-24 — Production keeps the composite's stage frames, on success and on refusal
+
+**Context:** `01f280789` made a composite refusal keep its evidence, but only in
+the Test Lab: it attaches `err.compositeDebug` at the two designed gates, and
+`server/lib/testlab.js` is the only consumer. The production generation path
+caught the throw, recorded a `compositeOutcome` the save whitelist then dropped,
+and discarded the populated plate plus the depopulated plate — two Grok calls
+already paid for.
+
+Measured 2026-08-24 while answering "did it work" for two finished stories: the
+composite triggered on three real pages (staging p4, prod p5, prod p17) and left
+no artefact at all, so the question cost an hour of forensics and still ended in
+"unknowable". The wider finding: `story_images` held **zero** `composite_*` rows
+in production for any story ever — `persistCompositeDebug` in
+`server/services/database.js` has always known how to write
+`composite_blocking` / `composite_clean_bg` / `composite_composited`, but
+`storyJobPipeline.js` never attached `compositeDebug` to a scene page, so the
+frames were lost on **success** as well as on abort. Only the cover path
+(`images.js:4354`) and the repair path were feeding it.
+
+**Decision:** The generation path attaches `compRes.debug` on success and
+`e.compositeDebug` on abort, and passes it out on the page object; the existing
+`persistCompositeDebug` does the rest and deletes the bytes off the blob.
+`refuse()` in `sceneComposite.js` now stamps `debug.abortReason` onto the debug
+object itself, and `persistCompositeDebug` copies `depthSpread` + `abortReason`
+inline, so a stored refusal reports its own number and its own sentence. The
+single-page save path calls `persistCompositeDebug` too, with an explicit
+page-number argument.
+
+**Rationale:** No new table, no new image type, no new plumbing — the writer
+already existed and was simply never called from this path. Attaching at the
+pipeline rather than inside the composite keeps the composite a pure function of
+its inputs. An unexpected throw still carries no debug, deliberately, so a bug
+stays distinguishable from a designed refusal.
+
+Note this makes the still-open whitelist item (`compositeOutcome` and
+`preScaleRepairImage` dropped at `storyJobPipeline.js`) less load-bearing for
+diagnosis: the refusal reason now survives as `compositeAbortReason` on the page
+regardless. It does not replace it — a *successful* composite's
+`preScaleRepairImage` is still dropped, so the version picker still cannot show
+the pre-composite render.
+
+**Verification:** `persistCompositeDebug` exercised offline against a spy for
+`saveStoryImage` — a refusal writes exactly the two plates and no `composited`
+frame, strips `img.compositeDebug`, and keeps spread + reason; the page-number
+override lands on the right page; an absent debug is a no-op. The end-to-end
+proof is the next page that trips the gate.
+
+**Touched:** `storyJobPipeline.js`, `server/lib/sceneComposite.js`,
+`server/services/database.js`.
+**Status:** ✅ active

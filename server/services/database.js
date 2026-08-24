@@ -2099,6 +2099,11 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   }
   delete dataForStorage.emptySceneImage;
 
+  // Composite stage frames, same as saveStoryData. This path is the one a
+  // single-page rerun takes; without it the debug's base64 would ride into
+  // the JSONB blob, which is the one thing images may never do.
+  imagesSaved += await persistCompositeDebug(storyId, dataForStorage, pageNumber);
+
   // Push every remaining inline image to R2 first (Grok/inpaint refs,
   // entity grids, debug overlays, landmark photos), replacing inline
   // base64 with the R2 URL. Then strip preserves URLs and clears anything
@@ -2527,20 +2532,23 @@ async function saveVbReferenceToR2(storyId, entryId, imageData) {
  *
  * @returns number of story_images rows written
  */
-async function persistCompositeDebug(storyId, img) {
+async function persistCompositeDebug(storyId, img, pageNumberOverride) {
   const cd = img.compositeDebug;
   if (!cd) return 0;
+  // The single-page path carries its page number as a separate argument;
+  // the whole-story loop reads it off the entry.
+  const pageNumber = pageNumberOverride != null ? pageNumberOverride : img.pageNumber;
   let saved = 0;
   if (cd.cleanBackground) {
-    await saveStoryImage(storyId, 'composite_clean_bg', img.pageNumber, cd.cleanBackground);
+    await saveStoryImage(storyId, 'composite_clean_bg', pageNumber, cd.cleanBackground);
     saved++;
   }
   if (cd.blocking) {
-    await saveStoryImage(storyId, 'composite_blocking', img.pageNumber, cd.blocking);
+    await saveStoryImage(storyId, 'composite_blocking', pageNumber, cd.blocking);
     saved++;
   }
   if (cd.composited) {
-    await saveStoryImage(storyId, 'composite_composited', img.pageNumber, cd.composited);
+    await saveStoryImage(storyId, 'composite_composited', pageNumber, cd.composited);
     saved++;
   }
   if (cd.bboxes) img.compositeBboxes = cd.bboxes;
@@ -2548,6 +2556,12 @@ async function persistCompositeDebug(storyId, img) {
   if (cd.blendPrompt) img.compositeBlendPrompt = cd.blendPrompt;
   if (cd.cleanBackgroundPrompt) img.compositeCleanBgPrompt = cd.cleanBackgroundPrompt;
   if (cd.cleanBackgroundSource) img.compositeCleanBgSource = cd.cleanBackgroundSource;
+  // A refused composite saves its plates but has no `composited` frame. These
+  // two scalars are what turn that into a readable answer: the measured spread
+  // and the gate's own sentence. Without them a stored refusal looks identical
+  // to a run that crashed halfway.
+  if (cd.depthSpread != null) img.compositeDepthSpread = cd.depthSpread;
+  if (cd.abortReason) img.compositeAbortReason = String(cd.abortReason).slice(0, 300);
 
   // Phantom-pose render persistence (per character):
   //   - heavy output bytes go to story_images under a per-character version index
@@ -2560,7 +2574,7 @@ async function persistCompositeDebug(storyId, img) {
       const name = names[i];
       const entry = cd.phantomPoseRenders[name] || {};
       if (entry.output) {
-        await saveStoryImage(storyId, 'composite_phantom_pose', img.pageNumber, entry.output, { versionIndex: i });
+        await saveStoryImage(storyId, 'composite_phantom_pose', pageNumber, entry.output, { versionIndex: i });
         saved++;
       }
       meta[name] = {

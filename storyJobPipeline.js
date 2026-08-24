@@ -3992,6 +3992,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // (asked about job_1786829555599_rgzoyoprx, 2026-08-16, and the
             // answer had to be reconstructed from scene metadata).
             let compositeOutcome = null;
+            // The composite's stage frames — populated plate, depopulated
+            // plate, finished composite. `persistCompositeDebug` in
+            // services/database.js already writes these to story_images as
+            // composite_blocking / composite_clean_bg / composite_composited
+            // and deletes the bytes off the blob, but this generation path
+            // never attached them, so production held ZERO composite_* rows
+            // for any story (measured 2026-08-24, both environments) — on
+            // success as well as on abort.
+            let compositeDebug = null;
             if (genResult.imageData && pageData.sceneMetadata) {
               try {
                 // Only the trigger is used here — the composite replaced
@@ -4151,9 +4160,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   compositeOutcome = scaleRepairResult
                     ? { status: 'composited', detector: compRes.debug?.detector || null, placed: (compRes.debug?.placements || []).length }
                     : { status: 'no-image', reason: 'the composite returned no image' };
+                  compositeDebug = compRes?.debug || null;
                 }
               } catch (e) {
                 compositeOutcome = { status: 'aborted', reason: String(e.message || e).slice(0, 300) };
+                // Only the two designed gates carry debug; an unexpected throw
+                // deliberately carries none, so a bug stays distinguishable
+                // from a refusal.
+                compositeDebug = e.compositeDebug || null;
                 log.warn(`⚠️ [SCALE-REPAIR] Page ${pageData.pageNumber} failed: ${e.message}`);
               }
             }
@@ -4201,6 +4215,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               scaleRepairPrompt: scaleRepairResult ? scaleRepairResult.prompt : null,
               scaleRepairGrokRefImages: scaleRepairResult ? scaleRepairResult.grokRefImages : null,
               compositeOutcome,
+              compositeDebug,
               thinkingText: genResult.thinkingText || null,
               usage: genResult.usage,
               prompt: pageData.prompt,
