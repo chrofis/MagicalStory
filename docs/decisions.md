@@ -14075,9 +14075,37 @@ detection box, because he is riding on another character's shoulders and the mas
 reaches onto the carrier. Max and Kiaan on the same page sit at 0.97 and 0.96.
 That is a mask-separation problem for touching bodies, not a matting problem.
 
+**The reference cell must be a FACE.** The first cut called
+`sceneComposite.cropSheetCell`, which is not exported (it lives under
+`_internal`), so the crop silently fell through to the whole 2×4 sheet — eight
+tiny poses sitting in a grid built to show faces at full size. The public path is
+`cropAvatarCell(sheet, { pose: 'front', includeFace: true }).face`, which also
+resolves a URL or data-URI itself. That cell is rendered hatless, which is why it
+cannot serve as a Grok generation reference and why it is right here: identity is
+the face, and each page cell wears whatever the story put on its head.
+
+**`face_drift` is a type, capped at MINOR.** Owner, asked whether a face that
+reads rounder or fuller than the reference while hair, skin tone and features
+still identify the same person should score: "Yes — MINOR, no redo".
+Classification goes in the prompt (a Type Tie-Break line plus the minor severity
+line); the ceiling goes in `MAX_SEVERITY_TYPES`, per the standing severity rule.
+Expression legitimately changes face shape — a smile widens cheeks and jaw — so
+it must never cost enough to trip the redo gate. A genuinely different person
+stays `face_mismatch` and is uncapped.
+
+**What this did NOT fix, measured.** Replaying Lorena's five pages with the
+reference face in place and the head grid primary still returns
+`consistent: true`, score 10 — the judge, now able to resolve the face properly,
+reads p16 as the same person. The earlier score-3 run flagged a DIFFERENT cell
+(p15), whose crop contains two women. So the plumbing is right and the judge is
+simply not sensitive to drift at this level. Catching it needs the deterministic
+route in task #39: a face-embedding distance between the reference and each
+page's face crop, rather than asking a prose judge to eyeball identity.
+
 **Touched files.** `server/lib/entityConsistency.js` (MAX_APPEARANCE_CELLS,
 `createEntityHeadGrid` reference cell, eval call-site image order,
-HEAD_GRID_INFO / refPhotoInfo / cropType prompt wiring).
+HEAD_GRID_INFO / refPhotoInfo / cropType prompt wiring),
+`prompts/entity-consistency-check.txt`, `server/lib/scoring.js`.
 
 ## 2026-08-20 — `emotion` and `viewer_address` become their own types
 
