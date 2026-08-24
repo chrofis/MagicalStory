@@ -8,7 +8,7 @@
    "source": "owner (Lorena's face on p16, staging job_1787514666616_yw9qsv1vf) + local probe: createLabeledGrid returns cells {letter,pageNumber,...} with NO metadata object, so the shipped mapping loop yields {}",
    "status": "fixed",
    "task": 39,
-   "fixedIn": "7b08aef7d",
+   "fixedIn": "b445eb256",
    "note": "Two sites in entityConsistency.js (gridCellToPage ~958, primaryCellToPage ~1092) read the nested cell.metadata.pageNumber. Because {} is truthy, the primaryCellToPage fallback never engaged either: any issue naming only cell letters resolved to no page, got pageNumbers:[], was never stamped on a version, never scored, never repaired, and never displayed. Only findings where the model volunteered an absolute pagesToFix survived (that is how Sarah's p2 MINOR got through on this story). Also why stored descriptions lack the '(page N)' annotation. Fix reads the flat field with the nested one as fallback; verified with a probe -> {A:3,B:16}."
   },
   {
