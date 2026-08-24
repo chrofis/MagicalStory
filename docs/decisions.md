@@ -17286,6 +17286,29 @@ the COMPOSED cover — title text included. The title survived legibly in all
 three arms but was restyled. This bypasses the cover-text contract (repaint
 `${key}Art`, restamp via `composeCover`). Filed to the backlog, not fixed here.
 
+**Why the repaint cannot fix a face, measured:** greyscale mean-absolute-diff
+against the input, split face-box vs rest (all arms warped identically, so the
+arms compare even though the absolute numbers are inflated):
+
+| arm | whole | face | rest | face/rest |
+|---|---|---|---|---|
+| Grok prompt-only | 20.1 | 21.4 | 20.0 | **1.07** |
+| Grok + sheets | 17.2 | 19.1 | 17.1 | 1.11 |
+| Gemini + sheets | 26.2 | 43.3 | 25.5 | 1.69 |
+
+None of the three returned the input unaltered — the "Grok hands it straight
+back" failure did not occur here. The problem is subtler: at **1.07** Grok
+spreads its repaint effort uniformly over the canvas, so the face — the only
+broken part — got no more attention than the sky. On a story page, where a face
+is a fraction of a cover face, uniform effort means the face receives almost
+nothing, and the page still comes back looking worked-on. Gemini's 1.69 is the
+grain, concentrated on the face: less photographic, not more watercolour.
+
+The owner's read (2026-08-24): stop here. Prompt-only Grok stays the repaint
+path and the faces-in-style ceiling stands as a known limitation. The obvious
+next lever — crop the face so it fills the frame, repaint, composite back
+through the feathered insert-blend — is PARKED, not rejected; see BACKLOG.
+
 **Caveats:** n=1 page, and it is a cover rather than a story page. The verdict
 is "no evidence of improvement, one clear regression", not "proven harmful on
 every page". Do not re-run this A/B without adding pages — re-running the same
