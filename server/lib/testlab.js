@@ -3648,26 +3648,56 @@ async function runStyleRepairStage(target, { experimentId, params = {}, promptOv
   }
   targets = targets.slice(0, maxTargets);
 
+  // `characterRefs` runs BOTH arms per model — prompt-only and the same
+  // repaint with the page cast's styled avatars attached as style sheets.
+  // One arm alone cannot answer "does the sheet improve it", which is the
+  // question holding `styleRepairCharacterRefs` flag-off (decisions.md
+  // 2026-08-24). Doubles the images per page; keep maxTargets small.
+  const refArms = params.characterRefs === true ? [false, true] : [false];
+
   // 3) A/B — repaint each outlier with every requested model.
   const results = [];
+  const steps = [];
   for (const tg of targets) {
     const perModel = {};
+    let sheets = [];
+    if (refArms.includes(true)) {
+      const { collectStyleRefSheets } = require('./repairPipeline');
+      sheets = await collectStyleRefSheets(tg.page, storyData.sceneImages || [], storyData.characters || [], artStyle);
+      if (sheets.length === 0) {
+        log.warn(`[TESTLAB] style_repair page ${tg.page}: no styled avatar sheets resolved — the refs arm is prompt-only, so the A/B is void for this page`);
+      }
+    }
     for (const model of models) {
-      const m0 = Date.now();
-      try {
-        const rep = await repairPageStyle(tg.image, tg.targetRefImage, { model, artStyle, promptOverride });
-        const versionIndex = await saveTestVersion(target.storyId, 'scene', tg.page, rep.imageData, experimentId);
-        perModel[model] = {
-          versionIndex,
-          passedGate: rep.passedGate,
-          beforeStyleMatch: rep.beforeStyleMatch,
-          afterStyleMatch: rep.afterStyleMatch,
-          modelId: rep.modelId,
-          elapsedMs: Date.now() - m0,
-        };
-      } catch (err) {
-        log.warn(`[TESTLAB] style_repair ${model} failed on page ${tg.page}: ${err.message}`);
-        perModel[model] = { error: err.message, elapsedMs: Date.now() - m0 };
+      for (const useRefs of refArms) {
+        const arm = useRefs ? `${model}+refs` : model;
+        const m0 = Date.now();
+        try {
+          const rep = await repairPageStyle(tg.image, tg.targetRefImage, {
+            model, artStyle, promptOverride,
+            refImages: useRefs ? sheets : [],
+          });
+          const versionIndex = await saveTestVersion(target.storyId, 'scene', tg.page, rep.imageData, experimentId);
+          perModel[arm] = {
+            versionIndex,
+            passedGate: rep.passedGate,
+            beforeStyleMatch: rep.beforeStyleMatch,
+            afterStyleMatch: rep.afterStyleMatch,
+            styleComparison: rep.styleComparison || null,
+            refSheets: useRefs ? sheets.length : 0,
+            modelId: rep.modelId,
+            elapsedMs: Date.now() - m0,
+          };
+          steps.push({
+            label: `page ${tg.page} — ${model}${useRefs ? ` + ${sheets.length} character style sheet(s)` : ', prompt-only'}`,
+            imageType: 'tl_step',
+            versionIndex,
+            pageNumber: tg.page,
+          });
+        } catch (err) {
+          log.warn(`[TESTLAB] style_repair ${arm} failed on page ${tg.page}: ${err.message}`);
+          perModel[arm] = { error: err.message, elapsedMs: Date.now() - m0 };
+        }
       }
     }
     results.push({
@@ -3675,6 +3705,7 @@ async function runStyleRepairStage(target, { experimentId, params = {}, promptOv
       targetRefPage: tg.targetRefPage,
       severity: tg.severity,
       differences: tg.differences,
+      refSheetsAvailable: sheets.length,
       models: perModel,
     });
   }
@@ -3700,6 +3731,7 @@ async function runStyleRepairStage(target, { experimentId, params = {}, promptOv
     },
     plan: { anchorPage: plan.anchorPage, targetPages: targets.map(t => t.page), skipped: plan.skipped },
     results,
+    steps: steps.length ? steps : undefined,
   };
 }
 

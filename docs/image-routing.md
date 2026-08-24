@@ -151,6 +151,10 @@ for 4 of 5, Lab 723): a flat cartoon figure gives a VLM nothing to recognise.
 `style_check` — finds style-outlier pages via `checkStoryStyleConsistency`, repaints each toward the
 dominant cluster with BOTH Gemini and Grok (`repairPageStyle`, model-parameterized), and surfaces the
 two candidates side-by-side with before/after `checkStyleMatch` scores so a human picks the winning model.
+`params.characterRefs: true` adds a second arm per model — the same repaint with the page cast's styled
+avatars attached as style reference sheets (`gemini` vs `gemini+refs`, `grok` vs `grok+refs`) — which is
+the A/B holding `styleRepairCharacterRefs` flag-off. Doubles the images per page; pair it with
+`params.maxTargets: 1` and pin the page via `params.pages` so both runs hit the same target.
 Test-Lab-first; production wiring deferred (decisions.md Pt 10).
 
 Targets: page stages `{storyId, pageNumber}`; avatar stages `{storyId, character}`; story-level `{storyId}` (+ `coverType` for `cover`).

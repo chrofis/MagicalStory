@@ -3224,6 +3224,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
 module.exports = {
   runUnifiedRepairPipeline,
+  // Exported for the Test Lab `style_repair` stage: the A/B that decides
+  // whether `styleRepairCharacterRefs` ships needs the SAME sheet-collection
+  // the pipeline uses, not a second implementation of it.
+  collectStyleRefSheets,
   // Version selection + the repair-strategy helpers. Small, pure, and only
   // meaningful next to the loop that uses them.
   selectBestVersion,
