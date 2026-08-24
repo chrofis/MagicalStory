@@ -52,12 +52,40 @@ async function refineStoryText(storyData, pages, opts = {}) {
   const original = pages.map(p => ({ ...p }));
   let current = pages.map(p => ({ ...p }));
   const rounds = [];
+  // Declared HERE, above the snapshot closure that reads it. Same lesson as the
+  // evaluator's expectedAgesBlock (2026-08-24): a `let` below its reader is a
+  // temporal-dead-zone throw waiting for the first call that reaches it.
+  let auditFindings = '';
+
+  // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
+  // and its caller races it against a join deadline — so a finished audit and a
+  // finished round 1 were worth NOTHING if round 2 was still in flight when the
+  // clock ran out. Staging job_1787514666616_yw9qsv1vf threw away $0.236 of
+  // completed grok audit and deepseek rewriting that way, and shipped the
+  // unrefined text. Every completed step is now handed to the caller
+  // immediately, in the same shape as the final return, so the deadline can
+  // only ever cost the round still running.
+  const snapshot = () => ({
+    pages: current.map(p => ({ ...p })),
+    original,
+    rounds: rounds.slice(),
+    changed: current
+      .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
+      .filter(n => n !== null),
+    audit: auditFindings,
+    partial: true,
+  });
+  const publish = () => {
+    if (typeof opts.onProgress !== 'function') return;
+    try { opts.onProgress(snapshot()); } catch (e) {
+      log.warn(`⚠️ [TEXT-REFINE] onProgress threw (${e.message}) — ignored`);
+    }
+  };
 
   // Blind audit of the text as delivered: a reader with only the back cover,
   // the pages and what each picture shows names faults. Round 1's fix ledger
   // must answer every one. Never blocks — a failed audit just means the
   // refiner runs on its own checks alone.
-  let auditFindings = '';
   const auditModel = opts.auditModel || MODEL_DEFAULTS.arcReviewModel || defaultModel;
   try {
     const { buildTextAuditPrompt } = require('./storyHelpers');
@@ -71,6 +99,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   } catch (auditErr) {
     log.warn(`⚠️ [TEXT-AUDIT] failed (${auditErr.message}) — refinement runs without audit findings`);
   }
+  publish();   // the audit survives even if no round finishes
 
   for (let i = 0; i < roundCount; i++) {
     const modelKey = perRound[i] || defaultModel;
@@ -140,6 +169,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         })),
       });
       current = next;
+      publish();                         // this round's rewrites are now safe
       if (changed.length === 0) break;   // converged
     } catch (err) {
       rounds.push({ round: i + 1, ok: false, modelKey, elapsedMs: Date.now() - t0, error: err.message });
@@ -151,7 +181,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
-  return { pages: current, original, rounds, changed, audit: auditFindings };
+  return { pages: current, original, rounds, changed, audit: auditFindings, partial: false };
 }
 
 /**

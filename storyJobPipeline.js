@@ -3141,6 +3141,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Per-page before/after, filled at the join so dev mode can show WHAT the
     // refiner changed rather than only that it ran.
     let textRefineReport = null;
+    // Latest snapshot the refiner published (audit, then after each round).
+    let textRefinePartial = null;
     // The other two review stages' before/after (beats mode only). Same shape,
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
@@ -3158,6 +3160,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         textRefinePromise = startBackgroundRefine(inputData, refinablePages, {
           rounds: parseInt(process.env.TEXT_REFINE_ROUNDS || '2', 10),
           usageLabel: 'text_refine',
+          // Latest completed state, so the bounded join below can salvage the
+          // audit and any finished round instead of discarding paid work when
+          // the round still in flight runs past the deadline.
+          onProgress: (snap) => { textRefinePartial = snap; },
         });
       }
     }
@@ -4904,7 +4910,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // meant the pass was DISCARDED after being paid for (staging
       // job_1786998860057_o6deqtv5s: $0.16 and 23k output tokens thrown away).
       // Worst case now adds up to 5 min on a run whose images finished early.
-      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS) || 300000;
+      // SCALED (2026-08-24). A flat 300s was measured on a stage that had no
+      // blind audit in front of it — that landed 2026-08-23 and roughly doubled
+      // the stage, so the budget no longer matched the work. It is also
+      // reading-level sensitive: a `standard` book's audit emitted 2.3x the
+      // output tokens of a `1st-grade` one (18.4k vs 7.9k on two runs the same
+      // evening), and its single round outweighed a whole 1st-grade round. The
+      // long-text levels get double the base, plus a per-page allowance beyond
+      // ten pages. Salvage below is what makes overrunning cheap; this only
+      // decides how long a user waits for the last round.
+      const LONG_TEXT_LEVELS = new Set(['standard', 'advanced']);
+      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS)
+        || ((LONG_TEXT_LEVELS.has(inputData?.languageLevel) ? 600000 : 300000)
+          + Math.max(0, (allImages?.length || 0) - 10) * 10000);
       const TIMED_OUT = Symbol('text-refine-join-timeout');
       let joinTimer = null;
       const refined = await Promise.race([
@@ -4915,22 +4933,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // it leaking, and that runs on both branches.
         new Promise((resolve) => { joinTimer = setTimeout(() => resolve(TIMED_OUT), JOIN_TIMEOUT_MS); }),
       ]).finally(() => { if (joinTimer) clearTimeout(joinTimer); });
+      // SALVAGE: on timeout, fall back to the last state the refiner published
+      // rather than throwing the whole stage away. Everything below reads
+      // `usable`, so a partial snapshot ships exactly like a complete run.
+      const usable = (refined === TIMED_OUT) ? textRefinePartial : refined;
       if (refined === TIMED_OUT) {
-        log.warn(`⚠️ [TEXT-REFINE] still running ${(JOIN_TIMEOUT_MS / 1000).toFixed(0)}s after images completed — shipping the ORIGINAL text`);
-        genLog.warn('text_refine_join_timeout', `Text refinement did not finish within ${(JOIN_TIMEOUT_MS / 1000).toFixed(0)}s of images completing — original text kept`);
-      } else if (refined?.changed?.length) {
+        const secs = (JOIN_TIMEOUT_MS / 1000).toFixed(0);
+        if (usable?.changed?.length) {
+          log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — shipping ${usable.rounds.length} completed round(s), abandoning the one in flight`);
+          genLog.warn('text_refine_join_partial', `Text refinement did not finish within ${secs}s of images completing — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}`);
+        } else {
+          log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed and no round had finished — shipping the ORIGINAL text`);
+          genLog.warn('text_refine_join_timeout', `Text refinement did not finish within ${secs}s of images completing — original text kept`);
+        }
+      }
+      if (usable?.changed?.length) {
         // Capture the pre-refine prose BEFORE the overwrite below — it is the
         // only moment both versions exist. Without it the refiner's work is
         // invisible: the story ships the rewritten text with no record of what
         // changed, and 10 of 14 pages were rewritten on the first real run.
         textRefineReport = {
-          rounds: refined.rounds.length,
-          changedPages: refined.changed,
-          audit: refined.audit || '',
-          durationMs: refined.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
-          model: refined.rounds[0]?.modelId || refined.rounds[0]?.modelKey || null,
-          pages: refined.pages
-            .filter(p => refined.changed.includes(p.pageNumber))
+          rounds: usable.rounds.length,
+          changedPages: usable.changed,
+          audit: usable.audit || '',
+          durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
+          model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
+          pages: usable.pages
+            .filter(p => usable.changed.includes(p.pageNumber))
             .map(p => ({
               pageNumber: p.pageNumber,
               before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
@@ -4940,7 +4969,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // BOTH arrays: allImages[].text is a COPY taken when the page was
         // prepared, so updating only the scene would leave the saved story on
         // the pre-refinement prose.
-        const byPage = new Map(refined.pages.map(p => [p.pageNumber, p.text]));
+        const byPage = new Map(usable.pages.map(p => [p.pageNumber, p.text]));
         for (const scene of expandedScenes) {
           const t = byPage.get(scene.pageNumber);
           if (t) scene.text = t;
@@ -4957,18 +4986,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         fullStoryText = storyPages.map(page =>
           `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
         ).join('\n\n');
-        const totalMs = refined.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
-        genLog.info(
-          'text_refine_complete',
-          `Text refined in ${refined.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${refined.changed.join(', ')}`,
-          null,
-          { rounds: refined.rounds.length, changedPages: refined.changed, durationMs: totalMs }
-        );
-      } else if (refined) {
+        const totalMs = usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
+        // A salvaged snapshot already logged text_refine_join_partial, which
+        // says what was kept AND what was abandoned. Emitting "complete" here
+        // too would read as a clean finish and hide the abandoned round.
+        if (!usable.partial) {
+          genLog.info(
+            'text_refine_complete',
+            `Text refined in ${usable.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${usable.changed.join(', ')}`,
+            null,
+            { rounds: usable.rounds.length, changedPages: usable.changed, durationMs: totalMs }
+          );
+        }
+      } else if (usable && !usable.partial) {
         // "Nothing to rewrite" and "a round failed" are different outcomes — a
         // failed round means the ORIGINAL text ships unreviewed, which must be
         // visible in the log, not filed as a clean convergence.
-        const failedRound = (refined.rounds || []).find(r => !r.ok);
+        const failedRound = (usable.rounds || []).find(r => !r.ok);
         if (failedRound) {
           genLog.warn('text_refine_failed', `Text refinement round ${failedRound.round} failed (${failedRound.error}) — original text kept`);
         } else {
