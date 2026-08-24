@@ -5584,9 +5584,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               // reads like a detector failure; naming the figures that WERE
               // found says the real thing — the character is not on this page,
               // so the fix is a page redo, not a face repair.
-              const found = (detection?.figures || [])
-                .map(f => f.name || f.label || 'unknown figure')
-                .filter(Boolean);
+              // Names, not labels. A figure's `label` is the detector's full
+              // prose descriptor ("adult, mid-thirties. tall, lean, upright
+              // posture. hair: deep red…") — pasting those into a user-facing
+              // sentence buries the one fact that matters. Unnamed figures
+              // collapse to a count.
+              const named = [...new Set((detection?.figures || [])
+                .map(f => f.name)
+                .filter(n => n && String(n).trim() && !/^unknown/i.test(n)))];
+              const unnamed = (detection?.figures || []).length - named.length;
+              const found = [...named, ...(unnamed > 0 ? [`${unnamed} unidentified figure${unnamed > 1 ? 's' : ''}`] : [])];
               const who = found.length
                 ? `Detected instead: ${found.join(', ')}.`
                 : 'No figures were detected at all.';
