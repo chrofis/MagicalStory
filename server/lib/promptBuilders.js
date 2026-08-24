@@ -3236,7 +3236,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   const metaCharacters = Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
     ? metadata.fullData.characters
     : (Array.isArray(metadata?.characters) ? metadata.characters : []);
-  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters);
+  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible);
   const eraGuard = buildEraGuard(metadata?.era);
   const sceneIntentLine = metadata?.sceneIntent
     ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
@@ -3397,7 +3397,42 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
  * @param {Array} interactions - metadata.interactions, array of {character, object, where}
  * @returns {string}
  */
-function buildExactPosesBlock(interactions, sceneCharacters = []) {
+// A visual-bible handle: three letters, three digits, optional landmark variant
+// suffix. Shared by the actor resolver below and the object check further down.
+const VB_HANDLE = /^(ART|LOC|CHR|VEH|ANI)(\d{3})(?:\.\d+)?$/i;
+const VB_ACTOR_COLLECTIONS = ['animals', 'secondaryCharacters', 'vehicles', 'artifacts'];
+
+/**
+ * Turn a visual-bible handle into the name a person would use.
+ *
+ * An actor may legitimately be a visual-bible entity rather than a human cast
+ * member — the dragon in a dragon story is the co-protagonist. Until 2026-08-24
+ * `sanitizeInteractions` deleted those rows outright, so animals could never
+ * act. They now survive, which makes resolution this function's job: an EXACT
+ * POSES line reading `- ANI001: walks behind Levin` is noise to an image model,
+ * while `- Drache (hatchling): walks behind Levin` is an instruction.
+ *
+ * Anything that is not a handle, or a handle the bible does not know, comes
+ * back unchanged — a name we cannot improve is still better than a blank.
+ */
+function resolveVbActorName(name, visualBible) {
+  const raw = String(name || '').trim();
+  const m = VB_HANDLE.exec(raw);
+  if (!m || !visualBible) return raw;
+  const wanted = (m[1] + m[2]).toUpperCase();
+  for (const key of VB_ACTOR_COLLECTIONS) {
+    const entries = visualBible[key];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const id = String((entry && entry.id) || '').trim().toUpperCase();
+      const label = String((entry && entry.name) || '').trim();
+      if (id === wanted && label) return label;
+    }
+  }
+  return raw;
+}
+
+function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null) {
   const interactionList = Array.isArray(interactions) ? interactions : [];
   // Even with zero declared interactions, we may still emit fill lines for
   // uncovered fg/mg characters — so don't early-return on an empty list.
@@ -3461,8 +3496,11 @@ function buildExactPosesBlock(interactions, sceneCharacters = []) {
       }
     }
     for (const target of targets) {
-      lines.push(`- ${target}: ${finalWhere}`);
-      coveredNames.add(target.toLowerCase());
+      // A visual-bible actor reaches the model by name, not by handle.
+      const label = resolveVbActorName(target, visualBible);
+      lines.push(`- ${label}: ${finalWhere}`);
+      coveredNames.add(label.toLowerCase());
+      coveredNames.add(target.toLowerCase());   // so the fill below skips it either way
     }
   }
 

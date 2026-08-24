@@ -16792,3 +16792,162 @@ books shipped with no auto-repair pass at all.
 
 **Touched files:** `server/lib/evalPipeline.js`, `tasks/bugs.json`.
 
+
+## 2026-08-24 — The style-repair gate is COMPARATIVE and content-vetoing (supersedes the absolute `checkStyleMatch` gate)
+
+**Context:** Two failures in the same pair of books, in opposite directions.
+
+*Too strict.* Prod `job_1787514321173_gvs2ojo4o0n` (watercolour, 18pp): the style
+audit correctly flagged 11 outliers — covers −1/−2/−3 and pages 1–6, 17, 18 —
+naming "photographic rendering of children's skin and hair", "camera-real fabric
+texture", "optical blur/bokeh". `style_repair` ran on all 11 (`runMetrics
+.style_repair_run: 11`) and only 5 landed. The other six were discarded by the
+gate, so the untouched originals shipped — including p17, the only fully
+photographic page in the book. The gate was
+`checkStyleMatch(anchor, after).sameStyle === true`: an ABSOLUTE medium-class
+match. A repaint that moved a page from "photograph" to "watercolour with
+photoreal faces" fails that test, and failing it means shipping the photograph.
+An absolute gate on a partial fix can only ever prefer the original.
+
+*Too loose.* Staging `job_1787514666616_yw9qsv1vf` p1: the repaint passed the
+same gate and replaced the captain's green tricorn with a red headscarf, and
+dropped the prop at her belt, while barely improving the style. The repair
+prompt already forbids exactly this ("identical hair and clothing … add nothing
+and remove nothing"); nothing verified that it obeyed. Clothing is contracted
+per story via `clothingRequirements` — a style pass may not renegotiate it.
+
+**Decision:** One judge, `compareStyleProximity(before, after, {anchorImage,
+artStyleDesc})` in `styleAnalysis.js`, answers both questions in a single call
+and the repaint must pass BOTH:
+1. `better === 'after'` — the repaint is rendered closer to the commissioned
+   style than the page we already have. `before` and `same` keep the original,
+   so a no-op repaint can never displace anything.
+2. `changed` is empty — nothing about the PEOPLE differs but the rendering. A
+   garment/hat/footwear/accessory that became a different item OR a different
+   colour, changed hair, a gone/added/swapped held object, a face reading as
+   another person or age, an added or missing figure: each is an entry naming
+   the person and the difference. "Painted more loosely" is not a change.
+
+Colour shifts count as changes here deliberately — this judge is the only thing
+between a wardrobe rewrite and the shipped book. Thinking stays ON for this
+call (a zero-budget read reports "no changes" on a swapped hat).
+
+Gate unavailability stays `passedGate: null` (ungated), never `false` — so a
+vision-API outage does not silently discard every repaint.
+
+**Also:** `repairPageStyle` accepts opt-in `refImages` — the page cast's styled
+avatars, attached as labelled STYLE reference sheets. This is NOT the sibling
+PAGE reference rejected on 2026-08-09 (that made the model paint the reference's
+people into the target); a character sheet shows the SAME cast already painted
+in the commissioned style, so there is no foreign cast to leak. Words alone were
+not moving the model off photoreal faces. Flag `styleRepairCharacterRefs`
+(`STYLE_REPAIR_CHARACTER_REFS`), default OFF pending a Test Lab `style_repair`
+A/B against prompt-only.
+
+**Rationale:** "Is the repaint better than what we have" is the only question a
+gate can answer usefully; "is the repaint perfect" discards partial fixes and
+ships photographs. Adding the content veto in the SAME call costs nothing extra
+and closes the loophole the comparative test would otherwise open — style
+improvement must not buy a costume change.
+
+**Touched:** `server/lib/styleAnalysis.js` (`compareStyleProximity` + export),
+`server/lib/styleRepair.js` (comparative + content-veto gate, `refImages`,
+injectable `repaintFn`), `server/lib/repairPipeline.js`
+(`collectStyleRefSheets`, `styleComparison` on the version record),
+`server/config/models.js` (`styleRepairCharacterRefs`),
+`tests/manual/test-style-repair.js` (rewritten section 3 — it had gone stale in
+2026-08-09 and died on a missing GEMINI_API_KEY before its assertions ran).
+
+**Status:** 🟡 conditional — gate logic active; the character-reference-sheet
+path is flag-off until the Lab A/B.
+
+## 2026-08-24 — Page prompts require complete, grounded figures (the cover rule, ported)
+
+**Context:** Prod `job_1787514321173_gvs2ojo4o0n` p13 rendered two of four
+children as legless torsos hovering above a fence, and p4 gave a standing boy
+legs that stop with no feet. Neither is a close-up. `image-generation.txt` only
+said a standing character "stands on visible standable ground — never in the
+air", which does not require the legs to exist. `front-cover.txt:15` has had the
+strong version for months ("feet flat on a stable surface … never floating,
+never mid-air; feet visible on the ground") — so covers were protected and pages
+were not. The waist-crop rule one line above is separate and correct: a declared
+close-up SHOULD cut at the waist (that is why p2/p6/p14/p16 show no feet, by
+design, and those are not defects).
+
+**Decision:** Fold completeness into the existing page-layer ground rule rather
+than adding a second site (SETTLED: one canonical wording per prompt layer):
+"Unless the frame edge cuts them off as above, a standing figure is drawn
+complete from head to feet with both feet on that ground: legs never stop
+mid-shin and no figure hovers above the surface." The close-up exemption is
+explicit so the two rules cannot fight.
+
+**Rationale:** The evaluator already punishes this (`D-12 figure_completeness`
+MAJOR for a missing leg inside the frame, `D-14 physics` CRITICAL for a floating
+figure) — but on this run the evaluator was dead (see the TDZ entry above), so
+nothing caught it and no repair round ran. Authoring-side prevention and
+eval-side detection are different owners; the page layer was missing the
+authoring half.
+
+**Touched:** `prompts/image-generation.txt`.
+
+**Status:** ✅ active.
+
+## 2026-08-24 — Interaction rows are reported, not deleted (both cast guards removed)
+
+**Context:** `sanitizeInteractions()` validated every declared interaction
+against the page's HUMAN cast and silently deleted, at `log.info`, any row it
+could not match. Audited over 24 stories / 282 pages:
+
+| guard | fired | correct |
+|---|---|---|
+| target (`isBareProperName(object)`) | 61 | **0** |
+| actor (part not in page cast) | 9 | 2 at best |
+
+The target guard treated any single capitalised word as a person's name. Every
+German common noun is capitalised, so it deleted props: `Drachenei` 20x,
+`Schatzkarte` 14x, `Schiffslaterne` 5x, plus Weggli, Messingteleskop,
+Messingkompass, Goldmünzen, Fernglas, Ruder, Drachennest, Schatzkiste — the
+title objects of the books it ran on. Not one firing was a mis-slotted human.
+Its premise was also unsound: an object never becomes a figure line in
+`buildExactPosesBlock`, so a person in the object slot could not have produced
+an extra body. The discriminator was pure word count — `Schiffslaterne` died,
+`Fiona's Schatzkarte` (space + apostrophe) survived, so on staging p7 the
+essential hands-on row was deleted while the non-essential one lived.
+
+The actor guard dropped the WHOLE row when any named actor was absent from the
+page cast, taking the recognised half of a fused row with it. Animals live in
+the visual bible, so the dragon could never act: prod
+`job_1787514321173_gvs2ojo4o0n` p7 lost its only interaction — essential,
+storyRelevant, "crossing the log" — and rendered with nothing but gaze-fill.
+Deleting never removed a person from the frame either; the prose still
+described them. It removed only the instruction saying what they were doing.
+
+**Decision (owner, interviewed):**
+1. Target guard **deleted outright**.
+2. Visual-bible actors **admitted**. `resolveVbActorName()` turns `ANI001` into
+   `Drache (hatchling)` at `buildExactPosesBlock`, which now takes the visual
+   bible; a handle would be noise to an image model, a name is an instruction.
+3. An actor in neither `characters[]` nor the bible is **reported, not
+   deleted** — new `interaction_actor_unknown` finding in `sceneBriefCheck`,
+   REVIEWABLE, so the scene review settles it before any image is made. It
+   fires 8x over 344 pages (Schatzkiste as an actor; Nia and Wächter One/Two,
+   secondary characters the prose frames but `characters[]` omits) — rare
+   enough for the reviewer's budget, unlike `object_id_unresolved` which was
+   measured at 1 page in 4 and deliberately left unsent.
+
+**Rationale:** report-and-let-the-reviewer-fix is the mechanism that worked on
+its first production run — the brief checks flagged 11 pages across two books
+and the reviewer fixed 9 of 9 real ones, leaving zero findings in either
+shipped book. Silent deletion had the opposite property: it was invisible, it
+was wrong 61 times out of 61 on one branch, and the pages it damaged still
+scored 100 because the evaluator was dead the same night.
+
+**Verified:** re-parsing the stored briefs restores every dropped row — prod p7
+regains both actors with the dragon named, staging p7 regains the lantern,
+staging p15 regains chest and lantern — with no new findings on those pages.
+Unit suite 140 passed (3 pre-existing `active-version-recompute` failures,
+unrelated files, already on the backlog).
+
+**Touched files:** `server/lib/sceneMetadata.js`, `server/lib/promptBuilders.js`,
+`server/lib/sceneBriefCheck.js`.
+

@@ -145,6 +145,46 @@ function checkPage(page, castNames = [], visualBible = null) {
     });
   }
 
+  // E — an actor nobody can resolve. Until 2026-08-24 sanitizeInteractions
+  // deleted these rows silently at log.info. Measured over 24 stories / 282
+  // pages, that guard fired 9 times: twice on `ANI001` and once on `Drache`
+  // (legitimate visual-bible actors, now admitted), twice on `Schatzkiste` (a
+  // chest in the actor slot — a real authoring error), and four times on
+  // `Wächter One`/`Wächter Two`, secondary characters the prose puts in frame
+  // while `characters[]` omits them. Deleting never removed those guards from
+  // the picture — the prose still described them — it removed only the line
+  // saying what they were doing. So the row is kept and the disagreement is
+  // reported here instead, for the review that authored both halves to settle.
+  const castOnPage = new Set(
+    ((metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
+      .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
+      .filter(Boolean))
+  );
+  const vbKnown = knownIds(visualBible);
+  const unresolved = new Set();
+  for (const row of interactions) {
+    if (!row || !row.character) continue;
+    for (const part of String(row.character).split(/\s*(?:\+|&|\band\b|,)\s*/i)) {
+      const name = part.trim();
+      if (!name || castOnPage.has(name)) continue;
+      const handle = /^([A-Z]{3})(\d{3})(?:\.\d+)?$/.exec(name.toUpperCase());
+      if (handle && vbKnown.has(handle[1] + handle[2])) continue;  // a visual-bible actor
+      unresolved.add(name);
+    }
+  }
+  if (unresolved.size > 0) {
+    const names = [...unresolved];
+    findings.push({
+      pageNumber: page.pageNumber,
+      type: 'interaction_actor_unknown',
+      names,
+      detail: `interactions[] gives an action to ${names.map(n => `"${n}"`).join(' and ')}, `
+        + `who ${names.length > 1 ? 'are' : 'is'} neither in characters[] nor a visual bible entry. `
+        + `A person in the frame belongs in characters[]; an animal or object belongs to its visual bible id; `
+        + `anything that is not in the picture should not be given an action at all.`,
+    });
+  }
+
   // D — one object, one pair of hands. Measured 2026-08-23 on
   // job_1787493968756_4fgr5nukroz: every hand-off scored at the bottom of the
   // book (10, 20, 30) while one-character-one-object pages scored 70–100 in the
@@ -207,7 +247,7 @@ function checkScenes(pages, castNames = [], visualBible = null) {
 //     and there is no measured link to a defect — sending it would have the
 //     reviewer rewriting one page in four for nothing. Kept as a diagnostic,
 //     NOT sent. Drop or add a type here without touching the others.
-const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands']);
+const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown']);
 
 // Reserved `action` labels for characters who are present but not acting. They
 // are values rather than an omitted field on purpose: when the field was

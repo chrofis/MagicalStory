@@ -166,10 +166,8 @@ function extractJsonFromText(text) {
  * `object` may be a plain noun (rope, ladder, stairs) — we only drop it when
  * it looks like a bare proper name not in the scene's character list.
  */
-function sanitizeInteractions(rawInteractions, characterNames) {
+function sanitizeInteractions(rawInteractions) {
   if (!Array.isArray(rawInteractions)) return [];
-  const charSet = new Set(characterNames || []);
-  const isBareProperName = (s) => /^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß]+$/.test(s);
   // Composite-character syntax: "Manuel + Roger" means both characters jointly
   // interact with one shared object (e.g. carrying one basket together).
   // Without this, the structured interactions[] forced one row per character
@@ -185,14 +183,35 @@ function sanitizeInteractions(rawInteractions, characterNames) {
     const character = String(i.character).trim();
     const object = String(i.object).trim();
     const where = String(i.where || '').trim();
+    // A row is dropped here ONLY when it names nobody at all. Membership of the
+    // page cast is no longer a condition, and neither guard that used to test it
+    // survives (owner decision 2026-08-24, measured over 24 stories / 282 pages):
+    //
+    //   TARGET guard — dropped when `object` was a single capitalised word not
+    //     in the cast, on the theory that it was a person mis-slotted as an
+    //     object. It fired 61 times and was right ZERO times. Every German
+    //     common noun is capitalised, so it deleted ordinary props: Drachenei
+    //     (20x), Schatzkarte (14x), Schiffslaterne, Weggli, Messingkompass,
+    //     Ruder — the title objects of the books it ran on. Its premise was
+    //     wrong anyway: an object never becomes a figure line, so a mis-slotted
+    //     person could not have produced an extra body.
+    //
+    //   ACTOR guard — dropped the WHOLE row when any named actor was absent
+    //     from the page cast, taking the recognised half of a fused
+    //     "Levin + ANI001" row with it. Animals live in the visual bible, not
+    //     the human cast, so the dragon could never act: prod
+    //     job_1787514321173_gvs2ojo4o0n p7 lost its only interaction — an
+    //     essential, storyRelevant "crossing the log" — and rendered with
+    //     nothing but gaze-fill lines. And deleting the row never removed the
+    //     person from the frame; the prose still describes them, so it removed
+    //     only the instruction saying what they were doing.
+    //
+    // An unrecognised actor is now REPORTED instead: sceneBriefCheck raises
+    // `interaction_actor_unknown` and the scene review resolves it, the same
+    // mechanism that fixed 9 of 9 flagged pages on its first production run.
     const characterParts = splitComposite(character);
-    const missingPart = characterParts.find(p => !charSet.has(p));
-    if (characterParts.length === 0 || missingPart) {
-      dropped.push(`${character}→${object} (${missingPart ? `actor "${missingPart}" absent` : 'no actor'})`);
-      continue;
-    }
-    if (isBareProperName(object) && !charSet.has(object)) {
-      dropped.push(`${character}→${object} (target absent)`);
+    if (characterParts.length === 0) {
+      dropped.push(`${character}→${object} (no actor)`);
       continue;
     }
     // Preserve priority + storyRelevant verbatim — the EXACT POSES builder
@@ -815,8 +834,9 @@ function extractSceneMetadata(sceneDescription) {
 
     // Character interactions: structured list of character-to-object contacts
     // (held, worn, in pocket, climbed, stood on, passed through, etc).
-    // Normalize + drop entries whose actor/target isn't in this scene.
-    const interactions = sanitizeInteractions(metadata.interactions, characterNames);
+    // Normalize; rows naming nobody are dropped, unknown actors are reported by
+    // sceneBriefCheck rather than deleted here.
+    const interactions = sanitizeInteractions(metadata.interactions);
 
     return {
       characters: characterNames,
@@ -979,8 +999,9 @@ function extractSceneMetadata(sceneDescription) {
 
     // Character interactions: structured list of character-to-object contacts
     // (held, worn, in pocket, climbed, stood on, passed through, etc).
-    // Normalize + drop entries whose actor/target isn't in this scene.
-    const interactionsJson = sanitizeInteractions(parsedData.interactions, characterNames);
+    // Normalize; rows naming nobody are dropped, unknown actors are reported by
+    // sceneBriefCheck rather than deleted here.
+    const interactionsJson = sanitizeInteractions(parsedData.interactions);
     parsedData.interactions = interactionsJson; // mirror into fullData so downstream readers see the sanitized list
 
     return {
