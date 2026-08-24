@@ -122,7 +122,7 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 
 - **critical**: Entity is unrecognizable (completely different face, wrong species for pets)
 - **major**: Obvious difference readers will notice (wrong hair color, significantly different features)
-- **minor**: Subtle variation that might go unnoticed (slightly different proportions, minor color shift)
+- **minor**: Subtle variation that might go unnoticed (slightly different proportions, minor color shift); `face_drift` is always minor
 
 ## Score Scale (1-10)
 
@@ -136,6 +136,7 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 
 If a defect could match multiple `type` values, pick the most specific:
 - Wrong species or completely different person → `face_mismatch`
+- Same person, but the face reads rounder, fuller or narrower than the reference → `face_drift`
 - Same person but visibly older/younger → `age_shift`
 - Same identity but hair color or style differs → `hair_change`
 - Same identity but skin pigmentation differs → `skin_tone`

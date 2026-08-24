@@ -132,11 +132,19 @@ const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
 // unverified_absence capped at MINOR by owner decision: compliance cannot see
 // the image, 55% of its absence claims were wrong, but a nudge is wanted over
 // silence.
+// face_drift capped at MINOR by owner decision (2026-08-24), answering "should
+// that level of drift score?" with "Yes — MINOR, no redo". A face that reads
+// rounder or fuller than the reference while hair, skin tone and features still
+// identify the same person is worth surfacing, but expression legitimately
+// changes face shape — a smile widens cheeks and jaw — so it must never cost
+// enough to trip the redo gate. A genuinely different person is face_mismatch
+// and is not capped.
 const MAX_SEVERITY_TYPES = {
   accessory: 'moderate',
   accessory_missing: 'moderate',
   clothing_detail: 'moderate',
   unverified_absence: 'minor',
+  face_drift: 'minor',
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever
