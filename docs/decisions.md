@@ -17296,3 +17296,55 @@ single target teaches nothing new.
 `docs/image-routing.md`.
 
 **Status:** ✅ active — flag stays off.
+
+## 2026-08-24 — The text-refine join SALVAGES completed work instead of discarding it
+
+**Context:** Text refinement runs in parallel with image generation; once images
+finish, the pipeline waits a bounded time for it to join and otherwise ships the
+original text. Staging `job_1787514666616_yw9qsv1vf` did exactly that — and the
+stage had not failed. It had completed a grok audit (18,396 output tokens,
+$0.1169) and a deepseek round (29,931, $0.1188). All $0.236 was thrown away
+because `refineStoryText` returned all-or-nothing and the deadline landed while
+round 2 was in flight. `textRefineReport` was null and the unrefined text
+shipped.
+
+Two causes compounded:
+1. The 300s budget was measured 2026-08-17 (raised from 90s). `77d0fae0a`
+   (2026-08-23) put a blind audit IN FRONT of the rounds and roughly doubled the
+   stage; the budget it must fit inside never moved. That is the same session
+   that added the audit — mine.
+2. The stage is reading-level sensitive. This story is `standard`; its audit
+   emitted 2.3× the output tokens of the same evening's `1st-grade` run (18.4k
+   vs 7.9k) and its single round outweighed a whole 1st-grade round. The
+   1st-grade book finished audit + 2 rounds in 584s and joined comfortably; this
+   one had 1133s of overlap and was still going. Survival depended on the
+   reading level and on images happening to finish LATE — a race, not a policy.
+
+**Decision:** `refineStoryText` publishes each completed step through
+`opts.onProgress` — the audit first, then after every round — in the same shape
+as its final return, flagged `partial: true`. The join keeps the last snapshot
+and ships it exactly like a complete run, so the deadline can only ever cost the
+round still running, never work already paid for. A salvaged run logs
+`text_refine_join_partial` naming what was kept and what was abandoned;
+`text_refine_complete` is suppressed so a partial finish cannot read as clean.
+
+The cap is also sized for the stage that now exists: **600s for `standard` /
+`advanced`, 300s otherwise, plus 10s per page past ten** (env
+`TEXT_REFINE_JOIN_TIMEOUT_MS` still overrides). Salvage is what makes
+overrunning cheap; the cap now only decides how long a user waits for the last
+round.
+
+**Rationale:** Raising the number alone is the move that was already tried —
+90s → 300s on 2026-08-17, after `job_1786998860057_o6deqtv5s` lost $0.16 the
+same way — and this is the same failure at the new number. A time budget is a
+symptom knob; all-or-nothing return is the defect. Fixing the shape means no
+third cap bump, and the cap change becomes a comfort setting rather than the
+thing correctness rests on.
+
+**Touched:** `server/lib/textRefine.js` (`onProgress` publication; `auditFindings`
+hoisted above the snapshot closure that reads it — same TDZ class as the
+evaluator outage the same day), `storyJobPipeline.js` (scaled deadline,
+`usable` salvage path, partial-aware logging),
+`tests/manual/test-text-refine-salvage.js` (new regression), `tasks/bugs.json`.
+
+**Status:** ✅ active.

@@ -1,259 +1,268 @@
 {
- "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
- "bugs": [
-  {
-   "id": "entity-cell-to-page-map-always-empty",
-   "title": "Entity-consistency cell->page map is always empty (reads cell.metadata.pageNumber; createLabeledGrid flattens it), so every letter-only finding is dropped unscored",
-   "reportedAt": "2026-08-24",
-   "source": "owner (Lorena's face on p16, staging job_1787514666616_yw9qsv1vf) + local probe: createLabeledGrid returns cells {letter,pageNumber,...} with NO metadata object, so the shipped mapping loop yields {}",
-   "status": "fixed",
-   "task": 39,
-   "fixedIn": "b445eb256",
-   "note": "Two sites in entityConsistency.js (gridCellToPage ~958, primaryCellToPage ~1092) read the nested cell.metadata.pageNumber. Because {} is truthy, the primaryCellToPage fallback never engaged either: any issue naming only cell letters resolved to no page, got pageNumbers:[], was never stamped on a version, never scored, never repaired, and never displayed. Only findings where the model volunteered an absolute pagesToFix survived (that is how Sarah's p2 MINOR got through on this story). Also why stored descriptions lack the '(page N)' annotation. Fix reads the flat field with the nested one as fallback; verified with a probe -> {A:3,B:16}."
-  },
-  {
-   "id": "dog-triggers-gemini-fallback",
-   "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
-   "reportedAt": "2026-08-19",
-   "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
-   "status": "fixed",
-   "task": 19,
-   "fixedIn": "4268015a8",
-   "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
-  },
-  {
-   "id": "fallback-replaces-instead-of-merging",
-   "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
-   "reportedAt": "2026-08-19",
-   "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
-   "status": "fixed",
-   "task": 21,
-   "fixedIn": "4268015a8",
-   "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
-  },
-  {
-   "id": "lab-unpinned-loads-v0",
-   "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
-   "reportedAt": "2026-08-19",
-   "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
-   "status": "fixed",
-   "task": 23,
-   "fixedIn": "4268015a8",
-   "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
-  },
-  {
-   "id": "experiments-route-strips-target-params",
-   "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
-   "reportedAt": "2026-08-19",
-   "source": "exp #9 stored target {storyId,pageNumber} only",
-   "status": "fixed",
-   "task": 23,
-   "fixedIn": "4268015a8",
-   "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
-  },
-  {
-   "id": "garment-seeds-missing-empty-description",
-   "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
-   "reportedAt": "2026-08-19",
-   "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
-   "status": "fixed",
-   "task": 24,
-   "fixedIn": "4268015a8",
-   "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
-  },
-  {
-   "id": "recolour-version-not-redetected",
-   "title": "Recolour version carried a stale, fp-nulled detection with no marker",
-   "reportedAt": "2026-08-19",
-   "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
-   "status": "fixed",
-   "fixedIn": "1dcdb3c09",
-   "task": 23,
-   "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
-  },
-  {
-   "id": "bbox-cache-keys-on-url-text",
-   "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
-   "reportedAt": "2026-08-19",
-   "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
-   "status": "fixed",
-   "fixedIn": "329170a3e",
-   "task": null,
-   "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
-  },
-  {
-   "id": "loadedfrom-null-on-new-code",
-   "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
-   "reportedAt": "2026-08-19",
-   "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
-   "status": "fixed",
-   "fixedIn": "329170a3e",
-   "task": null,
-   "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
-  },
-  {
-   "id": "version-detection-null-after-eval-refactor",
-   "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
-   "reportedAt": "2026-08-20",
-   "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
-   "status": "fixed",
-   "fixedIn": "1770eb63a",
-   "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
-  },
-  {
-   "id": "covers-undressed-call-site-4",
-   "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
-   "reportedAt": "2026-08-20",
-   "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
-   "status": "fixed",
-   "fixedIn": "756b8e692",
-   "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
-  },
-  {
-   "id": "refresh-bbox-strips-dino",
-   "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
-   "reportedAt": "2026-08-21",
-   "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
-   "status": "fixed",
-   "fixedIn": "4b6492a8e",
-   "note": "refine skipped for /dino/ backends; cover saves awaited before response."
-  },
-  {
-   "id": "silent-detection-failures-no-alert",
-   "title": "21 DINO detection failures shipped a degraded story with zero alerting",
-   "reportedAt": "2026-08-21",
-   "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
-   "status": "fixed",
-   "fixedIn": "4b6492a8e",
-   "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
-  },
-  {
-   "id": "garment-seed-off-colour-centroid",
-   "title": "Garment seed dot = blob centroid, lands off-colour on non-convex blobs (neighbour hand) and mis-seeds SAM",
-   "reportedAt": "2026-08-21",
-   "source": "owner + job_1787262655143_s9zb960muni p7 (top-red dot on Kiaan hand crossing Levin shirt; also p1 Kiaan, backCover Levin)",
-   "status": "fixed",
-   "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
-   "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
-  },
-  {
-   "id": "lab-unpinned-loads-v0",
-   "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
-   "reportedAt": "2026-08-21",
-   "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
-   "status": "fixed",
-   "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
-   "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
-  },
-  {
-   "id": "cover-save-clobbers-scene-page",
-   "title": "refresh-bbox cover branch saved the WHOLE story doc, clobbering the preceding scene page in-flight save",
-   "reportedAt": "2026-08-21",
-   "source": "trial-3 batch on job_1787262655143_s9zb960muni: p18 refreshed then covers; p18 detection erased (sam=0/4), single-page rerun clean",
-   "status": "fixed",
-   "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
-   "note": "new saveCoverData(storyId, coverType, coverData): jsonb_set on {coverImages,<type>} only, imageVersions bytes to story_images, R2 offload + strip; refresh-bbox cover branch uses it with full-save fallback."
-  },
-  {
-   "id": "repair-reference-full-sheet",
-   "title": "Char-repair reference = FULL 2x4 avatar sheet: extractFaceAndBody only matches the legacy tall format (aspect 1.5-2.0), square sheets (1.0) silently skip the crop",
-   "reportedAt": "2026-08-21",
-   "source": "owner question + exp #53: Max deterministically rejected on 2 pages (bg diff 95/79, 3 internal retries ~1% apart = sheet copied); local repro: cropToFrontColumn(1024x1024 sheet) returns input bytes unchanged for ALL characters",
-   "status": "fixed",
-   "note": "char-fix (and the Lab stage) now crop the pose-matched cell via the shared resolveCellPose/cropAvatarCell chain — cropSheetCell divides by grid geometry, so SQUARE 1024x1024 sheets crop correctly (verified: front/profile/back all yield ~256x607 cells from the failing sheet). Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793).",
-   "fixedIn": "30099b228"
-  },
-  {
-   "id": "active-image-no-admin-bypass",
-   "title": "PUT active-image 404s for admins on non-owned stories -> version selection silently does not save",
-   "reportedAt": "2026-08-22",
-   "source": "owner report: story opened from the Test Lab (demo-account story, admin logged in as own account); both PUT /:id/pages/:n/active-image and /:id/covers/:type/active-image checked user_id strictly while every other story route allows admin (any story) or impersonating admin",
-   "status": "fixed",
-   "fixedIn": "84e575ae8",
-   "note": "both routes now use the shared access rule (owner | admin | impersonating admin). Client swallow noted: StoryDisplay.handleSelectVersion catches and only console.errors, so the 404 was invisible."
-  },
-  {
-   "id": "som-identity-lines-undressed",
-   "title": "Gen-time SoM identity lines had NO clothing (and no hair): builder strips Wearing from description, rebuilds from c.clothing which generation never set",
-   "reportedAt": "2026-08-22",
-   "source": "owner (hpv76p0rokg mixups) + stored evidence: p3 v0 expectedCharacters = {name, description} only; gen-time answers consistently red->Julian 4/4 calls; Lab (builder sets clothing) 6/6 correct incl exp57 5x on the same v0 bytes",
-   "status": "fixed",
-   "fixedIn": "fix(identity) 2026-08-22 (same commit)",
-   "note": "storyJobPipeline gen call site now passes clothing: clothingText alongside the description; _somIdentifyFigures additionally falls back to the description own Wearing tail when c.clothing is absent, so no caller can send characters out undressed. Explains BOTH stories mixups incl. the s9zb960muni 30/30-replays-correct ghost. Remaining smaller gap: sceneCharacters carry no physical.hair, so gen lines still lack the Hair section the Lab lines have."
-  },
-  {
-   "id": "staging-analyzer-dino-crashloop",
-   "title": "Staging analyzer cannot load GroundingDINO since the ArcFace/TensorFlow image rebuild — every detection 503s",
-   "reportedAt": "2026-08-22",
-   "source": "staging runtime log: 6x \"[GDINO] Loading GroundingDINO...\" each followed by \"GroundingDINO unavailable:\" with EMPTY error (OOM-kill signature); Lab exps #799/#800 blocked/failed on /detect-figures-text HTTP 503 ~40min after deploy of f1448757b",
-   "status": "fixed",
-   "note": "Likely memory: TensorFlow(+deepface) now resident in the analyzer alongside DINO ~1.9GB + MobileSAM. The ArcFace commits (b123a2088 opt-in warmup, 36129ad73 idle reaper) hint at known pressure. Owner: the other agent (ArcFace author) is running a smoke test and owns this. Blocks verification of the identity fixes (task #29 exp on p1 waiting). UPDATE bbd41215: new build deployed, SAME crash loop (exp #801 failed identically, 503s). The empty error comes from get_groundingdino() (photo_analyzer.py:1975) — from_pretrained throws an exception whose str() is empty; the handler at :2089 prints only {load_err}. IMMEDIATE DIAGNOSTIC: log repr(load_err) + traceback there. Suspects: (a) transformers import path now touching the TF-2.13/protobuf-3.20.3 corridor (transformers auto-detects installed TF), (b) OOM during weight load with TF resident, (c) missing pre-downloaded weights in the rebuilt image (Dockerfile pre-download step vs new layer). ROOT CAUSE FOUND: Dockerfile layer order — requirements.txt (TF 2.13) downgrades typing_extensions below torch/transformers floor; the DINO pre-fetch layer ran BEFORE the typing_extensions>=4.12 repair layer, failed, was swallowed by || WARN, and the image shipped WITHOUT DINO weights; every runtime load re-downloaded ~900MB and died with an empty-str exception. FIX: typing_extensions upgrade moved BEFORE the pre-fetch layer; loader 503 path now logs repr+traceback+cache-presence so an empty str can never blind us again. CORRECTED ROOT CAUSE (diagnostics from 538d2f540): transformers>=4.44 re-resolved to 5.x in the ArcFace rebuild; transformers 5 requires torch>=2.5 and DISABLES our torch 2.1.2 (held there by the numpy==1.24.3 co-pin TF 2.13 needs) — every model class raised PyTorch-not-found. Fixed by pinning transformers<5 (a057d8017). The layer-order fix (typing_extensions before pre-fetch) stays as hardening.",
-   "fixedAt": "2026-08-22",
-   "fix": "ArcFace gate is now OFF by default (ARCFACE_GATE_ENABLED, server/lib/faceIdentity.js). Confirmed the cause rather than assumed it: POST /api/health/release-memory on staging reported 2336MB RSS and unload=true listed 'arcface-weights' as resident, dropping it to 1862MB. TensorFlow's ~350MB on top of GroundingDINO's ~1.9GB exceeded the container, so DINO died on load with an empty error and crash-looped. Disabled, no TF is imported at all and the analyzer returns to its pre-change footprint. The idle reaper could not have saved it: it requires the whole SERVICE to be idle, which never happens during a Lab run or a story. Re-enabling needs ArcFace out of the shared analyzer process.",
-   "fixedIn": "fix(analyzer) 2026-08-22 (same commit)"
-  },
-  {
-   "id": "text-refine-truncation-silent-converge",
-   "title": "Refiner output hit the 16k token cap; truncated reply parsed as zero rewrites and shipped as 'nothing to rewrite'",
-   "reportedAt": "2026-08-23",
-   "source": "job_1787423677246_r9llf5yi9 — text_refine usage row exactly 16000 output tokens, textRefineReport null, em-dashes shipped on p1/p12 despite the dash ban being an auto-flag",
-   "status": "fixed",
-   "fixedIn": "49ea80011",
-   "note": "server/lib/textRefine.js: cap raised 16000->32000 (deepseek-v4-pro allows 64k) and output_tokens >= cap now throws, recording a failed round instead of a silent convergence. storyJobPipeline.js join logs text_refine_failed (warn) when a round failed, distinct from a real nothing-to-rewrite."
-  },
-  {
-   "id": "closeup-face-eaten-by-leak-filter",
-   "title": "Close-up faces lost: leak filter + 0.15-crop cap rejected real full-frame faces (figure ships faceless)",
-   "reportedAt": "2026-08-23",
-   "source": "owner spotted Fiona r9llf5yi9 p2 (score 0.274, faceBox null) in the filter audit; crop-recovery cap 0.15*crop rejects any face >15% of its person crop",
-   "status": "fixed",
-   "fixedIn": "fix(detection) 2026-08-23 (same commit)",
-   "note": "crop-recovery cap 0.15->0.5; page-level leak-filter drops now logged in diag.faceLeaksDropped. Bundled: pre-identity crowd prune (faceless+<0.8%+score<0.45, face-contact untouchable, expected-count floor)."
-  },
-  {
-   "id": "cover-identity-undressed",
-   "title": "Cover refresh identity lines had empty clothing — coverHints deliver category labels/empties, the category filter blanks them, SoM matches on hair alone",
-   "reportedAt": "2026-08-23",
-   "source": "owner spotted wrong clothing on mfedxinwqd covers; frontCover detection swapped Levin/Julian (both blond curly); persisted expectedCharacters show clothing:\"\" and no Wearing in the prose; entity eval then reported a phantom Levin-wrong-shorts MAJOR",
-   "status": "fixed",
-   "fixedIn": "fix(refresh-bbox) 2026-08-23 (same commit)",
-   "note": "refresh-bbox cover branch now resolves each character through the shared buildIdentityClothingText chain (hint category -> clothingRequirements -> standard -> wardrobe). Separate finding kept open in #33: the entity eval MISSED Julian wearing only briefs (no trousers) on the backCover."
-  },
-  {
-   "id": "cancelled-job-persists-and-emails",
-   "title": "Cancel during repair/covers still persisted the story and emailed the customer; rerun-full emails the SOURCE story owner",
-   "reportedAt": "2026-08-23",
-   "source": "job_1787469664089_9e27p42el7l — admin rerun of a customer story cancelled at 81%; no checkCancellation after image phase, email block outside the completion guard; container restart was needed to stop the mail",
-   "status": "fixed",
-   "fixedIn": "same commit",
-   "note": "storyJobPipeline.js: checkCancellation() before avatar-persist/upsertStory; completion email now requires completionRes.rowCount>0 AND !inputData.adminRerun. server/routes/admin/jobs.js: rerun-full stamps adminRerun=true."
-  },
-  {
-   "id": "checkpoint-reaper-destroys-forensics",
-   "title": "Checkpoint purge policy: 1h retention for failed/cancelled, no salvage path for cancelled jobs",
-   "reportedAt": "2026-08-23",
-   "source": "job_1787469664089_9e27p42el7l post-mortem. NOTE: this job in fact had ZERO checkpoints (never written — separate investigation running); the purge policy and missing salvage were real defects found during that investigation and would have destroyed the evidence had it existed.",
-   "status": "fixed",
-   "fixedIn": "same commit",
-   "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-cleanup (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story); failed/cancelled checkpoints+rows NEVER auto-deleted (owner: keep the failed 1% forever); completed stays 1h."
-  },
-  {
-   "id": "cover-naming-two-names",
-   "title": "coverHints keyed by outline vocabulary (titlePage) while everything else says frontCover — third scheme (pipeline coverType titlePage) too",
-   "reportedAt": "2026-08-23",
-   "source": "owner: \"why do we have 2 names for the same thing\" — the mismatch left the frontCover identity lines undressed through two fix rounds while other covers healed",
-   "status": "fixed",
-   "fixedIn": "fix(covers) 2026-08-23 (same commit)",
-   "note": "Unified: outline parser translates the Title Page section at its boundary and writes coverHints.frontCover (unified+legacy+shared keyword map); migration 026 renamed titlePage in all stored stories (prod 106, staging 122, 0 remaining); COVER_HINT_KEY/coverKeyToHintKey retired from coverKeys.js and all 6 consumers read coverHints[coverKey] directly; pipeline coverType token titlePage renamed frontCover (storyJobPipeline + trial coverTypes) with a one-boundary legacy normalizer for queued jobs. Trial UX fields (titlePageImage etc.) are a different concept and untouched."
-  },
-  {
-   "id": "eval-tdz-expectedagesblock",
-   "title": "evaluateImageQuality threw ReferenceError on EVERY call — expectedAgesBlock read in its temporal dead zone; two whole books shipped with no quality/semantic score and no auto-repair",
-   "reportedAt": "2026-08-24",
-   "source": "staging job_1787514666616_yw9qsv1vf (16pp) + prod job_1787514321173_gvs2ojo4o0n (18pp): analytics.models.quality=[], zero page_quality/semantic_compliance calls in generationLog, every page finalScore=100 semanticScore=null, scoreBreakdown.visual.score=0. Only two stories in either DB with 0/N semantic coverage; every prior story is N/N.",
-   "status": "fixed",
-   "fixedIn": "935a46b8b",
-   "note": "0c9fa78e3 added `expectedAges: expectedAgesBlock` at evalPipeline.js:929 inside the evaluateThreeStage launch, while `let expectedAgesBlock` stayed at :1046 — a TDZ read, so the function threw on entry and the outer catch returned null for every page and every cover. Declaration moved above the launch. Verified: page 15 of the prod story now evaluates to score 90 in 1.5s instead of returning null. Same failure class the function header already documents for the hoisted promise handles. NOTE: the repair endpoints in regeneration.js call the same function, so the repair workflow was dead in prod for the same window."
-  }
- ]
+  "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
+  "bugs": [
+    {
+      "id": "entity-cell-to-page-map-always-empty",
+      "title": "Entity-consistency cell->page map is always empty (reads cell.metadata.pageNumber; createLabeledGrid flattens it), so every letter-only finding is dropped unscored",
+      "reportedAt": "2026-08-24",
+      "source": "owner (Lorena's face on p16, staging job_1787514666616_yw9qsv1vf) + local probe: createLabeledGrid returns cells {letter,pageNumber,...} with NO metadata object, so the shipped mapping loop yields {}",
+      "status": "fixed",
+      "task": 39,
+      "fixedIn": "b445eb256",
+      "note": "Two sites in entityConsistency.js (gridCellToPage ~958, primaryCellToPage ~1092) read the nested cell.metadata.pageNumber. Because {} is truthy, the primaryCellToPage fallback never engaged either: any issue naming only cell letters resolved to no page, got pageNumbers:[], was never stamped on a version, never scored, never repaired, and never displayed. Only findings where the model volunteered an absolute pagesToFix survived (that is how Sarah's p2 MINOR got through on this story). Also why stored descriptions lack the '(page N)' annotation. Fix reads the flat field with the nested one as fallback; verified with a probe -> {A:3,B:16}."
+    },
+    {
+      "id": "dog-triggers-gemini-fallback",
+      "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
+      "reportedAt": "2026-08-19",
+      "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
+      "status": "fixed",
+      "task": 19,
+      "fixedIn": "4268015a8",
+      "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
+    },
+    {
+      "id": "fallback-replaces-instead-of-merging",
+      "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
+      "reportedAt": "2026-08-19",
+      "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
+      "status": "fixed",
+      "task": 21,
+      "fixedIn": "4268015a8",
+      "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
+    },
+    {
+      "id": "lab-unpinned-loads-v0",
+      "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
+      "reportedAt": "2026-08-19",
+      "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
+      "status": "fixed",
+      "task": 23,
+      "fixedIn": "4268015a8",
+      "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
+    },
+    {
+      "id": "experiments-route-strips-target-params",
+      "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
+      "reportedAt": "2026-08-19",
+      "source": "exp #9 stored target {storyId,pageNumber} only",
+      "status": "fixed",
+      "task": 23,
+      "fixedIn": "4268015a8",
+      "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
+    },
+    {
+      "id": "garment-seeds-missing-empty-description",
+      "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
+      "reportedAt": "2026-08-19",
+      "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
+      "status": "fixed",
+      "task": 24,
+      "fixedIn": "4268015a8",
+      "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
+    },
+    {
+      "id": "recolour-version-not-redetected",
+      "title": "Recolour version carried a stale, fp-nulled detection with no marker",
+      "reportedAt": "2026-08-19",
+      "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
+      "status": "fixed",
+      "fixedIn": "1dcdb3c09",
+      "task": 23,
+      "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
+    },
+    {
+      "id": "bbox-cache-keys-on-url-text",
+      "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
+      "reportedAt": "2026-08-19",
+      "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
+      "status": "fixed",
+      "fixedIn": "329170a3e",
+      "task": null,
+      "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
+    },
+    {
+      "id": "loadedfrom-null-on-new-code",
+      "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
+      "reportedAt": "2026-08-19",
+      "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
+      "status": "fixed",
+      "fixedIn": "329170a3e",
+      "task": null,
+      "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
+    },
+    {
+      "id": "version-detection-null-after-eval-refactor",
+      "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
+      "reportedAt": "2026-08-20",
+      "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
+      "status": "fixed",
+      "fixedIn": "1770eb63a",
+      "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
+    },
+    {
+      "id": "covers-undressed-call-site-4",
+      "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
+      "reportedAt": "2026-08-20",
+      "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
+      "status": "fixed",
+      "fixedIn": "756b8e692",
+      "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
+    },
+    {
+      "id": "refresh-bbox-strips-dino",
+      "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
+      "reportedAt": "2026-08-21",
+      "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
+      "status": "fixed",
+      "fixedIn": "4b6492a8e",
+      "note": "refine skipped for /dino/ backends; cover saves awaited before response."
+    },
+    {
+      "id": "silent-detection-failures-no-alert",
+      "title": "21 DINO detection failures shipped a degraded story with zero alerting",
+      "reportedAt": "2026-08-21",
+      "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
+      "status": "fixed",
+      "fixedIn": "4b6492a8e",
+      "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
+    },
+    {
+      "id": "garment-seed-off-colour-centroid",
+      "title": "Garment seed dot = blob centroid, lands off-colour on non-convex blobs (neighbour hand) and mis-seeds SAM",
+      "reportedAt": "2026-08-21",
+      "source": "owner + job_1787262655143_s9zb960muni p7 (top-red dot on Kiaan hand crossing Levin shirt; also p1 Kiaan, backCover Levin)",
+      "status": "fixed",
+      "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
+      "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
+    },
+    {
+      "id": "lab-unpinned-loads-v0",
+      "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
+      "reportedAt": "2026-08-21",
+      "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
+      "status": "fixed",
+      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+      "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
+    },
+    {
+      "id": "cover-save-clobbers-scene-page",
+      "title": "refresh-bbox cover branch saved the WHOLE story doc, clobbering the preceding scene page in-flight save",
+      "reportedAt": "2026-08-21",
+      "source": "trial-3 batch on job_1787262655143_s9zb960muni: p18 refreshed then covers; p18 detection erased (sam=0/4), single-page rerun clean",
+      "status": "fixed",
+      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+      "note": "new saveCoverData(storyId, coverType, coverData): jsonb_set on {coverImages,<type>} only, imageVersions bytes to story_images, R2 offload + strip; refresh-bbox cover branch uses it with full-save fallback."
+    },
+    {
+      "id": "repair-reference-full-sheet",
+      "title": "Char-repair reference = FULL 2x4 avatar sheet: extractFaceAndBody only matches the legacy tall format (aspect 1.5-2.0), square sheets (1.0) silently skip the crop",
+      "reportedAt": "2026-08-21",
+      "source": "owner question + exp #53: Max deterministically rejected on 2 pages (bg diff 95/79, 3 internal retries ~1% apart = sheet copied); local repro: cropToFrontColumn(1024x1024 sheet) returns input bytes unchanged for ALL characters",
+      "status": "fixed",
+      "note": "char-fix (and the Lab stage) now crop the pose-matched cell via the shared resolveCellPose/cropAvatarCell chain — cropSheetCell divides by grid geometry, so SQUARE 1024x1024 sheets crop correctly (verified: front/profile/back all yield ~256x607 cells from the failing sheet). Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793).",
+      "fixedIn": "30099b228"
+    },
+    {
+      "id": "active-image-no-admin-bypass",
+      "title": "PUT active-image 404s for admins on non-owned stories -> version selection silently does not save",
+      "reportedAt": "2026-08-22",
+      "source": "owner report: story opened from the Test Lab (demo-account story, admin logged in as own account); both PUT /:id/pages/:n/active-image and /:id/covers/:type/active-image checked user_id strictly while every other story route allows admin (any story) or impersonating admin",
+      "status": "fixed",
+      "fixedIn": "84e575ae8",
+      "note": "both routes now use the shared access rule (owner | admin | impersonating admin). Client swallow noted: StoryDisplay.handleSelectVersion catches and only console.errors, so the 404 was invisible."
+    },
+    {
+      "id": "som-identity-lines-undressed",
+      "title": "Gen-time SoM identity lines had NO clothing (and no hair): builder strips Wearing from description, rebuilds from c.clothing which generation never set",
+      "reportedAt": "2026-08-22",
+      "source": "owner (hpv76p0rokg mixups) + stored evidence: p3 v0 expectedCharacters = {name, description} only; gen-time answers consistently red->Julian 4/4 calls; Lab (builder sets clothing) 6/6 correct incl exp57 5x on the same v0 bytes",
+      "status": "fixed",
+      "fixedIn": "fix(identity) 2026-08-22 (same commit)",
+      "note": "storyJobPipeline gen call site now passes clothing: clothingText alongside the description; _somIdentifyFigures additionally falls back to the description own Wearing tail when c.clothing is absent, so no caller can send characters out undressed. Explains BOTH stories mixups incl. the s9zb960muni 30/30-replays-correct ghost. Remaining smaller gap: sceneCharacters carry no physical.hair, so gen lines still lack the Hair section the Lab lines have."
+    },
+    {
+      "id": "staging-analyzer-dino-crashloop",
+      "title": "Staging analyzer cannot load GroundingDINO since the ArcFace/TensorFlow image rebuild — every detection 503s",
+      "reportedAt": "2026-08-22",
+      "source": "staging runtime log: 6x \"[GDINO] Loading GroundingDINO...\" each followed by \"GroundingDINO unavailable:\" with EMPTY error (OOM-kill signature); Lab exps #799/#800 blocked/failed on /detect-figures-text HTTP 503 ~40min after deploy of f1448757b",
+      "status": "fixed",
+      "note": "Likely memory: TensorFlow(+deepface) now resident in the analyzer alongside DINO ~1.9GB + MobileSAM. The ArcFace commits (b123a2088 opt-in warmup, 36129ad73 idle reaper) hint at known pressure. Owner: the other agent (ArcFace author) is running a smoke test and owns this. Blocks verification of the identity fixes (task #29 exp on p1 waiting). UPDATE bbd41215: new build deployed, SAME crash loop (exp #801 failed identically, 503s). The empty error comes from get_groundingdino() (photo_analyzer.py:1975) — from_pretrained throws an exception whose str() is empty; the handler at :2089 prints only {load_err}. IMMEDIATE DIAGNOSTIC: log repr(load_err) + traceback there. Suspects: (a) transformers import path now touching the TF-2.13/protobuf-3.20.3 corridor (transformers auto-detects installed TF), (b) OOM during weight load with TF resident, (c) missing pre-downloaded weights in the rebuilt image (Dockerfile pre-download step vs new layer). ROOT CAUSE FOUND: Dockerfile layer order — requirements.txt (TF 2.13) downgrades typing_extensions below torch/transformers floor; the DINO pre-fetch layer ran BEFORE the typing_extensions>=4.12 repair layer, failed, was swallowed by || WARN, and the image shipped WITHOUT DINO weights; every runtime load re-downloaded ~900MB and died with an empty-str exception. FIX: typing_extensions upgrade moved BEFORE the pre-fetch layer; loader 503 path now logs repr+traceback+cache-presence so an empty str can never blind us again. CORRECTED ROOT CAUSE (diagnostics from 538d2f540): transformers>=4.44 re-resolved to 5.x in the ArcFace rebuild; transformers 5 requires torch>=2.5 and DISABLES our torch 2.1.2 (held there by the numpy==1.24.3 co-pin TF 2.13 needs) — every model class raised PyTorch-not-found. Fixed by pinning transformers<5 (a057d8017). The layer-order fix (typing_extensions before pre-fetch) stays as hardening.",
+      "fixedAt": "2026-08-22",
+      "fix": "ArcFace gate is now OFF by default (ARCFACE_GATE_ENABLED, server/lib/faceIdentity.js). Confirmed the cause rather than assumed it: POST /api/health/release-memory on staging reported 2336MB RSS and unload=true listed 'arcface-weights' as resident, dropping it to 1862MB. TensorFlow's ~350MB on top of GroundingDINO's ~1.9GB exceeded the container, so DINO died on load with an empty error and crash-looped. Disabled, no TF is imported at all and the analyzer returns to its pre-change footprint. The idle reaper could not have saved it: it requires the whole SERVICE to be idle, which never happens during a Lab run or a story. Re-enabling needs ArcFace out of the shared analyzer process.",
+      "fixedIn": "fix(analyzer) 2026-08-22 (same commit)"
+    },
+    {
+      "id": "text-refine-truncation-silent-converge",
+      "title": "Refiner output hit the 16k token cap; truncated reply parsed as zero rewrites and shipped as 'nothing to rewrite'",
+      "reportedAt": "2026-08-23",
+      "source": "job_1787423677246_r9llf5yi9 — text_refine usage row exactly 16000 output tokens, textRefineReport null, em-dashes shipped on p1/p12 despite the dash ban being an auto-flag",
+      "status": "fixed",
+      "fixedIn": "49ea80011",
+      "note": "server/lib/textRefine.js: cap raised 16000->32000 (deepseek-v4-pro allows 64k) and output_tokens >= cap now throws, recording a failed round instead of a silent convergence. storyJobPipeline.js join logs text_refine_failed (warn) when a round failed, distinct from a real nothing-to-rewrite."
+    },
+    {
+      "id": "closeup-face-eaten-by-leak-filter",
+      "title": "Close-up faces lost: leak filter + 0.15-crop cap rejected real full-frame faces (figure ships faceless)",
+      "reportedAt": "2026-08-23",
+      "source": "owner spotted Fiona r9llf5yi9 p2 (score 0.274, faceBox null) in the filter audit; crop-recovery cap 0.15*crop rejects any face >15% of its person crop",
+      "status": "fixed",
+      "fixedIn": "fix(detection) 2026-08-23 (same commit)",
+      "note": "crop-recovery cap 0.15->0.5; page-level leak-filter drops now logged in diag.faceLeaksDropped. Bundled: pre-identity crowd prune (faceless+<0.8%+score<0.45, face-contact untouchable, expected-count floor)."
+    },
+    {
+      "id": "cover-identity-undressed",
+      "title": "Cover refresh identity lines had empty clothing — coverHints deliver category labels/empties, the category filter blanks them, SoM matches on hair alone",
+      "reportedAt": "2026-08-23",
+      "source": "owner spotted wrong clothing on mfedxinwqd covers; frontCover detection swapped Levin/Julian (both blond curly); persisted expectedCharacters show clothing:\"\" and no Wearing in the prose; entity eval then reported a phantom Levin-wrong-shorts MAJOR",
+      "status": "fixed",
+      "fixedIn": "fix(refresh-bbox) 2026-08-23 (same commit)",
+      "note": "refresh-bbox cover branch now resolves each character through the shared buildIdentityClothingText chain (hint category -> clothingRequirements -> standard -> wardrobe). Separate finding kept open in #33: the entity eval MISSED Julian wearing only briefs (no trousers) on the backCover."
+    },
+    {
+      "id": "cancelled-job-persists-and-emails",
+      "title": "Cancel during repair/covers still persisted the story and emailed the customer; rerun-full emails the SOURCE story owner",
+      "reportedAt": "2026-08-23",
+      "source": "job_1787469664089_9e27p42el7l — admin rerun of a customer story cancelled at 81%; no checkCancellation after image phase, email block outside the completion guard; container restart was needed to stop the mail",
+      "status": "fixed",
+      "fixedIn": "same commit",
+      "note": "storyJobPipeline.js: checkCancellation() before avatar-persist/upsertStory; completion email now requires completionRes.rowCount>0 AND !inputData.adminRerun. server/routes/admin/jobs.js: rerun-full stamps adminRerun=true."
+    },
+    {
+      "id": "checkpoint-reaper-destroys-forensics",
+      "title": "Checkpoint purge policy: 1h retention for failed/cancelled, no salvage path for cancelled jobs",
+      "reportedAt": "2026-08-23",
+      "source": "job_1787469664089_9e27p42el7l post-mortem. NOTE: this job in fact had ZERO checkpoints (never written — separate investigation running); the purge policy and missing salvage were real defects found during that investigation and would have destroyed the evidence had it existed.",
+      "status": "fixed",
+      "fixedIn": "same commit",
+      "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-cleanup (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story); failed/cancelled checkpoints+rows NEVER auto-deleted (owner: keep the failed 1% forever); completed stays 1h."
+    },
+    {
+      "id": "cover-naming-two-names",
+      "title": "coverHints keyed by outline vocabulary (titlePage) while everything else says frontCover — third scheme (pipeline coverType titlePage) too",
+      "reportedAt": "2026-08-23",
+      "source": "owner: \"why do we have 2 names for the same thing\" — the mismatch left the frontCover identity lines undressed through two fix rounds while other covers healed",
+      "status": "fixed",
+      "fixedIn": "fix(covers) 2026-08-23 (same commit)",
+      "note": "Unified: outline parser translates the Title Page section at its boundary and writes coverHints.frontCover (unified+legacy+shared keyword map); migration 026 renamed titlePage in all stored stories (prod 106, staging 122, 0 remaining); COVER_HINT_KEY/coverKeyToHintKey retired from coverKeys.js and all 6 consumers read coverHints[coverKey] directly; pipeline coverType token titlePage renamed frontCover (storyJobPipeline + trial coverTypes) with a one-boundary legacy normalizer for queued jobs. Trial UX fields (titlePageImage etc.) are a different concept and untouched."
+    },
+    {
+      "id": "eval-tdz-expectedagesblock",
+      "title": "evaluateImageQuality threw ReferenceError on EVERY call — expectedAgesBlock read in its temporal dead zone; two whole books shipped with no quality/semantic score and no auto-repair",
+      "reportedAt": "2026-08-24",
+      "source": "staging job_1787514666616_yw9qsv1vf (16pp) + prod job_1787514321173_gvs2ojo4o0n (18pp): analytics.models.quality=[], zero page_quality/semantic_compliance calls in generationLog, every page finalScore=100 semanticScore=null, scoreBreakdown.visual.score=0. Only two stories in either DB with 0/N semantic coverage; every prior story is N/N.",
+      "status": "fixed",
+      "fixedIn": "935a46b8b",
+      "note": "0c9fa78e3 added `expectedAges: expectedAgesBlock` at evalPipeline.js:929 inside the evaluateThreeStage launch, while `let expectedAgesBlock` stayed at :1046 — a TDZ read, so the function threw on entry and the outer catch returned null for every page and every cover. Declaration moved above the launch. Verified: page 15 of the prod story now evaluates to score 90 in 1.5s instead of returning null. Same failure class the function header already documents for the hoisted promise handles. NOTE: the repair endpoints in regeneration.js call the same function, so the repair workflow was dead in prod for the same window."
+    },
+    {
+      "id": "text-refine-join-discards-paid-work",
+      "title": "Text refine + blind audit completed and were discarded at the bounded join — $0.236 of grok audit and deepseek rewriting thrown away, original text shipped",
+      "reportedAt": "2026-08-24",
+      "source": "staging job_1787514666616_yw9qsv1vf (16pp, languageLevel standard): generationLog text_refine_start 20:38:36 -> text_refine_join_timeout 20:57:29, textRefineReport null, yet api_usage records text_audit 1 call grok-4.6 18,396 out $0.1169 and text_refine 1 call deepseek-v4-pro 29,931 out $0.1188. Same evening prod job_1787514321173_gvs2ojo4o0n (1st-grade) finished audit + 2 rounds in 584s and joined fine.",
+      "status": "fixed",
+      "fixedIn": "a6d92d25a",
+      "note": "refineStoryText returned all-or-nothing, so a finished audit and a finished round 1 were worth nothing when the join deadline landed during round 2. Two causes compounded: the 300s budget was measured 2026-08-17, before 77d0fae0a put the blind audit in front of the rounds and roughly doubled the stage; and standard/advanced reading levels produce far larger payloads (this audit emitted 2.3x the 1st-grade run tokens). Fix: onProgress publishes the audit and each completed round, the join salvages the last snapshot, and the cap is 600s for long-text levels + 10s/page past ten. Precedent the cap-raise alone did not fix: job_1786998860057_o6deqtv5s lost $0.16 the same way on 2026-08-17. Regression test tests/manual/test-text-refine-salvage.js."
+    }
+  ]
 }
