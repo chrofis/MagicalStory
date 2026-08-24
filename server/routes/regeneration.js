@@ -5529,11 +5529,43 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           // 3. Fallback: fresh detection if neither source has bbox
+          //
+          // THE WHOLE PAGE CAST, NOT ONE NAME (owner, 2026-08-24). This used to
+          // pass `expectedCharacters: [{ name: characterName }]` — a lineup of
+          // one. Asked "where is Sarah?" on a page holding four other people,
+          // the detector attributes the name to whichever figure fits best; the
+          // "identify by name if found" wording is no match for a single-name
+          // lineup. Measured on p15 of job_1787514666616_yw9qsv1vf: Sarah was
+          // never rendered on that page (her stored appearances are pages
+          // 2/4/7/12/-2), the one-name detection handed back a box anyway, and
+          // Grok was told to repaint a DIFFERENT character as Sarah. The figure
+          // moved, the blend gate measured 43% mask IoU against its 55% floor,
+          // and all three attempts were rejected — $0.06 and a silent failure
+          // for a repair that could never succeed. The same image detected
+          // against its full cast returns Fiona, Lorena, Saira + one unknown,
+          // and no Sarah, which is the correct answer.
           if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            const physDesc = buildCharacterPhysicalDescription(character);
+            // Everyone the page is supposed to hold, so each figure can take
+            // its own name and the requested character can come back genuinely
+            // absent. Names arrive as objects (sceneCharacters) or bare strings
+            // (sceneMetadata.characters); the requested one is always included
+            // so a cast list that omits them cannot suppress the lookup.
+            const castNames = new Set([characterName]);
+            for (const c of (sceneImage.sceneCharacters || [])) {
+              const n = typeof c === 'string' ? c : c?.name;
+              if (n) castNames.add(n);
+            }
+            for (const n of (sceneImage.sceneMetadata?.characters || [])) {
+              if (typeof n === 'string' && n) castNames.add(n);
+            }
+            const expectedCharacters = [...castNames].map(name => {
+              const c = storyData.characters?.find(x => x.name === name);
+              return { name, description: c ? buildCharacterPhysicalDescription(c) : name };
+            });
             const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
-              expectedCharacters: [{ name: characterName, description: physDesc }],
+              expectedCharacters,
+              sceneContext: (sceneImage.description || '').slice(0, 2000),
               artStyle
             });
             const charFigure = detection?.figures?.find(f =>
@@ -5548,7 +5580,27 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               };
               log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: face=${charFigure.faceBox ? 'yes' : 'no'}, body=${charFigure.bodyBox ? 'yes' : 'no'}`);
             } else {
-              return { task, error: true, failReason: `Could not locate ${characterName} on page ${pageNumber}` };
+              // WHO IS ACTUALLY THERE (owner, 2026-08-24). "Could not locate X"
+              // reads like a detector failure; naming the figures that WERE
+              // found says the real thing — the character is not on this page,
+              // so the fix is a page redo, not a face repair.
+              const found = (detection?.figures || [])
+                .map(f => f.name || f.label || 'unknown figure')
+                .filter(Boolean);
+              const who = found.length
+                ? `Detected instead: ${found.join(', ')}.`
+                : 'No figures were detected at all.';
+              log.warn(`🚫 [CHAR REPAIR] ${characterName} is not on page ${pageNumber} — refusing to repair. ${who}`);
+              return {
+                task, error: true,
+                failReason: `${characterName} was not found on page ${pageNumber} — nothing was repainted. ${who} Repairing a face needs that character to be in the picture; redo the page instead.`,
+                // Its own fingerprint so the daily report separates "the
+                // character is missing from the render" from the gate
+                // rejections — they have different fixes.
+                rejectedReason: 'not_on_page',
+                notOnPage: true,
+                detectedFigures: found,
+              };
             }
           }
 
@@ -5721,6 +5773,14 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               gateMessage: grokResult?.gateMessage || null,
               attempts: grokResult?.attempts ?? null,
               exhausted: !!grokResult?.exhausted,
+              // THE PICTURES, TOO (owner, 2026-08-24). The success branch above
+              // returns a full comparison; this branch returned prose only, so
+              // developer mode had nothing to render and a rejected repair was
+              // indistinguishable from one that never ran. Every rejected draw
+              // is carried on attemptFrames — what went to the model, what came
+              // back, and which gate stopped it — which is the only way to tell
+              // a correct rejection from a miscalibrated gate by looking.
+              attemptFrames: grokResult?.attemptFrames || [],
             };
           }
         } else {
@@ -5777,13 +5837,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     for (const apiResult of apiResults) {
       if (!apiResult) continue;
-      const { task, repairResult, error, failReason, rejectedReason, gateMessage, attempts, exhausted } = apiResult;
+      const { task, repairResult, error, failReason, rejectedReason, gateMessage, attempts, exhausted, attemptFrames, notOnPage } = apiResult;
       const { characterName, pageNumber } = task;
       const charResult = resultsByChar.get(characterName);
       if (!charResult) continue;
 
       if (error) {
-        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage, attempts });
+        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage, attempts, attemptFrames: attemptFrames || [], notOnPage: !!notOnPage });
         // Persisted on the page, not only returned: the Railway log window is
         // hours, and the question "why did my repair do nothing" is asked days
         // later. Without this the answer lives only in a log line that has

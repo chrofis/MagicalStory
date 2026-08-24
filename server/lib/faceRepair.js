@@ -761,6 +761,26 @@ async function checkRepairNaturalness(imageData, opts = {}) {
 async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   const metrics = () => require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.());
   let last = null;
+  // EVERY attempt's frames, not just the last (owner, 2026-08-24). The loop
+  // overwrote `last` on each redraw, so attempts 1 and 2 were garbage-collected
+  // and only attempt 3 could ever be inspected — and the route dropped even
+  // that. When three draws are all rejected, the three pictures ARE the
+  // evidence: they are what says whether the gate was right or miscalibrated.
+  // _repairCharacterFaceOnce already carries them on a rejection ("a rejected
+  // run is exactly the one you need to LOOK at"); this keeps them.
+  const attemptFrames = [];
+  const recordFrame = (attempt, r) => {
+    attemptFrames.push({
+      attempt,
+      rejectedReason: r?.rejectedReason || null,
+      gateMessage: r?.gateMessage || null,
+      grokRawResult: r?.grokRawResult || null,
+      blackoutImage: r?.blackoutImage || null,
+      blendMask: r?.blendMask || null,
+      cutoutSent: r?.cutoutSent || null,
+      iou: r?.iou ?? r?.blend?.iou ?? null,
+    });
+  };
   for (let attempt = 1; attempt <= REPAIR_ATTEMPTS; attempt++) {
     last = await _repairCharacterFaceOnce(sceneInput, avatarInput, opts);
     if (last?.imageData) {
@@ -769,6 +789,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
         metrics().count('repair_reject_repair_unnatural');
         log.info(`🧿 [FACE REPAIR] ${opts.charName || 'character'}: figure-integrity check rejected the repaint (match=${nat.match} edges=${nat.edges}) on attempt ${attempt}/${REPAIR_ATTEMPTS}`);
         last = { ...last, imageData: null, rejectedReason: 'repair_unnatural', gateMessage: `figure-integrity: face does not match the page's other faces (match=${nat.match}, edges=${nat.edges})`, naturalness: nat };
+        recordFrame(attempt, last);
         continue;
       }
       if (nat.skipped) log.debug(`🧿 [FACE REPAIR] naturalness check skipped: ${nat.skipped}`);
@@ -776,9 +797,10 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
         metrics().count('char_repair_retry_saved');
         log.info(`✅ [FACE REPAIR] ${opts.charName || 'character'}: accepted on attempt ${attempt}/${REPAIR_ATTEMPTS}`);
       }
-      return { ...last, attempts: attempt, ...(nat.checked ? { naturalness: nat } : {}) };
+      return { ...last, attempts: attempt, attemptFrames, ...(nat.checked ? { naturalness: nat } : {}) };
     }
     const reason = last?.rejectedReason || null;
+    recordFrame(attempt, last);
     if (reason) metrics().count(`repair_reject_${reason}`);
     if (!reason || !RETRYABLE_REJECTIONS.has(reason)) break;
     if (attempt < REPAIR_ATTEMPTS) {
@@ -790,7 +812,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
     metrics().count('char_repair_exhausted');
     log.warn(`🚫 [FACE REPAIR] ${opts.charName || 'character'}: ${REPAIR_ATTEMPTS} attempts all rejected (${reason}) — giving up`);
   }
-  return { ...(last || {}), attempts: REPAIR_ATTEMPTS, exhausted: !!(reason && RETRYABLE_REJECTIONS.has(reason)) };
+  return { ...(last || {}), attempts: REPAIR_ATTEMPTS, attemptFrames, exhausted: !!(reason && RETRYABLE_REJECTIONS.has(reason)) };
 }
 
 async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {

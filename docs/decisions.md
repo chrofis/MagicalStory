@@ -17491,3 +17491,41 @@ eye marker survives in the plate prompts.
 
 **Touched:** `server/lib/compositeCastBuilder.js`, `server/lib/sceneComposite.js`.
 **Status:** ✅ active
+
+---
+
+## 2026-08-24 — A face repair refuses when the character is not on the page
+
+**Context:** Owner ran a face repair for Sarah on p15 of `job_1787514666616_yw9qsv1vf`
+and nothing appeared. Three Grok draws were rejected by the blend gate (mask IoU 43%
+against the 55% floor), ~$0.06 spent, no image, no visible reason. Sarah is not on that
+page at all: her stored appearances are pages 2/4/7/12/-2, p15 has no persisted
+`bboxDetection`, and a fresh detection against the page's full cast returns Fiona,
+Lorena, Saira and one unknown figure. The bbox came from step 3 of the ladder, which
+called `detectAllBoundingBoxes` with `expectedCharacters: [{ name: characterName }]` — a
+lineup of one. Asked "where is Sarah?" on a page holding four other people, the detector
+attributes the name to whichever figure fits best, so the repair pointed Grok at a
+DIFFERENT character and told it to repaint them as Sarah. The figure moved, and the gate
+correctly refused to blend it. The gate was right three times; the target was wrong.
+
+**Decision:** (1) Step-3 detection passes the page's whole expected cast
+(`sceneCharacters` + `sceneMetadata.characters` + the requested name) plus scene context,
+so each figure can take its own name and the requested character can come back genuinely
+absent. (2) When they are absent, refuse before any model call — `rejectedReason:
+'not_on_page'`, a message naming who WAS detected, and a panel that offers a page redo
+instead of a retry. (3) Every rejected draw is kept: `repairCharacterFace` accumulates
+`attemptFrames` (what went to the model, what came back, which gate stopped it, the IoU)
+across all three attempts instead of overwriting `last`, the route returns them on the
+rejection branch, and the panel renders them. Previously the frames existed only on
+`err.partialResult`, which nothing outside `testlab.js` ever read — so a correct
+rejection and a broken pipeline looked identical from the UI.
+
+**Rationale:** A single-name lineup cannot express "not present", so the detector could
+never refuse. Paying for three model calls that no gate could pass is the cost of that;
+the silent UI is what made it undiagnosable. The frames are the evidence that separates a
+correct rejection from a miscalibrated gate — the IoU floor stays at 0.55, unchanged.
+
+**Touched:** `server/routes/regeneration.js`, `server/lib/faceRepair.js`,
+`client/src/components/generation/RepairWorkflowPanel.tsx`,
+`client/src/hooks/useRepairWorkflow.ts`, `client/src/services/storyService.ts`,
+`client/src/types/story.ts`.

@@ -1643,6 +1643,56 @@ export function RepairWorkflowPanel({
                                 )}
                               </div>
                               <p className="text-xs text-red-700 mb-2">{page.reason}</p>
+                              {/* Every rejected draw, in order. A repair that
+                                  was rejected has no `comparison` — without
+                                  these the panel showed a sentence and no
+                                  pixels, and a correct rejection looked exactly
+                                  like a broken one. */}
+                              {page.attemptFrames && page.attemptFrames.length > 0 && (
+                                <div className="space-y-2 mb-2">
+                                  {page.attemptFrames.map(frame => (
+                                    <div key={frame.attempt} className="border border-red-200 rounded p-2 bg-white/60">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs font-medium text-red-800">
+                                          Attempt {frame.attempt}/{page.attemptFrames!.length}
+                                        </span>
+                                        {frame.rejectedReason && (
+                                          <span className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-700">
+                                            {frame.rejectedReason.replace(/_/g, ' ')}
+                                          </span>
+                                        )}
+                                        {frame.iou != null && (
+                                          <span className="text-xs text-gray-500">IoU {Math.round(frame.iou * 100)}%</span>
+                                        )}
+                                      </div>
+                                      {frame.gateMessage && (
+                                        <p className="text-xs text-gray-600 mb-1">{frame.gateMessage}</p>
+                                      )}
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {([
+                                          ['Sent to model', frame.blackoutImage],
+                                          ['Model output', frame.grokRawResult],
+                                          ['Blend mask', frame.blendMask],
+                                        ] as Array<[string, string | null | undefined]>).map(([label, src]) => (
+                                          <div key={label} className="text-center">
+                                            {src ? (
+                                              <img
+                                                src={src}
+                                                alt={label}
+                                                className="w-full h-24 object-contain rounded border border-red-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => setGridLightbox(src)}
+                                              />
+                                            ) : (
+                                              <div className="w-full h-24 flex items-center justify-center rounded border border-red-200 bg-gray-50 text-xs text-gray-400">N/A</div>
+                                            )}
+                                            <span className="text-xs text-gray-500 mt-1 block">{label}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                               {page.comparison && (
                                 <div className="grid grid-cols-3 gap-2">
                                   <div className="text-center">
@@ -1678,6 +1728,14 @@ export function RepairWorkflowPanel({
                                   </div>
                                 </div>
                               )}
+                              {/* Retrying a character who is not in the picture
+                                  redraws nothing and refuses identically — the
+                                  page needs a redo, not another repair. */}
+                              {page.notOnPage ? (
+                                <p className="mt-2 text-xs text-red-800">
+                                  Nothing to retry — redo this page so {char} is drawn into it.
+                                </p>
+                              ) : (
                               <button
                                 onClick={async () => {
                                   const key = `${char}:${page.pageNumber}`;
@@ -1702,6 +1760,7 @@ export function RepairWorkflowPanel({
                                   <><RefreshCw className="w-3 h-3" /> Retry</>
                                 )}
                               </button>
+                              )}
                             </div>
                           ))}
                         </div>

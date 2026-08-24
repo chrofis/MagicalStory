@@ -1218,6 +1218,22 @@ export interface RepairComparison {
   blendMask?: string | null;
 }
 
+/**
+ * One rejected repair draw. The repair loop redraws up to three times; every
+ * attempt keeps the frames that show what the model was given, what it returned
+ * and which gate stopped it — the only way to judge a rejection by looking.
+ */
+export interface RepairAttemptFrame {
+  attempt: number;
+  rejectedReason: string | null;
+  gateMessage: string | null;
+  grokRawResult: string | null;
+  blackoutImage: string | null;
+  blendMask?: string | null;
+  cutoutSent?: string | null;
+  iou?: number | null;
+}
+
 export interface RepairVerification {
   improved: boolean;
   confidence: string;
@@ -1279,7 +1295,16 @@ export interface RepairWorkflowState {
   characterRepairResults: {
     charactersProcessed: string[];
     pagesRepaired: Record<string, RepairPageResult[]>;
-    pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: RepairComparison | null }>>;
+    pagesFailed: Record<string, Array<{
+      pageNumber: number;
+      reason: string;
+      rejected?: boolean;
+      comparison?: RepairComparison | null;
+      /** One entry per rejected draw — the pictures behind a "rejected" verdict. */
+      attemptFrames?: RepairAttemptFrame[];
+      /** The character was never in the picture; a face repair cannot apply. */
+      notOnPage?: boolean;
+    }>>;
   };
   inpaintResults: Record<number, {
     repaired: boolean;

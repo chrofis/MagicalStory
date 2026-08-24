@@ -927,6 +927,11 @@ export function useRepairWorkflow({
         reason: f.reason,
         rejected: f.rejected,
         comparison: f.comparison || null,
+        // A rejected repair has no `comparison` (there is no accepted image to
+        // compare), so the panel used to show prose and nothing else. Every
+        // rejected draw travels here instead.
+        attemptFrames: f.attemptFrames || [],
+        notOnPage: !!f.notOnPage,
       }));
 
       setWorkflowState(prev => {

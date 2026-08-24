@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection } from '@/types/story';
 
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
@@ -2756,6 +2756,8 @@ export const storyService = {
       pagesFailed?: Array<{
         pageNumber: number; reason: string; rejected?: boolean;
         comparison?: { before: string | null; after: string; diff?: string; reference: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; cutoutSent?: string | null } | null;
+        attemptFrames?: RepairAttemptFrame[];
+        notOnPage?: boolean;
       }>;
       error?: string;
     }>;
@@ -2773,6 +2775,8 @@ export const storyService = {
         pagesFailed?: Array<{
           pageNumber: number; reason: string; rejected?: boolean;
           comparison?: { before: string | null; after: string; diff?: string; reference: string; blackoutImage?: string | null; grokRawResult?: string | null; blendMask?: string | null; cutoutSent?: string | null } | null;
+          attemptFrames?: RepairAttemptFrame[];
+          notOnPage?: boolean;
         }>;
         error?: string;
       }>;
