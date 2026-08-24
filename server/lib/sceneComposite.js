@@ -1185,25 +1185,30 @@ function buildCastLines(cast) {
   return cast.map((c) => {
     const sizeHint = c.sizeHint || 'about two-thirds the size of the largest figure';
     const posHint = c.position || 'in the scene';
-    const direction = c.flip ? 'facing right' : 'facing left';
+    // No left/right here. The direction used to come from `c.flip`, which
+    // nothing in the beats metadata ever sets, so every three-quarter and
+    // profile figure was told "facing left" — a direction no one chose.
+    // Only front, side and back read reliably; which way a figure turns is
+    // left to the position and action text.
     const poseLabel = {
       front:        'front view, body facing the camera',
-      threeQuarter: `three-quarter view, ${direction}`,
-      profile:      `profile view, ${direction}`,
+      threeQuarter: 'three-quarter view',
+      profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
-    }[c.pose] || `three-quarter view, ${direction}`;
+    }[c.pose] || 'three-quarter view';
     const actionClause = c.action ? `, ${c.action}` : '';
     // Per-pose eye markers — black dot(s) inside the silhouette's head.
     // Front/three-quarter show two eyes; profile shows one; back shows none.
     const markerSpec = (() => {
-      const oppSide = c.flip ? 'left' : 'right';
+      // Dot COUNT is what the detector reads; the side came from the same
+      // unset flip flag, so it is gone with the direction.
       switch (c.pose) {
         case 'front':
           return 'two small BLACK dots side by side in the head area (eyes)';
         case 'threeQuarter':
-          return `two small BLACK dots in the head area offset toward the silhouette's ${oppSide} half (eyes)`;
+          return "two small BLACK dots in the head area, offset together toward one side of the head (eyes)";
         case 'profile':
-          return `ONE small BLACK dot near the silhouette's ${oppSide} edge of the head (eye)`;
+          return 'ONE small BLACK dot near one edge of the head area (eye)';
         case 'back':
           return 'NO eye dots — back-of-head only';
         default:
@@ -1228,19 +1233,22 @@ function buildAnonymousCastLines(cast) {
   return cast.map((c) => {
     const sizeHint = c.sizeHint || 'about two-thirds the size of the largest figure';
     const posHint = c.position || 'in the scene';
-    const direction = c.flip ? 'facing right' : 'facing left';
+    // No left/right here. The direction used to come from `c.flip`, which
+    // nothing in the beats metadata ever sets, so every three-quarter and
+    // profile figure was told "facing left" — a direction no one chose.
+    // Only front, side and back read reliably; which way a figure turns is
+    // left to the position and action text.
     const poseLabel = {
       front:        'front view, body facing the camera',
-      threeQuarter: `three-quarter view, ${direction}`,
-      profile:      `profile view, ${direction}`,
+      threeQuarter: 'three-quarter view',
+      profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
-    }[c.pose] || `three-quarter view, ${direction}`;
+    }[c.pose] || 'three-quarter view';
     const markerSpec = (() => {
-      const oppSide = c.flip ? 'left' : 'right';
       switch (c.pose) {
         case 'front':        return 'two small BLACK dots side by side in the head area (eyes)';
-        case 'threeQuarter': return `two small BLACK dots in the head area offset toward the silhouette's ${oppSide} half (eyes)`;
-        case 'profile':      return `ONE small BLACK dot near the silhouette's ${oppSide} edge of the head (eye)`;
+        case 'threeQuarter': return 'two small BLACK dots in the head area, offset together toward one side of the head (eyes)';
+        case 'profile':      return 'ONE small BLACK dot near one edge of the head area (eye)';
         case 'back':         return 'NO eye dots — back-of-head only';
         default:             return null;
       }
@@ -1932,13 +1940,17 @@ function buildBackCharLines(cast) {
   return cast.map((c) => {
     const sizeHint = c.sizeHint || (c.depth === 'background' ? 'small in the distance' : 'medium, closer to camera');
     const posHint = c.position || 'in the scene';
-    const direction = c.flip ? 'facing right' : 'facing left';
+    // No left/right here. The direction used to come from `c.flip`, which
+    // nothing in the beats metadata ever sets, so every three-quarter and
+    // profile figure was told "facing left" — a direction no one chose.
+    // Only front, side and back read reliably; which way a figure turns is
+    // left to the position and action text.
     const poseLabel = {
       front:        'front view, body facing the camera',
-      threeQuarter: `three-quarter view, ${direction}`,
-      profile:      `profile view, ${direction}`,
+      threeQuarter: 'three-quarter view',
+      profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
-    }[c.pose] || `three-quarter view, ${direction}`;
+    }[c.pose] || 'three-quarter view';
     const actionClause = c.action ? `, ${c.action}` : '';
     return `- ${c.name}: ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
   }).join('\n');
@@ -3855,7 +3867,8 @@ module.exports = {
   _internal: {
     findColorBbox,
     findSilhouettesByDiff,
-    subtractFiguresInFront,    buildPlateHeadRatio,
+    subtractFiguresInFront,
+    buildPlateHeadRatio,
     sizeFigure,
     buildAgeTargets,
     cropSheetCell,

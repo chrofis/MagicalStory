@@ -4,7 +4,8 @@
  * For each named character in the scene:
  *   1. Locate (or lazy-generate) the styled 2×4 reference sheet for the
  *      art-style + clothing combination needed on this page.
- *   2. Pull pose + flip from the scene metadata.
+ *   2. Resolve the cell pose via the shared resolveCellPose (front / side /
+ *      back only — a left-right facing is never derived).
  *   3. Pull the action phrase from interactions[] (essential > normal > low).
  *   4. Emit a cast entry: { name, sheetBuf, pose, flip, action, position, sizeHint }.
  *
@@ -29,6 +30,23 @@ const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
 const { slugifyCostume } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
+const { resolveCellPose } = require('./storyAvatars');
+
+/**
+ * Split an interaction's `character` field into the names it actually refers
+ * to. Scene briefs write a group action as one row — "A + B + C", sometimes
+ * with "and" or commas — and the per-name lookup that consumes this map has
+ * to find each of them.
+ *
+ * @param {string} raw
+ * @returns {string[]} lowercased names, empty entries removed
+ */
+function splitInteractionNames(raw) {
+  return String(raw)
+    .split(/\s*(?:\+|&|,)\s*|\s+(?:and|und|et)\s+/i)
+    .map(n => n.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null, visualBible = null } = deps;
@@ -53,8 +71,15 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       (prio[a.priority] ?? 1) - (prio[b.priority] ?? 1));
     for (const it of sorted) {
       if (!it?.character || !it?.where) continue;
-      const key = String(it.character).toLowerCase();
-      if (!actionsByChar.has(key)) actionsByChar.set(key, it.where);
+      // One interaction can name several characters — "A + B + C" is the shape
+      // the scene brief writes for a group doing one thing. Keying on the
+      // joined string meant every per-name lookup below missed and the whole
+      // group lost its action: measured on a page whose three foreground
+      // characters were all "watching the dragon" and were painted standing
+      // idle instead.
+      for (const key of splitInteractionNames(it.character)) {
+        if (!actionsByChar.has(key)) actionsByChar.set(key, it.where);
+      }
     }
   }
 
@@ -229,9 +254,14 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
     } else {
       sheetBuf = Buffer.from(stripDataUriPrefix(String(sheetUri)), 'base64');
     }
-    const pose = (sc.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
-      ? sc.pose : 'threeQuarter';
-    const flip = sc.flip === true;
+    // resolveCellPose is the ONE resolver (storyAvatars.js) — its own comment
+    // warns that three call sites had drifted inline copies and not to inline a
+    // fourth. This was the fourth: it read only `sc.pose`, which the beats
+    // metadata never emits (it writes `perspective`), so every character on
+    // every page fell through to 'threeQuarter'. The shared resolver reads
+    // perspective and maps only what renders reliably — front, side, back —
+    // and never derives a left-right facing.
+    const { pose, flip } = resolveCellPose(sc);
     out.push({
       name,
       sheetBuf,

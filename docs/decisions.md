@@ -17433,3 +17433,61 @@ That is the experiment (2 pages x 4 arms), not a claim.
 `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
 `server/lib/visualBible.js`, `server/lib/referenceSheets.js`.
 
+
+---
+
+## 2026-08-24 — The plate's flat lineup: a fourth inline pose copy, a compound key, and a direction nobody chose
+
+**Context:** The composite plate stages figures as an identical front-facing row
+that ignores what the page asked them to do. Diagnosed on the dragon page
+(`job_1787262655143_s9zb960muni` p17, Lab exp 69), from stored metadata — three
+independent causes, none of them the plate prompt's fault. The plate rendered
+exactly what it was handed.
+
+1. **Pose came from a field the beats pipeline never writes.**
+   `compositeCastBuilder.js` read `sc.pose`. Beats scene-expansion emits
+   `perspective`; `sceneMetadata.js` normalises that and only carries `pose`
+   when the source already had one. So `sc.pose` was always undefined and every
+   character on every page fell through to `'threeQuarter'`.
+2. **A compound interaction key fed nobody.** The page's only interaction was
+   `character: "Levin + Max + Kiaan"`, `where: "…watching the dragon…"`. The map
+   was keyed on that joined string while the lookup is per-name, so all three
+   missed and `action` was `null` for the whole group. That is the entire reason
+   nobody in the plate was looking at the dragon.
+3. **The direction was fabricated.** `buildCastLines` derived
+   `c.flip ? 'facing right' : 'facing left'`. Nothing in the beats metadata sets
+   `flip` (only `sceneMetadata.js:807`, when the model emits a literal boolean,
+   and a Test Lab shim), so every three-quarter and profile figure was told
+   **"facing left"** — on this page, the opposite of the brief's "facing right".
+
+**Decision:** (1) Call the shared `resolveCellPose` from `storyAvatars.js`
+instead of the inline copy. Its own comment warns that three call sites had
+drifted and not to inline a fourth — this was the fourth. It maps only what
+renders reliably (front / side / back) and never derives a facing.
+(2) Split an interaction's `character` field on `+`, `&`, `,` and whitespace-
+delimited `and` / `und` / `et`, registering the action under each name.
+(3) Remove the left/right direction from all three plate cast-line builders and
+from the eye-marker spec, which was keyed to the same flag. Cast lines now read
+`three-quarter view` / `profile view`; which way a figure turns is left to the
+position and action text.
+
+**Rationale:** Owner directive, 2026-08-24: *"the avatar is not reliably facing
+right / left. Only front or side view is reliable so flip has been removed and I
+do not want it back."* The first proposal here was to map `"facing right"` →
+`flip: true`, which is precisely that reintroduction; it was withdrawn. Note the
+shared resolver already encoded the owner's rule — the composite was simply not
+using it. Requiring whitespace around `and`/`und`/`et` rather than a word
+boundary keeps names like *Alexander* and *Sandy* from being split.
+
+The plate's fourth defect — `objects[]` never reaching the prompt, so PRIORITY 1's
+promise to render "every required object" has no source — is left open on
+purpose: it needs its own section competing for the 8000-char Grok budget the
+setting is already trimmed to fit. On the backlog, not fixed here.
+
+**Verification:** offline, no API calls — seven name-splitting cases including
+the two that must NOT split; eight `perspective` values confirming `flip` stays
+false throughout; and an assertion that no direction expression or side-keyed
+eye marker survives in the plate prompts.
+
+**Touched:** `server/lib/compositeCastBuilder.js`, `server/lib/sceneComposite.js`.
+**Status:** ✅ active
