@@ -128,6 +128,14 @@ The first two are corroborated by more than one source, which is why they lead.
 - [ ] Mitigation playbook for known image failure modes — deferred wholesale (hazard list in
       scene-expansion, matching eval checks, Lab validation)
       → `docs/image-failure-modes.md:35`
+- [ ] Composite plate stages a flat frontal lineup and drops required objects — measured on the
+      dragon page: the plate painted the creature (the fix worked) but posed three identical
+      front-facing figures and lost a required object. Undiagnosed; do NOT "fix" it by loosening
+      the blend → `docs/decisions.md` 2026-08-23 plate-creature entry
+- [ ] Composite delivers 0 pages out of every trigger measured so far — 3 real production
+      triggers across two finished stories (2026-08-24) all aborted; earlier audit found 11
+      gate-true pages / 161 with no record. Whether the gates are right or the plate is too weak
+      is the open question → `docs/decisions.md` 2026-08-24 stage-frames entry
 - [ ] Composite cover with the new Pixar avatars is untested, and the Lab toggle for
       `params.composite` is not exposed → `docs/image-routing.md:160`
 - [ ] Direct-vs-composite thresholds are intuition, never measured → `docs/image-routing.md:161`
@@ -285,6 +293,12 @@ measurement, is lost).
       → `tasks/sam-clothing-tasks-2026-07-20.md:31`
 - [ ] One full showcase re-run to confirm redo counts drop end-to-end
       → `tasks/redo-clothing-analysis-2026-07-20.md:124`
+- [ ] Composite blend fix (`3ad9e1a12`) unverified — the size-neutral "partly hidden" clause
+      never got a clean Lab run; exp 824 and exp 832 both died with "server restarted mid-run"
+      when other sessions deployed to staging → `docs/decisions.md` 2026-08-23 blend entry
+- [ ] Composite stage frames in production (`14bcc6330`) proven only offline against a spy —
+      the end-to-end proof is the next page that trips the gate → `docs/decisions.md`
+      2026-08-24 stage-frames entry
 - [ ] Admin drafts: no admin UI (publishing is a raw POST); old demo accounts not consolidated;
       the draft path is unproven end-to-end
       → `docs/production-todo-admin-drafts.md:63`
@@ -300,6 +314,10 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
+- [ ] Restore `compositeOutcome` + `preScaleRepairImage` to the page save whitelist. Lower stakes
+      since `14bcc6330` — a refusal now stores its own reason as `compositeAbortReason` — but a
+      SUCCESSFUL composite's pre-composite render is still dropped, so the version picker cannot
+      show before/after → `storyJobPipeline.js` (whitelist rebuild, ~4730/4830)
 - [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
 - [ ] C1 targeted confirmation eval — yes or no → `tasks/eval-variance-backlog.md`
 - [ ] Trial: generate the 2×4 costumed sheet eagerly or lazily?
