@@ -17247,3 +17247,52 @@ working ones get a single run would be guessing. Re-measure on the next story.
 **Touched files:** `server/lib/promptBuilders.js`,
 `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`.
 
+
+## 2026-08-24 — Character style sheets do NOT improve the style repaint (Lab #837) — `styleRepairCharacterRefs` stays OFF
+
+**Context:** `styleRepairCharacterRefs` shipped flag-off "pending a Test Lab
+`style_repair` A/B against prompt-only". The Lab stage never passed `refImages`,
+so that A/B had never been runnable. Wired it (`params.characterRefs` = both
+arms per model) and ran it once: Lab #837, staging
+`job_1787514666616_yw9qsv1vf`, watercolour, one target, 2 sheets resolved.
+Detection picked the front cover (page -1) as the outlier — background painted
+correctly, face rendered camera-real, the known faces-in-style ceiling.
+
+**Measured, by eye on the face crops (the only thing that matters here):**
+- **Grok prompt-only — best of the four.** Visible brush texture on skin,
+  looser hair and fabric, identity kept.
+- **Grok + sheets — worse than prompt-only.** The repaint sits closer to the
+  photographic original; the sheets pulled it BACK toward photoreal.
+- **Gemini prompt-only — refused.** `IMAGE_OTHER` after 3 attempts, the known
+  refusal on photoreal adult faces.
+- **Gemini + sheets — a grain filter, not a repaint.** The photographic face
+  with heavy noise laid over it. No brushwork.
+
+**Decision:** `styleRepairCharacterRefs` stays OFF. Prompt-only Grok is the
+repaint path.
+
+**Two findings worth more than the verdict:**
+1. **The comparative gate cannot tell grain from brushwork.** It scored the
+   Gemini+sheets grain overlay `better: 'after'` — "prominent brushstrokes and a
+   less photographic rendering". All four arms passed the gate; three of them
+   should not have. The gate protects against content changes (`changed: []` was
+   correct every time), not against a fake stylisation.
+2. **Attaching reference images suppresses the Gemini refusal.** Prompt-only was
+   refused; the same call with two character sheets returned an image. Narrow
+   but reproducible-looking, and it is the only argument for the flag.
+
+**Also observed, not acted on:** `style_repair` selected a COVER and repainted
+the COMPOSED cover — title text included. The title survived legibly in all
+three arms but was restyled. This bypasses the cover-text contract (repaint
+`${key}Art`, restamp via `composeCover`). Filed to the backlog, not fixed here.
+
+**Caveats:** n=1 page, and it is a cover rather than a story page. The verdict
+is "no evidence of improvement, one clear regression", not "proven harmful on
+every page". Do not re-run this A/B without adding pages — re-running the same
+single target teaches nothing new.
+
+**Touched:** `server/lib/testlab.js` (`characterRefs` arms + step images),
+`server/lib/repairPipeline.js` (`collectStyleRefSheets` exported),
+`docs/image-routing.md`.
+
+**Status:** ✅ active — flag stays off.
