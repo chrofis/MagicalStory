@@ -3352,6 +3352,64 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     if (ref) idToName.set(String(entry.id).toUpperCase(), ref);
   }
 
+  // PROPER NAMES of props, resolved the same way their ids are.
+  //
+  // Resolving the ids was only half the job. The Art Director does not write
+  // "ART001" in prose — it writes the entity's NAME, and that name reaches the
+  // model by four routes the id pass never sees: the prose itself, sceneIntent,
+  // the object appended to an EXACT POSES line, and cross-references inside
+  // another entry's description ("a narrower hull than the Goldene Möwe").
+  // The model then letters the name onto the prop: measured on staging
+  // job_1787514666616_yw9qsv1vf, p5 rendered "Fiona's Schatzkarte" painted
+  // across the map and p4 "Goldene Möwe" across the hull. Nothing had quoted a
+  // string, so rule 12c — which forbids quoting text to render — had nothing
+  // to say about it.
+  //
+  // The substitution is the entry's own `type`, which is already English and
+  // is a description rather than a label ("hand-drawn treasure map on aged
+  // parchment"), falling back to the same englishEntityRef the id path uses.
+  // Only the REF pools: character and animal names are identity anchors and
+  // stay, exactly as they do above.
+  const nameSubs = [];
+  const protectedNames = new Set();
+  for (const pool of NAME_POOLS) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      if (entry?.name) protectedNames.add(String(entry.name).trim().toLowerCase());
+    }
+  }
+  const seenAlias = new Map();
+  for (const [pool, genericNoun] of Object.entries(REF_POOLS)) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      const name = String((entry && entry.name) || '').trim();
+      if (name.length < 4) continue;
+      if (protectedNames.has(name.toLowerCase())) continue;   // also a person or animal
+      const ref = String(entry.type || '').trim() || englishEntityRef(entry, genericNoun);
+      if (!ref) continue;
+      const aliases = [name];
+      // "Fiona's Schatzkarte" also appears as bare "Schatzkarte". Register the
+      // possessive-stripped tail too — but only once: if two entries reduce to
+      // the same tail it is ambiguous and neither alias is safe.
+      const bare = name.replace(/^\S+['’]s?\s+/u, '').trim();
+      if (bare.length >= 4 && bare !== name) {
+        seenAlias.set(bare.toLowerCase(), (seenAlias.get(bare.toLowerCase()) || 0) + 1);
+        aliases.push(bare);
+      }
+      for (const alias of aliases) nameSubs.push({ alias, ref });
+    }
+  }
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Longest first, so "Fiona's Schatzkarte" is consumed before "Schatzkarte".
+  const activeSubs = nameSubs
+    .filter(s => !(seenAlias.get(s.alias.toLowerCase()) > 1))
+    .sort((a, b) => b.alias.length - a.alias.length);
+  const replaceNames = (line) => {
+    let out = line;
+    for (const { alias, ref } of activeSubs) {
+      out = out.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(alias)}(?![\\p{L}\\p{N}])`, 'giu'), `$1${ref}`);
+    }
+    return out;
+  };
+
   const ID_PATTERN = /(CHR|ANI|ART|LOC|VEH|CLO)\d+/g;
   // Orphan ids (no VB entry) are replaced with a pool-generic noun instead of
   // dropping the containing line. Dropping was catastrophic for single-line
@@ -3373,7 +3431,9 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
       return GENERIC_NOUN[id.slice(0, 3).toUpperCase()] || 'object';
     });
     if (lineOrphans.length > 0) orphans.push({ line: line.trim(), ids: lineOrphans });
-    out.push(resolved);
+    // Names after ids: the id pass inserts refs, never names, so this cannot
+    // re-process its own output.
+    out.push(replaceNames(resolved));
   }
 
   if (orphans.length > 0) {

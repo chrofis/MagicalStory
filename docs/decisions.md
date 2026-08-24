@@ -17109,3 +17109,56 @@ proof is the next page that trips the gate.
 **Touched:** `storyJobPipeline.js`, `server/lib/sceneComposite.js`,
 `server/services/database.js`.
 **Status:** ✅ active
+
+## 2026-08-24 — A prop's NAME is the thing that gets painted on it
+
+**Context:** staging `job_1787514666616_yw9qsv1vf` p5 rendered
+"Fiona's Schatzkarte" lettered across the treasure map; p4 rendered
+"Goldene Möwe" across the hull. Rule 12c forbids quoting a string to render,
+and nothing had quoted one — so 12c had nothing to say.
+
+**Cause:** `sanitizeVbIdsInPrompt` resolves ART/VEH/CLO **ids** to English
+description-derived refs, explicitly so story-language names never reach an
+English-only prompt. It only ever rewrote ids. The Art Director does not write
+`ART001` — it writes the entity's NAME, which reaches the model by four routes
+the id pass never sees: the prose, `sceneIntent`, the object appended to an
+EXACT POSES line, and cross-references inside another entry's description
+("a narrower hull than the Goldene Möwe"). The id sanitizer solved half the
+problem and left the other half in place.
+
+**Decision:** the same function now also rewrites the NAMES of artifacts,
+vehicles and clothing, substituting the entry's own `type` — already English,
+and a description rather than a label ("hand-drawn treasure map on aged
+parchment") — falling back to `englishEntityRef`. Only the REF pools:
+character and animal names are identity anchors and stay, as they already do.
+Guards: longest alias first so "Fiona's Schatzkarte" is consumed before
+"Schatzkarte"; whole-word; skip names under 4 chars; skip any name that is also
+a character or animal; a possessive-stripped alias is registered only when it
+is unique across entries. `finalize()` runs after EXACT POSES is appended, so
+one change point covers all four routes.
+
+**Verified:** replaying the three stored prompts that carried a prop name —
+staging p1 (6 names), p4 (3), p5 (3) — leaves zero. No character name is lost
+on any multi-cast page checked (staging p1, prod p3, prod p7). Prompt grows ~3%.
+
+**Also, rule 12d:** measured over the same two books, 7 of 7 pages whose brief
+described what is drawn ON a document rendered that face to the camera —
+including staging p13, whose brief also said "angled toward herself", and
+prod p9, whose brief correctly staged both boys reading. 12d constrained only
+the ANGLE and never forbade describing the FACE, which is the actual predictor.
+The clause is added, byte-identical in both scene-expansion templates.
+
+**Deliberately NOT done.** No new brief check: "describes the face" is not a
+declared field, and detecting it means pattern-matching prose, which produced
+wrong counts twice while this was being measured; a declared `face: "reader"`
+flag would be declared compliant by a model that is trying to comply and would
+fire on nothing. No new eval rule either: `rendered_text` (D-23, CATASTROPHIC),
+the compliance lettering rule from `c803569c7` (an entity name lettered onto a
+surface = MAJOR or higher) and `viewer_address` all already exist and have
+NEVER EXECUTED against this failure — the evaluator was throwing on entry for
+the whole window (see the TDZ entry above). Adding a fourth guard before three
+working ones get a single run would be guessing. Re-measure on the next story.
+
+**Touched files:** `server/lib/promptBuilders.js`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`.
+
