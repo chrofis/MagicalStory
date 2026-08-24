@@ -31,11 +31,11 @@ BEAT is what happens on that page: the event, and what changes because of it. On
 
 SCENE is what the illustration shows: who is present, where they are, what they are doing. One or two sentences.
 - A single moment that can be drawn — no montages, no before-and-after, no passage of time inside one picture.
-- A SIMPLE moment: ONE action per page. Any number of characters may perform that one action together; everyone else watches or reacts to it. Two characters doing different things — one pushing while another ties a rope — is two actions and belongs on two pages.
+- A SIMPLE moment: one event, at most two body configurations. Everything visible belongs to that event or reacts to it — never unrelated activities side by side. Any number of characters in the same configuration counts once: a chase where several run, or a whole group bracing against one wave, is one. With four or more named characters in frame, one configuration.
 - Characters with the same goal do the same thing in the same place: a group searching stands together scanning, never split across separate spots with separate mini-actions.
 - The action at the moment it happens, never the state that follows it. Name the one condition that causes the action when the beat depends on it, and nothing else about the setting.
 - Never compose the frame — what fills it, how large something looks, where it sits; a shot type is enough.
-- Never synchronized hand mechanics between characters, a thought or realization as the visual, or a climbing/stretching pose with hidden limbs. When the beat's event is internal or mechanical, the scene shows its visible result instead (the box open, the found object held up).
+- Never two characters interlocked at one instant — a shared grip on one object, an object in flight, a hand-over: show the moment before or after it. Never a thought or realization as the visual, or a climbing/stretching pose with hidden limbs. When the beat's event is internal or mechanical, the scene shows its visible result instead (the box open, the found object held up).
 
 Requirements:
 - Each page follows causally from the one before it.
