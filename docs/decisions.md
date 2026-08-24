@@ -16890,7 +16890,10 @@ authoring half.
 
 **Touched:** `prompts/image-generation.txt`.
 
-**Status:** ✅ active.
+**Status:** ⤴ superseded the same day — see "The page ground rule names the shot
+and the surface PER FIGURE" at the end of this file. The completeness
+requirement survives; the `mid-shin` height and the singular "that ground" do
+not.
 
 ## 2026-08-24 — Interaction rows are reported, not deleted (both cast guards removed)
 
@@ -16998,3 +17001,57 @@ without new measurement.
 
 **Touched:** `prompts/scene-review.txt` (check 6c).
 **Status:** ✅ active
+
+## 2026-08-24 — The page ground rule names the shot and the surface PER FIGURE (supersedes the same-day completeness entry)
+
+**Context:** The entry above ("Page prompts require complete, grounded figures")
+was written from prod `job_1787514321173_gvs2ojo4o0n` and shipped the wording
+"Unless the frame edge cuts them off as above, a standing figure is drawn
+complete from head to feet with both feet on that ground: legs never stop
+mid-shin and no figure hovers above the surface." Re-reading it against the
+corpus rather than the motivating pages surfaced two gaps.
+
+First, the exemption "as above" points at a rule that defines only `close-up`.
+The Art Director emits `close-up`, `medium` and `wide` (`fullData.shot`), and
+`medium` was undefined at the render layer while the scene prose it wraps opens
+with the words "Medium shot" — which in film convention means waist-up. Prose
+and rule therefore disagreed on every `medium` page. Measured on the prod book:
+6 pages are `medium`; 5 inspected; 3 clean, 2 defective — so the contradiction
+does not usually bite, but it was live in the template.
+
+Second, "both feet on **that** ground" is singular. Staging
+`job_1787514666616_yw9qsv1vf` p11 declares three stacked surfaces (a rock lip
+above, an inner ledge, a floor); one figure on the ledge is complete with boots
+and another's legs end mid-thigh in a dark pool. The rule never said which
+surface belongs to which figure.
+
+**Decision:** Define the shot vocabulary in the same bullet as the close-up
+carve-out (close-up ends at the waist; medium keeps each figure whole in frame;
+wide shows the setting), and make the ground per-figure: each standing figure is
+drawn complete down to both feet, placed on the surface the scene names for that
+figure, and where several surfaces are named each figure stands on its own. The
+completeness requirement is kept in affirmative form — "a lower body may be
+hidden by an object in front of the figure, never by the figure ending" —
+instead of naming one height at which legs may not stop.
+
+**Rationale:** Naming `mid-shin` was correct for the page that motivated it (p4
+of the prod book: bare legs terminate at the ankle and the forest floor
+continues through where the feet belong) but it describes one height out of
+several observed — the other two failures end at mid-thigh and at the chest. The
+affirmative form covers all three without enumerating. Practitioner literature on
+cropped figures agrees: an explicit foothold ("standing on X") is the lever that
+works, prohibitions are weak.
+
+**Not a reversal.** SETTLED's SOLID-GROUND rule (one canonical wording per prompt
+layer) is preserved — this is still a single bullet pair in
+`image-generation.txt`, not a second site. The authoring layer keeps its own
+close-up definition (`scene-expansion*.txt`, `scene-review.txt` check 7b), which
+already routes below-waist action to `medium`; the render layer now agrees with
+it instead of contradicting it.
+
+**Unvalidated.** All the evidence above predates the rule — no page has yet
+been rendered under either wording. This entry records the shape, not a measured
+improvement.
+
+**Touched:** `prompts/image-generation.txt`.
+**Status:** 🟡 conditional — shipped, awaiting a baseline render.
