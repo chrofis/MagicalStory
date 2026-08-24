@@ -14022,6 +14022,63 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-24 — The consistency judge gets faces first, with a reference face to compare them to
+
+**Context.** The owner spotted a drifted face on p16 of staging
+`job_1787514666616_yw9qsv1vf` and asked why nothing flagged it. Replaying the
+STORED grid through the real evaluator and the real prompt reproduced the miss
+exactly: `consistent: true`, score 10, zero issues.
+
+Three measurements explain it.
+
+1. **The faces are ~20 px.** Crops are packed into 256x256 cells; a full standing
+   figure inside one leaves the face about 20-25 px tall. That was the PRIMARY
+   image the judge scored identity on.
+2. **Bigger files do not help.** The same head grid sent at 384, 808, 1616 and
+   2400 px wide billed **258 image tokens in all four cases**. A single image is
+   squeezed into one fixed tile budget, so extra pixels are discarded before the
+   model looks. The lever is what FRACTION of the frame a face occupies —
+   composition, not resolution. Corollary: an extra image is a flat 258 tokens,
+   so more, simpler images is the cheap direction.
+3. **The head grid had no reference.** Cell R (the styled avatar) was only ever
+   added to the BODY grid. So the one image where faces were big had nothing to
+   compare against, and the one image holding the reference showed that face at
+   ~60 px.
+
+Replaying the same cells with the head grid promoted to primary returned score 3
+and a CRITICAL `face_mismatch` on cell D — page 15, whose crop really is a
+shredded cutout of a different, blonde, green-vested person that shipped
+unflagged.
+
+**Decision.**
+- The **head grid is the primary image and carries its own reference FACE cell**
+  (top-left cell of the 2x4 styled sheet, split via `cropSheetCell`; the whole
+  sheet is the fallback). Identity — face shape, features, hair, skin tone, age —
+  is judged there.
+- The **body grid stays as the second image** and keeps the reference sheet.
+  Clothing, garment colour and build are judged there, because a head crop
+  cannot show a wrong outfit (owner: "If we got wrong costume or clothing that
+  is not seen in the head"). The prompt now says which image answers which
+  question, and tells the judge not to read identity off the body grid.
+- **Five appearance cells per grid plus the reference** (owner: "Send 6 faces
+  max... The reference plus 5 to be evaluated"), replacing eight.
+
+**Not changed, because they were already built** — both were checked before
+being offered as ideas, and both turned out to exist: head cells are already cut
+from the DETECTED faceBox (hair margin above, just below the chin), and crops are
+already matted with the figure's SAM mask when the detection is in-process. The
+blind "top 32% x 70%" band is only the no-faceBox fallback.
+
+**Still open** (task #33): on prod p17 the matting did not save the crop —
+Julian's mask has `maskCoverage 1.102`, its bounding box 10% larger than his own
+detection box, because he is riding on another character's shoulders and the mask
+reaches onto the carrier. Max and Kiaan on the same page sit at 0.97 and 0.96.
+That is a mask-separation problem for touching bodies, not a matting problem.
+
+**Touched files.** `server/lib/entityConsistency.js` (MAX_APPEARANCE_CELLS,
+`createEntityHeadGrid` reference cell, eval call-site image order,
+HEAD_GRID_INFO / refPhotoInfo / cropType prompt wiring).
+
 ## 2026-08-20 — `emotion` and `viewer_address` become their own types
 
 Owner asked for per-character billing categories: clothing, identity, action /

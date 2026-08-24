@@ -431,6 +431,15 @@ const FACE_CROP_SIZE = 256;   // Size for face crops
 const BODY_CROP_SIZE = 512;   // Size for body crops
 const MIN_APPEARANCES = 1;    // Minimum appearances to check consistency (1 = compare even single appearances against reference avatar)
 const MAX_GRID_CELLS = 9;     // Maximum cells per grid (3x3)
+// Appearance cells per grid, EXCLUDING the reference cell (owner, 2026-08-24:
+// "Send 6 faces max, that is fine. The reference plus 5 to be evaluated").
+// The judge's view of one image is a FIXED token budget no matter how many
+// pixels we send -- measured: the same grid at 384, 808, 1616 and 2400 px wide
+// all billed 258 image tokens. So cell count, not image size, is what decides
+// how many pixels each face gets. Eight appearance cells left each face about
+// 20 px tall inside a body cell; five keeps them legible. An extra image is a
+// flat 258 tokens, so more grids is the cheap direction.
+const MAX_APPEARANCE_CELLS = 5;
 
 // Canonical clothing category normalizer — single source of truth lives in
 // clothingCategories.js. Re-exported here for backwards compat with existing
@@ -904,7 +913,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           const gridLabel = `${charName} (${clothingCategory})`;
 
           // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
-          const maxCrops = refAvatar ? MAX_GRID_CELLS - 1 : MAX_GRID_CELLS;
+          const maxCrops = MAX_APPEARANCE_CELLS;
           const numGrids = Math.ceil(crops.length / maxCrops);
           const batches = [];
           if (numGrids <= 1) {
@@ -938,15 +947,24 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             // Built in gridsOnly mode too: the final stored report (the panel's
             // source) is a gridsOnly rebuild over the shipped versions, and the
             // head grid is pure sharp work — no model call.
-            const headGrid = await createEntityHeadGrid(batchCrops, batchLabel);
+            const headGrid = await createEntityHeadGrid(batchCrops, batchLabel, refAvatar);
+            // IDENTITY on the head grid, WARDROBE on the body grid (owner,
+            // 2026-08-24). The head grid goes FIRST: replaying this exact grid
+            // with the body image primary returned "consistent, 10/10", and the
+            // same cells with the head grid primary returned score 3 with a
+            // CRITICAL face_mismatch on a cell that really was a different
+            // person. Both images still go in -- a head crop cannot show a
+            // wrong outfit, so garment colour and type are judged on the body
+            // grid, which also carries the reference sheet.
             const evalResult = gridsOnly
               ? { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' }
               : await evaluateEntityConsistency(
-                  gridResult.buffer, gridResult.manifest,
+                  headGrid?.buffer || gridResult.buffer, gridResult.manifest,
                   { entityType: 'character', entityName: charName, clothingCategory,
                     expectedClothing,
-                    referencePhoto: refAvatar, cellCount: batchCrops.length },
-                  headGrid?.buffer || null
+                    referencePhoto: refAvatar, cellCount: batchCrops.length,
+                    primaryIsHeadGrid: !!headGrid?.buffer },
+                  headGrid?.buffer ? gridResult.buffer : null
                 );
 
             gridResults.push({ gridResult, headGrid, evalResult, batchCrops });
@@ -2288,10 +2306,40 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
  * Same letters as the body grid. Returns null when no cell yields a head crop
  * (objects, or crops too small to slice).
  */
-async function createEntityHeadGrid(crops, entityName) {
+async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
   const sortedCrops = [...crops].sort((a, b) => a.pageNumber - b.pageNumber);
-  const cropsToUse = sortedCrops.slice(0, MAX_GRID_CELLS - 1);
+  const cropsToUse = sortedCrops.slice(0, MAX_APPEARANCE_CELLS);
   const cells = [];
+
+  // REFERENCE FACE as cell R (owner, 2026-08-24: "add the reference avatar
+  // face"). Until now the reference was added to the BODY grid only, so the one
+  // image where faces are big had nothing to compare them against, and the one
+  // image holding the reference showed that face at ~60 px. The styled avatar
+  // is a 2x4 sheet whose top-left cell is the front face; cropSheetCell is the
+  // single source of truth for splitting it (edge detection, with fixed-math
+  // fallback). If the split fails we still add the whole sheet -- a small
+  // reference beats no reference.
+  if (referencePhoto) {
+    try {
+      const sheet = await r2.bytesFromAnyImage(referencePhoto);
+      if (sheet) {
+        let faceCell = null;
+        try {
+          faceCell = await require('./sceneComposite').cropSheetCell(sheet, 1);
+        } catch (err) {
+          log.debug(`[ENTITY-HEAD-GRID] sheet split failed for ${entityName}: ${err.message} - using the whole sheet`);
+        }
+        cells.push({
+          buffer: faceCell || sheet,
+          letter: 'R',
+          pageInfo: 'Ref',
+          metadata: { isReference: true, entityName },
+        });
+      }
+    } catch (err) {
+      log.warn(`⚠️  [ENTITY-HEAD-GRID] reference face unavailable for ${entityName}: ${err.message}`);
+    }
+  }
   for (let i = 0; i < cropsToUse.length; i++) {
     const crop = cropsToUse[i];
     try {
@@ -2309,6 +2357,9 @@ async function createEntityHeadGrid(crops, entityName) {
           .toBuffer();
       }
       cells.push({
+        // Letter from the crop's own index, NOT from cells.length: the R cell
+        // above must not shift A onto page 2's crop. Same letters as the body
+        // grid, so an issue naming "cell C" means the same page in both.
         buffer,
         letter: String.fromCharCode(65 + i),
         pageInfo: `P${crop.pageNumber}`,
@@ -2335,7 +2386,8 @@ async function createEntityHeadGrid(crops, entityName) {
  * @returns {Promise<Object>} Evaluation result
  */
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
-  const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing } = entityInfo;
+  const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
+          primaryIsHeadGrid = false } = entityInfo;
 
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
@@ -2367,14 +2419,16 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
       cell: cell.letter,
       page: cell.isReference ? 'Reference Photo' : cell.pageNumber,
       clothing: clothing || 'unknown',
-      cropType: cell.cropType || 'face',
+      cropType: primaryIsHeadGrid ? 'face' : (cell.cropType || 'face'),
     };
   });
 
   // Build reference photo info
-  const refPhotoInfo = referencePhoto
-    ? 'A reference photo of this character is provided as cell R.'
-    : 'No reference photo available.';
+  const refPhotoInfo = !referencePhoto
+    ? 'No reference photo available.'
+    : primaryIsHeadGrid
+      ? 'A reference of this character is provided as cell R in both images: the reference FACE in the first image, the full reference sheet in the second.'
+      : 'A reference photo of this character is provided as cell R.';
 
   // Build clothing context info. Cell R is authoritative for IDENTITY only;
   // expected clothing comes as text from the story's clothingRequirements
@@ -2417,9 +2471,14 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     ENTITY_TYPE: entityType,
     ENTITY_NAME: entityName,
     REFERENCE_PHOTO_INFO: refPhotoInfo,
-    HEAD_GRID_INFO: headGridBuffer
-      ? 'A second image shows the same cells cropped to the head only, with the same letters. Judge facial features, hair colour and hair style on the second image; it shows each face at full size.'
-      : '',
+    HEAD_GRID_INFO: !headGridBuffer
+      ? ''
+      : primaryIsHeadGrid
+        // Head grid first (owner, 2026-08-24). Say which image answers which
+        // question: a head crop cannot show a wrong outfit, and a body cell
+        // renders the face at ~20 px, which is why identity drift went unscored.
+        ? 'The FIRST image shows each cell cropped to the head, at full size. Judge identity on it: face shape, facial features, hair colour, hair style, skin tone and apparent age. A SECOND image shows the same cells as full-body crops, with the same letters and the reference sheet as cell R. Judge clothing, garment colour and body build on the second image. Do not judge identity from the second image; the faces there are too small to compare.'
+        : 'A second image shows the same cells cropped to the head only, with the same letters. Judge facial features, hair colour and hair style on the second image; it shows each face at full size.',
     CLOTHING_CONTEXT: clothingContextInfo,
     CELL_INFO: JSON.stringify(cellInfo, null, 2),
     CELL_COUNT: cellCount.toString(),
