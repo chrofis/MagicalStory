@@ -955,10 +955,21 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               // manifest the model actually saw. Multi-grid batches each restart
               // lettering at 'A', so a single cross-grid map (or one rebuilt from
               // collection order) mis-attributes issues to the wrong page.
+              // createLabeledGrid FLATTENS each cell's metadata into the
+              // manifest cell ({letter, pageNumber, cropType, ...}) — there is
+              // no `cell.metadata` on the returned manifest. Reading the nested
+              // path built an ALWAYS-EMPTY map, and because `{}` is truthy the
+              // primaryCellToPage fallback below never engaged either: every
+              // issue that named only cell letters came out "not attributable
+              // to a page", was dropped from every version's stamps, and never
+              // scored or repaired. Only findings where the model volunteered
+              // an absolute `pagesToFix` survived. Read the flat field first,
+              // keep the nested one for any caller that still passes it.
               const gridCellToPage = {};
               for (const cell of (gridResult.manifest?.cells || [])) {
-                if (cell && cell.letter && cell.metadata && cell.metadata.pageNumber != null) {
-                  gridCellToPage[cell.letter] = cell.metadata.pageNumber;
+                const pageNumber = cell?.pageNumber ?? cell?.metadata?.pageNumber;
+                if (cell && cell.letter && pageNumber != null) {
+                  gridCellToPage[cell.letter] = pageNumber;
                 }
               }
               for (const iss of evalResult.issues) iss._gridCellToPage = gridCellToPage;
@@ -1089,10 +1100,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         // or dropped crops shifted the lettering, routing repair feedback to the
         // wrong page. Fall back to the primary grid's manifest if an issue lacks
         // its stamp.
+        // Flat field first — see the gridCellToPage comment above.
         const primaryCellToPage = new Map();
         for (const cell of (gridResult.manifest?.cells || [])) {
-          if (cell && cell.letter && cell.metadata && cell.metadata.pageNumber != null) {
-            primaryCellToPage.set(cell.letter, cell.metadata.pageNumber);
+          const pageNumber = cell?.pageNumber ?? cell?.metadata?.pageNumber;
+          if (cell && cell.letter && pageNumber != null) {
+            primaryCellToPage.set(cell.letter, pageNumber);
           }
         }
         // Translate "Cell X" → "Cell X (page N)" in human-facing strings so

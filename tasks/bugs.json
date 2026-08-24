@@ -2,6 +2,16 @@
  "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
  "bugs": [
   {
+   "id": "entity-cell-to-page-map-always-empty",
+   "title": "Entity-consistency cell->page map is always empty (reads cell.metadata.pageNumber; createLabeledGrid flattens it), so every letter-only finding is dropped unscored",
+   "reportedAt": "2026-08-24",
+   "source": "owner (Lorena's face on p16, staging job_1787514666616_yw9qsv1vf) + local probe: createLabeledGrid returns cells {letter,pageNumber,...} with NO metadata object, so the shipped mapping loop yields {}",
+   "status": "fixed",
+   "task": 39,
+   "fixedIn": "7b08aef7d",
+   "note": "Two sites in entityConsistency.js (gridCellToPage ~958, primaryCellToPage ~1092) read the nested cell.metadata.pageNumber. Because {} is truthy, the primaryCellToPage fallback never engaged either: any issue naming only cell letters resolved to no page, got pageNumbers:[], was never stamped on a version, never scored, never repaired, and never displayed. Only findings where the model volunteered an absolute pagesToFix survived (that is how Sarah's p2 MINOR got through on this story). Also why stored descriptions lack the '(page N)' annotation. Fix reads the flat field with the nested one as fallback; verified with a probe -> {A:3,B:16}."
+  },
+  {
    "id": "dog-triggers-gemini-fallback",
    "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
    "reportedAt": "2026-08-19",
