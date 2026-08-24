@@ -17371,3 +17371,65 @@ evaluator outage the same day), `storyJobPipeline.js` (scaled deadline,
 `tests/manual/test-text-refine-salvage.js` (new regression), `tasks/bugs.json`.
 
 **Status:** ✅ active.
+
+## 2026-08-24 — A document's reference image is drawn CLOSED, and that is the real lever
+
+**Context:** 7 of 7 pages holding a document rendered its face flat to the
+camera, including staging `job_1787514666616_yw9qsv1vf` p13 whose brief said
+"angled toward herself" and prod `job_1787514321173_gvs2ojo4o0n` p9 whose brief
+correctly staged both readers. A prose explanation could not account for those
+two. The reference images could: **every prop reference in the bible is drawn
+flat and face-up** — the map unrolled, the notebook lying open — and the
+reference pack for p5 carries that face-on map thumbnail into the request
+alongside the wording asking for the opposite.
+
+**Research (agent, 2026-08-24) — the mechanism is documented:**
+- Reference-conditioned models "tend to copy inputs directly", reproducing a
+  referenced object's "exact appearance **and pose**" despite the instruction
+  (OminiControl, arXiv:2411.15098). RetriBooru names it as spatial "leakage …
+  causing shortcuts" (arXiv:2312.02521); RAVA reports viewpoint drift from the
+  same cause (arXiv:2606.17619).
+- Where a conditioning-strength dial exists it explicitly trades identity
+  fidelity for pose freedom (Midjourney `--ow`, IP-Adapter scale). **Neither
+  Grok nor Gemini exposes one**, so the reference must show the pose we want.
+- Flat face-up is a document's CANONICAL viewpoint, and canonical views
+  dominate training data (Palmer/Rosch/Chase 1981; Mezuman & Weiss, NeurIPS
+  2012). Orientation is a benchmarked deficiency: 19–68% across 23 models,
+  which "lean towards default poses (e.g. front view)" (SpatialGenEval,
+  arXiv:2601.20354); occlusion sits near chance.
+- Describing the face is an active front-view attractor. Debiased-SDS
+  (arXiv:2303.15413): "despite 'Back view of' given in the prompts, the word
+  'smiling' … makes diffusion models biased towards the front view." The
+  printed content is our "smiling"; removing it is the top text lever.
+- Illustration practice has TWO shots, not one: the reader is an
+  over-the-shoulder shot, the content is an **insert**. In picture books a map
+  traditionally gets its own surface (endpapers or a spread), not a story page.
+
+**Decision (owner):** not a two-sided bible entry — **one reference image,
+drawn closed**. Artifacts gain an optional `referenceView`: one sentence for a
+prop whose interest is on a face, describing it rolled, folded or shut. The
+reference sheet appends it to the cell so the single picture drawn for that prop
+shows it as it looks in a hand. Nothing is lost by dropping the face view: by
+rule 12c the face carries no identity — it is illegible marks — so the prop's
+identity (material, edge wear, stain, cover) is fully visible from the closed
+side. This also avoids the one assumption the research could NOT support: no
+paper and no vendor doc shows that a front+back reference sheet lets a text
+prompt select the back on Grok or Gemini, and every system that reliably picks
+a view uses numeric camera conditioning, which neither model exposes.
+
+**Also fixed here:** `story-bible-from-beats.txt` — the LIVE beats template —
+still hinted `"visible text or illegible"` in the artifact `description`,
+directly contradicting the face rule added to the two unified templates in
+`6695b9a1a`. Same parity failure as 12c/12d before it: the rule shipped to the
+unified templates and the live beats one kept the old wording. All three now
+match. Both artifact parse sites in `visualBible.js` whitelist fields, so
+`referenceView` is preserved explicitly at each — an unlisted field is dropped
+silently.
+
+**Still unverified:** whether a closed reference actually flips the render.
+That is the experiment (2 pages x 4 arms), not a claim.
+
+**Touched files:** `prompts/story-bible-from-beats.txt`,
+`prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`server/lib/visualBible.js`, `server/lib/referenceSheets.js`.
+

@@ -152,7 +152,8 @@ Only the three blocks below. No preamble, no commentary.
       "name": "[Name]",
       "pages": [1],
       "type": "[what kind of object]",
-      "description": "[size, colour, material, geometry, visible text or illegible]"
+      "description": "[size, colour, material, geometry. A prop carrying writing has that writing 'illegible' / 'weathered' / 'smudged' / 'blurred' — never quote words to be painted, and never say 'handwritten letters visible' on its own, which makes the image model letter the prop's own name across it. A prop whose interest lies on its face — map, letter, note, chart, page — is described as an object: material, size, edge wear, how it folds or rolls, dominant colour. What is drawn or written on the face stays out of the description.]",
+      "referenceView": "[Only for a prop whose interest is on a face — map, letter, note, chart, book, page. One sentence describing it closed: rolled and tied, folded along its crease, or shut with the cover up. Omit for every other prop.]"
     }
   ],
   "locations": [

@@ -133,7 +133,21 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   const gridLayoutLines = elements.map((el, i) => {
     const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
     const desc = el.extractedDescription || el.description;
-    return `${pos}: ${desc}`;
+    // A prop whose interest is on a face is drawn CLOSED. The face-up view is
+    // a document's canonical viewpoint and the one the model reaches for by
+    // default, and a reference image carries pose, not just appearance:
+    // reference-conditioned models reproduce a referenced object's exact
+    // appearance AND pose regardless of the instruction (OminiControl
+    // arXiv:2411.15098; leakage/shortcut in RetriBooru arXiv:2312.02521).
+    // Measured here: every prop reference in staging
+    // job_1787514666616_yw9qsv1vf rendered flat and face-up — the map
+    // unrolled, the notebook lying open — and 7 of 7 pages holding one
+    // reproduced that pose, including a page whose brief asked for the
+    // opposite. Neither Grok nor Gemini exposes a conditioning-strength dial
+    // to trade that identity fidelity for pose freedom, so the reference has
+    // to show the pose we actually want.
+    const closed = typeof el.referenceView === 'string' ? el.referenceView.trim() : '';
+    return closed ? `${pos}: ${desc} ${closed}` : `${pos}: ${desc}`;
   });
 
   // Describe the grid in natural language. Passing literal digit-strings like

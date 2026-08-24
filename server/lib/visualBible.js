@@ -145,6 +145,15 @@ function tryParseVisualBibleJSON(outline) {
         appearsInPages: artifact.pages || [],
         description: artifact.description || `${artifact.type}: ${artifact.description}`,
         type: artifact.type,
+        // How the prop looks CLOSED, for props whose interest is on a face.
+        // The reference sheet draws from this instead of the open state: a
+        // reference image showing a map unrolled face-up is copied onto every
+        // page that uses it, and reference-conditioned models reproduce a
+        // referenced object's pose, not just its appearance (measured on
+        // staging job_1787514666616_yw9qsv1vf — 7 of 7 document pages rendered
+        // face-on, including one whose brief asked for the opposite).
+        // Whitelisted parse: an unlisted field is dropped silently.
+        referenceView: artifact.referenceView || null,
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
         source: 'outline',
@@ -1200,6 +1209,7 @@ function tryParseNewEntriesJSON(section) {
         name: artifact.name,
         description: artifact.description || `${artifact.type}: ${artifact.description}`,
         type: artifact.type,
+        referenceView: artifact.referenceView || null,   // see the outline parser above
         pages: artifact.pages || [],
         source: 'story_text'
       }));
