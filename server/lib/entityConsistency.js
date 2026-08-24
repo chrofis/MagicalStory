@@ -1767,6 +1767,16 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           versionIndex,
           imageData,
           faceBox: matchingFigure.faceBox || null,
+          // The MEASURED face box, before the depth envelope resized it. The
+          // stored faceBox is deliberately not a measurement: makeFaceBox drops
+          // the detected dimensions and stamps a fixed per-depth ideal
+          // (foreground 0.25 x 0.2125 = 256x218 px at 1024) centred on the face
+          // point. That is right for face REPAIR, which wants a generous
+          // whiteout, and wrong for an identity crop: on one measured page a
+          // 24x20 px background face carried a 256x218 box — 75% of that
+          // figure's own body height — so the head crop took in the character
+          // standing beside her. Head crops use this instead.
+          faceBoxRaw: matchingFigure.faceBoxRaw || null,
           bodyBox: matchingFigure.bodyBox || null,
           position: matchingFigure.position,
           label: matchingFigure.label,
@@ -2025,9 +2035,15 @@ async function extractEntityCrops(appearances, options = {}) {
         // which already carries the SAM silhouette, so neighbours and
         // background are gone for free. Never a second read of the page image.
         let headBuffer = null;
-        if (!isObject && Array.isArray(app.faceBox) && app.faceBox.length === 4 && cropResult.paddedBox) {
+        // MEASURED box first (faceBoxRaw), envelope box only as the fallback —
+        // see the faceBoxRaw note in collectEntityAppearances. The raw box hugs
+        // the facial features, which is why the margins below are generous.
+        const headSourceBox = (Array.isArray(app.faceBoxRaw) && app.faceBoxRaw.length === 4)
+          ? app.faceBoxRaw
+          : app.faceBox;
+        if (!isObject && Array.isArray(headSourceBox) && headSourceBox.length === 4 && cropResult.paddedBox) {
           try {
-            const [fy1, fx1, fy2, fx2] = app.faceBox;
+            const [fy1, fx1, fy2, fx2] = headSourceBox;
             const fh = fy2 - fy1, fw = fx2 - fx1;
             const [py1, px1, py2, px2] = cropResult.paddedBox; // page-normalized
             const pw = px2 - px1, ph = py2 - py1;
