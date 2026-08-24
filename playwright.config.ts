@@ -64,7 +64,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/, /repair-not-on-page\.spec\.ts/],
     },
 
     // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
@@ -111,6 +111,16 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
       testMatch: /repair-tile-visibility\.spec\.ts/,
+    },
+
+    // Character-repair refusal when the character is not in the picture
+    // (admin JWT injected — no auth-setup dependency).
+    {
+      name: 'repair-not-on-page',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /repair-not-on-page\.spec\.ts/,
     },
 
     // R2 readers check — public shared URL, no auth required.
