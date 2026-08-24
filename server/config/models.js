@@ -491,6 +491,16 @@ const MODEL_DEFAULTS = {
     ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
     : true,
   styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'gemini',
+  // Attach the page cast's styled avatars to the repaint as STYLE reference
+  // sheets (owner, 2026-08-24). The repaint has been prompt-only since
+  // 2026-08-09, when a sibling PAGE as reference made the model paint that
+  // page's people into the target. A character sheet is not that: it shows the
+  // same cast already painted in the commissioned style, so there is no
+  // foreign cast to leak — and words alone were not moving the model off
+  // photoreal faces (prod job_1787514321173_gvs2ojo4o0n: 6 of 11 repaints
+  // rejected, a fully photographic page among them). Default OFF until the
+  // Test Lab style_repair A/B says sheets beat prompt-only.
+  styleRepairCharacterRefs: process.env.STYLE_REPAIR_CHARACTER_REFS === 'true',
 
   // Output aspect ratios — one config per image type, read by every
   // generation / iterate / repair path. Defaults: A4 portrait for pages

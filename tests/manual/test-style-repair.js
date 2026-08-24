@@ -112,43 +112,110 @@ const detection = {
 }
 
 // ── 3. repairPageStyle per-model dispatch (stubbed) ─────────────────
+// Both branches are injectable: grok via editFn, gemini via repaintFn. Before
+// repaintFn existed this whole section died on "GEMINI_API_KEY missing" at the
+// first gemini dispatch, so its assertions had gone stale unnoticed — they
+// still demanded the target-style REFERENCE the repaint stopped sending when it
+// went prompt-only on 2026-08-09.
+const noRefsExpected = [];
+// EVERY case must stub this. `repairPageStyle` still measures beforeStyleMatch
+// through the real checkStyleMatch when it is not injected — three cases below
+// left it out and the "unit" test sat on live Gemini calls with fake base64.
+const stubMatch = async () => ({ sameStyle: false, styleA: 'watercolor', styleB: 'photo' });
+
 async function testDispatch(model, expectedModelId) {
   const calls = [];
   const editFn = async (imageData, instruction, modelId, refs, artStyle, aspect) => {
     calls.push({ imageData, modelId, refs, artStyle });
     return { imageData: `data:image/jpeg;base64,REPAINTED_BY_${modelId}`, usage: { model: modelId } };
   };
-  // Gate: report the repaint as same-style as the target.
-  const styleMatchFn = async (a, b) => ({ sameStyle: true, styleA: 'watercolor', styleB: 'watercolor' });
+  const repaintFn = async (prompt, pageImage, { refImages } = {}) => {
+    calls.push({ imageData: pageImage, modelId: 'gemini-2.5-flash-image', refs: refImages, artStyle: 'watercolor' });
+    return { imageData: 'data:image/jpeg;base64,REPAINTED_BY_gemini-2.5-flash-image', usage: {} };
+  };
+  // Comparative gate: closer to the target style, nothing else changed.
+  const compareFn = async () => ({ better: 'after', changed: [], reason: 'painted faces' });
 
-  const out = await repairPageStyle(img(4), img(2), { model, artStyle: 'watercolor', editFn, styleMatchFn });
+  const out = await repairPageStyle(img(4), img(2), {
+    model, artStyle: 'watercolor', editFn, repaintFn, compareFn, styleMatchFn: stubMatch,
+  });
 
   // One edit call routed to the right production model id.
   assert.strictEqual(calls.length, 1, `${model}: exactly one edit dispatch`);
   assert.strictEqual(calls[0].modelId, expectedModelId, `${model}: dispatches to ${expectedModelId}`);
   assert.strictEqual(calls[0].imageData, img(4), `${model}: source is the outlier page`);
-  assert.deepStrictEqual(calls[0].refs, [img(2)], `${model}: target-style ref attached as reference image`);
-  assert.strictEqual(calls[0].artStyle, 'watercolor', `${model}: artStyle threaded through`);
-  // Gate applied on the OWN output → passedGate true.
-  assert.strictEqual(out.passedGate, true, `${model}: gate ran on own output and passed`);
+  // PROMPT-ONLY by default (2026-08-09): no reference image is attached unless
+  // the caller passes character style sheets explicitly.
+  assert.deepStrictEqual(calls[0].refs, noRefsExpected, `${model}: repaint is prompt-only by default`);
+  assert.strictEqual(out.passedGate, true, `${model}: comparative gate passed`);
+  assert.strictEqual(out.styleComparison.better, 'after', `${model}: verdict recorded`);
   assert.strictEqual(out.modelId, expectedModelId);
   assert.ok(out.imageData.includes(expectedModelId), `${model}: returns the repaint`);
 }
 
-async function testGateRejects() {
-  const editFn = async () => ({ imageData: 'data:image/jpeg;base64,OFFSTYLE', usage: {} });
-  const styleMatchFn = async () => ({ sameStyle: false, styleA: 'watercolor', styleB: 'flat vector' });
-  const out = await repairPageStyle(img(4), img(2), { model: 'grok', editFn, styleMatchFn });
-  assert.strictEqual(out.passedGate, false, 'gate flags an off-style repaint as failed');
-  assert.strictEqual(out.afterStyleMatch.styleB, 'flat vector');
-  ok('repairPageStyle gate flags off-style repaints (passedGate=false)');
+// The gate's whole purpose: a repaint only replaces the page when it WINS.
+// 'before' and 'same' both keep the original — a no-op repaint must never
+// displace anything, and a partial fix must never be discarded for not being
+// perfect (prod job_1787514321173_gvs2ojo4o0n lost 6 of 11 repaints that way,
+// shipping a fully photographic page).
+async function testGateVerdict(better, expectedPass, label, changed = []) {
+  const editFn = async () => ({ imageData: 'data:image/jpeg;base64,CANDIDATE', usage: {} });
+  const compareFn = async () => ({ better, changed, reason: 'stub' });
+  const out = await repairPageStyle(img(4), img(2), { model: 'grok', editFn, compareFn, styleMatchFn: stubMatch });
+  assert.strictEqual(out.passedGate, expectedPass, label);
+  assert.strictEqual(out.styleComparison.better, better);
+  assert.deepStrictEqual(out.styleComparison.changed, changed);
+}
+
+// Character style sheets reach the generator when the caller supplies them.
+async function testRefSheetsThreaded() {
+  const seen = [];
+  const repaintFn = async (prompt, pageImage, { refImages } = {}) => {
+    seen.push(...refImages);
+    return { imageData: 'data:image/jpeg;base64,REPAINTED', usage: {} };
+  };
+  await repairPageStyle(img(4), img(2), {
+    model: 'gemini', artStyle: 'watercolor', repaintFn, styleMatchFn: stubMatch,
+    compareFn: async () => ({ better: 'after', changed: [], reason: 'stub' }),
+    refImages: ['data:image/jpeg;base64,SHEET_A', 'data:image/jpeg;base64,SHEET_B'],
+  });
+  assert.deepStrictEqual(seen, ['data:image/jpeg;base64,SHEET_A', 'data:image/jpeg;base64,SHEET_B'],
+    'character style sheets are threaded to the repaint');
+  ok('repairPageStyle threads opt-in character style sheets to the generator');
+}
+
+// A gate that cannot run must not veto a repaint — it returns ungated (null),
+// and the caller decides. Regression guard: passedGate===false is "rejected",
+// null is "unknown", and conflating them silently drops every repaint whenever
+// the vision API is down.
+async function testGateUnavailable() {
+  const editFn = async () => ({ imageData: 'data:image/jpeg;base64,CANDIDATE', usage: {} });
+  const compareFn = async () => { throw new Error('vision API down'); };
+  const out = await repairPageStyle(img(4), img(2), { model: 'grok', editFn, compareFn, styleMatchFn: stubMatch });
+  assert.strictEqual(out.passedGate, null, 'gate failure leaves passedGate null, not false');
+  assert.strictEqual(out.styleComparison, null);
+  ok('repairPageStyle returns ungated (null) when the gate is unavailable');
 }
 
 (async () => {
   console.log('style-repair unit tests:');
   await testDispatch('gemini', 'gemini-2.5-flash-image');
   await testDispatch('grok', 'grok-imagine');
-  ok('repairPageStyle routes gemini→gemini-2.5-flash-image and grok→grok-imagine, gate on own output');
-  await testGateRejects();
+  ok('repairPageStyle routes gemini→gemini-2.5-flash-image and grok→grok-imagine, prompt-only, comparative gate');
+  await testGateVerdict('after', true, 'a repaint that is closer wins');
+  await testGateVerdict('before', false, 'a repaint that is further away is rejected');
+  await testGateVerdict('same', false, 'a repaint that changed nothing does not displace the original');
+  ok('repairPageStyle gate accepts only a repaint that beats the original');
+  // The staging p1 case: style improved AND the costume was rewritten. Style
+  // alone must not buy a content change.
+  await testGateVerdict('after', false, 'a closer repaint that altered content is still rejected',
+    ["the woman's green tricorn hat is now a red headscarf"]);
+  ok('repairPageStyle gate vetoes a content change even when the style improved');
+  await testRefSheetsThreaded();
+  await testGateUnavailable();
   console.log(`\nAll ${passed} style-repair assertions passed.`);
+  // Explicit exit: the gemini branch lazily requires images.js, whose
+  // module-scope init keeps the event loop alive, so a passing run would hang
+  // forever. Only the FAILING path used to exit, which is why nobody noticed.
+  process.exit(0);
 })().catch(err => { console.error('\n✗ FAILED:', err.message); process.exit(1); });

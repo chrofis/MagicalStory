@@ -108,6 +108,89 @@ Output ONLY the style description as a single paragraph (3-5 sentences) that cou
 }
 
 /**
+ * Style-repaint gate: of the ORIGINAL and its REPAINT, is the repaint closer to
+ * the commissioned style — AND did it change nothing but the rendering?
+ *
+ * Two questions, one call, because a repaint has to pass BOTH to be worth
+ * shipping and each alone has already failed in production:
+ *
+ * 1. CLOSER? Replaces the old absolute `checkStyleMatch` gate, which measured
+ *    each image against the anchor on its own and accepted the repaint only on
+ *    a full medium-class match. That threw away every partial fix: prod
+ *    job_1787514321173_gvs2ojo4o0n repainted 11 outliers, 6 were discarded —
+ *    a fully photographic page among them — and the photograph shipped. The
+ *    question is never "is the repaint perfect", only "is it better than what
+ *    we already have"; anything else can only ever prefer the original.
+ *
+ * 2. UNCHANGED? A style repaint that rewrites the costume is a regression even
+ *    when the style improves. Staging job_1787514666616_yw9qsv1vf p1: the
+ *    repaint replaced the captain's green tricorn with a red headscarf and
+ *    dropped the prop at her belt. The repair prompt already forbids this
+ *    ("identical hair and clothing, add nothing and remove nothing"); nothing
+ *    checked whether it obeyed. Headwear, garments, hair, held items, faces and
+ *    the cast are all contract-bearing — clothing comes from the story's
+ *    clothingRequirements, so a repaint may not renegotiate it.
+ *
+ * A colour shift IS a change here, deliberately: this judge is the only thing
+ * standing between a wardrobe rewrite and the shipped book.
+ *
+ * @param {string} beforeImage - data-URI of the original (off-style) image
+ * @param {string} afterImage - data-URI of the repaint
+ * @param {Object} [opts]
+ * @param {string|null} [opts.anchorImage] - data-URI of the commissioned-style anchor
+ * @param {string|null} [opts.artStyleDesc] - resolved style descriptor
+ * @returns {Promise<{better:'after'|'before'|'same', changed:string[], reason:string}>}
+ */
+async function compareStyleProximity(beforeImage, afterImage, opts = {}) {
+  const { anchorImage = null, artStyleDesc = null } = opts;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+  const part = (img) => ({ inline_data: { mime_type: img.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(img) } });
+  const parts = [];
+  if (anchorImage) {
+    parts.push({ text: 'TARGET — an illustration in the commissioned style:' }, part(anchorImage));
+  }
+  parts.push({ text: 'IMAGE 1 (the current illustration):' }, part(beforeImage));
+  parts.push({ text: 'IMAGE 2 (a repaint of the same scene, meant to change the ART STYLE ONLY):' }, part(afterImage));
+  parts.push({
+    text: `Answer two questions about IMAGE 2 compared with IMAGE 1.
+
+1. "better": which is rendered closer to ${anchorImage ? 'the TARGET\'s rendering technique' : 'this style'}${artStyleDesc ? `: ${artStyleDesc}` : ''}? Judge ONLY how people are rendered — faces, skin, hair and fabric. Painted surfaces with visible brushwork are closer; photographic skin, camera-real fabric, optical blur and lens grain are further away. "after" when IMAGE 2 is closer, "before" when IMAGE 1 is closer, "same" when you cannot separate them.
+
+2. "changed": list everything about the PEOPLE that is not the same thing in IMAGE 2 as in IMAGE 1. Only the rendering technique was allowed to change. Report an entry when a garment, hat, headwear, footwear or accessory has become a DIFFERENT item or a different colour; when hair length, style or colour differs; when a held or worn object is gone, added or swapped; when a face reads as a different person, age or expression; or when a person is added or missing. Each entry names the person and the difference, e.g. "the woman's green tricorn hat is now a red headscarf". An item that is merely painted more loosely is NOT a change. Empty list when only the rendering differs.
+
+JSON only: {"better": "after"|"before"|"same", "changed": ["..."], "reason": "one short sentence"}`,
+  });
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      // Thinking ON: the change list is a careful two-image diff, not a
+      // classification — a zero-budget read reports "no changes" on a swapped
+      // hat. The budget must cover thinking AND the JSON: at 1200 the model
+      // spent it thinking and the reply truncated mid-string, so a correctly
+      // DETECTED hat swap ("the dark green tricorn hat is now a red head…")
+      // died in the JSON parse and the gate reported itself unavailable.
+      generationConfig: { temperature: 0, maxOutputTokens: 4000, responseMimeType: 'application/json' },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw new Error(`Gemini style comparison failed: ${(await response.text()).substring(0, 200)}`);
+  const data = await response.json();
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+  const parsed = getStoryHelpers().extractJsonFromText(text);
+  if (!parsed || !['after', 'before', 'same'].includes(parsed.better)) {
+    throw new Error(`Invalid style comparison response: ${text.slice(0, 120)}`);
+  }
+  return {
+    better: parsed.better,
+    changed: Array.isArray(parsed.changed) ? parsed.changed.map(c => String(c).slice(0, 200)) : [],
+    reason: String(parsed.reason || '').slice(0, 300),
+  };
+}
+
+/**
  * Binary style-match check: is image B rendered in the same artistic medium/
  * stylization as image A? Built for repair gating — the numeric
  * compareImageStyles score is too lenient there (a flat-vector repaint of a
@@ -257,6 +340,7 @@ module.exports = {
   analyzeImageStyle,
   loadStyleAnchor,
   checkStyleMatch,
+  compareStyleProximity,
   describeHeadPose,
   compareImageStyles,
 };

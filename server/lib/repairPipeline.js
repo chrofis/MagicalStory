@@ -326,6 +326,45 @@ function mergeEntityIssues(base, fresh, repairedPages) {
   return merged;
 }
 
+/**
+ * Style reference sheets for one style-repair target: the styled avatars of the
+ * characters that appear on that page, i.e. this exact cast already painted in
+ * the commissioned style.
+ *
+ * Deliberately NOT a sibling page — a content-rich page reference makes the
+ * model paint that page's people into the target (verified 2026-08-09, which is
+ * why the repaint went prompt-only). A character sheet carries the same cast,
+ * so there is nobody foreign to import.
+ *
+ * Capped at 2 sheets: the signal is "how is a face painted in this style", and
+ * every extra image is another chance for the model to treat a reference as
+ * content. Covers (page < 0) have no scene record, so they take the first
+ * characters with a sheet. Never throws — no sheet means prompt-only.
+ *
+ * @returns {Promise<string[]>} data-URIs, possibly empty
+ */
+async function collectStyleRefSheets(page, rawImages, characters, artStyle) {
+  const MAX_SHEETS = 2;
+  try {
+    const { getStyledAvatarForClothing } = require('./entityConsistency');
+    const scene = (rawImages || []).find(r => r.pageNumber === page) || null;
+    const wanted = new Set((scene?.sceneCharacters || []).map(c => String(c?.name || '').toLowerCase()).filter(Boolean));
+    const pool = (characters || []).filter(c => wanted.size === 0 || wanted.has(String(c?.name || '').toLowerCase()));
+    const sheets = [];
+    for (const char of pool) {
+      if (sheets.length >= MAX_SHEETS) break;
+      const category = scene?.sceneCharacterClothing?.[char.name] || scene?.clothing || 'standard';
+      const sheet = await getStyledAvatarForClothing(char, artStyle, category);
+      const img = typeof sheet === 'string' ? sheet : (sheet?.imageData || sheet?.url || null);
+      if (img && typeof img === 'string' && img.startsWith('data:')) sheets.push(img);
+    }
+    return sheets;
+  } catch (err) {
+    log.warn(`🎨 [STYLE-REPAIR] style sheets unavailable for page ${page} (${err.message}) — repainting prompt-only`);
+    return [];
+  }
+}
+
 async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const {
     characters = [],
@@ -2758,16 +2797,41 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const pageLabel = target.page < 0 ? `cover ${target.page}` : `page ${target.page}`;
           try {
             require('./runMetrics').forJob(storyData?.id || jobId).count('style_repair_run');
+            // Character style sheets for this page (owner, 2026-08-24): the
+            // styled avatars show THESE characters already painted in the
+            // commissioned style. Prompt-only wording was not moving the
+            // model off photoreal faces; a sheet of the same cast is the
+            // style signal that carries no foreign people to leak in (the
+            // 2026-08-09 finding was about a sibling PAGE, which does).
+            // Best-effort: no sheet resolved → prompt-only, exactly as before.
+            const refImages = MODEL_DEFAULTS.styleRepairCharacterRefs
+              ? await collectStyleRefSheets(target.page, rawImages, characters, artStyle)
+              : [];
             const rep = await repairPageStyle(target.image, target.targetRefImage, {
               model: styleRepairModel,
               artStyle,
+              refImages,
             });
             if (rep.usage && usageTracker) {
               const provider = rep.modelId?.startsWith('grok') ? 'grok' : 'gemini_image';
               usageTracker(provider, rep.usage, 'style_repair', rep.modelId);
             }
-            if (rep.passedGate === false) {
-              log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed the style gate — repaint discarded, original kept`);
+            // FAIL-CLOSED (2026-08-24): a repaint replaces a page only on an
+            // affirmative pass. `passedGate === false` used to be the only
+            // rejection, so an UNJUDGED repaint (null — gate threw, timed out,
+            // or its reply truncated) was applied unseen. That is how a
+            // wardrobe rewrite ships: the judge on staging
+            // job_1787514666616_yw9qsv1vf p1 did name the swapped hat, its
+            // reply truncated, and "unavailable" would have meant "accept".
+            // The original page is always a valid fallback; an unverified
+            // repaint is not.
+            if (rep.passedGate !== true) {
+              const why = rep.passedGate === false
+                ? ((rep.styleComparison?.changed || []).length > 0
+                  ? `altered content — ${rep.styleComparison.changed.join('; ')}`
+                  : `not closer to the target style (${rep.styleComparison?.better || 'unknown'})`)
+                : 'gate could not judge it';
+              log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} rejected — ${why}; original kept`);
               continue;
             }
             const versions = pageVersions.get(target.page);
@@ -2800,6 +2864,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 differences: target.differences,
                 beforeStyleMatch: rep.beforeStyleMatch || null,
                 afterStyleMatch: rep.afterStyleMatch || null,
+                // The comparative verdict the gate actually decided on.
+                styleComparison: rep.styleComparison || null,
                 passedGate: rep.passedGate,
               },
               pageNumber: target.page,

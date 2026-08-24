@@ -72,7 +72,7 @@ Change ONLY the art style. Every other detail of each person stays exactly as in
  * (IMAGE_OTHER / IMAGE_SAFETY, observed 1-in-3 on some pages); throws when
  * exhausted so the caller keeps the original page as the fallback.
  */
-async function geminiStyleRepaint(prompt, pageImage, { retries = 3 } = {}) {
+async function geminiStyleRepaint(prompt, pageImage, { retries = 3, refImages = [] } = {}) {
   const r2 = require('./r2');
   const sharp = require('sharp');
   const apiKey = process.env.GEMINI_API_KEY;
@@ -90,6 +90,21 @@ async function geminiStyleRepaint(prompt, pageImage, { retries = 3 } = {}) {
   } catch { /* keep default 1:1 */ }
   const mime = String(pageImage).match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
   const parts = [{ text: prompt }, { inlineData: { mimeType: mime, data: r2.stripDataUriPrefix(pageImage) } }];
+  // STYLE REFERENCE SHEETS (owner, 2026-08-24). The repaint was prompt-only
+  // because a content-rich reference — a sibling PAGE — made the model copy
+  // that page's people (verified 2026-08-09). A character reference sheet is
+  // not that: it shows THESE characters already painted in the commissioned
+  // style, so there is no foreign cast to leak in, and it answers the question
+  // the words alone were not moving the model on ("what does this person look
+  // like painted?"). Labelled so the model reads them as style samples, never
+  // as scene content to add.
+  if (refImages.length > 0) {
+    parts.push({ text: `The following ${refImages.length === 1 ? 'image is a style reference sheet' : `${refImages.length} images are style reference sheets`} showing these same characters already painted in the target style. Copy the PAINTING TECHNIQUE from them — brushwork, skin, hair and fabric handling. Do not copy their poses, framing or background, and add no figure from them into the illustration.` });
+    for (const ref of refImages) {
+      const rmime = String(ref).match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+      parts.push({ inlineData: { mimeType: rmime, data: r2.stripDataUriPrefix(ref) } });
+    }
+  }
   const body = { contents: [{ parts }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.7, imageConfig: { aspectRatio } } };
   let lastReason = 'unknown';
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -244,7 +259,10 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     artStyle = null,
     aspectRatio = null,
     editFn = null,
+    repaintFn = null,
     styleMatchFn = null,
+    compareFn = null,
+    refImages = [],
   } = opts;
 
   if (!pageImage) throw new Error('repairPageStyle: pageImage is required');
@@ -254,6 +272,7 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   // free of live image/vision API calls.
   const editImage = editFn || require('./images').editImageWithPrompt;
   const checkStyle = styleMatchFn || require('./styleAnalysis').checkStyleMatch;
+  const compareStyle = compareFn || require('./styleAnalysis').compareStyleProximity;
 
   // BEFORE: how far the outlier is from the target style (baseline for the A/B).
   let beforeStyleMatch = null;
@@ -279,32 +298,53 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   let imageData;
   let usage = null;
   if (model === 'grok') {
-    const r = await editImage(pageImage, prompt, modelId, [], artStyle, aspectRatio);
+    const r = await editImage(pageImage, prompt, modelId, refImages, artStyle, aspectRatio);
     if (!r || !r.imageData) throw new Error(`repairPageStyle: grok (${modelId}) produced no image`);
     imageData = r.imageData; usage = r.usage || null;
   } else {
-    ({ imageData, usage } = await geminiStyleRepaint(prompt, pageImage));
+    // repaintFn: injectable Gemini repaint so the unit test can exercise this
+    // branch without a live image API (the grok branch has editFn for that).
+    ({ imageData, usage } = await (repaintFn || geminiStyleRepaint)(prompt, pageImage, { refImages }));
   }
   const result = { imageData, usage };
 
-  // GATE on the path's OWN output: did the repaint actually land in the target
-  // style CLASS? Mirrors the Test Lab char-repair style gate. Gate
-  // unavailability (no Gemini key / transient error) is logged, not fatal —
-  // it must not turn a real repaint into a hard failure.
+  // GATE — COMPARATIVE, not absolute (owner, 2026-08-24). The question is
+  // "is the repaint better than the page we already have", never "is the
+  // repaint perfect": the old absolute check (`checkStyleMatch(anchor, after)
+  // .sameStyle === true`) discarded every partial fix and shipped the
+  // untouched original instead, which on a photographic page means shipping
+  // the photograph. Measured on prod job_1787514321173_gvs2ojo4o0n: 11
+  // repaints, 6 rejected, among them the only fully photographic page in the
+  // book. One call judges both images side by side.
+  //
+  // Ties and `before` keep the original — a repaint has to WIN to replace a
+  // page, so a no-op repaint (Gemini occasionally returns the input barely
+  // touched) cannot displace anything.
   let afterStyleMatch = null;
+  let styleComparison = null;
   let passedGate = null;
-  if (targetStyleRef) {
-    try {
-      afterStyleMatch = await checkStyle(targetStyleRef, result.imageData);
-      passedGate = afterStyleMatch.sameStyle === true;
-      if (passedGate === false) {
-        log.warn(`🎨 [STYLE-REPAIR] gate FAIL: ${model} output is "${afterStyleMatch.styleB}" but target is "${afterStyleMatch.styleA}" — repaint rejected as off-style`);
-      } else {
-        log.info(`🎨 [STYLE-REPAIR] gate PASS: ${model} output matches target style class`);
-      }
-    } catch (err) {
-      log.warn(`🎨 [STYLE-REPAIR] style gate unavailable (${err.message}) — repaint returned ungated`);
+  try {
+    styleComparison = await compareStyle(pageImage, result.imageData, {
+      anchorImage: targetStyleRef || null,
+      artStyleDesc: styleDesc,
+    });
+    const changed = styleComparison.changed || [];
+    // BOTH conditions. A repaint that improves the style while rewriting the
+    // costume is a regression, not a fix: staging job_1787514666616_yw9qsv1vf
+    // p1 turned a green tricorn into a red headscarf. Clothing is contracted
+    // per story (clothingRequirements) — a style pass may not renegotiate it.
+    passedGate = styleComparison.better === 'after' && changed.length === 0;
+    if (passedGate) {
+      log.info(`🎨 [STYLE-REPAIR] gate PASS: repaint is closer to the target style and changed nothing else — ${styleComparison.reason}`);
+    } else if (changed.length > 0) {
+      log.warn(`🎨 [STYLE-REPAIR] gate FAIL: repaint altered content, not just style — ${changed.join('; ')}`);
+    } else {
+      log.warn(`🎨 [STYLE-REPAIR] gate FAIL: repaint is not closer to the target style (${styleComparison.better}) — ${styleComparison.reason}`);
     }
+  } catch (err) {
+    // Gate unavailability (no Gemini key / transient error) is logged, not
+    // fatal — it must not turn a real repaint into a hard failure.
+    log.warn(`🎨 [STYLE-REPAIR] style gate unavailable (${err.message}) — repaint returned ungated`);
   }
 
   return {
@@ -313,6 +353,7 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     modelId,
     beforeStyleMatch,
     afterStyleMatch,
+    styleComparison,
     passedGate,
     usage: result.usage || null,
   };
