@@ -17529,3 +17529,29 @@ correct rejection from a miscalibrated gate — the IoU floor stays at 0.55, unc
 `client/src/components/generation/RepairWorkflowPanel.tsx`,
 `client/src/hooks/useRepairWorkflow.ts`, `client/src/services/storyService.ts`,
 `client/src/types/story.ts`.
+
+### Verification of the closed-prop reference (2026-08-24, 4 renders, $0.08)
+
+Rendered through the production path (`buildReferenceSheetPrompt` →
+`callGeminiAPIForImage`, grok-imagine-image), images kept in the session
+scratchpad:
+
+| arm | input | result |
+|---|---|---|
+| A control | old face-describing description, no `referenceView` | flat, face-on, unrolled — reproduces the shipped failure |
+| B confound | old face-describing description + `referenceView` | rolled BUT still part-open with script visible |
+| C | face-free description + `referenceView` | rolled, tied, **no writing**, identity intact |
+| D production shape | 4-element batch, 2 with `referenceView` | map rolled, notebook shut cover-up, lantern and rope unchanged, 2x2 grid intact |
+
+B is the Debiased-SDS conflict reproduced deliberately: a description that
+still describes the face fights the closed instruction and the face partly
+wins. It confirms the two halves are load-bearing TOGETHER — the bible rule
+that keeps the face out of `description` is not optional decoration around
+`referenceView`, it is half the mechanism. D confirms props without the field
+are untouched.
+
+**Unrelated defect found while doing this:** the map panel in D rendered two
+literal human hands, from `"roughly the size of two open palms"` in the
+description — a phrase copied verbatim from the real ART001 entry in
+production. Scale similes in a VB description can be drawn literally. Not
+caused by this change; logged to the backlog.
