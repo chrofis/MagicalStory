@@ -128,10 +128,12 @@ The first two are corroborated by more than one source, which is why they lead.
 - [ ] Mitigation playbook for known image failure modes — deferred wholesale (hazard list in
       scene-expansion, matching eval checks, Lab validation)
       → `docs/image-failure-modes.md:35`
-- [ ] Composite plate stages a flat frontal lineup and drops required objects — measured on the
-      dragon page: the plate painted the creature (the fix worked) but posed three identical
-      front-facing figures and lost a required object. Undiagnosed; do NOT "fix" it by loosening
-      the blend → `docs/decisions.md` 2026-08-23 plate-creature entry
+- [ ] Composite plate: `objects[]` never reaches the plate prompt, so PRIORITY 1's promise to
+      render "every required object" has no source — the setting text is the empty-scene prompt,
+      which by construction has no props. Needs its own section inside the 8000-char Grok budget
+      the setting is already trimmed to fit → `docs/decisions.md` 2026-08-24 flat-lineup entry
+      (the flat-lineup half of this item is FIXED in `143ed6f05`: pose resolver, compound
+      interaction keys, and the fabricated left/right direction)
 - [ ] Composite delivers 0 pages out of every trigger measured so far — 3 real production
       triggers across two finished stories (2026-08-24) all aborted; earlier audit found 11
       gate-true pages / 161 with no record. Whether the gates are right or the plate is too weak
