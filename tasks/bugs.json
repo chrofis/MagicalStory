@@ -235,6 +235,15 @@
    "status": "fixed",
    "fixedIn": "fix(covers) 2026-08-23 (same commit)",
    "note": "Unified: outline parser translates the Title Page section at its boundary and writes coverHints.frontCover (unified+legacy+shared keyword map); migration 026 renamed titlePage in all stored stories (prod 106, staging 122, 0 remaining); COVER_HINT_KEY/coverKeyToHintKey retired from coverKeys.js and all 6 consumers read coverHints[coverKey] directly; pipeline coverType token titlePage renamed frontCover (storyJobPipeline + trial coverTypes) with a one-boundary legacy normalizer for queued jobs. Trial UX fields (titlePageImage etc.) are a different concept and untouched."
+  },
+  {
+   "id": "eval-tdz-expectedagesblock",
+   "title": "evaluateImageQuality threw ReferenceError on EVERY call — expectedAgesBlock read in its temporal dead zone; two whole books shipped with no quality/semantic score and no auto-repair",
+   "reportedAt": "2026-08-24",
+   "source": "staging job_1787514666616_yw9qsv1vf (16pp) + prod job_1787514321173_gvs2ojo4o0n (18pp): analytics.models.quality=[], zero page_quality/semantic_compliance calls in generationLog, every page finalScore=100 semanticScore=null, scoreBreakdown.visual.score=0. Only two stories in either DB with 0/N semantic coverage; every prior story is N/N.",
+   "status": "fixed",
+   "fixedIn": "935a46b8b",
+   "note": "0c9fa78e3 added `expectedAges: expectedAgesBlock` at evalPipeline.js:929 inside the evaluateThreeStage launch, while `let expectedAgesBlock` stayed at :1046 — a TDZ read, so the function threw on entry and the outer catch returned null for every page and every cover. Declaration moved above the launch. Verified: page 15 of the prod story now evaluates to score 90 in 1.5s instead of returning null. Same failure class the function header already documents for the hoisted promise handles. NOTE: the repair endpoints in regeneration.js call the same function, so the repair workflow was dead in prod for the same window."
   }
  ]
 }

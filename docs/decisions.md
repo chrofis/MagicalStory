@@ -16753,3 +16753,42 @@ contradiction as a trait-bug signal; the smoke account's character-store row
 is 56.9 MB of JSONB for 5 characters (inline bytes vs the R2 iron rule).
 
 **Touched files.** server/routes/avatars.js.
+
+## 2026-08-24 — The eval was dead for a day, and two books shipped unscored
+
+**Context:** Two stories generated on the evening of 2026-08-23 —
+staging `job_1787514666616_yw9qsv1vf` (16pp) and prod
+`job_1787514321173_gvs2ojo4o0n` (18pp) — carry `finalScore: 100` and
+`semanticScore: null` on every page. `analytics.models.quality` is `[]`,
+and `page_quality` / `semantic_compliance` / `unified_pipeline_quality_r*`
+appear nowhere in either `generationLog`. They are the only two stories in
+either database with 0/N semantic coverage; every story before them is N/N.
+
+**Cause:** `0c9fa78e3` moved the age expectation from the evaluator to the
+compliance judge and passed it into the three-stage launch at
+`evalPipeline.js:929` — but left `let expectedAgesBlock` at `:1046`, below
+the read. A `let` read in its temporal dead zone throws, so
+`evaluateImageQuality` threw `ReferenceError` on entry for every page and
+every cover, and the function-level catch returned `null`. Callers read
+`null` as "no data" and defaulted to 100.
+
+**Decision:** Declaration moved above the launch. The two surviving legs
+explain what was still observed: the entity check (its own path) produced the
+only real deductions — the 85s on prod p15/p17/p18 — and `eval_consolidation`
+still ran over an empty finding set.
+
+**Rationale / why it went unnoticed:** a dead evaluator does not look broken.
+It looks like a perfect book. Every page scoring exactly 100 with zero retries
+is the signature, and `scoreBreakdown.visual.score: 0` alongside
+`finalScore: 100` is the tell. The function header already documented this
+exact failure class for the hoisted promise handles ("without these
+declarations here, the finally's `if (qualityFiguresResolve)` throws
+ReferenceError on every call, taking down all 10 page evaluations + cover gen
+with it") — the same trap, one variable later.
+
+**Blast radius:** the repair endpoints in `server/routes/regeneration.js` call
+the same function, so the repair workflow was also dead for that window. Both
+books shipped with no auto-repair pass at all.
+
+**Touched files:** `server/lib/evalPipeline.js`, `tasks/bugs.json`.
+

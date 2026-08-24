@@ -903,6 +903,36 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
+    // DECLARED AGES for the compliance judge. The evaluator used to receive
+    // head-to-body ratios ("- Daniel: 1:8") and check them itself. That failed
+    // twice over: it fired once in 271 versions, and that once was false —
+    // three adults all listed 1:8, and the judge read the colon as a ratio
+    // BETWEEN two of them ("Daniel is not roughly one-fifth the height of
+    // Hans") and demanded an adult be shrunk to a fifth of another adult.
+    //
+    // Age is the readable form of the same fact. The blind inventory estimates
+    // each figure's apparent age from head-to-body proportion without knowing
+    // who anyone is, identity supplies the name, and the judge compares that
+    // estimate against the number below. No notation to misread, and no
+    // cross-character comparison to invent.
+    //
+    // Declared HERE, above the three-stage launch that reads it. It was first
+    // written below that call, where `let` put every read in the temporal dead
+    // zone: `evaluateImageQuality` threw ReferenceError on entry, the outer
+    // catch returned null, and two whole books (34 pages, staging + prod) were
+    // generated with no quality score, no semantic score and no auto-repair
+    // before anyone noticed. Same failure class as the hoisted promise handles
+    // above. Nothing between here and the call may move below it.
+    let expectedAgesBlock = '';
+    try {
+      const lines = [];
+      for (const c of (sceneCharacters || [])) {
+        const age = parseInt(c?.age, 10);
+        if (c?.name && Number.isFinite(age)) lines.push(`- ${c.name}: ${age} years old`);
+      }
+      if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
+    } catch { /* silent — the judge tolerates an empty block */ }
+
     // Start three-stage eval in parallel for scene evaluations.
     // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
     // can pair each named character with the blind vision inventory by zone. We expose
@@ -1025,33 +1055,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
       if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }
-
-    // Build expected head-to-body ratios per character (for STEP 2C proportion
-    // check). Uses getHeadBodyRatio() from storyHelpers — single source of
-    // truth shared with avatar generation. Age words ("child"/"toddler") are
-    // never sent to Gemini, only the numeric ratios, which are safety-filter
-    // neutral. Empty string when no characters or none have age set.
-    // DECLARED AGES for the compliance judge. The evaluator used to receive
-    // head-to-body ratios ("- Daniel: 1:8") and check them itself. That failed
-    // twice over: it fired once in 271 versions, and that once was false —
-    // three adults all listed 1:8, and the judge read the colon as a ratio
-    // BETWEEN two of them ("Daniel is not roughly one-fifth the height of
-    // Hans") and demanded an adult be shrunk to a fifth of another adult.
-    //
-    // Age is the readable form of the same fact. The blind inventory estimates
-    // each figure's apparent age from head-to-body proportion without knowing
-    // who anyone is, identity supplies the name, and the judge compares that
-    // estimate against the number below. No notation to misread, and no
-    // cross-character comparison to invent.
-    let expectedAgesBlock = '';
-    try {
-      const lines = [];
-      for (const c of (sceneCharacters || [])) {
-        const age = parseInt(c?.age, 10);
-        if (c?.name && Number.isFinite(age)) lines.push(`- ${c.name}: ${age} years old`);
-      }
-      if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
-    } catch { /* silent — the judge tolerates an empty block */ }
 
     // CLOTHING CONTRACT (owner, 2026-08-08). The evaluator used to infer the
     // outfit from ORIGINAL_PROMPT alone. When the prompt carried no clothing —
