@@ -271,7 +271,7 @@
       "source": "staging job_1787683120734_qkgfbd86o (6pp trial, de-ch). VB stored ART002 \"Brauner Hund\", type \"Tier\", description \"Ein kleiner, flauschiger brauner Hund mit weichen Schlappohren...\". Every page cites ART002. The stored page prompts read \"Ein kleiner, flauschiger Tier mit weichen Schlappohren\" — the word Hund is gone from all six prompts, and the German agreement break (flauschiger Tier) shows it is a blind string replacement. With no species anchor the render is a free choice per page: shaggy ginger on p1/p2/p3/p6, golden retriever puppy on p5.",
       "status": "fixed",
       "note": "prompts/story-trial.txt VB schema offers only secondaryCharacters / artifacts / locations / backgrounds — no animals array. story-bible-from-beats.txt:138 and story-unified.txt:671 both have one, so this is trial-only. sanitizeVbIdsInPrompt (promptBuilders.js:3332) protects NAME_POOLS = mainCharacters/secondaryCharacters/animals and rewrites REF_POOLS = artifacts/vehicles/clothing to their type, which is correct for a prop (stops the name being lettered onto it, 2026-08-24 fix) and wrong for a living thing. Second defect visible in the same evidence: the substitution also fires INSIDE the entry own description, so the description that teaches the model what the thing looks like is the very text being degraded, and the bullet label becomes the first two words of the description (\"**Ein kleiner** (object)\", \"**Eine runde** (object)\").",
-      "fixedIn": "4effc734a"
+      "fixedIn": "5e8a0d1e3"
     }
   ]
 }
