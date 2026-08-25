@@ -3992,11 +3992,11 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
  * At most 2, or half the cast when the cast is small. Older first: a 3-year-old
  * carries a moment, not a book.
  *
- * Mains arrive in two shapes. The story pipeline passes `mainCharacters` as an
- * array of ids; the idea-generation payload has no such array and instead flags
- * each character with `isMain`. Both are read here, ids first, so the two stages
- * agree on who the book is about. With neither, the first character is the focus
- * — the long-standing fallback.
+ * Mains arrive in three shapes. The story pipeline passes `mainCharacters` as an
+ * array of ids and stamps `isMainCharacter` on the objects; the idea-generation
+ * payload has neither and flags each character with `isMain`. All are read here,
+ * ids first, so every stage agrees on who the book is about. With none of them,
+ * the first character is the focus — the long-standing fallback.
  *
  * This is the ONE place that decides who the focus character is — the story
  * shape and the age mode must never disagree about it.
@@ -4006,7 +4006,7 @@ function pickMainCharacters(inputData = {}) {
   const declaredMain = inputData.mainCharacters || [];
   const declared = declaredMain.length
     ? chars.filter(c => declaredMain.includes(c.id))
-    : chars.filter(c => c.isMain);
+    : chars.filter(c => c.isMain || c.isMainCharacter);
   const cap = Math.max(1, Math.min(2, Math.floor(chars.length / 2) || 1));
   const mains = declared
     .slice()

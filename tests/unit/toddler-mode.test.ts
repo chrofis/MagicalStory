@@ -52,6 +52,13 @@ describe('resolveAgeMode', () => {
     expect(resolveAgeMode({ characters: [char(1, 'A', 1, true), char(2, 'B', 5, false)] })).toBe('toddler');
   });
 
+  it('reads isMainCharacter, the flag the story pipeline stamps on its objects', () => {
+    const pipelineChar = (id: number, name: string, age: number, main: boolean) =>
+      ({ id, name, age: String(age), gender: 'male', role: main ? 'main' : 'secondary', isMainCharacter: main });
+    expect(resolveAgeMode({ characters: [pipelineChar(1, 'A', 1, true), pipelineChar(2, 'B', 5, false)] })).toBe('toddler');
+    expect(resolveAgeMode({ characters: [pipelineChar(1, 'A', 5, true), pipelineChar(2, 'B', 1, false)] })).toBe('standard');
+  });
+
   it('falls back to standard when the age is missing or the cast is empty', () => {
     expect(resolveAgeMode({ characters: [{ id: 1, name: 'A', isMain: true }], mainCharacters: [1] })).toBe('standard');
     expect(resolveAgeMode({ characters: [] })).toBe('standard');
