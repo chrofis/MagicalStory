@@ -116,6 +116,27 @@ describe('buildStoryShapeSection', () => {
     expect(shape).toMatch(/6 distinct events/);
   });
 
+  // Traits are optional (owner, 2026-08-25): "it can be that we do not have any
+  // child traits... if we have traits we use them. If not we take something
+  // generic. Both must work."
+  const shapeFor = (traits: unknown) => buildStoryShapeSection(
+    { characters: [{ ...char(1, 'A', 1, true), traits }], mainCharacters: [1] }, 6);
+
+  it('makes the traits the page plan when the character has any', () => {
+    expect(shapeFor({ strengths: ['Mutig'], flaws: [], challenges: [], specialDetails: '' }))
+      .toMatch(/traits are the page plan/);
+    expect(shapeFor(['Fröhlich'])).toMatch(/traits are the page plan/);
+    expect(shapeFor({ strengths: [], specialDetails: 'Liebt Hunde' })).toMatch(/traits are the page plan/);
+  });
+
+  it('falls back to generic toddler feelings when there are none', () => {
+    // The structured-but-empty shape is truthy — a naive check would pass it.
+    expect(shapeFor({ strengths: [], flaws: [], challenges: [], specialDetails: '' }))
+      .toMatch(/every small child is: hungry, sleepy, curious, delighted, grumpy/);
+    expect(shapeFor(undefined)).toMatch(/every small child is/);
+    expect(shapeFor(['', '  '])).toMatch(/every small child is/);
+  });
+
   it('keeps the computed challenge budget at every other age', () => {
     const shape = buildStoryShapeSection({
       characters: [char(1, 'A', 5, true)], mainCharacters: [1], storyTheme: 'pirate',

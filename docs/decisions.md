@@ -18462,3 +18462,38 @@ distinction that matters is emotional stake vs. cognitive demand.
 `tests/unit/toddler-mode.test.ts`.
 
 **Status:** ✅ active (supersedes the "nothing goes wrong" line above; not yet run).
+
+---
+
+## 2026-08-25 — Toddler mode: character traits are OPTIONAL, with a generic fallback
+
+**Context:** the trait rule added earlier the same day ("give each trait a page
+of its own") assumes every character carries traits. Many do not. Owner: *"it can
+be that we do not have any child traits... most children are hungry and happy and
+grumpy, just make sure if we have traits we use them. If not we take something
+generic. Both must work."*
+
+**Decision:** both branches are stated explicitly rather than left implied.
+
+- `prompts/toddler-mode.txt`: where traits are given, each gets a page; where
+  none are given, the pages come from what every small child is — hungry,
+  sleepy, curious, delighted, grumpy.
+- `buildStoryShapeSection`'s toddler branch emits whichever line matches, chosen
+  by a new `hasAnyTraits(char)`.
+
+**Why a helper and not a truthiness check:** `traits` arrives in two shapes — a
+flat array of strings, or `{ strengths, flaws, challenges, specialDetails }` —
+and either may be present but empty. A character created without filling the
+traits step carries the structured shape with empty lists and an empty
+`specialDetails`, which is **truthy**: `if (char.traits)` would take the
+"use the traits" branch against nothing at all. `hasAnyTraits` requires actual
+non-blank content in either shape.
+
+**Verified:** `tests/unit/toddler-mode.test.ts` covers both branches over six
+shapes, including the structured-but-empty object and a flat array of blanks.
+
+**Touched files:** `prompts/toddler-mode.txt`,
+`server/lib/promptBuilders.js` (`hasAnyTraits`, `buildStoryShapeSection`),
+`tests/unit/toddler-mode.test.ts`.
+
+**Status:** ✅ active (not yet run).

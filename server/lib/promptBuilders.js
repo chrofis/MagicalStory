@@ -4019,6 +4019,26 @@ function pickMainCharacters(inputData = {}) {
 const TODDLER_MAX_AGE = 3;
 
 /**
+ * Does this character carry any usable trait at all?
+ *
+ * `traits` is either a flat array of strings or the structured
+ * { strengths, flaws, challenges, specialDetails } shape, and either may be
+ * present but empty — a character created without filling the traits step has
+ * `{ strengths: [], flaws: [], challenges: [], specialDetails: '' }`, which is
+ * truthy and would pass a naive check.
+ */
+function hasAnyTraits(char) {
+  const t = char?.traits;
+  if (Array.isArray(t)) return t.some(x => String(x || '').trim());
+  if (t && typeof t === 'object') {
+    const lists = [t.strengths, t.flaws, t.challenges];
+    if (lists.some(l => Array.isArray(l) && l.some(x => String(x || '').trim()))) return true;
+    return !!String(t.specialDetails || '').trim();
+  }
+  return false;
+}
+
+/**
  * Which age band the story is written for.
  *
  * Owner rule (2026-08-25): the OLDEST main character decides, and secondary
@@ -4085,7 +4105,12 @@ function buildStoryShapeSection(inputData, pageCount) {
       `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — every page is theirs to enjoy, none is theirs to solve.`,
       'Challenges: one, small. Something is taken, dropped or will not work, the main character minds, and it is put right within a page or two. Nothing they must work out, nothing frightening.',
       'Feelings: three different ones across the book, plain on the face — delight, surprise, and a moment of being upset. The last page is happy.',
-      'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.',
+      // Traits are optional — plenty of characters carry none (owner,
+      // 2026-08-25). Asking for "a page per trait" against an empty list plans
+      // nothing, so say what to fall back on instead of leaving it implied.
+      hasAnyTraits(focus)
+        ? 'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.'
+        : 'No traits are recorded for them, so the pages come from what every small child is: hungry, sleepy, curious, delighted, grumpy.',
       others.length
         ? `Everyone else — ${others.map(c => c.name).join(', ')} — is simply there alongside the main character. No moment of their own, no arc.`
         : '',
