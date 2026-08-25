@@ -2793,6 +2793,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         for (const s of plan.skipped) {
           log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair skip ${s.page}: ${s.reason}`);
         }
+        // ATTEMPT LEDGER. A rejected repaint never becomes a version, so
+        // buildVersionEntry can only ever record the ones that were KEPT — and
+        // the interesting question is always the opposite one. Staging
+        // job_1787638394061_hs70901tfsn ran 18 repaints, kept 3, and shipped
+        // four still-photographic pages with nothing stored to say whether the
+        // gate rejected a good repaint or a bad one. Every outcome lands here.
+        styleConsistency.repairs = [];
+        const recordRepair = (page, outcome, rep) => {
+          styleConsistency.repairs.push({
+            page,
+            outcome,                                    // 'kept' | 'rejected' | 'error'
+            passedGate: rep?.passedGate ?? null,
+            better: rep?.styleComparison?.better || null,
+            changed: rep?.styleComparison?.changed || [],
+            reason: rep?.styleComparison?.reason || rep?.error || null,
+          });
+        };
         for (const target of plan.targets) {
           const pageLabel = target.page < 0 ? `cover ${target.page}` : `page ${target.page}`;
           try {
@@ -2832,6 +2849,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                   : `not closer to the target style (${rep.styleComparison?.better || 'unknown'})`)
                 : 'gate could not judge it';
               log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} rejected — ${why}; original kept`);
+              recordRepair(target.page, 'rejected', rep);
               continue;
             }
             // COVER: the repaint ran on the textless art, so the title has to
@@ -2850,6 +2868,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 // The repaint is textless art; shipping it as the cover would
                 // drop the title entirely. Keep the original instead.
                 log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: ${target.coverKey} restamp failed (${e.message}) — original cover kept`);
+                recordRepair(target.page, 'error', { ...rep, error: `restamp failed: ${e.message}` });
                 continue;
               }
             }
@@ -2857,6 +2876,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const prevBest = finalBestPerPage.get(target.page);
             if (!versions || !prevBest) {
               log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} has no version array — repaint discarded`);
+              recordRepair(target.page, 'error', { ...rep, error: 'no version array for this page' });
               continue;
             }
             // New version through the normal plumbing — inherits the picked
@@ -2901,11 +2921,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             versions.push(newVersion);
             // COMPETE, DO NOT APPOINT — see the text-space note above.
             finalBestPerPage.set(target.page, selectBestVersion(versions));
+            recordRepair(target.page, 'kept', rep);
             log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair applied on ${pageLabel} (${styleRepairModel}, gate=${rep.passedGate === null ? 'unavailable' : 'pass'}, ref=${target.targetRefLabel || `Page ${target.targetRefPage}`})`);
           } catch (repErr) {
             log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed: ${repErr.message} — original kept`);
+            recordRepair(target.page, 'error', { error: repErr.message });
           }
         }
+        // One line that answers "did style-repair help this book" without
+        // reading 18 scattered log entries.
+        const tally = styleConsistency.repairs.reduce((a, r) => { a[r.outcome] = (a[r.outcome] || 0) + 1; return a; }, {});
+        const contentVetoes = styleConsistency.repairs.filter(r => (r.changed || []).length > 0).length;
+        log.info(`🎨 [UNIFIED PIPELINE] Step 5: ${styleConsistency.repairs.length} repaint(s) — ` +
+          `kept ${tally.kept || 0}, rejected ${tally.rejected || 0} (${contentVetoes} for altering content), error ${tally.error || 0}`);
       } else if ((styleConsistency.outliers?.length || 0) > 0) {
         log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair disabled (STYLE_REPAIR_PRODUCTION=false) — ${styleConsistency.outliers.length} outlier(s) surfaced only`);
       }
@@ -3041,6 +3069,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // is answerable from the stored story instead of only from live logs.
       coherenceGate: v.evaluation?.coherenceGate || null,
       styleGate: v.evaluation?.styleGate || null,
+      // The style repaint's own record — which anchor it aimed at, and the
+      // comparative verdict the gate decided on. Same whitelist lesson as
+      // rawOutput and styleGate above: without this line the field exists only
+      // in memory, and a stored story cannot answer "why does this page still
+      // look photographic". Measured on staging job_1787638394061_hs70901tfsn:
+      // 18 repaints ran, 3 were kept, and not one carried a reason.
+      styleRepair: v.styleRepair || null,
       source: v.source,
       type: typeFor(v.source),
       modelId: v.modelId,
