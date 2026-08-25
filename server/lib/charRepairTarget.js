@@ -19,7 +19,7 @@
  */
 'use strict';
 
-const log = require('./logger');
+const { log } = require('../utils/logger');
 
 const getStoryHelpers = () => require('./storyHelpers');
 const images = () => require('./images');
