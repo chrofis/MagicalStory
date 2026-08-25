@@ -18542,3 +18542,66 @@ dog. Now: whatever the child is said to love appears in the book and gets a page
 landmark — weak index entries are a separate problem from the mandate.
 
 **Status:** ✅ active (not yet run).
+
+---
+
+## 2026-08-25 — The blend prompt is one positive description, and it is short on purpose
+
+**Context:** Exp 848 (staging, $0.06) put the blend fix `3ad9e1a12` to its first
+uninterrupted test. That fix held — the size-neutral occlusion clause no longer
+contradicts the depth line. The blend failed a different way: it painted a
+SECOND copy of the occluded background character at full foreground height and
+pulled the camera in, cropping out the bridge and tower. Everything upstream was
+right (plate spread 3.97×, the figure pasted at 121px of 235px, `head+occluded`).
+
+Both failures were already forbidden in that prompt, in writing — *"Do not add,
+remove or substitute a character"* and *"Do not re-frame: same camera distance,
+same borders, same crop"*. That is the finding that decides the approach: more
+prohibition text cannot fix a failure whose prohibition is present and ignored.
+The function's own doc comment already recorded the reason — *"the frame creeps
+in as the prompt grows (1810 chars held the framing exactly, 3063 zoomed enough
+to cut feet)"* — and exp 848's prompt measured **5451 chars**, far past the point
+where zoom was already known to occur.
+
+Two outright bugs were also found. `THE SCENE` was cut mid-word by a blind
+`.slice(0, 900)` (ending *"…chin-length straight bl"*) with 2549 chars of
+headroom under the cap — the same blind-cut pattern `images.js:635-642` logs as
+an incident. And the prompt cited *"the labelled portrait grid"* as the identity
+authority on a page that has no grid, so `blendRefs` was one image and the
+reference dangled.
+
+**Decision:** Replace the whole `people.length` branch with a single positive
+description of the finished picture. No `DO NOT` block. Every fact stated once —
+the old build repeated each action (census `doing:` plus CHANGE THESE), each
+outfit (scene overview plus `wearing:`) and each depth (census word plus a
+trailing `Depths as staged` line). The scene overview is dropped entirely: it
+described what the model can already see in Image 1, and it was half the length
+budget. Preservation is one closing positive sentence naming camera, borders,
+background and cast. Result: **1635 chars, from 5451** — inside the length that
+held framing.
+
+`_blendStyleLine` now prefers `BLEND_STYLE_LINES` over `ART_STYLES`. That map
+exists to give the blend a SHORT style line but sat behind `ART_STYLES`, so every
+mapped style got the long generation paragraph instead — dead code in practice.
+For `realistic` that paragraph ends *"cinematic composition"*, asking for a
+well-composed shot inside the prompt that needs the shot left alone. A short
+`realistic` entry was added.
+
+**Deliberately NOT done:** the occluder is still not named. Run E of Lab 695-705
+named it and the result was worse. Both bugs are fixed by construction rather
+than by patching — dropping the overview removes the blind slice, and dropping
+the DO-NOT block removes the dangling grid reference.
+
+**Rationale:** Owner's call (`AskUserQuestion`, 2026-08-25) between a bugs-only
+re-measure, this positive rewrite, masked per-figure edits, and reconsidering the
+blend entirely. This is the cheapest structural change — same three model calls,
+same $0.06 — and it is decisive either way: if Grok re-frames a 1635-char prompt
+that never asks it to, the whole-frame blend is not salvageable by wording and
+the masked-edit option becomes the answer.
+
+**Verification:** rebuilt offline from exp 848's real cast and metadata — 1635
+chars, no DO-NOT block, no "cinematic", no portrait-grid reference, occluder
+unnamed, each action stated once, no truncation. The paid re-run is the next step.
+
+**Touched:** `server/lib/sceneComposite.js`.
+**Status:** ✅ active — awaiting its first measured run.

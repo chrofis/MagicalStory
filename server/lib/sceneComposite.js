@@ -1502,6 +1502,7 @@ const BLEND_STYLE_LINES = {
   concept:      "digital concept art — painterly brushwork, dramatic lighting, rich palette, visible artistic strokes, cinematic atmosphere (NOT photorealistic)",
   pixel:        "16-bit pixel art style — limited palette, detailed sprite work, retro video-game aesthetic",
   cyber:        "cyberpunk graphic novel illustration — neon reflections, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog",
+  realistic:    "a photograph — real people, real skin texture, natural hair, natural light",
 };
 
 /**
@@ -1517,11 +1518,21 @@ const BLEND_STYLE_LINES = {
  */
 function _blendStyleLine(artStyle) {
   const key = String(artStyle || '').trim();
+  // BLEND_STYLE_LINES FIRST. It used to be the fallback behind ART_STYLES,
+  // which meant every style present there got the long GENERATION paragraph
+  // instead of the short blend line this map exists to provide — the map was
+  // effectively dead for every mapped style. Two costs, both measured:
+  // length (frame creep scales with prompt size — see buildBlendEditPrompt),
+  // and content. The realistic paragraph ends "cinematic composition", which
+  // asks for a well-composed shot in the same prompt that needs the shot left
+  // alone; exp 848 re-framed. ART_STYLES stays as the fallback for a style
+  // this map does not carry.
+  if (BLEND_STYLE_LINES[key]) return BLEND_STYLE_LINES[key];
   try {
     const { ART_STYLES } = require('./promptBuilders');
     if (ART_STYLES?.[key]) return ART_STYLES[key];
   } catch { /* fall through to the local map */ }
-  return BLEND_STYLE_LINES[key] || BLEND_STYLE_LINES.watercolor;
+  return BLEND_STYLE_LINES.watercolor;
 }
 
 // Grok's edit endpoint caps prompts at 8000 chars. Reserve ~300 char
@@ -1639,6 +1650,15 @@ function buildBlendMetadata(fullData, scene = null, clothingRequirements = null)
 
 // Age as the census words it. Kept coarse on purpose: the blend needs to know
 // a figure is a child rather than a shrunk adult, and nothing finer.
+// Metadata fragments arrive lowercase and unpunctuated ("kneels at the gap",
+// "eyes wide with urgency"). The blend reads as prose now, so each one becomes
+// its own sentence rather than a bullet fragment.
+function _sentence(text) {
+  const t = String(text || '').trim().replace(/[.\s]+$/, '');
+  if (!t) return '';
+  return t.charAt(0).toUpperCase() + t.slice(1) + '.';
+}
+
 function _ageWord(age) {
   const n = Number(age);
   if (!Number.isFinite(n)) return 'a person';
@@ -1694,14 +1714,8 @@ function buildBlendEditPrompt(scene, cast = null) {
     const expressions = scene.characterExpressions || {};
     const attention = scene.attentionTargets || {};
     const actions = scene.characterActions || {};
-    const clothing = scene.characterClothing || {};
     const occluded = scene.occludedBy || {};
     const artStyle = _blendStyleLine(scene.artStyle);
-
-    // The scene's own overview. Capped: this is context for a picture that
-    // already exists, not a brief for one to be built, and a long brief invites
-    // re-staging.
-    const overview = String(scene.description || scene.pageBrief || '').trim().slice(0, 900);
 
     const depthWord = (c) => {
       const d = String(c.depth || 'foreground').toLowerCase();
@@ -1709,69 +1723,35 @@ function buildBlendEditPrompt(scene, cast = null) {
         : d === 'midground' ? 'in the middle distance' : 'close to the camera';
     };
 
-    // Who is in the picture: where they stand, what they wear, what they are
-    // doing. Everything here describes Image 1 as it already IS.
-    const whoIsThere = people.map((c) => {
-      const bits = [`${c.name} — ${_ageWord(c.age)}, ${depthWord(c)}${c.position ? ` (${c.position})` : ''}`];
-      if (clothing[c.name]) bits.push(`  wearing: ${clothing[c.name]}`);
-      if (actions[c.name]) bits.push(`  doing: ${actions[c.name]}`);
-      if (occluded[c.name]) {
-        // SIZE-NEUTRAL on purpose. This clause used to end "at full height —
-        // never sitting on it, never shrunk to a small figure", which is a
-        // scale instruction, and the paste sets this flag for ANY figure it
-        // clipped at an occluder line — including a background figure whose
-        // correct rendering IS small. Measured on a bridge page: the distant
-        // character was clipped behind the parapet, told to stand at full
-        // height, and the blend enlarged him to near-foreground size and
-        // perched him on the railing — destroying the depth the composite
-        // exists to create, while the prompt's own closing line still said he
-        // was "in the background — small and distant". The intent was only
-        // ever to stop the model reading a half-body as a defect and painting
-        // it out, so say exactly that and leave size alone.
-        bits.push('  partly hidden: something in the scene crosses in FRONT of them, so only part of them shows.'
-          + ' That is correct and deliberate — keep them exactly as they are, at exactly the size they are.'
-          + ' Do not complete the hidden part, do not perch or seat them on the thing that crosses them.');
-      }
-      return bits.join('\n');
+    // One paragraph per person, and every fact stated ONCE. The old build said
+    // each action twice (as "doing:" in the census and again under CHANGE
+    // THESE), each outfit twice (the scene overview and "wearing:"), and each
+    // depth twice (the census word and a trailing "Depths as staged" line) —
+    // roughly a third of the prompt was restatement, and what got restated was
+    // what to CHANGE rather than what to keep.
+    const lines = people.map((c) => {
+      const bits = [`- ${c.name} — ${_ageWord(c.age)}, ${depthWord(c)}.`];
+      if (actions[c.name]) bits.push(` ${_sentence(actions[c.name])}`);
+      if (attention[c.name]) bits.push(` Looking at ${attention[c.name]}.`);
+      if (expressions[c.name]) bits.push(` ${_sentence(expressions[c.name])}`);
+      // Size-neutral, and the occluder is deliberately NOT named: run E of Lab
+      // 695-705 named it and the result was worse.
+      if (occluded[c.name]) bits.push(' Only part of them shows, which is deliberate — leave them exactly as they are, at exactly the size they are.');
+      return bits.join('');
     }).join('\n');
-
-    const emotionLines = people.filter(c => expressions[c.name])
-      .map(c => `- ${c.name}: ${expressions[c.name]}`).join('\n');
-    const interactionLines = people.filter(c => actions[c.name] || attention[c.name])
-      .map((c) => {
-        const what = actions[c.name] || `engages with ${attention[c.name]}`;
-        const look = attention[c.name] ? ` Their eyes go to ${attention[c.name]}.` : '';
-        return `- ${c.name}: ${what}.${look}`;
-      }).join('\n');
 
     const textDirective = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
 
-    return `YOUR TASK. Image 1 is a finished illustration. Every character is already in the right place, at the right size, on the right surface — that part is done and must not change. What is wrong is that they were pasted in: they stand stiff, blank-faced and disengaged from what is happening around them. Turn them, adjust their heads, arms and hands, and repaint their faces so that each one is doing what the scene asks and feeling what the scene asks — WITHOUT moving anyone. Then settle them into the picture so they read as painted rather than pasted.
+    return `${artStyle}.
 
-THE SCENE
-${overview}
+This picture is finished and correctly staged: every person stands where they belong, at the size they belong. What it lacks is life — the faces are blank and the bodies are stiff from being pasted in.
 
-WHO IS IN THE PICTURE
-${whoIsThere}
+Give each person below their expression, and turn their head and body on the spot toward what they are watching:
+${lines}
 
-CHANGE THESE — the interactions. Turn and adjust each character on the spot; their feet stay where they are:
-${interactionLines || '- (none declared)'}
+Then settle them into the picture: soften the pasted edges, paint out any solid colour fringe around them, match each person to the light and colour of the scene, and give each one a contact shadow where they meet the ground.
 
-CHANGE THESE — the emotions. The faces are blank and must not stay blank:
-${emotionLines || '- (none declared)'}
-
-DO NOT
-- Do not move anyone nearer, further, left, right, up or down, and do not change anyone's size. A turn of the body is a change of pose, not a change of place.
-- Do not re-frame: same camera distance, same borders, same crop, feet included.
-- Do not rebuild the background — architecture, landscape, water, sky and light stay as they are.
-- Do not add, remove or substitute a character. Faces, hair, age and clothing stay as Image 1 and the labelled portrait grid show them.
-- No text, captions, numbers or signatures.
-
-ALSO BLEND THEM IN
-- Soften the cut-out edges and paint over any solid red, blue, green, yellow, purple or cyan fringe.
-- Match each person to the scene light and colour, and give each one a contact shadow where they meet the ground.
-
-Art style: ${artStyle}.${buildStagedDepthLine(cast)}${textDirective}`;
+Everything else is already right and stays as it is — the camera position, the borders and the crop, the background, and who is in the frame. No lettering anywhere in the picture.${textDirective}`;
   }
 
   // Legacy path — no page prompt supplied (older callers, cover dispatcher).
