@@ -68,7 +68,7 @@ The `description` is copied verbatim into image prompts, so write it as image-pr
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
 - A prop with visible writing has that writing called illegible / weathered / smudged. Never quote words to be painted, and never say text is visible without describing it that way.
-- A prop whose interest lies on its face — map, letter, note, chart, page — is described as an object: material, size, edge wear, how it folds or rolls, dominant colour. What is drawn or written on the face stays out of the description.
+- A prop whose interest lies on its face — map, letter, note, chart, book, page, sign, board, plaque — is described as an object: material, size, edge wear, how it folds or rolls, dominant colour. What is drawn or written on the face stays out of the description.
 
 Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
 
@@ -152,8 +152,8 @@ Only the three blocks below. No preamble, no commentary.
       "name": "[Name]",
       "pages": [1],
       "type": "[what kind of object]",
-      "description": "[size, colour, material, geometry. A prop carrying writing has that writing 'illegible' / 'weathered' / 'smudged' / 'blurred' — never quote words to be painted, and never say 'handwritten letters visible' on its own, which makes the image model letter the prop's own name across it. A prop whose interest lies on its face — map, letter, note, chart, page — is described as an object: material, size, edge wear, how it folds or rolls, dominant colour. What is drawn or written on the face stays out of the description.]",
-      "referenceView": "[Only for a prop whose interest is on a face — map, letter, note, chart, book, page. One sentence describing it closed: rolled and tied, folded along its crease, or shut with the cover up. Omit for every other prop.]"
+      "description": "[size, colour, material, geometry. A prop carrying writing has that writing 'illegible' / 'weathered' / 'smudged' / 'blurred' — never quote words to be painted, and never say 'handwritten letters visible' on its own, which makes the image model letter the prop's own name across it. A prop whose interest lies on its face — map, letter, note, chart, book, page, sign, board, plaque — is described as an object: material, size, edge wear, how it folds or rolls, dominant colour. What is drawn or written on the face stays out of the description.]",
+      "referenceView": "[Only for a prop whose interest is on a face — map, letter, note, chart, book, page, sign, board, plaque. One sentence describing it closed: rolled and tied, folded along its crease, or shut with the cover up. Omit for every other prop.]"
     }
   ],
   "locations": [

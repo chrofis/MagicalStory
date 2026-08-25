@@ -17605,3 +17605,47 @@ the line-169 open question now answered), `docs/SETTLED.md`.
 
 **Status:** ✅ active — supersedes the 2026-08-09 (later) gemini flip, which
 supersedes the 2026-08-09 (earlier) grok default.
+
+## 2026-08-25 — First story under the new rules: verified in production, two gaps closed
+
+**Story:** prod `job_1787638707796_x8272kcs22m` (18pp, watercolour, DE), the
+first generated after the four fixes reached master.
+
+| what was broken | before | this story |
+|---|---|---|
+| evaluator dead (TDZ) | 0/18 semantic scores | **18/18**, quality model present |
+| prop NAME painted onto props | 6 names in one page's prompt | **0 leaks across 18 pages** |
+| interaction rows silently deleted | 8 across two books | **0** |
+| two actions on one page | 7 of 7 such pages failed | **18/18 pages carry exactly one** |
+
+**The closed reference worked on its first real prop.** The bible wrote
+`referenceView` on ART005 ("Kiaan's Book") and on nothing else — correctly, it
+was the only face-prop of the seven. Its reference image is a shut green book,
+cover up, no lettering, where the equivalent prop in the previous book
+(ART002, a notebook) was drawn lying open with handwriting across both pages.
+On p9 and p15 the boy carries it closed against his body. First held book in
+the project that is not presented face-on.
+
+**Natural control in the same frame.** ART004 "Nature Board" got no
+`referenceView` — a board was not in the type list — and its description opens
+"The board face is…". It rendered face-on to camera with gibberish lettering
+("Jdde Iras…"), the exact predicted failure, beside the book that behaved. One
+story, both arms.
+
+**Gap 1 closed:** the face-prop list now reads
+`map, letter, note, chart, book, page, sign, board, plaque`, identical in all
+seven places across five templates. It had drifted into three different lists.
+
+**Gap 2 closed:** `action` is now required in English whatever the story
+language. This story emitted 12 German labels against 14 English ("zeigen" and
+"pointing", "das fahrrad schieben" and "walking"). The label is a counting key
+for the one-action check, so a German and an English label for the same
+activity read as two actions and would raise a false
+`interaction_multiple_actions`. It did not fire here only because no single
+page mixed them — latent, not benign.
+
+**Open, not fixed here:** p15 scored 100/100/100 while carrying a duplicated
+inset panel pasted over its lower-left corner — a blatant compositional defect
+no evaluator axis caught. Backlogged.
+
+**Touched files:** the five prompt templates.

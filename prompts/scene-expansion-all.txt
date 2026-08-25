@@ -171,7 +171,7 @@ Field shape: `{character, object, where, action, hands, storyRelevant, priority}
 
 `hands`: `true` when the character's hands are on the object. One object takes one pair of hands: a second character in contact with the same object belongs on another page, and a hand-over is drawn as the moment before or after it — one holds the object out, the other reaches.
 
-`action`: required on every row. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
+`action`: required on every row, in English whatever the story language. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
 
 **Shared objects.** When several characters use ONE object at once, or act on ONE object together (carry the same basket, hold the same banner, pull the same rope, push the same cart), emit ONE entry: join the names with ` + ` in `character` and describe the shared action in the one `where` sentence. Separate entries with the same object render as duplicate objects. Characters each using their OWN identical object keep separate entries.
 
