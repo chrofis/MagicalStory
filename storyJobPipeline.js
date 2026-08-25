@@ -4541,6 +4541,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // can show the BG → blocking → composited → final pipeline. Stripped
           // from the JSONB blob after save.
           compositeDebug: img.compositeDebug || null,
+          // WHY the composite did or did not produce this page: 'triggered' /
+          // 'composited' / 'no-image' / 'aborted' + the gate's own reason. A
+          // few hundred bytes, no image data. Dropping it here meant three
+          // separate stories had to be diagnosed by inference and one could not
+          // be answered at all — the single field that says what happened was
+          // the one the save threw away.
+          compositeOutcome: img.compositeOutcome || null,
           imageVersions: [],
         }));
       } else {
@@ -4838,7 +4845,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // back to the original rawImages entry — the repair pipeline does
           // not propagate this field through, so without the fallback every
           // composite intermediate is silently dropped on save.
-          compositeDebug: img.compositeDebug || rawByPage.get(img.pageNumber)?.compositeDebug || null
+          compositeDebug: img.compositeDebug || rawByPage.get(img.pageNumber)?.compositeDebug || null,
+          // Same story as compositeDebug: the repair pipeline does not carry
+          // this through, so it needs the rawImages fallback or every abort
+          // reason is lost on the branch that runs for real stories.
+          compositeOutcome: img.compositeOutcome || rawByPage.get(img.pageNumber)?.compositeOutcome || null
         }));
 
         // Extract covers from pipeline results back into coverImages (updated with eval data)

@@ -18010,3 +18010,40 @@ necessarily borrowed, and a confident wrong label is indistinguishable from a ri
 so the repair must refuse rather than repaint whoever the label happens to sit on.
 
 **Touched:** `server/routes/regeneration.js`.
+
+---
+
+## 2026-08-24/25 — `compositeOutcome` survives the save; `preScaleRepairImage` deliberately does not
+
+**Context:** The composite writes `compositeOutcome` onto the page —
+`triggered` / `composited` / `no-image` / `aborted` plus the gate's own reason —
+and both whitelist rebuilds in `storyJobPipeline.js` dropped it. The cost was
+paid three times in two days: `job_1787514666616_yw9qsv1vf` p4,
+`job_1787514321173_gvs2ojo4o0n` p5/p17, and
+`job_1787638394061_hs70901tfsn` p11/p12/p14 — nine real triggers whose outcome
+had to be inferred from pixels, and the last set could not be resolved at all.
+The field naming what happened was the one field the save discarded.
+
+**Decision:** Restore `compositeOutcome` at both rebuild sites, with the
+`rawByPage` fallback at the repair-pipeline site (that branch does not carry
+per-page intermediates through, which is the same reason `compositeDebug` needs
+one). Do **not** restore `preScaleRepairImage`.
+
+**Rationale:** The two halves of the original item are not the same thing.
+`compositeOutcome` is a few hundred bytes of JSON with no image data — safe in
+the blob and useless anywhere else. `preScaleRepairImage` is raw base64: putting
+it back in the whitelist would write image bytes into `stories.data`, which is
+the one thing that is never allowed, and it would be redundant — the repair
+pipeline already reads it at `repairPipeline.js:778` and surfaces it as a
+separate image *version*, which reaches `story_images` through the normal
+version extraction. The version picker's "before/after" comes from there, not
+from the blob. Restoring it would have created a second, worse copy of a path
+that already works.
+
+**Verification:** static + shape assertions, offline — both sites carry the
+field, the repair site has its fallback, `preScaleRepairImage` is absent from
+both rebuilds while `repairPipeline` still consumes it, and none of the four
+`compositeOutcome` shapes carries image data.
+
+**Touched:** `storyJobPipeline.js`.
+**Status:** ✅ active
