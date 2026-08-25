@@ -6,9 +6,64 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const { AsyncLocalStorage } = require('async_hooks');
 const { log } = require('../utils/logger');
 
-const PROMPT_TEMPLATES = {};
+// The loaded templates. Everything reads them as `PROMPT_TEMPLATES.<key>`.
+const TEMPLATE_STORE = {};
+
+// PER-CALL TEMPLATE OVERRIDES (2026-08-25).
+//
+// The Lab's `promptOverride` used to be implemented by assigning onto this
+// registry and restoring in a `finally` — 22 sites doing
+// `PROMPT_TEMPLATES.x = override; try { build() } finally { PROMPT_TEMPLATES.x = orig }`.
+// That is a global mutation, so only ONE experiment could run at a time: with
+// two, B's override is what A's builder reads, or A's restore drops B's
+// override while B is still running. The results still look clean — they are
+// just attributed to the wrong prompt, which is the worst failure a
+// measurement tool can have. It is the reason the Lab was single-flight.
+//
+// Reads now resolve through an AsyncLocalStorage view, so an override is
+// visible only inside the async call tree that set it. Concurrent experiments
+// cannot see each other's templates, and no builder had to change: the export
+// is a Proxy, so the ~100 `PROMPT_TEMPLATES.key` read sites are untouched.
+const templateOverrides = new AsyncLocalStorage();
+
+const PROMPT_TEMPLATES = new Proxy(TEMPLATE_STORE, {
+  get(target, key) {
+    const overrides = templateOverrides.getStore();
+    if (overrides && typeof key === 'string' && Object.prototype.hasOwnProperty.call(overrides, key)) {
+      return overrides[key];
+    }
+    return target[key];
+  },
+  has(target, key) {
+    const overrides = templateOverrides.getStore();
+    if (overrides && typeof key === 'string' && Object.prototype.hasOwnProperty.call(overrides, key)) return true;
+    return key in target;
+  },
+  // set / ownKeys / deleteProperty fall through to the target, so load-time
+  // population and the derived-template pass (`for (const k of Object.keys(...))`)
+  // behave exactly as before.
+});
+
+/**
+ * Run `fn` with some templates replaced, visible only to this async call tree.
+ *
+ * @param {Object<string,string>} overrides  template key -> replacement text
+ * @param {Function} fn                      sync or async; its result is returned
+ * @returns {*} whatever fn returns (a promise if fn is async)
+ */
+function withTemplates(overrides, fn) {
+  const clean = Object.fromEntries(
+    Object.entries(overrides || {}).filter(([, v]) => typeof v === 'string' && v.length > 0)
+  );
+  if (Object.keys(clean).length === 0) return fn();
+  // Nested calls merge onto the parent view rather than replacing it, so a
+  // stage that overrides two templates in two nested scopes keeps both.
+  const parent = templateOverrides.getStore();
+  return templateOverrides.run({ ...(parent || {}), ...clean }, fn);
+}
 
 // Single source of truth for the character-repair style-match guard. Every
 // repair template includes the `{REPAIR_STYLE_GUARD}` token; it is substituted
@@ -427,6 +482,7 @@ function buildEvaluationPrompt(opts = {}) {
 
 module.exports = {
   PROMPT_TEMPLATES,
+  withTemplates,
   loadPromptTemplates,
   fillTemplate,
   buildEmptyScenePrompt,

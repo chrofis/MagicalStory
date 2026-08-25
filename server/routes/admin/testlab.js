@@ -5,9 +5,10 @@
  * per-stage rerun experiments (A/B prompt variants), sandboxed test image
  * versions (story_images.is_test) with an explicit promote action.
  *
- * All endpoints require an admin token. Experiments run in-process,
- * sequentially per experiment (bounded cost, no queue infra); progress is
- * persisted per-target so the UI can poll GET /experiments/:id.
+ * All endpoints require an admin token. Experiments run in-process, targets
+ * sequentially WITHIN an experiment, up to MAX_CONCURRENT_EXPERIMENTS running
+ * side by side; progress is persisted per-target so the UI can poll
+ * GET /experiments/:id.
  */
 
 const express = require('express');
@@ -423,8 +424,11 @@ router.delete('/sets/:id/members/:memberId', async (req, res) => {
 // so the prompt is the only variable. Stored on the experiment like any other
 // override, so the run is reproducible from its row.
 router.post('/sets/:id/run', async (req, res) => {
+  let claimed = false;
   try {
-    if (experimentRunning) return res.status(409).json({ error: 'Another experiment is already running' });
+    if (runningExperiments >= MAX_CONCURRENT_EXPERIMENTS) {
+      return res.status(409).json({ error: `Test Lab is at capacity (${runningExperiments}/${MAX_CONCURRENT_EXPERIMENTS} experiments running) — retry shortly` });
+    }
     const setId = parseInt(req.params.id, 10);
     const setRows = await dbQuery('SELECT name, stage, params FROM testlab_sets WHERE id = $1', [setId]);
     if (!setRows.length) return res.status(404).json({ error: 'Set not found' });
@@ -436,7 +440,7 @@ router.post('/sets/:id/run', async (req, res) => {
     const override = req.body?.params || {};
     const promptOverride = req.body?.promptOverride ? String(req.body.promptOverride) : null;
     const targets = members.map(m => ({ ...(m.target || {}), _params: { ...setParams, ...(m.params || {}), ...override } }));
-    experimentRunning = true;
+    runningExperiments++; claimed = true;
     const rows = await dbQuery(
       `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by, set_id)
        VALUES ($1, $2, $3, $4, 'running', $5, $6, $7) RETURNING id`,
@@ -445,17 +449,39 @@ router.post('/sets/:id/run', async (req, res) => {
     );
     const experimentId = rows[0].id;
     executeExperiment(experimentId, stage, targets, { promptOverride, params: { autoEval: true } });
+    claimed = false;   // the runner's finally owns the slot from here
     log.info(`[TESTLAB] Set ${setId} (${stage}) run as experiment ${experimentId} (${members.length} members)`);
     res.json({ id: experimentId, members: members.length });
-  } catch (err) { experimentRunning = false; res.status(500).json({ error: 'Failed to run set', details: err.message }); }
+  } catch (err) {
+    // Release only what this request claimed — an early failure (missing set,
+    // empty set) never incremented, and a blanket decrement would hand out a
+    // slot that does not exist and eventually wrap the counter negative.
+    if (claimed) runningExperiments--;
+    res.status(500).json({ error: 'Failed to run set', details: err.message });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────
 // Experiments
 // ─────────────────────────────────────────────────────────────────────
 
-// In-process guard: one experiment at a time (bounded cost; template swaps stay serialized).
-let experimentRunning = false;
+// CONCURRENCY (2026-08-25). This was single-flight — one experiment at a time —
+// for two reasons, both now addressed:
+//
+//   template swaps: `promptOverride` used to be set on the shared
+//     PROMPT_TEMPLATES registry for the length of a run, so a second experiment
+//     would read the first one's prompt. Overrides are now per-call
+//     (`withTemplates`, server/services/prompts.js), which is what makes
+//     concurrent prompt A/Bs trustworthy rather than merely possible.
+//   model memory: image stages open an analyzer session, but the analyzer
+//     REFCOUNTS sessions and its SAM/DINO/rembg workers are shared across them,
+//     so N experiments do not multiply model memory — they share one warm set.
+//
+// What is left is bounded cost, which a cap expresses directly. Several agents
+// testing different things (a composite, a face repair, a prompt A/B) now run
+// side by side instead of queueing behind whichever run started first.
+const MAX_CONCURRENT_EXPERIMENTS = Math.max(1, Number(process.env.TESTLAB_MAX_CONCURRENT) || 5);
+let runningExperiments = 0;
 
 // How often a running experiment says "still alive", and how long a silence has
 // to last before the row is treated as dead. A single stage call can legitimately
@@ -467,7 +493,8 @@ const HEARTBEAT_STALE = '5 minutes';
 
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
-  experimentRunning = true;
+  // The slot was claimed by the route that started us (a counter, so claiming
+  // twice would leak one). This function's finally is what releases it.
   // Analyzer session for the whole experiment — its model workers (SAM/DINO/
   // rembg/mediapipe) stay up for the run and are killed when the session count
   // hits zero. Fire-and-forget; the finally below always closes it.
@@ -552,7 +579,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
     ).catch(() => {});
   } finally {
     clearInterval(heartbeat);
-    experimentRunning = false;
+    runningExperiments = Math.max(0, runningExperiments - 1);
     require('../../lib/analyzerClient').sessionEnd(`testlab:${experimentId}`);
   }
 }
@@ -567,12 +594,12 @@ router.post('/experiments', async (req, res) => {
     if (!STAGES.includes(stage)) {
       return res.status(400).json({ error: `Invalid stage. Valid: ${STAGES.join(', ')}` });
     }
-    if (experimentRunning) {
-      return res.status(409).json({ error: 'Another experiment is already running — wait for it to finish' });
+    if (runningExperiments >= MAX_CONCURRENT_EXPERIMENTS) {
+      return res.status(409).json({ error: `Test Lab is at capacity (${runningExperiments}/${MAX_CONCURRENT_EXPERIMENTS} experiments running) — retry shortly` });
     }
-    // Claim the single-flight slot NOW — the awaits below (benchmark resolve,
-    // INSERT) left a window where two rapid POSTs both passed the check.
-    experimentRunning = true;
+    // Claim the slot NOW — the awaits below (benchmark resolve, INSERT) left a
+    // window where two rapid POSTs both passed the check.
+    runningExperiments++;
 
     let targets = Array.isArray(req.body.targets) ? req.body.targets : [];
     if (Array.isArray(benchmarkIds) && benchmarkIds.length > 0) {
@@ -611,8 +638,8 @@ router.post('/experiments', async (req, res) => {
         }))
         .filter(t => t.storyId && Number.isFinite(t.pageNumber));
     }
-    if (targets.length === 0) { experimentRunning = false; return res.status(400).json({ error: 'No valid targets' }); }
-    if (targets.length > 25) { experimentRunning = false; return res.status(400).json({ error: 'Max 25 targets per experiment' }); }
+    if (targets.length === 0) { runningExperiments--; return res.status(400).json({ error: 'No valid targets' }); }
+    if (targets.length > 25) { runningExperiments--; return res.status(400).json({ error: 'Max 25 targets per experiment' }); }
 
     // Genericity gate (advisory): every prompt change — override or extra
     // rule — is checked for story-specific leakage against the first target
@@ -655,7 +682,7 @@ router.post('/experiments', async (req, res) => {
     res.json({ id: experimentId, stage, targets, ...(genericity && !genericity.generic ? { genericityWarnings: genericity.issues } : {}) });
   } catch (err) {
     // Release the slot only if the runner never started (its finally owns it after).
-    if (!runnerStarted) experimentRunning = false;
+    if (!runnerStarted) runningExperiments--;
     log.error(`[TESTLAB] create experiment failed: ${err.message}`);
     res.status(500).json({ error: 'Failed to create experiment', details: err.message });
   }
@@ -700,7 +727,7 @@ router.get('/experiments', async (req, res) => {
     // minutes instead of the old blanket 2h, which both blocked pushes for an
     // hour (exp747) and could reap a genuinely long run out from under itself.
     // Rows predating the heartbeat column have NULL and keep the 2h rule.
-    if (!experimentRunning) {
+    if (runningExperiments === 0) {
       await dbQuery(
         `UPDATE testlab_experiments SET status = 'failed', error = 'server restarted mid-run', completed_at = NOW()
          WHERE status = 'running'
