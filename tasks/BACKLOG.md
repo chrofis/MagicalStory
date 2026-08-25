@@ -363,10 +363,6 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
-- [ ] Restore `compositeOutcome` + `preScaleRepairImage` to the page save whitelist. Lower stakes
-      since `14bcc6330` — a refusal now stores its own reason as `compositeAbortReason` — but a
-      SUCCESSFUL composite's pre-composite render is still dropped, so the version picker cannot
-      show before/after → `storyJobPipeline.js` (whitelist rebuild, ~4730/4830)
 - [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
 - [ ] C1 targeted confirmation eval — yes or no → `tasks/eval-variance-backlog.md`
 - [ ] Trial: generate the 2×4 costumed sheet eagerly or lazily?
