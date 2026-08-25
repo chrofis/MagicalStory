@@ -1120,6 +1120,356 @@ export const comparisons: ComparisonData[] = [
     ],
   },
 
+  // ─── 6b. BuchHeldenWelt (DE) ────────────────────────────────────
+  // Figures sourced from buchheldenwelt.de/buch-erstellen, 2026-08-25.
+  // Direct AI-vs-AI competitor: ranks in Germany for "Kinderbuch erstellen mit KI",
+  // the verb query we are targeting with /kinderbuch-erstellen.
+  {
+    id: 'buchheldenwelt',
+    competitorName: 'BuchHeldenWelt',
+    competitorUrl: 'https://www.buchheldenwelt.de',
+    title: {
+      en: 'MagicalStory vs BuchHeldenWelt',
+      de: 'MagicalStory vs BuchHeldenWelt',
+      fr: 'MagicalStory vs BuchHeldenWelt',
+    },
+    description: {
+      en: 'MagicalStory vs BuchHeldenWelt: two AI children\'s book generators compared. Both write original stories from your description — the difference is languages, editing depth and where they print.',
+      de: 'MagicalStory vs BuchHeldenWelt: zwei KI-Kinderbuch-Generatoren im Vergleich. Beide schreiben eigene Geschichten nach deiner Beschreibung — der Unterschied liegt bei Sprachen, Bearbeitung und Druck.',
+      fr: 'MagicalStory vs BuchHeldenWelt : deux générateurs de livres pour enfants par IA comparés. Tous deux écrivent des histoires originales — la différence est les langues, l\'édition et l\'impression.',
+    },
+    intro: {
+      en: 'This is an honest AI-vs-AI comparison. BuchHeldenWelt is one of the few German services that, like us, writes an original story from your own description instead of dropping a name into a fixed text — you sketch the adventure in 2–3 sentences and the AI writes it. It is German-only and sells by age band. MagicalStory is built for Swiss and European families: German, English and French, Swiss localization, and a free first story.',
+      de: 'Ein ehrlicher KI-gegen-KI-Vergleich. BuchHeldenWelt ist einer der wenigen deutschen Anbieter, der wie wir eine eigene Geschichte nach deiner Beschreibung schreibt statt einen Namen in einen fertigen Text einzusetzen — du skizzierst das Abenteuer in 2–3 Sätzen, die KI schreibt es aus. Das Angebot ist deutschsprachig und nach Altersstufen gestaffelt. MagicalStory ist für Schweizer und europäische Familien gebaut: Deutsch, Englisch und Französisch, Schweizer Lokalisierung und eine erste Geschichte gratis.',
+      fr: 'Une comparaison honnête IA contre IA. BuchHeldenWelt est l\'un des rares services allemands qui, comme nous, écrit une histoire originale à partir de votre description au lieu d\'insérer un prénom dans un texte figé. Le service est uniquement en allemand et vendu par tranche d\'âge. MagicalStory est conçu pour les familles suisses et européennes : allemand, anglais et français, localisation suisse, et une première histoire gratuite.',
+    },
+    features: [
+      {
+        label: { en: 'Story origin', de: 'Herkunft der Geschichte', fr: 'Origine de l\'histoire' },
+        us: 'Original story from your description',
+        them: 'Original story from your description (2-3 sentences)',
+        winner: 'tie',
+      },
+      {
+        label: { en: 'Languages', de: 'Sprachen', fr: 'Langues' },
+        us: 'German, English, French',
+        them: 'German only',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Price (digital)', de: 'Preis (digital)', fr: 'Prix (numérique)' },
+        us: 'CHF 9.90 (first story free)',
+        them: 'PDF included with book purchase',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
+        us: 'CHF 33-48',
+        them: '€29.95-39.95 by age band + €4.95 shipping (DE)',
+        winner: 'tie',
+      },
+      {
+        label: { en: 'Free trial', de: 'Gratis testen', fr: 'Essai gratuit' },
+        us: 'Full story free, no account needed',
+        them: 'No free story advertised',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Pages', de: 'Seiten', fr: 'Pages' },
+        us: 'Chosen per story',
+        them: '13 / 17 / 21 by age band',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Characters per story', de: 'Figuren pro Geschichte', fr: 'Personnages par histoire' },
+        us: 'Up to 10, each photo-based',
+        them: 'Siblings, friends or parents with own photo and name',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques' },
+        us: '8',
+        them: '10',
+        winner: 'them',
+      },
+      {
+        label: { en: 'Edit text / regenerate pages', de: 'Text bearbeiten / Seiten neu generieren', fr: 'Modifier / régénérer' },
+        us: 'Every word, every page, individual characters',
+        them: 'Regenerate pages and rewrite text before finalizing',
+        winner: 'tie',
+      },
+      {
+        label: { en: 'Swiss localization', de: 'Schweizer Lokalisierung', fr: 'Localisation suisse' },
+        us: 'Swiss towns, landmarks and legends',
+        them: 'None',
+        winner: 'us',
+      },
+    ],
+    ourStrengths: {
+      en: [
+        'Three languages — German, English and French — against German only',
+        'The first full story is free, with no account and no card',
+        'Up to 10 photo-based characters in one story',
+        'Swiss towns, landmarks and legends as story settings',
+        'Page count is not tied to a fixed age band',
+      ],
+      de: [
+        'Drei Sprachen — Deutsch, Englisch, Französisch — statt nur Deutsch',
+        'Die erste vollständige Geschichte ist gratis, ohne Konto und ohne Karte',
+        'Bis zu 10 fotobasierte Figuren in einer Geschichte',
+        'Schweizer Orte, Wahrzeichen und Sagen als Schauplätze',
+        'Die Seitenzahl ist nicht an eine feste Altersstufe gebunden',
+      ],
+      fr: [
+        'Trois langues — allemand, anglais, français — contre allemand uniquement',
+        'La première histoire complète est gratuite, sans compte ni carte',
+        'Jusqu\'à 10 personnages photo dans une histoire',
+        'Villes, monuments et légendes suisses comme décors',
+        'Le nombre de pages n\'est pas lié à une tranche d\'âge fixe',
+      ],
+    },
+    theirStrengths: {
+      en: [
+        'Ten illustration styles against our eight, including paper-cut and collage',
+        'Clear age-band pricing that makes the page count obvious upfront',
+        'Also lets you regenerate pages and rewrite text before finalizing',
+        'German domestic shipping at a flat €4.95',
+      ],
+      de: [
+        'Zehn Illustrationsstile gegenüber unseren acht, darunter Scherenschnitt und Collage',
+        'Klare Preise nach Altersstufe — die Seitenzahl ist von Anfang an ersichtlich',
+        'Erlaubt ebenfalls, Seiten neu zu generieren und Texte umzuschreiben',
+        'Versand innerhalb Deutschlands pauschal 4,95 €',
+      ],
+      fr: [
+        'Dix styles d\'illustration contre nos huit, dont le papier découpé et le collage',
+        'Tarifs clairs par tranche d\'âge',
+        'Permet aussi de régénérer des pages et réécrire les textes',
+        'Livraison en Allemagne à 4,95 € forfaitaires',
+      ],
+    },
+    verdict: {
+      en: 'If you are in Germany, write only in German and want a fixed page count for your child\'s age, BuchHeldenWelt is a solid choice with a wider range of illustration styles. If you need German, English or French, want Swiss settings, want more than a handful of characters, or simply want to see a finished story before paying anything, MagicalStory fits better. Both write original stories rather than templates — this is a genuine choice between two AI tools, not between AI and a name swap.',
+      de: 'Wer in Deutschland lebt, nur auf Deutsch schreibt und eine feste Seitenzahl für das Alter des Kindes möchte, ist bei BuchHeldenWelt gut aufgehoben — mit mehr Illustrationsstilen als bei uns. Wer Deutsch, Englisch oder Französisch braucht, Schweizer Schauplätze möchte, mehr als eine Handvoll Figuren einsetzen will oder einfach eine fertige Geschichte sehen möchte, bevor er etwas bezahlt, ist bei MagicalStory besser aufgehoben. Beide schreiben eigene Geschichten statt Vorlagen — hier geht es um die Wahl zwischen zwei KI-Werkzeugen, nicht zwischen KI und ausgetauschtem Namen.',
+      fr: 'Si vous êtes en Allemagne, écrivez uniquement en allemand et voulez un nombre de pages fixe, BuchHeldenWelt est un choix solide avec plus de styles d\'illustration. Si vous avez besoin d\'allemand, d\'anglais ou de français, de décors suisses, de plus de personnages, ou simplement de voir une histoire terminée avant de payer, MagicalStory convient mieux. Les deux écrivent des histoires originales — c\'est un choix entre deux outils IA, pas entre l\'IA et un prénom remplacé.',
+    },
+    faq: [
+      {
+        q: {
+          en: 'Do both services write a genuinely new story?',
+          de: 'Schreiben beide Anbieter wirklich eine neue Geschichte?',
+          fr: 'Les deux services écrivent-ils vraiment une nouvelle histoire ?',
+        },
+        a: {
+          en: 'Yes. Both take your description and have the AI write the text from it, rather than inserting a name into a pre-written story. That puts both in a different category from template services like Wonderbly or Librio.',
+          de: 'Ja. Beide nehmen deine Beschreibung und lassen die KI den Text daraus schreiben, statt einen Namen in eine fertige Geschichte einzusetzen. Das unterscheidet beide von Vorlagen-Anbietern wie Wonderbly oder Librio.',
+          fr: 'Oui. Les deux partent de votre description et laissent l\'IA écrire le texte, au lieu d\'insérer un prénom dans une histoire déjà écrite. Cela les distingue des services à modèles comme Wonderbly ou Librio.',
+        },
+      },
+      {
+        q: {
+          en: 'Can I get a book in French or English from BuchHeldenWelt?',
+          de: 'Bekomme ich bei BuchHeldenWelt ein Buch auf Französisch oder Englisch?',
+          fr: 'Puis-je obtenir un livre en français ou en anglais chez BuchHeldenWelt ?',
+        },
+        a: {
+          en: 'Their site lists German only. MagicalStory writes in German, English and French, which matters for bilingual and Swiss families.',
+          de: 'Auf ihrer Seite ist nur Deutsch aufgeführt. MagicalStory schreibt auf Deutsch, Englisch und Französisch — relevant für zweisprachige und Schweizer Familien.',
+          fr: 'Leur site ne mentionne que l\'allemand. MagicalStory écrit en allemand, anglais et français, ce qui compte pour les familles bilingues et suisses.',
+        },
+      },
+      {
+        q: {
+          en: 'Can I try either one before paying?',
+          de: 'Kann ich beide vorher testen?',
+          fr: 'Puis-je essayer avant de payer ?',
+        },
+        a: {
+          en: 'MagicalStory gives you a complete first story free without an account. BuchHeldenWelt does not advertise a free story — the PDF comes with the book purchase.',
+          de: 'Bei MagicalStory bekommst du eine vollständige erste Geschichte gratis, ohne Konto. BuchHeldenWelt bewirbt keine Gratis-Geschichte — das PDF gehört zum Buchkauf.',
+          fr: 'MagicalStory offre une première histoire complète gratuitement, sans compte. BuchHeldenWelt n\'annonce pas d\'histoire gratuite — le PDF accompagne l\'achat du livre.',
+        },
+      },
+    ],
+  },
+
+  // ─── 6c. Magisches Kinderbuch (DE) ──────────────────────────────
+  // Figures sourced from magischeskinderbuch.de, 2026-08-25.
+  {
+    id: 'magisches-kinderbuch',
+    competitorName: 'Magisches Kinderbuch',
+    competitorUrl: 'https://magischeskinderbuch.de',
+    title: {
+      en: 'MagicalStory vs Magisches Kinderbuch',
+      de: 'MagicalStory vs Magisches Kinderbuch',
+      fr: 'MagicalStory vs Magisches Kinderbuch',
+    },
+    description: {
+      en: 'MagicalStory vs Magisches Kinderbuch: two AI children\'s book platforms compared honestly — 26 languages and a cheaper ebook against more characters, Swiss settings and a free first story.',
+      de: 'MagicalStory vs Magisches Kinderbuch: zwei KI-Kinderbuch-Plattformen ehrlich verglichen — 26 Sprachen und günstigeres eBook gegen mehr Figuren, Schweizer Schauplätze und eine Gratis-Geschichte.',
+      fr: 'MagicalStory vs Magisches Kinderbuch : comparaison honnête — 26 langues et un ebook moins cher contre plus de personnages, décors suisses et une première histoire gratuite.',
+    },
+    intro: {
+      en: 'An honest AI-vs-AI comparison, and one where the competitor wins several rounds. Magisches Kinderbuch generates a custom story from your child\'s name, age and interests, offers 26 languages, and sells an ebook at €6.99 — cheaper than our digital story. It also has features we do not: an audiobook read-aloud and printable coloring pages. Where MagicalStory pulls ahead is character count, Swiss localization and a genuinely free first story.',
+      de: 'Ein ehrlicher KI-gegen-KI-Vergleich — und einer, den der Mitbewerber in mehreren Punkten gewinnt. Magisches Kinderbuch erzeugt eine massgeschneiderte Geschichte aus Name, Alter und Interessen, bietet 26 Sprachen und ein eBook für 6,99 € — günstiger als unsere digitale Geschichte. Dazu gibt es Funktionen, die wir nicht haben: Hörbuch-Vorlesefunktion und Ausmalbilder. MagicalStory liegt vorn bei Figurenzahl, Schweizer Lokalisierung und einer wirklich kostenlosen ersten Geschichte.',
+      fr: 'Une comparaison honnête IA contre IA, que le concurrent remporte sur plusieurs points. Magisches Kinderbuch génère une histoire sur mesure à partir du prénom, de l\'âge et des centres d\'intérêt, propose 26 langues et un ebook à 6,99 € — moins cher que notre histoire numérique. Il offre aussi un livre audio et des coloriages, que nous n\'avons pas. MagicalStory devance sur le nombre de personnages, la localisation suisse et une première histoire réellement gratuite.',
+    },
+    features: [
+      {
+        label: { en: 'Story origin', de: 'Herkunft der Geschichte', fr: 'Origine de l\'histoire' },
+        us: 'Original story from your description',
+        them: 'Custom story from name, age and interests',
+        winner: 'tie',
+      },
+      {
+        label: { en: 'Languages', de: 'Sprachen', fr: 'Langues' },
+        us: 'German, English, French',
+        them: '26',
+        winner: 'them',
+      },
+      {
+        label: { en: 'Price (digital)', de: 'Preis (digital)', fr: 'Prix (numérique)' },
+        us: 'CHF 9.90 (first story free)',
+        them: '€6.99 ebook',
+        winner: 'them',
+      },
+      {
+        label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)' },
+        us: 'CHF 33-48',
+        them: '€27.99 hardcover',
+        winner: 'them',
+      },
+      {
+        label: { en: 'Free trial', de: 'Gratis testen', fr: 'Essai gratuit' },
+        us: 'Full story free, no account needed',
+        them: 'Paid ebook first, hardcover after',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Pages', de: 'Seiten', fr: 'Pages' },
+        us: 'Chosen per story',
+        them: '26',
+        winner: 'tie',
+      },
+      {
+        label: { en: 'Characters per story', de: 'Figuren pro Geschichte', fr: 'Personnages par histoire' },
+        us: 'Up to 10',
+        them: 'Up to 5',
+        winner: 'us',
+      },
+      {
+        label: { en: 'Edit text and illustrations', de: 'Text und Illustrationen bearbeiten', fr: 'Modifier texte et illustrations' },
+        us: 'Every word, every page, individual characters',
+        them: 'Edit text and illustrations',
+        winner: 'tie',
+      },
+      {
+        label: { en: 'Audiobook', de: 'Hörbuch', fr: 'Livre audio' },
+        us: 'No',
+        them: 'Read-aloud audiobook',
+        winner: 'them',
+      },
+      {
+        label: { en: 'Coloring pages', de: 'Ausmalbilder', fr: 'Coloriages' },
+        us: 'No',
+        them: 'Generated from the illustrations',
+        winner: 'them',
+      },
+      {
+        label: { en: 'Swiss localization', de: 'Schweizer Lokalisierung', fr: 'Localisation suisse' },
+        us: 'Swiss towns, landmarks and legends',
+        them: 'None',
+        winner: 'us',
+      },
+    ],
+    ourStrengths: {
+      en: [
+        'A complete first story free, with no account and no payment first',
+        'Up to 10 photo-based characters against their 5',
+        'Swiss towns, landmarks and legends as story settings',
+        'Per-page and per-character repair, not just text and image editing',
+      ],
+      de: [
+        'Eine vollständige erste Geschichte gratis, ohne Konto und ohne Vorkasse',
+        'Bis zu 10 fotobasierte Figuren gegenüber ihren 5',
+        'Schweizer Orte, Wahrzeichen und Sagen als Schauplätze',
+        'Korrektur pro Seite und pro Figur, nicht nur Text- und Bildbearbeitung',
+      ],
+      fr: [
+        'Une première histoire complète gratuite, sans compte ni paiement préalable',
+        'Jusqu\'à 10 personnages photo contre 5 chez eux',
+        'Villes, monuments et légendes suisses comme décors',
+        'Correction par page et par personnage, pas seulement édition du texte',
+      ],
+    },
+    theirStrengths: {
+      en: [
+        '26 languages against our three — far better for multilingual families outside DE/EN/FR',
+        'Cheaper: €6.99 ebook and €27.99 hardcover',
+        'An audiobook read-aloud of the finished story',
+        'Printable coloring pages generated from the book\'s illustrations',
+        'Fixed 26-page format and delivery within about 15 minutes',
+      ],
+      de: [
+        '26 Sprachen gegenüber unseren drei — deutlich besser für mehrsprachige Familien ausserhalb DE/EN/FR',
+        'Günstiger: eBook 6,99 €, Hardcover 27,99 €',
+        'Hörbuch-Vorlesefunktion für die fertige Geschichte',
+        'Ausmalbilder, erzeugt aus den Illustrationen des Buchs',
+        'Festes 26-Seiten-Format, Lieferung in etwa 15 Minuten',
+      ],
+      fr: [
+        '26 langues contre nos trois — bien mieux pour les familles multilingues hors DE/EN/FR',
+        'Moins cher : ebook 6,99 €, livre relié 27,99 €',
+        'Livre audio de l\'histoire terminée',
+        'Coloriages imprimables générés à partir des illustrations',
+        'Format fixe de 26 pages, livraison en environ 15 minutes',
+      ],
+    },
+    verdict: {
+      en: 'Magisches Kinderbuch is cheaper and covers far more languages, and if you want an audiobook or coloring pages it has features we do not. Pick them if price, language coverage or those extras decide it for you. Pick MagicalStory if you want to see a full story before paying anything, need more than five characters in one book, or want Swiss towns and legends as the setting. Both generate original stories, so the honest question is which set of trade-offs suits your family.',
+      de: 'Magisches Kinderbuch ist günstiger, deckt deutlich mehr Sprachen ab und bietet mit Hörbuch und Ausmalbildern Funktionen, die wir nicht haben. Wähle sie, wenn Preis, Sprachauswahl oder diese Extras den Ausschlag geben. Wähle MagicalStory, wenn du eine vollständige Geschichte sehen möchtest, bevor du etwas bezahlst, mehr als fünf Figuren in einem Buch brauchst oder Schweizer Orte und Sagen als Schauplatz willst. Beide erzeugen eigene Geschichten — die ehrliche Frage ist, welche Kompromisse zu deiner Familie passen.',
+      fr: 'Magisches Kinderbuch est moins cher, couvre bien plus de langues et propose un livre audio et des coloriages que nous n\'avons pas. Choisissez-les si le prix, les langues ou ces extras décident pour vous. Choisissez MagicalStory si vous voulez voir une histoire complète avant de payer, avez besoin de plus de cinq personnages, ou voulez des décors suisses. Les deux génèrent des histoires originales — la vraie question est celle des compromis.',
+    },
+    faq: [
+      {
+        q: {
+          en: 'Which one is cheaper?',
+          de: 'Welcher Anbieter ist günstiger?',
+          fr: 'Lequel est le moins cher ?',
+        },
+        a: {
+          en: 'Magisches Kinderbuch, on both formats: €6.99 for the ebook and €27.99 for the hardcover, against CHF 9.90 and CHF 33–48. The one place we are cheaper is the first story, which is free with us.',
+          de: 'Magisches Kinderbuch, in beiden Formaten: 6,99 € für das eBook und 27,99 € für das Hardcover gegenüber CHF 9.90 und CHF 33–48. Günstiger sind wir nur bei der ersten Geschichte — die ist bei uns gratis.',
+          fr: 'Magisches Kinderbuch, sur les deux formats : 6,99 € l\'ebook et 27,99 € le relié, contre CHF 9.90 et CHF 33–48. Nous sommes moins chers uniquement sur la première histoire, gratuite chez nous.',
+        },
+      },
+      {
+        q: {
+          en: 'How many characters can appear in one book?',
+          de: 'Wie viele Figuren können in einem Buch vorkommen?',
+          fr: 'Combien de personnages dans un livre ?',
+        },
+        a: {
+          en: 'Magisches Kinderbuch allows up to 5 characters per story. MagicalStory allows up to 10, each based on its own uploaded photo — which matters if you want a whole family or a school class in the book.',
+          de: 'Magisches Kinderbuch erlaubt bis zu 5 Figuren pro Geschichte. MagicalStory erlaubt bis zu 10, jede auf einem eigenen hochgeladenen Foto basierend — relevant, wenn eine ganze Familie oder Schulklasse ins Buch soll.',
+          fr: 'Magisches Kinderbuch permet jusqu\'à 5 personnages. MagicalStory en permet 10, chacun basé sur sa propre photo — utile pour toute une famille ou une classe.',
+        },
+      },
+      {
+        q: {
+          en: 'Do either of them offer an audiobook?',
+          de: 'Bietet einer von beiden ein Hörbuch an?',
+          fr: 'L\'un des deux propose-t-il un livre audio ?',
+        },
+        a: {
+          en: 'Magisches Kinderbuch does — it can read the finished story aloud, and can also turn the illustrations into printable coloring pages. MagicalStory currently offers neither.',
+          de: 'Magisches Kinderbuch ja — die fertige Geschichte kann vorgelesen werden, und aus den Illustrationen lassen sich Ausmalbilder erzeugen. MagicalStory bietet beides derzeit nicht.',
+          fr: 'Magisches Kinderbuch oui — l\'histoire terminée peut être lue à voix haute, et les illustrations peuvent devenir des coloriages. MagicalStory ne propose ni l\'un ni l\'autre.',
+        },
+      },
+    ],
+  },
+
   // ─── 7. Best Personalized Children's Books Switzerland 2026 ─────
   {
     id: 'beste-personalisierte-kinderbuecher',
@@ -1470,6 +1820,56 @@ export const comparisons: ComparisonData[] = [
           en: ['Photos encrypted, deleted after use', '"Pixar-quality" illustration claim', 'Photo-to-illustration technology', 'US-only printing currently'],
           de: ['Fotos verschlüsselt, nach Nutzung gelöscht', '"Pixar-Qualität"-Behauptung', 'Foto-zu-Illustration-Technologie', 'Derzeit nur US-Druck'],
           fr: ['Photos chiffrées, supprimées après usage', 'Revendication qualité "Pixar"', 'Technologie photo-vers-illustration', 'Impression US uniquement actuellement'],
+        },
+      },
+      // German-market AI generators. Figures sourced from their own sites, 2026-08-25.
+      // A roundup aimed at German queries that omits these two is not credible.
+      {
+        name: 'BuchHeldenWelt',
+        url: 'https://www.buchheldenwelt.de',
+        bestFor: {
+          en: 'Best German-only option with the widest illustration range',
+          de: 'Am besten für rein deutschsprachige Bücher mit vielen Stilen',
+          fr: 'Meilleure option uniquement en allemand',
+        },
+        price: {
+          en: '€29.95-39.95 by age band, plus €4.95 shipping in Germany',
+          de: '29,95-39,95 € je nach Altersstufe, plus 4,95 € Versand in Deutschland',
+          fr: '29,95-39,95 € selon la tranche d\'âge, plus 4,95 € de livraison en Allemagne',
+        },
+        highlight: {
+          en: 'You sketch the adventure in 2-3 sentences and the AI writes it — a genuine original story, not a name swap. German only.',
+          de: 'Du skizzierst das Abenteuer in 2-3 Sätzen, die KI schreibt es aus — eine echte eigene Geschichte, kein ausgetauschter Name. Nur auf Deutsch.',
+          fr: 'Vous esquissez l\'aventure en 2-3 phrases et l\'IA l\'écrit — une vraie histoire originale. Allemand uniquement.',
+        },
+        features: {
+          en: ['10 illustration styles', '13/17/21 pages by age band', 'Regenerate pages and rewrite text before finalizing', 'Hardcover A5 plus immediate PDF', 'German only'],
+          de: ['10 Illustrationsstile', '13/17/21 Seiten je nach Altersstufe', 'Seiten neu generieren und Texte umschreiben vor der Finalisierung', 'Hardcover A5 plus sofortiges PDF', 'Nur Deutsch'],
+          fr: ['10 styles d\'illustration', '13/17/21 pages selon l\'âge', 'Régénérer les pages et réécrire le texte', 'Relié A5 plus PDF immédiat', 'Allemand uniquement'],
+        },
+      },
+      {
+        name: 'Magisches Kinderbuch',
+        url: 'https://magischeskinderbuch.de',
+        bestFor: {
+          en: 'Best for many languages, and the cheapest ebook',
+          de: 'Am besten für viele Sprachen und das günstigste eBook',
+          fr: 'Meilleur pour les langues multiples et l\'ebook le moins cher',
+        },
+        price: {
+          en: '€6.99 ebook, €27.99 hardcover',
+          de: '6,99 € eBook, 27,99 € Hardcover',
+          fr: '6,99 € ebook, 27,99 € relié',
+        },
+        highlight: {
+          en: 'Covers 26 languages and undercuts almost everyone on price. Also generates an audiobook read-aloud and printable coloring pages from the illustrations.',
+          de: 'Deckt 26 Sprachen ab und ist preislich kaum zu unterbieten. Erzeugt zusätzlich eine Hörbuch-Vorlesefunktion und Ausmalbilder aus den Illustrationen.',
+          fr: 'Couvre 26 langues au prix le plus bas. Génère aussi un livre audio et des coloriages à partir des illustrations.',
+        },
+        features: {
+          en: ['26 languages', '26 pages, up to 5 characters', 'Audiobook read-aloud', 'Coloring pages from the illustrations', 'Ebook delivered in about 15 minutes'],
+          de: ['26 Sprachen', '26 Seiten, bis zu 5 Figuren', 'Hörbuch-Vorlesefunktion', 'Ausmalbilder aus den Illustrationen', 'eBook in etwa 15 Minuten'],
+          fr: ['26 langues', '26 pages, jusqu\'à 5 personnages', 'Livre audio', 'Coloriages tirés des illustrations', 'Ebook en 15 minutes environ'],
         },
       },
     ],

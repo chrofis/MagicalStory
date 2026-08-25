@@ -492,6 +492,8 @@ const COMPARISONS = {
   framily: { name: 'Framily', de: 'MagicalStory vs Framily', en: 'MagicalStory vs Framily', fr: 'MagicalStory vs Framily' },
   'lullaby-ink': { name: 'Lullaby.ink', de: 'MagicalStory vs Lullaby.ink', en: 'MagicalStory vs Lullaby.ink', fr: 'MagicalStory vs Lullaby.ink' },
   lovetoread: { name: 'LoveToRead', de: 'MagicalStory vs LoveToRead', en: 'MagicalStory vs LoveToRead', fr: 'MagicalStory vs LoveToRead' },
+  buchheldenwelt: { name: 'BuchHeldenWelt', de: 'MagicalStory vs BuchHeldenWelt', en: 'MagicalStory vs BuchHeldenWelt', fr: 'MagicalStory vs BuchHeldenWelt' },
+  'magisches-kinderbuch': { name: 'Magisches Kinderbuch', de: 'MagicalStory vs Magisches Kinderbuch', en: 'MagicalStory vs Magisches Kinderbuch', fr: 'MagicalStory vs Magisches Kinderbuch' },
   'beste-personalisierte-kinderbuecher': { name: 'Beste Kinderbücher', de: 'Beste personalisierte Kinderbücher Schweiz 2026', en: 'Best Personalized Children\'s Books Switzerland 2026', fr: 'Meilleurs livres personnalisés pour enfants Suisse 2026' },
   'beste-ki-kinderbuch-generatoren': { name: 'Beste KI-Generatoren', de: 'Beste KI-Kinderbuch-Generatoren 2026', en: 'Best AI Children\'s Book Generators 2026', fr: 'Meilleurs générateurs de livres IA pour enfants 2026' },
 };
