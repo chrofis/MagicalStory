@@ -17656,3 +17656,43 @@ inset panel pasted over its lower-left corner — a blatant compositional defect
 no evaluator axis caught. Backlogged.
 
 **Touched files:** the five prompt templates.
+
+## 2026-08-25 — The scene review can CREATE a brief fault, and nothing was looking
+
+**Context:** staging `job_1787638394061_hs70901tfsn` p1 shipped declaring two
+actions ("reading the map" + "holding") on the pipeline whose entire purpose is
+one, and scored semantic 40.
+
+**Cause — sequencing, not the rule.** Replaying both sides of the review:
+
+    BEFORE review:  p1 cast_unlisted · p8 interaction_multiple_actions · p12 cast_unlisted
+    AFTER  review:  p1 interaction_multiple_actions
+    INTRODUCED:     p1 interaction_multiple_actions
+    SURVIVED:       (none)
+
+The reviewer resolved all three faults it was handed. On p1 the fault was
+`cast_unlisted` — the prose described a secondary character its own
+`characters[]` omitted — and it fixed that exactly as instructed, by adding the
+character to the page, giving them an interaction row carrying a second action.
+The brief checks ran once, BEFORE the review, so nothing ever examined the
+rewrite. Predicted from Lab exp 830 on 2026-08-23 and backlogged then; this is
+the first production occurrence.
+
+**Decision:** re-check the brief faults after the review, on EVERY page rather
+than only the ones that faulted before — this check's failure mode is the
+opposite of clothing's, which is why the existing clothing re-check
+(gated on `clothingByPage.size > 0`) would never have caught it. Findings split
+into SURVIVED (handed over, not fixed) and INTRODUCED (created by the rewrite);
+INTRODUCED is the louder signal because it means the fix instruction is
+producing defects. Both reach the log and `generationLog`, and land on
+`sceneReviewReport.briefUnfixed` / `.briefIntroduced`.
+
+**Reports, never repairs** — consistent with the owner's 2026-08-11 decision
+that this side stays advisory, and with the clothing precedent. A second review
+round would fix the page but costs a text call per story; that is an owner
+call, not one to take silently. **Open question for the owner.**
+
+**Verified:** replaying the stored briefs reports exactly the introduced fault
+and no false positives.
+
+**Touched files:** `server/lib/beatsPipeline.js`.

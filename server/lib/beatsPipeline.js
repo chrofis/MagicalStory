@@ -718,6 +718,8 @@ SCENE: ${x.scene || ''}`.trim(),
   let clothingFindings = '';
   let clothingByPage = null;
   let clothingUnfixedList = [];
+  let briefUnfixedList = [];
+  let briefIntroducedList = [];
   try {
     const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
     const checkPages = expansions.map(x => {
@@ -746,6 +748,10 @@ SCENE: ${x.scene || ''}`.trim(),
   // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
   // authored both halves; we must not invent a figure nobody wrote).
   let briefFindings = '';
+  // Hoisted for the post-review re-check below, which needs the same cast list
+  // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
+  let briefCastNames = [];
+  const briefBeforeByPage = new Map();
   try {
     const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
     // Secondary characters belong in this list too. `inputData.characters` is the
@@ -773,11 +779,13 @@ SCENE: ${x.scene || ''}`.trim(),
       seenCast.add(k);
       return true;
     });
+    briefCastNames = castNames;
     const res = checkBriefs(
       expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
       castNames,
       visualBible
     );
+    for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
     briefFindings = renderBriefBlock(res.byPage);
     if (briefFindings) {
       // Count only what the block actually carries — diagnostic-only types stay
@@ -898,6 +906,52 @@ SCENE: ${x.scene || ''}`.trim(),
         }
       }
 
+      // RE-CHECK the brief faults — on EVERY page, not only the ones that
+      // faulted before. This check's failure mode runs the opposite way to
+      // clothing's: the reviewer can CREATE a fault while resolving a
+      // different one, on a page that was clean when it was handed over.
+      //
+      // Measured on staging job_1787638394061_hs70901tfsn p1. Pre-review the
+      // page carried one fault, cast_unlisted — the prose described a
+      // secondary character its own characters[] omitted. The reviewer
+      // resolved it exactly as asked, by adding that character to the page —
+      // and gave them an interaction row with a second action. The page
+      // shipped declaring two actions, on the pipeline whose entire purpose is
+      // one, and scored semantic 40. The checks had run once, before the
+      // review, so nothing ever looked at the rewrite.
+      //
+      // Reports, never repairs: the reviewer authored both halves and the
+      // owner's 2026-08-11 decision keeps this side advisory. An INTRODUCED
+      // fault is the louder of the two — it means the fix instruction itself
+      // is producing defects.
+      try {
+        const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
+        const after = checkBriefs(
+          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+          briefCastNames,
+          visualBible
+        );
+        const left = after.findings.filter(f => REVIEWABLE.has(f.type));
+        const introduced = left.filter(f => !(briefBeforeByPage.get(f.pageNumber)?.has(f.type)));
+        const survived = left.filter(f => briefBeforeByPage.get(f.pageNumber)?.has(f.type));
+        briefUnfixedList = left;
+        briefIntroducedList = introduced;
+        if (introduced.length > 0) {
+          const d = introduced.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+          log.warn(`⚠️ [BEATS] brief check after review: ${introduced.length} fault(s) INTRODUCED by the rewrite — ${d}`);
+          gl.warn('beats_brief_introduced',
+            `The scene review introduced ${introduced.length} new brief fault(s) while rewriting: ${d}`, null, { findings: introduced });
+        }
+        if (survived.length > 0) {
+          const d = survived.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+          log.warn(`⚠️ [BEATS] brief check after review: ${survived.length} fault(s) survived — ${d}`);
+          gl.warn('beats_brief_unfixed', `Brief faults survived the scene review: ${d}`, null, { findings: survived });
+        }
+        if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
+      } catch (rcErr) {
+        log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
+      }
+
       sceneReviewReport = {
         model: srRes.modelId || sceneReviewModel,
         durationMs: meta.timings.sceneReviewMs,
@@ -913,6 +967,8 @@ SCENE: ${x.scene || ''}`.trim(),
         clothingFindings: clothingFindings || null,
         briefFindings: briefFindings || null,
         clothingUnfixed: clothingUnfixedList,
+        briefUnfixed: briefUnfixedList,
+        briefIntroduced: briefIntroducedList,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: srRes.modelId || sceneReviewModel,
