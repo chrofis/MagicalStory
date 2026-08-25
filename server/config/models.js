@@ -490,7 +490,20 @@ const MODEL_DEFAULTS = {
   styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
     ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
     : true,
-  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'gemini',
+  // GROK (owner, 2026-08-24) — reverses the 2026-08-09 (later) flip to Gemini,
+  // whose evidence was "Grok can't restyle, no-op ~10/255". That holds for a
+  // page already near the style; it does not hold for a fully photographic one.
+  // Gemini REFUSES those outright: IMAGE_OTHER on all 3 retries, on both
+  // photographic pages of staging job_1787638394061_hs70901tfsn, and again in
+  // Lab #837. A refusal produces no image, so the page keeps its photograph —
+  // which is why that 16-page book shipped 4 photographic pages after 18
+  // repaint attempts kept 3. Grok repainted the same page into correct
+  // watercolour in 18s for $0.02, identity and clothing intact.
+  // The no-op risk that motivated the Gemini flip is now handled downstream
+  // rather than by model choice: the comparative gate answers "same" for an
+  // unchanged repaint and the pipeline is fail-closed, so a Grok no-op is
+  // rejected and the original is kept. That guard did not exist in 2026-08-09.
+  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'grok',
   // Attach the page cast's styled avatars to the repaint as STYLE reference
   // sheets (owner, 2026-08-24). The repaint has been prompt-only since
   // 2026-08-09, when a sibling PAGE as reference made the model paint that

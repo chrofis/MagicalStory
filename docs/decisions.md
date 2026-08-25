@@ -17555,3 +17555,53 @@ literal human hands, from `"roughly the size of two open palms"` in the
 description — a phrase copied verbatim from the real ART001 entry in
 production. Scale similes in a VB description can be drawn literally. Not
 caused by this change; logged to the backlog.
+
+## 2026-08-24 — `styleRepairModel` back to GROK (supersedes the 2026-08-09 "later" flip to Gemini)
+
+**Context:** Staging `job_1787638394061_hs70901tfsn` (Fiona, 16pp, adult cast,
+watercolour) shipped **four pages the style audit itself called photographic**
+— p2, p8, p9, p11 — after Step 5 ran **18 repaint attempts and kept 3**. This is
+the drift `docs/image-routing.md` line 169 has had open since 2026-08-09, with
+three candidate causes listed and an instruction not to re-derive but to pull a
+real story and see which pages drift and whether `style_repair` fired. Done —
+and the cause is a **fourth** one, not on that list.
+
+`repairPageStyle` was run directly on p2 and p11 with both models:
+
+| model | outcome |
+|---|---|
+| gemini-2.5-flash-image | `IMAGE_OTHER` on **all 3 retries, both pages** — no image at all |
+| grok-imagine | p2 repainted in **18s / $0.02**: visible brushwork, paper texture, identity, clothing and pose intact; gate `better=after`, `changed=[]` |
+
+Gemini does not fail to restyle a photographic adult face — it **refuses to
+return an image for one**. A refusal produces nothing, so the page keeps its
+photograph and the repair looks like it "ran". Lab #837 hit the same refusal
+independently ("Gemini refused prompt-only (IMAGE_OTHER on a photoreal adult
+face)") and rated prompt-only Grok the best of its four arms.
+
+**Decision:** `styleRepairModel` default **gemini → grok** (`STYLE_REPAIR_MODEL`
+override unchanged). Owner sign-off 2026-08-24, asked as a reversal.
+
+**Rationale / why the old evidence does not carry:** the 2026-08-09 (later)
+entry flipped to Gemini on "Grok can't restyle — no-op ~10/255". That
+measurement was made on pages already close to the commissioned style, where
+there is little for a repaint to change. It says nothing about a fully
+photographic page, which is the case that actually reaches Step 5 on an
+adult-cast book. Both statements can be true; only one of them is about the
+pages that matter here.
+
+The no-op risk that motivated the Gemini flip is now handled **downstream
+instead of by model choice**, which is what makes this reversal safe in a way it
+would not have been in August: the comparative gate answers `same` for a repaint
+that changed nothing, and the pipeline is fail-closed, so a Grok no-op is
+rejected and the original page is kept. In 2026-08-09 an unchanged repaint could
+still be adopted, so the model had to carry that burden alone.
+
+**Evidence:** Lab #837; `IMAGE_OTHER` ×3 on two separate pages; one page
+verified repainted correctly by eye and by the gate; the 16-page story above.
+
+**Touched:** `server/config/models.js`, `docs/image-routing.md` (routing row +
+the line-169 open question now answered), `docs/SETTLED.md`.
+
+**Status:** ✅ active — supersedes the 2026-08-09 (later) gemini flip, which
+supersedes the 2026-08-09 (earlier) grok default.
