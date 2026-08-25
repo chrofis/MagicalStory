@@ -75,7 +75,7 @@ test('face repair repaints only the target when characters overlap', async ({ pa
   expect(failure.notOnPage, `expected notOnPage; got: ${failure.reason}`).toBe(true);
   expect(failure.rejectedReason).toBe('not_on_page');
   expect(failure.reason).toContain(CHARACTER);
-  expect(failure.reason).toMatch(/Detected instead:|No figures were detected/);
+  expect(failure.reason).toMatch(/The detector labelled them|No figures were detected/);
 
   // Refused up front — no Grok draws, so no attempt frames.
   expect(

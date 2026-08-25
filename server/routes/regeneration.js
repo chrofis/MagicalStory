@@ -5675,7 +5675,14 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             boxDiag.figureCount = ladderFigures.length;
             if (briefNames.size > ladderFigures.length) {
               const drew = [...new Set(ladderFigures.map(f => f.name || 'unidentified figure'))];
-              const who = drew.length ? `Detected instead: ${drew.join(', ')}.` : 'No figures were detected at all.';
+              // "Detected instead: Sarah, ..." reads as a contradiction when
+              // Sarah is the target. The point is that the labels themselves are
+              // unreliable, so say that: these are the names the detector put on
+              // the figures, and one of them must belong to someone the render
+              // left out.
+              const who = drew.length
+                ? `The detector labelled them ${drew.join(', ')} — one of those labels belongs to a character who was not drawn.`
+                : 'No figures were detected at all.';
               log.warn(`[CHAR REPAIR] p${pageNumber}: brief lists ${briefNames.size} character(s) but only ${ladderFigures.length} figure(s) were drawn - "${characterName}" may be a borrowed label; refusing`);
               return {
                 task, error: true,
