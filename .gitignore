@@ -164,3 +164,7 @@ drafts/
 # backlog are durable state, not scratch.
 !tasks/BACKLOG.md
 !tasks/eval-variance-backlog.md
+# Measured findings, not a session plan: a per-stage provenance trace of story-text
+# defects (which review stage introduces which defect). Agents must be able to read it
+# before touching story-arc-review / story-beats-review / text-refine.
+!tasks/story-text-quality-2026-08-25.md

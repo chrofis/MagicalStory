@@ -155,6 +155,52 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ---
 
+## Story text quality — the review stages trade feeling for logistics
+
+- [ ] **Toddler mode (ages 1–3) — plan written, not built.** No narrative age branch in the system
+      goes below 3 (challenge catalogue starts at 3–5, story shape at `focusAge <= 5`, lowest reading
+      level is `1st-grade`); `toddler` exists only as body proportions. Prod trial
+      `job_1787647410717_5dvfqu8jg` gave a 1-year-old main a solo train journey, a map to reason
+      from, and 100–140 words/page. Trigger rule settled by owner: oldest MAIN character ≤ 3.
+      → `tasks/toddler-mode-2026-08-25.md`
+- [ ] **The trial ignores reading level entirely** — `prompts/story-trial.txt:14` and `:181` hardcode
+      "100–140 words per page" and the template never references `{READING_LEVEL}`, so a `1st-grade`
+      trial gets standard-length pages. → folded into the toddler-mode plan above
+
+Full provenance trace of 15 defects in `job_1787638707796_x8272kcs22m` ("Levin und der kleine
+Drache", 18p, de-CH). Measured: the writer's draft is the best prose state of the run; the arc
+review, beats review and text refine each fix real faults by adding logistics and paying for
+them by deleting an emotional or characterising sentence. Text refine alone: 14 faults fixed,
+**8 emotional sentences destroyed, 3 new defects created.** All fixes below are prompt-only.
+
+- [ ] **T3 — text refine invents plot to close an audit fault, destroying an obstacle.** "Max hat
+      sein Velo durch das seichte Wasser geschoben" (p8) makes the p4 stream obstacle
+      retroactively fake. The refiner has no "delete the detail" disposition, only "fix on a page"
+      → `tasks/story-text-quality-2026-08-25.md:T3`
+- [ ] **T5 — page-turn travel raised as a continuity fault → travelogue openers.** "Nach der
+      Ruine steigen die vier Buben…", "Nach dem Flug…". The beats review had already ruled this
+      "stands"; the text audit has no memory of it → `tasks/story-text-quality-2026-08-25.md:T5`
+- [ ] **T2 — text refine deletes emotion to pay for logistics (8 measured deletions).** Includes
+      "Er dreht sich fast um" (p4), the hesitation beat the beats review explicitly *mandated*.
+      Needs a protected class + a deletion ledger → `tasks/story-text-quality-2026-08-25.md:T2`
+- [ ] **T1 — prop bookkeeping written into BEAT instead of SCENE → "Julian hält die Folie" on
+      7 pages.** The beats-review ledger routes around the writer's "do not narrate staging" rule
+      → `tasks/story-text-quality-2026-08-25.md:T1`
+- [ ] **T6 — arc review closes an orphan prop by carrying it through 11 pages** (Max's Velo). No
+      "retire the object" disposition → `tasks/story-text-quality-2026-08-25.md:T6`
+- [ ] **T4 — clock times written into prose** ("am Nachmittag", "später Nachmittag") to patch an
+      arc-level problem: a nightfall deadline starting on a "Sommermorgen"
+      → `tasks/story-text-quality-2026-08-25.md:T4`
+- [ ] **T8 / T11 / T13 — three missing checks, one clause each.** A build-up page whose action
+      is taken by someone else (Max p5 → Julian p6); a final-challenge blocker that is never
+      foreshadowed (the mist); an ending with a sentiment ceiling and no floor ("Niemand sagt
+      viel.") → `tasks/story-text-quality-2026-08-25.md:T8`
+- [ ] **T9(a) / T10 — reading level not re-checked after the writer** (p9 carries a 20-word
+      nested clause at 1st-grade); no pacing check that the story's most-wanted image gets a page
+      (the hatch happens between p2 and p3) → `tasks/story-text-quality-2026-08-25.md:T9`
+- [ ] **T15 — `stories.data.dedication` is empty on a delivered book.** Undiagnosed: wizard never
+      offered it, or it was collected and dropped → `tasks/story-text-quality-2026-08-25.md:T15`
+
 ## Tests
 
 - [ ] **3 unit tests fail on `staging` HEAD: `tests/unit/active-version-recompute.test.ts`.**
@@ -333,6 +379,20 @@ Nothing below should be coded until it is answered.
       cleanup interval 24h vs 48h; localStorage vs sessionStorage
       → `docs/plans/2026-03-08-anonymous-account-flow.md:244`
 - [ ] Whether any of the eval work goes to master → `tasks/eval-variance-backlog.md`
+- [ ] **T7 — spoil the payoff or risk the reader?** The arc review fixes "device acquires meaning
+      retroactively" by stating the rule where the device first appears, which spoiled this
+      story's ending 9 pages early (p9 board, then p15 Kiaan repeats it). Alternative: show a
+      character *learning* it without telling the reader what → `tasks/story-text-quality-2026-08-25.md:T7`
+- [ ] **T9(b) — should `textQualityJudge` run in the unified pipeline?** The template and
+      `server/lib/textQualityJudge.js` exist; it did not run on this story. Cost/latency call
+      → `tasks/story-text-quality-2026-08-25.md:T9`
+- [ ] **T12 — dialogue floor, and does a companion animal get a name?** ~8 spoken lines in 18
+      pages; the dragon is never named. The name rule changes story convention, not just prose
+      → `tasks/story-text-quality-2026-08-25.md:T12`
+- [ ] **T14 — must every title contain the main character's name?** Hard rule in
+      `story-text-from-beats.txt`; produces "Levin und der kleine Drache" for a four-lead story.
+      Product call (shelf recognisability) vs craft call
+      → `tasks/story-text-quality-2026-08-25.md:T14`
 
 ---
 
