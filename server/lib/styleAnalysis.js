@@ -143,6 +143,14 @@ Output ONLY the style description as a single paragraph (3-5 sentences) that cou
  */
 async function compareStyleProximity(beforeImage, afterImage, opts = {}) {
   const { anchorImage = null, artStyleDesc = null } = opts;
+  // Identical bytes never reach the judge. Asked to compare an image with
+  // itself it answers "after" and invents the evidence ("IMAGE 2 exhibits more
+  // visible brushstrokes") — it is told IMAGE 2 is a repaint, so it reasons
+  // toward the expected answer. A no-op repaint must never displace a page,
+  // and this is the one case that can be settled without a model.
+  if (beforeImage && afterImage && beforeImage === afterImage) {
+    return { better: 'same', changed: [], reason: 'identical image bytes — the repaint changed nothing' };
+  }
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured');
   const part = (img) => ({ inline_data: { mime_type: img.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(img) } });
@@ -155,7 +163,7 @@ async function compareStyleProximity(beforeImage, afterImage, opts = {}) {
   parts.push({
     text: `Answer two questions about IMAGE 2 compared with IMAGE 1.
 
-1. "better": which is rendered closer to ${anchorImage ? 'the TARGET\'s rendering technique' : 'this style'}${artStyleDesc ? `: ${artStyleDesc}` : ''}? Judge ONLY how people are rendered — faces, skin, hair and fabric. Painted surfaces with visible brushwork are closer; photographic skin, camera-real fabric, optical blur and lens grain are further away. "after" when IMAGE 2 is closer, "before" when IMAGE 1 is closer, "same" when you cannot separate them.
+1. "better": which is rendered closer to ${anchorImage ? 'the TARGET\'s rendering technique' : 'this style'}${artStyleDesc ? `: ${artStyleDesc}` : ''}? Judge ONLY how people are rendered — faces, skin, hair and fabric. Painted surfaces with visible brushwork are closer; photographic skin, camera-real fabric, optical blur and lens grain are further away. Judge the STRUCTURE, not the surface: in a painted figure the form itself is built from strokes, so edges dissolve and small detail is simplified away. Grain, noise or texture laid OVER photographic structure is not brushwork — if skin pores, individual hairs and sharp specular highlights survive underneath, that figure is still photographic however textured it looks. "after" when IMAGE 2 is closer, "before" when IMAGE 1 is closer, "same" when you cannot separate them. Answering "after" or "before" requires a specific difference you can actually see and name in the reason; the two images are often the SAME image or near enough, and "same" is the correct answer then — do not infer a difference from the fact that a repaint was attempted.
 
 2. "changed": list everything about the PEOPLE that is not the same thing in IMAGE 2 as in IMAGE 1. Only the rendering technique was allowed to change. Report an entry when a garment, hat, headwear, footwear or accessory has become a DIFFERENT item or a different colour; when hair length, style or colour differs; when a held or worn object is gone, added or swapped; when a face reads as a different person, age or expression; or when a person is added or missing. Each entry names the person and the difference, e.g. "the woman's green tricorn hat is now a red headscarf". An item that is merely painted more loosely is NOT a change. Empty list when only the rendering differs.
 
