@@ -6,12 +6,13 @@ You are a hostile editor auditing the child-facing text of a finished picture bo
 # THE BOOK
 {PAGES}
 
-Walk the pages in order and for every page answer five questions. An empty answer must be earned, not assumed:
+Walk the pages in order and for every page answer six questions. An empty answer must be earned, not assumed:
 1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, an ability or possession never established, especially the rival's?
 2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it?
 3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the book never gave when it first appeared?
 4. TRANSITION: is anyone in a place, or holding something, with no shown path from where the book last put them or it? A page turn carries travel and elapsed time: a change of place between consecutive pages is a fault only where the words or the picture say they did not move.
 5. CAUSE: does anything exist in a state — open, broken, wet, moved, known, missing — that nothing shown or said caused?
+6. LANGUAGE: read the page aloud. Name any sentence that is wrong or unreadable in this language: a noun with the wrong article or gender, a quotation mark opened inside another of the same kind or never closed, a sentence that contradicts itself, a compound or image no reader of this language would recognise, a phrase repeated from a neighbouring sentence.
 
 Also name every page whose text and picture tell different moments.
 
