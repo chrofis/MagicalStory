@@ -5597,36 +5597,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               f.name?.toLowerCase() === characterName.toLowerCase() ||
               f.label?.toLowerCase().includes(characterName.toLowerCase())
             );
-            // A NAME IS NOT EVIDENCE WHEN THERE ARE FEWER FIGURES THAN NAMES
-            // (owner, 2026-08-24). The detector distributes the names it is
-            // given across the figures it sees; it does not refuse. On p15 of
-            // job_1787514666616_yw9qsv1vf the brief lists five characters, the
-            // render drew four, and the leftover name landed on Kapitänin
-            // Rossa — so "repair Sarah's face" whited out ROSSA's head and Grok
-            // painted Sarah onto her. Describing Rossa from the VB did not stop
-            // it: with more names than figures, SOMEBODY gets a borrowed label,
-            // and a confident wrong label is indistinguishable from a right one.
-            //
-            // Narrow on purpose. It fires only when the fresh detection is the
-            // ONLY evidence (steps 1 and 2 found no stored appearance — a page
-            // that went through the repair rounds has one) AND the brief is
-            // short of figures. Where counts agree, or a stored box exists,
-            // nothing changes.
-            if (charFigure) {
-              const briefNames = new Set();
-              for (const c of (sceneImage.sceneCharacters || [])) {
-                const n = typeof c === 'string' ? c : c?.name;
-                if (n) briefNames.add(n);
-              }
-              for (const n of (sceneImage.sceneMetadata?.characters || [])) {
-                if (typeof n === 'string' && n) briefNames.add(n);
-              }
-              const figureCount = (detection?.figures || []).length;
-              if (briefNames.size > figureCount) {
-                log.warn(`🚫 [CHAR REPAIR] p${pageNumber}: brief lists ${briefNames.size} character(s) but only ${figureCount} figure(s) were drawn — "${characterName}" may be a borrowed label, refusing rather than repainting the wrong person`);
-                charFigure = null;
-              }
-            }
             if (charFigure && (charFigure.faceBox || charFigure.bodyBox)) {
               storedAppearance = {
                 faceBox: charFigure.faceBox,
@@ -5662,6 +5632,57 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 rejectedReason: 'not_on_page',
                 notOnPage: true,
                 detectedFigures: found,
+                boxDiag,
+              };
+            }
+          }
+
+          // A NAME IS NOT EVIDENCE WHEN THERE ARE FEWER FIGURES THAN NAMES
+          // (owner, 2026-08-25). The detector distributes the names it is given
+          // across the figures it sees; it never refuses. When the page's brief
+          // lists more characters than the render actually drew, one name is
+          // necessarily borrowed - and a confident wrong label is
+          // indistinguishable from a right one.
+          //
+          // This sits BELOW the whole ladder on purpose. The first version
+          // guarded only the fresh-detection branch, and then never ran: p15 of
+          // job_1787514666616_yw9qsv1vf had no stored detection until a
+          // refresh-bbox call persisted one WITH the bad label, after which
+          // step 1 answered first and handed back "Sarah" = the woman in the red
+          // coat (the Visual Bible secondary). A stored box is not more
+          // trustworthy than a fresh one; it is the same detector, cached.
+          //
+          // The entity-report source is exempt: its appearances come from the
+          // generation-time consistency pass, which ran with the full cast and
+          // cross-checked identity across pages.
+          const ladderFigures =
+            boxDiag.boxSource === 'fresh-detection' ? (freshDetection?.figures || [])
+              : boxDiag.boxSource === 'stored-scene-detection' ? (sceneBbox?.figures || [])
+                : null;
+          if (ladderFigures) {
+            const briefNames = new Set();
+            for (const c of (sceneImage.sceneCharacters || [])) {
+              const n = typeof c === 'string' ? c : c?.name;
+              if (n) briefNames.add(n);
+            }
+            for (const n of Object.keys(sceneImage.sceneMetadata?.characterPositions || {})) {
+              if (n) briefNames.add(n);
+            }
+            for (const n of (sceneImage.sceneMetadata?.characters || [])) {
+              if (typeof n === 'string' && n) briefNames.add(n);
+            }
+            boxDiag.briefNames = [...briefNames];
+            boxDiag.figureCount = ladderFigures.length;
+            if (briefNames.size > ladderFigures.length) {
+              const drew = [...new Set(ladderFigures.map(f => f.name || 'unidentified figure'))];
+              const who = drew.length ? `Detected instead: ${drew.join(', ')}.` : 'No figures were detected at all.';
+              log.warn(`[CHAR REPAIR] p${pageNumber}: brief lists ${briefNames.size} character(s) but only ${ladderFigures.length} figure(s) were drawn - "${characterName}" may be a borrowed label; refusing`);
+              return {
+                task, error: true,
+                failReason: `${characterName} could not be reliably identified on page ${pageNumber} - nothing was repainted. The page was written for ${briefNames.size} characters but only ${ladderFigures.length} were drawn, so the name may belong to a different figure. ${who} Redo the page instead.`,
+                rejectedReason: 'not_on_page',
+                notOnPage: true,
+                detectedFigures: drew,
                 boxDiag,
               };
             }

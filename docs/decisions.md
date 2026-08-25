@@ -17982,3 +17982,31 @@ renders correctly; unit suite 152 passed, same 3 pre-existing
 `active-version-recompute` failures.
 
 **Touched files:** `server/lib/beatsPipeline.js`, `server/lib/sceneBriefCheck.js`.
+
+---
+
+## 2026-08-25 — A cached bbox label is not evidence: the borrowed-label guard sits below the whole ladder
+
+**Context:** Follow-up to the entry above. The first version of the guard sat inside the
+fresh-detection branch (step 3 of the char-repair box ladder) and never fired. The
+`boxDiag` field added the same day proved why: the p15/Sarah repair returned
+`boxSource: 'stored-scene-detection'`. That page carried NO stored detection until a
+`refresh-bbox` call persisted one — including the misattributed "Sarah" label on the
+red-coated Visual Bible secondary. From then on step 1 answered first, and every guard
+below it was unreachable code. Six Grok draws across two days were spent discovering this
+by inference, because the box source lived only in a log line.
+
+**Decision:** (1) The guard moves below the entire ladder and judges the figures from
+whichever source supplied the box — stored scene detection or fresh detection alike. A
+stored box is the same detector, cached; caching a misattribution makes it permanent.
+(2) The entity-report source stays exempt: its appearances come from the generation-time
+consistency pass, which ran with the full cast and cross-checked identity across pages.
+(3) Rejections carry `boxDiag` — box source, the cast the detector was given, the names
+and count it returned — so "why did it aim there" is a read, not a $0.06 experiment.
+
+**Rationale:** The detector distributes the names it is given across the figures it sees and
+never refuses. When a page's brief names more characters than the render drew, some label is
+necessarily borrowed, and a confident wrong label is indistinguishable from a right one —
+so the repair must refuse rather than repaint whoever the label happens to sit on.
+
+**Touched:** `server/routes/regeneration.js`.
