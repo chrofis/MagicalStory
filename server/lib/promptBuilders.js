@@ -4627,15 +4627,28 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
  * the personalised-book product for one or two children — a parent scanning a
  * shelf wants to see it — and stops being reachable past that.
  *
+ * Mains arrive in three shapes, the same three `pickMainCharacters` reads: a
+ * `mainCharacters` id array, an `isMainCharacter` stamp on the objects, or an
+ * `isMain` flag from the idea-generation payload. All three are read here so a
+ * cast flagged only on the objects is not mistaken for "none marked" and
+ * silently counted as the whole cast.
+ *
+ * It does NOT delegate to `pickMainCharacters`: that caps the focus at two by
+ * design, which is right for the story shape and wrong here — capping a
+ * four-lead cast to two would make this demand both their names.
+ *
  * @param {Object} inputData
  * @returns {string} one prompt line
  */
 function buildTitleRule(inputData) {
   const mainIds = inputData?.mainCharacters || [];
   const chars = inputData?.characters || [];
-  const mainNames = chars.filter(c => mainIds.includes(c.id)).map(c => c.name).filter(Boolean);
-  // No main characters marked (older jobs, trials mid-migration): fall back to
-  // the whole cast, which is what the count is standing in for.
+  const declared = mainIds.length
+    ? chars.filter(c => mainIds.includes(c.id))
+    : chars.filter(c => c.isMain || c.isMainCharacter);
+  const mainNames = declared.map(c => c.name).filter(Boolean);
+  // Nothing marked at all (older jobs, trials mid-migration): fall back to the
+  // whole cast, which is what the count is standing in for.
   const names = mainNames.length ? mainNames : chars.map(c => c.name).filter(Boolean);
 
   const base = 'Every title is in the story language and does not spoil the ending.';

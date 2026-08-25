@@ -54,6 +54,24 @@ describe('buildTitleRule', () => {
     }
   });
 
+  it('reads the isMainCharacter stamp when no id array is present', () => {
+    // The story pipeline stamps the objects as well as passing ids; the
+    // idea-generation payload uses isMain. Missing either shape would read as
+    // "none marked" and silently count the whole cast.
+    const stamped = CAST.map((c, i) => ({ ...c, isMainCharacter: i < 2 }));
+    expect(buildTitleRule({ characters: stamped })).toContain('both names');
+  });
+
+  it('reads the isMain flag from the idea-generation payload', () => {
+    const flagged = CAST.map((c, i) => ({ ...c, isMain: i < 1 }));
+    expect(buildTitleRule({ characters: flagged })).toContain("Alex's name");
+  });
+
+  it('does not cap a four-lead cast to two the way pickMainCharacters does', () => {
+    const stamped = CAST.map(c => ({ ...c, isMainCharacter: true }));
+    expect(buildTitleRule({ characters: stamped })).toContain('optional');
+  });
+
   it('falls back to the whole cast when no main characters are marked', () => {
     // Older jobs and mid-migration trials carry no mainCharacters array; the
     // count it stands in for is the cast size.
