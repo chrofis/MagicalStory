@@ -6632,7 +6632,7 @@ function assertReviewerResponded(res, model) {
 }
 
 async function runBeatsReviewReplayStage(target, { params = {}, promptOverride = null }) {
-  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  const { loadPromptTemplates, withTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
@@ -6666,12 +6666,14 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     const fromRound = parseInt(params.fromRound, 10) || 1;
     const inBeats = parseBeats(String(params.fromText)).pages;
     if (!inBeats.length) throw new Error('fromText has no parseable beats');
-    const orig = PROMPT_TEMPLATES.storyBeatsReview;
-    if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
     const t = Date.now();
-    let res;
-    try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats, storedArc, ''), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
-    finally { PROMPT_TEMPLATES.storyBeatsReview = orig; }
+    // withTemplates, not a global swap: this window spans a model call, so a
+    // concurrently running experiment would otherwise read this override (or
+    // have its own dropped by the restore). The other override sites in this
+    // file are synchronous and safe by construction; these replay windows are
+    // the two that are not. See server/services/prompts.js.
+    const res = await withTemplates({ storyBeatsReview: promptOverride }, () =>
+      callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats, storedArc, ''), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }));
     assertReviewerResponded(res, model);
     const out = res.text || '';
     const marker = out.match(/---\s*BEATS\s*---/i);
@@ -6699,8 +6701,6 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     }
     return { storyId: target.storyId, branch: { fromRound, toRound: fromRound + 1, model, rewrittenPages: [...byPage.keys()], score: scorecard?.artifacts?.beats?.score ?? null } };
   }
-  const orig = PROMPT_TEMPLATES.storyBeatsReview;
-  if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
   const arms = [];
   // round 1 = the RAW beats (as generated, before any review), scored once.
   // Model-agnostic, so it's the shared baseline every reviewer arm builds on.
@@ -6714,67 +6714,68 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     } catch (e) { require('../utils/logger').log.warn(`[beats replay] round-1 raw score failed: ${e.message}`); }
   }
 
-  try {
-    for (const model of models) {
-      // Per-arm isolation, same reason as the scene fan-out: one provider's
-      // empty response must not discard the arms that already succeeded.
-      try {
-      let beats = beats0;
-      const passes = [];
-      let convergedAtPass = null;
-      for (let p = 1; p <= passCount; p++) {
-        const prompt = buildBeatsReviewPrompt(storyData, beats, storedArc, '');
-        const t = Date.now();
-        const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
-        assertReviewerResponded(res, model);
-        const out = res.text || '';
-        const marker = out.match(/---\s*BEATS\s*---/i);
-        const analysis = (marker ? out.slice(0, marker.index) : out).trim();
-        const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
-        const rewrittenPages = rewritten.map(r => r.pageNumber);
-        const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
-        // Full chain for this pass: the reviewer's complete analysis (all
-        // checks) + exact before→after per rewritten page. This is what the
-        // score row persists — a round must explain what produced it.
-        const chain = {
-          reviewModel: model,
-          pass: p,
-          analysis: analysis.slice(0, 15000),
-          rewrites: beats.filter(b => byPage.has(b.pageNumber)).map(b => {
-            const r = byPage.get(b.pageNumber);
-            return { page: b.pageNumber, before: `BEAT: ${b.beat}\nSCENE: ${b.scene}`.slice(0, 2000), after: `BEAT: ${r.beat}\nSCENE: ${r.scene}`.slice(0, 2000) };
-          }),
-        };
-        const entry = {
-          pass: p,
-          rewrittenPages,
-          converged: rewrittenPages.length === 0,
-          analysis: analysis.slice(0, 15000),
-          check8: (analysis.match(/8\.\s*Loose threads[\s\S]*?(?=\n\d{1,2}\.\s|$)/i) || [''])[0].trim().slice(0, 800),
-          cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
-          elapsedMs: Date.now() - t,
-        };
-        beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
-        if (scoreOutput) {
-          const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
-            model: params.judgeModel, evalVersion: params.evalVersion,
-            // round p+1: round 1 is the raw beats (scored below), so pass p → round p+1
-            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `review pass ${p}`, round: p + 1, genCost: entry.cost, genMs: entry.elapsedMs, chain },
-          });
-          entry.scorecard = sr.scorecard;
-          entry.cost += sr.cost;
-        }
-        passes.push(entry);
-        if (entry.converged) { convergedAtPass = p; break; }
+  for (const model of models) {
+    // Per-arm isolation, same reason as the scene fan-out: one provider's
+    // empty response must not discard the arms that already succeeded.
+    try {
+    let beats = beats0;
+    const passes = [];
+    let convergedAtPass = null;
+    for (let p = 1; p <= passCount; p++) {
+      // The override lives only around this synchronous build. It used to be
+      // set on the shared registry for the whole replay — many minutes and
+      // many awaits — which is one of the two windows that forced the Lab to
+      // run one experiment at a time.
+      const prompt = withTemplates({ storyBeatsReview: promptOverride }, () =>
+        buildBeatsReviewPrompt(storyData, beats, storedArc, ''));
+      const t = Date.now();
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
+      assertReviewerResponded(res, model);
+      const out = res.text || '';
+      const marker = out.match(/---\s*BEATS\s*---/i);
+      const analysis = (marker ? out.slice(0, marker.index) : out).trim();
+      const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
+      const rewrittenPages = rewritten.map(r => r.pageNumber);
+      const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
+      // Full chain for this pass: the reviewer's complete analysis (all
+      // checks) + exact before→after per rewritten page. This is what the
+      // score row persists — a round must explain what produced it.
+      const chain = {
+        reviewModel: model,
+        pass: p,
+        analysis: analysis.slice(0, 15000),
+        rewrites: beats.filter(b => byPage.has(b.pageNumber)).map(b => {
+          const r = byPage.get(b.pageNumber);
+          return { page: b.pageNumber, before: `BEAT: ${b.beat}\nSCENE: ${b.scene}`.slice(0, 2000), after: `BEAT: ${r.beat}\nSCENE: ${r.scene}`.slice(0, 2000) };
+        }),
+      };
+      const entry = {
+        pass: p,
+        rewrittenPages,
+        converged: rewrittenPages.length === 0,
+        analysis: analysis.slice(0, 15000),
+        check8: (analysis.match(/8\.\s*Loose threads[\s\S]*?(?=\n\d{1,2}\.\s|$)/i) || [''])[0].trim().slice(0, 800),
+        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+        elapsedMs: Date.now() - t,
+      };
+      beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
+      if (scoreOutput) {
+        const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
+          model: params.judgeModel, evalVersion: params.evalVersion,
+          // round p+1: round 1 is the raw beats (scored below), so pass p → round p+1
+          persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `review pass ${p}`, round: p + 1, genCost: entry.cost, genMs: entry.elapsedMs, chain },
+        });
+        entry.scorecard = sr.scorecard;
+        entry.cost += sr.cost;
       }
-      arms.push({ model, passes, convergedAtPass });
-      } catch (err) {
-        require('../utils/logger').log.warn(`⚠️ [beats replay] arm ${model} failed: ${err.message}`);
-        arms.push({ model, ok: false, error: err.message, passes: [] });
-      }
+      passes.push(entry);
+      if (entry.converged) { convergedAtPass = p; break; }
     }
-  } finally {
-    PROMPT_TEMPLATES.storyBeatsReview = orig;
+    arms.push({ model, passes, convergedAtPass });
+    } catch (err) {
+      require('../utils/logger').log.warn(`⚠️ [beats replay] arm ${model} failed: ${err.message}`);
+      arms.push({ model, ok: false, error: err.message, passes: [] });
+    }
   }
   return { storyId: target.storyId, beatCount: beats0.length, passesRequested: passCount, rawScore: rawScorecard?.artifacts?.beats?.score ?? null, arms };
 }
