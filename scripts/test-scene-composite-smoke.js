@@ -83,6 +83,14 @@ const TOPIC = arg('topic', 'pirate');
 const CITY = arg('city', null);
 const DETAILS = arg('details', 'Eine kurze Piratengeschichte für einen Pipeline-Smoke-Test.');
 const SKIP_COVERS = arg('skipCovers', 'true').toLowerCase() !== 'false';
+// --mainAge=2 overrides the FIRST character's age in the payload only — the
+// account is untouched. Age <= 3 on the focus character flips the pipeline
+// into toddler mode, so this is the knob for toddler validation runs.
+const MAIN_AGE = arg('mainAge', null);
+// --mains=1 declares only the first N characters as main cast. The focus
+// character is the OLDEST declared main (pickMainCharacters), so a toddler run
+// needs the toddler as the sole main: --mainAge=2 --mains=1.
+const MAINS_COUNT = Math.max(1, parseInt(arg('mains', '2'), 10) || 2);
 const REPAIR = arg('repair', 'false').toLowerCase() === 'true';
 const DRY_RUN = process.argv.includes('--dryRun');
 
@@ -183,8 +191,13 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     process.exit(1);
   }
 
-  // Use the first 2 characters as the main cast.
-  const mainCharacters = characters.slice(0, 2).map(c => c.id);
+  if (MAIN_AGE !== null && characters[0]) {
+    console.log(`   mainAge override: ${characters[0].name} age ${characters[0].age} -> ${MAIN_AGE} (payload only)`);
+    characters[0] = { ...characters[0], age: String(MAIN_AGE) };
+  }
+
+  // Use the first N characters as the main cast (default 2).
+  const mainCharacters = characters.slice(0, MAINS_COUNT).map(c => c.id);
 
   // 3. POST /api/jobs/create-story
   console.log('\n3. Submitting smoke-test story job...');
