@@ -18140,3 +18140,55 @@ Not yet observed on a real wizard story.
 `trialMode` onto `storyData`), `tests/unit/idea-provenance.test.ts`.
 
 **Status:** ✅ active.
+
+---
+
+## 2026-08-25 — `data.writerText` freezes the writer's draft; the derived quality counters are deliberately NOT stored
+
+**Context:** Answering "do we have this as metadata?" for the text-quality
+counters surfaced a data gap. `storyJobPipeline.js` rebuilds `fullStoryText`
+from the refined pages at the text-refine join, and both `data.storyText` and
+`data.originalStory` ship that refined prose. The rebuild is correct and
+deliberate — the Lab's edit mode reads those fields and used to show pre-refine
+text under a refined book — but the consequence was never written down: **the
+writer's draft afterwards survives only inside `textRefineReport.pages[].before`,
+and only for the pages that stage happened to change.**
+
+Measured across the corpus 2026-08-25: `storyText` holds the draft on
+`job_1787638707796`, `job_1786309527338`, `job_1786829555599`,
+`job_1786053708336`, `job_1787262655143`, and the *refined* text on the two
+newest runs `job_1787638394061` and `job_1787469664089`. `originalStory` matches
+`storyText` in every case. So "read storyText for the draft" is wrong half the
+time, silently — it made the first Lab exact-replay a no-op on 2 of 6 targets
+(fixed in `71997228b`).
+
+**Decision:**
+1. Capture `const writerText = fullStoryText` immediately after the pages are
+   parsed, before any stage can overwrite it, and persist it on both the
+   checkpoint save and the final save. Nothing reads it yet; it exists so that
+   before/after measurement is exact rather than reconstructed.
+2. Do **not** store the derived counters (feeling lost, bookkeeping added, clock
+   stamps, travelogue openers) — owner, 2026-08-25. They stay in
+   `scripts/analysis/refine-damage-report.js`, computed on demand.
+3. `story-text-quality-judge` stays Lab-only (owner, same session) — not wired
+   into generation.
+
+**Rationale:** The counters are regex heuristics over a fuzzy sentence diff.
+They find 4 of the 8 feeling deletions a human reader finds on the same story —
+sentences carrying relationship (`sein kleiner Bruder`) or restraint (`und sagt
+kein Wort`) hold feeling without a feeling word — and a heavily rephrased
+sentence scores as both a deletion and an addition. Freezing that into stored
+metadata would turn a floor-and-trend-line into a number people trust. Because
+the raw before/after is durable, any counter can be recomputed over the entire
+history at any time, including a better one; storing the derived value buys a
+time series and costs the ability to revise it. The verdict may flip once the
+counter is good — that needs a superseding entry, not a quiet change.
+
+**Touched:** `storyJobPipeline.js` (capture site after the page parse; both save
+sites), `scripts/analysis/refine-damage-report.js`,
+`tasks/story-text-quality-2026-08-25.md`.
+
+**Status:** ✅ active. `writerText` is write-only for now — the reconstruction in
+`refine-damage-report.js` and in the Lab's `fromWriterText` replay must keep
+working for stories generated before this, which is why both still read
+`textRefineReport.pages[].before`.

@@ -2462,6 +2462,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       `--- Page ${page.pageNumber} ---\n${page.text}`
     ).join('\n\n');
 
+    // The writer's output, frozen (owner, 2026-08-25). Everything downstream
+    // overwrites fullStoryText in place — text-consistency corrections, then
+    // the refine pass — and BOTH data.storyText and data.originalStory ship the
+    // refined prose (the rebuild at the refine join is deliberate: the Lab's
+    // edit mode reads them and used to show pre-refine text under a refined
+    // book). The consequence nobody wrote down is that the draft then survives
+    // only inside textRefineReport.pages[].before, and only for the pages that
+    // stage happened to change — recoverable by accident, one report-trimming
+    // from gone. Keeping it verbatim makes every before/after measurement exact
+    // and re-runnable over the whole history with a better counter later.
+    // See docs/decisions.md (2026-08-25) and scripts/analysis/refine-damage-report.js.
+    const writerText = fullStoryText;
+
     log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`);
     genLog.info('story_parsed', `"${title}" - ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`, null, { title, pageCount: storyPages.length });
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
@@ -4670,6 +4683,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneDescriptions: expandedScenes,
           story: fullStoryText,
           storyText: fullStoryText,
+          writerText, // frozen draft — carried on the checkpoint too, or a
+                      // story that never reaches the final save loses it
           visualBible,
           artStyle: inputData.artStyle,
           language: inputData.language,
@@ -5386,6 +5401,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
       story: fullStoryText, // Canonical field name — frontend reads 'story'
       storyText: fullStoryText, // Keep for backwards compatibility with existing blobs
+      writerText, // The writer's draft, never overwritten — see the capture site
       originalStory: originalStoryText || fullStoryText, // Store original AI text for dev mode
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
