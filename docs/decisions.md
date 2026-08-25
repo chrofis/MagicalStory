@@ -17882,3 +17882,50 @@ round instead of refining already-refined text),
 
 **Status:** 🟡 conditional — shipped to staging, validation via Lab
 `text_refine` replay on a multi-story corpus in progress.
+
+---
+
+## 2026-08-25 — Character repair builds its detection cast like every other site (supersedes the 2026-08-24 "not on the page" premise)
+
+**Context:** Owner's face repair for Sarah on p15 of `job_1787514666616_yw9qsv1vf` did
+nothing. Three Grok draws, three blend-gate rejections (43% / 0% / 45% mask IoU). The
+attempt frames — returned for the first time by the 2026-08-24 change — showed why: the
+whiteout was centred on the woman in the RED COAT, and Grok painted Sarah's face onto her.
+Cropping the four detected figures confirmed it: the figure the detector calls "Sarah" is
+Kapitänin Rossa, a Visual Bible secondary character (pages 7/8/12/15/16, "hair: deep red")
+who is absent from `storyData.characters`.
+
+The repair path's step-3 detection hand-rolled a bare list of names. Every other detection
+site — `refresh-bbox`, the eval, entity consistency — builds its cast from the page's
+`sceneMetadata` through `buildCharacterDescriptionsForBbox` + `buildExpectedCharactersForBbox`,
+which carry per-character POSITIONS ("far background, right of the far mouth"), per-page
+CLOTHING, and the VB secondaries. Given four names and four figures and no positions, the
+detector distributes every name it is handed — it never refuses — so a name landed on a
+stranger and a confident wrong label became indistinguishable from a right one.
+
+**Decision:** The repair path uses the SAME builders and the SAME inputs as every other
+detection site. The requested character is forced into the lineup when page metadata omits
+them, so the lookup can still run. Two guards remain as backstops: a refusal
+(`rejectedReason: 'not_on_page'`) when no figure matches, naming who WAS detected; and a
+refusal when the fresh detection is the only evidence AND the brief names more characters
+than figures were drawn, because then some label is necessarily borrowed.
+
+**Corrections to the 2026-08-24 entry:** (a) its premise that "Sarah is not on the page"
+was asserted from ONE Lab detection run while the production detector named her 3/3 at high
+confidence — the truth is she is not among the drawn figures, but the detector will always
+claim she is, which is the actual defect; (b) describing VB secondaries alone did not stop
+the misassignment — positions were the missing input; (c) the IoU floor was never the
+problem. The blend gate refused correctly on every one of the six draws measured across two
+days, and story metrics confirm char repair is not broken globally
+(`char_repair_retry_saved=1` on 2026-08-25, `repair_registration=1` on 2026-08-23, 2-4 clean
+repairs per story 2026-08-14..20).
+
+**Rationale:** One source of truth for "who is expected on this page". A detection cast
+assembled differently per call site is how the same page yields different names to different
+consumers, and the repair path — the one that repaints a human face — had the weakest cast
+of them all.
+
+**Touched:** `server/routes/regeneration.js`, `server/lib/faceRepair.js` (attempt frames),
+`client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/hooks/useRepairWorkflow.ts`,
+`client/src/types/story.ts`, `client/src/services/storyService.ts`,
+`tests/e2e/repair-not-on-page.spec.ts`.
