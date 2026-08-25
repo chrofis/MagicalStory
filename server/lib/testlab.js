@@ -3237,6 +3237,111 @@ async function runOutlineReviewStage(target, { params = {} }) {
  *   to the plan, so a change to the idea GENERATOR can only be measured by
  *   planning the same cast and setting from a different idea.
  */
+/**
+ * Stored beats → Art Director → (optionally) page text, run twice: once with
+ * the beats-audit faults carried in, once without.
+ *
+ * Answers the question CARRY_ROUTES exists for — can a stage downstream of the
+ * beats repair what the beats review left behind — on a story that already
+ * shipped, with no images and no re-planning. Uses the SAME route text
+ * production uses (server/lib/carryRoutes.js), or the arms would measure a
+ * string production never sends.
+ */
+async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costOf }) {
+  const { buildSceneExpansionAllPrompt, buildAvailableAvatarsForPrompt, parseRefinedText: parseAll,
+    buildStoryTextFromBeatsPrompt } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
+  const { CARRY_ROUTES, withCarriedFindings } = require('./carryRoutes');
+  const { checkScenes, REVIEWABLE } = require('./sceneBriefCheck');
+
+  const beatsAudit = String(params.beatsAudit || storyData?.beatsReviewReport?.audit || '').trim();
+  if (!beatsAudit) throw new Error('no beats audit findings stored on this story — nothing to carry');
+
+  const limit = parseInt(params.expandPages, 10) || storedBeats.length;
+  const toExpand = storedBeats.slice(0, limit);
+  const model = params.expansionModel || MODEL_DEFAULTS.outline;
+  const imgCfg = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
+  const availableAvatars = buildAvailableAvatarsForPrompt
+    ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+    : '';
+
+  const basePrompt = buildSceneExpansionAllPrompt(
+    { ...storyData, characters: storyData.characters || [], pageClothing: null },
+    toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, scene: b.scene })),
+    {
+      visualBible: storyData.visualBible || null,
+      availableAvatars,
+      maxCharactersPerScene: imgCfg?.maxCharactersPerScene || 3,
+      clothingRequirements: storyData.clothingRequirements || null,
+    }
+  );
+  if (!basePrompt) throw new Error('scene-expansion-all template unavailable');
+
+  const castNames = [
+    ...(storyData.characters || []).map(c => c && c.name),
+    ...(Array.isArray(storyData.visualBible?.secondaryCharacters)
+      ? storyData.visualBible.secondaryCharacters
+      : Object.values(storyData.visualBible?.secondaryCharacters || {})).map(c => c && c.name),
+  ].filter(Boolean);
+
+  const arms = [
+    { key: 'control', label: 'no carry', prompt: basePrompt },
+    { key: 'carry', label: 'beats audit carried', prompt: withCarriedFindings(basePrompt, beatsAudit, CARRY_ROUTES.beatsToArtDirector) },
+  ];
+
+  const results = [];
+  for (const arm of arms) {
+    const t0 = Date.now();
+    const res = await callTextModelStreaming(arm.prompt, null, null, model, { usageLabel: 'testlab_carry_ab' });
+    const parsed = parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES');
+    const briefs = parsed.pages.map(p => ({ pageNumber: p.pageNumber, brief: p.text }));
+    const checked = checkScenes(briefs, castNames, storyData.visualBible || null);
+    const faults = checked.findings.filter(f => REVIEWABLE.has(f.type));
+    results.push({
+      arm: arm.key,
+      label: arm.label,
+      promptChars: arm.prompt.length,
+      elapsedMs: Date.now() - t0,
+      modelId: res.modelId,
+      usage: res.usage,
+      cost: costOf ? costOf(res) : null,
+      pagesReturned: briefs.length,
+      faultCount: faults.length,
+      faults: faults.map(f => ({ page: f.pageNumber, type: f.type })),
+      briefs,
+    });
+  }
+
+  let storyText = null;
+  if (params.alsoText) {
+    const textBase = buildStoryTextFromBeatsPrompt(storyData, toExpand, [], storyData.outline || '');
+    if (textBase) {
+      const textArms = [
+        { key: 'control', prompt: textBase },
+        { key: 'carry', prompt: withCarriedFindings(textBase, beatsAudit, CARRY_ROUTES.beatsToStoryText) },
+      ];
+      storyText = [];
+      for (const a of textArms) {
+        const r = await callTextModelStreaming(a.prompt, null, null, params.textModel || MODEL_DEFAULTS.storyText || model, { usageLabel: 'testlab_carry_ab_text' });
+        storyText.push({ arm: a.key, promptChars: a.prompt.length, modelId: r.modelId, usage: r.usage, cost: costOf ? costOf(r) : null, text: String(r.text || '').slice(0, 30000) });
+      }
+    }
+  }
+
+  return {
+    stageKind: 'beats_scenes',
+    mode: 'stored_beats_carry_ab',
+    storyId: storyData.id || null,
+    beatsAuditFaults: (beatsAudit.match(/^FAULT:/gm) || []).length,
+    beatsAudit,
+    pages: toExpand.length,
+    arms: results,
+    delta: results.length === 2 ? { control: results[0].faultCount, carry: results[1].faultCount } : null,
+    storyText,
+  };
+}
+
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -3261,6 +3366,26 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
 
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
   const lockStart = Date.now();
+
+  // START FROM THE STORED BEATS (owner, 2026-08-25). The stage normally plans
+  // and reviews beats from scratch, which measures the planner. To ask the
+  // different question — can the Art Director and the text writer repair what
+  // the beats left behind — the beats have to be the ones that actually
+  // shipped, not a fresh draft. Every page keeps its own beat in
+  // `outlineExtract` ("BEAT: … SCENE: …"), so the shipped set is recoverable
+  // without re-running anything.
+  if (params.useStoredBeats) {
+    const stored = (storyData.sceneImages || [])
+      .map((s) => {
+        const raw = String(s.outlineExtract || '');
+        const beat = (raw.match(/BEAT:\s*([\s\S]*?)(?=\nSCENE:|$)/i) || [, ''])[1].trim();
+        const scene = (raw.match(/SCENE:\s*([\s\S]*)$/i) || [, ''])[1].trim();
+        return beat ? { pageNumber: s.pageNumber, beat, scene } : null;
+      })
+      .filter(Boolean);
+    if (stored.length === 0) throw new Error('useStoredBeats: no page carries an outlineExtract BEAT');
+    return await runStoredBeatsScenes(storyData, stored, { params, experimentId: null, costOf, lockStart });
+  }
 
   // ── Step 1: plan ────────────────────────────────────────────────────────
   let plannerPrompt = buildBeatsPrompt(storyData, pageCount);
@@ -7451,4 +7576,10 @@ module.exports = {
   resolveReplayParams,
   loadActivePageImage,
   checkRuleGenericity,
+  // The scorecard judge itself. Every stage runner in this file already calls
+  // it; exporting it lets a measurement score an arbitrary artifact (the text
+  // after each refine round, a candidate rewrite) through the SAME evaluator
+  // resolution and rubric as a stored scorecard, instead of a second copy of
+  // the judge wiring drifting alongside it.
+  scoreArtifactsWithJudge,
 };
