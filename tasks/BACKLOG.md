@@ -357,9 +357,12 @@ measurement, is lost).
       → `tasks/sam-clothing-tasks-2026-07-20.md:31`
 - [ ] One full showcase re-run to confirm redo counts drop end-to-end
       → `tasks/redo-clothing-analysis-2026-07-20.md:124`
-- [ ] Composite blend fix (`3ad9e1a12`) unverified — the size-neutral "partly hidden" clause
-      never got a clean Lab run; exp 824 and exp 832 both died with "server restarted mid-run"
-      when other sessions deployed to staging → `docs/decisions.md` 2026-08-23 blend entry
+- [x] ~~Composite blend fix (`3ad9e1a12`) unverified~~ — VERIFIED in exp 848 (2026-08-25): the
+      size-neutral clause held, no enlargement onto the occluder. A DIFFERENT blend defect
+      surfaced in the same run (duplicate figure + re-frame) → next line
+- [ ] Composite blend v2 (`8c1baa515`, positive description, 1635 chars) awaits its first
+      measured run — exp 848 duplicated the occluded figure and re-framed at 5451 chars, both
+      already forbidden in that prompt → `docs/decisions.md` 2026-08-25 blend-rewrite entry
 - [ ] Composite stage frames in production (`14bcc6330`) proven only offline against a spy —
       the end-to-end proof is the next page that trips the gate → `docs/decisions.md`
       2026-08-24 stage-frames entry
