@@ -17556,7 +17556,7 @@ description — a phrase copied verbatim from the real ART001 entry in
 production. Scale similes in a VB description can be drawn literally. Not
 caused by this change; logged to the backlog.
 
-## 2026-08-24 — `styleRepairModel` back to GROK (supersedes the 2026-08-09 "later" flip to Gemini)
+## 2026-08-24 — `styleRepairModel` back to GROK; neither model is reliable (supersedes the 2026-08-09 "later" flip to Gemini)
 
 **Context:** Staging `job_1787638394061_hs70901tfsn` (Fiona, 16pp, adult cast,
 watercolour) shipped **four pages the style audit itself called photographic**
@@ -17573,22 +17573,29 @@ and the cause is a **fourth** one, not on that list.
 | gemini-2.5-flash-image | `IMAGE_OTHER` on **all 3 retries, both pages** — no image at all |
 | grok-imagine | p2 repainted in **18s / $0.02**: visible brushwork, paper texture, identity, clothing and pose intact; gate `better=after`, `changed=[]` |
 
-Gemini does not fail to restyle a photographic adult face — it **refuses to
-return an image for one**. A refusal produces nothing, so the page keeps its
-photograph and the repair looks like it "ran". Lab #837 hit the same refusal
-independently ("Gemini refused prompt-only (IMAGE_OTHER on a photoreal adult
-face)") and rated prompt-only Grok the best of its four arms.
+`IMAGE_OTHER` is Gemini's **safety refusal**: it returns no image at all, so the
+page silently keeps what it had and the repair looks like it "ran". **It is not
+a rule about adults or about photorealism** — an earlier draft of this entry
+said so and was wrong. The trigger is a content COMBINATION (owner's example: a
+young girl in a bikini rendered as a mermaid), it is not predictable from the
+page, and Gemini restyles comparable pages perfectly well on other runs. Lab
+#837 hit the same refusal independently and rated prompt-only Grok best of its
+four arms.
+
+**Neither model is dependable.** Grok no-ops on some pages — that is exactly why
+2026-08-09 flipped away from it. Gemini refuses others. This decision picks the
+one that won the pages actually measured; it does not claim a general rule.
 
 **Decision:** `styleRepairModel` default **gemini → grok** (`STYLE_REPAIR_MODEL`
 override unchanged). Owner sign-off 2026-08-24, asked as a reversal.
 
-**Rationale / why the old evidence does not carry:** the 2026-08-09 (later)
-entry flipped to Gemini on "Grok can't restyle — no-op ~10/255". That
-measurement was made on pages already close to the commissioned style, where
-there is little for a repaint to change. It says nothing about a fully
-photographic page, which is the case that actually reaches Step 5 on an
-adult-cast book. Both statements can be true; only one of them is about the
-pages that matter here.
+**Rationale:** the 2026-08-09 (later) entry flipped to Gemini on "Grok can't
+restyle — no-op ~10/255", measured on pages already close to the commissioned
+style where a repaint has little to change. Both observations are real and
+neither generalises: the two models fail in different, unpredictable ways.
+Grok is default because it produced a correct repaint on the pages this book
+actually failed on. **The durable fix is to try the other model when the first
+returns no image — a fallback, not a default. It is not built yet.**
 
 The no-op risk that motivated the Gemini flip is now handled **downstream
 instead of by model choice**, which is what makes this reversal safe in a way it

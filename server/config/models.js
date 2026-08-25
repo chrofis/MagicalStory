@@ -482,27 +482,35 @@ const MODEL_DEFAULTS = {
   // disable): repairPageStyle now sends a validated, character-focused,
   // feature-preserving prompt RAW to the Gemini image edit (prompt-only, no
   // style-reference image, temp 0.7, retry on safety no-image). Validated on
-  // p3/p10/initial page — photographic adult faces become watercolor while
+  // p3/p10/initial page — photographic figures become watercolor while
   // eyes/eyewear/identity are preserved (keeps glasses if present, never
-  // invents them). GEMINI is the engine (it restyles faces; Grok no-ops on
-  // this edit — the earlier "Gemini refuses" verdict was a prompt bug, not a
-  // real refusal). A page Gemini refuses after retries keeps its original.
+  // invents them). The engine choice in that entry (Gemini, because Grok
+  // no-opped on the pages measured then) is SUPERSEDED — see styleRepairModel
+  // below. A page the model refuses after retries keeps its original.
   styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
     ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
     : true,
-  // GROK (owner, 2026-08-24) — reverses the 2026-08-09 (later) flip to Gemini,
-  // whose evidence was "Grok can't restyle, no-op ~10/255". That holds for a
-  // page already near the style; it does not hold for a fully photographic one.
-  // Gemini REFUSES those outright: IMAGE_OTHER on all 3 retries, on both
-  // photographic pages of staging job_1787638394061_hs70901tfsn, and again in
-  // Lab #837. A refusal produces no image, so the page keeps its photograph —
-  // which is why that 16-page book shipped 4 photographic pages after 18
-  // repaint attempts kept 3. Grok repainted the same page into correct
-  // watercolour in 18s for $0.02, identity and clothing intact.
-  // The no-op risk that motivated the Gemini flip is now handled downstream
-  // rather than by model choice: the comparative gate answers "same" for an
-  // unchanged repaint and the pipeline is fail-closed, so a Grok no-op is
-  // rejected and the original is kept. That guard did not exist in 2026-08-09.
+  // GROK (owner, 2026-08-24) — reverses the 2026-08-09 (later) flip to Gemini.
+  //
+  // NEITHER MODEL IS RELIABLE HERE. Gemini sometimes restyles a page fine and
+  // sometimes returns IMAGE_OTHER — its safety refusal, which yields NO image,
+  // so the page silently keeps whatever it had. The trigger is a content
+  // COMBINATION (a young girl in a bikini as a mermaid is the owner's example),
+  // not the age of the cast and not photorealism; it cannot be predicted from
+  // the page. Grok is no more dependable — the 2026-08-09 flip to Gemini was
+  // made because Grok no-opped (~10/255 diff) on the pages measured then.
+  //
+  // So this is a coin-toss picked on measurement, not a theory: on both
+  // photographic pages of staging job_1787638394061_hs70901tfsn Gemini refused
+  // 3/3 and Grok repainted correctly in 18s for $0.02, identity and clothing
+  // intact; Lab #837 saw the same refusal and rated prompt-only Grok best of
+  // four arms. Expect the other model to be right on some other book — a
+  // fallback across both is the real fix, and is not built yet.
+  //
+  // What makes flipping safe now: a no-op no longer wins by default. The
+  // comparative gate answers "same" for an unchanged repaint and the pipeline
+  // is fail-closed, so a Grok no-op is rejected and the original is kept. That
+  // guard did not exist in 2026-08-09, when the model had to carry it alone.
   styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'grok',
   // Attach the page cast's styled avatars to the repaint as STYLE reference
   // sheets (owner, 2026-08-24). The repaint has been prompt-only since
