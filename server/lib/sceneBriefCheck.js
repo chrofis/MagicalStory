@@ -90,7 +90,8 @@ function checkPage(page, castNames = [], visualBible = null) {
       type: 'cast_unlisted',
       names: missing,
       detail: `The prose names ${missing.join(' and ')}; characters[] lists ${listed.length ? listed.join(', ') : 'nobody'}. `
-        + `Whoever is in the frame belongs in characters[]; whoever is only mentioned should not read as present.`,
+        + `Whoever is in the frame belongs in characters[]; whoever is only mentioned should not read as present. `
+        + `A figure added this way takes the action the page already has, or "watching" — never a second one.`,
     });
   }
 

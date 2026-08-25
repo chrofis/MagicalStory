@@ -17929,3 +17929,56 @@ of them all.
 `client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/hooks/useRepairWorkflow.ts`,
 `client/src/types/story.ts`, `client/src/services/storyService.ts`,
 `tests/e2e/repair-not-on-page.spec.ts`.
+
+## 2026-08-25 — Fixing an unresolved finding: sharpen the text, re-round the page, carry the arc forward
+
+**Context:** the post-review re-check added earlier today reports an INTRODUCED
+brief fault but does not stop it shipping. Owner asked whether a second round
+can be made cheap, and whether an unresolved finding can instead ride into the
+next stage that is already being called.
+
+**Measured first.** On staging `job_1787638394061_hs70901tfsn`, the scene review
+was in 19,820 / out 34,212 tokens, $0.14. The 16 briefs are 71,030 chars — about
+91% of the input. So the briefs ARE the input, and re-sending one costs a
+fraction. Rebuilding the real prompt with only the faulted page: **91,855 chars
+→ 14,516, an 84% input cut**, with output falling from 8 rewritten briefs to 1.
+`buildSceneReviewPrompt(inputData, scenes, options)` already takes a page
+subset, so the builder needed no change.
+
+**Three changes, cheapest first:**
+
+1. **The finding text caused the fault.** `cast_unlisted` told the reviewer
+   "whoever is in the frame belongs in characters[]" and never said what the
+   added figure should be DOING, so it invented a second action. It now adds:
+   *a figure added this way takes the action the page already has, or
+   "watching" — never a second one.* Free, no extra call, and it attacks the
+   cause rather than catching the effect.
+
+2. **Targeted second round.** When a fault survives the re-check, exactly ONE
+   more review runs, on the faulted pages only (~$0.02 against $0.14). Never
+   loops; whatever survives is reported and ships, the same contract as before
+   with one cheap attempt in between. Recorded on
+   `sceneReviewReport.briefSecondRound`, and its diffs carry `round: 2`.
+
+3. **Arc faults carry into the beats plan.** The arc audit's faults went to the
+   arc review and nothing checked whether it answered them — an arc is prose, so
+   there is no deterministic re-check the way there is for briefs and clothing,
+   and buying a second audit call to find out would not be free. Instead they
+   ride into the plan call that happens anyway, which is the next stage that
+   OWNS the material since it divides the arc into pages. Zero cost; a fault
+   already fixed simply reads as satisfied.
+
+**Where carry-forward does NOT work, and why.** It only helps when the
+downstream stage rewrites the faulted artifact. Checked every stage after the
+scene review: `beats_story_text` writes page text, `scene_translation`
+translates, and `prompt_compress` shortens prose only ("Output ONLY the
+rewritten description") and only when the prompt is over budget. The brief fault
+lives in `interactions[]`, which builds EXACT POSES, and nothing downstream
+rewrites that. Hence the targeted round for briefs and carry-forward for the arc
+— not one mechanism for both.
+
+**Verified:** 84% input cut measured on the real prompt; the sharpened finding
+renders correctly; unit suite 152 passed, same 3 pre-existing
+`active-version-recompute` failures.
+
+**Touched files:** `server/lib/beatsPipeline.js`, `server/lib/sceneBriefCheck.js`.

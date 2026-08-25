@@ -245,6 +245,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const basePrompt = buildBeatsPrompt(inputData, pageCount);
   if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
   let approvedArc = '';
+  let arcAuditFindings = '';
   let arcReviewReport = null;
   let t = Date.now();
   try {
@@ -258,7 +259,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // Blind audit: a reader with only the commission and the arc names faults.
     // The reviewer's fix ledger must answer every one. Never blocks — a failed
     // audit just means the review runs on its own findings alone.
-    let arcAuditFindings = '';
     try {
       const arcAuditPrompt = buildArcAuditPrompt(inputData, drafted);
       if (arcAuditPrompt) {
@@ -300,9 +300,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
+  // CARRY-FORWARD (owner, 2026-08-25). The arc audit's faults were handed to
+  // the arc review, and whether it answered each one is nobody's job to check —
+  // an arc is prose, so there is no deterministic re-check the way there is for
+  // briefs and clothing. Rather than buy a second audit call to find out, the
+  // faults ride along into the plan call that happens anyway: this is the next
+  // stage that OWNS the material, since it is the one dividing the arc into
+  // pages. Costs nothing, and a fault the reviewer already fixed simply reads
+  // as satisfied. The same trick does not work downstream of the scene review —
+  // no later stage rewrites brief metadata (docs/decisions.md 2026-08-25).
+  const arcCarry = arcAuditFindings.trim()
+    ? `\n\nAn audit of the draft arc raised the faults below. The approved arc may already answer some of them. Where one still stands, resolve it in the page plan.\n\n---ARC AUDIT---\n${arcAuditFindings.trim()}`
+    : '';
   const planPrompt = approvedArc
-    ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
+    ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}${arcCarry}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
     : basePrompt;
+  if (arcCarry) gl.info('beats_arc_carry', `Arc audit faults carried into the beats plan (${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
@@ -721,6 +734,7 @@ SCENE: ${x.scene || ''}`.trim(),
   let clothingUnfixedList = [];
   let briefUnfixedList = [];
   let briefIntroducedList = [];
+  let briefSecondRound = null;
   try {
     const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
     const checkPages = expansions.map(x => {
@@ -949,6 +963,75 @@ SCENE: ${x.scene || ''}`.trim(),
           gl.warn('beats_brief_unfixed', `Brief faults survived the scene review: ${d}`, null, { findings: survived });
         }
         if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
+
+        // TARGETED SECOND ROUND (owner, 2026-08-25). Reporting a fault does not
+        // stop it shipping, and the page that motivated this — staging
+        // job_1787638394061_hs70901tfsn p1 — went out declaring two actions.
+        //
+        // The briefs ARE the input: 71,030 of the review's ~19,820 input tokens
+        // were the 16 briefs, so re-sending only the faulted ones costs roughly
+        // an eighth of a full round (~$0.018 against $0.14 measured on that
+        // story). buildSceneReviewPrompt already takes a page subset, so there
+        // is nothing to change in the builder.
+        //
+        // Exactly ONE extra round, ever. No loop: whatever survives it is
+        // reported and ships, which is the same contract as before, only with
+        // one cheap attempt at a fix in between.
+        if (left.length > 0) {
+          const faultPages = new Set(left.map(f => f.pageNumber));
+          const subset = expansions.filter(x => faultPages.has(x.pageNumber));
+          const subsetByPage = new Map();
+          for (const [pn, list] of after.byPage) if (faultPages.has(pn)) subsetByPage.set(pn, list);
+          const { renderFindingsBlock: renderBriefBlock2 } = require('./sceneBriefCheck');
+          const rrPrompt = buildSceneReviewPrompt(
+            inputData,
+            subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+            { briefFindings: renderBriefBlock2(subsetByPage), beats }
+          );
+          if (rrPrompt) {
+            try {
+              const pagesLabel = [...faultPages].sort((a, b) => a - b).join(', ');
+              log.info(`🧩 [BEATS] second review round on page(s) ${pagesLabel} (${subset.length}/${expansions.length} briefs)`);
+              const rrRes = await textModels.callTextModelStreaming(rrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_r2' });
+              const rrParsed = parseRefinedText(rrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
+              const rrByPage = new Map(rrParsed.pages.map(p => [p.pageNumber, p.text]));
+              const rrChanged = [];
+              for (const x of subset) {
+                const fixed = rrByPage.get(x.pageNumber);
+                if (fixed && fixed.trim() && fixed !== x.brief) {
+                  sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 2 });
+                  x.brief = fixed;
+                  x.reviewRewrote = true;
+                  rrChanged.push(x.pageNumber);
+                }
+              }
+              const after2 = checkBriefs(
+                expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+                briefCastNames,
+                visualBible
+              );
+              const left2 = after2.findings.filter(f => REVIEWABLE.has(f.type));
+              briefUnfixedList = left2;
+              briefSecondRound = {
+                pages: [...faultPages].sort((a, b) => a - b),
+                rewrote: rrChanged,
+                before: left.length,
+                after: left2.length,
+                usage: rrRes.usage || null,
+              };
+              if (left2.length === 0) {
+                log.info(`🧩 [BEATS] second round resolved all ${left.length} fault(s)`);
+                gl.info('beats_brief_round2', `Second review round on page(s) ${pagesLabel} resolved all ${left.length} fault(s)`);
+              } else {
+                const d = left2.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
+                log.warn(`⚠️ [BEATS] second round: ${left2.length}/${left.length} fault(s) still present — ${d}`);
+                gl.warn('beats_brief_round2_unfixed', `Second review round left ${left2.length} fault(s): ${d}`, null, { findings: left2 });
+              }
+            } catch (r2Err) {
+              log.warn(`⚠️ [BEATS] second review round failed (${r2Err.message}) — faults ship as reported`);
+            }
+          }
+        }
       } catch (rcErr) {
         log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
       }
@@ -970,6 +1053,7 @@ SCENE: ${x.scene || ''}`.trim(),
         clothingUnfixed: clothingUnfixedList,
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
+        briefSecondRound,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: srRes.modelId || sceneReviewModel,
