@@ -592,7 +592,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // `moderate` and `catastrophic`, so a moderate entity issue DISPLAYED as −0
   // while computeMathFinalScore charged it −5 (normalizeIssues accepts every
   // severity in SEVERITY_POINTS). Same table, no subsetting, no drift.
-  const { SEVERITY_POINTS: ENTITY_PENALTIES } = require('./scoring');
+  // deductionPoints applies ZERO_POINT_TYPES, MAX_SEVERITY_TYPES and
+  // MIN_SEVERITY_TYPES on top of SEVERITY_POINTS — the same arithmetic the
+  // consolidated score uses, so an entity finding cannot cost more here than
+  // its type is allowed to cost there.
+  const { SEVERITY_POINTS: ENTITY_PENALTIES, deductionPoints } = require('./scoring');
   // Returns { penalty, issues } so callers can persist BOTH the number AND the
   // source issues on each version. Without the issues, the dev panel shows a
   // mysterious "−N" deduction that the user can't drill into.
@@ -603,9 +607,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const charIssues = charData.issues || [];
       for (const issue of charIssues) {
         if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += ENTITY_PENALTIES[String(issue.severity || '').toLowerCase()] || 0;
+          // Charge through deductionPoints so the TYPE ceilings actually apply
+          // here. This path used to bill severity alone, so every
+          // MAX_SEVERITY_TYPES entry — accessory, unverified_absence,
+          // face_drift, hair_nuance — was silently ignored for entity
+          // findings: the bounding existed in code but not on the path that
+          // does the entity billing. Measured cost on one production book:
+          // 75 points across four pages and a cover for hair differing by a
+          // shade, which the owner reads as a nuance.
+          out.penalty += deductionPoints(issue);
           out.issues.push({
             name: charName,
+            // Carried so the ceiling is reproducible downstream and the dev
+            // panel can show WHY a MAJOR-looking finding cost 2 points.
+            type: issue.type || null,
+            subType: issue.subType || null,
             severity: issue.severity,
             description: issue.description || issue.problem || '',
             source: 'character',
@@ -618,9 +634,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const objIssues = objData.issues || [];
       for (const issue of objIssues) {
         if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += ENTITY_PENALTIES[String(issue.severity || '').toLowerCase()] || 0;
+          out.penalty += deductionPoints(issue);
           out.issues.push({
             name: objName,
+            type: issue.type || null,
+            subType: issue.subType || null,
             severity: issue.severity,
             description: issue.description || issue.problem || '',
             source: 'object',

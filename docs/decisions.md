@@ -14022,6 +14022,60 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-25 — A hair difference of one shade is a nuance, and the type ceilings finally reach entity findings
+
+**Context.** The newest production book (`job_1787638707796_x8272kcs22m`) came
+back with MAJOR hair findings on pages 1, 3, 4, 18 and a cover: the pages were
+charged for hair "lighter brown and wavy" against a styled avatar the judge read
+as "golden-blonde and curly". Tracing it, the pages were right and the reference
+was the odd one out — the source photo shows light blonde, softly wavy hair, and
+all three written sources agree (`detailedHairAnalysis {type: "wavy", styling:
+"tousled"}`, the visual bible's "light blonde, wavy, short, tousled", and the gen
+prompt's "blonde wavy short tousled hair"). Only the styled avatar had drifted a
+shade browner and curlier.
+
+Shown the photo, the avatar and the page side by side, the owner's verdict was
+that the avatar is fine: "wavy or curly. Dark blond or brown. It's a nuance."
+
+**Cost of treating that nuance as MAJOR**, measured on that book: 75 points
+across four pages and a cover. Page 1 fell from 45 to 30 on it alone — a page
+matching both the photo and its own written spec.
+
+**Decision.**
+- New type `hair_nuance` for hair differing only in SHADE within one colour
+  family or in texture between wavy and curly. A different colour FAMILY or
+  style CATEGORY stays `hair_change` and is not capped. Classification in the
+  prompt; the MINOR ceiling in `MAX_SEVERITY_TYPES`, per the standing severity
+  rule.
+- **`deductionPoints` now reads `subType` before `type`.** This is the larger
+  find. Entity findings are normalised to a flat `type: 'consistency'` with the
+  real classification moved to `subType` (`entityConsistency.js:2561`), so
+  reading `type` alone made EVERY ceiling and floor inert for them:
+  `accessory`, `unverified_absence`, `face_drift`, even the zero-point
+  `garment_colour` were all billed at raw severity. The bounding existed in
+  code but not on the path that bills entity issues.
+- `getEntityPenaltyAndIssues` charges through `deductionPoints` instead of
+  indexing `SEVERITY_POINTS` by severity, so the entity penalty and the
+  consolidated score cannot disagree about what a type may cost. The stamp now
+  carries `type` and `subType` so a 2-point MAJOR is explainable in the panel.
+
+**Verified** on the same production pages, same model, new prompt: pages 1/3/4
+came back `MINOR / hair_nuance / 2 pts` — "a lighter, cooler blonde and less
+curly/more wavy" — while pages 13/18 came back `MAJOR / hair_change / 15 pts`,
+"significantly darker brown". Looking at page 13, that is correct: the hair there
+really is a different colour family. The split discriminates; it is not an
+amnesty.
+
+**Not done, deliberately.** The avatar's own drift (browner, curlier, and eyes
+reading brown where the spec says green) is left alone on the owner's call. Worth
+knowing: `avatars.faceMatch` scored that avatar 9/10, and every line of its
+reasoning grades face GEOMETRY — shape, spacing, proportion. Nothing in the gate
+looks at hair colour, hair texture or eye colour, so drift in exactly those
+attributes cannot be caught there today (task #36).
+
+**Touched files.** `prompts/entity-consistency-check.txt`,
+`server/lib/scoring.js`, `server/lib/repairPipeline.js`.
+
 ## 2026-08-24 — The consistency judge gets faces first, with a reference face to compare them to
 
 **Context.** The owner spotted a drifted face on p16 of staging

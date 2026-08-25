@@ -145,6 +145,15 @@ const MAX_SEVERITY_TYPES = {
   clothing_detail: 'moderate',
   unverified_absence: 'minor',
   face_drift: 'minor',
+  // hair_nuance capped at MINOR by owner decision (2026-08-25), looking at the
+  // avatar next to the photo and the page: "wavy or curly. Dark blond or brown.
+  // It's a nuance." Measured cost of treating it as MAJOR on one production
+  // book (job_1787638707796_x8272kcs22m): 75 points across pages 1, 3, 4, 18
+  // and a cover — page 1 alone dropped 45 -> 30 — for pages that matched both
+  // the photo and their own written spec, against a styled avatar that had
+  // drifted a shade. A different colour FAMILY or style CATEGORY stays
+  // hair_change and is not capped.
+  hair_nuance: 'minor',
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever
@@ -303,7 +312,15 @@ function composeDeductions({ evalResult = null, entityResult = null, consolidate
  * total deduction; `100 − total` is the raw (un-clamped) score.
  */
 function deductionPoints(d) {
-  const type = String(d?.type || '').toLowerCase();
+  // subType FIRST. Entity findings are normalised to a flat `type:
+  // 'consistency'` with the real classification moved to `subType`
+  // (entityConsistency.js), so reading `type` alone made EVERY ceiling and
+  // floor inert for them — accessory, unverified_absence, face_drift,
+  // garment_colour, hair_nuance all billed at raw severity. Measured: 75
+  // points of MAJOR hair findings on one production book that the owner reads
+  // as a shade-level nuance. The quality/semantic/compliance buckets carry
+  // their classification in `type` and are unaffected.
+  const type = String(d?.subType || d?.type || '').toLowerCase();
   if (ZERO_POINT_TYPES.has(type)) return 0;
   const raw = SEVERITY_POINTS[String(d?.severity || '').toLowerCase()] || 0;
   // Ceiling by type — charge the lower of what was claimed and what the type
