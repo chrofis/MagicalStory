@@ -157,7 +157,14 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ## Story text quality — the review stages trade feeling for logistics
 
-- [x] **Toddler mode (ages 1–3) — BUILT 2026-08-25, unproven on a real run.** No narrative age branch in the system
+- [ ] **The landmark mandate teleports a toddler book (observed 2026-08-25).** `story-trial.txt`'s
+      LANDMARKS section says "At least one scene MUST take place at one of these real local
+      landmarks", and toddler mode says "No journeys. The story begins where it happens." In staging
+      story `job_1787683120734_qkgfbd86o` the two collided: pages 1-5 are on a pirate ship at sea,
+      then p6 opens "Später sitzt Leynor am Stüssibrunnen in Dübendorf" — an unexplained teleport on
+      the last page. Fix is a choice: drop the landmark requirement in toddler mode, or set the whole
+      story at the landmark from p1. → `prompts/story-trial.txt` (LANDMARKS), `prompts/toddler-mode.txt`
+- [x] **Toddler mode (ages 1–3) — BUILT 2026-08-25, verified on two staging runs.** No narrative age branch in the system
       goes below 3 (challenge catalogue starts at 3–5, story shape at `focusAge <= 5`, lowest reading
       level is `1st-grade`); `toddler` exists only as body proportions. Prod trial
       `job_1787647410717_5dvfqu8jg` gave a 1-year-old main a solo train journey, a map to reason

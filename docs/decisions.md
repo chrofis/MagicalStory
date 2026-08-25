@@ -18081,3 +18081,62 @@ callers plus a 221-line shared module that replaces two divergent copies of the 
 
 **Touched:** `server/lib/charRepairTarget.js` (new), `server/lib/repairPipeline.js`,
 `server/routes/regeneration.js`.
+
+---
+
+## 2026-08-25 — Idea provenance: store OUR idea, the USED idea, and a flag
+
+**Context:** When a story comes out strange the first question is whose premise
+it was. A story built on an idea we generated has to be good; a story built on a
+premise the customer introduced is a different conversation. Nothing recorded
+which had happened.
+
+The raw material was already being sent: the wizard posts `ideaGeneration
+{ input, output, rawResponse, prompt, model, selectedIndex }` on create-story.
+It was only `log.debug`'d (`server/routes/jobs.js:192`) and otherwise landed in
+`story_jobs.input_data`, which is pruned — so it was gone by the time anyone
+asked.
+
+**Decision:** Three columns on `stories` (migration `027_idea_provenance.sql`):
+`idea_source`, `idea_original`, `idea_used`. Columns rather than JSONB because
+the question is asked across the whole table (owner's choice). Resolved by
+`server/lib/ideaProvenance.js` and written in `persistStoryToDatabase`'s single
+UPDATE, so every save path — including `upsertStory`, which routes through it —
+stamps them.
+
+Three states, decided by an **exact** string compare (owner's choice: no
+similarity threshold, a typo fix and a rewrite both read as edited; only
+leading/trailing whitespace and line endings are forgiven, because a textarea
+round-trip changes those without the customer touching a word):
+
+- `ours-unchanged` — the used text matches an idea we offered
+- `ours-edited` — an idea was selected but the text differs
+- `user-written` — nothing selected and nothing matches
+
+**Why the text is compared and `selectedIndex` is not trusted:** typing in the
+wizard's textarea calls `setStoryDetails` without resetting `selectedIdeaIndex`
+(`StoryWizard.tsx`, `handleSelectIdea`), so a story whose premise was rewritten
+after picking still carries the index of the idea it started from. `selectedIndex`
+alone cannot distinguish "used ours" from "started from ours and replaced it".
+
+**Trials are always `ours-unchanged`** (owner's choice). `TrialIdeasStep` gates
+creation on `selectedIndex !== null` and renders no textarea; `TrialWizard` posts
+`generatedIdeas[i]` verbatim. There is no way for a trial customer to edit the
+idea, so the column is stamped even when the payload carried no `ideaGeneration`
+block — rather than left null with the meaning implied.
+
+**Rationale:** resolving on every save (not once at job creation) keeps the
+answer correct if the idea changes between saves, and keeping it in the same
+UPDATE means no new write path can forget it.
+
+**Verified:** `tests/unit/idea-provenance.test.ts`, 9 assertions — including the
+post-selection edit that `selectedIndex` misses, a lost index whose text is still
+verbatim ours, an out-of-range index, and a story with no idea data at all.
+Not yet observed on a real wizard story.
+
+**Touched files:** `migrations/027_idea_provenance.sql`,
+`server/lib/ideaProvenance.js`, `server/services/database.js`
+(`persistStoryToDatabase`), `storyJobPipeline.js` (carries `ideaGeneration` and
+`trialMode` onto `storyData`), `tests/unit/idea-provenance.test.ts`.
+
+**Status:** ✅ active.

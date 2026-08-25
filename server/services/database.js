@@ -2024,9 +2024,24 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
   if (imagesSaved > 0) {
     console.log(`💾 [${TAG}] Extracted ${imagesSaved} images to story_images for ${storyId}`);
   }
+  // Whose idea was this? Resolved on every save from the data we already hold,
+  // so it is correct even if the customer edited the idea between saves. Never
+  // fatal — a provenance we cannot work out is a null column, not a lost story.
+  let ideaCols = { source: null, original: null, used: null };
+  try {
+    const { resolveIdeaProvenance } = require('../lib/ideaProvenance');
+    ideaCols = resolveIdeaProvenance(dataForStorage);
+  } catch (err) {
+    console.warn(`⚠️  [${TAG}] Idea provenance unresolved for ${storyId}: ${err.message}`);
+  }
+
   await dbQuery(
-    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
-    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
+    `UPDATE stories
+        SET data = $1, metadata = $2,
+            idea_source = $4, idea_original = $5, idea_used = $6
+      WHERE id = $3`,
+    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId,
+      ideaCols.source, ideaCols.original, ideaCols.used]
   );
 }
 

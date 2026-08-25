@@ -5333,6 +5333,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       storyTopic: inputData.storyTopic || '', // Specific topic within category
       storyTheme: inputData.storyTheme || '', // Theme/setting for the story
       storyDetails: inputData.storyDetails || '', // User's custom story idea
+      // What the idea generator offered, so the save path can work out whether
+      // the customer used our idea, edited it, or wrote their own. The wizard
+      // has always sent this; nothing carried it this far before 2026-08-25.
+      // See server/lib/ideaProvenance.js.
+      ideaGeneration: inputData.ideaGeneration || null,
+      trialMode: !!inputData.trialMode,
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',
       languageLevel: inputData.languageLevel || '1st-grade',
