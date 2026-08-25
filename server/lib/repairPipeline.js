@@ -221,79 +221,10 @@ function bothStrategiesTriedAndRegressed(versions) {
   return repairBest <= preRepairBest;
 }
 
-function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageData = null } = {}) {
-  if (!charName || charName === 'UNKNOWN') {
-    return { faceBbox: null, bodyBbox: null, source: null };
-  }
-  // When the caller says which bytes the box will be applied to, skip any
-  // stored box stamped for different bytes (bboxPairsWith) — the entity
-  // report can predate a repair and its boxes then point at the wrong spot
-  // on the repaired pixels.
-  const pairs = (det) => !imageData || images().bboxPairsWith(det, imageData);
-  const lowerName = charName.toLowerCase();
-  const toRect = (b) => {
-    if (!b) return null;
-    if (Array.isArray(b)) return b;
-    if (typeof b.y === 'number' && typeof b.height === 'number') {
-      return [b.y, b.x, b.y + b.height, b.x + b.width];
-    }
-    return null;
-  };
-
-  // Tier 1: entity report (cascade-improved faces when available)
-  const charEntity = entityReport?.characters?.[charName];
-  if (charEntity?.byClothing) {
-    for (const clothingData of Object.values(charEntity.byClothing)) {
-      const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-      if (app && (app.faceBox || app.bodyBox) && pairs(app)) {
-        const faceBbox = toRect(app.faceBox);
-        const bodyBbox = toRect(app.bodyBox);
-        if (faceBbox || bodyBbox) {
-          return { faceBbox, bodyBbox, source: 'entity' };
-        }
-      }
-    }
-  }
-
-  // Tier 2: canonical bbox detection figures
-  const figures = pairs(bestEval?.bboxDetection) ? (bestEval?.bboxDetection?.figures || []) : [];
-  const figure = figures.find(f => {
-    if (!f.name || f.name === 'UNKNOWN') return false;
-    return f.name.toLowerCase() === lowerName ||
-      (f.label && f.label.toLowerCase().includes(lowerName));
-  });
-  if (figure && (figure.faceBox || figure.bodyBox)) {
-    // Reuse the detection SAM silhouette (page-res PNG, _gdinoMasks index-
-    // aligned with figures) so the repair blend gate skips re-segmenting the
-    // ORIGINAL figure. Byte-safe: this tier only runs when pairs() confirmed
-    // the detection matches the pixels being repaired. Absent on reloaded-from-
-    // DB detections → null → the gate falls back to a fresh SAM call.
-    const figIdx = figures.indexOf(figure);
-    const bodyMask = (figIdx >= 0 && bestEval.bboxDetection._gdinoMasks?.[figIdx]) || null;
-    return {
-      faceBbox: toRect(figure.faceBox),
-      bodyBbox: toRect(figure.bodyBox),
-      source: 'bbox',
-      bodyMask,
-    };
-  }
-
-  // Tier 3: quality eval matches (face only)
-  const matches = bestEval?.matches || [];
-  const match = matches.find(m =>
-    m.name?.toLowerCase() === lowerName ||
-    m.character?.toLowerCase() === lowerName
-  );
-  if (match && (match.face_bbox || match.bbox)) {
-    return {
-      faceBbox: toRect(match.face_bbox),
-      bodyBbox: toRect(match.bbox),
-      source: 'eval',
-    };
-  }
-
-  return { faceBbox: null, bodyBbox: null, source: null };
-}
+// resolveCharBbox now lives in charRepairTarget.js — ONE targeting
+// implementation shared with the manual repair endpoint, which used to carry a
+// second, different ladder. See that file's header for why.
+const { resolveCharBbox } = require('./charRepairTarget');
 
 /**
  * Merge a per-round entity report (repaired pages only) into the working
@@ -1164,6 +1095,25 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: `no bbox for ${charName}` };
     }
 
+    // SAME GUARD THE MANUAL ENDPOINT USES. The detector distributes the names
+    // it is given across the figures it sees and never refuses, so a page whose
+    // brief names more characters than the render drew hands somebody a
+    // borrowed label. Repainting the face under a borrowed label destroys a
+    // bystander — an automatic repair does it without anyone watching, which is
+    // worse than the manual case, not better.
+    const { findBorrowedLabel } = require('./charRepairTarget');
+    const borrowed = findBorrowedLabel({
+      figures: Array.isArray(targetResolved.figures) ? targetResolved.figures : null,
+      sceneCharacters: img.sceneCharacters || [],
+      sceneMetadata: img.sceneMetadata || {},
+      characterName: charName,
+      pageNumber,
+    });
+    if (borrowed) {
+      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_reject_borrowed_label');
+      return { pageNumber, imageData: null, error: borrowed.message, borrowedLabel: borrowed };
+    }
+
     const character = characters.find(c => c.name === charName);
     if (!character) {
       return { pageNumber, imageData: null, error: `character ${charName} not found` };
@@ -1534,19 +1484,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
     const meta = r.sceneMetadata || orig?.sceneMetadata || {};
     const clothingByName = r.sceneCharacterClothing || orig?.sceneCharacterClothing || meta.characterClothing || {};
-    const sh = getStoryHelpers();
-    const expectedCharacters = sceneChars.map(c => {
-      const name = c.name || c;
-      if (typeof c !== 'object') return { name, description: '' };
-      const clothingText = sh.buildIdentityClothingText(
-        c, clothingByName[name], artStyle, storyData?.clothingRequirements || null,
-        { label: `p${r.pageNumber} ${roundLabel} ` });
-      return { name, description: sh.buildIdentityLine(c, clothingText) };
+    // ONE cast builder, shared with the manual repair endpoint.
+    const { buildPageCast } = require('./charRepairTarget');
+    const expectedCharacters = buildPageCast({
+      storyData,
+      sceneCharacters: sceneChars,
+      sceneMetadata: meta,
+      clothingByName,
+      outlineCharacters: r.outlineCharacters || orig?.outlineCharacters || [],
+      artStyle,
+      visualBible,
+      label: `p${r.pageNumber} ${roundLabel} `,
     });
-    expectedCharacters.push(...sh.buildSecondaryExpectedCharacters(
-      visualBible, meta, expectedCharacters.map(c => c.name),
-      { pageLabel: `PAGE ${r.pageNumber} ${roundLabel} `, extraNames: r.outlineCharacters || orig?.outlineCharacters || [] }
-    ));
     return images().detectAllBoundingBoxes(r.imageData, {
       expectedCharacters,
       expectedObjects: Array.isArray(meta.objects) ? meta.objects.filter(x => typeof x === 'string') : [],

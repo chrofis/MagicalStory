@@ -18047,3 +18047,37 @@ both rebuilds while `repairPipeline` still consumes it, and none of the four
 
 **Touched:** `storyJobPipeline.js`.
 **Status:** ✅ active
+
+---
+
+## 2026-08-25 — One targeting implementation for character repair (charRepairTarget.js)
+
+**Context:** The automatic pipeline and the manual repair endpoint each had their own answer
+to "who am I repairing and where are they". The pipeline built a proper cast (identity lines
++ per-page clothing + Visual Bible secondaries via `buildSecondaryExpectedCharacters`) and
+resolved boxes through a tiered ladder (`resolveCharBbox`). The endpoint hand-rolled a bare
+list of names and a second, differently-ordered ladder. Only the pipeline's version was any
+good, and the divergence is what produced the p15 bug: the endpoint's nameless lineup let the
+detector spread four user names over four figures, "Sarah" landed on the Visual Bible
+secondary in the red coat, and the face repair whited out the wrong person's head.
+
+The borrowed-label guard then existed only on the endpoint — so the automatic pipeline, which
+repaints faces with nobody watching, was the less protected of the two.
+
+**Decision:** `server/lib/charRepairTarget.js` is the single implementation, used by both:
+- `buildPageCast()` — the cast the detector is told to expect (moved from the pipeline's
+  `redetectVersionImage`; `visualBible` is an explicit argument because the pipeline carries
+  it separately from `storyData`).
+- `resolveCharBbox()` — the tiered box ladder (moved verbatim from `repairPipeline.js`;
+  now also returns the entity appearance's `clothing` and the Tier-2 `figures`).
+- `findBorrowedLabel()` — refuses when the page's brief names more characters than the render
+  drew, because the detector never refuses and some label is then necessarily borrowed.
+  Applied in BOTH paths. The entity-report tier is exempt: its appearances come from the
+  generation-time consistency pass, which ran with the full cast and cross-checked identity.
+
+**Rationale:** Repainting a human face is the most destructive thing this codebase does to an
+image; it gets one targeting implementation, not one per caller. Net −142 lines across the two
+callers plus a 221-line shared module that replaces two divergent copies of the same idea.
+
+**Touched:** `server/lib/charRepairTarget.js` (new), `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`.

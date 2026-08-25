@@ -5499,201 +5499,107 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // the cast it was given are three cheap facts that turn that guesswork
           // into a read — carried on the result, so they survive the log window.
           const boxDiag = { boxSource: null, expectedCast: [], detectedNames: [], detectedCount: null };
-
-          // 1. Try bbox from quality evaluation (stored on scene/version — most reliable)
-          let storedAppearance = null;
-          // Set when step 3 runs, so the protection list below can use the same
-          // figures instead of falling back to nothing.
           let freshDetection = null;
-          const sceneBbox = sceneImage.bboxDetection;
-          if (sceneBbox?.figures && bboxPairsWith(sceneBbox, sceneImage.imageData)) {
-            const fig = sceneBbox.figures.find(f =>
-              f.name?.toLowerCase() === characterName.toLowerCase()
-            );
-            if (fig && (fig.faceBox || fig.bodyBox)) {
-              storedAppearance = { faceBox: fig.faceBox, bodyBox: fig.bodyBox, clothing: pageClothing };
-              boxDiag.boxSource = 'stored-scene-detection';
-              log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from scene evaluation (page ${pageNumber}, clothing: ${pageClothing})`);
-            }
-          } else if (sceneBbox?.figures) {
-            log.warn(`⚠️ [CHAR REPAIR] Stored scene bbox for page ${pageNumber} was computed on different image bytes (stale version) — ignoring`);
-          }
 
-          // 2. Try entity consistency report (stored during consistency check)
-          if (!storedAppearance) {
-            const storedEntityReport = storyData.finalChecksReport?.entity;
-            const charReport = storedEntityReport?.characters?.[characterName];
-            if (charReport?.byClothing) {
-              for (const [, clothingData] of Object.entries(charReport.byClothing)) {
-                const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-                if (app?.faceBox || app?.bodyBox) {
-                  if (!bboxPairsWith(app, sceneImage.imageData)) {
-                    log.warn(`⚠️ [CHAR REPAIR] Entity-report box for ${characterName} page ${pageNumber} was computed on different image bytes (stale version) — ignoring`);
-                    continue;
-                  }
-                  storedAppearance = app;
-                  boxDiag.boxSource = 'entity-report';
-                  log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from entity report (page ${pageNumber})`);
-                  break;
-                }
-              }
-            }
-          }
+          // ONE targeting implementation, shared with the automatic pipeline
+          // (server/lib/charRepairTarget.js). This endpoint used to carry its
+          // own cast builder and its own three-tier ladder; that divergence is
+          // what let "Sarah" land on a Visual Bible secondary and a face repair
+          // white out the wrong person's head.
+          const { buildPageCast, findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
 
-          // 3. Fallback: fresh detection if neither source has bbox
-          //
-          // THE WHOLE PAGE CAST, NOT ONE NAME (owner, 2026-08-24). This used to
-          // pass `expectedCharacters: [{ name: characterName }]` — a lineup of
-          // one. Asked "where is Sarah?" on a page holding four other people,
-          // the detector attributes the name to whichever figure fits best; the
-          // "identify by name if found" wording is no match for a single-name
-          // lineup. Measured on p15 of job_1787514666616_yw9qsv1vf: Sarah was
-          // never rendered on that page (her stored appearances are pages
-          // 2/4/7/12/-2), the one-name detection handed back a box anyway, and
-          // Grok was told to repaint a DIFFERENT character as Sarah. The figure
-          // moved, the blend gate measured 43% mask IoU against its 55% floor,
-          // and all three attempts were rejected — $0.06 and a silent failure
-          // for a repair that could never succeed. The same image detected
-          // against its full cast returns Fiona, Lorena, Saira + one unknown,
-          // and no Sarah, which is the correct answer.
-          if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
+          let resolved = resolveCharBbox(characterName, {
+            bestEval: { bboxDetection: sceneImage.bboxDetection, matches: sceneImage.matches },
+            entityReport: storyData.finalChecksReport?.entity,
+            pageNumber,
+            imageData: sceneImage.imageData,
+          });
+          if (resolved.source) {
+            boxDiag.boxSource = resolved.source === 'entity' ? 'entity-report'
+              : resolved.source === 'bbox' ? 'stored-scene-detection' : 'quality-eval';
+            log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from ${boxDiag.boxSource} (page ${pageNumber})`);
+          }
+          // Figures behind the box, for the borrowed-label check below. A stored
+          // detection is the same detector, cached — it gets judged too.
+          let ladderFigures = Array.isArray(resolved.figures) ? resolved.figures : null;
+
+          // Nothing stored → detect now, with the SAME cast the pipeline builds.
+          if (!resolved.faceBbox && !resolved.bodyBbox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            // THE SAME CAST EVERY OTHER DETECTION SITE USES (owner, 2026-08-24).
-            // This path hand-rolled a bare list of names — no positions, no
-            // clothing, no Visual Bible secondaries — while refresh-bbox, the
-            // eval and entity consistency all build theirs from the page's
-            // sceneMetadata through buildCharacterDescriptionsForBbox +
-            // buildExpectedCharactersForBbox. A nameless lineup is why the
-            // detector misplaced names on p15 of job_1787514666616_yw9qsv1vf:
-            // it was never told that Sarah belongs "far background, right of the
-            // far mouth" and that "Rossa" (a Visual Bible secondary, absent from
-            // storyData.characters) is on the page at all — so it spread the
-            // four user names over the four figures it saw, "Sarah" landed on
-            // Rossa in her red coat, and the face repair whited out the wrong
-            // person's head. Three Grok draws, three blend-gate rejections.
-            const smeta = sceneImage.sceneMetadata || {};
-            const expectedPositions = { ...(smeta.characterPositions || {}) };
-            const expectedClothing = { ...(smeta.characterClothing || {}) };
-            // The requested character must be in the lineup even when the page
-            // metadata forgot them — otherwise the lookup can never succeed.
-            if (!(characterName in expectedPositions)) expectedPositions[characterName] = '';
-            const characterDescriptions = buildCharacterDescriptionsForBbox(storyData, expectedPositions);
-            const { buildExpectedCharactersForBbox } = require('../lib/images');
-            const expectedCharacters = buildExpectedCharactersForBbox(
-              characterDescriptions, expectedPositions, expectedClothing,
-            );
+            const expectedCharacters = buildPageCast({
+              storyData,
+              sceneCharacters: sceneImage.sceneCharacters || [],
+              sceneMetadata: sceneImage.sceneMetadata || {},
+              clothingByName: sceneImage.sceneCharacterClothing || null,
+              outlineCharacters: sceneImage.outlineCharacters || [],
+              artStyle,
+              visualBible: storyData.visualBible || null,
+              requiredName: characterName,
+              label: `p${pageNumber} manual-repair `,
+            });
             const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
               expectedCharacters,
-              sceneContext: (sceneImage.description || '').slice(0, 2000),
-              artStyle
+              expectedObjects: Array.isArray(sceneImage.sceneMetadata?.objects)
+                ? sceneImage.sceneMetadata.objects.filter(x => typeof x === 'string') : [],
+              sceneContext: sceneImage.description || sceneImage.sceneDescription || null,
+              pageContext: `PAGE ${pageNumber} manual-repair`,
+              artStyle,
             });
-            // Keep it for the protection list below — see freshDetection.
             freshDetection = detection;
             boxDiag.boxSource = 'fresh-detection';
             boxDiag.expectedCast = expectedCharacters.map(c => c.name);
             boxDiag.detectedNames = (detection?.figures || []).map(f => f.name || 'UNNAMED');
             boxDiag.detectedCount = (detection?.figures || []).length;
-            let charFigure = detection?.figures?.find(f =>
-              f.name?.toLowerCase() === characterName.toLowerCase() ||
-              f.label?.toLowerCase().includes(characterName.toLowerCase())
-            );
-            if (charFigure && (charFigure.faceBox || charFigure.bodyBox)) {
-              storedAppearance = {
-                faceBox: charFigure.faceBox,
-                bodyBox: charFigure.bodyBox,
-                clothing: pageClothing
-              };
-              log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: face=${charFigure.faceBox ? 'yes' : 'no'}, body=${charFigure.bodyBox ? 'yes' : 'no'}`);
-            } else {
-              // WHO IS ACTUALLY THERE (owner, 2026-08-24). "Could not locate X"
-              // reads like a detector failure; naming the figures that WERE
-              // found says the real thing — the character is not on this page,
-              // so the fix is a page redo, not a face repair.
-              // Names, not labels. A figure's `label` is the detector's full
-              // prose descriptor ("adult, mid-thirties. tall, lean, upright
-              // posture. hair: deep red…") — pasting those into a user-facing
-              // sentence buries the one fact that matters. Unnamed figures
-              // collapse to a count.
-              const named = [...new Set((detection?.figures || [])
-                .map(f => f.name)
-                .filter(n => n && String(n).trim() && !/^unknown/i.test(n)))];
-              const unnamed = (detection?.figures || []).length - named.length;
-              const found = [...named, ...(unnamed > 0 ? [`${unnamed} unidentified figure${unnamed > 1 ? 's' : ''}`] : [])];
-              const who = found.length
-                ? `Detected instead: ${found.join(', ')}.`
-                : 'No figures were detected at all.';
-              log.warn(`🚫 [CHAR REPAIR] ${characterName} is not on page ${pageNumber} — refusing to repair. ${who}`);
-              return {
-                task, error: true,
-                failReason: `${characterName} could not be identified on page ${pageNumber} — nothing was repainted. ${who} Repairing a face needs that character to be in the picture and reliably located; redo the page instead.`,
-                // Its own fingerprint so the daily report separates "the
-                // character is missing from the render" from the gate
-                // rejections — they have different fixes.
-                rejectedReason: 'not_on_page',
-                notOnPage: true,
-                detectedFigures: found,
-                boxDiag,
-              };
-            }
+            ladderFigures = detection?.figures || [];
+            // Computed on THESE bytes, so no fingerprint check is needed.
+            resolved = resolveCharBbox(characterName, {
+              bestEval: { bboxDetection: detection },
+              pageNumber,
+            });
           }
 
-          // A NAME IS NOT EVIDENCE WHEN THERE ARE FEWER FIGURES THAN NAMES
-          // (owner, 2026-08-25). The detector distributes the names it is given
-          // across the figures it sees; it never refuses. When the page's brief
-          // lists more characters than the render actually drew, one name is
-          // necessarily borrowed - and a confident wrong label is
-          // indistinguishable from a right one.
-          //
-          // This sits BELOW the whole ladder on purpose. The first version
-          // guarded only the fresh-detection branch, and then never ran: p15 of
-          // job_1787514666616_yw9qsv1vf had no stored detection until a
-          // refresh-bbox call persisted one WITH the bad label, after which
-          // step 1 answered first and handed back "Sarah" = the woman in the red
-          // coat (the Visual Bible secondary). A stored box is not more
-          // trustworthy than a fresh one; it is the same detector, cached.
-          //
-          // The entity-report source is exempt: its appearances come from the
-          // generation-time consistency pass, which ran with the full cast and
-          // cross-checked identity across pages.
-          const ladderFigures =
-            boxDiag.boxSource === 'fresh-detection' ? (freshDetection?.figures || [])
-              : boxDiag.boxSource === 'stored-scene-detection' ? (sceneBbox?.figures || [])
-                : null;
-          if (ladderFigures) {
-            const briefNames = new Set();
-            for (const c of (sceneImage.sceneCharacters || [])) {
-              const n = typeof c === 'string' ? c : c?.name;
-              if (n) briefNames.add(n);
-            }
-            for (const n of Object.keys(sceneImage.sceneMetadata?.characterPositions || {})) {
-              if (n) briefNames.add(n);
-            }
-            for (const n of (sceneImage.sceneMetadata?.characters || [])) {
-              if (typeof n === 'string' && n) briefNames.add(n);
-            }
-            boxDiag.briefNames = [...briefNames];
-            boxDiag.figureCount = ladderFigures.length;
-            if (briefNames.size > ladderFigures.length) {
-              const drew = [...new Set(ladderFigures.map(f => f.name || 'unidentified figure'))];
-              // "Detected instead: Sarah, ..." reads as a contradiction when
-              // Sarah is the target. The point is that the labels themselves are
-              // unreliable, so say that: these are the names the detector put on
-              // the figures, and one of them must belong to someone the render
-              // left out.
-              const who = drew.length
-                ? `The detector labelled them ${drew.join(', ')} — one of those labels belongs to a character who was not drawn.`
-                : 'No figures were detected at all.';
-              log.warn(`[CHAR REPAIR] p${pageNumber}: brief lists ${briefNames.size} character(s) but only ${ladderFigures.length} figure(s) were drawn - "${characterName}" may be a borrowed label; refusing`);
-              return {
-                task, error: true,
-                failReason: `${characterName} could not be reliably identified on page ${pageNumber} - nothing was repainted. The page was written for ${briefNames.size} characters but only ${ladderFigures.length} were drawn, so the name may belong to a different figure. ${who} Redo the page instead.`,
-                rejectedReason: 'not_on_page',
-                notOnPage: true,
-                detectedFigures: drew,
-                boxDiag,
-              };
-            }
+          // The label must be trustworthy before anything is repainted.
+          const borrowed = findBorrowedLabel({
+            figures: ladderFigures,
+            sceneCharacters: sceneImage.sceneCharacters || [],
+            sceneMetadata: sceneImage.sceneMetadata || {},
+            characterName,
+            pageNumber,
+          });
+          if (borrowed) {
+            boxDiag.briefNames = borrowed.briefNames;
+            boxDiag.figureCount = borrowed.figureCount;
+            return {
+              task, error: true,
+              failReason: borrowed.message,
+              rejectedReason: 'not_on_page',
+              notOnPage: true,
+              detectedFigures: borrowed.detectedFigures,
+              boxDiag,
+            };
           }
+
+          if (!resolved.faceBbox && !resolved.bodyBbox) {
+            const drew = [...new Set((ladderFigures || []).map(f => f.name || 'unidentified figure'))];
+            const who = drew.length
+              ? `The detector labelled the figures ${drew.join(', ')}.`
+              : 'No figures were detected at all.';
+            log.warn(`🚫 [CHAR REPAIR] ${characterName} not located on page ${pageNumber} — refusing. ${who}`);
+            return {
+              task, error: true,
+              failReason: `${characterName} could not be identified on page ${pageNumber} - nothing was repainted. ${who} Repairing a face needs that character to be in the picture and reliably located; redo the page instead.`,
+              rejectedReason: 'not_on_page',
+              notOnPage: true,
+              detectedFigures: drew,
+              boxDiag,
+            };
+          }
+
+          const storedAppearance = {
+            faceBox: resolved.faceBbox,
+            bodyBox: resolved.bodyBbox,
+            clothing: resolved.clothing || pageClothing,
+          };
 
           const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
           // NO DEFAULT (owner, 2026-08-07): this category picks the styled
@@ -5785,10 +5691,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // away. The stored boxes are also only valid for the bytes they were
           // computed on, so an unpaired stored detection is worse than the
           // fresh one — same pairing rule as the target box above.
-          const protectionSource =
-            (sceneBbox?.figures && bboxPairsWith(sceneBbox, sceneImage.imageData)) ? sceneBbox
-              : (freshDetection?.figures ? freshDetection : null);
-          if (!protectionSource?.figures?.length) {
+          // Protect the OTHER figures from the same detection the box came
+          // from. This list used to be built only from the stored detection, so
+          // a page without one protected nobody: Grok got a mask over two
+          // shoulder-to-shoulder women, repainted both, and turned the one
+          // behind the target into a bearded man.
+          const protectionSource = ladderFigures?.length ? { figures: ladderFigures } : null;
+          if (!protectionSource) {
             log.warn(`⚠️ [CHAR REPAIR] p${pageNumber}: no usable detection for neighbour protection — other figures in the mask can be repainted`);
           }
           if (protectionSource?.figures) {
