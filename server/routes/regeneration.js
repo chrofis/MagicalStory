@@ -5549,46 +5549,30 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // and no Sarah, which is the correct answer.
           if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            // Everyone the page is supposed to hold, so each figure can take
-            // its own name and the requested character can come back genuinely
-            // absent. Names arrive as objects (sceneCharacters) or bare strings
-            // (sceneMetadata.characters); the requested one is always included
-            // so a cast list that omits them cannot suppress the lookup.
-            const castNames = new Set([characterName]);
-            for (const c of (sceneImage.sceneCharacters || [])) {
-              const n = typeof c === 'string' ? c : c?.name;
-              if (n) castNames.add(n);
-            }
-            for (const n of (sceneImage.sceneMetadata?.characters || [])) {
-              if (typeof n === 'string' && n) castNames.add(n);
-            }
-            const expectedCharacters = [...castNames].map(name => {
-              const c = storyData.characters?.find(x => x.name === name);
-              return { name, description: c ? buildCharacterPhysicalDescription(c) : name };
-            });
-            // STORY-INVENTED PEOPLE NEED DESCRIBING TOO (owner, 2026-08-24).
-            // The detector distributes the names it is given over the figures it
-            // sees. Give it only the USER's characters and a story-invented
-            // character standing in the picture still gets one of those names —
-            // measured on p15 of job_1787514666616_yw9qsv1vf: the Visual Bible's
-            // "Kapitänin Rossa" (secondary character, pages 7/8/12/15/16, "hair:
-            // deep red…") was labelled "Sarah", so the face repair whited out
-            // ROSSA's head and Grok repainted her with Sarah's face. Three
-            // draws, three blend-gate rejections, and the real answer — Sarah is
-            // not in this picture — was unreachable because a confident wrong
-            // name looks exactly like a right one. The VB carries these people
-            // with a description and a page list; use both.
-            const vb = storyData.visualBible || {};
-            for (const c of [...(vb.secondaryCharacters || []), ...(vb.mainCharacters || [])]) {
-              if (!c?.name || !c.description) continue;
-              const pages = c.pages || c.appearsInPages;
-              // No page list → offer them anyway; a wrong extra name costs the
-              // detector nothing, a missing one costs a misattribution.
-              if (Array.isArray(pages) && !pages.includes(pageNumber)) continue;
-              if (castNames.has(c.name)) continue;
-              castNames.add(c.name);
-              expectedCharacters.push({ name: c.name, description: c.description });
-            }
+            // THE SAME CAST EVERY OTHER DETECTION SITE USES (owner, 2026-08-24).
+            // This path hand-rolled a bare list of names — no positions, no
+            // clothing, no Visual Bible secondaries — while refresh-bbox, the
+            // eval and entity consistency all build theirs from the page's
+            // sceneMetadata through buildCharacterDescriptionsForBbox +
+            // buildExpectedCharactersForBbox. A nameless lineup is why the
+            // detector misplaced names on p15 of job_1787514666616_yw9qsv1vf:
+            // it was never told that Sarah belongs "far background, right of the
+            // far mouth" and that "Rossa" (a Visual Bible secondary, absent from
+            // storyData.characters) is on the page at all — so it spread the
+            // four user names over the four figures it saw, "Sarah" landed on
+            // Rossa in her red coat, and the face repair whited out the wrong
+            // person's head. Three Grok draws, three blend-gate rejections.
+            const smeta = sceneImage.sceneMetadata || {};
+            const expectedPositions = { ...(smeta.characterPositions || {}) };
+            const expectedClothing = { ...(smeta.characterClothing || {}) };
+            // The requested character must be in the lineup even when the page
+            // metadata forgot them — otherwise the lookup can never succeed.
+            if (!(characterName in expectedPositions)) expectedPositions[characterName] = '';
+            const characterDescriptions = buildCharacterDescriptionsForBbox(storyData, expectedPositions);
+            const { buildExpectedCharactersForBbox } = require('../lib/images');
+            const expectedCharacters = buildExpectedCharactersForBbox(
+              characterDescriptions, expectedPositions, expectedClothing,
+            );
             const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
               expectedCharacters,
               sceneContext: (sceneImage.description || '').slice(0, 2000),
