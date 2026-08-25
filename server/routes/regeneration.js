@@ -5493,6 +5493,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // newer version. Mismatch → fall through to fresh detection below.
           const { bboxPairsWith } = require('../lib/images');
 
+          // WHICH FIGURE DID WE AIM AT, AND ON WHAT EVIDENCE (owner, 2026-08-25).
+          // Every rejection so far had to be diagnosed by inferring the detector's
+          // answer from a $0.06 repair. The box source, the names it returned and
+          // the cast it was given are three cheap facts that turn that guesswork
+          // into a read — carried on the result, so they survive the log window.
+          const boxDiag = { boxSource: null, expectedCast: [], detectedNames: [], detectedCount: null };
+
           // 1. Try bbox from quality evaluation (stored on scene/version — most reliable)
           let storedAppearance = null;
           // Set when step 3 runs, so the protection list below can use the same
@@ -5505,6 +5512,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             );
             if (fig && (fig.faceBox || fig.bodyBox)) {
               storedAppearance = { faceBox: fig.faceBox, bodyBox: fig.bodyBox, clothing: pageClothing };
+              boxDiag.boxSource = 'stored-scene-detection';
               log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from scene evaluation (page ${pageNumber}, clothing: ${pageClothing})`);
             }
           } else if (sceneBbox?.figures) {
@@ -5524,6 +5532,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                     continue;
                   }
                   storedAppearance = app;
+                  boxDiag.boxSource = 'entity-report';
                   log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from entity report (page ${pageNumber})`);
                   break;
                 }
@@ -5580,6 +5589,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             });
             // Keep it for the protection list below — see freshDetection.
             freshDetection = detection;
+            boxDiag.boxSource = 'fresh-detection';
+            boxDiag.expectedCast = expectedCharacters.map(c => c.name);
+            boxDiag.detectedNames = (detection?.figures || []).map(f => f.name || 'UNNAMED');
+            boxDiag.detectedCount = (detection?.figures || []).length;
             let charFigure = detection?.figures?.find(f =>
               f.name?.toLowerCase() === characterName.toLowerCase() ||
               f.label?.toLowerCase().includes(characterName.toLowerCase())
@@ -5649,6 +5662,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 rejectedReason: 'not_on_page',
                 notOnPage: true,
                 detectedFigures: found,
+                boxDiag,
               };
             }
           }
@@ -5848,6 +5862,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               // back, and which gate stopped it — which is the only way to tell
               // a correct rejection from a miscalibrated gate by looking.
               attemptFrames: grokResult?.attemptFrames || [],
+              boxDiag,
             };
           }
         } else {
@@ -5904,13 +5919,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     for (const apiResult of apiResults) {
       if (!apiResult) continue;
-      const { task, repairResult, error, failReason, rejectedReason, gateMessage, attempts, exhausted, attemptFrames, notOnPage } = apiResult;
+      const { task, repairResult, error, failReason, rejectedReason, gateMessage, attempts, exhausted, attemptFrames, notOnPage, boxDiag } = apiResult;
       const { characterName, pageNumber } = task;
       const charResult = resultsByChar.get(characterName);
       if (!charResult) continue;
 
       if (error) {
-        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage, attempts, attemptFrames: attemptFrames || [], notOnPage: !!notOnPage });
+        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage, attempts, attemptFrames: attemptFrames || [], notOnPage: !!notOnPage, boxDiag: boxDiag || null });
         // Persisted on the page, not only returned: the Railway log window is
         // hours, and the question "why did my repair do nothing" is asked days
         // later. Without this the answer lives only in a log line that has
