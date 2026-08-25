@@ -2473,6 +2473,28 @@ function resolvePrerenderedFile(routePath, lang) {
 // server/routes/sharing.js — that handler now also injects the cover-image
 // preconnect/preload hints alongside the OG tags it was already adding.
 
+// Permanent redirects for retired SEO slugs. Keep an entry forever once a public
+// URL has been indexed — dropping it turns an indexed page into a soft-404 and
+// throws away whatever link equity it had.
+const LEGACY_REDIRECTS = {
+  '/so-funktionierts': '/kinderbuch-erstellen',
+};
+
+// Canonical host + retired-slug consolidation. Both www and apex used to answer 200,
+// which split reporting in Search Console (canonical tags already pointed at the apex,
+// so this only makes explicit what Google was inferring — and saves the crawl budget).
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+
+  const host = req.hostname || '';
+  const target = LEGACY_REDIRECTS[req.path.replace(/\/+$/, '') || '/'];
+  if (!target && !host.startsWith('www.')) return next();
+
+  const qs = req.originalUrl.slice(req.path.length); // preserves ?lang=
+  const canonicalHost = host.startsWith('www.') ? host.slice(4) : host;
+  return res.redirect(301, `${req.protocol}://${canonicalHost}${target || req.path}${qs}`);
+});
+
 // SPA fallback — serves pre-rendered HTML for SEO routes, raw index.html for app routes
 app.get('*', (req, res, next) => {
   // Skip API routes

@@ -55,7 +55,7 @@ export function enumerateRoutes(swissCities: Array<{ id: string }> = []): string
   routes.push(
     '/',
     '/pricing',
-    '/so-funktionierts',
+    '/kinderbuch-erstellen',
     '/faq',
     '/about',
     '/contact',

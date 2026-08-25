@@ -2344,13 +2344,18 @@ const SAME_MUNICIPALITY_SQL = `(municipality IS NULL
   OR LOWER(translate(municipality, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
      = LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')))`;
 
-// Class 0 is "not a place at all" — a municipality, an event, an organisation.
-// Ranking it last was not enough: a town whose index holds nothing else still
-// gets it served. Wallisellen's only surviving row was `Wallisellen (Stadt)`,
-// the municipality entity itself, which a story would have to set a scene in.
-// Excluding it lets the proximity fallback offer a real neighbouring landmark
-// instead, which is the right answer for a town with none of its own.
-const IS_A_PLACE_SQL = `${LANDMARK_CLASS_SQL} > 0`;
+// An EVENT or an ORGANISATION can never be a scene setting — a cyclocross
+// championship, a football federation, a company. 237 such rows.
+//
+// City/Village rows are NOT excluded, even though they share class 0. They are
+// the deliberate `<Town> (Stadt|ville|città)` overview rows that
+// broad-city-overviews.js creates for the ~950 small towns with no iconic
+// landmark of their own: "we DO want a basic photo for them so creative
+// generation can later use the city as a setting". Dropping them would strip
+// the only local coverage 1340 of 1593 towns have and silently replace the
+// child's own town with a neighbour's church. They stay, ranked last by class,
+// which is exactly the last-resort role they were built for.
+const NEVER_A_SETTING_SQL = `coalesce(type,'x') NOT IN ('Event','Organisation','Other')`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -2472,7 +2477,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       SELECT * FROM landmark_index
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
         AND ${SAME_MUNICIPALITY_SQL}
-        AND ${IS_A_PLACE_SQL}
+        AND ${NEVER_A_SETTING_SQL}
       ORDER BY ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
@@ -2484,7 +2489,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
         SELECT * FROM landmark_index
         WHERE TRIM(REPLACE(LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
           AND ${SAME_MUNICIPALITY_SQL}
-          AND ${IS_A_PLACE_SQL}
+          AND ${NEVER_A_SETTING_SQL}
         ORDER BY ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [inputNorm, limit]);

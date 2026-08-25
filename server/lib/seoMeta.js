@@ -252,16 +252,16 @@ const STATIC_ROUTES = {
       fr: 'Questions fréquemment posées sur Magical Story. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
     },
   },
-  '/so-funktionierts': {
+  '/kinderbuch-erstellen': {
     title: {
-      en: 'Customize Every Page – Edit, Regenerate, Perfect It | Magical Story',
-      de: 'Kinderbuch selbst gestalten – Jede Seite bearbeiten & neu generieren | Magical Story',
-      fr: 'Livre enfant personnalisable – Modifiez et régénérez chaque page | Magical Story',
+      en: 'Create a Children\'s Book with AI – Your Own Story | Magical Story',
+      de: 'Kinderbuch erstellen mit KI – deine eigene Geschichte | Magical Story',
+      fr: 'Créer un livre pour enfant avec l\'IA – votre propre histoire | Magical Story',
     },
     description: {
-      en: 'Don\'t accept the first draft. Edit every word, regenerate any page, refine any character — keep going until your personalized children\'s book is exactly right. First story free.',
-      de: 'Akzeptiere nicht einfach den ersten Entwurf. Jedes Wort bearbeiten, jede Seite neu generieren, Charaktere verfeinern — bis dein Kinderbuch genau richtig ist. Erste Geschichte gratis.',
-      fr: 'N\'acceptez pas le premier brouillon. Modifiez chaque mot, régénérez chaque page, affinez les personnages — jusqu\'à ce que votre livre soit parfait. Première histoire gratuite.',
+      en: 'Create your own children\'s book: upload a photo, describe the story you want, and AI writes and illustrates it. Not a template with the name swapped — an original story. Edit every word and regenerate any page. First story free.',
+      de: 'Kinderbuch selbst erstellen: Foto hochladen, deine Geschichte beschreiben, die KI schreibt und illustriert sie. Keine Vorlage mit ausgetauschtem Namen — eine eigene Geschichte. Jedes Wort bearbeiten, jede Seite neu generieren. Erste Geschichte gratis.',
+      fr: 'Créez votre propre livre pour enfant : téléchargez une photo, décrivez votre histoire, l\'IA l\'écrit et l\'illustre. Pas un modèle avec le prénom remplacé — une histoire originale. Modifiez chaque mot, régénérez chaque page. Première histoire gratuite.',
     },
   },
   '/about': {
@@ -779,6 +779,13 @@ function getMetaForRoute(routePath, lang) {
       meta.jsonLd = [
         buildHowToJsonLd(lang),
         buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Gratis Geschichte erstellen' : lang === 'fr' ? 'Créer une histoire' : 'Create Your Story' }]),
+      ];
+    } else if (cleanPath === '/kinderbuch-erstellen') {
+      // Same HowTo as /try — this is the indexable, content-bearing version of that
+      // intent, while /try is the wizard itself.
+      meta.jsonLd = [
+        buildHowToJsonLd(lang),
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Kinderbuch erstellen' : lang === 'fr' ? 'Créer un livre' : 'Create a Book' }]),
       ];
     } else if (cleanPath === '/themes') {
       meta.jsonLd = [
@@ -1337,7 +1344,7 @@ function generateSitemap() {
     '/vergleich': '0.6',
     '/science': '0.7',
     '/faq': '0.5',
-    '/so-funktionierts': '0.7',
+    '/kinderbuch-erstellen': '0.9',
     '/about': '0.5',
     '/contact': '0.5',
     '/terms': '0.3',

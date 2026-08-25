@@ -45,7 +45,7 @@ export default function SSRApp() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/pricing" element={<Pricing />} />
-        <Route path="/so-funktionierts" element={<HowItWorks />} />
+        <Route path="/kinderbuch-erstellen" element={<HowItWorks />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />

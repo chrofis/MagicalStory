@@ -18915,12 +18915,19 @@ Measured immediately, with zero calls:
 | Basel | — | Kunstmuseum, Jüdisches Museum, Mittlere Brücke |
 | Dübendorf | Lindenhofbrunnen (Zürich), Mühlegasse 5 | Lazariterkirche Gfenn, Flieger-Flab-Museum, Maria Frieden |
 
-**Second fix — class 0 is excluded, not merely ranked last.** A town whose index
-holds nothing else was still served it: Wallisellen's only surviving row was
-`Wallisellen (Stadt)`, the municipality entity itself. `IS_A_PLACE_SQL` drops
-class 0 from the city-NAME lookups so the proximity fallback offers a real
-neighbouring landmark instead. **1901 rows — 40% of the index** — can no longer
-be served as a scene setting.
+**Second fix — Events and Organisations are excluded from city lookups.** A
+cyclocross championship or a football federation can never be a scene setting
+(237 rows).
+
+**Nearly a regression here, caught by measuring:** the first version excluded all
+of class 0, which also covers the `<Town> (Stadt|ville|città)` rows. Those are
+DELIBERATE — `broad-city-overviews.js` creates them for the ~950 small towns with
+no iconic landmark: *"we DO want a basic photo for them so creative generation
+can later use the city as a setting"*. Dropping them took **1340 of 1593 towns**
+from one local photo to none, silently replacing the child's own town with a
+neighbour's church. Narrowed to Event/Organisation/Other: **106** towns now have
+no name match and fall to the proximity fallback, which is the right answer for
+a place with genuinely nothing of its own.
 
 **Third fix — 30 rows per environment had leading/trailing whitespace** in
 `nearest_city` / `municipality` (`"Poschiavo "`), which defeats the exact-match

@@ -5,9 +5,30 @@ import { Navigation, Footer } from '@/components/common';
 
 const translations = {
   en: {
-    title: 'Your Book, Your Vision',
-    subtitle: 'Complete creative control over every text and every image.',
-    heroDesc: 'Unlike other personalized book services, MagicalStory gives you full control. Edit any text, reshape any illustration, refine any character — until your book is exactly how you imagined it.',
+    title: 'Create a Children\'s Book with AI',
+    subtitle: 'Your own story — not a template with the name swapped in.',
+    heroDesc: 'Most personalized books are one pre-written story with your child\'s name dropped into it. MagicalStory writes an original story instead: upload a photo, describe what should happen, and the AI writes and illustrates a book that has never existed before. Then you edit every word and regenerate any page until it is exactly how you imagined it.',
+    stepsTitle: 'How to create your children\'s book',
+    step1Title: 'Upload a photo',
+    step1Desc: 'One clear photo per character. Your child, siblings, grandparents — up to 10 people, each recognizable on every page.',
+    step2Title: 'Describe your story',
+    step2Desc: 'Pick from 170+ themes or describe your own idea: a first day at school, a lost tooth, a dragon in the garden. The story is written around it.',
+    step3Title: 'AI writes and illustrates',
+    step3Desc: 'An original story with matching illustrations in your chosen art style, in German, English or French, at your child\'s reading level.',
+    step4Title: 'Edit until it is right',
+    step4Desc: 'Rewrite any sentence, regenerate any illustration, fix a single character on a single page. Then read it on screen or order it printed.',
+    faqTitle: 'Questions about creating a book',
+    faq1Q: 'Can I write my own story, or do I pick from templates?',
+    faq1A: 'You describe the story you want and the AI writes it. Themes are starting points, not fixed texts — two books on the same theme come out as different stories. You can also edit every sentence afterwards.',
+    faq2Q: 'What does the AI actually do?',
+    faq2A: 'It writes the text and generates every illustration. Your uploaded photo is used to keep each character looking consistent across all pages, rather than pasting the photo into the book.',
+    faq3Q: 'How long does it take to create a book?',
+    faq3A: 'The first version is ready in a few minutes. Editing and regenerating pages takes as long as you want to spend on it.',
+    faq4Q: 'What does it cost?',
+    faq4A: 'The first story is free, with no account required. After that it is CHF 9.90 for a digital book and CHF 33–48 for a printed hardcover.',
+    exploreTitle: 'Before you start',
+    exploreThemes: 'Browse all 170+ story themes',
+    exploreCompare: 'Compare AI children\'s book generators',
     // Sections
     s1Title: 'Edit Every Word',
     s1Desc: 'Every page of text is fully editable. Change names, rewrite sentences, adjust the story to fit your family perfectly. The AI writes the first draft — you make it yours.',
@@ -36,9 +57,30 @@ const translations = {
     ctaButton: 'Create Your Story',
   },
   de: {
-    title: 'Dein Buch, deine Vision',
-    subtitle: 'Volle kreative Kontrolle über jeden Text und jedes Bild.',
-    heroDesc: 'Anders als bei anderen personalisierten Büchern hast du bei MagicalStory die volle Kontrolle. Bearbeite jeden Text, gestalte jede Illustration, verfeinere jeden Charakter — bis dein Buch genau so ist, wie du es dir vorstellst.',
+    title: 'Kinderbuch erstellen mit KI',
+    subtitle: 'Deine eigene Geschichte — keine Vorlage mit ausgetauschtem Namen.',
+    heroDesc: 'Die meisten personalisierten Bücher sind eine fertig geschriebene Geschichte, in die nur der Name deines Kindes eingesetzt wird. MagicalStory schreibt stattdessen eine eigene Geschichte: Foto hochladen, beschreiben was passieren soll — die KI schreibt und illustriert ein Buch, das es vorher nicht gab. Danach bearbeitest du jedes Wort und generierst jede Seite neu, bis alles genau so ist, wie du es dir vorgestellt hast.',
+    stepsTitle: 'So erstellst du dein Kinderbuch',
+    step1Title: 'Foto hochladen',
+    step1Desc: 'Ein klares Foto pro Figur. Dein Kind, Geschwister, Grosseltern — bis zu 10 Personen, auf jeder Seite wiedererkennbar.',
+    step2Title: 'Geschichte beschreiben',
+    step2Desc: 'Wähle aus über 170 Themen oder beschreibe deine eigene Idee: der erste Schultag, ein Wackelzahn, ein Drache im Garten. Die Geschichte wird darum herum geschrieben.',
+    step3Title: 'Die KI schreibt und illustriert',
+    step3Desc: 'Eine eigene Geschichte mit passenden Illustrationen im gewählten Kunststil — auf Deutsch, Englisch oder Französisch, in der Lesestufe deines Kindes.',
+    step4Title: 'Bearbeiten bis es stimmt',
+    step4Desc: 'Jeden Satz umschreiben, jede Illustration neu generieren, eine einzelne Figur auf einer einzelnen Seite korrigieren. Danach am Bildschirm lesen oder gedruckt bestellen.',
+    faqTitle: 'Fragen zum Erstellen',
+    faq1Q: 'Kann ich meine eigene Geschichte schreiben oder wähle ich aus Vorlagen?',
+    faq1A: 'Du beschreibst die Geschichte, die du möchtest, und die KI schreibt sie. Themen sind Ausgangspunkte, keine fertigen Texte — zwei Bücher zum selben Thema werden zu unterschiedlichen Geschichten. Jeden Satz kannst du danach bearbeiten.',
+    faq2Q: 'Was macht die KI genau?',
+    faq2A: 'Sie schreibt den Text und erzeugt jede Illustration. Dein hochgeladenes Foto dient dazu, jede Figur auf allen Seiten gleich aussehen zu lassen — das Foto wird nicht ins Buch geklebt.',
+    faq3Q: 'Wie lange dauert es, ein Buch zu erstellen?',
+    faq3A: 'Die erste Fassung ist in wenigen Minuten fertig. Bearbeiten und Neugenerieren dauert so lange, wie du dafür aufwenden möchtest.',
+    faq4Q: 'Was kostet es?',
+    faq4A: 'Die erste Geschichte ist gratis, ohne Konto. Danach kostet ein digitales Buch CHF 9.90, ein gedrucktes Hardcover CHF 33–48.',
+    exploreTitle: 'Bevor du startest',
+    exploreThemes: 'Alle 170+ Themen ansehen',
+    exploreCompare: 'KI-Kinderbuch-Generatoren vergleichen',
     s1Title: 'Jeden Text bearbeiten',
     s1Desc: 'Jede Seite ist vollständig editierbar. Ändere Namen, schreibe Sätze um, passe die Geschichte an deine Familie an. Die KI schreibt den ersten Entwurf — du machst ihn zu deinem.',
     s1b1: 'Klicke auf einen Text, um ihn direkt zu bearbeiten',
@@ -66,9 +108,30 @@ const translations = {
     ctaButton: 'Geschichte erstellen',
   },
   fr: {
-    title: 'Votre livre, votre vision',
-    subtitle: 'Contrôle créatif total sur chaque texte et chaque image.',
-    heroDesc: 'Contrairement aux autres services de livres personnalisés, MagicalStory vous donne le contrôle total. Modifiez chaque texte, façonnez chaque illustration, affinez chaque personnage — jusqu\'à ce que votre livre soit exactement comme vous l\'imaginez.',
+    title: 'Créer un livre pour enfant avec l\'IA',
+    subtitle: 'Votre propre histoire — pas un modèle avec le prénom remplacé.',
+    heroDesc: 'La plupart des livres personnalisés sont une histoire déjà écrite dans laquelle on insère le prénom de votre enfant. MagicalStory écrit une histoire originale : téléchargez une photo, décrivez ce qui doit se passer, et l\'IA écrit et illustre un livre qui n\'existait pas avant. Ensuite vous modifiez chaque mot et régénérez chaque page jusqu\'à ce que tout soit exactement comme vous l\'imaginiez.',
+    stepsTitle: 'Comment créer votre livre pour enfant',
+    step1Title: 'Téléchargez une photo',
+    step1Desc: 'Une photo nette par personnage. Votre enfant, ses frères et sœurs, ses grands-parents — jusqu\'à 10 personnes, reconnaissables sur chaque page.',
+    step2Title: 'Décrivez votre histoire',
+    step2Desc: 'Choisissez parmi plus de 170 thèmes ou décrivez votre propre idée : la rentrée, une dent qui bouge, un dragon dans le jardin. L\'histoire est écrite autour.',
+    step3Title: 'L\'IA écrit et illustre',
+    step3Desc: 'Une histoire originale avec des illustrations assorties dans le style choisi, en allemand, anglais ou français, au niveau de lecture de votre enfant.',
+    step4Title: 'Modifiez jusqu\'au bon résultat',
+    step4Desc: 'Réécrivez une phrase, régénérez une illustration, corrigez un seul personnage sur une seule page. Puis lisez à l\'écran ou commandez l\'impression.',
+    faqTitle: 'Questions sur la création',
+    faq1Q: 'Puis-je écrire ma propre histoire ou dois-je choisir un modèle ?',
+    faq1A: 'Vous décrivez l\'histoire souhaitée et l\'IA l\'écrit. Les thèmes sont des points de départ, pas des textes figés — deux livres sur le même thème donnent deux histoires différentes. Vous pouvez ensuite modifier chaque phrase.',
+    faq2Q: 'Que fait exactement l\'IA ?',
+    faq2A: 'Elle écrit le texte et génère chaque illustration. Votre photo sert à garder chaque personnage identique sur toutes les pages — elle n\'est pas collée dans le livre.',
+    faq3Q: 'Combien de temps faut-il pour créer un livre ?',
+    faq3A: 'La première version est prête en quelques minutes. Les modifications prennent le temps que vous souhaitez y consacrer.',
+    faq4Q: 'Quel est le prix ?',
+    faq4A: 'La première histoire est gratuite, sans compte. Ensuite, CHF 9.90 pour un livre numérique et CHF 33–48 pour un livre relié imprimé.',
+    exploreTitle: 'Avant de commencer',
+    exploreThemes: 'Voir les 170+ thèmes',
+    exploreCompare: 'Comparer les générateurs de livres IA',
     s1Title: 'Modifiez chaque texte',
     s1Desc: 'Chaque page est entièrement modifiable. Changez les noms, réécrivez des phrases, adaptez l\'histoire à votre famille. L\'IA écrit le premier brouillon — vous le personnalisez.',
     s1b1: 'Cliquez sur un texte pour le modifier directement',
@@ -130,6 +193,28 @@ export default function HowItWorks() {
         </div>
       </section>
 
+      {/* Steps — the "how do I create one" intent, in the words people search with */}
+      <section className="py-12 px-4 border-b border-stone-100">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">{t.stepsTitle}</h2>
+          <ol className="space-y-6">
+            {[1, 2, 3, 4].map((n) => (
+              <li key={n} className="flex items-start gap-4">
+                <span className="shrink-0 w-9 h-9 rounded-full bg-indigo-500 text-white font-bold flex items-center justify-center">
+                  {n}
+                </span>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                    {t[`step${n}Title` as keyof typeof t] as string}
+                  </h3>
+                  <p className="text-gray-600">{t[`step${n}Desc` as keyof typeof t] as string}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
       {/* Feature Sections */}
       <section className="py-12 px-4">
         <div className="max-w-3xl mx-auto space-y-8">
@@ -166,6 +251,42 @@ export default function HowItWorks() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* FAQ — long-tail creation questions, and the answers Google quotes */}
+      <section className="py-12 px-4 bg-stone-50 border-y border-stone-100">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">{t.faqTitle}</h2>
+          <div className="space-y-6">
+            {[1, 2, 3, 4].map((n) => (
+              <div key={n}>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  {t[`faq${n}Q` as keyof typeof t] as string}
+                </h3>
+                <p className="text-gray-600">{t[`faq${n}A` as keyof typeof t] as string}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Internal links out of this page into the two clusters that matter */}
+      <section className="py-10 px-4">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t.exploreTitle}</h2>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link to="/themes" className="text-indigo-500 font-medium hover:underline">
+              {t.exploreThemes}
+            </Link>
+            <span className="hidden sm:inline text-stone-300">|</span>
+            <Link
+              to="/vergleich/beste-ki-kinderbuch-generatoren"
+              className="text-indigo-500 font-medium hover:underline"
+            >
+              {t.exploreCompare}
+            </Link>
+          </div>
         </div>
       </section>
 
