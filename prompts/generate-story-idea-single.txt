@@ -50,6 +50,8 @@ Your entire output must be in the language specified above.
 
 ---
 
+{TODDLER_MODE}
+
 Generate a story idea that includes:
 1. LOCATION and TIME: Where and when does the story take place?
 2. THE SETUP: who is there and what they want.

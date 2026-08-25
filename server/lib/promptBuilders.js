@@ -3987,6 +3987,66 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
 }
 
 /**
+ * The main characters of a story, oldest first, plus the one the book follows.
+ *
+ * At most 2, or half the cast when the cast is small. Older first: a 3-year-old
+ * carries a moment, not a book.
+ *
+ * Mains arrive in two shapes. The story pipeline passes `mainCharacters` as an
+ * array of ids; the idea-generation payload has no such array and instead flags
+ * each character with `isMain`. Both are read here, ids first, so the two stages
+ * agree on who the book is about. With neither, the first character is the focus
+ * — the long-standing fallback.
+ *
+ * This is the ONE place that decides who the focus character is — the story
+ * shape and the age mode must never disagree about it.
+ */
+function pickMainCharacters(inputData = {}) {
+  const chars = inputData.characters || [];
+  const declaredMain = inputData.mainCharacters || [];
+  const declared = declaredMain.length
+    ? chars.filter(c => declaredMain.includes(c.id))
+    : chars.filter(c => c.isMain);
+  const cap = Math.max(1, Math.min(2, Math.floor(chars.length / 2) || 1));
+  const mains = declared
+    .slice()
+    .sort((a, b) => (parseInt(b.age, 10) || 0) - (parseInt(a.age, 10) || 0))
+    .slice(0, cap);
+  const focus = mains[0] || chars[0] || null;
+  return { mains, focus, others: chars.filter(c => !mains.includes(c)) };
+}
+
+const TODDLER_MAX_AGE = 3;
+
+/**
+ * Which age band the story is written for.
+ *
+ * Owner rule (2026-08-25): the OLDEST main character decides, and secondary
+ * characters never do. Two mains aged 5 and 1 get a 5-year-old's story; a
+ * 1-year-old main with a 5-year-old secondary gets a toddler's story. Because
+ * pickMainCharacters already sorts mains oldest-first, the focus character IS
+ * the oldest main.
+ *
+ * An unreadable or absent age falls back to 'standard' — the existing
+ * behaviour, and the safe direction to be wrong in.
+ */
+function resolveAgeMode(inputData = {}) {
+  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  return Number.isFinite(age) && age >= 0 && age <= TODDLER_MAX_AGE ? 'toddler' : 'standard';
+}
+
+/**
+ * Content rules for a main character aged 3 or under (prompts/toddler-mode.txt),
+ * or '' at every other age. Scope is deliberately narrow — WHAT the story is
+ * about and what happens in it. Text length belongs to the reading level and is
+ * not touched here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0).
+ */
+function buildToddlerModeSection(inputData = {}) {
+  if (resolveAgeMode(inputData) !== 'toddler') return '';
+  return PROMPT_TEMPLATES.toddlerMode || '';
+}
+
+/**
  * Shared context block for the beats prompts — the same brief, language and
  * PSYCHOLOGICAL character profile the refiner gets. Extracted so beats, the
  * beats review and text refinement can never describe the same book differently.
@@ -4007,17 +4067,29 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
 function buildStoryShapeSection(inputData, pageCount) {
   const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
   const chars = inputData.characters || [];
-  const declaredMain = inputData.mainCharacters || [];
+  const { mains, focus, others } = pickMainCharacters(inputData);
+  const topic = String(inputData.storyTopic || inputData.storyTheme || '').trim();
 
-  // At most 2, or half the cast when the cast is small. Older first: a 3-year-old
-  // carries a moment, not a book.
-  const cap = Math.max(1, Math.min(2, Math.floor(chars.length / 2) || 1));
-  const mains = chars
-    .filter(c => declaredMain.includes(c.id))
-    .sort((a, b) => (parseInt(b.age, 10) || 0) - (parseInt(a.age, 10) || 0))
-    .slice(0, cap);
-  const focus = mains[0] || chars[0] || null;
-  const others = chars.filter(c => !mains.includes(c));
+  // A book for a child of three or under has no challenge to budget pages for,
+  // so the arithmetic below is skipped entirely rather than run down to zero:
+  // every line of it prices challenges the story is not allowed to contain.
+  // The content rules themselves live in prompts/toddler-mode.txt.
+  if (resolveAgeMode(inputData) === 'toddler') {
+    return [
+      '# STORY SHAPE (fixed by the age of the main character — not yours to change)',
+      '',
+      `Pages: ${pages}. One storyline, in one place, with nothing to overcome.`,
+      topic
+        ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
+        : '',
+      `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — the book follows them looking, holding and being cared for. They solve nothing and go nowhere.`,
+      'Challenges: none. No obstacle, no setback, no danger, no goal pursued across pages.',
+      others.length
+        ? `Everyone else — ${others.map(c => c.name).join(', ')} — is simply there alongside the main character. No moment of their own, no arc.`
+        : '',
+      `Page budget: ${pages} pages of small moments, each one a thing seen, touched, given or shared. The last page ends at rest.`,
+    ].filter(Boolean).join('\n');
+  }
 
   // The page budget is arithmetic, so code does it and the arc only fills it in.
   // A major challenge is worth 2-3 pages, a secondary character's moment 1-2, and
@@ -4062,7 +4134,7 @@ function buildStoryShapeSection(inputData, pageCount) {
   // the subject behind eyes in the dark or a sound offstage is a technique for
   // longer books and older readers; in a picture book it just means the thing
   // the child was promised never turns up.
-  const subjectName = String(inputData.storyTopic || inputData.storyTheme || '').trim();
+  const subjectName = topic;
   const subject = !subjectName ? '' : simplest
     ? `Subject: the ${subjectName} is what this book is about. It appears in full view early, stays present through the story, and looks friendly and fun — never suggested by eyes in the dark, a shadow, a rumble or a sound offstage, and never frightening to look at.`
     : `Subject: the ${subjectName} is what this book is about and drives the ending. It may be withheld or hinted at for part of the book, but it is seen and it matters.`;
@@ -4189,6 +4261,7 @@ function buildBeatsPrompt(inputData, pageCount) {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount),
+    TODDLER_MODE: buildToddlerModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
@@ -4537,8 +4610,36 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
     BEATS: blocks,
+    TITLE_RULE: buildTitleRule(inputData),
     DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
   });
+}
+
+/**
+ * The title rule, by how many main characters the book has (owner, 2026-08-25).
+ *
+ * A trial story has exactly one child, so "the title contains the main
+ * character's name" was written as an unconditional rule and then applied to
+ * casts it does not fit: a four-lead story came back titled after one of them
+ * ("<name> und der kleine Drache"), which reads as a two-hander. The name is
+ * the personalised-book product for one or two children — a parent scanning a
+ * shelf wants to see it — and stops being reachable past that.
+ *
+ * @param {Object} inputData
+ * @returns {string} one prompt line
+ */
+function buildTitleRule(inputData) {
+  const mainIds = inputData?.mainCharacters || [];
+  const chars = inputData?.characters || [];
+  const mainNames = chars.filter(c => mainIds.includes(c.id)).map(c => c.name).filter(Boolean);
+  // No main characters marked (older jobs, trials mid-migration): fall back to
+  // the whole cast, which is what the count is standing in for.
+  const names = mainNames.length ? mainNames : chars.map(c => c.name).filter(Boolean);
+
+  const base = 'Every title is in the story language and does not spoil the ending.';
+  if (names.length === 1) return `${base} Each one contains ${names[0]}'s name.`;
+  if (names.length === 2) return `${base} Each one contains both names: ${names[0]} and ${names[1]}.`;
+  return `${base} A name in the title is optional: with this many main characters, prefer what they do together.`;
 }
 
 /**
@@ -5055,6 +5156,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       LANGUAGE_NOTE: getLanguageNote(language),
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
+      TODDLER_MODE: buildToddlerModeSection(inputData),
       AVATAR_SELECTION: avatarSelection,
       LANDMARKS: landmarksInstruction,
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
@@ -5264,6 +5366,9 @@ module.exports = {
   buildBeatsAuditPrompt,
   buildTextAuditPrompt,
   buildStoryShapeSection,
+  pickMainCharacters,
+  resolveAgeMode,
+  buildToddlerModeSection,
   parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,

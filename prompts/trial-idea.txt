@@ -5,6 +5,8 @@ Character: {CHARACTER}. {CATEGORY_CONTEXT}
 
 {LANDMARKS}
 
+{TODDLER_MODE}
+
 Center the idea on the main character. Keep the cast minimal — add another person only when the story needs one.
 
 The idea must fit the title above. Respond with ONLY 2-3 sentences describing the core idea of the story. Maximum 40 words. Plain text, no markdown, no labels. Do NOT repeat the title.

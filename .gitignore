@@ -168,3 +168,8 @@ drafts/
 # defects (which review stage introduces which defect). Agents must be able to read it
 # before touching story-arc-review / story-beats-review / text-refine.
 !tasks/story-text-quality-2026-08-25.md
+# The toddler-mode design record, not a session plan: BACKLOG.md and the
+# decisions.md entry both point at it for the settled trigger rule and for the
+# three things deliberately NOT built (reading level, refrain form, trial word
+# count). Untracked, those pointers dangle for the next agent.
+!tasks/toddler-mode-2026-08-25.md

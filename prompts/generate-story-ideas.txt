@@ -52,6 +52,8 @@ Your entire output must be in the language specified above.
 
 STORY LENGTH: {STORY_LENGTH_CATEGORY}
 
+{TODDLER_MODE}
+
 {STORY_REQUIREMENTS}
 
 ---

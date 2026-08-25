@@ -2078,14 +2078,22 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Load prompt template from prompts/trial-idea.txt
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
+    const { buildToddlerModeSection, resolveAgeMode } = require('../lib/promptBuilders');
+    const isToddler = resolveAgeMode({ characters }) === 'toddler';
+
     const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
       CHARACTER: charDesc,
       CATEGORY_CONTEXT: categoryContext,
       TITLE: trialTitle || '',
       LANDMARKS: landmarksText,
       LANG_INSTRUCTION: langInstruction,
+      TODDLER_MODE: buildToddlerModeSection({ characters }),
     });
-    const prompt2 = prompt1 + '\nGenerate a DIFFERENT idea than the first one — different conflict, different setting.';
+    // A toddler idea has no conflict to vary, so the second one varies what the
+    // child sees and does instead.
+    const prompt2 = prompt1 + (isToddler
+      ? '\nGenerate a DIFFERENT idea than the first one — a different place, and different things to look at and hold.'
+      : '\nGenerate a DIFFERENT idea than the first one — different conflict, different setting.');
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);

@@ -17696,3 +17696,93 @@ call, not one to take silently. **Open question for the owner.**
 and no false positives.
 
 **Touched files:** `server/lib/beatsPipeline.js`.
+
+---
+
+## 2026-08-25 — Toddler mode: a main character aged ≤ 3 gets a different STORY, not a shorter one
+
+**Context:** Prod trial `job_1787647410717_5dvfqu8jg` was written for a main
+character aged **1**. It sent him alone to a railway station with a phone, on a
+train across the city, and had him resolve a forked path by reasoning off a
+treasure map. The premise (a toddler in a pirate costume at the zoo) was fine;
+the agency was not.
+
+The cause was that **no narrative age branch in the system went below 3.**
+`getAgeCategory()` classified `age ≤ 2` as `toddler`, but only to pick body
+proportions for the renderer. Everything narrative bottomed out higher:
+`challenge-catalogue.txt`'s lowest band is 3–5, `storyIdeas.js` mapped any
+`youngest <= 5` onto the `'3'` band, `buildStoryShapeSection`'s lowest branch was
+`focusAge <= 5`, and the lowest reading level is `1st-grade` ("for early
+readers"). A 1-year-old was therefore written as a 3-to-5-year-old.
+
+**Decision:** A story whose **oldest MAIN character is 3 or under** switches to
+toddler mode, which changes *what the story is about and what happens in it* and
+nothing else:
+
+- `resolveAgeMode(inputData)` → `'toddler' | 'standard'`, built on the extracted
+  `pickMainCharacters()` so the age mode and the story shape can never disagree
+  about who the focus character is.
+- `prompts/toddler-mode.txt` is injected as `{TODDLER_MODE}` into the trial
+  writer, the beats planner and both idea generators; it is `''` at every other
+  age, so the normal path renders unchanged. It carries: small familiar topics
+  (never a quest/search/rescue), toddler-scale actions only, no journeys, an
+  adult always nearby but never a *character* (hands at the frame edge, a lap, or
+  a same-size companion), nothing to overcome, and an ending at rest.
+- `buildStoryShapeSection` returns a toddler shape that states `Challenges: none`
+  and skips the page-budget arithmetic entirely — every line of it prices
+  challenges the story is not allowed to contain.
+- `storyIdeas.js` skips the challenge-catalogue sample (its lowest band is 3–5,
+  so any sample is wrong by construction).
+
+**Owner rules, both settled explicitly on 2026-08-25:**
+
+1. *"The oldest age of the main character decides."* Two mains aged 5 and 1 get a
+   5-year-old's story; a 1-year-old main with a 5-year-old **secondary** gets a
+   toddler story. Secondaries never pull the mode down. `pickMainCharacters`
+   already sorted mains oldest-first, so the focus character IS the oldest main
+   and no selection logic changed.
+2. *"No reading level. The 3 year old reading skill is same as a 1 year old. Only
+   different story content."* — **rejected**: an earlier draft added a 4th
+   `LANGUAGE_LEVELS` entry and overrode the wizard's selector. Reading level
+   encodes the child's *reading skill*, which does not discriminate inside the
+   toddler band. `LANGUAGE_LEVELS` / `getReadingLevel` / `getTokensPerPage` are
+   untouched, and `toddler-mode.txt` states no word or sentence count (a unit
+   test enforces that).
+
+**Also rejected (same round):** a picture-book *form* redesign (walk / list /
+repeated refrain). It would have required carve-outs in four anti-repetition
+rules (`story-beats.txt`'s consecutive-pages rule,
+`story-text-from-beats.txt:57`, `story-text-quality-judge.txt:26`,
+`text-refine.txt:53`); none were made and all four are unchanged.
+
+**Also rejected:** wiring `{READING_LEVEL}` into `story-trial.txt`, which
+hardcodes "100–140 words per page" and ignores the reading level for *every*
+trial. Owner: *"leave trial on 100 words per page that is fine."* The
+consequence — a `1st-grade` trial gets standard-length pages — is known and
+accepted; recorded so it is not re-proposed as a gap.
+
+**Rationale:** classification belongs in the prompt, and the one thing code owns
+here is a mode switch plus the challenge budget it already computed. Making the
+fragment empty outside toddler mode keeps the blast radius at zero for every
+existing story.
+
+**Verified:** `tests/unit/toddler-mode.test.ts`, 12 assertions over 10 cast
+configurations — both boundaries (3 → toddler, 4 → standard), the two-mains case,
+the older-secondary case, the `isMain`-flag payload shape, missing ages, and that
+the normal-path story shape still prices `exactly 2` challenges. No story has run
+under it yet.
+
+**Open:** `challenge-catalogue.txt` has no 1–3 band (toddler mode skips it
+entirely instead). The `age: "1"` in the motivating story was not traced back to
+the wizard.
+
+**Touched files:** `server/lib/promptBuilders.js` (`pickMainCharacters`,
+`resolveAgeMode`, `buildToddlerModeSection`, `buildStoryShapeSection`),
+`server/routes/storyIdeas.js`, `server/routes/trial.js`,
+`server/services/prompts.js`, `prompts/toddler-mode.txt`,
+`prompts/story-trial.txt`, `prompts/story-beats.txt`, `prompts/trial-idea.txt`,
+`prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`tests/unit/toddler-mode.test.ts`, `tasks/toddler-mode-2026-08-25.md`.
+
+**Status:** ✅ active (unproven on a real run — no story has been generated in
+toddler mode yet).

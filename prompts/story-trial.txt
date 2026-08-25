@@ -21,6 +21,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - **Characters**: {CHARACTERS}
 - **Story Idea**: {STORY_DETAILS}
 
+{TODDLER_MODE}
+
 {AVATAR_SELECTION}
 
 {LANDMARKS}

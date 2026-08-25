@@ -36,6 +36,7 @@ Three loading mechanisms feed these templates:
 | text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines) |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
+| toddler-mode.txt | promptBuilders.js `buildToddlerModeSection` → `{TODDLER_MODE}` in story-trial, story-beats, trial-idea, generate-story-idea(s) | Content rules when the oldest MAIN character is ≤ 3; empty at every other age |
 | generate-story-ideas.txt | storyIdeas.js `buildIdeasPromptContext` | Wizard story ideas (multi) |
 | generate-story-idea-single.txt | storyIdeas.js `buildIdeasPromptContext` | Wizard story idea (single) |
 | story-idea-requirements-adventure-1/-2.txt | storyIdeas.js `buildIdeasPromptContext` | Idea requirements (adventure) |

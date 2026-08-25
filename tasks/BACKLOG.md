@@ -157,15 +157,16 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ## Story text quality — the review stages trade feeling for logistics
 
-- [ ] **Toddler mode (ages 1–3) — plan written, not built.** No narrative age branch in the system
+- [x] **Toddler mode (ages 1–3) — BUILT 2026-08-25, unproven on a real run.** No narrative age branch in the system
       goes below 3 (challenge catalogue starts at 3–5, story shape at `focusAge <= 5`, lowest reading
       level is `1st-grade`); `toddler` exists only as body proportions. Prod trial
       `job_1787647410717_5dvfqu8jg` gave a 1-year-old main a solo train journey, a map to reason
       from, and 100–140 words/page. Trigger rule settled by owner: oldest MAIN character ≤ 3.
       → `tasks/toddler-mode-2026-08-25.md`
-- [ ] **The trial ignores reading level entirely** — `prompts/story-trial.txt:14` and `:181` hardcode
-      "100–140 words per page" and the template never references `{READING_LEVEL}`, so a `1st-grade`
-      trial gets standard-length pages. → folded into the toddler-mode plan above
+- ~~The trial ignores reading level entirely~~ — **won't do (owner, 2026-08-25: "leave trial on 100
+      words per page that is fine")**. `prompts/story-trial.txt:14` and `:181` hardcode "100–140 words
+      per page" and never reference `{READING_LEVEL}`; the `1st-grade`-trial consequence is known and
+      accepted. Recorded so it is not re-proposed → `tasks/toddler-mode-2026-08-25.md` §6
 
 Full provenance trace of 15 defects in `job_1787638707796_x8272kcs22m` ("Levin und der kleine
 Drache", 18p, de-CH). Measured: the writer's draft is the best prose state of the run; the arc

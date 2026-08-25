@@ -159,6 +159,10 @@ async function loadPromptTemplates() {
     ['clothingReview', 'clothing-review.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
+    // Content rules for a main character aged 3 or under. Injected as
+    // {TODDLER_MODE} into the idea, trial and beats prompts, empty otherwise —
+    // see buildToddlerModeSection in promptBuilders.js.
+    ['toddlerMode', 'toddler-mode.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],
     ['boundingBoxDetection', 'bounding-box-detection.txt'],
     ['repairVerification', 'repair-verification.txt'],
