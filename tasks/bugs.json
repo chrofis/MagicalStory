@@ -263,6 +263,15 @@
       "status": "fixed",
       "fixedIn": "a6d92d25a",
       "note": "refineStoryText returned all-or-nothing, so a finished audit and a finished round 1 were worth nothing when the join deadline landed during round 2. Two causes compounded: the 300s budget was measured 2026-08-17, before 77d0fae0a put the blind audit in front of the rounds and roughly doubled the stage; and standard/advanced reading levels produce far larger payloads (this audit emitted 2.3x the 1st-grade run tokens). Fix: onProgress publishes the audit and each completed round, the join salvages the last snapshot, and the cap is 600s for long-text levels + 10s/page past ten. Precedent the cap-raise alone did not fix: job_1786998860057_o6deqtv5s lost $0.16 the same way on 2026-08-17. Regression test tests/manual/test-text-refine-salvage.js."
+    },
+    {
+      "id": "trial-vb-has-no-animals-pool-species-word-deleted",
+      "title": "Every animal in a TRIAL story loses its species word before the image model sees it — the trial Visual Bible has no animals pool, so animals are filed as artifacts and the sanitizer replaces the name with the type",
+      "reportedAt": "2026-08-25",
+      "source": "staging job_1787683120734_qkgfbd86o (6pp trial, de-ch). VB stored ART002 \"Brauner Hund\", type \"Tier\", description \"Ein kleiner, flauschiger brauner Hund mit weichen Schlappohren...\". Every page cites ART002. The stored page prompts read \"Ein kleiner, flauschiger Tier mit weichen Schlappohren\" — the word Hund is gone from all six prompts, and the German agreement break (flauschiger Tier) shows it is a blind string replacement. With no species anchor the render is a free choice per page: shaggy ginger on p1/p2/p3/p6, golden retriever puppy on p5.",
+      "status": "fixed",
+      "note": "prompts/story-trial.txt VB schema offers only secondaryCharacters / artifacts / locations / backgrounds — no animals array. story-bible-from-beats.txt:138 and story-unified.txt:671 both have one, so this is trial-only. sanitizeVbIdsInPrompt (promptBuilders.js:3332) protects NAME_POOLS = mainCharacters/secondaryCharacters/animals and rewrites REF_POOLS = artifacts/vehicles/clothing to their type, which is correct for a prop (stops the name being lettered onto it, 2026-08-24 fix) and wrong for a living thing. Second defect visible in the same evidence: the substitution also fires INSIDE the entry own description, so the description that teaches the model what the thing looks like is the very text being degraded, and the bullet label becomes the first two words of the description (\"**Ein kleiner** (object)\", \"**Eine runde** (object)\").",
+      "fixedIn": "4effc734a"
     }
   ]
 }

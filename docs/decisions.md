@@ -18293,3 +18293,78 @@ Unit suite 168 passed, same 3 pre-existing failures.
 **Unexercised:** no story has run with a non-empty carry block.
 
 **Touched files:** `server/lib/beatsPipeline.js`.
+
+---
+
+## 2026-08-25 — Trial Visual Bible gains an `animals` pool; the toddler adult-presence device is removed
+
+Two corrections to the toddler work of the same day, both from owner review of
+staging stories `job_1787682773703_v5c2dq4te` (A) and `job_1787683120734_qkgfbd86o` (B).
+
+### 1. Animals in a trial lost their species word (bug)
+
+**Context:** B rendered the same dog as a shaggy ginger mongrel on p1/p2/p3/p6
+and a golden retriever puppy on p5. The Visual Bible was not at fault — it held
+`ART002 "Brauner Hund"` with a full description, and every page cited it.
+
+`prompts/story-trial.txt`'s VB schema offered only `secondaryCharacters`,
+`artifacts`, `locations`, `backgrounds` — **no `animals` array**, unlike
+`story-bible-from-beats.txt:138` and `story-unified.txt:671`. The writer filed
+the dog under `artifacts` with `"type": "Tier"`. `sanitizeVbIdsInPrompt`
+(`promptBuilders.js:3332`) protects `NAME_POOLS`
+(mainCharacters/secondaryCharacters/animals) as identity anchors and rewrites
+`REF_POOLS` (artifacts/vehicles/clothing) to their `type` — correct for a prop,
+since that is the 2026-08-24 fix stopping a prop's name being lettered onto it,
+and wrong for a living thing. The word *Hund* was therefore deleted from all six
+page prompts, which read "Ein kleiner, flauschiger **Tier** mit weichen
+Schlappohren" — the German agreement break betraying a blind string replacement.
+With no species anchor, each page's breed was a free choice.
+
+**Decision:** add the `animals` pool to the trial VB schema, matching the other
+two templates. Parser (`outlineParser/unified.js`) and reference sheets
+(`referenceSheets.js`) already handled `animals` everywhere; the trial template
+was the only gap.
+
+**Verified:** replaying the stored description through `sanitizeVbIdsInPrompt`
+reproduces "flauschiger Tier" when the entry sits in `artifacts` and preserves
+"brauner Hund" when it sits in `animals`.
+
+**Still open:** the substitution also fires INSIDE an entry's own description, so
+for a genuine prop the very text that teaches the model what the thing looks like
+is the text being degraded, and the bullet label becomes the first two words of
+the description ("**Eine runde** (object)"). Not changed here — the sanitizer is
+load-bearing for the lettering fix and needs its own decision.
+
+### 2. The adult-presence device is removed (owner)
+
+**Context:** `toddler-mode.txt` required an adult be present but never as a
+character — "hands at the frame edge, a lap, or an adult's legs behind the
+child". It worked (B p4 rendered two adult hands lowering a bowl, no face, no VB
+entry) but it fired on four of six pages in A and read as an intrusive tic.
+
+**Decision:** removed. Owner: *"remove all these hands and schoss and so on why
+is this needed"*. The implausibility it was invented for — a one-year-old alone
+at a railway station — is already prevented by "No journeys" and the
+toddler-scale action list, so the device was carrying no load those two rules
+were not already carrying. Adults are now neither mandated nor forbidden.
+
+### 3. Two content rules added
+
+A's p5 had the child find an unattended basket ("**Das** Körbchen", a definite
+article for a thing no earlier page mentions) containing ice lollies in warm sun
+and chicken pieces, and help himself. Cause: the replayed brief demanded a
+*funkelnder Schatz* be found while toddler mode forbade the quest, so the writer
+materialised the treasure instead — the VB entry is literally `ART002
+"Schatz-Körbchen"`. Added: food is ordinary, plainly named, chewable, never
+sweets or ice cream; and nothing is referred to as known before a page has shown
+it there, nothing valuable or edible is simply found.
+
+**The broader lesson: toddler mode cannot rescue a quest brief.** In production
+the idea is generated under toddler mode and the collision does not arise; A only
+exists because the old premise was replayed deliberately to test the writer in
+isolation. A customer-written quest premise for a toddler would hit the same wall.
+
+**Touched files:** `prompts/story-trial.txt`, `prompts/toddler-mode.txt`,
+`tasks/bugs.json`.
+
+**Status:** ✅ active.
