@@ -5376,6 +5376,7 @@ module.exports = {
   buildSceneReviewPrompt,
   buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
+  buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
   buildUnifiedStoryPrompt,
   buildTrialStoryPrompt,
