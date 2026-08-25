@@ -18728,9 +18728,34 @@ ledger block appends only when a ledger exists; no-ledger calls are
 byte-identical to before. Unit suite 182 passed, same 3 pre-existing
 `active-version-recompute` failures as before the change.
 
-**Unexercised:** no story has yet run with a non-empty rulings block, and no
-toddler story has yet passed through the injected reviewers — validate on the
-next toddler / full-story run.
+**VALIDATED 2026-08-26 on staging, both halves:**
+- Rulings carry: `job_1787690387854_6nc4yo8u8` (9-13 arc faults, 5-11 beats
+  faults across two runs) — the Art Director prompt carries the
+  `---BEATS AUDIT---` findings AND the `REVIEWER'S RULINGS` block.
+- Toddler mode in the reviewers: `job_1787693271900_cyc9lol5y`, 10 pages, de,
+  focus character age 2. Both review prompts carry `# TODDLER MODE`.
+
+The A/B is unusually clean, because the two runs differ in the focus
+character's age and nothing else — same account, same cast, same pirate topic,
+same 10 pages:
+
+| | age 5 (no toddler mode) | age 2 (toddler mode) |
+|---|---|---|
+| title | *Emma und der vergrabene Schatz* | *Emma, die kleine Piratin* |
+| shape | buried-treasure quest | dress-up play in the garden |
+| ending | — | picnic blanket where page 1 began |
+
+The age-2 book obeys the rules the reviewers previously had no way to see: a
+costume theme rather than a mission, one small setback (a refused parrot) put
+right one page later, three feelings, ordinary food (bread and apple), opens
+and closes in the same garden. A treasure map appears but is deliberately left
+leading nowhere ("the map told them nothing yet, but together that was fine") —
+the beats review rewrote 8 of 10 pages and introduced no peril and no quest,
+which is the check-3 conflict this fix was meant to resolve.
+
+**Not caused by this change, found in the same run** — see `tasks/BACKLOG.md`:
+page-image style breaks and one reference-sheet leak. The run had
+`skipQualityEval=true`, so no eval or repair pass ran to catch them.
 
 **Touched files:** `server/lib/carryRoutes.js`, `server/lib/beatsPipeline.js`,
 `server/lib/promptBuilders.js`, `prompts/story-arc-review.txt`,

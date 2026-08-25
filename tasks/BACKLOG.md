@@ -472,3 +472,21 @@ Recorded so nobody re-proposes them as gaps.
 - [ ] **Validate the 2026-08-25 review fixes on a live run**: first toddler story through the injected arc/beats reviewers, and first story with a non-empty REVIEWER'S RULINGS carry block → `docs/decisions.md` (2026-08-25 "Carried findings travel WITH the reviewer's rulings" entry)
 - [ ] **SEO repositioning onto the creation differentiator** — measured: ~10 clicks/month, all 149 ranking queries are the template-book category at pos 38-52 (Librio's turf), creation queries at pos 27-61. Phase B shipped 2026-08-25 (footer link architecture, /so-funktionierts→/kinderbuch-erstellen + 301, www→apex 301, page rewritten to the searched vocabulary). Phases C (scale the AI-generator comparison set, creation hub, editorial surface) and D (authority: Swiss family bloggers, Trustpilot, startup press, roundup listings, expand /science) still open. → `tasks/seo-creation-repositioning-2026-08-25.md`
 - [ ] Comparison slugs live in two places — `COMPARISONS` in `server/lib/seoMeta.js:488` duplicates the ids in `client/src/constants/comparisonData.ts`. Adding a comparison requires editing both; missing the server one silently costs the page its meta, canonical and sitemap entry. Derive one from the other. → `server/lib/seoMeta.js:488`
+- [ ] **Page 7 shipped as a reference SHEET, not a scene (2026-08-26).** staging
+      `job_1787693271900_cyc9lol5y` p7: the final `scene/p7/v0.jpg` is a two-panel diptych
+      with a red/blue border and a strip of four reference thumbnails (vest, girl, hat,
+      parrot) along the bottom. The beat is one adult crouching to offer a toy to a child;
+      the render splits them into separate panels. `story_images` for that story carries
+      `ref_sheet_source` rows, so the suspicion is the reference sheet leaking into the page
+      output. ONE occurrence, on a run with `skipQualityEval=true` (no eval/repair pass), so
+      systematic-ness is unproven — reproduce before treating as a registry bug.
+      → `server/lib/images.js` (page image path), `story_images.image_type='ref_sheet_source'`
+- [ ] **Full-cast pages render photorealistic instead of the requested art style (2026-08-26).**
+      Same story, `artStyle=watercolor`: 7 of 10 pages are watercolor, but p1 and p10 — the only
+      two pages carrying all five characters — came out photographic. Hypothesis: the cast-aware
+      router sends full-cast pages down the composite path, which pastes photographic avatar
+      cutouts. Worth confirming against `compositeOutcome` per page before any fix.
+      → `server/lib/imageRouter.js`, `server/lib/sceneComposite.js`
+- [ ] **A watercolour page rendered as a photographed painting (2026-08-26).** Same story p2: the
+      illustration is depicted as a physical painting lying on a white surface, with paper edges
+      and margins inside the frame instead of filling it. → `prompts/image-generation.txt`
