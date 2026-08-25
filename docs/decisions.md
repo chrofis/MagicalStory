@@ -18497,3 +18497,48 @@ shapes, including the structured-but-empty object and a flat array of blanks.
 `tests/unit/toddler-mode.test.ts`.
 
 **Status:** ✅ active (not yet run).
+
+---
+
+## 2026-08-25 — The two story ideas differ in KIND: one in the child's town, one make-believe entered from home
+
+**Context:** every toddler story so far ended by teleporting. `job_1787683120734_qkgfbd86o`
+finished at the Stüssibrunnen after five pages at sea; `job_1787687259758_k7mennm8c` finished at the
+Lindenhofbrunnen after five pages at sea. Diagnosis showed the writer was not at fault:
+`story-trial.txt` mandates "at least one scene MUST take place at one of these real local landmarks",
+the idea placed the story on the open sea, and the only legal move left was to bolt a landmark onto
+the final page. VB confirms it — `LOC001 Lindenhofbrunnen isRealLandmark:true pages:[6]`,
+`LOC002 Piratenschiff isRealLandmark:false pages:[1..5]`.
+
+The real defect was upstream: **both** generated ideas were sea/island fantasies. Neither was set in
+the child's town, so the landmark mandate had nothing to attach to.
+`generate-story-ideas.txt` only asked the second idea to be "a DIFFERENT story idea (different
+structure and approach)" — nothing made the pair differ in kind.
+
+**Decision (owner):** the two ideas exist to offer a real choice, so they differ in kind.
+
+- **Idea 1** is set in the child's own town, at the real local landmarks — the costume or theme shows
+  in what they wear and play, never in travelling somewhere else.
+- **Idea 2** is a make-believe world that **opens where the child really is** — dressing up, or
+  starting to play — so the reader sees where it began and where it returns to.
+
+Owner: *"What if they enter a dream world... Normally in page 1 they dress up. This is the toddler
+mode that does not have this."* The convention already exists in `prompts/adventure-guides.txt`
+(per theme: "Dream sequence where kids become real pirates", "Imagination play that comes to life",
+"Dressing up leads into a real fairy-tale kingdom") — it was simply never required of the idea pair.
+
+Toddler mode gains the matching structural rule: a make-believe story opens and closes where the
+child really is, and never moves them somewhere real they were not shown leaving for. That removes
+the teleport by making the return deliberate instead of accidental.
+
+**Also fixed in the same round:** a "loves X" trait was a CAP, not a requirement — the rule read
+"A 'loves X' detail earns one page, never the whole book", so a dog-loving child got a parrot and no
+dog. Now: whatever the child is said to love appears in the book and gets a page of its own.
+
+**Touched files:** `prompts/generate-story-ideas.txt` (DRAFT_1 / DRAFT_2),
+`server/routes/trial.js` (the trial's two-idea prompts), `prompts/toddler-mode.txt`.
+
+**Open:** the Dübendorf landmark index offers "Mühlegasse 5", a street address rather than a
+landmark — weak index entries are a separate problem from the mandate.
+
+**Status:** ✅ active (not yet run).

@@ -2089,11 +2089,15 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       LANG_INSTRUCTION: langInstruction,
       TODDLER_MODE: buildToddlerModeSection({ characters }),
     });
-    // A toddler idea has no conflict to vary, so the second one varies what the
-    // child sees and does instead.
-    const prompt2 = prompt1 + (isToddler
-      ? '\nGenerate a DIFFERENT idea than the first one — a different place, and different things to look at and hold.'
-      : '\nGenerate a DIFFERENT idea than the first one — different conflict, different setting.');
+    // The two ideas exist to offer a real choice, so they differ in KIND, not
+    // just in detail (owner, 2026-08-25): one grounded in the child's own town
+    // at its real landmarks, one in a make-believe world entered from home.
+    // Both ideas coming back as the same fantasy is what left the landmark
+    // mandate nothing to attach to, and the writer bolted one onto the last page.
+    const localIdea = '\nSet this idea in the child\'s own town, at the real local places named above. A costume or theme shows in what they wear and play, never in travelling somewhere else.';
+    const fantasyIdea = '\nGenerate a DIFFERENT idea than the first one, set in a make-believe world. It opens where the child really is — dressing up, or starting to play — and the make-believe follows from that.';
+    const prompt1Local = prompt1 + localIdea;
+    const prompt2 = prompt1 + fantasyIdea;
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);
@@ -2109,7 +2113,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     log.debug('  Starting parallel story generation...');
 
     // Stream Story 1 (800 max tokens — 2-3 sentence idea)
-    const streamStory1 = callTextModelStreaming(prompt1, 800, (delta, fullText) => {
+    const streamStory1 = callTextModelStreaming(prompt1Local, 800, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);

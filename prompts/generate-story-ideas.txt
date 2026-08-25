@@ -63,7 +63,9 @@ STORY LENGTH: {STORY_LENGTH_CATEGORY}
 For EACH story idea, output these three stages:
 
 [DRAFT_1]
-Write your first story idea.
+Write your first story idea, set in the child's own town and at the real local landmarks listed
+above. A costume or theme shows in what they wear and what they play, never in travelling somewhere
+else. Where no landmarks are listed, use the town's own everyday places.
 
 [REVIEW_1]
 List exactly 5 improvements. Never say "no issues" - always find ways to make it better.
@@ -83,7 +85,9 @@ Check: (1) Is entire output in correct language (not just terminology)? (2) Form
 Corrected final version of story 1.
 
 [DRAFT_2]
-Write a DIFFERENT story idea (different structure and approach).
+Write a DIFFERENT story idea, set in a make-believe world. It opens where the child really is —
+dressing up, or starting to play — and the make-believe follows from that, so the reader sees where
+it began and where it will come back to.
 
 [REVIEW_2]
 Same process - first check language, then list exactly 5 improvements:
