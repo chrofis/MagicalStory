@@ -29,7 +29,7 @@ First write the ARC: the whole story, with no pages in it. Then divide that stor
 
 Give each part of the arc the pages the budget allows it, and use the division to make the book drawable — split a moment that has too many people in it across pages, hold on one face where the arc turns, and let a picture carry what the words then need not say.
 
-BEAT is what happens on that page: the event, and what changes because of it. One or two sentences. One change per beat — never a sequence of actions inside one page; move the next step to the next page.
+BEAT is what happens on that page: the event, and what changes because of it. One or two sentences. One change per beat — never a sequence of actions inside one page; move the next step to the next page. An established object that is only still held or still there goes in SCENE; BEAT carries what changes.
 
 SCENE is what the illustration shows: who is present, where they are, what they are doing. One or two sentences.
 - A single moment that can be drawn — no montages, no before-and-after, no passage of time inside one picture.
@@ -59,6 +59,10 @@ Requirements:
 - When an AVAILABLE LANDMARKS list is present, set key scenes AT those places — the action happens on, in, or under the landmark, not with it as distant backdrop. Pick landmarks whose real character fits the beats.
 - A page keeps its characters at one depth together. Separate a figure into the background only when the beat itself requires the separation (left behind, watching from afar, arriving in the distance) — keep such pages to the few the story needs.
 - Resolve what the commission conflates or leaves to coincidence — distinguish two things it treats as one, give every arrival a cause — and drop what earns nothing.
+- An animal or creature that travels with the children is given a name by them, where they decide to help it, and goes by that name after.
+- When the deadline is a time of day, the story starts at an hour the book's length can cross to reach it.
+- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
+- The last page shows them safe and together, and one of them feels something a child can name.
 - Match peril to the youngest named child in the cast: frightening is the right level, and nothing may be able to kill or injure a child — no drowning, no fall from a height. A refusal, a loss, a delay or a promise broken can carry it instead. Nobody in the story looks monstrous, and no familiar character turns frightening. When anyone is separated or lost, a later page shows the reunion and the last page shows them safe.
 - An obstacle exists for its own reasons: never shape one around a thing a character happens to carry, and never give a barrier exactly one solution that a character already holds. Where peril has to be softened, take the replacement from what the setting already contains.
 - An obstacle belongs to the story's own world: weather, distance, a rival, a broken or missing or guarded thing, a character's own flaw. No mechanism from other stories — a puzzle door, a riddle to answer, a lock with a trick, a test set by no one — unless the commission establishes it.

@@ -3566,6 +3566,37 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
   const pages = extractRefinablePages(storyData.sceneImages || []);
   if (pages.length === 0) throw new Error(`Story ${target.storyId} has no page text to refine`);
 
+  // EXACT REPLAY — params.fromWriterText sources the page text from the WRITER's
+  // output (data.storyText) instead of the shipped pages, which are what refine
+  // already returned. Without it a replay refines refined text: a second round,
+  // so a prompt change cannot be compared against the stored first round. The
+  // scene briefs stay as they are; only the prose the refiner starts from moves.
+  if (params.fromWriterText === true || params.fromWriterText === 'true') {
+    // Two page-marker shapes are in the corpus: the writer emits `## Page N`
+    // and the persisted artifacts use `--- Page N ---`. Accept both, or an
+    // exact replay silently finds zero pages and refines the shipped text.
+    const byPage = new Map(
+      String(storyData.storyText || '')
+        .split(/(?:^|\n)\s*(?:##\s*Page\s*(\d+)\s*|-{2,}\s*Page\s+(\d+)\s*-{2,})\s*\n/i)
+        .reduce((acc, part, i, arr) => {
+          const n = parseInt(part, 10);
+          if (!Number.isFinite(n)) return acc;
+          // The body is the next non-marker chunk: the split yields one capture
+          // slot per alternative, so skip the sibling group before the text.
+          const body = String(arr[i + 1] ?? '').trim() || String(arr[i + 2] ?? '').trim();
+          return body ? [...acc, [n, body]] : acc;
+        }, [])
+    );
+    if (byPage.size === 0) throw new Error(`Story ${target.storyId} has no data.storyText to replay from`);
+    let moved = 0;
+    for (const p of pages) {
+      const writerText = byPage.get(p.pageNumber);
+      if (writerText) { p.text = writerText; moved++; }
+    }
+    if (moved === 0) throw new Error('writer text page numbers do not match the story pages');
+    log.info(`[TESTLAB] text_refine exact replay: ${moved}/${pages.length} pages sourced from the writer's text`);
+  }
+
   const res = await refineStoryText(storyData, pages, {
     rounds: params.rounds,
     model: params.model,

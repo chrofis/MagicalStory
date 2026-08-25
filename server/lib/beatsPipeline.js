@@ -68,6 +68,7 @@ const {
   extractSceneMetadata,
 } = require('./storyHelpers');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
+const { stableCandidateIndex } = require('./outlineParser/shared');
 const { log } = require('../utils/logger');
 
 const PIPELINE_MODES = ['unified', 'beats'];
@@ -988,14 +989,29 @@ SCENE: ${x.scene || ''}`.trim(),
     log.warn(`⚠️ [BEATS] Text writer omitted page(s) ${parsedText.missing.join(', ')} after retry — those pages are dropped`);
     gl.warn('beats_text_incomplete', `Text writer omitted page(s) ${parsedText.missing.join(', ')}`);
   }
-  // The title: nothing else in a beats run produces one.
-  const title = ((textRaw.match(/---\s*TITLE\s*---\s*([^\n]+)/i) || [])[1] || '')
+  // The title: nothing else in a beats run produces one. The writer emits three
+  // candidates so the best phrasing wins rather than the first one it thought
+  // of; stableCandidateIndex is the same deterministic pick the unified parser
+  // uses, so cover generation and the story save never diverge on the title.
+  const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z])/i) || [])[1] || '';
+  const cleanTitle = s => String(s || '')
     .replace(/^\**\s*TITLE\s*:\s*/i, '')
     .replace(/^\*{1,2}|\*{1,2}$/g, '')
     .replace(/^"|"$/g, '')
-    .trim() || null;
-  gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
-    pages: parsedText.pages.length, title, model: textModelId,
+    .trim();
+  const titleCandidates = titleSection
+    .split('\n')
+    .map(l => (l.match(/^\s*\d+[.)]\s*(.+?)\s*$/) || [])[1])
+    .filter(Boolean)
+    .map(cleanTitle)
+    .filter(Boolean);
+  // Fall back to the first non-empty line for a writer that ignored the list
+  // format — a run must never lose its title to a format miss.
+  const title = titleCandidates.length
+    ? titleCandidates[stableCandidateIndex(titleCandidates)]
+    : (cleanTitle(titleSection.split('\n').find(l => l.trim())) || null);
+  gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''}${titleCandidates.length ? ` (from ${titleCandidates.length} candidates)` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
+    pages: parsedText.pages.length, title, titleCandidates, model: textModelId,
   });
 
   /**
@@ -1094,6 +1110,11 @@ SCENE: ${x.scene || ''}`.trim(),
   // cover-hints regex) the clothing requirements, Visual Bible and cover hints.
   const rawOutline = [
     '---TITLE---',
+    // Candidates first: UnifiedStoryParser prefers the list and re-picks with
+    // the same stableCandidateIndex, so it lands on the title chosen above.
+    ...(titleCandidates.length
+      ? ['TITLE_CANDIDATES:', ...titleCandidates.map((t, i) => `${i + 1}. ${t}`)]
+      : []),
     `TITLE: ${title || '(none)'}`,
     '',
     // Before ---BEATS--- on purpose: every beats extractor keys on that marker

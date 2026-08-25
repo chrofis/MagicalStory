@@ -50,11 +50,12 @@ The arc's stake — what must happen and why — is stated plainly in the text: 
 Everything else works the other way: information neither the beats nor the pictures carry is cut, never added.
 Every word must be one a child at the reading level above already uses. Name a thing plainly instead of reaching for a rare compound or an unusual colour or material word, and keep a sentence to one idea when the word count is tight.
 No abbreviation or acronym reaches the page, even when a beat uses one: write the thing the way a child says it — the little train up the mountain, not its initials.
-The title is in the story language, contains the main character's name, and does not spoil the ending.
+Characters speak: at least a third of the pages carry a spoken line, and speech carries feeling and decision, not only what the pictures already show.
+{TITLE_RULE}
 
 Work in two steps.
 
-Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it.
+Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it. End it with the pages that carry no spoken line, and their count against the floor above.
 
 Step 2 — write the pages, fixing what the analysis found. A problem the analysis names must change the page it names.
 
@@ -65,7 +66,10 @@ Step 2 — write the pages, fixing what the analysis found. A problem the analys
 Three blocks, in this order, nothing before or after.
 
 ---TITLE---
-<the title, in the story language>
+TITLE_CANDIDATES:
+1. <a title, in the story language>
+2. <a second, taking a different angle on the story>
+3. <a third, taking a different angle again>
 
 ---ANALYSIS---
 <one line per page>

@@ -39,17 +39,20 @@ Judge the arc as a reader who sees only this. A fault you name must change the a
 7. Change — does one of the main characters do the same kind of act differently, once early and once late? Name the two, name any change that only restates a trait, and any line that states what someone learned.
 8. Threads — does the number of lines of action match the book's length, and do they meet? Name a second thread that is really a detour, or a long book running on one line.
 9. Joining and parting — does the arc say who starts, who arrives later and why then, and who is separated and where they return? Name anyone who is simply present from the start with no reason.
-10. Blockers — does whoever stands in the way want something of their own? Name any blocker who exists only to be passed.
+10. Blockers — does whoever stands in the way want something of their own? Name any blocker who exists only to be passed. For each blocker, name the earlier moment where the reader could see it coming; a blocker in the last challenge that first exists when it blocks is unearned, even when its cause is natural.
 11. Reasons and closure — is any turn licensed by a sign, an inscription or a rule announced for the purpose? Name any obstacle that belongs to no world but stories — a puzzle door, a riddle, a lock with a trick, a test set by no one — that the commission never established; replace it with something the story's own world contains. Name every object, question or promise opened and where it closes; anything that cannot be closed is cut. Name anything impossible in space or time as written — a thing followed, found or known before it exists, someone in two places, an act that cannot be done while holding what they hold.
-12. Subject and peril — is the thing the book is about present as the STORY SHAPE requires, rather than hinted at offstage? Frightening is the right level: name anything that could kill or injure a child, anyone who looks monstrous, and any separation with no reunion and no safe ending.
+11b. How a fault is corrected — an object with no path may be retired instead of carried: left somewhere for a reason and collected later. Retire it whenever it does nothing in the challenges it would otherwise be carried through. A device may be given its meaning by showing a character learn it, without saying what they learned; take that route whenever the device's meaning is the story's solution.
+12. Subject and peril — is the thing the book is about present as the STORY SHAPE requires, rather than hinted at offstage? Frightening is the right level: name anything that could kill or injure a child, anyone who looks monstrous, and any separation with no reunion and no safe ending. An animal or creature that travels with the children is given a name by them, where they decide to help it; name the arc that leaves it unnamed.
 13. Flow — does the shape run opening, building, relief and ending without a stretch where nothing tightens? Name where it sags or where two turns crowd together.
+14. Clock — when the arc sets a deadline at a time of day, does the starting time leave the book's length to cross? Name a start that reaches the deadline too early or cannot reach it, and move the start rather than the deadline.
+15. Ending — does the last part show the characters safe and together, with one of them feeling something a child can name? Name an ending that closes on distance or silence alone.
 
 # OUTPUT FORMAT
 
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to checks 1-13>
+<your answers to checks 1-15>
 
 ---ARC---
 <the corrected arc, complete, in the same shape as the one you were given>
