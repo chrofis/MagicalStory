@@ -18821,3 +18821,65 @@ need its own plan and Lab validation if ever revisited.
 
 **Touched:** nothing — confirmation of existing code.
 **Status:** ✅ settled by owner. Don't propose lowering it on near-miss evidence.
+
+---
+
+## 2026-08-25 — Landmarks are ranked by a JUDGED story score, not by any fame proxy; a town is only offered its own
+
+**Context (owner):** *"Look at images yourself or find a good way to find famous
+things only. The amount of links is a shitty proxy for this."* Correct, and so is
+every other number in the table. Measured across Dübendorf's 30 rows:
+
+| signal | what it ranks top |
+|---|---|
+| `fame_sitelinks` | A4 motorway (15), cyclocross championship (8), stations (6-7) |
+| Commons category files | Eawag institute (124), A4 motorway (115) |
+| `fame_pageviews` | Empa (1012), Eawag (511) |
+| `score` | parish churches in OTHER towns (135) |
+
+Lazariterkirche Gfenn — a medieval stepped-gable church in a meadow, the one
+genuinely storybook place in the town — is 2 sitelinks, 18 Commons files,
+score 130. **Photo abundance measures how well DOCUMENTED a thing is, not
+whether a small child would enjoy it.** A motorway is very well documented.
+
+**Decision 1 — judge the photo.** `story_score` (migration 029), 0-100, produced
+by `scripts/admin/score-landmarks-for-stories.js`: Haiku is shown the landmark's
+own reference photo plus name, type and extract, and asked how good a place it is
+for a child to visit in a story. It becomes the primary tie-break *within* the
+existing backdrop class in `LANDMARK_RANK_SQL`; `fame_sitelinks` and `score`
+remain behind it, so an unjudged city orders exactly as before — NULL means
+"not judged", never "bad".
+
+Only the photo catches what metadata cannot: **Ruine Dübelstein** is typed
+`Castle` and scores 134, and photographs as knee-high foundation stones in
+gravel (judged 18: *"little more than low stone foundations"*). **"The Hall"** is
+filed in Dübendorf and its photo is Zürich's Limmat with the Grossmünster — a
+wrong image that would have rendered another city into a personalised book. The
+judge's ranking independently matched a manual review of all 13 photos.
+
+**Decision 2 — a town is only offered its own landmarks.** `SAME_MUNICIPALITY_SQL`
+guards the city-NAME lookups: a row is excluded only when its municipality is
+KNOWN and different. NULL is not evidence of anything — 57% of the index has no
+municipality-class P131 — and dropping NULLs would hide most of the table. The
+proximity fallback is untouched: it is explicitly about places *near* a town, so
+a village with none of its own still gets its neighbour's.
+
+Result for Dübendorf — before: Lindenhofbrunnen (Zürich, 6km), Mühlegasse 5 (a
+street address), Giacometti-Halle (Zürich). After: **Lazariterkirche Gfenn (78),
+Maria Frieden (45), Flieger-Flab-Museum (43)** — all three actually in Dübendorf.
+
+**Rejected: re-anchoring `nearest_city` to the municipality wholesale.** The
+dry-run showed it renames anchors into other-language exonyms and sub-districts —
+`Milan → Mailand`, `Neuchâtel → Neuenburg`, `London → City of Westminster`,
+`Biel → Biel/Bienne` — which would strand users whose city string is the common
+form. 1080 prod rows would have moved. Filtering at query time achieves the same
+correctness without touching the anchor.
+
+**Touched files:** `migrations/029_landmark_story_score.sql`,
+`scripts/admin/score-landmarks-for-stories.js`,
+`server/lib/landmarkPhotos.js` (`LANDMARK_RANK_SQL`, `SAME_MUNICIPALITY_SQL`).
+
+**Open:** only Dübendorf is judged. Scoring the whole index is ~1400 backdrop-type
+rows of Haiku calls — cheap, not yet run.
+
+**Status:** ✅ active.

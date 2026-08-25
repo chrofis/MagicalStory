@@ -2298,11 +2298,43 @@ const LANDMARK_CLASS_SQL = `(CASE
   WHEN coalesce(type,'x') IN (${BACKDROP_TYPES}) THEN 2
   ELSE 1 END)`;
 
-// Fame (Wikipedia language editions, migration 025) ranks WITHIN a class.
-// `score` stays as the tie-break so rows not yet backfilled still order
-// sensibly among themselves.
-// City-name lookups have no distance to spend, so they rank on class then fame.
-const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
+// WITHIN a class, rank on how good the place actually is for a children's book.
+//
+// `story_score` (migration 029) leads because every numeric proxy ranks the
+// wrong things. Measured across Dübendorf's 30 rows: fame_sitelinks puts the A4
+// motorway top (15 editions) and a cyclocross championship third (8); Commons
+// file count puts a water-research institute top (124 files) and the motorway
+// second (115); pageviews put Empa top. All three measure how well DOCUMENTED a
+// thing is. Lazariterkirche Gfenn — a medieval stepped-gable church in a meadow,
+// the one genuinely storybook place in the town — is 2 sitelinks, 18 files.
+//
+// story_score is judged from the landmark's own PHOTO, which is the only thing
+// that catches a "Castle" photographing as knee-high stones in gravel, or a row
+// whose picture is of a different city altogether.
+//
+// fame_sitelinks and score remain behind it as fallbacks, so an unjudged city
+// orders exactly as it did before — NULL means "not judged", never "bad".
+const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
+
+// A landmark is only offered as a town's OWN when it is actually in that town.
+//
+// `nearest_city` is the city discovery was searching around, not the one the
+// landmark stands in (10km radius — see migration 028), so a city-name lookup
+// returns the neighbours too: a Dübendorf story was offered Zürich's zoo and a
+// Zürich-Schwamendingen church, and the prompt then tells the writer these are
+// local, which is how a book ended "am Lindenhofbrunnen in Dübendorf" — a place
+// that does not exist.
+//
+// NULL municipality means NOT JUDGED, never "not local": 57% of the index has no
+// municipality-class P131 (motorways, events, unnamed halls) and dropping those
+// would hide most of it. Only a KNOWN, DIFFERENT municipality excludes a row.
+//
+// This guards the city-NAME lookups only. The proximity fallback below is
+// explicitly about places near the town rather than in it, and keeps returning
+// them — a village with no landmarks of its own still gets its neighbour's.
+const SAME_MUNICIPALITY_SQL = `(municipality IS NULL
+  OR LOWER(translate(municipality, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
+     = LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')))`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -2419,10 +2451,11 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // Normalize diacritics on both sides (e.g. "Zurich" matches "Zürich")
     const normalizedCity = normalizeForCompare(city);
 
-    // Try exact match first
+    // Try exact match first — the town's OWN landmarks only (see SAME_MUNICIPALITY_SQL)
     let result = await pool.query(`
       SELECT * FROM landmark_index
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
+        AND ${SAME_MUNICIPALITY_SQL}
       ORDER BY ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
