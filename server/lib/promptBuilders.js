@@ -418,6 +418,33 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
         || (e?.id && e.id.toLowerCase() === key));
       if (entry) { matched = { entry, kind }; break; }
     }
+    // A TITLE IS NOT A DIFFERENT PERSON (owner, 2026-08-25). The Visual Bible
+    // names secondaries in full ("Kapitänin Rossa", "König Ludwig"); the scene
+    // metadata refers to them the way the prose does ("Rossa"). Exact match
+    // alone therefore resolved neither, and the detector was never told that
+    // figure exists — so it borrowed a user character's name for her instead.
+    // Measured on p15 of job_1787514666616_yw9qsv1vf: "Sarah" landed on Rossa
+    // and a face repair whited out the wrong person's head.
+    //
+    // Word-boundary containment either way, and ONLY when exactly one entry
+    // matches: two candidates mean the reference is genuinely ambiguous, and
+    // guessing between them is how the wrong description gets attached.
+    if (!matched) {
+      const asWord = (haystack, needle) =>
+        new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`, 'i').test(haystack);
+      for (const { list, kind } of lists) {
+        if (!Array.isArray(list)) continue;
+        const candidates = list.filter(e => e?.name
+          && (asWord(e.name, name) || asWord(name, e.name)));
+        if (candidates.length === 1) { matched = { entry: candidates[0], kind }; break; }
+        if (candidates.length > 1) {
+          log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene reference "${name}" matches ${candidates.length} Visual Bible entries (${candidates.map(c => c.name).join(', ')}) — too ambiguous to resolve`);
+        }
+      }
+      if (matched) {
+        log.debug(`[BBOX-BUILD] ${pageLabel}Resolved scene reference "${name}" to Visual Bible entry "${matched.entry.name}"`);
+      }
+    }
     if (!matched) {
       log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene references "${name}" but no Visual Bible entry resolves it — the detector will report it as missing`);
       continue;
@@ -4307,6 +4334,7 @@ function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '', audit
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
     STORY_SHAPE: buildStoryShapeSection(inputData, beats.length),
+    TODDLER_MODE: buildToddlerModeSection(inputData),
     PAGE_PLAN: String(pagePlan || '').trim() || '(the planner emitted no page plan — check 6c falls back to the beats alone)',
     CURRENT_BEATS: current,
     CURRENT_ARC: String(arc || '').trim() || '(the planner authored no arc)',
@@ -4379,6 +4407,7 @@ function buildArcReviewPrompt(inputData, arc, auditFindings = '') {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: inputData.pages || (inputData.sceneImages || []).length || 10,
     STORY_SHAPE: buildStoryShapeSection(inputData, inputData.pages || (inputData.sceneImages || []).length || 10),
+    TODDLER_MODE: buildToddlerModeSection(inputData),
     CURRENT_ARC: String(arc || '').trim(),
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
   });

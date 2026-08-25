@@ -20,11 +20,11 @@ const { CARRY_ROUTES, withCarriedFindings } = require('./carryRoutes');
  * Scheduling is by data dependency, not by list order:
  *
  *   beats ─> beats review ─> bible ─┬─> styled avatars   (caller-owned, long pole)
- *                                   ├─> scene expansion ─> scene review
- *                                   └─> page text
+ *                                   └─> scene expansion ─> scene review ─> page text
  *
- * Step 6 reads the beats only, never a brief, so it is started before step 4
- * and awaited after step 5. Styled avatars need only clothingRequirements, so
+ * Step 6 runs AFTER the scene review and reads the FINAL briefs (owner decision
+ * 2026-08-10: the scenes come first, the text must follow — see the note at the
+ * old kickoff site below). Styled avatars need only clothingRequirements, so
  * they start the instant step 3 returns (via opts.onClothingRequirements) and
  * overlap everything after it — page images await briefs AND avatars, both in
  * server.js, unchanged. Step 3 is the one thing that cannot overlap: its
@@ -318,7 +318,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
       : basePrompt,
     arcAuditFindings,
-    CARRY_ROUTES.arc
+    CARRY_ROUTES.arc,
+    // The arc review's analysis ends with its per-fault ledger. Carried with
+    // the findings so the planner respects a "stands, with reason" ruling
+    // instead of re-litigating it (owner: issue 2, 2026-08-25 review).
+    arcReviewReport?.analysis || ''
   );
   if (arcAuditFindings.trim()) {
     gl.info('beats_carry_arc', `Arc audit faults carried into the beats plan (${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
@@ -690,7 +694,9 @@ SCENE: ${x.scene || ''}`.trim(),
       clothingRequirements,
     }),
     beatsAuditFindings,
-    CARRY_ROUTES.beatsToArtDirector
+    CARRY_ROUTES.beatsToArtDirector,
+    // The beats review's rulings ride along — same reason as the arc carry.
+    beatsReviewAnalysis
   );
   if (beatsAuditFindings.trim()) {
     gl.info('beats_carry_artdirector', `Beats audit faults carried into the Art Director (${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
@@ -1131,7 +1137,9 @@ SCENE: ${x.scene || ''}`.trim(),
     const textPrompt = withCarriedFindings(
       buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc),
       beatsAuditFindings,
-      CARRY_ROUTES.beatsToStoryText
+      CARRY_ROUTES.beatsToStoryText,
+      // The beats review's rulings ride along — same reason as the arc carry.
+      beatsReviewAnalysis
     );
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
     if (beatsAuditFindings.trim()) {

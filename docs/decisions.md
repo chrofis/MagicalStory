@@ -18268,9 +18268,12 @@ it. Free — the call is being made either way.
 
 **A stage qualifies only if it REWRITES the faulted material.** That is the rule
 that kept briefs out: every stage after the scene review was checked and none
-of them qualifies — `beats_story_text` never reads a brief by design (it is
-scheduled in parallel with expansion precisely because it does not depend on
-one), `scene_translation` produces `translatedSummary` for the UI which never
+of them qualifies — `beats_story_text` consumes the final briefs but only as
+read-only ILLUSTRATION blocks it must follow, never writing one back
+(correction 2026-08-25: this entry first claimed it never reads a brief,
+describing the parallel scheduling that the 2026-08-10 "scenes come first"
+decision had already superseded — the conclusion stands, the reason was stale),
+`scene_translation` produces `translatedSummary` for the UI which never
 returns to the image path, and `prompt_compress` shortens prose only, and only
 when the prompt exceeds the provider's character budget. Brief faults get the
 targeted second review round instead.
@@ -18673,3 +18676,62 @@ the `migrations/025_landmark_fame.sql` problem, still unconsumed.
 `scripts/admin/backfill-landmark-municipality.js`.
 
 **Status:** ✅ active for the data; 🟡 selection unchanged pending the decision above.
+
+## 2026-08-25 — Carried findings travel WITH the reviewer's rulings, and toddler mode reaches the reviewers
+
+**Context:** An architecture review of the 3-day writing/review overhaul (owner
+session, 2026-08-25 evening) confirmed two gaps as bugs:
+
+1. **Ledger amnesia.** `CARRY_ROUTES` forwarded each audit's RAW faults
+   downstream, without the ledger of the reviewer they were first handed to. A
+   fault that reviewer ruled "stands, with a reason" was re-presented to the
+   beats planner / Art Director / text writer with only "may already answer
+   some of them" — so a downstream stage could re-litigate a ruling it never
+   saw. This is the same mechanism as the travelogue-opener defect in the
+   2026-08-25 provenance trace (beats review ruled a page-turn TRANSITION
+   fault "stands"; the text stage had no memory of that ledger).
+2. **Toddler mode never reached the reviewers.** Only the planner
+   (`story-beats.txt`) and the trial got `toddler-mode.txt`. The arc and beats
+   reviewers saw only the toddler STORY SHAPE — but `story-beats-review.txt`
+   check 3 unconditionally orders "rewrite it so something is at risk", and
+   the content-only rules (no sweets, no real-world errands alone, open/close
+   at home) reached no reviewer at all, so a reviewer rewrite could violate
+   them unchecked.
+
+**Decision:**
+
+1. `withCarriedFindings()` takes a fourth argument, the reviewer's analysis
+   (which ends with its per-fault ledger). When present it is appended as a
+   `---<LABEL>: REVIEWER'S RULINGS---` block with one instruction: a fault the
+   reviewer fixed is satisfied; a fault ruled to stand, with a reason, stays as
+   ruled. All three pipeline call sites pass it (`arcReviewReport?.analysis`
+   for the arc route, `beatsReviewAnalysis` for both beats routes). The Test
+   Lab replay stage passes nothing and keeps its old byte-identical A/B.
+   The full analysis is carried, not a parsed ledger extract — the ledger is
+   free prose, and parsing it would be a new brittle contract for a few
+   thousand input tokens on calls made anyway.
+2. `{TODDLER_MODE}` is injected into `story-arc-review.txt` and
+   `story-beats-review.txt` (after `{STORY_SHAPE}`), via
+   `buildToddlerModeSection` in both builders — same pattern as the planner.
+   Empty at every other age. The audits stay blind on purpose and get nothing.
+
+**Also corrected (stale docs):** the CARRY_ROUTES entry above and the
+`beatsPipeline.js` module header still described `beats_story_text` as
+scheduled in parallel and never reading a brief — superseded on 2026-08-10
+when page text moved after the scene review. Both now state the current
+scheduling; the CARRY_ROUTES conclusion (briefs have no downstream rewriter)
+was and remains correct.
+
+**Verified:** built prompts for an age-2 main character carry `# TODDLER MODE`
+in both review prompts and an age-8 one carries neither text nor placeholder;
+ledger block appends only when a ledger exists; no-ledger calls are
+byte-identical to before. Unit suite 182 passed, same 3 pre-existing
+`active-version-recompute` failures as before the change.
+
+**Unexercised:** no story has yet run with a non-empty rulings block, and no
+toddler story has yet passed through the injected reviewers — validate on the
+next toddler / full-story run.
+
+**Touched files:** `server/lib/carryRoutes.js`, `server/lib/beatsPipeline.js`,
+`server/lib/promptBuilders.js`, `prompts/story-arc-review.txt`,
+`prompts/story-beats-review.txt`, `docs/decisions.md` (in-place correction).
