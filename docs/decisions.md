@@ -18799,3 +18799,25 @@ mid-thirties… hair: deep red…"; pages that do not reference her are unchange
 unchanged.
 
 **Touched:** `server/lib/promptBuilders.js`.
+
+---
+
+## 2026-08-25 — MIN_DEPTH_SPREAD stays at 2.0× (owner confirmation after the proof suite)
+
+**Context:** The proof suite left one open number: three of five runs refused at
+1.48×/1.68×/1.96× against the 2.0× gate, one by four hundredths.
+
+**Decision:** Keep 2.0×. Owner's call via `AskUserQuestion`, 2026-08-25, with
+the near-miss evidence on the table.
+
+**Rationale:** The composite is insurance for DRAMATIC depth failures
+(SETTLED, 2026-08-18 — firing rarely is the intended state). A plate that rolls
+1.5–2× means the direct render already carries moderate depth acceptably;
+refusing is safe and costs nothing further. A near-miss at a threshold is noise
+around the line, not evidence the line is wrong. The depth-aware variant
+(compare painted spread against what the DECLARED cast predicts — a toddler in
+the background is legitimately small) was presented and not chosen; it would
+need its own plan and Lab validation if ever revisited.
+
+**Touched:** nothing — confirmation of existing code.
+**Status:** ✅ settled by owner. Don't propose lowering it on near-miss evidence.
