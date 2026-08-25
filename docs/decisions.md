@@ -18192,3 +18192,50 @@ sites), `scripts/analysis/refine-damage-report.js`,
 `refine-damage-report.js` and in the Lab's `fromWriterText` replay must keep
 working for stories generated before this, which is why both still read
 `textRefineReport.pages[].before`.
+
+## 2026-08-25 — A finding names where it goes (CARRY_ROUTES)
+
+**Owner principle:** *"when naming the issue we should define where it goes."*
+Naming a fault is half the job; the finding also has to say which stage can fix
+it. Otherwise an unresolved one is logged once and dropped, which is what every
+audit in this pipeline did.
+
+**`CARRY_ROUTES` in `beatsPipeline.js`** is now the single place that answers
+it. Each audit's faults go to its own reviewer first; whatever that reviewer
+does not resolve rides into the next call that already happens AND can act on
+it. Free — the call is being made either way.
+
+| findings | destination | why that stage |
+|---|---|---|
+| arc audit | `beats_plan` | it divides the arc into pages |
+| beats audit | Art Director (`beats_scene_expansion`) | it writes each page's brief |
+| beats audit | `beats_story_text` | it writes the page's words |
+| brief checks | *(none)* | nothing downstream rewrites brief metadata |
+
+**A stage qualifies only if it REWRITES the faulted material.** That is the rule
+that kept briefs out: every stage after the scene review was checked and none
+of them qualifies — `beats_story_text` never reads a brief by design (it is
+scheduled in parallel with expansion precisely because it does not depend on
+one), `scene_translation` produces `translatedSummary` for the UI which never
+returns to the image path, and `prompt_compress` shortens prose only, and only
+when the prompt exceeds the provider's character budget. Brief faults get the
+targeted second review round instead.
+
+**Each destination gets an instruction matched to its powers**, which is the
+part that makes this more than a broadcast. The Art Director is told to resolve
+a still-standing visual fault in the brief it writes. The text writer is told
+the opposite — it cannot change a beat, so it is asked only to write the page so
+a reader does not meet the inconsistency, never to contradict a sound beat and
+never to add plot to paper over one. The owner's point that a beats
+inconsistency can be handled in the text is right, but it is mitigation, not
+repair, and the wording says so.
+
+**Verified:** all three routes carry every fault, distinct guidance per
+destination, empty findings leave the prompt byte-identical, a null prompt stays
+null. Ordering checked: `beatsAuditFindings` is assigned at the audit long
+before all three consumers, and `runStoryText` has a single call site after it.
+Unit suite 168 passed, same 3 pre-existing failures.
+
+**Unexercised:** no story has run with a non-empty carry block.
+
+**Touched files:** `server/lib/beatsPipeline.js`.

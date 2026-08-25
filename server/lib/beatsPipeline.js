@@ -1,4 +1,50 @@
 /**
+ * WHERE A FINDING GOES (owner, 2026-08-25).
+ *
+ * Naming an issue is only half the job — a finding also has to say which stage
+ * can fix it. Each audit's faults are handed to its own reviewer first; when
+ * that reviewer does not resolve them, they ride into the NEXT call that
+ * already happens and that can act on them, instead of being logged once and
+ * dropped. Free: the call is being made either way.
+ *
+ * A stage only qualifies as a destination if it REWRITES the faulted material.
+ * That is why briefs have no entry here — every stage after the scene review
+ * was checked and none of them rewrites brief metadata (`story_text` never
+ * reads a brief by design, `scene_translation` produces UI text that never
+ * returns to the image path, `prompt_compress` shortens prose and only when the
+ * prompt is over budget), so brief faults get a targeted second review round
+ * instead. See docs/decisions.md 2026-08-25.
+ *
+ * Each destination gets an instruction matched to what it can actually change:
+ * the Art Director rewrites the page's brief, the text writer cannot alter a
+ * beat at all and can only avoid repeating its mistake.
+ */
+const CARRY_ROUTES = {
+  // Arc faults → the beats plan, which is the stage that divides the arc into pages.
+  arc: {
+    label: 'ARC AUDIT',
+    intro: 'An audit of the draft arc raised the faults below. The approved arc may already answer some of them. Where one still stands, resolve it in the page plan.',
+  },
+  // Beats faults → the Art Director, which writes each page's brief...
+  beatsToArtDirector: {
+    label: 'BEATS AUDIT',
+    intro: 'An audit of the draft beats raised the faults below. The reviewed beats may already answer some of them. Where one still stands and it is visual, resolve it in the brief you write for that page.',
+  },
+  // ...and → the text writer, which cannot change a beat, only how it reads.
+  beatsToStoryText: {
+    label: 'BEATS AUDIT',
+    intro: 'An audit of the draft beats raised the faults below. The reviewed beats may already answer some of them. Where one still stands, write the page so a reader does not meet the inconsistency: do not restate the contradicted detail and do not draw attention to it. Never contradict a beat that is sound, and never add plot to paper over one.',
+  },
+};
+
+/** Append a routed findings block to a built prompt. Empty findings change nothing. */
+function withCarriedFindings(prompt, findings, route) {
+  const body = String(findings || '').trim();
+  if (!prompt || !body || !route) return prompt;
+  return `${prompt}\n\n${route.intro}\n\n---${route.label}---\n${body}`;
+}
+
+/**
  * Beats-first story generation (pipelineMode: 'beats').
  *
  * Replaces the single unified Sonnet call + outline review with staged
@@ -309,13 +355,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // pages. Costs nothing, and a fault the reviewer already fixed simply reads
   // as satisfied. The same trick does not work downstream of the scene review —
   // no later stage rewrites brief metadata (docs/decisions.md 2026-08-25).
-  const arcCarry = arcAuditFindings.trim()
-    ? `\n\nAn audit of the draft arc raised the faults below. The approved arc may already answer some of them. Where one still stands, resolve it in the page plan.\n\n---ARC AUDIT---\n${arcAuditFindings.trim()}`
-    : '';
-  const planPrompt = approvedArc
-    ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}${arcCarry}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
-    : basePrompt;
-  if (arcCarry) gl.info('beats_arc_carry', `Arc audit faults carried into the beats plan (${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+  const planPrompt = withCarriedFindings(
+    approvedArc
+      ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
+      : basePrompt,
+    arcAuditFindings,
+    CARRY_ROUTES.arc
+  );
+  if (arcAuditFindings.trim()) {
+    gl.info('beats_carry_arc', `Arc audit faults carried into the beats plan (${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+  }
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
@@ -672,15 +721,22 @@ SCENE: ${x.scene || ''}`.trim(),
   t = Date.now();
   const beatPageNumbers = beats.map(b => b.pageNumber);
   let expansions = [];
-  const allPrompt = buildSceneExpansionAllPrompt(inputData, beats, {
-    visualBible,
-    availableAvatars,
-    maxCharactersPerScene,
-    // The Art Director needs the outfit TEXT, not just the category key — see
-    // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
-    // only source, and it is resolved by the time scenes are expanded.
-    clothingRequirements,
-  });
+  const allPrompt = withCarriedFindings(
+    buildSceneExpansionAllPrompt(inputData, beats, {
+      visualBible,
+      availableAvatars,
+      maxCharactersPerScene,
+      // The Art Director needs the outfit TEXT, not just the category key — see
+      // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
+      // only source, and it is resolved by the time scenes are expanded.
+      clothingRequirements,
+    }),
+    beatsAuditFindings,
+    CARRY_ROUTES.beatsToArtDirector
+  );
+  if (beatsAuditFindings.trim()) {
+    gl.info('beats_carry_artdirector', `Beats audit faults carried into the Art Director (${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+  }
   if (!allPrompt) {
     log.error('🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
     gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
@@ -1114,8 +1170,15 @@ SCENE: ${x.scene || ''}`.trim(),
       log.warn('⚠️ [BEATS] Step 6 has NO scene briefs — text is being written blind to the illustrations');
       gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
     }
-    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc);
+    const textPrompt = withCarriedFindings(
+      buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc),
+      beatsAuditFindings,
+      CARRY_ROUTES.beatsToStoryText
+    );
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
+    if (beatsAuditFindings.trim()) {
+      gl.info('beats_carry_storytext', `Beats audit faults carried into the page text (${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+    }
     const beatPages = beats.map(b => b.pageNumber);
     let raw = '';
     let modelId = textModel;
