@@ -157,13 +157,21 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ## Story text quality — the review stages trade feeling for logistics
 
-- [ ] **The landmark mandate teleports a toddler book (observed 2026-08-25).** `story-trial.txt`'s
+- [ ] **The landmark mandate teleports a toddler book — 2 of 2 toddler stories (2026-08-25).** `story-trial.txt`'s
       LANDMARKS section says "At least one scene MUST take place at one of these real local
       landmarks", and toddler mode says "No journeys. The story begins where it happens." In staging
       story `job_1787683120734_qkgfbd86o` the two collided: pages 1-5 are on a pirate ship at sea,
       then p6 opens "Später sitzt Leynor am Stüssibrunnen in Dübendorf" — an unexplained teleport on
       the last page. Fix is a choice: drop the landmark requirement in toddler mode, or set the whole
       story at the landmark from p1. → `prompts/story-trial.txt` (LANDMARKS), `prompts/toddler-mode.txt`
+      SECOND occurrence, same shape: `job_1787687259758_k7mennm8c` p1-p5 are on a pirate ship at sea,
+      p6 opens "Nach dem grossen Abenteuer auf dem Piratenschiff sitzt Leynor am Lindenhofbrunnen in
+      Dübendorf". Every toddler story with a landmark has done this, so it is systematic, not luck.
+- [ ] **"riesenross" — a non-word the writer produces for "riesengross", twice in one day.**
+      `job_1787682773703_v5c2dq4te` p4 ("Seine Augen werden riesenross") and
+      `job_1787687259758_k7mennm8c` p2 ("Das Steuerrad ist riesenross"). Both de-CH, both survived
+      text refine. Two occurrences in two of three stories is a pattern, not a one-off sampling slip.
+      → text-refine / story-text-audit prompts
 - [x] **Toddler mode (ages 1–3) — BUILT 2026-08-25, verified on two staging runs.** No narrative age branch in the system
       goes below 3 (challenge catalogue starts at 3–5, story shape at `focusAge <= 5`, lowest reading
       level is `1st-grade`); `toddler` exists only as body proportions. Prod trial
