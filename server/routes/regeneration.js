@@ -5566,6 +5566,29 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               const c = storyData.characters?.find(x => x.name === name);
               return { name, description: c ? buildCharacterPhysicalDescription(c) : name };
             });
+            // STORY-INVENTED PEOPLE NEED DESCRIBING TOO (owner, 2026-08-24).
+            // The detector distributes the names it is given over the figures it
+            // sees. Give it only the USER's characters and a story-invented
+            // character standing in the picture still gets one of those names —
+            // measured on p15 of job_1787514666616_yw9qsv1vf: the Visual Bible's
+            // "Kapitänin Rossa" (secondary character, pages 7/8/12/15/16, "hair:
+            // deep red…") was labelled "Sarah", so the face repair whited out
+            // ROSSA's head and Grok repainted her with Sarah's face. Three
+            // draws, three blend-gate rejections, and the real answer — Sarah is
+            // not in this picture — was unreachable because a confident wrong
+            // name looks exactly like a right one. The VB carries these people
+            // with a description and a page list; use both.
+            const vb = storyData.visualBible || {};
+            for (const c of [...(vb.secondaryCharacters || []), ...(vb.mainCharacters || [])]) {
+              if (!c?.name || !c.description) continue;
+              const pages = c.pages || c.appearsInPages;
+              // No page list → offer them anyway; a wrong extra name costs the
+              // detector nothing, a missing one costs a misattribution.
+              if (Array.isArray(pages) && !pages.includes(pageNumber)) continue;
+              if (castNames.has(c.name)) continue;
+              castNames.add(c.name);
+              expectedCharacters.push({ name: c.name, description: c.description });
+            }
             const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
               expectedCharacters,
               sceneContext: (sceneImage.description || '').slice(0, 2000),

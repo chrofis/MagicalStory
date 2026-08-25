@@ -46,7 +46,12 @@ test('face repair repaints only the target when characters overlap', async ({ pa
     `${BASE}/api/stories/${STORY_ID}/repair-workflow/character-repair`,
     {
       headers: { Authorization: `Bearer ${token}` },
-      data: { repairs: [{ character: CHARACTER, pages: [PAGE_NUMBER] }] },
+      // EXACTLY WHAT THE UI SENDS. The repair-face button passes
+      // whiteoutTarget:'face' (StoryWizard.tsx), which routes through
+      // resolveRepairAxes to the tight cutout+whiteout path. Omitting it takes
+      // the body/full-scene path instead — a different code path that fails for
+      // a different reason, which is not the case under test.
+      data: { repairs: [{ character: CHARACTER, pages: [PAGE_NUMBER] }], whiteoutTarget: 'face' },
       timeout: 540_000,
     },
   );
