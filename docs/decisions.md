@@ -18946,3 +18946,25 @@ for cities that need it and is the only thing that catches a wrong photo or a
 `scripts/admin/sync-landmark-index-to-staging.js`.
 
 **Status:** ✅ active.
+
+---
+
+## 2026-08-25 (addendum 2) — a landmark judged unsuitable is not offered at all
+
+Ranking a bad landmark low is not enough. The idea generator is handed the top
+10 and told to "use 1-2 of these" (`storyIdeas.js`), so it picks on narrative
+fit, not on our order: given Dübendorf's list it chose **Giessenturm** — judged
+12, *"a modern apartment tower seen from a construction site"* — over the town's
+medieval church at 73.
+
+`JUDGED_USABLE_SQL` (`story_score IS NULL OR story_score >= 30`) drops rows a
+photo shows to be an apartment block, an office or a building site. The bar is
+deliberately low — everything merely ordinary stays — and NULL is untouched, so
+a city that has never been judged behaves exactly as before.
+
+Dübendorf's offered list is now Lazariterkirche Gfenn (73), Flieger-Flab-Museum
+(47), Maria Frieden (45).
+
+**Touched files:** `server/lib/landmarkPhotos.js`.
+
+**Status:** ✅ active.

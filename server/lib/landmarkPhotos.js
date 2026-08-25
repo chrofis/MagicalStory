@@ -2357,6 +2357,17 @@ const SAME_MUNICIPALITY_SQL = `(municipality IS NULL
 // which is exactly the last-resort role they were built for.
 const NEVER_A_SETTING_SQL = `coalesce(type,'x') NOT IN ('Event','Organisation','Other')`;
 
+// A row JUDGED unsuitable is not offered at all. Ranking it low is not enough:
+// the idea generator is handed the top 10 and told to "use 1-2 of these", so it
+// picks on narrative fit, not on our order — it chose Giessenturm (judged 12,
+// "a modern apartment tower seen from a construction site") over the town's
+// medieval church at 73.
+//
+// The bar is deliberately low. It removes what a photo shows to be an apartment
+// block, an office or a construction site, and keeps everything merely ordinary.
+// NULL is untouched: a city that has never been judged behaves exactly as before.
+const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= 30)`;
+
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
 // own bridge 400m from the centre (3 editions), and the neighbouring village's
@@ -2478,6 +2489,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
         AND ${SAME_MUNICIPALITY_SQL}
         AND ${NEVER_A_SETTING_SQL}
+        AND ${JUDGED_USABLE_SQL}
       ORDER BY ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
@@ -2490,6 +2502,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
         WHERE TRIM(REPLACE(LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
           AND ${SAME_MUNICIPALITY_SQL}
           AND ${NEVER_A_SETTING_SQL}
+        AND ${JUDGED_USABLE_SQL}
         ORDER BY ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [inputNorm, limit]);
