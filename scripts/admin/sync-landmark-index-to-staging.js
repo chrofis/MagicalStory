@@ -47,6 +47,10 @@ const COLUMNS = [
   'photo_url_6', 'photo_attribution_6', 'photo_description_6',
   'photo_type', 'photo_type_2', 'photo_type_3', 'photo_type_4', 'photo_type_5', 'photo_type_6',
   'fame_sitelinks', 'fame_pageviews', 'fame_updated_at',
+  // Enrichment lives on prod and must travel with the row, or staging silently
+  // ranks on the old signals while prod ranks on the new ones.
+  'municipality', 'municipality_updated_at',
+  'story_score', 'story_score_reason', 'story_score_at',
 ];
 
 (async () => {

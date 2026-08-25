@@ -18883,3 +18883,59 @@ correctness without touching the anchor.
 rows of Haiku calls — cheap, not yet run.
 
 **Status:** ✅ active.
+
+---
+
+## 2026-08-25 (addendum) — `fame_pageviews` fixes landmark ranking for EVERY city, for free
+
+**Context (owner):** *"only Dübendorf or all — you must fix all issues you find
+and all cities"*, then *"do everything you can in console without api calls"*.
+
+Judging photos with Haiku works but only scales at a price (~1038 unjudged
+backdrop rows on prod). The free fix was already in the database and unused.
+
+**`fame_pageviews` is populated on 4754 of 4764 rows (99.8%)** — backfilled by
+migration 025 and never consumed — while `fame_sitelinks`, which *was* consumed,
+is the worst signal available: a motorway has 15 language editions, a cyclocross
+championship 8, a railway station 6, against 2 for a town's medieval church.
+
+**Decision:** rank `class DESC, story_score DESC, fame_pageviews DESC,
+fame_sitelinks DESC, score DESC`. Pageviews measure people actually looking a
+place up, so inside the backdrop class they order real landmarks sensibly with
+no API calls and no per-city work. `story_score` still leads where a city has
+been judged; everything else improves anyway.
+
+Measured immediately, with zero calls:
+
+| city | before | after |
+|---|---|---|
+| Zürich | Grossmünster **unreachable** (`score 0`) | Grossmünster, Fraumünster, Wasserkirche |
+| Luzern | — | Löwendenkmal, Kapellbrücke, KKL |
+| Bern | — | Zytglogge, Zentrum Paul Klee, Bellevue Palace |
+| Basel | — | Kunstmuseum, Jüdisches Museum, Mittlere Brücke |
+| Dübendorf | Lindenhofbrunnen (Zürich), Mühlegasse 5 | Lazariterkirche Gfenn, Flieger-Flab-Museum, Maria Frieden |
+
+**Second fix — class 0 is excluded, not merely ranked last.** A town whose index
+holds nothing else was still served it: Wallisellen's only surviving row was
+`Wallisellen (Stadt)`, the municipality entity itself. `IS_A_PLACE_SQL` drops
+class 0 from the city-NAME lookups so the proximity fallback offers a real
+neighbouring landmark instead. **1901 rows — 40% of the index** — can no longer
+be served as a scene setting.
+
+**Third fix — 30 rows per environment had leading/trailing whitespace** in
+`nearest_city` / `municipality` (`"Poschiavo "`), which defeats the exact-match
+lookup. Trimmed on both.
+
+**Sync now carries the enrichment:** `municipality`, `story_score` and their
+timestamps were added to `sync-landmark-index-to-staging.js`, or staging would
+rank on the old signals while prod ranked on the new.
+
+**Not done: judging all 1038 remaining backdrop rows with Haiku** (~CHF 2). The
+free ranking already fixes every city measured; per-photo judging stays available
+for cities that need it and is the only thing that catches a wrong photo or a
+`Castle` that is really knee-high stones.
+
+**Touched files:** `server/lib/landmarkPhotos.js`,
+`scripts/admin/sync-landmark-index-to-staging.js`.
+
+**Status:** ✅ active.

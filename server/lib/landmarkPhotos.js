@@ -2312,9 +2312,17 @@ const LANDMARK_CLASS_SQL = `(CASE
 // that catches a "Castle" photographing as knee-high stones in gravel, or a row
 // whose picture is of a different city altogether.
 //
-// fame_sitelinks and score remain behind it as fallbacks, so an unjudged city
-// orders exactly as it did before — NULL means "not judged", never "bad".
-const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
+// Behind it, `fame_pageviews` ranks every city for free. It is populated on
+// 4754 of 4764 rows (99.8%) by migration 025 and was never consumed, while
+// `fame_sitelinks` — which WAS consumed — is the worst of the signals: a
+// motorway has 15 language editions, a cyclocross championship 8, a railway
+// station 6, against 2 for the town's medieval church. Pageviews measure people
+// actually looking the place up, so within the backdrop class they order real
+// landmarks sensibly with no API calls and no per-city work.
+//
+// sitelinks and score stay as last resorts for the 10 rows with no pageviews.
+// A NULL anywhere means "unknown", never "bad".
+const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LAST, fame_pageviews DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
 
 // A landmark is only offered as a town's OWN when it is actually in that town.
 //
@@ -2335,6 +2343,14 @@ const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LA
 const SAME_MUNICIPALITY_SQL = `(municipality IS NULL
   OR LOWER(translate(municipality, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
      = LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')))`;
+
+// Class 0 is "not a place at all" — a municipality, an event, an organisation.
+// Ranking it last was not enough: a town whose index holds nothing else still
+// gets it served. Wallisellen's only surviving row was `Wallisellen (Stadt)`,
+// the municipality entity itself, which a story would have to set a scene in.
+// Excluding it lets the proximity fallback offer a real neighbouring landmark
+// instead, which is the right answer for a town with none of its own.
+const IS_A_PLACE_SQL = `${LANDMARK_CLASS_SQL} > 0`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -2456,6 +2472,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       SELECT * FROM landmark_index
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
         AND ${SAME_MUNICIPALITY_SQL}
+        AND ${IS_A_PLACE_SQL}
       ORDER BY ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
@@ -2466,6 +2483,8 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       result = await pool.query(`
         SELECT * FROM landmark_index
         WHERE TRIM(REPLACE(LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
+          AND ${SAME_MUNICIPALITY_SQL}
+          AND ${IS_A_PLACE_SQL}
         ORDER BY ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [inputNorm, limit]);
