@@ -73,10 +73,42 @@ const detection = {
   assert.strictEqual(plan.anchorPage, 1, 'anchor falls back to first dominant-cluster PAGE with an image (covers never anchor)');
   assert.deepStrictEqual(plan.targets.map(t => t.page), [-1, -3, 3], 'front cover, back cover AND page 3 are all repair targets');
   const front = plan.targets.find(t => t.page === -1);
-  assert.strictEqual(front.image, 'data:image/jpeg;base64,FRONT', 'front-cover target uses the cover pixels');
+  // No ${key}Art stored here, so the composed cover is the only source.
+  assert.strictEqual(front.image, 'data:image/jpeg;base64,FRONT', 'front-cover target falls back to the composed cover when no art is stored');
+  assert.strictEqual(front.usedArt, false, 'fallback is flagged so the caller does not restamp');
+  assert.strictEqual(front.coverKey, 'frontCover', 'the cover key travels with the target');
   assert.strictEqual(front.targetRefPage, 1, 'cover repaints toward the page anchor');
   assert.strictEqual(plan.skipped.length, 0, 'nothing skipped when all outliers have images');
   ok('planStyleRepair repairs cover outliers like pages (owner: covers = pages)');
+}
+
+// A cover with stored TEXTLESS art is repainted from the ART, never from the
+// composed cover — handing a model the baked-in title lets it restyle the
+// lettering (Lab #837 repainted it on all three arms). The caller restamps.
+{
+  const storyWithArt = {
+    ...storyData,
+    coverImages: {
+      frontCover: { imageData: 'data:image/jpeg;base64,FRONT_TITLED' },
+      frontCoverArt: { imageData: 'data:image/jpeg;base64,FRONT_TEXTLESS' },
+      backCover: { imageData: 'data:image/jpeg;base64,BACK_TITLED' },
+    },
+  };
+  const det = {
+    dominantCluster: [1, 2],
+    anchorPage: 1,
+    outliers: [{ page: -1, severity: 'major' }, { page: -3, severity: 'major' }],
+  };
+  const plan = planStyleRepair(det, storyWithArt);
+  const front = plan.targets.find(t => t.page === -1);
+  assert.strictEqual(front.image, 'data:image/jpeg;base64,FRONT_TEXTLESS', 'the front cover repaints from its textless art');
+  assert.strictEqual(front.usedArt, true, 'usedArt tells the caller to restamp the title');
+  assert.strictEqual(front.coverKey, 'frontCover');
+  // The back cover has no art stored — it must still be repairable.
+  const back = plan.targets.find(t => t.page === -3);
+  assert.strictEqual(back.image, 'data:image/jpeg;base64,BACK_TITLED', 'a cover without stored art still uses the composed image');
+  assert.strictEqual(back.usedArt, false);
+  ok('planStyleRepair repaints covers from textless art when it exists');
 }
 
 // A cover outlier with NO stored cover image is skipped (not a crash).

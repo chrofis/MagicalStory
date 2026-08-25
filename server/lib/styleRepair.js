@@ -185,10 +185,23 @@ function planStyleRepair(detection, storyData, opts = {}) {
       pagesByNum.set(s.pageNumber, s.imageData);
     }
   }
-  // Covers join the repairable set at their negative page numbers.
+  // Covers join the repairable set at their negative page numbers — as their
+  // TEXTLESS art wherever it exists (2026-08-24). Feeding the composed cover to
+  // an image model hands it the title as pixels to restyle: Lab #837 selected
+  // page -1 and all three arms repainted the lettering along with the art. It
+  // stayed legible that once; nothing guarantees it. `${coverKey}Art` is the
+  // canonical textless source, and the caller restamps with composeCover the
+  // same way the cover-inpaint path does. No art stored (older stories) → fall
+  // back to the composed cover, which is still better than skipping the outlier.
+  const coverArtSource = new Map();
   for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_NUMBERS)) {
-    const img = storyData?.coverImages?.[coverKey]?.imageData;
-    if (img) pagesByNum.set(coverPage, img);
+    const art = storyData?.coverImages?.[`${coverKey}Art`]?.imageData;
+    const composed = storyData?.coverImages?.[coverKey]?.imageData;
+    const img = art || composed;
+    if (img) {
+      pagesByNum.set(coverPage, img);
+      coverArtSource.set(coverPage, { coverKey, usedArt: !!art });
+    }
   }
 
   const dominantCluster = Array.isArray(det.dominantCluster) ? det.dominantCluster : [];
@@ -222,7 +235,12 @@ function planStyleRepair(detection, storyData, opts = {}) {
     seen.add(page);
     if (!pagesByNum.has(page)) { skipped.push({ page, reason: page < 0 ? 'no stored image for cover' : 'no stored image for page' }); continue; }
     if (!anchorImage) { skipped.push({ page, reason: 'no dominant-cluster reference image available' }); continue; }
+    const coverSrc = coverArtSource.get(page) || null;
     targets.push({
+      // Covers only: which cover this is, and whether the repaint source is the
+      // textless art. The caller restamps the title back on when it is.
+      coverKey: coverSrc?.coverKey || null,
+      usedArt: coverSrc ? coverSrc.usedArt : false,
       page,
       image: pagesByNum.get(page),
       targetRefPage: anchorPage,

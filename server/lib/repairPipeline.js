@@ -2834,6 +2834,25 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} rejected — ${why}; original kept`);
               continue;
             }
+            // COVER: the repaint ran on the textless art, so the title has to
+            // go back on before this becomes the served cover. Same
+            // restampCover contract the cover-inpaint path above uses —
+            // titledData is what ships, textlessData feeds ${key}Art.
+            if (target.coverKey && target.usedArt) {
+              try {
+                const { restampCover } = require('./coverTypography');
+                const figures = storyData?.coverImages?.[target.coverKey]?.bboxDetection?.figures || [];
+                const stamped = await restampCover(storyData, target.coverKey, rep.imageData, { seed: storyData?.title, figures });
+                rep.artImageData = stamped.textlessData;
+                rep.imageData = stamped.titledData;
+                log.info(`🎨 [UNIFIED PIPELINE] Step 5: ${target.coverKey} title restamped onto the repainted art`);
+              } catch (e) {
+                // The repaint is textless art; shipping it as the cover would
+                // drop the title entirely. Keep the original instead.
+                log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: ${target.coverKey} restamp failed (${e.message}) — original cover kept`);
+                continue;
+              }
+            }
             const versions = pageVersions.get(target.page);
             const prevBest = finalBestPerPage.get(target.page);
             if (!versions || !prevBest) {
@@ -2847,6 +2866,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const { applyScore: stampStyleRepair } = require('./scoring');
             const newVersion = {
               imageData: rep.imageData,
+              // Covers only: the repainted TEXTLESS art, so ${key}Art tracks the
+              // served cover instead of going stale against it.
+              ...(rep.artImageData ? { artImageData: rep.artImageData } : {}),
               score: prevBest.score ?? null,
               source: `style-repair-${styleRepairModel}`,
               evaluation: prevBest.evaluation || null,
