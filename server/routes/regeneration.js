@@ -5495,6 +5495,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           // 1. Try bbox from quality evaluation (stored on scene/version — most reliable)
           let storedAppearance = null;
+          // Set when step 3 runs, so the protection list below can use the same
+          // figures instead of falling back to nothing.
+          let freshDetection = null;
           const sceneBbox = sceneImage.bboxDetection;
           if (sceneBbox?.figures && bboxPairsWith(sceneBbox, sceneImage.imageData)) {
             const fig = sceneBbox.figures.find(f =>
@@ -5568,6 +5571,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               sceneContext: (sceneImage.description || '').slice(0, 2000),
               artStyle
             });
+            // Keep it for the protection list below — see freshDetection.
+            freshDetection = detection;
             const charFigure = detection?.figures?.find(f =>
               f.name?.toLowerCase() === characterName.toLowerCase() ||
               f.label?.toLowerCase().includes(characterName.toLowerCase())
@@ -5689,8 +5694,26 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const protectedFaces = [];
           const protectedBodies = [];
           const toRect = (b) => Array.isArray(b) ? b : [b.y, b.x, b.y + b.height, b.x + b.width];
-          if (sceneBbox?.figures) {
-            for (const fig of sceneBbox.figures) {
+          // PROTECT THE NEIGHBOURS FROM WHICHEVER DETECTION WE ACTUALLY HAVE
+          // (owner, 2026-08-24). This list was built only from the STORED
+          // detection. A page with no stored detection — p15 of
+          // job_1787514666616_yw9qsv1vf has `figures: []` — therefore protected
+          // nobody: Grok got a mask over two shoulder-to-shoulder women, was
+          // free to repaint both, and turned the one behind Sarah into a
+          // bearded man. The figure moved, and the blend gate correctly refused
+          // (54% mask IoU, and twice before that "the model redrew the SCENE").
+          // Step 3 had just detected all four figures and threw the result
+          // away. The stored boxes are also only valid for the bytes they were
+          // computed on, so an unpaired stored detection is worse than the
+          // fresh one — same pairing rule as the target box above.
+          const protectionSource =
+            (sceneBbox?.figures && bboxPairsWith(sceneBbox, sceneImage.imageData)) ? sceneBbox
+              : (freshDetection?.figures ? freshDetection : null);
+          if (!protectionSource?.figures?.length) {
+            log.warn(`⚠️ [CHAR REPAIR] p${pageNumber}: no usable detection for neighbour protection — other figures in the mask can be repainted`);
+          }
+          if (protectionSource?.figures) {
+            for (const fig of protectionSource.figures) {
               if (!fig.name || fig.name === 'UNKNOWN') continue;
               if (fig.name.toLowerCase() === characterName.toLowerCase()) continue;
               if (fig.faceBox) {

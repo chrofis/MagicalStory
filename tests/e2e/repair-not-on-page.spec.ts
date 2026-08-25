@@ -1,15 +1,18 @@
 import { test, expect, Page } from '@playwright/test';
 
 /**
- * A face repair for a character who is NOT in the picture must refuse, say who
- * WAS detected, and offer a page redo instead of a retry — without spending a
- * model call.
+ * A face repair on a page where the target stands shoulder-to-shoulder with
+ * another character must repaint ONLY the target.
  *
- * The regression this locks down: step 3 of the bbox ladder asked the detector
- * for a lineup of ONE name, so it always produced a box. Sarah is not on p15 of
- * this story (her appearances are pages 2/4/7/12/-2); the old code pointed Grok
- * at a different character, and all three draws were rejected by the blend gate
- * at 43% mask IoU — silently, with no images and no reason in the UI.
+ * The regression this locks down: the neighbour-protection list was built only
+ * from the STORED bbox detection. p15 of this story has `figures: []` stored,
+ * so nothing was protected — Grok received a mask covering two overlapping
+ * women, repainted both (turning the one behind Sarah into a bearded man), the
+ * silhouette moved, and the blend gate rejected all three draws at 54% mask
+ * IoU. Step 3 had just detected all four figures and discarded the result.
+ *
+ * The contract: the repair produces an image, and every rejected draw is
+ * inspectable rather than silent.
  */
 
 const STORY_ID = 'job_1787514666616_yw9qsv1vf';
@@ -35,43 +38,51 @@ async function authenticate(page: Page) {
   return token as string;
 }
 
-test('face repair refuses when the character is not on the page', async ({ page }) => {
-  test.setTimeout(240_000);
+test('face repair repaints only the target when characters overlap', async ({ page }) => {
+  test.setTimeout(600_000);
   const token = await authenticate(page);
 
-  // The API is the contract under test; the panel renders what it returns.
   const res = await page.request.post(
     `${BASE}/api/stories/${STORY_ID}/repair-workflow/character-repair`,
     {
       headers: { Authorization: `Bearer ${token}` },
       data: { repairs: [{ character: CHARACTER, pages: [PAGE_NUMBER] }] },
-      timeout: 180_000,
+      timeout: 540_000,
     },
   );
   expect(res.ok(), `repair call failed: ${res.status()}`).toBeTruthy();
   const body = await res.json();
 
-  const failed = body.results?.[0]?.pagesFailed || [];
-  const entry = failed.find((f: { pageNumber: number }) => f.pageNumber === PAGE_NUMBER);
-  expect(entry, `no pagesFailed entry for page ${PAGE_NUMBER}: ${JSON.stringify(body).slice(0, 600)}`).toBeTruthy();
+  const result = body.results?.[0];
+  const repaired = result?.pagesRepaired || [];
+  const failed = result?.pagesFailed || [];
+  const failure = failed.find((f: { pageNumber: number }) => f.pageNumber === PAGE_NUMBER);
 
-  // Refused for the right reason, before any model call.
-  expect(entry.notOnPage, `expected notOnPage; got reason: ${entry.reason}`).toBe(true);
-  expect(entry.rejectedReason).toBe('not_on_page');
+  // On a rejection, every draw must be inspectable — that is what separates a
+  // correct gate verdict from a silent dead end.
+  if (failure) {
+    // eslint-disable-next-line no-console
+    console.log(`[repair] REJECTED: ${failure.reason}`);
+    for (const f of failure.attemptFrames || []) {
+      // eslint-disable-next-line no-console
+      console.log(`  attempt ${f.attempt}: ${f.rejectedReason} — ${f.gateMessage}`);
+    }
+    expect(
+      (failure.attemptFrames || []).length,
+      'a rejected repair must carry its attempt frames',
+    ).toBeGreaterThan(0);
+    for (const f of failure.attemptFrames || []) {
+      expect(f.grokRawResult || f.blackoutImage, `attempt ${f.attempt} carries no image`).toBeTruthy();
+    }
+  }
 
-  // The message names who WAS found — that is what makes it actionable.
-  expect(entry.reason).toContain(CHARACTER);
-  expect(entry.reason).toMatch(/Detected instead:|No figures were detected/);
-  expect(entry.reason).toContain('redo the page');
-
-  // Nothing was repainted.
-  expect(body.results?.[0]?.pagesRepaired || []).toHaveLength(0);
-
-  // eslint-disable-next-line no-console
-  console.log(`[not-on-page] ${entry.reason}`);
+  expect(
+    repaired.length,
+    `repair produced no image. reason: ${failure?.reason || 'none reported'}`,
+  ).toBeGreaterThan(0);
 });
 
-test('the story page still renders after a refused repair', async ({ page }) => {
+test('the story page still renders after a repair attempt', async ({ page }) => {
   test.setTimeout(120_000);
   await authenticate(page);
   const errors: string[] = [];
