@@ -4083,7 +4083,8 @@ function buildStoryShapeSection(inputData, pageCount) {
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
       `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — every page is theirs to enjoy, none is theirs to solve.`,
-      'Challenges: none. Nothing goes wrong and nothing is at stake; the variety is what carries the book.',
+      'Challenges: one, small. Something is taken, dropped or will not work, the main character minds, and it is put right within a page or two. Nothing they must work out, nothing frightening.',
+      'Feelings: three different ones across the book, plain on the face — delight, surprise, and a moment of being upset. The last page is happy.',
       'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.',
       others.length
         ? `Everyone else — ${others.map(c => c.name).join(', ')} — is simply there alongside the main character. No moment of their own, no arc.`

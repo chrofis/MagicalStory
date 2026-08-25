@@ -104,12 +104,16 @@ describe('buildToddlerModeSection', () => {
 });
 
 describe('buildStoryShapeSection', () => {
-  it('prices no challenges and no page budget in toddler mode', () => {
+  it('asks for one small setback and a range of feelings, not the computed challenge budget', () => {
     const shape = buildStoryShapeSection({
       characters: [char(1, 'A', 1, true)], mainCharacters: [1], storyTheme: 'pirate',
     }, 6);
-    expect(shape).toContain('Challenges: none.');
+    // One small thing goes wrong and comes right (owner, 2026-08-25) — NOT the
+    // multi-challenge page budget, which prices work a toddler cannot do.
+    expect(shape).toMatch(/Challenges: one, small/);
+    expect(shape).toMatch(/Feelings: three different ones/);
     expect(shape).not.toMatch(/major challenge/);
+    expect(shape).toMatch(/6 distinct events/);
   });
 
   it('keeps the computed challenge budget at every other age', () => {

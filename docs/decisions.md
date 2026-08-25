@@ -18424,3 +18424,41 @@ delights, and the personalised traits are the obvious source of them.
 `server/lib/promptBuilders.js` (`buildStoryShapeSection` toddler branch).
 
 **Status:** ✅ active (not yet run — no story has been generated under it).
+
+---
+
+## 2026-08-25 — Toddler mode: one small setback IS wanted, and three feelings (supersedes "nothing goes wrong" from the same day)
+
+**Reverses**, on owner instruction, the "Plenty happens; nothing goes wrong" line
+written hours earlier in the entry above.
+
+**Context:** with variety fixed, the remaining complaint was flatness. Owner:
+*"the traits are not really shown. Try to show at least 2, better 3 different
+emotions. Happy is a given for the ending. But what about surprised in one page
+and maybe a bit sad or upset on another. Can still have a story line. The seagull
+steals his food. Unhappy, he gets it back, happy."*
+
+**Decision:**
+
+- **Three feelings** across the book (two minimum), plain on the face and in the
+  body: delight, surprise, and a moment of being upset or sad. The last page is
+  happy.
+- **One small thing goes wrong and comes right** — taken, dropped, blown away or
+  will not work; the child minds; it is put right within a page or two. That is
+  the whole storyline and it is enough.
+- The guardrails that stay: never frightening, never dangerous, nobody unkind on
+  purpose, and **nothing the child has to work out to fix**.
+- Story shape now states `Challenges: one, small` (was `none`) plus a Feelings
+  line.
+
+**Rationale:** the earlier "nothing goes wrong" was aimed at the wrong target. The
+thing a child of three or under cannot do is *reason their way out of a problem* —
+not *have a feeling about one*. A seagull taking the food is an emotional beat,
+not a puzzle, and it is what gives the traits something to play against. The
+distinction that matters is emotional stake vs. cognitive demand.
+
+**Touched files:** `prompts/toddler-mode.txt`,
+`server/lib/promptBuilders.js` (`buildStoryShapeSection` toddler branch),
+`tests/unit/toddler-mode.test.ts`.
+
+**Status:** ✅ active (supersedes the "nothing goes wrong" line above; not yet run).
