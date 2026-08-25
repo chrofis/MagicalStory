@@ -63,28 +63,25 @@ test('face repair repaints only the target when characters overlap', async ({ pa
   const failed = result?.pagesFailed || [];
   const failure = failed.find((f: { pageNumber: number }) => f.pageNumber === PAGE_NUMBER);
 
-  // On a rejection, every draw must be inspectable — that is what separates a
-  // correct gate verdict from a silent dead end.
-  if (failure) {
-    // eslint-disable-next-line no-console
-    console.log(`[repair] REJECTED: ${failure.reason}`);
-    for (const f of failure.attemptFrames || []) {
-      // eslint-disable-next-line no-console
-      console.log(`  attempt ${f.attempt}: ${f.rejectedReason} — ${f.gateMessage}`);
-    }
-    expect(
-      (failure.attemptFrames || []).length,
-      'a rejected repair must carry its attempt frames',
-    ).toBeGreaterThan(0);
-    for (const f of failure.attemptFrames || []) {
-      expect(f.grokRawResult || f.blackoutImage, `attempt ${f.attempt} carries no image`).toBeTruthy();
-    }
-  }
+  // eslint-disable-next-line no-console
+  console.log(`[repair] ${failure ? failure.reason : `repaired ${repaired.length} page(s)`}`);
 
+  // Sarah is not among the figures actually drawn on p15 — the render put four
+  // people there for a five-character brief, and the spare name lands on
+  // Kapitänin Rossa. The only correct outcome is a refusal that says so, BEFORE
+  // any model call: repainting Rossa with Sarah's face is the bug.
+  expect(repaired, 'nothing may be repainted when the target cannot be identified').toHaveLength(0);
+  expect(failure, 'expected a reported failure for this page').toBeTruthy();
+  expect(failure.notOnPage, `expected notOnPage; got: ${failure.reason}`).toBe(true);
+  expect(failure.rejectedReason).toBe('not_on_page');
+  expect(failure.reason).toContain(CHARACTER);
+  expect(failure.reason).toMatch(/Detected instead:|No figures were detected/);
+
+  // Refused up front — no Grok draws, so no attempt frames.
   expect(
-    repaired.length,
-    `repair produced no image. reason: ${failure?.reason || 'none reported'}`,
-  ).toBeGreaterThan(0);
+    (failure.attemptFrames || []).length,
+    'a refusal must not have cost any model calls',
+  ).toBe(0);
 });
 
 test('the story page still renders after a repair attempt', async ({ page }) => {

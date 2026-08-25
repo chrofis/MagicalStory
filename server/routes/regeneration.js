@@ -5596,10 +5596,40 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             });
             // Keep it for the protection list below — see freshDetection.
             freshDetection = detection;
-            const charFigure = detection?.figures?.find(f =>
+            let charFigure = detection?.figures?.find(f =>
               f.name?.toLowerCase() === characterName.toLowerCase() ||
               f.label?.toLowerCase().includes(characterName.toLowerCase())
             );
+            // A NAME IS NOT EVIDENCE WHEN THERE ARE FEWER FIGURES THAN NAMES
+            // (owner, 2026-08-24). The detector distributes the names it is
+            // given across the figures it sees; it does not refuse. On p15 of
+            // job_1787514666616_yw9qsv1vf the brief lists five characters, the
+            // render drew four, and the leftover name landed on Kapitänin
+            // Rossa — so "repair Sarah's face" whited out ROSSA's head and Grok
+            // painted Sarah onto her. Describing Rossa from the VB did not stop
+            // it: with more names than figures, SOMEBODY gets a borrowed label,
+            // and a confident wrong label is indistinguishable from a right one.
+            //
+            // Narrow on purpose. It fires only when the fresh detection is the
+            // ONLY evidence (steps 1 and 2 found no stored appearance — a page
+            // that went through the repair rounds has one) AND the brief is
+            // short of figures. Where counts agree, or a stored box exists,
+            // nothing changes.
+            if (charFigure) {
+              const briefNames = new Set();
+              for (const c of (sceneImage.sceneCharacters || [])) {
+                const n = typeof c === 'string' ? c : c?.name;
+                if (n) briefNames.add(n);
+              }
+              for (const n of (sceneImage.sceneMetadata?.characters || [])) {
+                if (typeof n === 'string' && n) briefNames.add(n);
+              }
+              const figureCount = (detection?.figures || []).length;
+              if (briefNames.size > figureCount) {
+                log.warn(`🚫 [CHAR REPAIR] p${pageNumber}: brief lists ${briefNames.size} character(s) but only ${figureCount} figure(s) were drawn — "${characterName}" may be a borrowed label, refusing rather than repainting the wrong person`);
+                charFigure = null;
+              }
+            }
             if (charFigure && (charFigure.faceBox || charFigure.bodyBox)) {
               storedAppearance = {
                 faceBox: charFigure.faceBox,
@@ -5628,7 +5658,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               log.warn(`🚫 [CHAR REPAIR] ${characterName} is not on page ${pageNumber} — refusing to repair. ${who}`);
               return {
                 task, error: true,
-                failReason: `${characterName} was not found on page ${pageNumber} — nothing was repainted. ${who} Repairing a face needs that character to be in the picture; redo the page instead.`,
+                failReason: `${characterName} could not be identified on page ${pageNumber} — nothing was repainted. ${who} Repairing a face needs that character to be in the picture and reliably located; redo the page instead.`,
                 // Its own fingerprint so the daily report separates "the
                 // character is missing from the render" from the gate
                 // rejections — they have different fixes.
