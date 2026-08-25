@@ -18604,4 +18604,72 @@ chars, no DO-NOT block, no "cinematic", no portrait-grid reference, occluder
 unnamed, each action stated once, no truncation. The paid re-run is the next step.
 
 **Touched:** `server/lib/sceneComposite.js`.
-**Status:** ✅ active — awaiting its first measured run.
+**Status:** ✅ active — first run PASSED (exp 851, 2026-08-25): framing, cast and depth held; gaze/expression partially landed. One run, one page.
+
+---
+
+## 2026-08-25 — `nearest_city` is a search anchor, not a location; staging now shares production's landmark index
+
+**Context:** a staging story personalised to Dübendorf ended "am Lindenhofbrunnen
+in Dübendorf". The Lindenhofbrunnen is on the Lindenhof in **Zürich**, ~6 km
+away. Two independent faults produced that sentence.
+
+### 1. Staging and production had different indexes
+
+They are separate Postgres instances and each `landmark_index` is filled by its
+own discovery runs. Measured 2026-08-25: **prod 4764 rows / 1594 cities,
+staging 449 / 21**. Staging knew nothing about Dübendorf, so the city lookup
+missed and the radius fallback offered Zürich city-centre landmarks instead.
+
+**Decision:** the index is REFERENCE data — discovered from Wikipedia/Wikidata,
+identical for every environment, owned by no user — so it is copied
+production → staging by `scripts/admin/sync-landmark-index-to-staging.js`,
+upserting on the UNIQUE `wikidata_qid`. **One direction only**: staging
+discovery runs are experiments and must never leak into the production index.
+Photo URLs copy verbatim because both environments share the same R2 bucket.
+Run: staging went 449 → **4814 rows across 1599 cities**.
+
+### 2. `nearest_city` never meant "is in this town"
+
+Discovery searches a 10 km radius around a city's geocoded centre and then
+stamps every hit with the city it was *searching for*
+(`server/lib/landmarkPhotos.js`: `landmark.nearestCity = city`). So churches in
+Wallisellen, Dietlikon, Schwerzenbach and Zürich-Schwamendingen are all filed
+as Dübendorf landmarks. The prompt then asserts "The story takes place in
+<city> … at least one scene MUST take place at one of these real local
+landmarks", and the writer places the landmark inside that city.
+
+**Decision:** add `landmark_index.municipality` (migration 028), the true
+containing town from Wikidata P131, backfilled by
+`scripts/admin/backfill-landmark-municipality.js`. `nearest_city` **keeps** its
+meaning as the discovery anchor — it is what the city lookup matches on, and
+redefining it would silently repoint every existing story's landmark search.
+Both columns now carry SQL comments saying which is which.
+
+**A trap found while building it:** P131 points at whatever administrative level
+Wikidata recorded, which is often a canton or district — "St. Gallus
+(Zürich-Schwamendingen)" → *Kanton Zürich*, "St. Michael (Dietlikon)" →
+*Bezirk Bülach*. Taking the first claim would have filled the column with
+cantons and made any municipality filter reject genuinely local landmarks. The
+script therefore reads **every** P131 claim and accepts only a target whose P31
+is a municipality class.
+
+**Measured on Dübendorf:** 20 of 30 rows resolve to a municipality, and **8 of
+those 20 are in a different town than `nearest_city` claims**. The remaining 10
+have no municipality-class P131 at all (motorways, a championship, "The Hall").
+
+**Not yet decided — selection still runs on `nearest_city`.** Whether the picker
+should restrict to true-municipality matches, or keep radius matches but label
+them honestly ("in Wallisellen, 4 km away"), is open. A strict filter risks
+offering a small town nothing at all.
+
+**Also visible in the same data:** `score` is dominated by a type-based
+`boost_amount`, so 7 of Dübendorf's top 12 are parish churches with 2 Wikipedia
+sitelinks, while Zürich Zoo (14 sitelinks) ties a village church at 134. That is
+the `migrations/025_landmark_fame.sql` problem, still unconsumed.
+
+**Touched files:** `migrations/028_landmark_municipality.sql`,
+`scripts/admin/sync-landmark-index-to-staging.js`,
+`scripts/admin/backfill-landmark-municipality.js`.
+
+**Status:** ✅ active for the data; 🟡 selection unchanged pending the decision above.
