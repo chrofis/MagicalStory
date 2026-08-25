@@ -18768,3 +18768,34 @@ separately. Refusing remains safe (the direct render ships).
 
 **Touched:** nothing (evidence-only entry).
 **Status:** ✅ recorded
+
+---
+
+## 2026-08-25 — A title is not a different person: Visual Bible names resolve by word containment
+
+**Context:** `buildSecondaryCharacterDescriptions` matched a scene's character reference to a
+Visual Bible entry by EXACT name only. The Visual Bible names secondaries in full
+("Kapitänin Rossa"); scene metadata refers to them the way the prose does ("Rossa"). Neither
+resolved, and the log said so on every page —
+`[BBOX-BUILD] p15 Scene references "Rossa" but no Visual Bible entry resolves it`.
+
+The consequence is not a missing description, it is a stolen name: the detector is handed the
+user's cast and no entry for the figure who is actually standing there, so it borrows a user
+character's name for her. On p15 of `job_1787514666616_yw9qsv1vf` "Sarah" landed on Rossa,
+and a face repair whited out the wrong person's head. This affected BOTH repair paths and the
+generation-time detection, because all of them build their cast through this function.
+
+**Decision:** After the exact match fails, match by word-boundary containment in either
+direction ("Rossa" ⊂ "Kapitänin Rossa"), and ONLY when exactly one entry matches. Two
+candidates are logged as ambiguous and left unresolved — guessing between them attaches the
+wrong description, which is worse than none.
+
+**Rationale:** The bare name is how the story text, the scene metadata and the reader all
+refer to the character; the full name is a Visual Bible formatting convention. Requiring them
+to be byte-identical made a naming convention into an identity failure.
+
+**Verified:** p15 and p16 now resolve "Rossa" → "Kapitänin Rossa (secondary character). adult,
+mid-thirties… hair: deep red…"; pages that do not reference her are unchanged; p2's cast is
+unchanged.
+
+**Touched:** `server/lib/promptBuilders.js`.
