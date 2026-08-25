@@ -4078,16 +4078,17 @@ function buildStoryShapeSection(inputData, pageCount) {
     return [
       '# STORY SHAPE (fixed by the age of the main character — not yours to change)',
       '',
-      `Pages: ${pages}. One storyline, in one place, with nothing to overcome.`,
+      `Pages: ${pages}. ${pages} different moments, one per page — each shows something the page before it did not.`,
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
-      `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — the book follows them looking, holding and being cared for. They solve nothing and go nowhere.`,
-      'Challenges: none. No obstacle, no setback, no danger, no goal pursued across pages.',
+      `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — every page is theirs to enjoy, none is theirs to solve.`,
+      'Challenges: none. Nothing goes wrong and nothing is at stake; the variety is what carries the book.',
+      'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.',
       others.length
         ? `Everyone else — ${others.map(c => c.name).join(', ')} — is simply there alongside the main character. No moment of their own, no arc.`
         : '',
-      `Page budget: ${pages} pages of small moments, each one a thing seen, touched, given or shared. The last page ends at rest.`,
+      `Page budget: ${pages} pages, ${pages} distinct events. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
     ].filter(Boolean).join('\n');
   }
 

@@ -18368,3 +18368,59 @@ isolation. A customer-written quest premise for a toddler would hit the same wal
 `tasks/bugs.json`.
 
 **Status:** ✅ active.
+
+---
+
+## 2026-08-25 — Toddler mode over-corrected into "nothing happens"; variety is the engine, traits are the plan
+
+**Context:** Staging story `job_1787683120734_qkgfbd86o` (the first story built on
+a toddler-generated idea) was boring. Owner: *"He sees food in one page, he wants
+the food in the next, some hands hand him the food, and then he is somewhere
+totally different and full. Super boring."* Six pages carried one micro-want.
+
+The character's traits were **Fröhlich, Mutig, Klug, Stark, Abenteuerlustig;
+liebt es zu essen, und Hunde**. The pipeline spent the whole book on the last two
+and ignored the five adjectives that would have made it fun.
+
+Three of my own rules caused it:
+
+- `toddler-mode.txt` said *"Nothing to overcome"* and *"Topic: something small,
+  familiar and close at hand"* — read as "nothing happens".
+- `buildStoryShapeSection`'s toddler branch said *"One storyline, in one place"*
+  and, literally, *"They solve nothing and go nowhere."*
+- The action list banned *"operating a machine or vehicle"* and *"No journeys"*
+  banned movement — which forbids the owner's own examples: steering the ship,
+  an island sliding past.
+
+**The mistake:** the defect in the original age-blind story was **real-world
+independence** — a one-year-old alone at a railway station with a phone,
+navigating a city. That was generalised into "nothing may happen anywhere", which
+is a different thing. Make-believe doing was never the problem.
+
+**Decision:**
+
+- Variety is the engine: a new thing seen, met, heard, touched or done on every
+  page; one want may never be carried across pages.
+- The character's traits are the page plan — each trait gets a page, in the form
+  a child this age can do it (brave is patting something big, strong is dragging
+  something heavy for them, adventurous is climbing up to look over). A "loves X"
+  detail earns one page, never the whole book.
+- "No journeys" narrowed to **no real-world errands alone** (stations, tickets,
+  traffic, shops, crowds navigated by themselves). Inside the story's own
+  make-believe world the child may sail, ride, fly or be carried anywhere.
+- Make-believe doing is explicitly welcome (at the wheel, holding a rope, waving
+  at a bird). The ban is kept only on things that turn on working something out:
+  reading, following clues, planning, puzzles, deciding for others.
+- "Nothing to overcome" reworded to "Plenty happens; nothing goes wrong" so it
+  cannot be read as "nothing happens".
+- The story shape now states N distinct events for N pages and forbids a page
+  that only wants what the last page wanted.
+
+**Rationale:** the guardrail that matters is *nothing goes wrong and nothing must
+be worked out*, not *nothing occurs*. A toddler book is a string of small
+delights, and the personalised traits are the obvious source of them.
+
+**Touched files:** `prompts/toddler-mode.txt`,
+`server/lib/promptBuilders.js` (`buildStoryShapeSection` toddler branch).
+
+**Status:** ✅ active (not yet run — no story has been generated under it).
