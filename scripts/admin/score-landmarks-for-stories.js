@@ -52,16 +52,30 @@ Reply as exactly: SCORE|one short reason`;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Wikimedia rate-limits bulk fetches (429) — a full-index run WILL hit it, and
+// without a retry those rows would be silently skipped and look "unjudged"
+// forever. Back off and try again rather than losing them.
 async function fetchImageBase64(url) {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch) landmark-QA' },
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!res.ok) throw new Error(`photo ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  const sharp = require('sharp');
-  const small = await sharp(buf).resize(700, 700, { fit: 'inside' }).jpeg({ quality: 72 }).toBuffer();
-  return `data:image/jpeg;base64,${small.toString('base64')}`;
+  let lastErr;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch; rogerfischer@hotmail.com) landmark-QA' },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (res.status === 429 || res.status >= 500) throw new Error(`photo ${res.status}`);
+      if (!res.ok) throw Object.assign(new Error(`photo ${res.status}`), { fatal: true });
+      const buf = Buffer.from(await res.arrayBuffer());
+      const sharp = require('sharp');
+      const small = await sharp(buf).resize(700, 700, { fit: 'inside' }).jpeg({ quality: 72 }).toBuffer();
+      return `data:image/jpeg;base64,${small.toString('base64')}`;
+    } catch (e) {
+      lastErr = e;
+      if (e.fatal) throw e;
+      await sleep(2000 * (attempt + 1));
+    }
+  }
+  throw lastErr;
 }
 
 (async () => {
@@ -75,6 +89,9 @@ async function fetchImageBase64(url) {
     where.push(`LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = LOWER(translate($${params.length}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))`);
   }
   if (!ALL) where.push(`type = ANY('{${BACKDROP.join(',')}}')`);
+  // Resume by default: a full-index run is ~1000 rows and must survive being
+  // interrupted without paying to re-judge what is already done.
+  if (!args.includes('--rescore')) where.push('story_score IS NULL');
 
   const rows = (await pool.query(
     `SELECT id, name, type, municipality, wikipedia_extract, photo_url, score, story_score
