@@ -279,7 +279,7 @@
       "reportedAt": "2026-08-25",
       "source": "Railway staging deployment 0b5acc98-90c2-426a-b982-ba41d1a69191 (commit 1140e8176) status FAILED. Deploy log: \"Error: Cannot find module ./logger\" at /app/server/lib/charRepairTarget.js:22, require stack charRepairTarget -> repairPipeline -> storyJobPipeline -> server.js. Introduced by 3565fced9 (20:38 CH); every push after it failed to deploy, and the /api/health commit SHA kept reporting the last GOOD build (0fb99344), so the breakage was invisible from the outside.",
       "status": "fixed",
-      "fixedIn": "pending",
+      "fixedIn": "bb933ca08",
       "note": "charRepairTarget.js sits in server/lib/ and the logger lives at server/utils/logger.js, exported as { log }. Every sibling uses const { log } = require(\"../utils/logger\"); this file had const log = require(\"./logger\"). Two lessons: (1) /api/health reports RAILWAY_GIT_COMMIT_SHA, which is the last SUCCESSFUL build — it cannot detect a failed deploy, so gating a validation run on it is unsound; check a boot-time side effect (a migration column) or the Railway deployment status instead. (2) check-no-undef in the pre-push hook does not resolve require() paths, so a bad module path passes every gate and only fails at container start."
     }
   ]
