@@ -83,9 +83,12 @@ const TOPIC = arg('topic', 'pirate');
 const CITY = arg('city', null);
 const DETAILS = arg('details', 'Eine kurze Piratengeschichte für einen Pipeline-Smoke-Test.');
 const SKIP_COVERS = arg('skipCovers', 'true').toLowerCase() !== 'false';
-// --mainAge=2 overrides the FIRST character's age in the payload only — the
-// account is untouched. Age <= 3 on the focus character flips the pipeline
-// into toddler mode, so this is the knob for toddler validation runs.
+// --mainAge does NOT work and refuses to run. processStoryJob replaces
+// inputData.characters wholesale with the account's stored rows (the 2026-08-10
+// cross-account guard in storyJobPipeline.js), so a payload age is discarded
+// and the story silently generates at the stored age. Verified the hard way on
+// job_1787690387854_6nc4yo8u8: payload age 2, story written for age 5.
+// Age must be changed on the characters row itself.
 const MAIN_AGE = arg('mainAge', null);
 // --mains=1 declares only the first N characters as main cast. The focus
 // character is the OLDEST declared main (pickMainCharacters), so a toddler run
@@ -191,9 +194,12 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     process.exit(1);
   }
 
-  if (MAIN_AGE !== null && characters[0]) {
-    console.log(`   mainAge override: ${characters[0].name} age ${characters[0].age} -> ${MAIN_AGE} (payload only)`);
-    characters[0] = { ...characters[0], age: String(MAIN_AGE) };
+  if (MAIN_AGE !== null) {
+    console.error('   ❌ --mainAge does not work: the pipeline re-reads characters from the');
+    console.error('      account row and discards any age in the payload, so the story would');
+    console.error('      silently generate at the STORED age. Change the age on the characters');
+    console.error('      row instead (and restore it afterwards).');
+    process.exit(2);
   }
 
   // Use the first N characters as the main cast (default 2).

@@ -595,3 +595,33 @@ calls are free; `--no-cache` forces a fresh login.
 **The wider pattern:** a monitor that re-authenticates every tick is
 self-throttling. Anything a poll loop does per iteration — logging in, opening a
 DB pool, spawning node — should be hoisted out of the loop or cached.
+
+## A payload cannot change a character's age — the job re-reads the account row (2026-08-25)
+
+**What happened:** validating toddler mode (`age <= 3` on the focus character)
+called for a 10-page story with a toddler main character. The smoke runner was
+given a `--mainAge=2` flag that overrode the age in the POSTed payload. The job
+ran to completion and produced "Emma und der vergrabene Schatz" — a buried
+treasure quest, which toddler mode explicitly forbids ("Never a quest, a search,
+a rescue, a secret or a prize"). The stored story had Emma at age 5.
+
+**Root cause:** `processStoryJob` replaces `inputData.characters` wholesale with
+the rows from `characters_<user_id>` (the 2026-08-10 cross-account guard, added
+after a story generated with another account's faces). Every payload field on a
+character — age included — is discarded. `inputData.mainCharacters` is NOT
+overwritten, which is why `--mains=1` worked and `--mainAge=2` did not.
+
+**Rules going forward:**
+1. To exercise age-driven behaviour, change the age on the characters ROW,
+   snapshot the original first, and restore it as soon as the run completes.
+2. A validation knob that the pipeline can silently discard must fail loudly,
+   not degrade. `--mainAge` now exits with an explanation instead of producing a
+   confidently wrong story. Prefer this shape for any test flag.
+3. Before spending on a validation run, ask which layer actually reads the knob.
+   The payload is not the source of truth wherever a guard re-hydrates from the
+   database.
+
+**Also:** the runner's poll timeout was sized from the text phase alone
+(~520-631s for 10 pages) and expired at 64% while the job was healthy. A poll
+exiting non-zero is not a failed story — check `story_jobs` before concluding
+anything.

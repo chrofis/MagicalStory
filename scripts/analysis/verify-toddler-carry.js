@@ -32,14 +32,14 @@ function mark(ok) { return ok ? '✅' : '❌'; }
 
 (async () => {
   const pool = new Pool({ connectionString: conn, ssl: { rejectUnauthorized: false } });
-  const r = await pool.query('SELECT id, title, data FROM stories WHERE id = $1', [storyId]);
+  const r = await pool.query('SELECT id, data FROM stories WHERE id = $1', [storyId]);
   if (r.rows.length === 0) {
     console.error(`No story ${storyId} on ${useProd ? 'production' : 'staging'}`);
     await pool.end();
     process.exit(1);
   }
   const d = r.rows[0].data || {};
-  console.log(`Story: ${r.rows[0].title || '(untitled)'}  [${storyId}]`);
+  console.log(`Story: ${d.title || '(untitled)'}  [${storyId}]`);
   console.log('='.repeat(70));
 
   const arc = d.arcReviewReport || null;
