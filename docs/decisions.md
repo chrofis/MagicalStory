@@ -17786,3 +17786,99 @@ the wizard.
 
 **Status:** ✅ active (unproven on a real run — no story has been generated in
 toddler mode yet).
+
+---
+
+## 2026-08-25 — Every review stage traded a sentence of feeling for a sentence of logistics; each now has a way to close a fault that does not cost prose
+
+**Context:** A provenance trace of `job_1787638707796_x8272kcs22m` ("Levin und
+der kleine Drache", 18p, de-CH, avgQualityScore 69) walked every stored
+artifact — idea → arc → arc audit/review → page plan → draft beats → beats
+audit/review → writer text → text audit → text refine → shipped page text — and
+located where each of 15 named text defects is born. The measured result:
+
+| Stage | Faults fixed | Emotional/characterising sentences deleted | New defects created |
+|---|---|---|---|
+| Arc review | 8 | 0 | 2 |
+| Beats review | 18 ledger items | 3 | 1 |
+| Text refine | 14 | **8** | **3** |
+
+**The writer's draft is the best prose state of a run.** Every reviewer after it
+has a hard obligation to close every fault ("fixed on a page, or a stated reason
+it stands"), no budget, and no protected class of prose — and page length is
+implicitly held constant, so each fix is paid for by cutting the cheapest
+sentence, which is always the one carrying no plot. Verifiable in
+`textRefineReport.pages` for that story: `Er dreht sich fast um` (the exact
+almost-turn the beats review had *mandated*), `Julians Gesicht ist wie
+eingefroren`, `Sein Gesicht ist ruhig. Er zweifelt nicht.`, and five more, all
+replaced by logistics.
+
+Three defects were manufactured outright by review stages:
+- The text audit's question 5 ("does anything exist in a state — open, broken,
+  **wet**, moved…") fired on a bicycle's wet wheels. With only *fix on a page*
+  available, the refiner invented a wade across the stream — which made the
+  story's established first obstacle (stepping stones too far apart) retroactively
+  passable. The correct move, deleting `die Räder sind nass`, did not exist.
+- The audit raised travel between consecutive pages as a TRANSITION fault. The
+  beats review had already ruled this "stands" (a descent is a passage of time,
+  not one drawn moment) but the text audit has no memory of that ledger, so
+  travelogue openers were written onto two pages.
+- The arc reviewer closed "this object has no path" by giving the object a path
+  through 11 pages it does nothing in, and closed "this device gains meaning
+  retroactively" by stating the rule where the device first appears — spending
+  the ending nine pages early and making the payoff line a repeat.
+
+**Decision:**
+1. `text-refine.txt` — a fault has **three** ways to close: fixed on a page, **the
+   detail removed**, or a stated reason it stands. Plus: never invent an event
+   that makes an established obstacle easier; never state a clock time to close a
+   fault; a sentence naming what a character feels, notices or almost does is
+   never the one cut to make room; removals are itemised in the ledger; reading
+   level is re-checked here, not only at the writer.
+2. `story-text-audit.txt` + `story-beats-audit.txt` (both carry the identical
+   question 4) — a page turn carries travel and elapsed time.
+3. `story-beats-review.txt` + `story-beats.txt` — object continuity goes in
+   SCENE, never BEAT; a build-up page is followed by that character acting; the
+   most-wanted picture gets a page; the last page is safe, together, one named
+   feeling.
+4. `story-arc-review.txt` — an orphan object may be **retired** rather than
+   carried; a device may earn its meaning by showing a character *learn* it
+   (owner choice, 2026-08-25, over stating the rule early); blockers need
+   foreshadowing; a time-of-day deadline needs a start that spans the book.
+5. `story-text-from-beats.txt` + `buildTitleRule()` — a dialogue floor (a third
+   of pages carry a spoken line, counted in the analysis); an animal companion is
+   named by the children; and the title rule is **cast-size dependent** (owner):
+   one main character → the name, two → both names, more than two → a name is
+   optional. Three title candidates instead of one, picked with the same
+   `stableCandidateIndex` the unified parser uses.
+
+**Rationale:** The reviews are not wrong — they found ~40 genuine faults on this
+story. The defect is that closing a fault had exactly one shape, and that shape
+always added words to the child-facing prose. Giving each reviewer a
+non-prose-costing disposition (remove the detail, retire the object, show the
+learning, put it in SCENE) closes the same faults without the tax. The prop rule
+is the same mechanical-count pattern that fixed interaction load on 2026-08-23:
+the writer prompt already said "do not narrate staging", but a prop written into
+BEAT is not staging to the writer, it is an event — so the fix is upstream, in
+which field the reviewer is allowed to write.
+
+Only the beats path is changed. `story-unified.txt` and
+`story-unified-imagefirst.txt` keep the unconditional name-in-title rule: beats
+is the pipeline in every environment (`runtime.pipelineMode = 'beats'`), those
+writers are reachable only by a per-job override, and a half-wired conditional in
+a dormant template is worse than a consistent one. `story-trial.txt` is
+unchanged and stays correct — a trial has exactly one child, which is the
+one-main-character case.
+
+**Touched:** `prompts/text-refine.txt`, `prompts/story-text-audit.txt`,
+`prompts/story-beats-audit.txt`, `prompts/story-beats-review.txt`,
+`prompts/story-beats.txt`, `prompts/story-arc-review.txt`,
+`prompts/story-text-from-beats.txt`, `server/lib/promptBuilders.js`
+(`buildTitleRule`), `server/lib/beatsPipeline.js` (title candidates + stable
+pick), `server/lib/testlab.js` (`text_refine` `params.fromWriterText` — replay
+from the writer's text so a prompt change is compared against the stored first
+round instead of refining already-refined text),
+`tasks/story-text-quality-2026-08-25.md` (the full per-defect trace).
+
+**Status:** 🟡 conditional — shipped to staging, validation via Lab
+`text_refine` replay on a multi-story corpus in progress.
