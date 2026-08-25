@@ -18735,3 +18735,36 @@ next toddler / full-story run.
 **Touched files:** `server/lib/carryRoutes.js`, `server/lib/beatsPipeline.js`,
 `server/lib/promptBuilders.js`, `prompts/story-arc-review.txt`,
 `prompts/story-beats-review.txt`, `docs/decisions.md` (in-place correction).
+
+---
+
+## 2026-08-25 — Proof suite: every composite fix verified in paid runs; the bottleneck is now MIN_DEPTH_SPREAD
+
+**Context:** Owner asked for proof the composite can work. Five paid runs on
+staging commit `8c1baa51` (~$0.24, none interrupted): exps 848/851 (Kapellbrücke,
+blend), 853 (watercolor 5-char regression), 854 (pixar, three back-view
+background characters), 855 (the dragon flat-lineup page).
+
+**Measured:**
+- **End to end works once (exp 851):** plate 3.83× spread → paste with occlusion
+  clipping → blend v2 held framing, cast and depth. First finished frame in the
+  composite's history that improves the paste without destroying anything.
+- **Cast fixes all live-proven (853/854/855):** no fabricated facing direction in
+  any prompt; back-view characters resolve to `back` and render as backs of
+  heads in the plate (854); "watching the dragon" reached all three boys and the
+  plate paints them in profile, clustered, watching (855) — against exp 69's
+  three frontal blobs; the creature block is present (855).
+- **Refusal machinery works:** all three refusals kept their plates, spread and
+  reason (save-on-abort in the Lab path).
+- **Three of five runs refused at 1.48× / 1.68× / 1.96×** against
+  `MIN_DEPTH_SPREAD = 2.0` (`sceneComposite.js`). The plates DO paint depth on
+  flat-ground scenes — visibly, in 854 — but 1.5–2×, not 2×. 854 missed by four
+  hundredths. Architectural-depth scenes (a bridge above a bank) roll 3.8–4×.
+
+**Decision:** No code change. The composite is proven able to work; whether it
+ever fires outside architectural-depth pages is now a single calibration
+question — the 2.0× refusal threshold — and that is the owner's call, raised
+separately. Refusing remains safe (the direct render ships).
+
+**Touched:** nothing (evidence-only entry).
+**Status:** ✅ recorded

@@ -134,6 +134,12 @@ Rules that follow, and the reason each exists:
   chars (each fact once, no scene overview, no DO-NOT list, occluder unnamed)
   held framing/cast/depth on the page that failed at 5451 — exp 851,
   `8c1baa515`. One clean run, not yet a corpus.
+- **The gate, not the blend, is now what stops pages.** Proof suite 853/854/855
+  (2026-08-25): flat-ground plates paint real but moderate depth — refused at
+  1.48×/1.68×/1.96× against `MIN_DEPTH_SPREAD = 2.0`; architectural-depth pages
+  roll 3.8–4×. Cast fixes (back views, compound actions, creatures, no
+  fabricated facing) all verified in those plates. Threshold calibration = owner
+  question, decisions.md 2026-08-25 proof-suite entry.
 - **Eval-then-repair is not an escape hatch.** Feeding the top-3 evaluator
   findings back as the repair instruction reproduced the same relocation, because
   the evaluator scores the paste against the same brief and its prescribed fix
