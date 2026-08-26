@@ -19605,3 +19605,33 @@ repair on that page.
 **Touched:** `server/lib/charRepairTarget.js`, `server/lib/faceRepair.js`,
 `server/routes/regeneration.js`.
 **Status:** 🟡 conditional — pushed to staging, awaiting a repair rerun.
+
+---
+
+## 2026-08-26 — The entity grid enumerates clothing per cell before it judges
+
+**Context:** On `job_1787689073034_1v6ew0y1kae` the entity check returned 6 findings, all
+hair/face, and zero clothing — while a character's denim dungarees (bib panel + crossing
+shoulder straps) were absent from p12 and all three covers, leaving a plain tee and shorts.
+The contract text reached the prompt verbatim, and the model could see the difference: asked
+per-cell and per-part directly, it answered all five cells correctly. It simply never made
+the comparison when asked to "analyse consistency" across identity, hair, skin, age, build,
+clothing and colour in one call — garment parts lost to identity.
+
+**Decision:** `clothing_check` is a required output field — one row per cell, `missing[]` and
+`unexpected[]`, filled by walking the expected-clothing checklist before any other field is
+written, and every non-empty row must also appear in `fixable_issues`. Forcing the enumeration
+into the OUTPUT is what makes the comparison happen; the same shape the consolidator uses with
+`fix_draft` → `fix_critique` → `fix_instruction`, and the compliance eval with its blind
+inventory. One call, no extra pass.
+
+**Verified** on 9 stored grids from that story: 2 true positives, 0 false negatives, 0 false
+positives. The covers now come back `clothing_inconsistent` MAJOR, `pagesToFix [-3,-2,-1]`,
+"wearing regular denim shorts instead of navy blue denim dungaree shorts…".
+
+**Measurement trap worth recording:** `evaluateEntityConsistency` maps the model's `type` into
+`subType` and sets `type: 'consistency'` on every issue. An A/B that filters findings on `type`
+sees zero clothing findings whatever the prompt says — which is exactly how three earlier
+attempts at this fix were wrongly judged to have changed nothing.
+
+**Touched:** `prompts/entity-consistency-check.txt`.

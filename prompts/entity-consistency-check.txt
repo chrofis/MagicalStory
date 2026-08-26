@@ -51,6 +51,7 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - Example: If cell A has "winter" and cell B has "standard", different outfits are fine
 - Example: If both cells have "standard" but one shows a jacket and one shows a t-shirt, that's inconsistent
 - The expected clothing description is a checklist of garments and of the parts it names — a hood, a collar, straps, a fastening, a pocket. A named part missing from a cell, or present where none is named, is `clothing_inconsistent` MAJOR even when the category and colour read correctly.
+- Fill `clothing_check` first, one row per cell, walking that checklist item by item before writing any other field. Every cell with a non-empty `missing` or `unexpected` also gets a `clothing_inconsistent` entry in `fixable_issues`.
 - Judge a part only from an angle that would show it.
 
 ## Visibility Rules
@@ -64,6 +65,10 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 Return ONLY valid JSON (no markdown, no explanation):
 
 {
+  "clothing_check": [
+    {"cell": "A", "missing": ["bib panel", "shoulder straps"], "unexpected": []},
+    {"cell": "B", "missing": [], "unexpected": []}
+  ],
   "consistent": true/false,
   "score": 1-10,
   "fixable_issues": [
@@ -153,6 +158,7 @@ If two types apply equally, list the primary visual change first.
 
 If no issues found, return:
 {
+  "clothing_check": [{"cell": "A", "missing": [], "unexpected": []}],
   "consistent": true,
   "score": 10,
   "fixable_issues": [],
