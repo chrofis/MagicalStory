@@ -19021,3 +19021,74 @@ word "und" is missing. The word "vier" is partially cut off. The word "Buben" is
 off.'}` — reproducing the shipped rejection exactly.
 
 **Touched:** `server/lib/coverTitlePaint.js`.
+
+## 2026-08-26 — The trial landmark plate is always STYLED, and trial pages get one pose cell
+
+**Context:** The owner reported two trial-mode symptoms: "some empty scenes are
+NOT watercolour but directly use the landmark", and "why do we send the full
+reference sheet in trial mode and not only the correct pose". Both reproduced
+from stored evidence on prod `job_1787647410717_5dvfqu8jg` ("Leynor, der kleine
+Pirat", `artStyle=watercolor`).
+
+**Landmark — root cause.** The trial empty-scene branch gated its landmark photo
+on `photoFetchStatus === 'success'`. Only ONE of the two landmark storage shapes
+ever gets that flag stamped:
+
+| shape | photo source | gets `'success'`? |
+|---|---|---|
+| variant-backed (Swiss pre-indexed, 2-3 photos by kind) | `pickVariantForView` + `loadLandmarkPhotoVariant`, on demand | **never** — excluded from `prefetchLandmarkPhotos` by the `!l.photoVariants?.length` filter at its call site |
+| legacy single-photo | `referencePhotoUrl/Data` | yes |
+
+So for the normal modern landmark the gate could never pass, in any run, at any
+time. Measured: prod (`Bahnhof Stettbach`, `photoVariants=2`,
+`photoFetchStatus='pending_lazy'`) and staging `job_1787696601288_bfgznq960` —
+both `pending_lazy`, both ZERO `empty_scene` rows. The trial empty-scene feature
+recorded as active since the 2026-05 entry above was in fact inert.
+
+The damage is downstream: with no plate, `packReferences` promotes the RAW
+photograph into a Grok slot (`grok.js:1113-1124`, `!hasSceneBackground`), so the
+page is generated as an EDIT of a real photo. Prod p1 received 3 reference
+images where every other page got 2, and is the only non-watercolour page in the
+book — real concrete, real bystanders' faces, a garbled "SBB CFF FFS" board.
+Pages 2 and 4, with no landmark, are clean watercolour. One page differs in one
+input, and that page is the one that breaks style.
+
+**Decision (landmark):** plate and page share ONE resolver,
+`resolveLandmarkPhotoForLocation`, which decides on the landmark's SHAPE instead
+of on a status flag that half of them never set. Its policy half,
+`decideLandmarkPhotoSource`, is split out with no I/O so the rule is unit-testable
+without the DB-backed variant loader. Resolution runs inside the async plate task
+because `onVisualBible` is deliberately synchronous — making it async would leave
+an un-awaited promise on the stream handler.
+
+*Not* the fix, and worth recording so it is not re-attempted: awaiting the
+`landmarksReady` barrier. It looks right (the file documents that exact race for
+covers) but resolves immediately here, because the landmark is not in the
+prefetch set at all. That change would have shipped and altered nothing.
+`decisions.md` 2026-08-16 already settled that the photo BELONGS in the plate's
+reference slot; making the plate exist honours that rather than reversing it.
+
+**Pose — root cause.** The intent is already one-pose: `cropAvatarCell` exists and
+the full pipeline uses it. On trial it no-opped because `setStyledAvatar` (used to
+seed pre-generated sheets) writes ONLY the module cache, and `prepareStyledAvatars`
+then skips an already-cached entry — so its write-back to
+`char.avatars.styledAvatars` never ran. That object is the only thing
+`projectStoryCharacterAvatars` reads, so the map came back empty,
+`applyStoryCellRefs` bailed at `if (!story) continue`, and the full 8-panel sheet
+stayed in `photoUrl`. Verified: the stored reference for prod p2 is the whole
+sheet. Known cost of that: Grok reproducing the reference sheet, scored -140.
+
+**Decision (pose):** seeding writes BOTH the cache and the character object,
+mirroring the canonical write-back shape. Fixing it at the seeding root also
+repairs the trial COVER path, which had the same dependency — patching only the
+page call site would have left it broken. Scene metadata is now parsed before the
+crop so the pose comes from the brief; previously trial passed raw character
+records with no `pose`/`perspective`, so `resolveCellPose` returned
+`threeQuarter` for every page including declared back-view figures.
+
+**Touched:** `server/lib/storyHelpers.js`, `storyJobPipeline.js`,
+`tests/unit/landmark-plate-resolve.test.ts` (11 tests, incl. the pending_lazy
+regression).
+
+**Status:** 🟡 conditional — unit-verified and pushed to staging; awaiting a live
+trial run to confirm a styled plate and a single-cell reference.
