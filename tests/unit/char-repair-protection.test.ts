@@ -83,3 +83,30 @@ describe('resolveCharBbox — entity tier carries the cast for neighbour protect
     expect(r.source).not.toBe('entity');
   });
 });
+
+// @ts-expect-error - JS module without types
+import { resolveFigureMask } from '../../server/lib/charRepairTarget.js';
+
+describe('resolveFigureMask — reuse before re-segmenting', () => {
+  it('prefers the in-memory detection silhouette', async () => {
+    const m = await resolveFigureMask('Julian', { bodyMask: 'IN_MEMORY', figures: FIGURES }, { storyId: 's', pageNumber: -2 });
+    expect(m).toBe('IN_MEMORY');
+  });
+
+  it('returns null (→ re-segment, reported as a miss) when the character is not among the figures', async () => {
+    const m = await resolveFigureMask('Nobody', { figures: FIGURES }, { storyId: 's', pageNumber: -2 });
+    expect(m).toBeNull();
+  });
+
+  it('returns null without a storyId rather than guessing', async () => {
+    const m = await resolveFigureMask('Julian', { figures: FIGURES }, {});
+    expect(m).toBeNull();
+  });
+
+  it('never throws when the store is unavailable', async () => {
+    // pageNumber present, figures present, but the DB layer will refuse outside
+    // database mode — the caller must get null, not an exception.
+    const m = await resolveFigureMask('Julian', { figures: FIGURES }, { storyId: 's', pageNumber: -2 });
+    expect(m === null || Buffer.isBuffer(m)).toBe(true);
+  });
+});

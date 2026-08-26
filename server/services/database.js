@@ -1902,6 +1902,7 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
         img.hasEmptySceneImage = true;
       }
       imagesSaved += await persistCompositeDebug(storyId, img);
+      imagesSaved += await persistFigureMasks(storyId, img);
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;
@@ -2118,6 +2119,7 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   // single-page rerun takes; without it the debug's base64 would ride into
   // the JSONB blob, which is the one thing images may never do.
   imagesSaved += await persistCompositeDebug(storyId, dataForStorage, pageNumber);
+  imagesSaved += await persistFigureMasks(storyId, dataForStorage, pageNumber);
 
   // Push every remaining inline image to R2 first (Grok/inpaint refs,
   // entity grids, debug overlays, landmark photos), replacing inline
@@ -2547,6 +2549,40 @@ async function saveVbReferenceToR2(storyId, entryId, imageData) {
  *
  * @returns number of story_images rows written
  */
+/**
+ * Persist detection's per-figure SAM silhouettes as `figure_mask` rows.
+ *
+ * `_gdinoMasks` is non-enumerable (bboxDetection.js) so it never reaches the
+ * JSONB blob — correct, and the reason it was ALSO never stored anywhere at
+ * all. Detection segments each figure on the full page with box + seed points
+ * and gets a good silhouette; it was discarded milliseconds later, so a repair
+ * days on had to re-segment on a CROP, and that call is what returns background
+ * instead of the child (job_1787689073034_1v6ew0y1kae initialPage, IoU 0%).
+ *
+ * A mask is 1.4-4.3 KB as PNG — ~0.34 MB for a whole 20-page story, about 4% of
+ * ONE page image. Index-aligned with `figures[]`, stored under that index as
+ * versionIndex so a character maps to its mask by position.
+ */
+async function persistFigureMasks(storyId, img, pageNumberOverride) {
+  const masks = img?.bboxDetection?._gdinoMasks;
+  if (!Array.isArray(masks) || !masks.some(Boolean)) return 0;
+  const pageNumber = pageNumberOverride != null ? pageNumberOverride : img.pageNumber;
+  let saved = 0;
+  for (let i = 0; i < masks.length; i++) {
+    const m = masks[i];
+    if (!m) continue;
+    const dataUri = Buffer.isBuffer(m) ? `data:image/png;base64,${m.toString('base64')}` : m;
+    try {
+      await saveStoryImage(storyId, 'figure_mask', pageNumber, dataUri, { versionIndex: i });
+      saved++;
+    } catch (e) {
+      log.warn(`[FIGURE-MASK] p${pageNumber} figure ${i}: save failed — ${e.message}`);
+    }
+  }
+  if (saved > 0) log.debug(`🎭 [FIGURE-MASK] p${pageNumber}: stored ${saved} silhouette(s) for repair reuse`);
+  return saved;
+}
+
 async function persistCompositeDebug(storyId, img, pageNumberOverride) {
   const cd = img.compositeDebug;
   if (!cd) return 0;
@@ -2726,6 +2762,28 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
  * @param {number} versionIndex - Version index (default 0)
  * @returns {object|null} Image data with metadata or null if not found
  */
+/**
+ * Fetch a stored figure silhouette so a repair can REUSE it instead of
+ * re-segmenting. Returns a PNG Buffer, or null when this story predates
+ * figure_mask persistence — in which case the caller re-runs SAM and says so
+ * loudly (faceRepair stamps `samRecomputed`).
+ *
+ * @param {number} figureIndex - position in bboxDetection.figures[]
+ */
+async function loadFigureMaskPng(storyId, pageNumber, figureIndex) {
+  if (!isDatabaseMode() || !Number.isInteger(figureIndex) || figureIndex < 0) return null;
+  try {
+    const row = await getStoryImage(storyId, 'figure_mask', pageNumber, figureIndex);
+    const bytes = row && await imgBytesAsync(row.imageData ? { image_data: row.imageData } : { image_url: row.imageUrl });
+    if (!bytes) return null;
+    const m = String(bytes).match(/^data:image\/\w+;base64,(.+)$/);
+    return Buffer.from(m ? m[1] : bytes, 'base64');
+  } catch (e) {
+    log.warn(`[FIGURE-MASK] load failed p${pageNumber} #${figureIndex}: ${e.message}`);
+    return null;
+  }
+}
+
 async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
@@ -3456,6 +3514,7 @@ module.exports = {
   ensureStoryRow,
   // Image functions
   saveStoryImage,
+  loadFigureMaskPng,
   getNextVersionIndex,
   getStoryImage,
   imagesExistByType,

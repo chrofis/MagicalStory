@@ -5715,6 +5715,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
 
+          const figureMaskPng = useFaceOnly
+            ? null
+            : await require('../lib/charRepairTarget').resolveFigureMask(characterName, resolved, { storyId: id, pageNumber });
+
           const grokResult = await repairCharacterMismatch(
             sceneImage.imageData,
             avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
@@ -5732,9 +5736,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               protectedFaces,
               protectedBodies,
               // Reuse detection's silhouette instead of re-segmenting on the
-              // crop. Null after a DB reload (_gdinoMasks is non-enumerable),
-              // and faceRepair logs that miss loudly rather than absorbing it.
-              detectionBodyMask: useFaceOnly ? null : (resolved?.bodyMask || null),
+              // crop: in-memory when this is the same run, else the stored
+              // figure_mask. Null → faceRepair re-runs SAM and reports the miss.
+              detectionBodyMask: useFaceOnly ? null : figureMaskPng,
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
               includeDebug: req.user.role === 'admin',
               photoType: avatarPhotoType,

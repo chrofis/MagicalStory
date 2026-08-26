@@ -19724,3 +19724,53 @@ deletable character.
 `server/lib/textRefine.js`, `server/lib/testlab.js`, `storyJobPipeline.js`,
 `scripts/analysis/verify-toddler-carry.js`.
 **Status:** ✅ kept — committed locally; not yet deployed.
+
+## 2026-08-26 — Detection's SAM masks are PERSISTED (`figure_mask`), and repair reuses them everywhere
+
+**Context:** Owner: *"How big is the dinoMask, why can we not store it. I do not
+understand."* — then *"add it and fix this once and for all everywhere."*
+
+**Measured, because the answer decides the design.** A real figure mask for the
+page in question (87,155 px filled, against Julian's measured 87,458) is
+**4.3 KB** as grayscale PNG, **1.4 KB** as 2-colour. Four figures = 17 KB;
+a 20-page story = **0.34 MB**. The page image it describes is ~300 KB and that
+story's `stories.data` is 7.8 MB. The mask is ~4% of ONE page image.
+
+**So size was never the reason.** `bboxDetection.js:425` makes `_gdinoMasks`
+non-enumerable with the comment *"JSON persistence (stories.data JSONB) and the
+raw API response never see them"* — correct, and the right instinct: images may
+never ride in JSONB. But "keep it out of JSONB" was implemented as "keep it out
+of everywhere". The other half — write it to R2 like every other image — was
+never built, so a good silhouette was discarded milliseconds after detection and
+a repair days later had to re-segment on a CROP. That crop-space call is the one
+that returns background instead of the child (IoU 0%, three refusals).
+
+**Decision:**
+- New `story_images.image_type = 'figure_mask'`, one row per figure,
+  `version_index` = the figure's index in `bboxDetection.figures[]`.
+  `persistFigureMasks` reads the non-enumerable property explicitly and writes
+  through the existing `saveStoryImage`/R2 path — no new storage, no JSONB
+  bytes. Called at BOTH save sites, next to `persistCompositeDebug`.
+- `loadFigureMaskPng(storyId, pageNumber, figureIndex)` reads it back.
+- `resolveFigureMask(charName, resolved, {storyId, pageNumber})` in
+  `charRepairTarget` is THE silhouette resolver: in-memory mask first, stored
+  mask second, null last. Both repair call sites — the automatic round and the
+  manual endpoint — go through it, so reuse no longer depends on which door you
+  came in by.
+- A null still means "re-run SAM", and `faceRepair` reports that as a miss
+  (`samRecomputed`, `char_repair_sam_recomputed`) instead of absorbing it.
+
+**Rationale:** 0.34 MB per story to remove an entire class of failure is not a
+trade-off. Storing the mask also makes the repair deterministic against the
+detection everything else already agrees on, rather than a second opinion
+computed on different pixels.
+
+**Verification:** 10 unit tests (`char-repair-protection.test.ts`) covering the
+tier-1 cast, in-memory mask reuse, stored-mask lookup, and the null paths that
+must never throw. Suite 211 passed, same 3 pre-existing failures. Old stories
+have no `figure_mask` rows and correctly fall back to a reported re-segmentation.
+
+**Touched:** `server/services/database.js`, `server/lib/charRepairTarget.js`,
+`server/lib/repairPipeline.js`, `server/routes/regeneration.js`.
+**Status:** 🟡 conditional — pushed to staging; first re-detection on a page will
+write the rows.

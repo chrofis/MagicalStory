@@ -1223,6 +1223,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     log.info(`🛡️ [CHAR-FIX] Round ${roundNum} char-fix ${charName} on p${pageNumber}: target bbox source=${targetResolved.source}, protection bboxes for: ${protectedNames.length ? protectedNames.join(', ') : '(none)'}`);
 
+    // Detection's silhouette for the ORIGINAL figure: in-memory on this run,
+    // else the stored figure_mask. Body mode only — the detection mask is a
+    // full-figure silhouette, not a head mask.
+    const figureMaskPng = useFaceOnly
+      ? null
+      : await require('./charRepairTarget').resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobId || null, pageNumber });
+
     // Per-story clothingRequirements is the source of truth (correct for THIS
     // story); avatars.clothing is character-level metadata that persists
     // across stories and can carry stale colours from a previous run. Without
@@ -1275,7 +1282,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // blend gate reuses it instead of re-running SAM on the same pixels.
         // Body mode only — the detection mask is a full-figure silhouette, not
         // a head mask; null → gate falls back to a fresh /figure-mask call.
-        detectionBodyMask: useFaceOnly ? null : (targetResolved.bodyMask || null),
+        detectionBodyMask: useFaceOnly ? null : figureMaskPng,
         textPosition: pageTextPosition,
         // The repair prompt builds an "Art style — match this medium and
         // rendering exactly: <full descriptor>" block from this, and falls back

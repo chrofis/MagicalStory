@@ -240,9 +240,38 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   return { faceBbox: null, bodyBbox: null, source: null, figures };
 }
 
+/**
+ * THE silhouette for a repair: the in-memory detection mask when this is the
+ * same run, otherwise the one detection stored on R2. Both repair call sites
+ * (automatic round + manual endpoint) go through here, so reuse never depends
+ * on which one you came from.
+ *
+ * `_gdinoMasks` is non-enumerable and dies with the process, so before masks
+ * were persisted every later repair re-segmented on a crop — the call that
+ * returns background instead of the figure. A null return still means
+ * "re-run SAM", and faceRepair reports that as a miss rather than absorbing it.
+ *
+ * @returns {Promise<Buffer|string|null>} PNG silhouette, or null to re-segment.
+ */
+async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {}) {
+  if (resolved?.bodyMask) return resolved.bodyMask;
+  if (!storyId || pageNumber == null || !charName) return null;
+  const figures = Array.isArray(resolved?.figures) ? resolved.figures : [];
+  const lower = String(charName).toLowerCase();
+  const idx = figures.findIndex(f => f?.name && f.name.toLowerCase() === lower);
+  if (idx < 0) return null;
+  try {
+    const { loadFigureMaskPng } = require('../services/database');
+    return await loadFigureMaskPng(storyId, pageNumber, idx);
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   buildPageCast,
   briefNamesForPage,
   findBorrowedLabel,
   resolveCharBbox,
+  resolveFigureMask,
 };
