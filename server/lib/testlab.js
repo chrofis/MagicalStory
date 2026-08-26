@@ -3017,6 +3017,44 @@ async function runStyleCheckStage(target, { experimentId }) {
 }
 
 /**
+ * Final-book audit (report only). Target: {storyId}.
+ *
+ * Reads the stored book the way a child receives it — each page's text next to
+ * the image that actually shipped on it. `loadStoryDataFull` rehydrates the
+ * ACTIVE image per page, which is the picture the reader sees; bookAudit falls
+ * back to the bestSource version for any page that arrives without bytes.
+ */
+async function runBookAuditStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, withTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { auditStoryBook } = require('./bookAudit');
+  const { storyData } = await loadStoryDataFull(target.storyId);
+  const t0 = Date.now();
+  // withTemplates, not a global assignment: the override must be visible only
+  // inside this run's async tree so two concurrent experiments cannot read each
+  // other's prompt.
+  const audit = await withTemplates({ bookAudit: promptOverride }, () => auditStoryBook(storyData, {
+    storyId: target.storyId,
+    modelId: params.modelId || undefined,
+  }));
+  if (!audit) return { ok: false, elapsedMs: Date.now() - t0, faults: 0, byRoute: { IMG: [], TEXT: [] }, logLines: [] };
+  return {
+    ok: true,
+    elapsedMs: Date.now() - t0,
+    modelId: audit.modelId,
+    faults: audit.faults,
+    byRoute: audit.byRoute,
+    pagesRead: audit.pagesRead,
+    pagesSkipped: audit.pagesSkipped,
+    // The fault lines verbatim — the same yardstick countFaults reads.
+    logLines: [...audit.byRoute.IMG, ...audit.byRoute.TEXT]
+      .sort((a, b) => (a.page ?? 0) - (b.page ?? 0))
+      .map(f => f.line),
+    raw: audit.raw,
+  };
+}
+
+/**
  * Outline-review model comparison (split outline review, Call 2). Target:
  * {storyId}. Compares how DIFFERENT models perform AS THE REVIEWER.
  *
@@ -5873,11 +5911,43 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     try {
       const { compareTraitsToImage, resolveStoredTraits } = require('./traitPanel');
       const storedTraits = resolveStoredTraits(character);
-      const res = await compareTraitsToImage(sheetForDisplay, storedTraits);
+      // READ THE SOURCE PHOTO TOO (owner, 2026-08-26: "Add the face picture and
+      // the 2x4 avatar to the lab so you can compare yourself"). Comparing the
+      // avatar against stored traits alone cannot say WHICH of the two is wrong.
+      // With the photo read the same way, the three-way answer is mechanical:
+      //   photo agrees with avatar, both differ from stored  -> the TRAIT is wrong
+      //     (mis-extracted at character creation; the avatar is faithful)
+      //   photo agrees with stored, avatar differs           -> the AVATAR drifted
+      // Measured case: Emma's stored hairLength said 'ear-length' while the
+      // avatar read 'long' — and her source photo shows long hair, so the trait
+      // was the defect, not the render.
+      const [res, photoRes] = await Promise.all([
+        compareTraitsToImage(sheetForDisplay, storedTraits),
+        facePhoto ? compareTraitsToImage(facePhoto, storedTraits) : Promise.resolve(null),
+      ]);
+      // Save the face photo as a Lab version so the card shows photo + sheet
+      // side by side instead of asking anyone to take this on trust.
+      let facePhotoVersionIndex = null;
+      if (facePhoto) {
+        try { facePhotoVersionIndex = await saveTestVersion(target.storyId, 'tl_face_photo', null, facePhoto, experimentId); }
+        catch (e) { log.warn(`[AVATAR-EVAL] could not save the face photo for display: ${e.message}`); }
+      }
+      const blame = (field) => {
+        const inAvatar = res.mismatches.some(m => m.field === field);
+        const inPhoto = photoRes ? photoRes.mismatches.some(m => m.field === field) : null;
+        if (inPhoto === null) return 'unknown (no source photo)';
+        if (inAvatar && inPhoto) return 'STORED TRAIT is wrong — photo and avatar agree against it';
+        if (inAvatar && !inPhoto) return 'AVATAR drifted — the photo matches the stored trait';
+        return 'avatar matches stored';
+      };
       colourCheck = {
         ...res,
         verdict: res.mismatches.length === 0 ? 'matches stored traits' : `${res.mismatches.length} field(s) disagree`,
         storedTraits,
+        photoReadings: photoRes ? photoRes.readings : null,
+        photoMismatches: photoRes ? photoRes.mismatches.map(m => m.field) : null,
+        ...(facePhotoVersionIndex != null ? { facePhotoVersionIndex, facePhotoImageType: 'tl_face_photo' } : {}),
+        diagnosis: res.mismatches.map(m => ({ field: m.field, blame: blame(m.field) })),
       };
     } catch (e) {
       colourCheck = { error: e.message };
@@ -7445,6 +7515,7 @@ const STORY_STAGES = {
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
   style_check: runStyleCheckStage,
+  book_audit: runBookAuditStage,
   style_repair: runStyleRepairStage,
   outline_review: runOutlineReviewStage,
   text_refine: runTextRefineStage,
