@@ -490,19 +490,28 @@ Recorded so nobody re-proposes them as gaps.
 - [ ] **A watercolour page rendered as a photographed painting (2026-08-26).** Same story p2: the
       illustration is depicted as a physical painting lying on a white surface, with paper edges
       and margins inside the frame instead of filling it. → `prompts/image-generation.txt`
-- [ ] **Trial empty-scene plates never generate for Swiss landmarks, so the PAGE edits a raw photo (2026-08-26).**
-      `storyJobPipeline.js:1856` gates plate generation on `loc.photoFetchStatus !== 'success'`, but Swiss
-      pre-indexed landmarks are stamped `'pending_lazy'` (`visualBible.js:1703`) and nothing flips them before
-      that branch runs. Measured: 2 of 2 landmark trials (prod `job_1787647410717_5dvfqu8jg`, staging
-      `job_1787696601288_bfgznq960`) have `pending_lazy` and ZERO `empty_scene` rows. With no plate,
-      `packReferences` promotes the raw landmark photograph into a Grok slot (`grok.js:1113-1124`,
-      `!hasSceneBackground`), so the page becomes an EDIT of a real photo: prod p1 got 3 refs vs 2 on every
-      other page and is the only non-watercolour page (real bystanders, garbled SBB board). The trial
+- [ ] **Trial empty-scene plates never generate for variant-backed landmarks, so the PAGE edits a raw photo (2026-08-26).**
+      `storyJobPipeline.js:1856` gates plate generation on `loc.photoFetchStatus === 'success'`. That status is
+      only ever set by `prefetchLandmarkPhotos` (`landmarkPhotos.js:1370,1395`) — and the call site at
+      `storyJobPipeline.js:2578` filters to `!l.photoVariants?.length`, so any landmark WITH photo variants is
+      excluded from the prefetch entirely and keeps `'pending_lazy'` forever. Variant-backed Swiss landmarks are
+      the normal modern case, so the gate can never pass. Measured: prod `job_1787647410717_5dvfqu8jg`
+      ("Bahnhof Stettbach", `isSwissPreIndexed=true`, `photoVariants=2`, `photoFetchStatus='pending_lazy'`) and
+      staging `job_1787696601288_bfgznq960` — both ZERO `empty_scene` rows.
+      NOT merely the streaming race: the `landmarksReady` barrier (declared `:602`, awaited only by covers at
+      `:1214`) would resolve immediately here, since the landmark is not in the prefetch set at all. The fix is
+      to resolve the plate's photo the variant-aware way pages already use
+      (`getLandmarkPhotosForScene` -> `pickVariantForView` -> `loadLandmarkPhotoVariant`), not to await the barrier
+      and not to loosen the status check.
+      Consequence: with no plate, `packReferences` promotes the raw landmark photograph into a Grok slot
+      (`grok.js:1113-1124`, `!hasSceneBackground`), so the page becomes an EDIT of a real photo — prod p1 got 3
+      refs vs 2 elsewhere and is the only non-watercolour page (real bystanders, garbled SBB board). The trial
       empty-scene feature believed active since `decisions.md:1514` is effectively inert.
-      NOTE: `decisions.md:12530` settled that the photo BELONGS in the plate's reference slot — so the fix is
-      to make the plate exist, not to remove the photo. Also: `validateEmptyScene` has no style/photorealism
-      check at all, so a photographic plate would pass QC even in full mode.
-      → `storyJobPipeline.js:1843-1917`, `server/lib/grok.js:1113-1124`, `server/lib/visualBible.js:1703`
+      NOTE: `decisions.md:12530` settled that the photo BELONGS in the plate's reference slot, so the fix is to
+      make the plate exist, not to remove the photo. Also `validateEmptyScene` has no style/photorealism check,
+      so a photographic plate passes QC even in full mode.
+      -> `storyJobPipeline.js:1843-1917,2578`, `server/lib/grok.js:1113-1124`, `server/lib/landmarkPhotos.js`
+
 - [ ] **Trial sends the whole 2x4 character sheet as the page reference instead of the matching pose (2026-08-26).**
       The intended design is already one-pose: `cropAvatarCell` (`sceneComposite.js:936`) exists and the full
       pipeline uses it (`storyJobPipeline.js:3303-3310`). On the trial path it no-ops for two independent
