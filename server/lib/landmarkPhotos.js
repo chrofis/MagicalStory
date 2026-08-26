@@ -2292,6 +2292,8 @@ const NON_PLACE_CATEGORIES = "(Gemeinde|Municipalit|Commune|Comune|Bezirk|Distri
 //   0  not a place at all: a municipality, an event, an organisation.
 const BACKDROP_TYPES = "'Cathedral','Church','Abbey','Monastery','Castle','Palace','Museum','Bridge','Tower','Fountain','Square','Theatre','Park','Monument','Library'";
 const NON_PLACE_TYPES = "'City','Village','Event','Organisation','Other'";
+// Same list, usable from JS — the SQL string above cannot be tested against a row.
+const NON_PLACE_TYPES_SET = new Set(['City', 'Village', 'Event', 'Organisation', 'Other']);
 const LANDMARK_CLASS_SQL = `(CASE
   WHEN coalesce(type,'x') IN (${NON_PLACE_TYPES})
     OR coalesce(array_to_string(categories,' '),'') ~* '${NON_PLACE_CATEGORIES}' THEN 0
@@ -2431,7 +2433,15 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
               cos(radians(longitude) - radians($2)) +
               sin(radians($1)) * sin(radians(latitude))
             )) <= $6
-      ORDER BY ${SAME_CITY_SQL}, ${FAME_MINUS_DISTANCE_SQL}, score DESC
+        -- Proximity exists to find a REAL landmark when the town has none of
+        -- its own. Class 0 is a municipality/event/organisation, and the town's
+        -- own `(Stadt|ville|città)` aerial sits at 0km, so without this it wins
+        -- on distance every time: Locarno was served its own aerial while the
+        -- Castello Visconteo, 500m away, was never offered. When proximity
+        -- finds nothing, the caller falls back to that aerial anyway.
+        AND ${LANDMARK_CLASS_SQL} > 0
+        AND ${JUDGED_USABLE_SQL}
+      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LAST, ${FAME_MINUS_DISTANCE_SQL}, score DESC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 
@@ -2531,6 +2541,24 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // Use typeof checks: legacy string callers leave lat/lon as `undefined`, and
     // `undefined !== null` is true — without the type guard the fallback fired
     // with undefined coords and wasted 3 DB queries per missed city.
+    // A name match that found ONLY the town's own aerial is not a real match.
+    // The `<Town> (Stadt|ville|città)` overview row is class 0, and because it
+    // exists the name lookup "succeeds" and suppresses the proximity search —
+    // so Locarno was offered its own aerial while the Madonna del Sasso and
+    // twenty other landmarks sat 2km away, anchored to Ascona. (A landmark can
+    // carry only one `nearest_city`, and neighbours 4km apart share a 10km
+    // discovery radius, so whichever town was indexed first keeps them.)
+    //
+    // Treat "no actual place among the matches" as no match, and let proximity
+    // run. The overview row is kept as the fallback-of-last-resort below, so a
+    // village with genuinely nothing nearby still gets its aerial.
+    const overviewOnly = result.rows.length > 0 && !result.rows.some(r => !NON_PLACE_TYPES_SET.has(r.type || 'x'));
+    const overviewRows = overviewOnly ? result.rows : [];
+    if (overviewOnly) {
+      log.info(`[LANDMARK-INDEX] "${city}" name-matched only its overview row — trying proximity for a real landmark`);
+      result = { rows: [] };
+    }
+
     if (result.rows.length === 0 && typeof latitude === 'number' && typeof longitude === 'number') {
       for (const radiusKm of [20, 50, 100]) {
         const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit, city);
@@ -2539,6 +2567,13 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
           return nearby;
         }
       }
+    }
+
+    // Nothing real anywhere near — hand back the town's own aerial rather than
+    // nothing, which is what broad-city-overviews.js created it for.
+    if (result.rows.length === 0 && overviewRows.length > 0) {
+      log.info(`[LANDMARK-INDEX] "${city}": no real landmark within 100km — using the town overview`);
+      return overviewRows;
     }
 
     log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks for city "${city}"`);

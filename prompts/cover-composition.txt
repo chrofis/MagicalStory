@@ -1,0 +1,20 @@
+### front
+- ALL MAIN CHARACTERS are prominently featured and clearly recognizable, arranged in a balanced composition (side by side, or grouped naturally). Keep it simple and uncluttered.
+- All characters stand firmly on solid ground — feet flat on a stable surface (floor, pavement, cobblestones, grass, path). Never standing in or on water, never floating, never mid-air; feet visible on the ground and level with each other.
+- The top third of the canvas is always open background in the scene's own colors and lighting — sky outdoors, upper wall or ceiling indoors, never plain white — and holds no character, head, hair, hand, prop, raised arm or effect, whatever the scene describes. Scale the whole group down so the tallest head and anything held sit below the one-third line while feet rest at the bottom; the figures fill only the lower two-thirds.
+- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
+
+### initialPage
+{GROUP_COMPOSITION}
+- All characters stand firmly on solid ground — feet flat on a stable surface (floor, pavement, cobblestones, grass, path). Never standing in or on water, never floating, never mid-air; feet visible on the ground and level with each other.
+- Create a warm, inviting atmosphere that draws readers in and sets the mood for the story.
+- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
+- The bottom 20% of the canvas contains no character, face, or prop — only calm ground or floor continuing the scene in its own colors and lighting. Never plain white.
+
+### back
+- Draw EXACTLY the characters listed in the scene — no more, no fewer. Do not invent extra figures.
+- If only one character is listed, center it with comfortable negative space around the figure. If more than one is listed, arrange them as a balanced group with equal prominence.
+- Characters look happy and relaxed — smiling, laughing, or at ease after the adventure. Warm lighting, relaxed poses.
+- All characters stand firmly on solid ground — feet flat on a stable surface (floor, pavement, cobblestones, grass, path). Never standing in or on water, never floating, never mid-air; feet visible on the ground and level with each other.
+- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
+- The bottom 10% of the canvas contains no character, face, or prop — only calm scene continuation in its own colors and lighting. Never plain white.

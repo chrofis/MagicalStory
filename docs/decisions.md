@@ -14072,11 +14072,31 @@ are inside Julian's sentence — followed by the height order and the colour
 legend (GREEN = Levin, RED = Julian, PURPLE = Max, BLUE = Kiaan), which matches
 the frames actually baked into the packed reference image.
 
-**Still divergent, deliberately not touched in this commit.** The cover
-TEMPLATES are still six separate files filled by `fillTemplate` rather than
-`buildImagePrompt`. Collapsing those is the remaining half of "identical code"
-and belongs in its own change with its own verification, not bolted onto this
-one.
+**Follow-up, same day — the other path is now retired.** The owner: "fix it
+properly first. Retire the other path. Than test." Cover art is built by
+`buildCoverPrompt()`, which calls `buildImagePrompt` — the page builder — for all
+three cover types, from all three call sites (coverIterate, the streaming cover,
+the trial cover), which each used to fill their own copy of the cover templates.
+`front-cover.txt`, `back-cover.txt`, `initial-page-with-dedication.txt`,
+`initial-page-no-dedication.txt` and the two derived textless variants are
+DELETED. The only cover-specific content left is `cover-composition.txt` (the
+title-safe top third, group arrangement and bottom margin), injected through a
+`{COVER_COMPOSITION}` placeholder that is empty for pages.
+
+Art is always generated textless; the title, dedication and branding are
+composited afterwards by `coverTypography.js` — the one extra pass a cover gets,
+exactly as the owner specified. `buildImagePrompt` gained three override options
+(`characterReferenceListOverride`, `visualBibleOverride`, `promptTemplateOverride`)
+because a cover pre-filters its cast and Visual Bible by the cover hint before
+the prompt is built.
+
+Verified by building all three cover types from the affected story's stored data:
+each has the wardrobe bound inline (dungarees inside Julian's sentence), the card
+colour legend, its composition bullets, no title-paint block and no unfilled
+placeholders; 75/75 templates load and all six retired keys resolve to undefined.
+A side effect worth noting: covers now inherit the page's clothing guard, which
+immediately reported that cover prose does not dress its characters — true, and
+the reason the inline wardrobe block is load-bearing.
 
 **Touched files.** `server/lib/promptBuilders.js`, `server/lib/coverIterate.js`,
 `server/lib/storyHelpers.js`, `storyJobPipeline.js`.

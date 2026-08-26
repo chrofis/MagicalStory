@@ -150,10 +150,7 @@ Sizes measured 2026-08-09.
 
 | Template | Consumer | Stage |
 |---|---|---|
-| front-cover.txt | coverIterate.js (`frontCover` / derived `frontCoverTextless`) | Front cover |
-| back-cover.txt | coverIterate.js (`backCover` / derived `backCoverTextless`) | Back cover |
-| initial-page-with-dedication.txt | coverIterate.js | Initial page (dedication) |
-| initial-page-no-dedication.txt | coverIterate.js | Initial page (no dedication) |
+| cover-composition.txt | promptBuilders.js `buildCoverPrompt` (`coverComposition`) | Cover-only composition bullets (front / initialPage / back), injected into image-generation.txt. RETIRED 2026-08-26: front-cover.txt, back-cover.txt, initial-page-with-dedication.txt, initial-page-no-dedication.txt and the derived textless variants — a cover is now built from the SAME image-generation template as a page, plus the typography pass. |
 
 Note: `PROMPT_TEMPLATES.coverImageEvaluation` is referenced in regeneration.js but the file
 was deliberately deleted — callers guard and fall back to `imageEvaluation`. By design.

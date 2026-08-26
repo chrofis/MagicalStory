@@ -135,10 +135,10 @@ async function loadPromptTemplates() {
     // failure across every entry below it. Fall back to imageEvaluation
     // for cover scoring — the two regeneration.js callers already guard
     // with `if (PROMPT_TEMPLATES.coverImageEvaluation)`.
-    ['frontCover', 'front-cover.txt'],
-    ['initialPageWithDedication', 'initial-page-with-dedication.txt'],
-    ['initialPageNoDedication', 'initial-page-no-dedication.txt'],
-    ['backCover', 'back-cover.txt'],
+    // Cover-only composition bullets, injected into the SAME image-generation
+    // template pages use (buildCoverPrompt). The four cover templates above are
+    // retired once every caller routes through it.
+    ['coverComposition', 'cover-composition.txt'],
     ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
     ['characterAnalysis', 'character-analysis.txt'],
     ['imageSystemInstruction', 'image-system-instruction.txt'],
@@ -243,20 +243,12 @@ async function loadPromptTemplates() {
   // Backwards-compat aliases (computed AFTER loads so the source key is set)
   PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
 
-  // Textless cover variants (for app-side cover typography — MODEL_DEFAULTS.appSideCoverType).
-  // Derived from the base templates so composition edits auto-sync: the labelled text-baking block
-  // (**TITLE:** / **TEXT:**) is replaced with an explicit no-text directive. The initial page just
-  // uses the existing initialPageNoDedication when the flag is on. Kept off the two paint paths.
-  // Owner rule (tasks/lessons.md): state the constraint ONLY — never why ("text added afterwards")
-  // and never "empty/uncluttered space"; both invited painted titles and blank white bands.
-  const NO_TEXT = '**NO TEXT:**\nThe illustration contains no written text of any kind — no title, no lettering, no caption, no letters, numbers, or symbols anywhere in the image.\n';
-  // Lookahead stops at the next **SECTION**, the next {PLACEHOLDER} line, or
-  // end-of-template — the text-baking block is the LAST section in the cover
-  // templates (followed only by {VISUAL_BIBLE}) since the duplicate FRAMING
-  // section was merged into the opening paragraph.
-  const makeTextless = (tpl, label) => tpl ? tpl.replace(new RegExp(`\\*\\*${label}:\\*\\*[\\s\\S]*?(?=\\n\\*\\*|\\n\\{|$)`), NO_TEXT) : tpl;
-  PROMPT_TEMPLATES.frontCoverTextless = makeTextless(PROMPT_TEMPLATES.frontCover, 'TITLE');
-  PROMPT_TEMPLATES.backCoverTextless = makeTextless(PROMPT_TEMPLATES.backCover, 'TEXT');
+  // RETIRED 2026-08-26 — the four cover templates and their textless variants.
+  // A cover is now built by buildCoverPrompt() from the SAME image-generation
+  // template a page uses, plus cover-composition.txt for the title-safe/group
+  // bullets. Art is always generated textless; the title, dedication and
+  // branding are composited afterwards by coverTypography.js — the one extra
+  // pass a cover gets over a page.
 
   // One-source-of-truth repair guard: fill {REPAIR_STYLE_GUARD} in every
   // template that carries it (all character-repair templates).

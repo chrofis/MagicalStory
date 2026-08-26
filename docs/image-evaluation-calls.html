@@ -1,0 +1,220 @@
+<title>Image evaluation — every call, what it sees, how it consolidates</title>
+<style>
+:root{--bg:#faf9f7;--fg:#1c1b1a;--mut:#6b6560;--line:#e3ded8;--card:#fff;
+      --a:#0277bd;--b:#7b1fa2;--c:#2e7d32;--d:#c62828;--warn:#b45309;--code:#f2efeb}
+@media (prefers-color-scheme:dark){:root{--bg:#16151a;--fg:#eceaf0;--mut:#9c96a3;--line:#2e2b35;--card:#1e1d24;
+      --a:#4fc3f7;--b:#ce93d8;--c:#81c784;--d:#ef9a9a;--warn:#fbbf24;--code:#24232b}}
+*{box-sizing:border-box}
+body{margin:0;padding:2.5rem 2rem 5rem;background:var(--bg);color:var(--fg);
+     font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1180px;margin-inline:auto}
+h1{font-size:1.8rem;margin:0 0 .4rem;letter-spacing:-.02em}
+h2{font-size:1.25rem;margin:3rem 0 .8rem;padding-bottom:.4rem;border-bottom:2px solid var(--line)}
+h3{font-size:1rem;margin:1.8rem 0 .5rem}
+.sub{color:var(--mut);max-width:75ch;margin:0 0 2rem}
+code{font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--code);padding:1px 5px;border-radius:4px}
+.wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:840px;font-size:.9rem;margin:.5rem 0 1rem}
+th,td{padding:.6rem .7rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mut);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+tbody tr:hover{background:color-mix(in srgb,var(--fg) 3%,transparent)}
+.n{font:600 13px ui-monospace,monospace;color:#fff;background:var(--a);border-radius:50%;
+   width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+.n.b{background:var(--b)}.n.c{background:var(--c)}.n.g{background:var(--mut)}
+.blind{color:var(--c);font-weight:600}.sighted{color:var(--a);font-weight:600}
+.flow{display:flex;flex-direction:column;gap:.5rem;margin:1.2rem 0}
+.row{display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;flex:1;min-width:190px}
+.box b{display:block;font-size:.9rem;margin-bottom:.15rem}
+.box span{color:var(--mut);font-size:.8rem;display:block}
+.box.hl{border-color:var(--a);border-width:2px}
+.arrow{text-align:center;color:var(--mut);font-size:1.1rem;line-height:1}
+.note{background:color-mix(in srgb,var(--warn) 10%,transparent);border-left:3px solid var(--warn);
+      padding:.8rem 1rem;border-radius:0 6px 6px 0;margin:1.2rem 0}
+.note b{color:var(--warn)}
+.math{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:1rem 1.2rem;
+      font:13px/2 ui-monospace,Menlo,Consolas,monospace;margin:1rem 0;overflow-x:auto}
+.tag{display:inline-block;font-size:.7rem;padding:.1rem .45rem;border-radius:4px;
+     background:var(--code);color:var(--mut);margin-left:.3rem;white-space:nowrap}
+ul{padding-left:1.2rem}li{margin:.35rem 0}
+.foot{color:var(--mut);font-size:.85rem;margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem}
+</style>
+
+<h1>Image evaluation — every call, what it sees, how it consolidates</h1>
+<p class="sub">One scene page, from generated pixels to a final score. Five model calls run inside
+<code>evaluateImageQuality</code>, plus a local detection before it and one story-level pass after.
+The split that matters throughout: some callers <span class="sighted">see the prompt</span> (they know
+who is supposed to be there) and some are <span class="blind">blind</span> (they only see the picture).</p>
+
+<h2>The calls</h2>
+
+<h3>Before the eval — once per image</h3>
+<div class="wrap">
+<table>
+<thead><tr><th>#</th><th>Call</th><th>Model</th><th>Sees</th><th>Produces</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="n g">0</span></td>
+  <td><b>Shared figure detection</b><br><span style="color:var(--mut);font-size:.85rem">Phase 5b-pre, <code>storyJobPipeline.js:4599</code></span></td>
+  <td>GroundingDINO → MobileSAM<br><span class="tag">local, no API</span></td>
+  <td>image + per-character identity lines (incl. clothing)</td>
+  <td><code>figures[]</code> with <code>faceBox</code>, <code>bodyBox</code> and a <b>name</b> per figure; object boxes</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>Inside <code>evaluateImageQuality</code> — all five launched in parallel</h3>
+<div class="wrap">
+<table>
+<thead><tr><th>#</th><th>Call / prompt</th><th>Model</th><th>Sees</th><th>Produces</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="n">1</span></td>
+  <td><b>Quality evaluator</b><br><code>image-evaluation.txt</code></td>
+  <td><code>gemini-2.5-flash</code></td>
+  <td class="sighted">image + reference photos + prompt + art style + clothing contract + declared interactions</td>
+  <td>the primary score, <code>figures[]</code>, <b><code>matches[]</code> — identity + <code>face_bbox</code>/<code>body_bbox</code></b>,
+      <code>fixable_issues</code>, <code>style_gate</code>, <code>coherence_gate</code>, <code>height_order</code></td>
+</tr>
+<tr>
+  <td><span class="n c">2</span></td>
+  <td><b>P1 visual inventory</b><br><code>image-visual-inventory.txt</code></td>
+  <td><code>gemini-2.5-flash</code></td>
+  <td class="blind">the image alone</td>
+  <td><code>figures[]</code>, <code>object_matches</code>, rendering booleans (<code>extra_limbs</code>,
+      <code>cross_eyes</code>, <code>physics_ok</code>, <code>composite_seam</code>).
+      <span style="color:var(--warn)">Also writes <code>scene_summary</code> + <code>main_action</code>, which the code discards.</span></td>
+</tr>
+<tr>
+  <td><span class="n b">3</span></td>
+  <td><b>Semantic fidelity</b><br><code>image-semantic.txt</code></td>
+  <td><code>gemini-2.5-flash</code></td>
+  <td class="sighted">image + the page's story text + prompt + scene hint</td>
+  <td><code>semanticIssues[]</code> — does the picture tell the sentence on the page?</td>
+</tr>
+<tr>
+  <td><span class="n c">4</span></td>
+  <td><b>Three-stage · Stage 1</b><br><code>image-vision-inventory.txt</code></td>
+  <td><code>gemini-2.5-flash</code></td>
+  <td class="blind">the image alone</td>
+  <td>prose inventory — label, zone, garments, eyewear, headwear, facial hair, worn items,
+      height rank, age group, standing surface, lettering, physics, and interactions between labels</td>
+</tr>
+<tr>
+  <td><span class="n">5</span></td>
+  <td><b>Three-stage · Stage 2 (compliance)</b><br><code>image-prompt-compliance.txt</code></td>
+  <td><code>qwen3-max</code><br><span class="tag">text only — never sees the image</span></td>
+  <td class="sighted">Stage 1's prose + call 1's <code>figures[]</code>/<code>matches[]</code> + prompt + declared interactions</td>
+  <td><code>fixable_issues</code>, <code>character_compliance</code>, <code>interaction_compliance</code>, <code>main_action_check</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>After — once per story</h3>
+<div class="wrap">
+<table>
+<thead><tr><th>#</th><th>Call</th><th>Model</th><th>Sees</th><th>Produces</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="n g">6</span></td>
+  <td><b>Entity consistency</b><br><code>entity-consistency-check.txt</code></td>
+  <td><code>gemini-2.5-flash</code></td>
+  <td>face/figure crops from <b>all</b> pages together</td>
+  <td>cross-page drift (a character changing face or outfit between pages) → <code>entityPenalty</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--mut);font-size:.88rem">Text-region detection and the empty-scene QC also run on each page, but they are
+pixel code, not model calls.</p>
+
+<h2>Who names the figures</h2>
+<p class="sub">This is the part that keeps biting, so it is worth stating on its own. Three of the calls
+produce a figure list, but only two are allowed to attach a <b>name</b> to a figure:</p>
+<div class="flow">
+  <div class="row">
+    <div class="box hl"><b>① Quality evaluator</b><span>has the reference photos, the character
+      descriptions, the clothing contract and each character's declared position</span>
+      <span style="margin-top:.4rem;color:var(--a)"><b>owns <code>matches[]</code></b> — identity + boxes</span></div>
+    <div class="box hl"><b>⓪ Figure detection</b><span>has the per-character identity lines and full-body masks</span>
+      <span style="margin-top:.4rem;color:var(--a)"><b>owns its own names</b> — independent second opinion</span></div>
+  </div>
+  <div class="arrow">↓ compared on body-box centres · <code>identityAgreement.js</code></div>
+  <div class="row">
+    <div class="box"><b>They agree</b><span>the page was easy — carry on</span></div>
+    <div class="box"><b>They disagree</b><span>the detector wins (it has masks and clothing lines);
+      the page is harvested into the Lab set <i>Identity conflicts (auto-harvested)</i></span></div>
+  </div>
+</div>
+<p>The two <span class="blind">blind</span> calls — ② and ④ — describe figures but never name them.
+They have no character contract, so a name from them would be a guess. ④ gives each figure a
+descriptive <b>label</b> ("the young boy in green") and Stage 2 resolves that label to a real name by
+pairing on zone against ①'s <code>matches[]</code>.</p>
+
+<div class="note">
+<b>Why it must work that way.</b> Until 2026-08-23, P1 (②) was handed the reference photos and asked to
+match. It answered <code>UNMATCHED</code> at confidence 0 — and because that array is not empty, it
+<i>replaced</i> the evaluator's real names. Measured across two production stories: 12 versions where
+the evaluator had named everyone at 0.85–0.90 stored <code>unmatched</code> instead. Every
+per-character check — clothing, action, scale — keys off a name, so all of them went silent on those
+pages.
+</div>
+
+<h2>How it consolidates</h2>
+<div class="flow">
+  <div class="row">
+    <div class="box"><b>fixable_issues</b><span>call ① + call ⑤, concatenated</span></div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="row">
+    <div class="box"><b>visual score recomputed</b><span>from the <i>merged</i> list, same severity rubric —
+      not the score call ① first reported</span></div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="row">
+    <div class="box"><b>− semantic penalty</b><span>call ③ · CRITICAL −30, MAJOR −20, else −10</span></div>
+    <div class="box"><b>− entity penalty</b><span>call ⑥ · capped; raw kept as <code>entityPenaltyRaw</code></span></div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="row">
+    <div class="box hl"><b>finalScore</b><span>drives redo, repair targeting and pick-best across versions</span></div>
+  </div>
+</div>
+
+<div class="math">
+visualScore  = 10 × max(0, 10 − Σ severityPenalty(merged fixable_issues))<br>
+finalScore   = visualScore − semanticPenalty − entityPenalty
+</div>
+
+<p>The recompute step exists because three-stage findings used to appear in the dev panel but never move
+the number that triggers a repair — a page sat at 85 with −30 of real defects listed under it and was
+never redone.</p>
+
+<h3>Score names, which are counterintuitive on purpose</h3>
+<ul>
+<li><code>qualityScore</code> — the RAW visual score from call ①, before any penalty</li>
+<li><code>score</code> — the FINAL penalised score (visual − semantic − entity − three-stage)</li>
+<li><code>semanticScore</code> / <code>threeStageScore</code> — those judges' own 0–100, kept separate</li>
+</ul>
+
+<h2>Honest assessment of the complexity</h2>
+<p>Five model calls per page, from three vendors, is a lot — and the redundancy is real:</p>
+<ul>
+<li><b>Three figure inventories</b> per page (①, ②, ④). ①'s schema is a superset of ②'s, and ④'s is
+    richer than both. ② is the odd one out: since it stopped naming anyone, its only unique output is
+    the rendering booleans.</li>
+<li><b>Four sources of findings</b> (①, ③, ⑤, ⑥), each with its own severity scale, merged by
+    concatenation and then re-scored.</li>
+<li><b>One call's entire text output is thrown away</b> — ②'s <code>scene_summary</code> and
+    <code>main_action</code> are generated on every page and never returned by
+    <code>runVisualInventory</code>.</li>
+</ul>
+<p>The blind/sighted split is worth keeping — it is what makes a wrong-outfit or wrong-person defect
+detectable at all. Having <i>two</i> blind describers and <i>three</i> figure lists is not.</p>
+
+<p class="foot">Sources: <code>server/lib/evalPipeline.js</code> (calls 1–5 and the merge),
+<code>storyJobPipeline.js</code> (call 0), <code>server/lib/entityConsistency.js</code> (call 6),
+<code>server/lib/scoring.js</code> (final score), <code>server/config/models.js</code> (models).
+Routing decisions live in <code>docs/decisions.md</code>; generation-side methods in
+<code>docs/image-generation-methods.html</code>.</p>

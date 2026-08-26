@@ -65,6 +65,7 @@ const {
   getCharacterPhotoDetails,
   buildCharacterReferenceList,
   buildReferenceCardColours,
+  buildCoverPrompt,
   extractPageClothing,
   buildSceneExpansionPrompt,
   buildImagePrompt,
@@ -1618,49 +1619,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // App-side cover typography: generate the art TEXTLESS (title / dedication /
         // branding are composited afterwards by server/lib/coverTypography.js).
-        const textlessCovers = MODEL_DEFAULTS.appSideCoverType;
-        let coverPrompt;
-        if (coverType === 'frontCover') {
-          // Front cover: include title for text rendering (skipped when textless)
-          const storyTitle = streamingTitle || inputData.title || 'My Story';
-          coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover, {
-            TITLE_PAGE_SCENE: sceneDescription,
-            STYLE_DESCRIPTION: styleDescription,
-            STORY_TITLE: storyTitle,
-            CHARACTER_REFERENCE_LIST: characterRefList,
-            VISUAL_BIBLE: visualBibleText
-          });
-        } else if (coverType === 'initialPage') {
-          // Initial page: with or without dedication (textless → always the no-text scene).
-          // Group-composition boilerplate is conditional on the actual cast size —
-          // for 1-2 characters it would contradict the hint's explicit positions.
-          const { buildInitialPageComposition } = require('./server/lib/coverIterate');
-          const groupComposition = buildInitialPageComposition(coverPhotos.length);
-          coverPrompt = (!textlessCovers && inputData.dedication && inputData.dedication.trim())
-            ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-                INITIAL_PAGE_SCENE: sceneDescription,
-                STYLE_DESCRIPTION: styleDescription,
-                DEDICATION: inputData.dedication,
-                CHARACTER_REFERENCE_LIST: characterRefList,
-                GROUP_COMPOSITION: groupComposition,
-                VISUAL_BIBLE: visualBibleText
-              })
-            : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-                INITIAL_PAGE_SCENE: sceneDescription,
-                STYLE_DESCRIPTION: styleDescription,
-                CHARACTER_REFERENCE_LIST: characterRefList,
-                GROUP_COMPOSITION: groupComposition,
-                VISUAL_BIBLE: visualBibleText
-              });
-        } else {
-          // Back cover
-          coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover, {
-            BACK_COVER_SCENE: sceneDescription,
-            STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_REFERENCE_LIST: characterRefList,
-            VISUAL_BIBLE: visualBibleText
-          });
-        }
+        // Same builder as pages and as every other cover path (owner,
+        // 2026-08-26). Art is generated textless; the title, dedication and
+        // branding are composited afterwards by coverTypography.js.
+        const { buildInitialPageComposition } = require('./server/lib/coverIterate');
+        const coverPrompt = buildCoverPrompt(
+          coverType === 'frontCover' ? 'front' : coverType === 'backCover' ? 'back' : 'initialPage',
+          {
+            sceneDescription,
+            inputData,
+            characters: (inputData.characters || []).filter(c => coverPhotos.some(ph => ph.name === c.name)),
+            visualBible: streamingVisualBible,
+            referencePhotos: coverPhotos,
+            groupComposition: coverType === 'initialPage' ? buildInitialPageComposition(coverPhotos.length) : '',
+            options: {
+              customStyleDescription: styleDescription,
+              characterReferenceListOverride: characterRefList,
+              visualBibleOverride: visualBibleText,
+            },
+          }
+        );
 
         // Final chokepoint — same VB-id protection buildImagePrompt gives
         // pages. buildCoverSceneFromHint falls back to the bare id when a
@@ -2108,15 +2086,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // the flag, so the model painted the title into the art AND
             // bakeCoverTypographyPostPersist stamped a second one over it
             // (job_1786815617426: two titles on the trial cover).
-            let coverPrompt = fillTemplate(
-              MODEL_DEFAULTS.appSideCoverType ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover,
-              {
-                TITLE_PAGE_SCENE: sceneDescription,
-                STORY_TITLE: coverTitle,
-                STYLE_DESCRIPTION: styleDescription,
-                CHARACTER_REFERENCE_LIST: characterRefList,
-                VISUAL_BIBLE: visualBibleText
-              });
+            // Same builder as pages and as every other cover path.
+            let coverPrompt = buildCoverPrompt('front', {
+              sceneDescription,
+              inputData,
+              characters: (inputData.characters || []).filter(c => coverPhotos.some(ph => ph.name === c.name)),
+              visualBible: streamingVisualBible,
+              referencePhotos: coverPhotos,
+              options: {
+                customStyleDescription: styleDescription,
+                characterReferenceListOverride: characterRefList,
+                visualBibleOverride: visualBibleText,
+              },
+            });
 
             // Final chokepoint — same VB-id protection the full-account cover
             // path applies (streaming cover + coverIterate). The code-fenced

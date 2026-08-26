@@ -22,4 +22,6 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 
 {TEXT_AREA_INSTRUCTION}
 
+{COVER_COMPOSITION}
+
 **ART STYLE:** {STYLE_DESCRIPTION}

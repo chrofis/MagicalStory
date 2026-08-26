@@ -133,21 +133,24 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   const gridLayoutLines = elements.map((el, i) => {
     const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
     const desc = el.extractedDescription || el.description;
-    // A prop whose interest is on a face is drawn CLOSED. The face-up view is
-    // a document's canonical viewpoint and the one the model reaches for by
-    // default, and a reference image carries pose, not just appearance:
-    // reference-conditioned models reproduce a referenced object's exact
-    // appearance AND pose regardless of the instruction (OminiControl
-    // arXiv:2411.15098; leakage/shortcut in RetriBooru arXiv:2312.02521).
-    // Measured here: every prop reference in staging
-    // job_1787514666616_yw9qsv1vf rendered flat and face-up — the map
-    // unrolled, the notebook lying open — and 7 of 7 pages holding one
-    // reproduced that pose, including a page whose brief asked for the
-    // opposite. Neither Grok nor Gemini exposes a conditioning-strength dial
-    // to trade that identity fidelity for pose freedom, so the reference has
-    // to show the pose we actually want.
-    const closed = typeof el.referenceView === 'string' ? el.referenceView.trim() : '';
-    return closed ? `${pos}: ${desc} ${closed}` : `${pos}: ${desc}`;
+    // A reference image carries POSE, not just appearance: reference-conditioned
+    // models reproduce a referenced object's exact appearance AND pose whatever
+    // the instruction says (OminiControl arXiv:2411.15098; leakage/shortcut in
+    // RetriBooru arXiv:2312.02521), and neither Grok nor Gemini exposes a
+    // conditioning-strength dial to trade fidelity for pose freedom. Measured:
+    // every prop reference in staging job_1787514666616_yw9qsv1vf rendered flat
+    // and face-up, and 7 of 7 pages holding one reproduced that pose, including
+    // a page whose brief asked for the opposite.
+    //
+    // So the side a face-prop shows has to come from the reference. Since
+    // 2026-08-26 that is expressed as TWO bible entries — "(turned away)" and
+    // "(face to camera)" — each with its own description and therefore its own
+    // reference image, which the Art Director selects between per page through
+    // objects[]. Nothing to override in the cell: the entry's own description
+    // already says which side it is. This replaced a `referenceView` field that
+    // appended the closed state to a single entry; two entries do the same job
+    // and also put the orientation into the page prompt.
+    return `${pos}: ${desc}`;
   });
 
   // Describe the grid in natural language. Passing literal digit-strings like

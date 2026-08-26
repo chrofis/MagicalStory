@@ -1926,6 +1926,63 @@ function buildCharacterRestriction(selectedNames, excludedNames) {
  * be that same filtered set — building it from ALL characters diverges in
  * membership and the colours bind to the wrong person.
  */
+/**
+ * Build a COVER prompt — through the exact same builder a page uses.
+ *
+ * Owner, 2026-08-26: "make them IDENTICAL to normal pages. IDENTICAL CODE...
+ * Covers get one more pass for text, that is it. Otherwise they are identical."
+ *
+ * Before this, three separate call sites (coverIterate, the streaming cover in
+ * storyJobPipeline, and the trial cover) each filled their own copy of four
+ * cover templates. Three duplicated parallel paths, none of which received the
+ * improvements pages got — which is how a character kept his dungarees on every
+ * page and lost them on every cover.
+ *
+ * A cover is now a page plus two things: the cover-only composition bullets
+ * (title-safe top third, group arrangement, bottom margin) and, afterwards, the
+ * typography pass that composites the title. The art itself is generated
+ * textless, so no template needs a TITLE or DEDICATION block at all.
+ *
+ * @param {'front'|'initialPage'|'back'} coverType
+ * @param {Object} args - everything buildImagePrompt needs, plus groupComposition
+ */
+function buildCoverPrompt(coverType, {
+  sceneDescription,
+  inputData,
+  characters = null,
+  visualBible = null,
+  referencePhotos = null,
+  groupComposition = '',
+  options = {},
+} = {}) {
+  const key = coverType === 'front' ? 'front' : coverType === 'back' ? 'back' : 'initialPage';
+  const raw = PROMPT_TEMPLATES.coverComposition || '';
+  // Sections are delimited by '### <key>' lines in cover-composition.txt.
+  const section = (() => {
+    const m = raw.split(/^###\s+/m).find(b => b.trim().toLowerCase().startsWith(key.toLowerCase()));
+    if (!m) {
+      log.error(`❌ [COVER PROMPT] cover-composition.txt has no '### ${key}' section — the cover ships without its composition rules.`);
+      return '';
+    }
+    return m.slice(m.indexOf('\n') + 1).trim();
+  })();
+  const composition = section
+    ? `**COMPOSITION GUIDELINES:**\n${section.replace('{GROUP_COMPOSITION}', groupComposition || '').trim()}`
+    : '';
+
+  return buildImagePrompt(
+    sceneDescription,
+    inputData,
+    characters,
+    visualBible,
+    require('./coverKeys').COVER_PAGE_NUMBERS[
+      coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage'
+    ] ?? null,
+    referencePhotos,
+    { ...options, coverComposition: composition }
+  );
+}
+
 function buildReferenceCardColours(chars, referencePhotos) {
   chars = Array.isArray(chars) ? chars.filter(Boolean) : [];
   if (chars.length === 0) return '';
@@ -3290,7 +3347,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     log.debug(`[IMAGE PROMPT] Skipping Visual Bible text for page ${pageNumber} (visual reference sent as image)`);
   }
 
-  const template = PROMPT_TEMPLATES.imageGeneration || null;
+  // COVER OVERRIDES. A cover pre-computes these two blocks because its cast and
+  // its Visual Bible are filtered by the cover hint (worn-vs-held dedupe,
+  // allowedElementIds) before the prompt is built. Everything else — the
+  // per-character wardrobe binding, the card-colour legend, heights, age
+  // proportions, the VB-id sanitiser — is the page code, unchanged.
+  if (options.characterReferenceListOverride) characterReferenceList = options.characterReferenceListOverride;
+  if (options.visualBibleOverride !== undefined) visualBibleSection = options.visualBibleOverride;
+
+  const template = options.promptTemplateOverride || PROMPT_TEMPLATES.imageGeneration || null;
 
   // Build an EXACT POSES block from the scene's declared interactions. Image
   // models (Grok Aurora especially) weight the end of the prompt heavily, and
@@ -3342,6 +3407,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       VISUAL_BIBLE: visualBibleSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
       ERA_GUARD: eraGuard,
+      // Cover-only composition bullets (title-safe top third, group
+      // arrangement, bottom margin). '' for pages, so the placeholder is
+      // stripped and a page prompt is byte-identical to before.
+      COVER_COMPOSITION: options.coverComposition || '',
       SCENE_INTENT: sceneIntentLine
     })));
   }
@@ -5449,6 +5518,7 @@ module.exports = {
   buildCharacterRestriction,
   buildCharacterReferenceList,
   buildReferenceCardColours,
+  buildCoverPrompt,
   buildBasePrompt,
   buildRecurringElementsText,
   buildSceneExpansionAllPrompt,

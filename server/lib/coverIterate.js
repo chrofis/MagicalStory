@@ -389,6 +389,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     parseClothingCategory,
     buildCharacterReferenceList,
     buildReferenceCardColours,
+    buildCoverPrompt,
     convertClothingToCurrentFormat,
     buildCharacterRestriction,
   } = getStoryHelpers();
@@ -639,47 +640,28 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const storyTitle = storyData.title || 'My Story';
   const coverDedication = storyData.dedication;
 
-  // App-side cover typography → regenerate the art TEXTLESS too (text composited afterwards).
-  const textlessCovers = MODEL_DEFAULTS.appSideCoverType;
-  let coverPrompt;
-  if (normalizedCoverType === 'front') {
-    coverPrompt = fillTemplate(promptTemplateOverride || (textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover), {
-      TITLE_PAGE_SCENE: sceneDescription,
-      STYLE_DESCRIPTION: styleDescription,
-      STORY_TITLE: storyTitle,
-      CHARACTER_REFERENCE_LIST: characterRefList,
-      VISUAL_BIBLE: visualBiblePrompt
-    });
-  } else if (normalizedCoverType === 'initialPage') {
-    // Group-composition boilerplate is conditional on the actual cast size —
-    // for 1-2 characters it would contradict the hint's explicit positions.
-    const groupComposition = buildInitialPageComposition(coverCharacterPhotos.length);
-    coverPrompt = (!textlessCovers && coverDedication)
-      ? fillTemplate(promptTemplateOverride || PROMPT_TEMPLATES.initialPageWithDedication, {
-          INITIAL_PAGE_SCENE: sceneDescription,
-          STYLE_DESCRIPTION: styleDescription,
-          DEDICATION: coverDedication,
-          CHARACTER_REFERENCE_LIST: characterRefList,
-          GROUP_COMPOSITION: groupComposition,
-          VISUAL_BIBLE: visualBiblePrompt
-        })
-      : fillTemplate(promptTemplateOverride || PROMPT_TEMPLATES.initialPageNoDedication, {
-          INITIAL_PAGE_SCENE: sceneDescription,
-          STYLE_DESCRIPTION: styleDescription,
-          // No STORY_TITLE — initial-page-no-dedication has no title
-          // placeholder (the page is deliberately text-free).
-          CHARACTER_REFERENCE_LIST: characterRefList,
-          GROUP_COMPOSITION: groupComposition,
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-  } else {
-    coverPrompt = fillTemplate(promptTemplateOverride || (textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover), {
-      BACK_COVER_SCENE: sceneDescription,
-      STYLE_DESCRIPTION: styleDescription,
-      CHARACTER_REFERENCE_LIST: characterRefList,
-      VISUAL_BIBLE: visualBiblePrompt
-    });
-  }
+  // ONE builder for covers and pages (owner, 2026-08-26). This used to fill one
+  // of four cover-only templates here, a second copy in the streaming cover and
+  // a third in the trial cover — three parallel paths that never received what
+  // pages got. Cover art is generated TEXTLESS and the title is composited by
+  // the typography pass afterwards, so no template needs a TITLE block.
+  const groupComposition = normalizedCoverType === 'initialPage'
+    ? buildInitialPageComposition(coverCharacterPhotos.length)
+    : '';
+  const coverPrompt = buildCoverPrompt(normalizedCoverType, {
+    sceneDescription,
+    inputData: { ...storyData, artStyle: artStyleId },
+    characters: (storyData.characters || []).filter(c => clothingDedupedPhotos.some(p => p.name === c.name)),
+    visualBible,
+    referencePhotos: clothingDedupedPhotos,
+    groupComposition,
+    options: {
+      customStyleDescription: styleDescription,
+      characterReferenceListOverride: characterRefList,
+      visualBibleOverride: visualBiblePrompt,
+      promptTemplateOverride,
+    },
+  });
 
   // Explicit character restriction. The reference-photo filter above drops an
   // excluded character's photo, but the cover prose still names them and the
