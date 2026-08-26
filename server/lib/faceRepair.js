@@ -32,6 +32,11 @@
 
 const { log } = require('../utils/logger');
 
+// Run counters, keyed to the current job's cache scope. Module-level so every
+// function here shares ONE definition (it used to be a closure-local const in
+// repairCharacterFace, so _repairCharacterFaceOnce could not count anything).
+const metrics = () => require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.());
+
 // Stable descriptor replacing the old free-text `method` strings for
 // logs / telemetry / the dev panel: e.g. "grok:cutout:whiteout:face".
 function repairDescriptor({ model, regionSource, treatment, faceOnly }) {
@@ -759,7 +764,6 @@ async function checkRepairNaturalness(imageData, opts = {}) {
 }
 
 async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
-  const metrics = () => require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.());
   let last = null;
   // EVERY attempt's frames, not just the last (owner, 2026-08-24). The loop
   // overwrote `last` on each redraw, so attempts 1 and 2 were garbage-collected
@@ -871,18 +875,30 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   // FAITHFULNESS-CHECK: images.js:11203 (requireMobilesam retry fetcher).
   const maskFetch = (b, box, o) => fetchMaskWithRetry(b, box, 4, { ...(o || {}), requireMobilesam: gates.requireMobilesam && requireMobilesam });
 
+  // Reuse the silhouette detection already produced. `repairPipeline` sets
+  // `detectionBodyMask` and the treatments read `figureMaskPng` — the two names
+  // were never bridged, so every repair re-segmented from scratch. Re-running
+  // SAM is a degradation, not a fallback: detection masks the figure on the FULL
+  // page, this path masks it again on a crop, and the crop call is what returned
+  // background instead of the child (job_1787689073034_1v6ew0y1kae, IoU 0%).
+  // Logged and stamped on the result so a miss surfaces instead of being absorbed.
+  const figureMask = opts.figureMaskPng || opts.detectionBodyMask || null;
+  const samRecomputed = !figureMask;
+  if (samRecomputed) {
+    log.warn(`🚨 [FACE REPAIR] ${charName}: no stored figure mask — re-segmenting on the crop (reuse MISS; cause is upstream)`);
+    metrics().count('char_repair_sam_recomputed');
+  }
+  const cropProvidedMask = figureMask
+    ? await sharp(figureMask).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
+    : null;
+
   // --- Treatment -------------------------------------------------------------
   let treated;
   if (treatment === 'whiteout') {
     treated = await buildWhiteoutTreatment({
       cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam,
       gateCoverage: gates.coverage,
-      // Caller-supplied exact silhouette, cropped to this repair's crop window.
-      providedMaskPng: opts.figureMaskPng
-        ? await sharp(opts.figureMaskPng)
-          .extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h })
-          .png().toBuffer()
-        : null,
+      providedMaskPng: cropProvidedMask,
     });
   } else if (treatment === 'crosshatch') {
     // Face box mapped into crop pixels so the hatch can carry a blurred head.
@@ -897,19 +913,14 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox,
       faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false, blurStrength: opts.blurStrength || 'slight',
       blurFigure: opts.blurFigure === true,
-      // Caller-supplied exact silhouette, cropped to this repair's crop window.
       // Without a silhouette the hatch stays RECTANGULAR and the face blur is
       // skipped — a different treatment wearing the same name.
-      providedMaskPng: opts.figureMaskPng
-        ? await sharp(opts.figureMaskPng).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
-        : null,
+      providedMaskPng: cropProvidedMask,
     });
   } else if (treatment === 'blur') {
     treated = await buildBlurTreatment({
       cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage,
-      providedMaskPng: opts.figureMaskPng
-        ? await sharp(opts.figureMaskPng).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
-        : null,
+      providedMaskPng: cropProvidedMask,
     });
   } else {
     throw new Error(`${descriptor}: unknown treatment "${treatment}"`);
@@ -1123,6 +1134,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       blendSteps,
       blendMask: blendSteps.length ? blendSteps[blendSteps.length - 1].image : null,
       iou: blendErr?.partialResult?.iou ?? null,
+      samRecomputed,
     };
   }
 
@@ -1178,6 +1190,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     // slot has rendered nothing since the blend moved onto SAM).
     blendSteps,
     blendMask: blendSteps.length ? blendSteps[blendSteps.length - 1].image : null,
+    samRecomputed,
     debug: opts.includeDebug ? { prompt, sceneSent: treatedDataUri, avatarSent: avatarUri, grokRawResult, bbox: bodyBbox, faceBbox, crop, descriptor } : null,
   };
 }

@@ -19635,3 +19635,50 @@ sees zero clothing findings whatever the prompt says — which is exactly how th
 attempts at this fix were wrongly judged to have changed nothing.
 
 **Touched:** `prompts/entity-consistency-check.txt`.
+
+## 2026-08-26 — Repair reuses detection's SAM mask; a re-segmentation is a flagged failure
+
+**Context:** Owner, on the initial-page repair that produced nothing: *"why do we
+run SAM again, we should use the SAM mask we already have. Any rerun must be
+flagged as failure so we see this and fix the cause and not rerun just because."*
+
+**The reuse path was built on both ends and never connected in the middle.**
+`repairPipeline` sets `detectionBodyMask`, `charRepairRequest` declares it as a
+passthrough — and the treatments read `opts.figureMaskPng`. Nothing bridged the
+two names, so `detectionBodyMask` was written and never read and EVERY repair
+re-segmented from scratch. The manual endpoint set neither.
+
+**Why that is not cosmetic.** Detection masks the figure on the FULL page with
+the box plus face/garment seed points and gets a good silhouette — Lab exp 856
+re-ran it on this exact image and returned all four boys (Julian 87,458px, Max
+99,025, Kiaan 67,563, Levin 43,962). The repair instead re-masks on an 864×864
+crop of an 864×1222 page, and THAT call returns a patch of river and bridge with
+a head-shaped hole where the child should be. The gate then compares background
+against a clean boy: IoU 0%, three attempts, all refused. Same model, same
+image; only the cropped call fails.
+
+**Decision:**
+- `faceRepair` reads `opts.figureMaskPng || opts.detectionBodyMask`, so both
+  callers' existing field names work, and the three duplicated per-treatment
+  crop blocks collapse to one `cropProvidedMask`.
+- The manual endpoint passes `resolved.bodyMask` (available on tier 1 since the
+  same-day targeting fix).
+- **A re-segmentation is reported, not absorbed:** it logs
+  `no stored figure mask — re-segmenting on the crop (reuse MISS; cause is
+  upstream)`, counts `char_repair_sam_recomputed`, and stamps `samRecomputed`
+  on the result. The owner's rule: a rerun must surface as a failure so the
+  cause gets fixed, instead of being silently retried.
+
+**Known remaining gap:** `_gdinoMasks` is non-enumerable (`bboxDetection.js:425`)
+so a DB-reloaded detection carries no silhouette — a repair run days later still
+misses. That miss is now VISIBLE, which is the precondition for fixing it;
+persisting masks to R2 is a separate decision.
+
+**Lab exp 856** (bbox, this page) also logged `empty identity line (no
+description, no clothing, no gdinoPrompt) — SAM gets no garment seeds` for all
+four characters. Unresolved: whether that is Lab cover-context only or a real gap
+for `initialPage`.
+
+**Touched:** `server/lib/faceRepair.js`, `server/routes/regeneration.js`.
+**Status:** 🟡 conditional — pushed to staging; Lab exp 857 (char_repair on the
+same page) running to compare crop-space SAM against the full-page call.

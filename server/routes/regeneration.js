@@ -5731,6 +5731,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               faceBbox,
               protectedFaces,
               protectedBodies,
+              // Reuse detection's silhouette instead of re-segmenting on the
+              // crop. Null after a DB reload (_gdinoMasks is non-enumerable),
+              // and faceRepair logs that miss loudly rather than absorbing it.
+              detectionBodyMask: useFaceOnly ? null : (resolved?.bodyMask || null),
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
               includeDebug: req.user.role === 'admin',
               photoType: avatarPhotoType,
