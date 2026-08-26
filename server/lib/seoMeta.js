@@ -529,6 +529,42 @@ const GUIDES = {
       fr: 'Ce qui fonctionne vraiment pour créer un livre pour enfant avec l\'IA : comment décrire l\'histoire, pourquoi les personnages changent d\'apparence, et quoi vérifier avant d\'imprimer.',
     },
   },
+  'geschwisterstreit-was-tun': {
+    title: {
+      de: 'Geschwisterstreit: was wirklich hilft',
+      en: 'Siblings Fighting Constantly: What Actually Helps',
+      fr: 'Disputes entre frères et sœurs : ce qui aide vraiment',
+    },
+    description: {
+      de: 'Warum Geschwister streiten, warum Schlichten es schlimmer macht und was stattdessen hilft — und woran du erkennst, wann aus normalem Streit etwas anderes wird.',
+      en: 'Why siblings fight, why refereeing makes it worse, and what to do instead — plus how to tell ordinary conflict from something that needs help.',
+      fr: 'Pourquoi les fratries se disputent, pourquoi arbitrer aggrave les choses, et quoi faire à la place — et comment distinguer un conflit ordinaire d\'un problème réel.',
+    },
+  },
+  'umzug-mit-kind': {
+    title: {
+      de: 'Umzug mit Kind: wenn es nicht weg will',
+      en: 'Moving House with a Child Who Does Not Want To',
+      fr: 'Déménager avec un enfant qui ne veut pas partir',
+    },
+    description: {
+      de: 'Was ein Umzug für ein Kind wirklich bedroht, wann du es sagst, warum der Abschied wichtiger ist als die Ankunft — und warum die schwersten Wochen erst nach dem Auspacken kommen.',
+      en: 'What a move actually threatens for a child, when to tell them, why the goodbye matters more than the welcome, and why the hardest weeks come after the boxes are unpacked.',
+      fr: 'Ce qu\'un déménagement menace vraiment pour un enfant, quand lui dire, pourquoi l\'au revoir compte plus que l\'accueil, et pourquoi les semaines les plus dures viennent après.',
+    },
+  },
+  'neues-geschwisterchen': {
+    title: {
+      de: 'Ein Geschwisterchen kommt: das ältere Kind vorbereiten',
+      en: 'A New Baby Is Coming: Preparing the Older Child',
+      fr: 'Un bébé arrive : préparer l\'aîné',
+    },
+    description: {
+      de: 'Warum Rückschritte normal sind, warum das Versprechen eines Spielkameraden nach hinten losgeht, was du schützen solltest und welche gut gemeinten Sätze am meisten Ärger machen.',
+      en: 'Why regression is normal, why promising a playmate backfires, what to protect, and which well-meant sentences cause the most trouble.',
+      fr: 'Pourquoi la régression est normale, pourquoi promettre un camarade de jeu se retourne contre vous, quoi protéger, et quelles phrases bien intentionnées font le plus de dégâts.',
+    },
+  },
   'eigene-geschichte-oder-vorlage': {
     title: {
       de: 'Vorlage oder eigene Geschichte? Der echte Unterschied bei personalisierten Büchern',

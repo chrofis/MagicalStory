@@ -8,7 +8,7 @@ const texts = {
   en: {
     title: 'Guides',
     subtitle: 'How to make a children\'s book worth reading twice — and how to choose between the services that make them.',
-    sections: { creating: 'Creating a book', choosing: 'Choosing a service' } as Record<GuideCategory, string>,
+    sections: { helping: 'Helping through hard times', creating: 'Creating a book', choosing: 'Choosing a service' } as Record<GuideCategory, string>,
     minutes: 'min read',
     ctaTitle: 'Create your first story free',
     ctaDesc: 'Upload a photo, describe the story you want, and see the result before paying anything.',
@@ -16,8 +16,8 @@ const texts = {
   },
   de: {
     title: 'Ratgeber',
-    subtitle: 'Wie ein Kinderbuch entsteht, das zweimal vorgelesen wird — und wie du zwischen den Anbietern wählst.',
-    sections: { creating: 'Buch erstellen', choosing: 'Anbieter wählen' } as Record<GuideCategory, string>,
+    subtitle: 'Ein Kind durch eine schwierige Zeit begleiten, ein Buch machen, das zweimal vorgelesen wird — und zwischen den Anbietern wählen.',
+    sections: { helping: 'Mutmacher — durch schwierige Zeiten', creating: 'Buch erstellen', choosing: 'Anbieter wählen' } as Record<GuideCategory, string>,
     minutes: 'Min. Lesezeit',
     ctaTitle: 'Erste Geschichte gratis erstellen',
     ctaDesc: 'Foto hochladen, gewünschte Geschichte beschreiben und das Ergebnis ansehen, bevor du etwas bezahlst.',
@@ -26,7 +26,7 @@ const texts = {
   fr: {
     title: 'Guides',
     subtitle: 'Comment créer un livre qu\'on relit — et comment choisir entre les services qui les fabriquent.',
-    sections: { creating: 'Créer un livre', choosing: 'Choisir un service' } as Record<GuideCategory, string>,
+    sections: { helping: 'Accompagner les moments difficiles', creating: 'Créer un livre', choosing: 'Choisir un service' } as Record<GuideCategory, string>,
     minutes: 'min de lecture',
     ctaTitle: 'Créez votre première histoire gratuitement',
     ctaDesc: 'Téléchargez une photo, décrivez l\'histoire souhaitée et voyez le résultat avant de payer.',
@@ -34,7 +34,7 @@ const texts = {
   },
 };
 
-const categoryOrder: GuideCategory[] = ['creating', 'choosing'];
+const categoryOrder: GuideCategory[] = ['helping', 'creating', 'choosing'];
 
 export default function GuideHub() {
   const { language } = useLanguage();

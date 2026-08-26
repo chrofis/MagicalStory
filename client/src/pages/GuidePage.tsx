@@ -7,6 +7,7 @@ import { guides } from '@/constants/guideData';
 const texts = {
   en: {
     back: 'All guides',
+    themeLink: 'A personalized story about exactly this',
     faqTitle: 'Frequently asked',
     relatedTitle: 'Keep reading',
     ctaTitle: 'Try it on your own story',
@@ -16,6 +17,7 @@ const texts = {
   },
   de: {
     back: 'Alle Ratgeber',
+    themeLink: 'Eine personalisierte Geschichte genau dazu',
     faqTitle: 'Häufige Fragen',
     relatedTitle: 'Weiterlesen',
     ctaTitle: 'Probier es an deiner eigenen Geschichte',
@@ -25,6 +27,7 @@ const texts = {
   },
   fr: {
     back: 'Tous les guides',
+    themeLink: 'Une histoire personnalisée sur ce thème',
     faqTitle: 'Questions fréquentes',
     relatedTitle: 'À lire ensuite',
     ctaTitle: 'Essayez sur votre propre histoire',
@@ -115,6 +118,14 @@ export default function GuidePage() {
                   <span className="font-semibold text-gray-900">{g.title[lang]}</span>
                 </Link>
               ))}
+              {guide.relatedTheme && (
+                <Link
+                  to={`/themes/life-challenges/${guide.relatedTheme}${suffix}`}
+                  className="block bg-stone-50 border border-stone-200 rounded-xl p-4 hover:border-indigo-300 transition-colors"
+                >
+                  <span className="font-semibold text-gray-900">{t.themeLink}</span>
+                </Link>
+              )}
               <Link
                 to={`/kinderbuch-erstellen${suffix}`}
                 className="block bg-stone-50 border border-stone-200 rounded-xl p-4 hover:border-indigo-300 transition-colors"
