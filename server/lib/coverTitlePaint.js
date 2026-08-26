@@ -89,6 +89,37 @@ Return JSON: {"matches": true|false, "problem": "<short description, or empty if
  * @returns {Promise<{imageData, spec, ok, coverage, spill, reason, cost}>}
  *          ok=false ⇒ imageData is the FLAT composite (safe fallback, never garbled)
  */
+/**
+ * The region the painted-title judge is shown: the strip the model was actually
+ * handed — full cover width across the title band, padded 3% of the page height.
+ *
+ * VERIFY WHAT WE SENT, NOT THE FLAT LOCKUP'S FOOTPRINT (owner, 2026-08-26).
+ * This used to crop to `minx..maxx`, the bounding box of the RENDERED flat
+ * glyphs, and then ask the judge whether the MODEL'S painting reads correctly
+ * inside it. Those are different geometries by design: the repaint exists to
+ * produce bolder, wider, hand-lettered forms, which is exactly why coverage and
+ * spill are diagnostics rather than gates. A paint that legitimately ran wider
+ * than the flat lockup had its right-hand words sliced off before the judge saw
+ * them, and the judge then truthfully reported them missing.
+ *
+ * Measured on job_1787689073034_1v6ew0y1kae ("Feurio und die vier Buben"): flat
+ * lockup x 0.045-0.521, painted title x 0.234-0.762 — 21% of the page width of
+ * correct lettering fell outside the crop. The judge was shown
+ * "Feurio / die vi / Bube" and rejected it for a missing "und". It was right;
+ * the crop was wrong, and a perfect painted title was discarded for the flat one.
+ *
+ * Full width is safe: the page-fill check upstream already rejects ink that
+ * lands outside this band.
+ *
+ * Pure and exported so the geometry is unit-testable without sharp or a model.
+ */
+function titleEvalCropRect({ W, H, bandY0, bandY1, padFrac = 0.03 }) {
+  const pad = Math.round(H * padFrac);
+  const top = Math.max(0, Math.min(bandY0, bandY1) - pad);
+  const bottom = Math.min(H - 1, Math.max(bandY0, bandY1) + pad);
+  return { left: 0, top, width: W, height: bottom - top + 1 };
+}
+
 async function paintCoverTitle(artBuffer, title, opts = {}) {
   const { composeCover } = require('./coverTypography');
   const { editImageWithPrompt } = require('./images');
@@ -401,34 +432,8 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
 
   // FINAL EVAL: the expected text AND the painted cover, one call.
   try {
-    // VERIFY THE STRIP WE SENT, NOT THE FLAT LOCKUP'S FOOTPRINT (owner,
-    // 2026-08-26). This crop used to be minx..maxx — the bounding box of the
-    // RENDERED glyphs — and then asked the judge whether the MODEL'S painting
-    // reads correctly inside it. Those are different geometries by design: the
-    // whole point of the repaint is bolder, wider, hand-lettered forms, which is
-    // why coverage/spill above are diagnostics rather than gates. A paint that
-    // legitimately runs wider than the flat lockup therefore got its right-hand
-    // words sliced off before the judge ever saw them, and the judge truthfully
-    // reported them missing.
-    //
-    // Measured on job_1787689073034_1v6ew0y1kae ("Feurio und die vier Buben"):
-    // the flat lockup spanned x 0.045-0.521, the painted title x 0.234-0.762, so
-    // 21% of the page width of correct lettering fell outside the crop. The
-    // judge was shown "Feurio / die vi / Bube" and answered 'the word "und" is
-    // missing'. It was right; the crop was wrong, and a perfect painted title
-    // was discarded for the flat one.
-    //
-    // The strip the model was handed is full cover width across the band rows —
-    // exactly the region it was allowed to paint in — so that is what gets
-    // verified. The page-fill check above already rejects ink outside it.
-    const evalPad = Math.round(H * 0.03);
-    const ey0 = Math.max(0, bandY0 - evalPad);
-    const ey1 = Math.min(H - 1, bandY1 + evalPad);
-    const crop = await sharp(painted).extract({
-      left: 0, top: ey0,
-      width: W,
-      height: ey1 - ey0 + 1,
-    }).jpeg({ quality: 95 }).toBuffer();
+    const box = titleEvalCropRect({ W, H, bandY0, bandY1 });
+    const crop = await sharp(painted).extract(box).jpeg({ quality: 95 }).toBuffer();
     const verdict = await verifyTitleRender(`data:image/jpeg;base64,${crop.toString('base64')}`, title);
     if (!verdict.matches) {
       const m = coverage == null ? 're-fitted' : `coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}`;
@@ -451,4 +456,4 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   }
 }
 
-module.exports = { paintCoverTitle, PLATE_PROMPT };
+module.exports = { paintCoverTitle, PLATE_PROMPT, titleEvalCropRect };
