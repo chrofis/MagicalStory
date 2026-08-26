@@ -80,16 +80,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       // A thumbnail we cannot download is one an agent cannot judge — skip it
       // rather than hand the agent a missing file and get an invented score.
     }
+    // Write the manifest AS WE GO. Wikimedia throttles a long run, so a prep
+    // can crawl or stall for many minutes; writing only at the end means the
+    // file→id mapping never lands and no agent can start on the images that
+    // already downloaded. Flushing per batch lets judging begin immediately and
+    // makes an interrupted prep still useful.
+    if (manifest.length && manifest.length % BATCH === 0) writeManifest();
     if ((i + 1) % 100 === 0) { console.log(`  ${ok}/${i + 1} downloaded`); }
     await sleep(120);
   }
 
-  fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1));
-  const batches = [];
-  for (let i = 0; i < manifest.length; i += BATCH) batches.push(manifest.slice(i, i + BATCH));
-  fs.writeFileSync(path.join(OUT, 'batches.json'), JSON.stringify(batches.map((b, i) => ({
-    batch: i, dir: OUT, items: b.map(x => ({ id: x.id, file: x.file, name: x.name, type: x.type, city: x.city })),
-  })), null, 1));
+  writeManifest();
+
+  function writeManifest() {
+    fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1));
+    const batches = [];
+    for (let i = 0; i < manifest.length; i += BATCH) batches.push(manifest.slice(i, i + BATCH));
+    fs.writeFileSync(path.join(OUT, 'batches.json'), JSON.stringify(batches.map((b, i) => ({
+      batch: i, dir: OUT, items: b.map(x => ({ id: x.id, file: x.file, name: x.name, type: x.type, city: x.city })),
+    })), null, 1));
+  }
 
   console.log(`\n✅ ${ok} thumbnails, ${batches.length} batches of ${BATCH} in ${OUT}`);
   await pool.end();
