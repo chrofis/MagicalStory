@@ -5715,9 +5715,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
 
-          const figureMaskPng = useFaceOnly
-            ? null
-            : await require('../lib/charRepairTarget').resolveFigureMask(characterName, resolved, { storyId: id, pageNumber });
+          // Face repairs get the mask TOO. The treatments clip whatever
+          // silhouette they are given to `faceClip` (the DINO face box), so the
+          // stored full-figure mask becomes the head mask by intersection —
+          // that is what the clip is for. Withholding it for faceOnly forced a
+          // re-segmentation on every face repair and defeated the reuse.
+          const figureMaskPng = await require('../lib/charRepairTarget')
+            .resolveFigureMask(characterName, resolved, { storyId: id, pageNumber });
 
           const grokResult = await repairCharacterMismatch(
             sceneImage.imageData,
@@ -5738,7 +5742,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               // Reuse detection's silhouette instead of re-segmenting on the
               // crop: in-memory when this is the same run, else the stored
               // figure_mask. Null → faceRepair re-runs SAM and reports the miss.
-              detectionBodyMask: useFaceOnly ? null : figureMaskPng,
+              detectionBodyMask: figureMaskPng,
               whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
               includeDebug: req.user.role === 'admin',
               photoType: avatarPhotoType,

@@ -1226,9 +1226,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // Detection's silhouette for the ORIGINAL figure: in-memory on this run,
     // else the stored figure_mask. Body mode only — the detection mask is a
     // full-figure silhouette, not a head mask.
-    const figureMaskPng = useFaceOnly
-      ? null
-      : await require('./charRepairTarget').resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobId || null, pageNumber });
+    // Face repairs included: the treatments clip the silhouette to the DINO
+    // face box, so the stored full-figure mask yields the head mask.
+    const figureMaskPng = await require('./charRepairTarget')
+      .resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobId || null, pageNumber });
 
     // Per-story clothingRequirements is the source of truth (correct for THIS
     // story); avatars.clothing is character-level metadata that persists
@@ -1278,11 +1279,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         protectedFaces,
         protectedBodies,
         whiteoutTarget: useFaceOnly ? 'face' : 'body',
-        // Detection SAM silhouette (page-res) for the ORIGINAL figure so the
-        // blend gate reuses it instead of re-running SAM on the same pixels.
-        // Body mode only — the detection mask is a full-figure silhouette, not
-        // a head mask; null → gate falls back to a fresh /figure-mask call.
-        detectionBodyMask: useFaceOnly ? null : figureMaskPng,
+        // Detection's silhouette for the ORIGINAL figure, so SAM is not re-run
+        // on the same pixels. Face mode included — the treatment clips it to
+        // the face box. Null → a reported re-segmentation.
+        detectionBodyMask: figureMaskPng,
         textPosition: pageTextPosition,
         // The repair prompt builds an "Art style — match this medium and
         // rendering exactly: <full descriptor>" block from this, and falls back
