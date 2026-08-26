@@ -1072,7 +1072,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   let servedImageData = imageResult.imageData;
   let artImageData = null;
   let typographySpec = null;
-  if (textlessCovers) {
+  // Cover art is ALWAYS generated textless now (2026-08-26) — the title,
+  // dedication and branding are composited by the typography pass, which is the
+  // one extra pass a cover gets over a page. There is no longer a text-baking
+  // template to gate this on.
+  {
     let bakeAlreadyRan = false;
     try {
       const { dbQuery } = require('../services/database');
