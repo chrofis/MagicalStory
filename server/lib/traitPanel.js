@@ -118,10 +118,40 @@ async function compareTraitsToImage(imageData, storedTraits, { vendors = ['qwen'
   return { mismatches, readings, vendorsAvailable: available.map(([v]) => v) };
 }
 
+/**
+ * Resolve a character's stored traits into the panel's field names.
+ *
+ * They are NOT all in one place, and the naive `character.traits ||
+ * character.physical` chain reads an empty `traits` object and stops there —
+ * which is how the first Lab run compared against five nulls and reported a
+ * trivial "matches" (experiment #859). Explicit mapping, no fallback chain:
+ *   hairColor / eyeColor / skinTone   physical.*
+ *   hairStyle                         physical.detailedHairAnalysis.type
+ *   hairLength                        physical.detailedHairAnalysis.lengthTop
+ * `traits` and `avatars.extractedTraits` win when they actually carry a value,
+ * because the 3-model review writes its overrides there.
+ */
+function resolveStoredTraits(character) {
+  const ph = character?.physical || {};
+  const dha = ph.detailedHairAnalysis || {};
+  const t = character?.traits || {};
+  const ex = character?.avatars?.extractedTraits || {};
+  const pick = (...vals) => vals.find(v => v != null && v !== '') ?? null;
+  return {
+    hairColor: pick(t.hairColor, ex.hairColor, ph.hairColor),
+    hairStyle: pick(t.hairStyle, ex.hairStyle, dha.type),
+    hairLength: pick(t.hairLength, ex.hairLength, dha.lengthTop, ph.hairLength),
+    eyeColor: pick(t.eyeColor, ex.eyeColor, ph.eyeColor),
+    skinTone: pick(t.skinTone, ex.skinTone, ph.skinTone),
+    facialHair: pick(t.facialHair, ex.facialHair, ph.facialHair),
+  };
+}
+
 module.exports = {
   TRAIT_REVIEW_FIELDS,
   _TRAIT_HEX_ON_OVERRIDE,
   _traitBucket,
   _traitProbe,
   compareTraitsToImage,
+  resolveStoredTraits,
 };

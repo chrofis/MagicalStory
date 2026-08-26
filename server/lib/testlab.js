@@ -5871,16 +5871,13 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   let colourCheck = null;
   if (params.colourCheck) {
     try {
-      const { compareTraitsToImage } = require('./traitPanel');
-      const storedTraits = character.traits || character.avatars?.extractedTraits || character.physical || {};
+      const { compareTraitsToImage, resolveStoredTraits } = require('./traitPanel');
+      const storedTraits = resolveStoredTraits(character);
       const res = await compareTraitsToImage(sheetForDisplay, storedTraits);
       colourCheck = {
         ...res,
         verdict: res.mismatches.length === 0 ? 'matches stored traits' : `${res.mismatches.length} field(s) disagree`,
-        storedTraits: Object.fromEntries(
-          ['hairColor', 'hairStyle', 'hairLength', 'eyeColor', 'skinTone']
-            .map(k => [k, storedTraits?.[k] ?? null])
-        ),
+        storedTraits,
       };
     } catch (e) {
       colourCheck = { error: e.message };
