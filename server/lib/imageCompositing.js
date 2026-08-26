@@ -705,6 +705,46 @@ function buildCharActionContextFromInteractions(sceneDescription, charName) {
  * (R)") that the inpaint model never sees — to Grok those phrases are noise.
  * Also collapses label-concatenation slips ("costume costume").
  */
+/**
+ * Replace character NAMES in a fix instruction with the visual identifier of
+ * the figure they refer to. Grok is given a page, not a cast list, so a name
+ * means nothing to it; "the boy in the red shirt" does.
+ *
+ * ONE PASS, NEVER RE-SCANNING WHAT WE INJECTED (owner, 2026-08-26). This looped
+ * name-by-name over the running result. A visual identifier legitimately
+ * mentions other characters to locate its subject ("the boy between A and B"),
+ * so the first substitution injected those names back into the text and a later
+ * iteration replaced them again, nesting the identifier inside itself. Measured
+ * on job_1787689073034_1v6ew0y1kae initialPage, where Grok received
+ * "...positioned between A and the boy in the center-left, positioned between A
+ * and B appears" — no verb, no end, unpaintable.
+ *
+ * A single alternation over the ORIGINAL text fixes it by construction: the
+ * replacement output is never examined again. Longest name first so a name
+ * containing another ("Anna Maria" over "Anna") wins.
+ *
+ * @param {string} text
+ * @param {Object} opts
+ * @param {string[]} opts.names          every character name in the story
+ * @param {Map} opts.vidByName           lowercased name -> visual identifier
+ * @param {Map} opts.fallbackByName      lowercased name -> age/gender descriptor
+ * @param {string|null} opts.ownVisualId identifier of the entry being written
+ */
+function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), ownVisualId = null } = {}) {
+  if (!text || typeof text !== 'string' || names.length === 0) return text;
+  const escapeRe = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const vidFor = (name) => vidByName.get(name.toLowerCase()) || ownVisualId
+    || fallbackByName.get(name.toLowerCase()) || 'the character';
+  const alternation = [...names].sort((a, b) => b.length - a.length).map(escapeRe).join('|');
+  // Possessives: both "Hans's" and bare-apostrophe "Hans'" — the bare form
+  // otherwise leaves a dangling apostrophe ("the character' hands").
+  const re = new RegExp(`\\b(${alternation})(['’]s?)?(?!\\w)`, 'g');
+  return text
+    .replace(re, (_m, name, poss) => (poss ? `${vidFor(name)}'s` : vidFor(name)))
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function sanitizeIssueForInpaint(text) {
   if (!text) return text;
   let out = String(text);
@@ -759,5 +799,6 @@ module.exports = {
   grokEditSceneExact,
   buildCharActionContextFromInteractions,
   sanitizeIssueForInpaint,
+  stripCharacterNames,
   measureRegionSharpness,
 };

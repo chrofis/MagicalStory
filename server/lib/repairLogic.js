@@ -397,4 +397,33 @@ function mapStrategyToMethod(s) {
   return { method: s.strategy || 'skip', reason: s.reason || '' };
 }
 
-module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod };
+
+// WHAT INPAINT MAY NOT BE ASKED TO DO (owner, 2026-08-26).
+//
+// Inpaint turns a figure, moves it, changes hand pose, gaze or expression, and
+// edits objects. It cannot change clothing, hair, or the form of a face: asked
+// to, it repaints the figure and the identity drifts. Those defects belong to
+// character repair, which is anchored to the character's avatar, or to a page
+// redo — both routes already exist.
+//
+// Measured on job_1787689073034_1v6ew0y1kae: 5 of 11 inpaint calls carried 9
+// forbidden directives ("Change the hair color to light blonde", "Add the
+// square bib panel and two crossing shoulder straps", "Recolour the shorts",
+// "Repaint the hair light blonde and wavy", plus two pasted age findings).
+//
+// Keyed on the DECLARED type, never on the description prose — classifying by
+// reading the text is what docs/SETTLED.md forbids. Same contract as
+// ZERO_POINT_TYPES / MAX_SEVERITY_TYPES in scoring.js: the finding is still
+// reported in full, only its ROUTE is constrained.
+const NOT_INPAINTABLE_TYPES = new Set([
+  // identity / face
+  'character_identity', 'face_mismatch', 'face_drift', 'age_shift', 'skin_tone',
+  // hair
+  'hair', 'hair_change', 'hair_nuance',
+  // clothing (garment_colour has its own mechanical recolour path)
+  'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
+  // body form
+  'scale',
+]);
+
+module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES };

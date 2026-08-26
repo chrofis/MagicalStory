@@ -23,7 +23,7 @@ const r2Lib = require('./r2');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
 // sanitizeIssueForInpaint moved to imageCompositing.js with the rest of the
 // mask/edit cluster; the inpaint prompt builders here still call it.
-const { sanitizeIssueForInpaint } = require('./imageCompositing');
+const { sanitizeIssueForInpaint, stripCharacterNames } = require('./imageCompositing');
 const { blackoutIssueRegions } = require('./imageInpainting');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
@@ -2580,6 +2580,15 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // Collect quality issues (legacy path)
   const qualityIssues = (evaluation.fixableIssues || []).map(i => ({
     description: i.description || i.issue || i,
+    // The declared type travels with the issue: the inpaint router filters on
+    // it (NOT_INPAINTABLE_TYPES below), and dropping it here left every quality
+    // issue untyped, so the filter could never see one.
+    type: i.type || i.subType || null,
+    // The evaluator's own `fix` is an INSTRUCTION; `description` is a
+    // diagnosis. The fallback below used to send the diagnosis, so Grok was
+    // handed "apparent age 4 vs expected 5 years — slight under-ageing" and
+    // asked to paint it (job_1787689073034_1v6ew0y1kae, backCover).
+    fix: i.fix || null,
     source: 'quality'
   }));
 
@@ -2598,6 +2607,30 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       const desc = issue.description || '';
       return desc && arr.findIndex(i => (i.description || '') === desc) === idx;
     });
+
+  // WHAT INPAINT MAY NOT BE ASKED TO DO (owner, 2026-08-26). Inpaint turns a
+  // figure, moves it, changes hand pose, gaze or expression, and edits objects.
+  // It cannot change clothing, hair, or the form of a face — asked to, it
+  // repaints the figure and the result drifts from the character. Those defects
+  // belong to character repair (avatar-anchored) or to a page redo, and both
+  // routes already exist; sending them here spends a model call that can only
+  // make the page worse.
+  //
+  // Measured on job_1787689073034_1v6ew0y1kae: 5 of 11 inpaint calls carried 9
+  // such directives — "Change the hair color to light blonde", "Add the square
+  // bib panel and two crossing shoulder straps", "Recolour the shorts", "Repaint
+  // the hair light blonde and wavy", plus two pasted age findings.
+  //
+  // Filtering on the DECLARED type, never on the description prose: classifying
+  // by reading the text is what docs/SETTLED.md forbids.
+  const { NOT_INPAINTABLE_TYPES } = require('./repairLogic');
+  const inpaintableIssues = combinedIssues.filter(i => {
+    const t = String(i.type || '').toLowerCase();
+    if (!t) return true;                       // untyped: leave the old behaviour alone
+    if (!NOT_INPAINTABLE_TYPES.has(t)) return true;
+    log.info(`[INPAINT PAGE] P${pageNumber}: "${t}" is not inpaintable — left for character repair`);
+    return false;
+  });
 
   if (combinedIssues.length === 0) {
     log.debug(`[INPAINT PAGE] No issues to fix, skipping inpaint`);
@@ -2672,7 +2705,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // character's own visual identifier (from per_character_fixes). Falls
     // back to "the character" for names not in the plan.
     const characterNames = (characters || []).map(c => c?.name).filter(Boolean);
-    const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Per-name visual-identifier lookup from the consolidator plan.
     const visualIdByName = new Map();
     for (const pcf of (consolidatedPlan.per_character_fixes || [])) {
@@ -2690,24 +2722,25 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       const bits = [c.age ? `${c.age}-year-old` : null, c.gender || null].filter(Boolean).join(' ');
       descriptorByName.set(c.name.toLowerCase(), bits ? `the ${bits} figure` : 'the character');
     }
-    const stripNames = (text, ownVisualId) => {
-      if (!text || typeof text !== 'string' || characterNames.length === 0) return text;
-      let out = text;
-      for (const name of characterNames) {
-        // Prefer the per-name visual identifier, else the current entry's own
-        // identifier, else an age/gender descriptor built from character data.
-        const vid = visualIdByName.get(name.toLowerCase()) || ownVisualId
-          || descriptorByName.get(name.toLowerCase()) || 'the character';
-        // Possessives: both "Hans's" and bare-apostrophe "Hans'" — the bare
-        // form otherwise falls through to the name regex and leaves a
-        // dangling apostrophe ("the character' hands").
-        const possRe = new RegExp(`\\b${escapeRe(name)}['’]s?(?!\\w)`, 'g');
-        out = out.replace(possRe, `${vid}'s`);
-        const bareRe = new RegExp(`\\b${escapeRe(name)}\\b`, 'g');
-        out = out.replace(bareRe, vid);
-      }
-      return out.replace(/\s{2,}/g, ' ').trim();
-    };
+    // ONE PASS, NEVER RE-SCANNING WHAT WE INJECTED (owner, 2026-08-26). This
+    // looped name-by-name, replacing into the running result. A
+    // `visual_identifier` legitimately mentions other characters to locate its
+    // subject ("the boy between <A> and <B>"), so the first substitution
+    // injected those names back into the text and a later iteration replaced
+    // them again, nesting the identifier inside itself. Measured on
+    // job_1787689073034_1v6ew0y1kae initialPage, where the instruction reached
+    // Grok as "...positioned between <A> and the boy in the center-left,
+    // positioned between <A> and <B> appears" — no verb, no end, unpaintable.
+    //
+    // A single alternation over the ORIGINAL text fixes it by construction:
+    // replacement output is never re-examined. Longest name first so a name
+    // that contains another ("Anna Maria" over "Anna") wins.
+    const stripNames = (text, ownVisualId) => stripCharacterNames(text, {
+      names: characterNames,
+      vidByName: visualIdByName,
+      fallbackByName: descriptorByName,
+      ownVisualId,
+    });
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
     const sceneInstr = stripNames(sceneInstrRaw, null);
@@ -2771,11 +2804,19 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // job_1783845868262 P4). Rank by severity, keep the top few, and emit a
     // numbered atomic list — same shape and ≤3 cap as the plan path.
     const SEV = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
-    const ranked = combinedIssues
+    const ranked = inpaintableIssues
       .filter(i => i.description)
       .sort((a, b) => (SEV[String(b.severity || 'MODERATE').toUpperCase()] ?? 2) - (SEV[String(a.severity || 'MODERATE').toUpperCase()] ?? 2))
       .slice(0, 3);
-    editInstruction = ranked.map((it, i) => `${i + 1}. ${sanitizeIssueForInpaint(it.description)}`).join('\n');
+    // AN INSTRUCTION, OR NOTHING. `fix` is what the evaluator wrote for the
+    // repairer; `description` is what it wrote for a human reading a report. A
+    // page whose issues carry no `fix` yields no instruction rather than a
+    // diagnosis Grok cannot execute.
+    const withFix = ranked.filter(it => it.fix && String(it.fix).trim());
+    for (const it of ranked) {
+      if (!it.fix) log.info(`[INPAINT PAGE] P${pageNumber}: no fix instruction for "${String(it.description).slice(0, 60)}" — not sent`);
+    }
+    editInstruction = withFix.map((it, i) => `${i + 1}. ${sanitizeIssueForInpaint(it.fix)}`).join('\n');
     log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), fallback to top-${ranked.length} of ${combinedIssues.length} issues by severity`);
   }
 

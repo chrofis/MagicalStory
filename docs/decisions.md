@@ -19494,3 +19494,43 @@ counters (`arc N → M`) measure them from the next story onward.
 `server/services/prompts.js`.
 
 **Status:** ✅ active — C1 (style repaint can never win its tie) remains OPEN.
+
+---
+
+## 2026-08-26 — Inpaint may not be asked to change clothing, hair or face form
+
+**Context:** Audit of production story `job_1787689073034_1v6ew0y1kae`. Inpaint turns a figure,
+moves it, changes hand pose, gaze or expression, and edits objects; it cannot change clothing,
+hair, or the form of a face — asked to, it repaints the figure and identity drifts. 5 of that
+story's 11 inpaint calls carried 9 forbidden directives: "Change the hair color to light
+blonde" (×2), "Add the square bib panel and two crossing shoulder straps…", "Recolour the
+shorts from dark grey to dark brown", "Repaint the hair light blonde and wavy", "Recolor the
+shorts dark brown", plus two pasted age findings.
+
+Two further defects in the same instruction path:
+- The consolidator-failed fallback emitted the issue's `description` — a diagnosis written for
+  a human report — as the instruction. Grok was handed "apparent age 4 vs expected 5 years —
+  slight under-ageing" and asked to paint it.
+- The name→visual-identifier substitution looped name by name over its own output. A visual
+  identifier legitimately names other characters to locate its subject, so those names were
+  injected and replaced again, nesting the identifier inside itself: "...positioned between A
+  and the boy in the center-left, positioned between A and B appears" — no verb, no end.
+
+**Decision:** (1) `NOT_INPAINTABLE_TYPES` in `repairLogic.js` — keyed on the DECLARED type,
+never on description prose, the same contract as `ZERO_POINT_TYPES`/`MAX_SEVERITY_TYPES`: the
+finding is still reported in full, only its ROUTE is constrained. Those defects belong to
+character repair (avatar-anchored) or a page redo, both of which already exist. The quality
+issue mapper now carries `type` through — it was dropping it, so no filter could have seen one.
+(2) The fallback sends the evaluator's `fix` (an instruction) and never `description`; an issue
+with no `fix` yields no instruction rather than an unpaintable diagnosis. (3) `stripCharacterNames`
+is extracted to `imageCompositing.js` and does one pass over the original text with a single
+alternation, so injected output is never re-scanned; longest name first.
+
+**Rationale:** Spending a model call on a change the tool cannot make can only make the page
+worse, and it consumes one of the three fix slots the consolidator is capped at.
+
+**Not fixed here:** the entity check still reports no clothing findings on that story — see the
+open item in `tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/repairLogic.js`, `server/lib/images.js`,
+`server/lib/imageCompositing.js`, `tests/unit/inpaint-routing.test.ts`.
