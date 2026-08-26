@@ -35,6 +35,8 @@ import GiftHub from './pages/GiftHub';
 import GiftPage from './pages/GiftPage';
 import Comparisons from './pages/Comparisons';
 import ComparisonPage from './pages/ComparisonPage';
+import GuideHub from './pages/GuideHub';
+import GuidePage from './pages/GuidePage';
 import CityListing from './pages/CityListing';
 import CityPage from './pages/CityPage';
 
@@ -62,6 +64,8 @@ export default function SSRApp() {
         <Route path="/geschenk/:giftSlug" element={<GiftPage />} />
         <Route path="/vergleich" element={<Comparisons />} />
         <Route path="/vergleich/:competitorSlug" element={<ComparisonPage />} />
+        <Route path="/ratgeber" element={<GuideHub />} />
+        <Route path="/ratgeber/:guideSlug" element={<GuidePage />} />
         <Route path="/stadt" element={<CityListing />} />
         <Route path="/stadt/:cityId" element={<CityPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

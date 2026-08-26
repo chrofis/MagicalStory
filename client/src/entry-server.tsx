@@ -23,6 +23,7 @@ import { storyTypes, lifeChallenges, educationalTopics, historicalEvents } from 
 import { occasions } from './constants/occasionData';
 import { giftPages } from './constants/giftData';
 import { comparisons } from './constants/comparisonData';
+import { guides } from './constants/guideData';
 
 export interface RenderResult {
   /** The rendered HTML for the React tree (goes inside <div id="root">) */
@@ -67,6 +68,7 @@ export function enumerateRoutes(swissCities: Array<{ id: string }> = []): string
     '/anlass',
     '/geschenk',
     '/vergleich',
+    '/ratgeber',
     '/stadt'
   );
 
@@ -92,6 +94,9 @@ export function enumerateRoutes(swissCities: Array<{ id: string }> = []): string
 
   // Comparison pages — slug field is `id`
   for (const c of comparisons) routes.push(`/vergleich/${c.id}`);
+
+  // Guide articles — slug field is `id`
+  for (const g of guides) routes.push(`/ratgeber/${g.id}`);
 
   // City pages — derived from data passed in (server-side json file)
   for (const c of swissCities) routes.push(`/stadt/${c.id}`);

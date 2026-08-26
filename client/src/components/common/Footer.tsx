@@ -11,6 +11,7 @@ const footerTexts = {
   en: {
     createHeading: 'Create',
     create: 'Create a book with AI',
+    guides: 'Guides',
     themes: 'Themes',
     pricing: 'Pricing',
     tryFree: 'Try it free',
@@ -36,6 +37,7 @@ const footerTexts = {
   de: {
     createHeading: 'Erstellen',
     create: 'Kinderbuch erstellen mit KI',
+    guides: 'Ratgeber',
     themes: 'Themen',
     pricing: 'Preise',
     tryFree: 'Gratis ausprobieren',
@@ -61,6 +63,7 @@ const footerTexts = {
   fr: {
     createHeading: 'Créer',
     create: 'Créer un livre avec l\'IA',
+    guides: 'Guides',
     themes: 'Thèmes',
     pricing: 'Tarifs',
     tryFree: 'Essayer gratuitement',
@@ -102,6 +105,7 @@ export function Footer() {
       heading: texts.createHeading,
       links: [
         { to: '/kinderbuch-erstellen', label: texts.create },
+        { to: '/ratgeber', label: texts.guides },
         { to: '/themes', label: texts.themes },
         { to: '/pricing', label: texts.pricing },
         { to: '/try', label: texts.tryFree },

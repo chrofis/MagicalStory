@@ -252,6 +252,18 @@ const STATIC_ROUTES = {
       fr: 'Questions fréquemment posées sur Magical Story. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
     },
   },
+  '/ratgeber': {
+    title: {
+      en: 'Guides — Making and Choosing Children\'s Books | Magical Story',
+      de: 'Ratgeber — Kinderbücher erstellen und Anbieter wählen | Magical Story',
+      fr: 'Guides — Créer un livre pour enfant et choisir un service | Magical Story',
+    },
+    description: {
+      en: 'Practical guides on creating a children\'s book with AI, keeping characters consistent, writing for a child\'s reading level, and choosing between personalized book services.',
+      de: 'Praktische Ratgeber zum Kinderbuch-Erstellen mit KI: Figuren konsistent halten, altersgerecht schreiben und zwischen Anbietern personalisierter Bücher wählen.',
+      fr: 'Guides pratiques pour créer un livre pour enfant avec l\'IA, garder des personnages cohérents, écrire au bon niveau de lecture et choisir entre les services de livres personnalisés.',
+    },
+  },
   '/kinderbuch-erstellen': {
     title: {
       en: 'Create a Children\'s Book with AI – Your Own Story | Magical Story',
@@ -493,9 +505,42 @@ const COMPARISONS = {
   'lullaby-ink': { name: 'Lullaby.ink', de: 'MagicalStory vs Lullaby.ink', en: 'MagicalStory vs Lullaby.ink', fr: 'MagicalStory vs Lullaby.ink' },
   lovetoread: { name: 'LoveToRead', de: 'MagicalStory vs LoveToRead', en: 'MagicalStory vs LoveToRead', fr: 'MagicalStory vs LoveToRead' },
   buchheldenwelt: { name: 'BuchHeldenWelt', de: 'MagicalStory vs BuchHeldenWelt', en: 'MagicalStory vs BuchHeldenWelt', fr: 'MagicalStory vs BuchHeldenWelt' },
+  // NOTE: mirrors client/src/constants/comparisonData.ts — both must be edited.
   'magisches-kinderbuch': { name: 'Magisches Kinderbuch', de: 'MagicalStory vs Magisches Kinderbuch', en: 'MagicalStory vs Magisches Kinderbuch', fr: 'MagicalStory vs Magisches Kinderbuch' },
   'beste-personalisierte-kinderbuecher': { name: 'Beste Kinderbücher', de: 'Beste personalisierte Kinderbücher Schweiz 2026', en: 'Best Personalized Children\'s Books Switzerland 2026', fr: 'Meilleurs livres personnalisés pour enfants Suisse 2026' },
   'beste-ki-kinderbuch-generatoren': { name: 'Beste KI-Generatoren', de: 'Beste KI-Kinderbuch-Generatoren 2026', en: 'Best AI Children\'s Book Generators 2026', fr: 'Meilleurs générateurs de livres IA pour enfants 2026' },
+};
+
+// ─── Guide Data (for meta tags) ───────────────────────────────────────────────
+// The /ratgeber editorial cluster. Mirrors client/src/constants/guideData.ts —
+// both must be edited when a guide is added, same as COMPARISONS above.
+// Descriptions are kept in sync with the `description` field of each article.
+
+const GUIDES = {
+  'kinderbuch-mit-ki-erstellen': {
+    title: {
+      de: 'Kinderbuch mit KI erstellen: die praktische Anleitung',
+      en: 'How to Create a Children\'s Book with AI: A Practical Guide',
+      fr: 'Créer un livre pour enfant avec l\'IA : le guide pratique',
+    },
+    description: {
+      de: 'Was beim Kinderbuch-Erstellen mit KI wirklich funktioniert: wie du die Geschichte beschreibst, warum Figuren zwischen den Seiten anders aussehen und was du vor dem Druck prüfen solltest.',
+      en: 'What actually works when you create a children\'s book with AI: how to describe the story, why characters change appearance between pages, and what to check before you print.',
+      fr: 'Ce qui fonctionne vraiment pour créer un livre pour enfant avec l\'IA : comment décrire l\'histoire, pourquoi les personnages changent d\'apparence, et quoi vérifier avant d\'imprimer.',
+    },
+  },
+  'eigene-geschichte-oder-vorlage': {
+    title: {
+      de: 'Vorlage oder eigene Geschichte? Der echte Unterschied bei personalisierten Büchern',
+      en: 'Template or Your Own Story? The Real Difference in Personalized Books',
+      fr: 'Modèle ou histoire originale ? La vraie différence',
+    },
+    description: {
+      de: 'Die meisten personalisierten Kinderbücher sind eine fertige Geschichte mit ausgetauschtem Namen. Wenige schreiben eine eigene Geschichte. So erkennst du vor dem Kauf, was du bekommst.',
+      en: 'Most personalized children\'s books are one pre-written story with the name swapped in. A few write an original story. Here is how to tell which is which before you pay.',
+      fr: 'La plupart des livres personnalisés sont une histoire pré-écrite avec le prénom remplacé. Quelques-uns écrivent une histoire originale. Voici comment les distinguer avant de payer.',
+    },
+  },
 };
 
 // ─── Occasion Data (for meta tags) ────────────────────────────────────────────
@@ -907,6 +952,40 @@ function getMetaForRoute(routePath, lang) {
           buildBreadcrumbJsonLd([
             { name: 'Home', url: '/' },
             { name: lang === 'de' ? 'Vergleich' : lang === 'fr' ? 'Comparaison' : 'Compare', url: '/vergleich' },
+            { name: title },
+          ]),
+        ],
+      };
+    }
+  }
+
+  // 5b. Guide article: /ratgeber/:guideSlug
+  const guideMatch = cleanPath.match(/^\/ratgeber\/([^/]+)$/);
+  if (guideMatch) {
+    const guide = GUIDES[guideMatch[1]];
+    if (guide) {
+      const title = guide.title[lang] || guide.title.de;
+      return {
+        title: `${title} | Magical Story`,
+        description: guide.description[lang] || guide.description.de,
+        canonical: canonicalUrl,
+        path: cleanPath,
+        noindex: false,
+        hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: title,
+            description: guide.description[lang] || guide.description.de,
+            inLanguage: lang,
+            author: { '@type': 'Organization', name: 'Magical Story' },
+            publisher: { '@type': 'Organization', name: 'Magical Story' },
+            mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+          },
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Ratgeber' : 'Guides', url: '/ratgeber' },
             { name: title },
           ]),
         ],
@@ -1344,6 +1423,7 @@ function generateSitemap() {
     '/anlass': '0.7',
     '/geschenk': '0.8',
     '/vergleich': '0.6',
+    '/ratgeber': '0.8',
     '/science': '0.7',
     '/faq': '0.5',
     '/kinderbuch-erstellen': '0.9',
@@ -1401,6 +1481,16 @@ function generateSitemap() {
       lastmod: today,
       changefreq: 'monthly',
       priority: '0.6',
+    });
+  }
+
+  // Guide articles
+  for (const guideSlug of Object.keys(GUIDES)) {
+    paths.push({
+      path: `/ratgeber/${guideSlug}`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
     });
   }
 

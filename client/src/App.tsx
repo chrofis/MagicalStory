@@ -63,6 +63,8 @@ const GiftHub = lazy(() => import('./pages/GiftHub'));
 const GiftPage = lazy(() => import('./pages/GiftPage'));
 const Comparisons = lazy(() => import('./pages/Comparisons'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
+const GuideHub = lazy(() => import('./pages/GuideHub'));
+const GuidePage = lazy(() => import('./pages/GuidePage'));
 const CityListing = lazy(() => import('./pages/CityListing'));
 const CityPage = lazy(() => import('./pages/CityPage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
@@ -104,6 +106,8 @@ function App() {
           <Route path="/geschenk/:giftSlug" element={<GiftPage />} />
           <Route path="/vergleich" element={<Comparisons />} />
           <Route path="/vergleich/:competitorSlug" element={<ComparisonPage />} />
+          <Route path="/ratgeber" element={<GuideHub />} />
+          <Route path="/ratgeber/:guideSlug" element={<GuidePage />} />
           <Route path="/stadt" element={<CityListing />} />
           <Route path="/stadt/:cityId" element={<CityPage />} />
           <Route path="/shared/:shareToken" element={<SharedStoryViewer />} />
