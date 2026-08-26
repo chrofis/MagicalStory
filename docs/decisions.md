@@ -19092,3 +19092,34 @@ regression).
 
 **Status:** 🟡 conditional — unit-verified and pushed to staging; awaiting a live
 trial run to confirm a styled plate and a single-cell reference.
+
+### CARRY_ROUTES fired in production (prod `job_1787689073034_1v6ew0y1kae`, 2026-08-25)
+
+First story with every change live. All three routes fired:
+
+    beats_carry_arc          10 arc faults   -> beats plan
+    beats_carry_artdirector   4 beats faults -> Art Director
+    beats_carry_storytext     4 beats faults -> page text
+
+The post-review re-check came back clean — `briefIntroduced: []`,
+`briefUnfixed: []` — so the second round correctly did NOT fire. Earlier fixes
+held: semantic 18/18, 0 prop-name leaks over 18 page prompts, 0 interaction rows
+dropped. `referenceView` landed on ART006 (the only face-prop of eight) and its
+reference rendered shut, cover up, colour marks, no legible text.
+
+**Numbers, with the caveat first: n=1 and a different story, so none of this is
+attributable.** Mean finalScore 70 against 55 and 64 on the two previous books,
+1 page under 50 against 5. Beats-audit faults 4, against 17–23 on the three
+earlier stories — consistent with the arc carry improving the plan, and equally
+consistent with an easier story.
+
+**The limit the closed reference has.** p9 needed the book OPEN (the beat is
+"looking up from the book") and it rendered flat to the camera. A closed
+reference cannot help a page that must show the thing open — it fixes the
+CARRIED case, not the READ case, and for the read case 12d's prose rule is back
+in charge on its own. The brief was not at fault here: it staged the book "on
+his lap", and the render stood the boy up and presented it. Logged, not fixed.
+
+**Unrelated, still open:** p14 scored semantic 0 — its declared action
+("speaking") is not depicted at all, four boys stand in a row facing camera. The
+gaze-fill default lines did not break the portrait pose.
