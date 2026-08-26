@@ -1587,6 +1587,12 @@ async function runCharRepairStage(ctx, opts) {
     protectedBodies,
     textPosition: ctx.textPosition,
     includeDebug: true,
+    // Axis overrides — omitted unless the experiment names one, so an unset run
+    // resolves exactly as production does. This is what lets the Lab A/B a
+    // treatment (blur vs whiteout on a face) instead of only a legacy mode.
+    ...(params.treatment ? { treatment: params.treatment } : {}),
+    ...(params.regionSource ? { regionSource: params.regionSource } : {}),
+    ...(params.faceOnly !== undefined ? { faceOnly: !!params.faceOnly } : {}),
   });
   const { repairCharacterMismatch } = require('./images');
   const result = await repairCharacterMismatch(imageData, avatarPhoto, bbox, charName, {

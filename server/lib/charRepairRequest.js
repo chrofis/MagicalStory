@@ -38,6 +38,16 @@ const CHAR_REPAIR_REQUEST_KEYS = Object.freeze([
   'protectedBodies',
   'textPosition',          // keeps the repaint out of the text zone
   'includeDebug',          // per-step debug images
+  // THE THREE AXES, selectable. The spine has always read opts.treatment /
+  // regionSource / faceOnly, but nothing could set them: callers could only
+  // pick a legacy flag combination and take whatever mapping fell out. That
+  // made "is blur better than whiteout for a face?" unaskable — the exact
+  // question the 2026-08-05 whole-figure decision answered for the body and
+  // nobody ever answered for the head. Omitted → the mapping decides, so
+  // production behaviour is unchanged.
+  'treatment',             // 'blur' | 'crosshatch' | 'whiteout'
+  'regionSource',          // 'box' | 'cutout'
+  'faceOnly',              // head vs whole figure
 ]);
 
 /**

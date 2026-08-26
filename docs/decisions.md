@@ -20150,3 +20150,47 @@ What the same runs DO show, and what the harness had been hiding:
 only on the body-primary path (used when no head grid is built) and inert otherwise.
 
 **Touched:** `prompts/entity-consistency-check.txt`, `docs/decisions.md`, `tasks/BACKLOG.md`.
+
+## 2026-08-26 — Face repair treatment = BLUR (was whiteout); the three axes are Lab-selectable
+
+**Context:** Owner, reviewing a working repair: *"I thought we had crosshatch for
+full figure repair in addition to bluring. And for face we surely had blur not
+whiteout."*
+
+**Half right, and the record settles which half.** Whole-figure was and is
+`crosshatch body + blurred head` — `decisions.md` 2026-08-05, owner decision off
+exp #315, with the evidence (red zone: crosshatch 5,060px vs blur 16,182 vs
+whiteout 25,373; whiteout loses the pose). That is what production runs.
+
+Face-only resolved to `cutout + whiteout`. That was never an experiment verdict:
+`docs/face-repair-merge-design.md` records it only as *"Defaults reproduce
+today's dominant path (cutout+whiteout+grok+faceOnly)"* — inherited from
+`grok_face_insert`, which won by being the path that already went through
+`samUnionBlend` with the full gate battery, while the legacy face `blur`
+(`grok_blended`) had its own private blend engine and sharpness as its ONLY
+gate. So the comparison was never treatment-vs-treatment; it was gated-vs-ungated.
+
+**Decision (owner):** face repairs use **blur**. Only the TREATMENT axis moves —
+region stays `cutout`, every gate still applies. The reasoning is the one the
+whole-figure decision already made for the head it blurs over the hatch: a blur
+destroys the features while keeping head size and tilt, so pose survives and
+identity must come from the reference avatar; a whiteout hands the model an
+empty region and loses that anchor. Changed in both resolvers
+(`resolveRepairAxes` and `legacyFlagsToAxes`). Not a SETTLED.md line — checked.
+
+**Also: the axes are now selectable.** The spine has always read
+`opts.treatment` / `regionSource` / `faceOnly`, but nothing could set them —
+callers picked a legacy flag combination and took whatever mapping fell out,
+which is why "is blur better than whiteout on a face?" was unaskable. They are
+added to `CHAR_REPAIR_REQUEST_KEYS` and threaded from Lab params; omitted, the
+mapping decides, so production behaviour is unchanged.
+
+**Benchmark set:** 12 `benchmark_scenes` (ids 21-32, tag `repair-bench`) across
+all six art styles present on staging — watercolor, concept, realistic, oil,
+pixar, steampunk — two pages each, cast sizes 1 to 4, every target carrying a
+character with both a face and a body box.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/charRepairRequest.js`,
+`server/lib/testlab.js`.
+**Status:** 🟡 conditional — the blur-vs-whiteout matrix on the new benchmark set
+is the evidence this entry is missing.

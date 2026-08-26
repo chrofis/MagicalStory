@@ -1253,8 +1253,16 @@ function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'gro
   if (forceTarget === 'face') faceOnly = hasFaceBbox;
   else if (forceTarget === 'body') faceOnly = false;
   else faceOnly = hasFaceIssue && !hasClothingIssue && hasFaceBbox;
+  // FACE = BLUR (owner, 2026-08-26). A blur destroys the features while keeping
+  // head size and tilt, so the pose survives and identity has to come from the
+  // reference avatar; a whiteout hands the model an empty region and loses that
+  // anchor. Same reasoning the whole-figure decision already used for the head
+  // it blurs over the hatch (2026-08-05, exp #315). The whiteout default was
+  // never an experiment verdict — face-repair-merge-design.md records it only as
+  // "reproduce today's dominant path". Only the TREATMENT axis moves: region
+  // stays `cutout` and every gate still applies.
   return faceOnly
-    ? { regionSource: 'cutout', treatment: 'whiteout', model, faceOnly: true }
+    ? { regionSource: 'cutout', treatment: 'blur', model, faceOnly: true }
     : { regionSource: 'box', treatment: 'crosshatch', model, faceOnly: false };
 }
 
@@ -1268,9 +1276,10 @@ function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'gro
 // ---------------------------------------------------------------------------
 function legacyFlagsToAxes({ useBlended = null, useCutout = null, useFullScene = null, whiteoutTarget = null, hasFaceBbox = false, model = 'grok' } = {}) {
   const target = whiteoutTarget || 'body';
-  // Face-insert precedence: face target + face box → cutout+whiteout+face.
+  // Face target + face box → cutout+BLUR+face (owner, 2026-08-26; see
+  // resolveRepairAxes). Was whiteout; only the treatment axis changed.
   if (target === 'face' && hasFaceBbox) {
-    return { regionSource: 'cutout', treatment: 'whiteout', model, faceOnly: true };
+    return { regionSource: 'cutout', treatment: 'blur', model, faceOnly: true };
   }
   // Explicit flags.
   if (useBlended === true) return { regionSource: 'box', treatment: 'blur', model, faceOnly: target === 'face' };
