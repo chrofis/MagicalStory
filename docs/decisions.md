@@ -19211,3 +19211,55 @@ his lap", and the render stood the boy up and presented it. Logged, not fixed.
 **Unrelated, still open:** p14 scored semantic 0 — its declared action
 ("speaking") is not depicted at all, four boys stand in a row facing camera. The
 gaze-fill default lines did not break the portrait pose.
+
+## 2026-08-26 — Fresh judgment after every review; carries shrink to rulings-only (supersedes the 2026-08-25 fault-carry design)
+
+**Context:** The chain provenance trace of prod `job_1787689073034_1v6ew0y1kae`
+showed the three worst shipped faults — the flying dragon, the gateless keeper,
+the refiner's embellishment — were all INTRODUCED BY FIXES, and that nothing
+ever reads a reviewer's output. The 2026-08-25 CARRY_ROUTES design forwarded
+each audit's fault list into downstream prompts; measured on its first prod
+run, all 10 carried arc faults were already marked fixed (noise), and the one
+carry with real effect handed the text writer the flying "fix" as settled law
+("a fault it fixed is satisfied — do not re-open it"), i.e. it AMPLIFIED a
+reviewer-introduced fault. Owner: "of course we need a fresh judgement. What is
+the point of passing faults that have already been fixed."
+
+**Decision:** After each review, the SAME blind audit runs again on the
+reviewed artifact — same template, same judge, so the before/after fault counts
+are one yardstick. Faults found get ONE targeted re-fix (re-run of the same
+reviewer with the re-audit's findings plus the prior ledger); no convergence
+loop. Three sites:
+- arc: `beats_arc_audit2` → `beats_arc_review2` (beatsPipeline)
+- beats: `beats_audit2` → `beats_review2` (beatsPipeline)
+- text: `text_audit2` → one corrective refine round (textRefine, after the
+  round loop; publishes a salvage snapshot first, so the join deadline can only
+  ever cost this step)
+
+A truly fixed fault vanishes from the re-audit by itself; a botched fix and a
+review-introduced fault both surface as plain faults — the class no carried
+list can see, because an introduction has no finding to carry. Counts are
+logged per stage (`arc 10 → 2`) and both audit texts are stored
+(`*.audit` / `*.audit2`), so the fault trajectory per story is now measured,
+not hand-counted.
+
+CARRY_ROUTES stays, but carries ONLY the reviewer's ledger, framed as
+precedent ("only the rulings bind you; entries recording fixes are history").
+That keeps the one thing the fault-carry genuinely solved — a later stage
+re-litigating a "stands, with reason" trade-off it never saw the reason for —
+and drops both failure modes. `withCarriedFindings(prompt, findings, route,
+ledger)` → `withCarriedRulings(prompt, ledgers, route)`.
+
+**Cost:** +3 grok audit calls (~$0.10–0.20/story) + re-fix calls only when the
+re-audit finds faults; ~+6–12 min wall clock, of which the text-stage part is
+absorbed by the image phase on most runs.
+
+**Not chosen:** a bespoke "verify" prompt (its counts would not compare with
+the first audit's); auditing only the final text (arc-level introductions would
+be patched at text level, where a locked beat cannot be undone — the flying
+showed exactly that).
+
+**Touched:** `server/lib/carryRoutes.js`, `server/lib/beatsPipeline.js`,
+`server/lib/textRefine.js`, `storyJobPipeline.js` (audit2 persisted).
+
+**Status:** ✅ active.

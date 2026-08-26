@@ -56,6 +56,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // evaluator's expectedAgesBlock (2026-08-24): a `let` below its reader is a
   // temporal-dead-zone throw waiting for the first call that reaches it.
   let auditFindings = '';
+  // Declared with auditFindings, ABOVE the snapshot closure that reads them —
+  // a `let` below its reader is the TDZ throw that killed the evaluator on
+  // 2026-08-24. The re-audit at the bottom fills it.
+  let audit2 = '';
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so a finished audit and a
@@ -73,6 +77,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
       .filter(n => n !== null),
     audit: auditFindings,
+    audit2,
     partial: true,
   });
   const publish = () => {
@@ -177,11 +182,64 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   }
 
+  // FRESH JUDGMENT (owner, 2026-08-26). The refiner is the last thing to touch
+  // the prose and nothing used to read its output — its two failures on
+  // job_1787689073034 (embellishing the flagged flying, pluperfect backfill)
+  // shipped precisely because of that. The SAME blind audit re-reads the final
+  // text: same template, same judge, so the two counts are one yardstick.
+  // Faults found get ONE more corrective round; no loop. Non-blocking, and the
+  // publish() below means the join-deadline salvage can only ever cost this
+  // step, never the rounds already done.
+  if (auditFindings) {
+    try {
+      const { buildTextAuditPrompt } = require('./storyHelpers');
+      const audit2Prompt = buildTextAuditPrompt(storyData, current);
+      if (audit2Prompt && TEXT_MODELS[auditModel]) {
+        const t0 = Date.now();
+        const a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
+        audit2 = String(a2.text || '').trim();
+        const n1 = (auditFindings.match(/^FAULT:/gm) || []).length;
+        const n2 = (audit2.match(/^FAULT:/gm) || []).length;
+        log.info(`🔎 [TEXT-AUDIT2] ${auditModel}: ${n1} → ${n2} fault(s) after ${rounds.filter(r => r.ok).length} round(s), ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+        if (n2 > 0) {
+          const modelKey = perRound[rounds.length] || defaultModel;
+          const withRulings = `${audit2}\n\nEarlier rounds answered a previous audit in their ledgers. A fault ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.`;
+          const prompt2 = buildTextRefinePrompt(storyData, current, withRulings);
+          const t1 = Date.now();
+          const MAX_OUT = Math.min(64000, TEXT_MODELS[modelKey].maxOutputTokens || 64000);
+          const r2 = await callTextModelStreaming(prompt2, MAX_OUT, null, modelKey, { usageLabel });
+          const parsed2 = parseRefinedText(r2.text || '', expected);
+          const byPage2 = new Map(parsed2.pages.map(p => [p.pageNumber, p.text]));
+          const next2 = current.map(p => ({ ...p, text: byPage2.get(p.pageNumber) || p.text }));
+          const changed2 = next2.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
+          rounds.push({
+            round: rounds.length + 1,
+            ok: true,
+            reAudit: true,
+            modelKey,
+            modelId: r2.modelId || TEXT_MODELS[modelKey].modelId,
+            elapsedMs: Date.now() - t1,
+            usage: { input_tokens: r2.usage?.input_tokens || 0, output_tokens: r2.usage?.output_tokens || 0 },
+            analysis: (parsed2.analysis || '').slice(0, 40000),
+            rawResponse: (r2.text || '').slice(0, 40000),
+            changedPages: changed2,
+            converged: changed2.length === 0,
+          });
+          current = next2;
+          publish();
+          log.info(`✍️  [TEXT-AUDIT2] corrective round rewrote page(s) ${changed2.join(', ') || 'none'}`);
+        }
+      }
+    } catch (e2) {
+      log.warn(`⚠️ [TEXT-AUDIT2] re-audit failed (${e2.message}) — refined text kept as-is`);
+    }
+  }
+
   const changed = current
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
-  return { pages: current, original, rounds, changed, audit: auditFindings, partial: false };
+  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, partial: false };
 }
 
 /**

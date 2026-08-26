@@ -1,6 +1,10 @@
 
 
-const { CARRY_ROUTES, withCarriedFindings } = require('./carryRoutes');
+const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
+
+// One yardstick everywhere: audits emit "FAULT:" lines, counts compare only
+// when the same template and judge produced both sides.
+const countFaults = (s) => (String(s || '').match(/^FAULT:/gm) || []).length;
 
 /**
  * Beats-first story generation (pipelineMode: 'beats').
@@ -294,6 +298,43 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     gl.info('beats_arc', `Arc drafted by ${arcRes.modelId || planModel}, reviewed by ${arcRevRes.modelId || arcReviewModel} (${arcReviewReport.changed ? 'rewritten' : 'unchanged'})`, null, {
       changed: arcReviewReport.changed, model: arcRevRes.modelId || arcReviewModel,
     });
+
+    // FRESH JUDGMENT (owner, 2026-08-26). The SAME blind audit runs again on
+    // the reviewed arc — same template, same judge, so the before/after fault
+    // counts are one yardstick. A fault the review truly fixed vanishes on its
+    // own; a botched fix and a review-INTRODUCED fault both surface as plain
+    // faults, which no carried fault list ever could (an introduction has no
+    // finding to carry — the deleted Lindenhof gate crossed three carries
+    // untouched on job_1787689073034). Faults found here get ONE targeted
+    // re-review; no convergence loop.
+    try {
+      const audit2Prompt = buildArcAuditPrompt(inputData, approvedArc);
+      if (audit2Prompt && arcAuditFindings) {
+        const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit2' });
+        const findings2 = String(a2.text || '').trim();
+        const n1 = countFaults(arcAuditFindings);
+        const n2 = countFaults(findings2);
+        arcReviewReport.audit2 = findings2;
+        gl.info('beats_arc_audit2', `Arc re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2 });
+        if (n2 > 0) {
+          // The first review's ledger rides along so a trade-off it ruled to
+          // stand is answered by citing the ruling, not churned.
+          const withRulings = `${findings2}\n\nThe previous review answered an earlier audit; its ledger follows. A fault it ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.\n\n${arcReviewReport.analysis || ''}`;
+          const fixPrompt = buildArcReviewPrompt(inputData, approvedArc, withRulings);
+          const fixRes = await textModels.callTextModelStreaming(fixPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_review2' });
+          const fix = parseArcReview(fixRes.text || '');
+          if (fix.arc && fix.arc.trim()) {
+            approvedArc = fix.arc.trim();
+            arcReviewReport.analysis2 = fix.analysis || '';
+            arcReviewReport.changed2 = true;
+            gl.info('beats_arc_review2', `Arc re-review resolved the re-audit's ${n2} fault(s)`);
+          }
+        }
+      }
+    } catch (e2) {
+      log.warn(`⚠️ [BEATS] Arc re-audit failed (${e2.message}) — reviewed arc kept as-is`);
+      gl.warn('beats_arc_audit2_failed', `Arc re-audit failed: ${e2.message}`);
+    }
   } catch (err) {
     // Never block a story on the arc step: without it the planner writes the
     // arc inline exactly as it did before this stage existed.
@@ -304,28 +345,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
-  // CARRY-FORWARD (owner, 2026-08-25). The arc audit's faults were handed to
-  // the arc review, and whether it answered each one is nobody's job to check —
-  // an arc is prose, so there is no deterministic re-check the way there is for
-  // briefs and clothing. Rather than buy a second audit call to find out, the
-  // faults ride along into the plan call that happens anyway: this is the next
-  // stage that OWNS the material, since it is the one dividing the arc into
-  // pages. Costs nothing, and a fault the reviewer already fixed simply reads
-  // as satisfied. The same trick does not work downstream of the scene review —
-  // no later stage rewrites brief metadata (docs/decisions.md 2026-08-25).
-  const planPrompt = withCarriedFindings(
+  // RULINGS-ONLY CARRY (owner, 2026-08-26 — supersedes the 2026-08-25
+  // fault-carry). Whether the review answered each fault is now the re-audit's
+  // job above; carrying the fault list forward was noise (all 10 carried
+  // faults on the first prod run were already marked fixed) and, worse, gave a
+  // defective fix downstream authority. Only the reviewer's LEDGER travels,
+  // framed as precedent, so a "stands, with reason" ruling is not re-litigated
+  // by a stage that never saw the reason.
+  const planPrompt = withCarriedRulings(
     approvedArc
       ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
       : basePrompt,
-    arcAuditFindings,
-    CARRY_ROUTES.arc,
-    // The arc review's analysis ends with its per-fault ledger. Carried with
-    // the findings so the planner respects a "stands, with reason" ruling
-    // instead of re-litigating it (owner: issue 2, 2026-08-25 review).
-    arcReviewReport?.analysis || ''
+    [arcReviewReport?.analysis || '', arcReviewReport?.analysis2 || ''],
+    CARRY_ROUTES.arc
   );
-  if (arcAuditFindings.trim()) {
-    gl.info('beats_carry_arc', `Arc audit faults carried into the beats plan (${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+  if (arcReviewReport?.analysis) {
+    gl.info('beats_carry_arc', 'Arc review rulings carried into the beats plan');
   }
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
@@ -441,6 +476,48 @@ SCENE: ${x.scene || ''}`.trim(),
       gl.info('beats_review', `Beat review by ${revRes.modelId || reviewModel}: ${changed.length} page(s) rewritten (${(meta.timings.beatsReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: revRes.modelId || reviewModel,
       });
+
+      // FRESH JUDGMENT (owner, 2026-08-26) — same design as the arc re-audit
+      // above: the identical blind audit re-reads the REVIEWED beats, so a fix
+      // that introduced a fault (the flying "fix" on job_1787689073034 was
+      // born exactly here) is caught before the Art Director and the text
+      // writer inherit it as settled law. One targeted re-review; no loop.
+      try {
+        const audit2Prompt = buildBeatsAuditPrompt(beats, pagePlan);
+        if (audit2Prompt && beatsAuditFindings) {
+          const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, reviewModel, { usageLabel: 'beats_audit2' });
+          const findings2 = String(a2.text || '').trim();
+          const n1 = countFaults(beatsAuditFindings);
+          const n2 = countFaults(findings2);
+          beatsReviewReport.audit2 = findings2;
+          gl.info('beats_audit2', `Beats re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2 });
+          if (n2 > 0) {
+            const withRulings = `${findings2}\n\nThe previous review answered an earlier audit; its ledger follows. A fault it ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.\n\n${beatsReviewAnalysis || ''}`;
+            const fixPrompt = buildBeatsReviewPrompt(inputData, beats, plan.arc, pagePlan, withRulings);
+            const fixRes = await textModels.callTextModelStreaming(fixPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_review2' });
+            const fixParsed = parseBeats(fixRes.text || '', []);
+            const rewrites2 = [];
+            const merged2 = mergeByPage(beats, fixParsed.pages, (p, fix) => {
+              const next = { ...p, beat: fix.beat || p.beat, scene: fix.scene || p.scene };
+              rewrites2.push({
+                pageNumber: p.pageNumber,
+                before: `BEAT: ${p.beat}\nSCENE: ${p.scene}`,
+                after: `BEAT: ${next.beat}\nSCENE: ${next.scene}`,
+              });
+              return next;
+            });
+            beats = merged2.merged;
+            const diffs2 = rewrites2.filter(r => r.before !== r.after);
+            beatsReviewReport.analysis2 = fixParsed.analysis || '';
+            beatsReviewReport.changedPages2 = diffs2.map(r => r.pageNumber);
+            beatsReviewReport.pages2 = diffs2;
+            gl.info('beats_review2', `Beats re-review rewrote page(s) ${diffs2.map(r => r.pageNumber).join(', ') || 'none'} for the re-audit's ${n2} fault(s)`);
+          }
+        }
+      } catch (e2) {
+        log.warn(`⚠️ [BEATS] Beats re-audit failed (${e2.message}) — reviewed beats kept as-is`);
+        gl.warn('beats_audit2_failed', `Beats re-audit failed: ${e2.message}`);
+      }
     } catch (err) {
       // Same containment as the unified path's outline review: never block.
       log.warn(`🚨 [BEATS] Beat review failed (${err.message}) — proceeding with the unreviewed plan`);
@@ -683,7 +760,7 @@ SCENE: ${x.scene || ''}`.trim(),
   t = Date.now();
   const beatPageNumbers = beats.map(b => b.pageNumber);
   let expansions = [];
-  const allPrompt = withCarriedFindings(
+  const allPrompt = withCarriedRulings(
     buildSceneExpansionAllPrompt(inputData, beats, {
       visualBible,
       availableAvatars,
@@ -693,13 +770,13 @@ SCENE: ${x.scene || ''}`.trim(),
       // only source, and it is resolved by the time scenes are expanded.
       clothingRequirements,
     }),
-    beatsAuditFindings,
-    CARRY_ROUTES.beatsToArtDirector,
-    // The beats review's rulings ride along — same reason as the arc carry.
-    beatsReviewAnalysis
+    // Rulings only (2026-08-26): the re-audit above already decided whether the
+    // review's fixes held; the ledger travels as precedent, not as work.
+    [beatsReviewAnalysis, beatsReviewReport?.analysis2 || ''],
+    CARRY_ROUTES.beatsToArtDirector
   );
-  if (beatsAuditFindings.trim()) {
-    gl.info('beats_carry_artdirector', `Beats audit faults carried into the Art Director (${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+  if (beatsReviewAnalysis) {
+    gl.info('beats_carry_artdirector', 'Beats review rulings carried into the Art Director');
   }
   if (!allPrompt) {
     log.error('🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
@@ -1134,16 +1211,15 @@ SCENE: ${x.scene || ''}`.trim(),
       log.warn('⚠️ [BEATS] Step 6 has NO scene briefs — text is being written blind to the illustrations');
       gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
     }
-    const textPrompt = withCarriedFindings(
+    const textPrompt = withCarriedRulings(
       buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc),
-      beatsAuditFindings,
-      CARRY_ROUTES.beatsToStoryText,
-      // The beats review's rulings ride along — same reason as the arc carry.
-      beatsReviewAnalysis
+      // Rulings only (2026-08-26) — see the Art Director carry above.
+      [beatsReviewAnalysis, beatsReviewReport?.analysis2 || ''],
+      CARRY_ROUTES.beatsToStoryText
     );
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
-    if (beatsAuditFindings.trim()) {
-      gl.info('beats_carry_storytext', `Beats audit faults carried into the page text (${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s))`);
+    if (beatsReviewAnalysis) {
+      gl.info('beats_carry_storytext', 'Beats review rulings carried into the page text');
     }
     const beatPages = beats.map(b => b.pageNumber);
     let raw = '';
