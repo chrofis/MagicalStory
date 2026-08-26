@@ -526,3 +526,11 @@ Recorded so nobody re-proposes them as gaps.
       (`decisions.md:10189`, `:10703`).
       → `storyJobPipeline.js:1046-1055`, `server/lib/storyAvatars.js:56-99,230-240`, `server/lib/styledAvatars.js:543,1149`
 - [ ] A closed prop reference cannot serve a page that needs the prop OPEN — prod job_1787689073034_1v6ew0y1kae p9 ("looking up from the book") rendered the open book flat to camera. The reference fixes the carried case; the read case still rests on 12d prose alone.
+- [ ] **Trial pages still send the whole 2x4 sheet, not the pose cell (2026-08-26, OPEN).** Landmark half of
+      the same work is fixed and verified; this half is not. Every page's stored ref is `photoType=bodyNoBg`,
+      never `cell-*`. Reproduced against PERSISTED data locally: the projection and `applyStoryCellRefs` both
+      work (`cell-threeQuarter-headbody`), so the fault is purely WHEN the sheet lands on the character vs
+      page render. `publishStyledAvatarsToCharacters` at the end of `prepareStyledAvatars` did not close it.
+      The silent `continue` paths in `applyStoryCellRefs` are now loud, so the next trial names the reason —
+      look for `[CELL REFS] ... sending the FULL reference image`. Two paid trials already spent; do not
+      re-run blind. → `server/lib/storyAvatars.js:233-250`, `storyJobPipeline.js:1046-1095`

@@ -234,9 +234,19 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     const charName = ref?.name;
     if (!charName) continue;
     const story = storyCharacterAvatars[charName];
-    if (!story) continue;
+    // Both of these used to `continue` in silence, which is how a page could
+    // ship the WHOLE 2×4 sheet as its reference and leave no trace of why.
+    // Same reason the crop-failure catch below is loud: a fallback nobody can
+    // see is a fallback nobody fixes.
+    if (!story) {
+      log.warn(`[CELL REFS] ${charName}: no story sheet available yet (have: ${Object.keys(storyCharacterAvatars).join(', ') || 'none'}) — sending the FULL reference image instead of a pose cell`);
+      continue;
+    }
     const resolved = resolveSheetForRef(story, ref);
-    if (!resolved) continue;
+    if (!resolved) {
+      log.warn(`[CELL REFS] ${charName}: no usable sheet for clothing "${ref.clothingCategory || 'none'}" (slots: ${Object.keys(story).join(', ')}) — sending the FULL reference image instead of a pose cell`);
+      continue;
+    }
     const { uri: sheetUri, slotKey } = resolved;
     const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
     // Foreground → stack head + body into one ref (canvas-large faces need

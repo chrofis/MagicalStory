@@ -19179,7 +19179,36 @@ The seeding write-back from the first pass is still correct but was not what bit
 here: this trial had no `preGeneratedStyledAvatars`, so the sheets came from
 `prepareStyledAvatars` normally and the gap was purely when they were published.
 
-**Status:** 🟡 conditional — re-validating on a second live trial.
+**Second live trial (staging `job_1787763237534_7qmaknnpk`, Cathédrale de
+Lausanne, fr) — the landmark half is CONFIRMED, the pose half is not:**
+
+- ✅ **Landmark: fixed, visually verified.** Railway logs show
+  `Slot 1: scene background (clean, alone)` and
+  `Skipping 1 landmark(s) — already in scene background`, and both landmark
+  pages render as full watercolour — no photographic background, no real
+  bystanders, no garbled real-world signage. Compare the pre-fix prod trial p1
+  (Stettbach station), which was a photograph with a painted child pasted on.
+  NOTE for future readers: `sceneImages[].landmarkPhotos` is the RESOLVED list,
+  NOT proof of what was sent — a page can carry `landmarkPhotos=1` while
+  `packReferences` skipped the raw photo because the plate won the slot. Judge
+  from the Grok slot logs or the image, never from that field.
+- ❌ **Pose: still shipping the whole sheet.** Every page's stored reference is
+  `photoType=bodyNoBg`, never `cell-*`. Reproduced against the PERSISTED data
+  locally: `projectStoryCharacterAvatars` yields `{Léa: {styled-standard}}` and
+  `applyStoryCellRefs` produces `cell-threeQuarter-headbody`. So the shape and
+  the crop are correct and the remaining fault is purely WHEN the sheet lands on
+  the character relative to page render. `publishStyledAvatarsToCharacters` at
+  the end of `prepareStyledAvatars` did not close it.
+
+Two paid trials have now failed to validate the pose half, so per the
+burn-loop rule no third run was fired. Instead the two silent `continue` paths
+in `applyStoryCellRefs` were made loud — they are what let a page ship the full
+sheet leaving no trace of why, the same blind spot the crop-failure catch was
+made loud for. The next trial will name the reason instead of requiring another
+round of inference.
+
+**Status:** 🟡 landmark half ✅ verified in production-shaped conditions; pose
+half ❌ still open, instrumented and awaiting one diagnostic trial.
 
 ### CARRY_ROUTES fired in production (prod `job_1787689073034_1v6ew0y1kae`, 2026-08-25)
 
