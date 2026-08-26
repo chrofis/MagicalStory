@@ -255,15 +255,27 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
  */
 async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {}) {
   if (resolved?.bodyMask) return resolved.bodyMask;
-  if (!storyId || pageNumber == null || !charName) return null;
+  // Every null says WHY. A silent null here is indistinguishable from "no mask
+  // exists", which is what sent the last diagnosis down the wrong path.
+  if (!storyId || pageNumber == null || !charName) {
+    log.warn(`[FIGURE-MASK] ${charName || '?'}: cannot look up a stored mask (storyId=${!!storyId}, pageNumber=${pageNumber})`);
+    return null;
+  }
   const figures = Array.isArray(resolved?.figures) ? resolved.figures : [];
   const lower = String(charName).toLowerCase();
   const idx = figures.findIndex(f => f?.name && f.name.toLowerCase() === lower);
-  if (idx < 0) return null;
+  if (idx < 0) {
+    log.warn(`[FIGURE-MASK] ${charName}: not in the resolved cast (${figures.length} figure(s): ${figures.map(f => f?.name).join(', ') || 'none'}) — cannot map to a stored mask`);
+    return null;
+  }
   try {
     const { loadFigureMaskPng } = require('../services/database');
-    return await loadFigureMaskPng(storyId, pageNumber, idx);
-  } catch {
+    const png = await loadFigureMaskPng(storyId, pageNumber, idx);
+    if (!png) log.warn(`[FIGURE-MASK] ${charName}: figure #${idx} has no stored mask for p${pageNumber}`);
+    else log.info(`♻️ [FIGURE-MASK] ${charName}: reusing stored silhouette #${idx} (${(png.length / 1024).toFixed(1)}KB)`);
+    return png;
+  } catch (e) {
+    log.warn(`[FIGURE-MASK] ${charName}: mask load threw — ${e.message}`);
     return null;
   }
 }

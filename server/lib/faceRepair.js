@@ -784,6 +784,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       // Every mask the blend emitted for THIS attempt, so three refusals leave
       // three inspectable sequences instead of three sentences.
       blendSteps: r?.blendSteps || [],
+      samRecomputed: r?.samRecomputed ?? null,
       cutoutSent: r?.cutoutSent || null,
       iou: r?.iou ?? r?.blend?.iou ?? null,
     });
