@@ -534,3 +534,4 @@ Recorded so nobody re-proposes them as gaps.
       The silent `continue` paths in `applyStoryCellRefs` are now loud, so the next trial names the reason —
       look for `[CELL REFS] ... sending the FULL reference image`. Two paid trials already spent; do not
       re-run blind. → `server/lib/storyAvatars.js:233-250`, `storyJobPipeline.js:1046-1095`
+- [ ] Verify the two-entry face-prop rule on a real story — that the bible emits a pair with matching identity, that the Art Director names exactly one per page (never both), and that a page needing the face gets it. Replaces referenceView, which was verified; the pair is not. → docs/decisions.md 2026-08-26

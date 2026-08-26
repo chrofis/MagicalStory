@@ -19312,3 +19312,59 @@ showed exactly that).
 `server/lib/textRefine.js`, `storyJobPipeline.js` (audit2 persisted).
 
 **Status:** ✅ active.
+
+## 2026-08-26 — A face-prop is TWO bible entries, not one entry with two views
+
+**Supersedes the `referenceView` field added 2026-08-24 (same day).** That field
+worked — the shut-book reference it produced was measurably correct, and the
+first production story carried the book closed on two pages. It is replaced
+because two entries do the same job and more, not because it failed.
+
+**The gap it could not close.** prod `job_1787689073034_1v6ew0y1kae` p9 needed
+the book OPEN ("looking up from the book"). A closed reference cannot serve that
+page, so the model fell back to its default and rendered the face to camera. One
+reference can only ever describe one state.
+
+**Owner's design:** make the two sides two visual-bible entries —
+`"<thing> (turned away)"` and `"<thing> (face to camera)"` — and let the Art
+Director name one of them in `objects[]` per page.
+
+**Why it is strictly better than what it replaces:**
+- **It needs no new plumbing.** `getElementReferenceImagesForPage` already
+  selects entries by the ids the brief names, so referencing one id or the other
+  already attaches a different reference image. Verified before building.
+- **`artifactMinAppearances` is 1**, so splitting one prop across two entries
+  cannot starve either of a reference image. This was the main risk and it is a
+  non-issue.
+- **The selection is OURS, not the model's.** The 2026-08-24 research could not
+  find any evidence that a text prompt can pick a side out of a multi-view
+  reference sheet on Grok or Gemini, and every system that reliably selects a
+  view uses numeric camera conditioning neither model exposes. Attaching one
+  reference per page sidesteps that entirely — the model is never asked to
+  choose.
+- **The orientation reaches the prompt as well as the picture.** An entry's
+  `description` is copied into REQUIRED OBJECTS, so "turned away from the
+  viewer" arrives as an egocentric statement in the prompt AND as a reference
+  image. `referenceView` only ever reached the picture. GenSpace
+  (arXiv:2505.24870) measured egocentric final-image phrasing binding far better
+  than intrinsic phrasing, which is what the old brief wording
+  ("angled toward herself") was.
+
+**Guardrails written into the rules:** both entries carry the same material,
+size, edge wear and dominant colour so they read as one object; what is drawn on
+the face stays out of BOTH descriptions; and the Art Director names exactly one
+of the pair per page, never both, or the page renders two copies of one prop.
+
+**Default is the turned-away entry** — a document is normally being read or
+carried, and only the page whose beat IS what the document says gets the face.
+
+**Removed:** the `referenceView` schema field from all three bible templates,
+its append in `buildReferenceSheetPrompt`, and both whitelisted parse
+passthroughs in `visualBible.js`. Keeping both mechanisms would have left two
+sources of truth for one concept.
+
+**Unverified:** no story has run under the pair rule. Unit suite 198 passed,
+same 3 pre-existing failures.
+
+**Touched files:** the three bible templates, both scene-expansion templates,
+`server/lib/referenceSheets.js`, `server/lib/visualBible.js`.
