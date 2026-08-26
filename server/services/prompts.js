@@ -200,6 +200,11 @@ async function loadPromptTemplates() {
     // page's TEXT followed by that page's SHIPPED IMAGE, in reading order, and
     // routes each fault to the artefact that would fix it (IMG or TEXT).
     ['bookAudit', 'book-audit.txt'],
+    // The other half of the arc audit: a listener, not an editor. Runs in
+    // parallel with storyArcAudit and its faults join the same review ledger.
+    ['storyChildCritic', 'story-child-critic.txt'],
+    // Chooses the shipped title from the writer's candidates.
+    ['titleJudge', 'title-judge.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],
@@ -241,6 +246,8 @@ async function loadPromptTemplates() {
     ['storyScorecardJudgeV1_2', 'story-scorecard-judge-v1_2.txt'],
     ['storyScorecardJudgeV2', 'story-scorecard-judge-v2.txt'],
     ['storyScorecardJudgeV3', 'story-scorecard-judge-v3.txt'],
+    // Evaluator 4.4: the finished text scored by what a listening child retained.
+    ['storyRetellJudge', 'story-retell-judge.txt'],
   ];
 
   await Promise.all(FILES.map(([k, f]) => load(k, f)));

@@ -4489,6 +4489,51 @@ function buildArcAuditPrompt(inputData, arc) {
   });
 }
 
+/**
+ * The age the judge role-plays: the youngest MAIN character, since the book has
+ * to work for the youngest listener in the cast. Falls back to 5 when no main
+ * character carries a usable age.
+ */
+function youngestMainAge(inputData, fallback = 5) {
+  const mainIds = inputData?.mainCharacters || [];
+  const chars = (inputData?.characters || []).filter(c => c && (!mainIds.length || mainIds.includes(c.id)));
+  const ages = chars.map(c => parseInt(c.age, 10)).filter(n => Number.isFinite(n) && n > 0);
+  return ages.length ? Math.min(...ages) : fallback;
+}
+
+/**
+ * Child critic of the arc: a listener, not an editor. Runs alongside the hostile
+ * audit and answers only comprehension and engagement.
+ */
+function buildChildCriticPrompt(inputData, arc) {
+  const template = PROMPT_TEMPLATES.storyChildCritic;
+  if (!template) {
+    log.error('[PROMPT] storyChildCritic template not loaded — child critic unavailable');
+    return null;
+  }
+  return fillTemplate(template, {
+    AGE: youngestMainAge(inputData),
+    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
+    ARC: String(arc || '').trim(),
+  });
+}
+
+/** Picks the shipped title from the writer's candidates. */
+function buildTitleJudgePrompt(inputData, candidates = []) {
+  const template = PROMPT_TEMPLATES.titleJudge;
+  if (!template) {
+    log.error('[PROMPT] titleJudge template not loaded — title judge unavailable');
+    return null;
+  }
+  const list = (candidates || []).filter(Boolean);
+  if (list.length < 2) return null;
+  return fillTemplate(template, {
+    AGE: youngestMainAge(inputData),
+    CANDIDATES: list.map((t, i) => `${i + 1}. ${t}`).join('\n'),
+    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
+  });
+}
+
 /** Blind audit of the beats: the auditor sees ONLY the page plan and the beats. */
 function buildBeatsAuditPrompt(beats, pagePlan = '') {
   const template = PROMPT_TEMPLATES.storyBeatsAudit;
@@ -5583,6 +5628,9 @@ module.exports = {
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
   buildArcAuditPrompt,
+  buildChildCriticPrompt,
+  buildTitleJudgePrompt,
+  youngestMainAge,
   buildBeatsAuditPrompt,
   buildTextAuditPrompt,
   buildTextProofreadPrompt,

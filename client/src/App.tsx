@@ -1,4 +1,4 @@
-import { Suspense, lazy, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, type ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
@@ -6,6 +6,7 @@ import { ScrollToTop } from './components/common/ScrollToTop';
 import { RouteTracker } from './components/common/RouteTracker';
 import { GenerationProvider } from './context/GenerationContext';
 import { useAuth } from './context/AuthContext';
+import { captureAttribution } from './utils/trialFunnel';
 
 // Route guard for admin-only pages. Without this wrapper, the AdminDashboard
 // component briefly mounts and renders before its own role check fires —
@@ -70,6 +71,14 @@ const CityPage = lazy(() => import('./pages/CityPage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
 
 function App() {
+  // Capture ad attribution on the FIRST page of the visit, whatever it is.
+  // The Search ads land on the homepage carrying the tags, but the funnel
+  // tracker only runs inside /try — so by the time it looked, the query string
+  // was gone and every trial_events row landed with a null campaign (0 of 40
+  // in production, checked 2026-08-26). This call is idempotent and writes to
+  // localStorage, so /try later reads back whatever the landing page saw.
+  useEffect(() => { captureAttribution(); }, []);
+
   return (
     <GenerationProvider>
       <ScrollToTop />

@@ -436,8 +436,8 @@ async function recordTrialEvent(event) {
 
   const result = await pool.query(
     `INSERT INTO trial_events
-       (visit_id, step, utm_source, utm_medium, utm_campaign, referrer, language, device, user_id, meta)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       (visit_id, step, utm_source, utm_medium, utm_campaign, utm_term, gclid, referrer, language, device, user_id, meta)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (visit_id, step) DO NOTHING`,
     [
       event.visitId,
@@ -445,6 +445,8 @@ async function recordTrialEvent(event) {
       _trim(event.utmSource, 60),
       _trim(event.utmMedium, 60),
       _trim(event.utmCampaign, 80),
+      _trim(event.utmTerm, 120),
+      _trim(event.gclid, 200),
       _trim(event.referrer, 500),
       _trim(event.language, 10),
       _trim(event.device, 20),
@@ -503,6 +505,8 @@ router.post('/event', trialEventLimiter, async (req, res) => {
       utmSource: req.body.utmSource,
       utmMedium: req.body.utmMedium,
       utmCampaign: req.body.utmCampaign,
+      utmTerm: req.body.utmTerm,
+      gclid: req.body.gclid,
       referrer: req.body.referrer,
       language: req.body.language,
       device: /mobile|android|iphone|ipad/i.test(ua) ? 'mobile' : 'desktop',

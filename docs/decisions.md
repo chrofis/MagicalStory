@@ -14022,6 +14022,49 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-26 — The description must match the AVATAR, and lengthTop is not hair length
+
+**Context.** Chasing why a girl with a long ponytail was stored as `ear-length`,
+two things came out — one a real principle, one a mistake of mine.
+
+**The principle (owner).** The stored description and the avatar are BOTH handed
+to the image model when a page is drawn. So the description has to describe the
+avatar that ships with it: "if they do not match we create impossible images to
+render". Internal consistency between the pair beats fidelity to the photo.
+
+That makes `avatars.js:2133` look wrong at first — it prefers the PHOTO's
+`detailedHairAnalysis` and falls back to the avatar's, under a comment calling
+the photo "ground truth". But the ordering is NOT the defect, because the two
+constraints only ever conflict when the avatar has drifted from the photo:
+
+  * avatar matches photo  → "matches the avatar" and "matches the photo" are the
+    same statement, and no priority is needed
+  * avatar drifted        → picking a winner only chooses which symptom to keep:
+    renderable pages of a child who no longer looks like the child, or a true
+    description fighting its own reference image
+
+So the real defect is avatar drift, and the priority question is downstream of
+it. The system already assumes avatar ≈ photo — it passes the photo again at
+story-avatar creation. Left the ordering untouched.
+
+**The mistake (mine).** `resolveStoredTraits` mapped `hairLength` from
+`detailedHairAnalysis.lengthTop`. The schema says lengthTop is "the longest hair
+ON TOP OF THE HEAD", on the same scale as hair length but measuring something
+else. A vision model asked for "hairLength" answers with OVERALL length. On a
+ponytailed child the top section reads ear-length while her hair is long, so the
+comparison was between two different measurements — which is why the same image
+flagged in Lab #860 and did not in #861. Not model noise: a category error.
+
+`hairLength` no longer resolves from `lengthTop`. Only fields that measure the
+same thing are compared: hair colour, eye colour, skin tone, hair style (type).
+
+**Consequence.** The evidence for "Emma's stored traits are wrong" evaporated —
+her data is consistent with her avatar, which is what the rule requires. No
+correction applied to her character, and none proposed. The Lab colour check
+stays aimed at the pair that must agree: AVATAR vs stored traits.
+
+**Touched files.** `server/lib/traitPanel.js`.
+
 ## 2026-08-26 — Covers build their character block with the SAME code as pages
 
 **Context.** The owner reported a child losing his dungarees on covers and said
@@ -19891,3 +19934,94 @@ p12 reads as flat.
 
 **Touched:** `server/lib/styleConsistency.js`.
 **Status:** 🟡 conditional — committed locally, not pushed. Measure-only by design.
+**Status:** ✅ active — awaiting its first measured run.
+
+---
+
+## 2026-08-26 — Three child-perspective judges: a CHILD CRITIC on the arc, evaluator 4.4 on the text, a TITLE JUDGE on the candidates
+
+**Context:** Every reader in the pipeline was an adult editor. The arc audit
+(`story-arc-audit.txt`) asks whether the arc *holds up*; the scorecard judges
+(4.1-4.3) score craft and shape; the title was picked by `stableCandidateIndex`,
+a hash. Nothing anywhere asked the one question the product is actually judged
+on: did a child follow it, care about it, and could they say its name. Three
+stages, one wave.
+
+**Decision:**
+
+1. **CHILD CRITIC in the arc loop.** `prompts/story-child-critic.txt` role-plays
+   a child of the youngest main character's age (`youngestMainAge`, default 5),
+   is read the draft arc once, retells it in 3-6 sentences, then emits
+   `FAULT[CHILD]: …` lines for comprehension, boredom and fear **only** — never
+   style or logic, which the hostile audit already owns. It runs in a
+   `Promise.all` **beside** `beats_arc_audit` (usageLabel `beats_child_critic`,
+   `MODEL_DEFAULTS.childCriticModel` = `claude-sonnet`), and only its
+   `FAULT[CHILD]` lines are appended to `arcAuditFindings` **before**
+   `buildArcReviewPrompt` runs — so the SAME arc review answers both streams in
+   one ledger. Its raw output (retell included) is stored as
+   `arcReviewReport.childCritic`. Non-blocking: a failure contributes an empty
+   string and the review proceeds exactly as before.
+2. **Evaluator 4.4 "child listener."** `prompts/story-retell-judge.txt` +
+   `EVALUATORS['4.4']` (`promptKey: storyRetellJudge`, judge `claude-sonnet`).
+   The judge is read the finished book, retells it, answers what the hero feared
+   / why they won / which pages confused them, then scores ONE artifact
+   (`storyText`) on **comprehension, stake, resolution, engagement**. Its dims
+   live in their own `RETELL_RUBRIC`, so 4.4 numbers are never comparable with
+   4.1-4.3. No code change was needed in `scoreArtifactsWithJudge` — registry +
+   template only, as designed.
+3. **TITLE JUDGE.** `prompts/title-judge.txt`, called once at
+   `storyJobPipeline.js` where the final title is fixed for BOTH pipelines
+   (`title = beatsMode ? beatsResult.title : parser.extractTitle()`). Criteria:
+   names the adventure or the bond rather than a vehicle/object that merely
+   carries it, spoils no ending, sayable by a child of that age. Returns
+   `{pick, reason}`; stored as `data.titleJudge = {pick (array index), reason,
+   candidates}`. `claude-sonnet`, temperature 0, usageLabel `title_judge`. Any
+   failure — bad JSON, out-of-range pick, model error — keeps the existing hash
+   pick unchanged. It does not run below two candidates.
+
+**Rationale (measured, 2026-08-26 replays):**
+
+- **Child critic**, prod `job_1787689073034_1v6ew0y1kae` (cast Levin 5, Julian 3,
+  Max 3, Kiaan 3 → AGE 3), replayed on `arcReviewReport.drafted`: a plausible
+  retell plus **5 FAULT[CHILD] lines, zero style critique**. Every one is a
+  comprehension/boredom fault an editor would not raise — three named landmarks
+  the child cannot picture ("it's just a long hard name with no picture in my
+  head"), a route it could not follow because it has no map of the city in its
+  head, and one boredom fault ("I got a little bored… nothing loud or exciting
+  happened"). This is exactly the class the hostile audit structurally cannot
+  produce: none of them are faults *in* the arc.
+- **4.4**, staging `job_1787638394061_hs70901tfsn`: valid scorecard,
+  comprehension 8 / stake 8 / resolution 7 / engagement 8, overall 7.8. The
+  retell independently surfaced both of this story's known weaknesses — it
+  reports the chest sailing home **unopened**, and names the two pages it could
+  not resolve (a depth-number conflict, and whether the passage was tight or
+  roomy). `resolution` is the low dim, which is the right shape.
+- **Title judge**: the requested staging story has `titleCandidates: null` (a
+  legacy single-line `TITLE:`), so it was replayed on the four most recent
+  stories that DO carry candidates. It moved the pick twice, both toward the
+  rule: staging `job_1787690387854_6nc4yo8u8` shipped "Emma und der vergrabene
+  Schatz" (states the ending) and the judge picked "Emma, die furchtlose
+  Piratin"; prod `job_1786918670311_qgrdbmlr8` shipped "The Flag That Could Not
+  Wave" (an object) over "Ethan and Lily Fly to the Moon", and the judge picked
+  the adventure. It agreed with the hash pick on the other two.
+
+**Not found on this branch, deliberately not guessed:** the tagged
+`FAULT[<TAG>]` convention, `countFaults` / `faultsByCategory` helpers, and the
+arc re-audit (`beats_arc_audit2`) + targeted re-review do not exist here. The
+live convention is a bare `FAULT:` line counted by `/^FAULT:/gm`. The child
+critic therefore emits `FAULT[CHILD]:` as specified and is counted by its own
+`/^FAULT\[CHILD\]:/gm` regex; there is no byCategory tally to pick it up
+automatically, and the existing `beats_arc_audit` / `beats_carry_arc` counters
+continue to report hostile faults only.
+
+**Touched:** `prompts/story-child-critic.txt`, `prompts/story-retell-judge.txt`,
+`prompts/title-judge.txt`, `server/services/prompts.js`,
+`server/lib/promptBuilders.js` (`buildChildCriticPrompt`,
+`buildTitleJudgePrompt`, `youngestMainAge`), `server/lib/storyHelpers.js`
+(facade), `server/lib/beatsPipeline.js` (arc stage),
+`server/config/models.js` (`childCriticModel`),
+`server/lib/storyScorecard.js` (`RETELL_RUBRIC`, `4.4`),
+`storyJobPipeline.js` (title selection + `data.titleJudge`),
+`docs/prompt-inventory.md`.
+
+**Status:** ✅ active

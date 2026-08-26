@@ -2848,13 +2848,25 @@ const SWISS_CITIES = [
  * Can be used to bulk-index Swiss cities or any other cities
  * @param {Object} options - Options
  * @param {Array} options.cities - Array of {city, country, region} objects (defaults to SWISS_CITIES)
- * @param {boolean} options.analyzePhotos - Whether to analyze photos with AI (costs ~$0.15 total)
+ * @param {boolean} options.analyzePhotos - Whether to DESCRIBE photos with AI (Gemini, paid).
+ *   NOTE: this used to gate the photo FETCH as well, which is free. Passing
+ *   `false` to keep a bulk run cheap therefore inserted landmarks with no
+ *   reference image at all — 4,903 of them on 2026-08-26, and a landmark with
+ *   no photo cannot be drawn, only named. Fetching is now controlled by
+ *   `fetchPhotos` and defaults ON regardless of `analyzePhotos`.
+ * @param {boolean} options.fetchPhotos - Whether to FETCH photos from
+ *   Wikipedia/Commons (free). Defaults true. There is almost no reason to
+ *   disable it: a row without a photo is a name, not a landmark.
  * @param {Function} options.onProgress - Progress callback (city, current, total)
  * @returns {Promise<{total: number, saved: number, errors: number}>}
  */
 async function indexLandmarksForCities(options = {}) {
   const {
     analyzePhotos = true,
+    // Fetching is FREE (Wikipedia/Commons) and describing is PAID (Gemini).
+    // They were one flag; a cost-free bulk run therefore shipped landmarks with
+    // no reference image. Defaults ON and is independent of analyzePhotos.
+    fetchPhotos = true,
     useMultiImageAnalysis = true,  // Use new multi-image quality analysis
     forceReanalyze = false,        // If true, re-analyze photos even if already have description
     onProgress = null,
@@ -2942,7 +2954,10 @@ async function indexLandmarksForCities(options = {}) {
         landmark.score = score;
 
         // Fetch and analyze photo if requested
-        if (analyzePhotos && (forceReanalyze || !landmark.photoDescription)) {
+        // `fetchPhotos`, not `analyzePhotos` — the block below FETCHES (free)
+        // and only its inner branch DESCRIBES (paid). Gating the fetch on the
+        // paid flag is what inserted 4,903 photoless landmarks on 2026-08-26.
+        if (fetchPhotos && (forceReanalyze || !landmark.photoDescription)) {
           try {
             if (useMultiImageAnalysis) {
               // Strategy:
@@ -3023,10 +3038,14 @@ async function indexLandmarksForCities(options = {}) {
               if (photoResult && photoResult.photoData) {
                 landmark.photoUrl = photoResult.photoUrl || `https://${landmark.lang}.wikipedia.org/wiki/${encodeURIComponent(landmark.name)}`;
                 landmark.attribution = photoResult.attribution;
-                const description = await analyzeLandmarkPhoto(photoResult.photoData, landmark.name, landmark.type);
-                if (description && description !== 'undefined') {
-                  landmark.photoDescription = description;
-                  analyzedCount++;
+                // The URL above is the free part and is already saved. Only the
+                // description costs money, so it stays behind analyzePhotos.
+                if (analyzePhotos) {
+                  const description = await analyzeLandmarkPhoto(photoResult.photoData, landmark.name, landmark.type);
+                  if (description && description !== 'undefined') {
+                    landmark.photoDescription = description;
+                    analyzedCount++;
+                  }
                 }
               }
             }

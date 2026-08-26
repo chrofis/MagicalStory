@@ -73,6 +73,11 @@ const RUBRIC_V3 = {
 // Rubric for the arc-only judge (story-arc-judge.txt). Lives here, not in the
 // stage that uses it: this module declares itself the one home of rubrics, and a
 // second copy in testlab.js already drifted once.
+// Rubric for the child-listener evaluator (4.4). One artifact, four dims, all of
+// them about what a listening child was left with rather than how the prose
+// reads — so it is a separate rubric, never a variant of the storyText dims.
+const RETELL_RUBRIC = { storyText: ['comprehension', 'stake', 'resolution', 'engagement'] };
+
 const ARC_RUBRIC = { arc: ['shape', 'attempts', 'lost', 'agency', 'ensemble', 'change', 'blockers', 'grounding', 'fit', 'focus', 'entrances', 'difficulty', 'sense', 'engaging'] };
 
 const EVALUATORS = {
@@ -101,6 +106,11 @@ const EVALUATORS = {
   '4.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV4', rubric: RUBRIC, judge: 'claude-sonnet' },
   '4.2': { name: 'grok', promptKey: 'storyScorecardJudgeV4', rubric: RUBRIC, judge: 'grok-4.6' },
   '4.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV4', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
+  // 4.4 = child listener. Not a fourth judge of the 4.x rubric: it scores ONE
+  // artifact (the finished text) on what a child retained after one reading —
+  // the judge retells the book first and is scored on that retell. Its dims live
+  // in RETELL_RUBRIC, so its numbers are never comparable with 4.1-4.3.
+  '4.4': { name: 'child listener', promptKey: 'storyRetellJudge', rubric: RETELL_RUBRIC, judge: 'claude-sonnet' },
 };
 // back-compat shapes for anything that read these directly
 const EVALUATOR_PROMPT_KEYS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.promptKey]));
@@ -309,7 +319,7 @@ function parseJudgeJson(text) {
 }
 
 module.exports = {
-  RUBRIC, RUBRIC_V1, ARC_RUBRIC, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
+  RUBRIC, RUBRIC_V1, ARC_RUBRIC, RETELL_RUBRIC, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
   buildJudgeInput, buildJudgeInputFromArtifacts, buildBriefContext, provenanceOf,
   scoreFromDims, parseJudgeJson,
   EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS, EVALUATORS,

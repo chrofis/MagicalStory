@@ -38,6 +38,16 @@ interface Attribution {
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
+  /** ValueTrack {keyword} from the ad's final URL — the keyword that was paid for. */
+  utmTerm?: string;
+  /**
+   * Google Ads click id, present on every paid click because account-level
+   * auto-tagging is on. Survives when UTM tags are stripped, and is the key an
+   * offline conversion import needs to attribute a LATER purchase back to the
+   * click — which is the only way to answer "did this keyword produce buyers,
+   * or only trials?" for a funnel whose purchase lands days after the click.
+   */
+  gclid?: string;
   referrer?: string;
 }
 
@@ -78,11 +88,28 @@ export function getTrialVisitId(): string {
  * Capture the landing attribution once per visit, from the URL that brought
  * them in. Later events read it back, so a step recorded three clicks deep
  * still carries the campaign that paid for the visitor.
+ *
+ * MUST run on the FIRST page of the visit, whatever that page is. Until
+ * 2026-08-26 it was only reachable via trackTrialStep(), which fires solely
+ * inside /try — but the Search ads land on the HOMEPAGE carrying the tags
+ * (`magicalstory.ch/?utm_source=google&utm_medium=search&utm_campaign=…`).
+ * A visitor therefore arrived tagged, navigated client-side to /try, and by
+ * the time this ran the query string was gone: 0 of 40 trial_events rows in
+ * production carried a campaign. captureAttribution() is now also called at
+ * app mount (see main.tsx / App.tsx), and stays idempotent so the later
+ * trackTrialStep() calls simply read back what the landing page stored.
+ *
+ * Empty is NOT cached: a direct visit that later becomes an ad click in the
+ * same browser would otherwise be permanently stuck unattributed.
  */
-function captureAttribution(): Attribution {
+export function captureAttribution(): Attribution {
   try {
     const stored = localStorage.getItem(ATTR_KEY);
-    if (stored) return JSON.parse(stored) as Attribution;
+    if (stored) {
+      const parsed = JSON.parse(stored) as Attribution;
+      // Only trust a cached record that actually identifies a source.
+      if (parsed.utmSource || parsed.gclid) return parsed;
+    }
   } catch { /* fall through and re-derive */ }
 
   let attribution: Attribution = {};
@@ -92,9 +119,15 @@ function captureAttribution(): Attribution {
       utmSource: params.get('utm_source') || undefined,
       utmMedium: params.get('utm_medium') || undefined,
       utmCampaign: params.get('utm_campaign') || undefined,
+      utmTerm: params.get('utm_term') || undefined,
+      gclid: params.get('gclid') || undefined,
       referrer: document.referrer || undefined,
     };
-    localStorage.setItem(ATTR_KEY, JSON.stringify(attribution));
+    // Persist only once there is something worth attributing, so an untagged
+    // first pageview cannot poison a later tagged one.
+    if (attribution.utmSource || attribution.gclid) {
+      localStorage.setItem(ATTR_KEY, JSON.stringify(attribution));
+    }
   } catch { /* storage blocked — the events still send, just unattributed */ }
   return attribution;
 }

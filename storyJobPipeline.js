@@ -2460,8 +2460,34 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // the trial prompt deliberately omits. See docs/decisions.md → "Trial
     // stories skip draft → analysis → revise".
     const parser = new UnifiedStoryParser(unifiedResponse, { isTrial: !!inputData.trialMode });
-    const title = (beatsMode ? beatsResult.title : parser.extractTitle()) || streamingTitle || inputData.storyType || 'Untitled Story';
+    let title = (beatsMode ? beatsResult.title : parser.extractTitle()) || streamingTitle || inputData.storyType || 'Untitled Story';
     const titleCandidates = parser.extractTitleCandidates();
+    // TITLE JUDGE. This is the first and only server-side point where the final
+    // title is fixed for BOTH pipelines — everything upstream (beatsPipeline's
+    // stableCandidateIndex, UnifiedStoryParser.extractTitle) picks a candidate by
+    // hash, which is deterministic but blind to what the title says. The judge
+    // reads the candidates against the brief and the age instead. Non-blocking:
+    // any failure keeps the hash pick exactly as it was.
+    let titleJudge = null;
+    if (Array.isArray(titleCandidates) && titleCandidates.length > 1) {
+      try {
+        const { buildTitleJudgePrompt } = require('./server/lib/storyHelpers');
+        const judgePrompt = buildTitleJudgePrompt(inputData, titleCandidates);
+        if (judgePrompt) {
+          const judgeRes = await callTextModelStreaming(judgePrompt, 300, null, 'claude-sonnet', { usageLabel: 'title_judge', temperature: 0 });
+          const raw = String(judgeRes?.text || '');
+          const parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+          // The prompt numbers candidates from 1; `pick` is stored as the array index.
+          const idx = parseInt(parsed.pick, 10) - 1;
+          if (!(idx >= 0 && idx < titleCandidates.length)) throw new Error(`pick ${parsed.pick} out of range`);
+          titleJudge = { pick: idx, reason: String(parsed.reason || '').trim(), candidates: titleCandidates };
+          title = titleCandidates[idx];
+          log.info(`[TITLE-JUDGE] Picked "${title}" (${idx + 1}/${titleCandidates.length}): ${titleJudge.reason}`);
+        }
+      } catch (err) {
+        log.warn(`[TITLE-JUDGE] failed (${err.message}) — keeping "${title}"`);
+      }
+    }
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
@@ -5534,6 +5560,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       id: storyId,
       title: title,
       titleCandidates: titleCandidates || null, // Full list the model produced; null if legacy single-line TITLE
+      titleJudge, // {pick (array index), reason, candidates} — null when the judge did not run or failed
       storyType: inputData.storyType || '',
       storyTypeName: inputData.storyTypeName || '', // Display name for story type
       storyCategory: inputData.storyCategory || '', // adventure, life-challenge, educational

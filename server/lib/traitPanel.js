@@ -140,7 +140,15 @@ function resolveStoredTraits(character) {
   return {
     hairColor: pick(t.hairColor, ex.hairColor, ph.hairColor),
     hairStyle: pick(t.hairStyle, ex.hairStyle, dha.type),
-    hairLength: pick(t.hairLength, ex.hairLength, dha.lengthTop, ph.hairLength),
+    // hairLength is DELIBERATELY not resolved from detailedHairAnalysis.lengthTop
+    // (owner-confirmed 2026-08-26). They are different measurements on the same
+    // scale: lengthTop is "the longest hair ON TOP OF THE HEAD", while a vision
+    // model asked for "hairLength" answers with OVERALL length. On a child with
+    // a ponytail the top section legitimately reads ear-length while her hair is
+    // long, so comparing the two produced a phantom mismatch that flipped
+    // between identical runs (Lab #860 flagged it, #861 did not). Only compare
+    // fields that measure the same thing.
+    hairLength: pick(t.hairLength, ex.hairLength, ph.hairLength),
     eyeColor: pick(t.eyeColor, ex.eyeColor, ph.eyeColor),
     skinTone: pick(t.skinTone, ex.skinTone, ph.skinTone),
     facialHair: pick(t.facialHair, ex.facialHair, ph.facialHair),
