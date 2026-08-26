@@ -5867,7 +5867,27 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         // hours, and the question "why did my repair do nothing" is asked days
         // later. Without this the answer lives only in a log line that has
         // rolled (measured: Noah p6, the IoU-34% rejection was unrecoverable).
-        recordRepairFailure(pageNumber, characterName, { reason: failReason, rejectedReason, gateMessage, attempts, exhausted });
+        // The FRAMES ride along, not just the sentence. They were already
+        // collected (faceRepair returns attemptFrames even when exhausted) and
+        // returned in the HTTP response, then dropped here — so a refused
+        // repair left a perfect written record and not one pixel, and "why did
+        // my repair do nothing" stayed unanswerable once the log window rolled
+        // (prod job_1787689073034_1v6ew0y1kae initialPage, 2026-08-26).
+        // Bytes are data URIs at this point; the save path offloads them to R2
+        // like every other image, so nothing large lands in JSONB.
+        recordRepairFailure(pageNumber, characterName, {
+          reason: failReason, rejectedReason, gateMessage, attempts, exhausted,
+          attemptFrames: (attemptFrames || []).map(f => ({
+            attempt: f.attempt,
+            rejectedReason: f.rejectedReason || null,
+            gateMessage: f.gateMessage || null,
+            iou: f.iou ?? null,
+            charRepairGrokRaw: f.grokRawResult || null,
+            charRepairWhiteout: f.blackoutImage || null,
+            charRepairBlendMask: f.blendMask || null,
+            blendSteps: f.blendSteps || [],
+          })),
+        });
         // CUSTOMER-VISIBLE: someone pressed a button and got nothing. The
         // fingerprint is the GATE, not the message — "IoU 34%" and "IoU 51%"
         // must collapse into one line in the daily report, or a hundred rows

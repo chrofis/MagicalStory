@@ -163,10 +163,37 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
         const faceBbox = toRect(app.faceBox);
         const bodyBbox = toRect(app.bodyBox);
         if (faceBbox || bodyBbox) {
-          // `clothing` travels with the box: the manual endpoint resolves the
-          // styled avatar to repaint towards from the appearance's own outfit,
-          // and dropping it here would silently fall back to the page default.
-          return { faceBbox, bodyBbox, source: 'entity', clothing: app.clothing || null };
+          // `figures` travels with the box too, or the BEST tier silently buys
+          // the WORST protection. The caller builds protectedFaces/Bodies from
+          // whatever figure list comes back; tier 1 returned none, so every
+          // repair that resolved through the entity report protected nobody —
+          // Grok got a crop with the neighbours unmasked, repainted the whole
+          // group, the target moved, and the blend gate refused every attempt.
+          // Measured on prod job_1787689073034_1v6ew0y1kae initialPage: four
+          // boys shoulder to shoulder, Julian and Kiaan each refused 3/3 at
+          // 48/10/53% and 52% mask IoU, with
+          // "no usable detection for neighbour protection" in the log.
+          //
+          // Same pairing rule as tier 2 — a stored detection is only valid for
+          // the bytes it was computed on, so an unpaired one is dropped rather
+          // than trusted. `_gdinoMasks` is non-enumerable and never survives a
+          // DB reload, so bodyMask is normally null here and the blend falls
+          // back to a fresh SAM call, exactly as it does for tier 2.
+          const detection = bestEval?.bboxDetection;
+          const paired = pairs(detection) ? detection : null;
+          const figs = paired?.figures || [];
+          const selfIdx = figs.findIndex(f => f?.name && f.name.toLowerCase() === lowerName);
+          return {
+            faceBbox,
+            bodyBbox,
+            source: 'entity',
+            // `clothing` travels with the box: the manual endpoint resolves the
+            // styled avatar to repaint towards from the appearance's own outfit,
+            // and dropping it here would silently fall back to the page default.
+            clothing: app.clothing || null,
+            figures: figs,
+            bodyMask: (selfIdx >= 0 && paired?._gdinoMasks?.[selfIdx]) || null,
+          };
         }
       }
     }

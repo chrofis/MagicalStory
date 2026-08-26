@@ -777,6 +777,9 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       grokRawResult: r?.grokRawResult || null,
       blackoutImage: r?.blackoutImage || null,
       blendMask: r?.blendMask || null,
+      // Every mask the blend emitted for THIS attempt, so three refusals leave
+      // three inspectable sequences instead of three sentences.
+      blendSteps: r?.blendSteps || [],
       cutoutSent: r?.cutoutSent || null,
       iou: r?.iou ?? r?.blend?.iou ?? null,
     });
@@ -1018,6 +1021,22 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   const colorCorrect = opts.colorCorrect !== undefined ? opts.colorCorrect : true;
   const bodyColorMode = opts.bodyColorMode !== undefined ? opts.bodyColorMode : !faceOnly;
   let blend;
+  // EVERY mask the blend computes is emitted through addStep — the SAM masks,
+  // the union, the red zone, the red/green IoU disagreement view and the final
+  // alpha. Production used to pass nothing, so the no-op default swallowed all
+  // of them: `charRepairBlendMask` has been null in every story since
+  // 2026-06-27, and a gate rejection ("mask IoU 48%") could not be looked at,
+  // only read about. The Test Lab saw them and production did not, which is
+  // exactly backwards — a refused repair on a customer's page is the one you
+  // most need to see. Collected here for every caller; the Test Lab's own
+  // addStep still runs alongside.
+  const blendSteps = [];
+  const collectStep = async (label, dataUri) => {
+    if (dataUri) blendSteps.push({ label, image: dataUri });
+    if (typeof opts.addStep === 'function') {
+      try { await opts.addStep(label, dataUri); } catch { /* a viewer must never break a repair */ }
+    }
+  };
   try {
     blend = await samUnionBlend({
       originalCropBuf: cropBuf,
@@ -1026,9 +1045,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       cropW: crop.w,
       cropH: crop.h,
       oldMaskPng: oldMaskPng || null,
-      // Test Lab threads an addStep so the shared blend emits its SAM round-1/2
-      // views into the run timeline; production omits it (no-op default).
-      ...(typeof opts.addStep === 'function' ? { addStep: opts.addStep } : {}),
+      addStep: collectStep,
       failCtx: {},
       maskFetcher: (faceOnly && oldMaskPng) ? async (buf) => {
         const r2Body = r2BodyBox || bodyBoxInCrop;
@@ -1098,6 +1115,14 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
       grokRawResult,
       promptSent: prompt,
+      // The masks the gate judged. `blendMask` is the last one emitted (the
+      // composite alpha) — the field the version viewer already renders and
+      // which has been null since the blend moved onto SAM. blendSteps carries
+      // the whole sequence, including the red/green disagreement view that
+      // shows WHY an IoU came out at 48%.
+      blendSteps,
+      blendMask: blendSteps.length ? blendSteps[blendSteps.length - 1].image : null,
+      iou: blendErr?.partialResult?.iou ?? null,
     };
   }
 
@@ -1148,6 +1173,11 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     iou: blend.iou,
     colorInfo: blend.colorInfo || null,
     blendRule: blend.blendRule,
+    // Same masks on the way OUT as on a rejection — a successful repair that
+    // still looks wrong needs them just as much (the viewer's "Blend mask"
+    // slot has rendered nothing since the blend moved onto SAM).
+    blendSteps,
+    blendMask: blendSteps.length ? blendSteps[blendSteps.length - 1].image : null,
     debug: opts.includeDebug ? { prompt, sceneSent: treatedDataUri, avatarSent: avatarUri, grokRawResult, bbox: bodyBbox, faceBbox, crop, descriptor } : null,
   };
 }

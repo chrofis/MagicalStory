@@ -19534,3 +19534,74 @@ open item in `tasks/BACKLOG.md`.
 
 **Touched:** `server/lib/repairLogic.js`, `server/lib/images.js`,
 `server/lib/imageCompositing.js`, `tests/unit/inpaint-routing.test.ts`.
+
+## 2026-08-26 — SAM masks: computed everywhere, kept nowhere; and the best target tier bought the worst protection
+
+**Context:** The owner ran a character repair on the initial page of prod
+`job_1787689073034_1v6ew0y1kae` ("Feurio und die vier Buben") and nothing
+happened. Julian was refused 3/3 by the blend gate at 48/10/53% mask IoU and
+Kiaan at 52%, and NOTHING from any attempt was stored — no version, no frame.
+The page is four boys shoulder to shoulder; three of four are `occluded: true`.
+
+**Three faults, one root: the masks exist only in memory.**
+
+1. **The entity tier returned no cast, so nobody was protected.**
+   `resolveCharBbox` tier 1 (entity report — the most-trusted tier) returned
+   `{faceBbox, bodyBbox, clothing}` and no `figures`. The caller builds
+   `protectedFaces`/`protectedBodies` from that list
+   (`regeneration.js`: `ladderFigures?.length ? ... : null`), so every repair
+   resolving through tier 1 protected NOBODY and logged
+   "no usable detection for neighbour protection". Grok got a crop containing
+   three overlapping children with none of them masked, repainted the group,
+   the target moved, and the gate correctly refused. **Taking the best box cost
+   all the protection** — and on a group page that makes the repair unable to
+   succeed by construction, which is why all six attempts failed the same way.
+
+2. **Production plugged a no-op into the mask emitter.** `samUnionBlend` emits
+   every mask it computes through `addStep` — the SAM masks, the union, the red
+   zone, the red/green IoU disagreement view, the final alpha — and its default
+   is `async () => {}`. `faceRepair.js` threaded an `addStep` only
+   `if (typeof opts.addStep === 'function')`, which ONLY the Test Lab supplies.
+   So the Lab could see the masks and production could not, which is exactly
+   backwards: a refused repair on a customer's page is the one you most need to
+   look at. This is why `charRepairBlendMask` has been null in every story since
+   **2026-06-27** — the version viewer's "Blend mask" slot was never broken, its
+   producer simply stopped existing when repair moved onto the SAM path.
+
+3. **A refused repair persisted the sentence and dropped the pixels.**
+   `faceRepair` already collects `attemptFrames` on every attempt and returns
+   them when exhausted, and admin callers set `includeDebug`. The route put them
+   in the HTTP response and then called `recordRepairFailure` with only the text
+   fields — so the page kept a flawless written record of both refusals and not
+   one image.
+
+**Decision:**
+- Tier 1 carries `figures` (and `bodyMask` when still in memory), under the SAME
+  pairing rule as tier 2 — a stored detection is only valid for the bytes it was
+  computed on, so an unpaired one is dropped rather than trusted.
+- `faceRepair` always collects the blend's steps into `blendSteps` and exposes
+  the last one as `blendMask`, on success AND on rejection. The Test Lab's own
+  `addStep` still runs alongside; a viewer callback that throws can never break a
+  repair.
+- `recordRepairFailure` receives the frames, mapped onto the field names the
+  version viewer already renders (`charRepairGrokRaw` / `charRepairWhiteout` /
+  `charRepairBlendMask`). Bytes are data URIs at that point and the save path's
+  generic Phase-1.5 sweep offloads every base64 string in the tree to R2, so
+  nothing large lands in JSONB (IRON RULE intact) and no new plumbing was needed.
+
+**Not changed, deliberately:** the 55% IoU gate. It was doing its job — refusing
+to blend a figure that had visibly moved. Lowering it would have shipped the
+smeared, misregistered figures it exists to stop.
+
+**Still open:** `_gdinoMasks` is non-enumerable by design (`bboxDetection.js:425`)
+so detection silhouettes never survive a DB reload — a repair run days later
+always re-segments from scratch. Persisting them to R2 is a separate decision.
+
+**Verification:** 6 unit tests on the tier-1 cast + mask reuse
+(`tests/unit/char-repair-protection.test.ts`); suite 211 passed, same 3
+pre-existing `active-version-recompute` failures. End-to-end proof is the next
+repair on that page.
+
+**Touched:** `server/lib/charRepairTarget.js`, `server/lib/faceRepair.js`,
+`server/routes/regeneration.js`.
+**Status:** 🟡 conditional — pushed to staging, awaiting a repair rerun.
