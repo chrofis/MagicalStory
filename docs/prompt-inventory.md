@@ -30,6 +30,8 @@ Three loading mechanisms feed these templates:
 | story-arc-audit.txt | storyHelpers.js `buildArcAuditPrompt` | Blind arc audit: commission + arc only, exhaustive fault list for the reviewer ledger |
 | story-beats-audit.txt | storyHelpers.js `buildBeatsAuditPrompt` | Blind beats audit: page plan + beats only |
 | story-text-audit.txt | storyHelpers.js `buildTextAuditPrompt` | Blind text audit: back cover + pages + DEPICTS-only picture info |
+| story-child-critic.txt | storyHelpers.js `buildChildCriticPrompt` | Child critic of the arc, in PARALLEL with story-arc-audit: role-plays the youngest main character's age, retells the arc, then emits `FAULT[CHILD]:` lines for comprehension/boredom/fear only. Its faults join the same arc-review ledger |
+| title-judge.txt | storyHelpers.js `buildTitleJudgePrompt`; storyJobPipeline.js (final title selection) | Picks the shipped title from `titleCandidates` (adventure/bond over vehicle, no spoiler, sayable at the age). Non-blocking — failure keeps the deterministic hash pick |
 | scene-review.txt | storyHelpers.js `buildSceneReviewPrompt` | Beats-first step 4: ONE review over ALL scene briefs (repetition, arc, continuity) |
 | clothing-review.txt | storyHelpers.js `buildClothingReviewPrompt` | Beats-first step 3b: wardrobe review over the bible's clothing contract, BEFORE the styled-avatar kickoff. Emits `---ANALYSIS---` + `---CLOTHING---`, parsed by `parseClothingReview` |
 | story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the locked beats. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |
@@ -108,6 +110,7 @@ Sizes measured 2026-08-09.
 | repair-verification.txt | 1,799 | 48 | repairVerification.js `verifyRepairWithGemini` | Verifies a repair changed the target region |
 | story-text-quality-judge.txt | 2,880 | 48 | textQualityJudge.js `judgeStoryText` | Test Lab text-only harness: scores story TEXT on 5 criteria (cross-model judge) |
 | story-scorecard-judge.txt | 2,398 | 50 | testlab.js `runStoryScorecardStage` / storyScorecard.js | Test Lab `story_scorecard` stage: LLM judge rates 4 final artifacts (beats/scene/text/VB) on a 4×5 rubric for model comparison |
+| story-retell-judge.txt | 1,263 | 20 | storyScorecard.js evaluator `4.4` (`storyRetellJudge`) / testlab.js `scoreArtifactsWithJudge` | Evaluator 4.4 "child listener": role-plays the target-age child, retells the finished text, then scores ONE artifact (storyText) on comprehension/stake/resolution/engagement. Own rubric (RETELL_RUBRIC) — never comparable with 4.1-4.3 |
 
 ## Bounding boxes
 

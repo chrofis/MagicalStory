@@ -218,6 +218,8 @@ const MODEL_DEFAULTS = {
   // negative five times out of five. Plan sonnet / review grok was the best
   // cell, and it matches what the beats stage already uses.
   arcReviewModel: process.env.ARC_REVIEW_MODEL || 'grok-4.6',
+  // Child critic of the arc — role-play quality and speed, not hostile judgment.
+  childCriticModel: process.env.CHILD_CRITIC_MODEL || 'claude-sonnet',
   // The three reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the scene and wardrobe reviews too. They are
   // separate decisions with separate evidence and now separate keys.

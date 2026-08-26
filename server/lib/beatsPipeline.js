@@ -57,6 +57,7 @@ const {
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
   buildArcAuditPrompt,
+  buildChildCriticPrompt,
   buildBeatsAuditPrompt,
   parseArcReview,
   buildClothingReviewPrompt,
@@ -228,6 +229,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const planModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
   const arcReviewModel = modelOverrides.arcReviewModel || MODEL_DEFAULTS.arcReviewModel || reviewModel;
+  const childCriticModel = modelOverrides.childCriticModel || MODEL_DEFAULTS.childCriticModel || planModel;
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
   const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
@@ -250,6 +252,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
   let approvedArc = '';
   let arcAuditFindings = '';
+  let childCriticReport = null;
   let arcReviewReport = null;
   let t = Date.now();
   try {
@@ -263,18 +266,50 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // Blind audit: a reader with only the commission and the arc names faults.
     // The reviewer's fix ledger must answer every one. Never blocks — a failed
     // audit just means the review runs on its own findings alone.
-    try {
-      const arcAuditPrompt = buildArcAuditPrompt(inputData, drafted);
-      if (arcAuditPrompt) {
-        await stage(2, 'Auditing the story arc...', { next: 2, ms: 90000 });
-        const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit' });
-        arcAuditFindings = String(auditRes.text || '').trim();
-        gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s)`);
-      }
-    } catch (auditErr) {
-      log.warn(`⚠️ [BEATS] Arc audit failed (${auditErr.message}) — review runs without audit findings`);
-      gl.warn('beats_arc_audit_failed', `Arc audit failed: ${auditErr.message}`);
-    }
+    //
+    // The CHILD CRITIC runs beside it, on the same arc, at the same time. The
+    // hostile audit asks whether the arc holds up; the child asks whether a
+    // listener followed it, cared, and was not frightened past fun — two
+    // different failure modes, so they are two different readers. Its faults are
+    // tagged FAULT[CHILD] and appended to the SAME findings block, because one
+    // review answering one ledger is cheaper and never leaves a stream unanswered.
+    await stage(2, 'Auditing the story arc...', { next: 2, ms: 90000 });
+    const [auditFindings, childFindings] = await Promise.all([
+      (async () => {
+        try {
+          const arcAuditPrompt = buildArcAuditPrompt(inputData, drafted);
+          if (!arcAuditPrompt) return '';
+          const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit' });
+          const text = String(auditRes.text || '').trim();
+          gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${(text.match(/^FAULT:/gm) || []).length} fault(s)`);
+          return text;
+        } catch (auditErr) {
+          log.warn(`⚠️ [BEATS] Arc audit failed (${auditErr.message}) — review runs without audit findings`);
+          gl.warn('beats_arc_audit_failed', `Arc audit failed: ${auditErr.message}`);
+          return '';
+        }
+      })(),
+      (async () => {
+        try {
+          const childPrompt = buildChildCriticPrompt(inputData, drafted);
+          if (!childPrompt) return '';
+          const childRes = await textModels.callTextModelStreaming(childPrompt, null, onChunk, childCriticModel, { usageLabel: 'beats_child_critic' });
+          const text = String(childRes.text || '').trim();
+          gl.info('beats_child_critic', `Child critic by ${childRes.modelId || childCriticModel}: ${(text.match(/^FAULT\[CHILD\]:/gm) || []).length} fault(s)`);
+          return text;
+        } catch (childErr) {
+          // Non-blocking by design: a missing child critic contributes nothing.
+          log.warn(`⚠️ [BEATS] Child critic failed (${childErr.message}) — review runs without child findings`);
+          gl.warn('beats_child_critic_failed', `Child critic failed: ${childErr.message}`);
+          return '';
+        }
+      })(),
+    ]);
+    childCriticReport = childFindings || null;
+    // Only the FAULT[CHILD] lines join the ledger — the retell is the child's
+    // working, kept in the report rather than handed to the reviewer as a fault.
+    const childFaultLines = (childFindings.match(/^FAULT\[CHILD\]:.*$/gm) || []).join('\n');
+    arcAuditFindings = [auditFindings, childFaultLines].filter(s => s && s.trim()).join('\n');
 
     const arcReviewPrompt = buildArcReviewPrompt(inputData, drafted, arcAuditFindings);
     if (!arcReviewPrompt) throw new Error('story-arc-review template unavailable');
@@ -290,6 +325,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       changed: approvedArc !== drafted,
       drafted, analysis, prompt: arcReviewPrompt,
       audit: arcAuditFindings,
+      // Raw child output, retell included — the report is where a reader sees
+      // what the listener actually took away, not just what it faulted.
+      childCritic: childCriticReport,
     };
     gl.info('beats_arc', `Arc drafted by ${arcRes.modelId || planModel}, reviewed by ${arcRevRes.modelId || arcReviewModel} (${arcReviewReport.changed ? 'rewritten' : 'unchanged'})`, null, {
       changed: arcReviewReport.changed, model: arcRevRes.modelId || arcReviewModel,
