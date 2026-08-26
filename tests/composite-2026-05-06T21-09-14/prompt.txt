@@ -1,0 +1,20 @@
+Reference images attached:
+1. The empty landmark "Tellsplatte (boat jump)" — use this as the background scenery.
+2. A placement template: a rough composite showing where each character belongs in the scene.
+3 onwards: individual character reference photos (one per character) — use these as the IDENTITY of each figure.
+
+Generate ONE unified illustration in this art style: watercolor children's storybook illustration, soft brushwork, gentle colors. Render everything from scratch — do NOT just copy the placement template. The template only tells you WHERE each character goes.
+
+CHARACTERS (in placement order, left to right): Emma, Noah, Daniel, Sarah.
+
+REQUIREMENTS:
+- Render everything in the named art style. NOT photoreal.
+- Each character's face must match their individual reference photo (identity, hair, skin tone, age proportions).
+- Each character's clothing must match their individual reference photo.
+- Position each character roughly where the placement template shows.
+- Heights must match the placement template — children shorter than adults.
+- All characters stand on the ground with natural ground shadows.
+- Match lighting direction and color temperature throughout the scene.
+- The landmark must look like reference image 1.
+
+DO NOT add or remove characters. DO NOT swap which face goes where.

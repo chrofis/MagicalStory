@@ -1,0 +1,20 @@
+{
+  "runStarted": "2026-05-11T21:06:12.288Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Emma.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Emma.jpg",
+    "costume": "pirate costume — wide-brimmed brown tricorn hat with feather, white blouse, red sash at waist, dark breeches, brown boots",
+    "style": "watercolor",
+    "name": "Emma-baseline-2x2"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 10298,
+      "tokensIn": 905,
+      "tokensOut": 1290,
+      "cells": 8
+    }
+  ],
+  "runFinished": "2026-05-11T21:06:23.074Z"
+}

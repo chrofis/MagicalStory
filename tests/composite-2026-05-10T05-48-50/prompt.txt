@@ -1,0 +1,16 @@
+PASS 1: REPOSE FIGURES ONLY.
+
+The input shows 5 character cutouts on a plain white background, plus 1 prop(s) in the foreground. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the white background. Keep every face/hair/skin/clothing exactly. Keep every prop. Just change the poses.
+
+═══ POSE REDRAW (mandatory — do every line) ═══
+- the leftmost figure (the elderly figure): REDRAW the pose. New pose: RIGHT ARM raised and wrapped around the second-from-left figure (the adult)'s shoulders, pulling that figure close. Body angled slightly to the right. NOT standing with arms at sides.
+- the second-from-left figure (the adult): REDRAW the pose. New pose: RIGHT ARM raised and wrapped around the centre figure (the small child)'s shoulders, pulling that figure close. Body angled slightly to the right. NOT standing with arms at sides.
+- the centre figure (the small child): REDRAW the pose. New pose: BOTH HANDS rest on the Schatztruhe on the ground in front. Body leans slightly forward over the prop. Head tilts down to look at the prop, then up at the viewer. NOT standing with arms at sides.
+- the second-from-right figure (the older child): REDRAW the pose. New pose: LEFT HAND placed on the centre figure (the small child)'s shoulder, fingers visible. Body angled slightly to the left. NOT standing with arms at sides.
+- the rightmost figure (the adult): REDRAW the pose. New pose: LEFT HAND placed on the second-from-right figure (the older child)'s shoulder, fingers visible. Body angled slightly to the left. NOT standing with arms at sides.
+
+PRESERVE: every face, every hair colour, every skin tone, every clothing detail, every prop, the white background, the relative positions of the figures (leftmost stays leftmost etc.).
+
+DO NOT add or remove characters. DO NOT change clothing. DO NOT add a landscape or any background. KEEP THE WHITE BACKGROUND. NO TEXT, no letters.
+
+If any figure still has arms at their sides in your output, the task has failed.

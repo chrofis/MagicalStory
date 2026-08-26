@@ -1,0 +1,10 @@
+{
+  "framing": "E_aftermath_pierced_apple",
+  "description": "AFTERMATH — bolt has pierced THROUGH the apple and is stuck in the tree. Lukas standing in front, relieved.",
+  "elapsedMs": 10388,
+  "modelId": "grok-imagine-image",
+  "cost": 0.02,
+  "characters": [
+    "Lukas"
+  ]
+}

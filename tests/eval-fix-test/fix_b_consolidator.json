@@ -1,0 +1,34 @@
+{
+  "plan": {
+    "per_character_fixes": [
+      {
+        "characterName": "Lukas",
+        "visual_identifier": "the seven-year-old boy in brown tunic and dark cloak running in the left-center foreground",
+        "bbox": null,
+        "severity": "CRITICAL",
+        "issues": [
+          "stuffed elephant positioned under right arm instead of left arm",
+          "trousers appear green or too light, should be dark brown or dark wool",
+          "boots too heavy; should be simple leather shoes",
+          "cloak has a hood; should be plain dark cloak without hood"
+        ],
+        "fix_instruction": "Reposition the stuffed grey elephant from the right arm to the left arm, tucked tight against the ribs. Recolor the trousers to dark brown or dark wool. Replace the boots with simple, plain leather shoes. Remove the hood from the cloak or redraw the cloak as a plain dark cloak without any hood."
+      }
+    ],
+    "scene_fix": {
+      "severity": "CRITICAL",
+      "instruction": "Replace entire background: Remove all market stalls and vendor tables. Add a wide stone-paved square in the midground. Place a tall wooden pole at the far center of the square with a fur-trimmed hat mounted on top. Reposition all villagers so their backs are turned to the camera, arranged in a crowd facing the wooden pole, all wearing muted wool cloaks and tunics. Add timber-framed buildings with narrow windows surrounding the square on all sides. Add a grey stone church tower in the right background. Modify the foreground path: it should be dirt descending from the shadowed left corner down toward the stone square. Ensure the bottom-left corner is shadowed by a dark stone wall with dead leaves scattered on the ground. Keep the sky pale and overcast with heavy clouds pressing low. Maintain wide-shot perspective with late-morning overcast lighting.",
+      "preserve": [
+        "boy's running position and forward momentum in left-center foreground",
+        "body lean and arm pump consistent with active running",
+        "overall composition depth from shadowed foreground to distant buildings"
+      ]
+    },
+    "dropped_issues": []
+  },
+  "usage": {
+    "input_tokens": 3612,
+    "output_tokens": 519
+  },
+  "error": null
+}

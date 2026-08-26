@@ -1,0 +1,11 @@
+{
+  "framing": "D1_left_right_facing",
+  "description": "WIDE — Manuel far left aiming right across the frame; Lukas far right in profile against the tree, apple on head.",
+  "elapsedMs": 8213,
+  "modelId": "grok-imagine-image",
+  "cost": 0.02,
+  "characters": [
+    "Manuel",
+    "Lukas"
+  ]
+}

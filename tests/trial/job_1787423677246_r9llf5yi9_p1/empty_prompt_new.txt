@@ -1,0 +1,59 @@
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+Render every surface, material and light source in that art style. The style applies to the backdrop exactly as it applies to a page with characters — a location described in documentary terms is still drawn in this style, never as a photograph.
+
+Generate a SINGLE illustration of the background environment. Paint only what the description below names. Do not add people, crowds, or figures that the description does not mention.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+Render every surface, material and light source in that art style. The style applies to the backdrop exactly as it applies to a page with characters — a location described in documentary terms is still drawn in this style, never as a photograph.
+
+Generate a SINGLE illustration of the background environment. Paint only what the description below names. Do not add people, crowds, or figures that the description does not mention.
+
+**SHOT:** wide
+
+**LOCATION:** Quaibrücke am Zürichsee (wide stone pedestrian bridge with a low stone balustrade running along both sides; mooring points along the lower quay edge below the bridge level where boats tie up; open water stretching behind; opposite bank showing the Fraumünster dark roof silhouette; warm grey stone balustrade, deep blue-green lake water, pale blue summer sky, white swan shapes; low quay landing directly below the bridge rail where a boat sits tied, accessible from the bridge by steps)
+**VANTAGE:** Wide summer bridge and lake
+
+The full width of the stone bridge fills the lower frame, balustrade crossing left to right. Behind it the broad Zürichsee stretches to the far shore. The dark angular roofline and thin spire of the Fraumünster are visible on the opposite bank in atmospheric summer haze. The lower quay mooring is visible just below the rail. Empty foreground band at the bottom of the frame is open quay stone.
+
+Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.
+
+**ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph and it defines the STRUCTURE only — silhouette, proportions, materials, roof and window shapes, and its signature details. Everything else comes from the scene description above: camera angle, distance and framing, season, time of day, weather and light. Repaint the structure into the scene's conditions — a photo taken in summer daylight still renders as the described night, winter or storm, with the building unchanged. Never take the photo's rendering: it is not a style reference, and the result is drawn in the ART STYLE above. Exclude modern-era elements visible in the photo per the STORY ERA rule above. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
+
+**LANDMARK IN THIS SCENE: Quaibrücke am Zürichsee.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
+
+**IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it.
+
+**MEDIUM (never from the photo):** The photo supplies geometry and nothing else. Every surface of the landmark is painted in the ART STYLE, with the same brushwork, edges, texture and palette as the rest of the page — no photographic detail, no lens depth of field, no camera grain. A page whose landmark reads sharper or more photographic than its sky, ground and figures is wrong.
+
+**CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the structure into them. The landmark still reads at page size: never a tiny speck against a wide cityscape.
+
+**EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.
+
+Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not draw a comic-book panel border, inked keyline, or coloured frame around the artwork. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
+Lighting must come from a consistent direction — all shadows point the same way.
+The ground, floor, or surface where characters would stand or sit must be clearly visible.
+The frame must leave enough physical space for characters to be composited into the scene naturally.
+For `over-the-shoulder` framing, keep the centre-back of the frame visually open.
+Use the camera angle named in the **SHOT** line above. Do not change the framing.
+
+**VEHICLES:** Any boat, ship, wagon, carriage, or other vehicle in this backdrop is one of the vessels described below — render it exactly to its description, never a generic substitute:
+- Goldene Möwe: a wooden sailing boat roughly ten metres long with a single mast rising from the centre of the deck; the hull is dark brown painted wood sitting low in the water; a large square-cut sail is rigged on a horizontal yard mounted at right angles to the mast and hangs from it, the sail fabric cream-white with a simple black painted shape of crossed bones at its centre; the bow is blunt and rounded; a rope railing runs along each side of the deck attached to short wooden posts; the stern has a flat rail where a figure can stand at the tiller
+
+
+
+
+
+
+
+**ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph and it defines the STRUCTURE only — silhouette, proportions, materials, roof and window shapes, and its signature details. Everything else comes from the scene description above: camera angle, distance and framing, season, time of day, weather and light. Repaint the structure into the scene's conditions — a photo taken in summer daylight still renders as the described night, winter or storm, with the building unchanged. Never take the photo's rendering: it is not a style reference, and the result is drawn in the ART STYLE above. Exclude modern-era elements visible in the photo per the STORY ERA rule above. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
+
+
+
+Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not draw a comic-book panel border, inked keyline, or coloured frame around the artwork. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
+Lighting must come from a consistent direction — all shadows point the same way.
+The ground, floor, or surface where characters would stand or sit must be clearly visible.
+The frame must leave enough physical space for characters to be composited into the scene naturally.
+For `over-the-shoulder` framing, keep the centre-back of the frame visually open.
+Use the camera angle named in the **SHOT** line above. Do not change the framing.

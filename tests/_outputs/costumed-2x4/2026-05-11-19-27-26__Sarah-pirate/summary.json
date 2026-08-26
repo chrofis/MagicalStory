@@ -1,0 +1,17 @@
+{
+  "runStarted": "2026-05-11T19:27:26.542Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Sarah.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Sarah.jpg",
+    "costume": "pirate costume — long dark coat, red sash, white shirt, knee-high boots",
+    "style": "watercolor",
+    "name": "Sarah-pirate"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "error": "No image in response (finish=IMAGE_OTHER, text=\"\", safety=[])"
+    }
+  ],
+  "runFinished": "2026-05-11T19:27:41.453Z"
+}

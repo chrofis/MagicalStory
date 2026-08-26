@@ -1,0 +1,104 @@
+{
+  "objects": [],
+  "setting": {
+    "camera": "Medium shot at street level, framed looking down the junction, showing all three figures in sharp focus against architectural geometry",
+    "weather": "Clear afternoon sky, no precipitation",
+    "lighting": "Afternoon, golden hour sunlight slanting across the uneven cobblestones, creating warm light and long shadows",
+    "location": "Altstadt-Gassen Baden [Kirchgasse junction]",
+    "depthLayers": "Characters in midground/foreground at junction center. Medieval buildings form middle-distance walls. Castle ruins visible in top-right background above roofline. Open cobblestone plaza extends outward from center point.",
+    "description": "Cobblestone street junction in the medieval Altstadt of Baden. Cream and ochre plaster buildings with narrow windows and shutters frame both sides. Wrought-iron street lanterns stand sentinel at the corner. Above the slate rooflines, the rocky hillside rises with grey stone ruins of Stein castle visible against blue sky.",
+    "indoorOutdoor": "outdoor",
+    "weatherVisibility": "directly on scene - warm golden light, clear visibility"
+  },
+  "clothing": null,
+  "fullData": {
+    "objects": [],
+    "setting": {
+      "camera": "Medium shot at street level, framed looking down the junction, showing all three figures in sharp focus against architectural geometry",
+      "weather": "Clear afternoon sky, no precipitation",
+      "lighting": "Afternoon, golden hour sunlight slanting across the uneven cobblestones, creating warm light and long shadows",
+      "location": "Altstadt-Gassen Baden [Kirchgasse junction]",
+      "depthLayers": "Characters in midground/foreground at junction center. Medieval buildings form middle-distance walls. Castle ruins visible in top-right background above roofline. Open cobblestone plaza extends outward from center point.",
+      "description": "Cobblestone street junction in the medieval Altstadt of Baden. Cream and ochre plaster buildings with narrow windows and shutters frame both sides. Wrought-iron street lanterns stand sentinel at the corner. Above the slate rooflines, the rocky hillside rises with grey stone ruins of Stein castle visible against blue sky.",
+      "indoorOutdoor": "outdoor",
+      "weatherVisibility": "directly on scene - warm golden light, clear visibility"
+    },
+    "characters": [
+      {
+        "name": "Werner",
+        "pose": "Standing upright and centered at the junction, facing forward with both arms extended outward",
+        "action": "Commanding gesture with arms spread: left arm extended toward left lane (Verena), right arm extended toward right lane (Uschi)",
+        "avatar": "Werner",
+        "holding": {
+          "leftHand": "extended outward in gesture",
+          "rightHand": "extended outward in gesture"
+        },
+        "clothing": "costumed:superhero",
+        "position": "middle-center midground",
+        "expression": "Direct gaze, authoritative presence, sharp focus"
+      },
+      {
+        "name": "Verena",
+        "pose": "Standing with body angled to the left, mid-turn posture, head and torso pivoting toward left lane",
+        "action": "Turning/pivoting toward the left lane (Engelgasse direction) in response to Werner's direction",
+        "avatar": "Verena",
+        "holding": {
+          "leftHand": "empty",
+          "rightHand": "empty"
+        },
+        "clothing": "costumed:superhero",
+        "position": "middle-left midground",
+        "expression": "Focused attention, acknowledging direction, eyes clear and alert"
+      },
+      {
+        "name": "Uschi",
+        "pose": "Standing ready, body angled toward the right lane, facing right direction",
+        "action": "Standing prepared and attentive on the right side, ready to take her assigned position",
+        "avatar": "Uschi",
+        "holding": {
+          "leftHand": "empty",
+          "rightHand": "empty"
+        },
+        "clothing": "costumed:superhero",
+        "position": "middle-right midground",
+        "expression": "Calm readiness, focused determination, eyes open and engaged"
+      }
+    ],
+    "imageSummary": "Werner stands at the center of a cobblestone street junction with both arms extended outward in a commanding gesture. To his left, Verena stands mid-turn toward the left lane. To his right, Uschi stands facing the right lane. Medieval Altstadt buildings rise on both sides, and the ruins of Stein castle are visible on the hillside above. Afternoon light casts long shadows down both diverging street lanes.",
+    "reuseEmptyScene": false,
+    "sceneComplexity": "simple",
+    "emptyScenePrompt": "A medieval Altstadt street junction with uneven grey cobblestones. Cream and ochre plaster buildings with narrow windows and blue shutters frame both sides of the junction. Wrought-iron street lanterns stand at the corner. Above the slate rooflines, a rocky hillside is visible with grey stone castle ruins silhouetted against a clear blue sky. Afternoon golden sunlight slants across the junction, casting long shadows down both diverging street lanes. The cobblestone junction is empty and open. Medium shot at street level looking down the junction.",
+    "landmarkPlacement": {
+      "steinCastleRuins": "top-right background",
+      "strassenlaternen": "top-center background",
+      "altstadt_buildings": "left-right background, framing junction"
+    },
+    "translatedSummary": "Werner steht in der Mitte einer Kopfsteinpflaster-Strassenkreuzung mit beiden Armen ausgestreckt in einer befehlenden Geste. Zu seiner Linken steht Verena und wendet sich dem linken Gässchen zu. Zu seiner Rechten steht Uschi und schaut in Richtung des rechten Gässchens. Die mittelalterliche Altstadt erhebt sich auf beiden Seiten, und die Ruine Stein ist auf dem Hügel oben sichtbar. Nachmittagslicht wirft lange Schatten auf die Kopfsteinpflaster-Gasse."
+  },
+  "thinking": null,
+  "characters": [
+    "Werner",
+    "Verena",
+    "Uschi"
+  ],
+  "imageSummary": "Werner stands at the center of a cobblestone street junction with both arms extended outward in a commanding gesture. To his left, Verena stands mid-turn toward the left lane. To his right, Uschi stands facing the right lane. Medieval Altstadt buildings rise on both sides, and the ruins of Stein castle are visible on the hillside above. Afternoon light casts long shadows down both diverging street lanes.",
+  "interactions": null,
+  "isJsonFormat": true,
+  "textPosition": null,
+  "reuseEmptyScene": false,
+  "sceneComplexity": "simple",
+  "emptyScenePrompt": "A medieval Altstadt street junction with uneven grey cobblestones. Cream and ochre plaster buildings with narrow windows and blue shutters frame both sides of the junction. Wrought-iron street lanterns stand at the corner. Above the slate rooflines, a rocky hillside is visible with grey stone castle ruins silhouetted against a clear blue sky. Afternoon golden sunlight slants across the junction, casting long shadows down both diverging street lanes. The cobblestone junction is empty and open. Medium shot at street level looking down the junction.",
+  "landmarkVariants": null,
+  "characterClothing": {
+    "Uschi": "costumed:superhero",
+    "Verena": "costumed:superhero",
+    "Werner": "costumed:superhero"
+  },
+  "translatedSummary": "Werner steht in der Mitte einer Kopfsteinpflaster-Strassenkreuzung mit beiden Armen ausgestreckt in einer befehlenden Geste. Zu seiner Linken steht Verena und wendet sich dem linken Gässchen zu. Zu seiner Rechten steht Uschi und schaut in Richtung des rechten Gässchens. Die mittelalterliche Altstadt erhebt sich auf beiden Seiten, und die Ruine Stein ist auf dem Hügel oben sichtbar. Nachmittagslicht wirft lange Schatten auf die Kopfsteinpflaster-Gasse.",
+  "characterPositions": {
+    "Uschi": "middle-right midground",
+    "Verena": "middle-left midground",
+    "Werner": "middle-center midground"
+  },
+  "characterPerspectives": null
+}

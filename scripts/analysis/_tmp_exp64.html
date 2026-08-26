@@ -1,0 +1,50 @@
+<title>Composite Rerun — Exp 64</title>
+<style>
+ :root{--bg:#fbfbfa;--fg:#1c1b19;--mut:#6d6a65;--line:#e3e0da;--card:#fff;--acc:#b4442e;--ok:#2f6f4e;}
+ @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;}}
+ :root[data-theme="dark"]{--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;}
+ body{background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:32px 24px 80px;}
+ .wrap{max-width:1180px;margin:0 auto;} h1{font-size:26px;margin:0 0 6px;letter-spacing:-.02em;}
+ .lede{color:var(--mut);max-width:74ch;margin:0 0 26px;}
+ .box{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:16px 20px;margin:0 0 30px;}
+ h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:36px 0 14px;border-bottom:1px solid var(--line);padding-bottom:6px;}
+ table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+ td,th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
+ .err{color:var(--mut);font-size:12.5px;}
+ .tag{padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700;color:#fff;}
+ .tag.depth-spread{background:#8a4d2b;} .tag.cast-empty{background:var(--acc);}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;}
+ figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+ figure img{width:100%;display:block;} figcaption{padding:8px 10px;font-size:12.5px;color:var(--mut);}
+ .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:8px;}
+ @media(max-width:760px){.ba{grid-template-columns:1fr;}}
+ .ba figure{border:2px solid var(--line);} .ba figure.win{border-color:var(--ok);}
+ code{background:var(--line);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+</style>
+<div class="wrap">
+<h1>Composite rerun — production experiment 64</h1>
+<p class="lede">The five production pages whose outline declared a foreground <em>and</em> a background character. Each was re-run through the real composite stage to answer: what would the page have looked like?</p>
+<div class="box"><b>4 of 5 aborted by design. 1 produced a page.</b> The composite was never silently broken — it runs, inspects the plate, and refuses when the premise does not hold. The abort reason was being thrown away before save, which is why the database looked as if nothing ever happened.</div>
+
+<h2>The four aborts</h2>
+<table><tr><th>page</th><th>gate</th><th>reason</th></tr><tr><td>…r9llf5yi9 <b>p1</b></td>
+   <td><span class="tag depth-spread">depth-spread</span></td><td class="err">[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is 1.56x (needs 2x). Every character is at the same distance, so the declared foreground/background split is not real and there is nothing for the composite to correct — the page keeps its original render</td></tr><tr><td>…r9llf5yi9 <b>p10</b></td>
+   <td><span class="tag cast-empty">cast-empty</span></td><td class="err">composite cast is empty — page has no scene characters, or no story avatar sheets</td></tr><tr><td>…r9llf5yi9 <b>p14</b></td>
+   <td><span class="tag cast-empty">cast-empty</span></td><td class="err">composite cast is empty — page has no scene characters, or no story avatar sheets</td></tr><tr><td>…zb960muni <b>p1</b></td>
+   <td><span class="tag depth-spread">depth-spread</span></td><td class="err">[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is 1.51x (needs 2x). Every character is at the same distance, so the declared foreground/background split is not real and there is nothing for the composite to correct — the page keeps its original render</td></tr></table>
+
+<h2>The one that ran — Das Ei im Wurzelnest, page 17</h2>
+<p class="lede">Cast: Levin (foreground), Max (foreground), Kiaan (foreground), Julian (background) · detector dino · 4 figures placed · $0.06</p>
+<div class="ba">
+ <figure><img src="_tmp_c64/00-original.jpg"><figcaption><b>What shipped</b> — the original render</figcaption></figure>
+ <figure class="win"><img src="_tmp_c64/99-final-composited.jpg"><figcaption><b>What the composite produced</b></figcaption></figure>
+</div>
+<table><tr><td>Levin</td><td>age 5</td><td>as-painted</td>
+  <td>head 40px</td><td>target 248px</td><td>—</td></tr><tr><td>Max</td><td>age 3</td><td>as-painted</td>
+  <td>head 38px</td><td>target 246px</td><td>—</td></tr><tr><td>Kiaan</td><td>age 3</td><td>as-painted</td>
+  <td>head 38px</td><td>target 222px</td><td>—</td></tr><tr><td>Julian</td><td>age 3</td><td>as-painted</td>
+  <td>head 23px</td><td>target 118px</td><td>—</td></tr></table>
+
+<h2>Every intermediate step</h2>
+<div class="grid"><figure><img src="_tmp_c64/01-1_plate_with_colour_silhouettes.jpg"><figcaption>1 plate with colour silhouettes.jpg</figcaption></figure><figure><img src="_tmp_c64/02-2_depopulated_silhouettes_remove.jpg"><figcaption>2 depopulated silhouettes remove.jpg</figcaption></figure><figure><img src="_tmp_c64/03-3_avatar_cut_outs_pasted_raw_pre.png"><figcaption>3 avatar cut outs pasted raw pre.png</figcaption></figure><figure><img src="_tmp_c64/04-_cut_out_used_for_Levin.png"><figcaption> cut out used for Levin.png</figcaption></figure><figure><img src="_tmp_c64/05-_cut_out_used_for_Max.png"><figcaption> cut out used for Max.png</figcaption></figure><figure><img src="_tmp_c64/06-_cut_out_used_for_Kiaan.png"><figcaption> cut out used for Kiaan.png</figcaption></figure><figure><img src="_tmp_c64/07-_cut_out_used_for_Julian.png"><figcaption> cut out used for Julian.png</figcaption></figure></div>
+</div>

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Lukas",
+    "photoType": "costumed-mittelalterlich",
+    "clothingCategory": "costumed",
+    "clothingDescription": "Einfache hellbraune Wolltunika bis zu den Knien, mit einem schmalen Ledergürtel. Dunkelbraune Wollhosen, einfache Lederschuhe mit Riemen. Kein Kopfbedeckung."
+  },
+  {
+    "name": "Uschi",
+    "photoType": "clothing-standard",
+    "clothingCategory": "standard",
+    "clothingDescription": "Light green long-sleeve t-shirt with white and light green striped trim on the collar and cuffs, Dark blue slim-fit jeans, White lace-up sneakers"
+  }
+]

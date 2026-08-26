@@ -1,0 +1,21 @@
+SYSTEM:
+You are creating a clean pose-reference template for a children's book character pipeline. The image will be used as an angle reference — its only job is to show 8 distinct viewing angles of a featureless mannequin. Do not add face features, hair, clothing, accessories, or text labels.
+
+PROMPT:
+Create a pose reference sheet — 8 panels arranged as 2 rows and 4 columns, equal panel sizes, plain white background.
+
+Every panel shows the SAME FEATURELESS ARTIST'S MANNEQUIN — a smooth wooden / dressmaker's mannequin with NO face features (no eyes, nose, mouth, ears), NO hair, NO clothing, NO skin colour variation. Uniform light beige wooden colour. The mannequin's only purpose is to show body/head ANGLE — viewers should be able to tell which way the figure is facing, nothing more.
+
+Row 1 (top) — show only the HEAD (forehead to chin equivalent on the mannequin), no shoulders or body visible.
+  Panel 1: head facing front (0°, towards camera).
+  Panel 2: head turned 45° to camera's right (three-quarter view).
+  Panel 3: head in profile, 90° right (only one side visible).
+  Panel 4: back of head (180°, viewer sees the back).
+
+Row 2 (bottom) — show the FULL BODY of the mannequin head to feet, standing upright, arms relaxed at sides, feet roughly hip-width apart.
+  Panel 5: full body front (0°).
+  Panel 6: full body turned 45° right.
+  Panel 7: full body side profile (90° right).
+  Panel 8: full body back view (180°).
+
+Render this in soft watercolor children's storybook illustration style — gentle washes, simple outlines, light beige paper feel. No text labels anywhere. No props. No background details. Just the 8 mannequin panels.

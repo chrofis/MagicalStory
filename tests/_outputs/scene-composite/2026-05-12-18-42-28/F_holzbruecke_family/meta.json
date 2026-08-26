@@ -1,0 +1,37 @@
+{
+  "scene": "F_holzbruecke_family",
+  "mode": "blocking",
+  "bboxes": {
+    "Hans": {
+      "x": 652,
+      "y": 307,
+      "width": 186,
+      "height": 412,
+      "pixels": 29884
+    },
+    "Daniel": {
+      "x": 601,
+      "y": 298,
+      "width": 105,
+      "height": 365,
+      "pixels": 18542
+    },
+    "Emma": {
+      "x": 435,
+      "y": 424,
+      "width": 62,
+      "height": 197,
+      "pixels": 6987
+    },
+    "Noah": {
+      "x": 493,
+      "y": 442,
+      "width": 63,
+      "height": 177,
+      "pixels": 5940
+    }
+  },
+  "blockingMs": 5949,
+  "cleanMs": 26111,
+  "pass1Ms": 7296
+}

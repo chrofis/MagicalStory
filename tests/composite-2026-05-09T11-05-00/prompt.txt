@@ -1,0 +1,58 @@
+THIS IS A COVER ILLUSTRATION COMPOSITE. You have FOUR independent jobs to do, and ALL of them must happen. Returning the input image with only style applied is a failure.
+
+The input shows: 5 character cutouts standing in a row with ARMS AT THEIR SIDES (this is WRONG — see Job B), 1 prop cutout(s) pasted in the foreground, on top of a real landmark photograph (this background is correct — see Job A).
+
+═══════════════════════════════════════════════════════════════
+JOB A — PRESERVE THE BACKGROUND (do not redraw)
+═══════════════════════════════════════════════════════════════
+The landmark behind the figures is ALREADY in the input composite. Keep it pixel-faithful: same buildings, same architecture, same proportions, same window placement. Apply watercolor styling ON TOP of the existing structure — but do NOT invent a new background, do NOT generalise to a generic "old town", do NOT move buildings. The landmark depicted is described here for reference (do NOT use this as a redraw instruction): "A photograph shows the Haus zum Rüden building in Zurich, Switzerland, during a parade with people in historical costumes."
+
+═══════════════════════════════════════════════════════════════
+JOB B — REPOSE EVERY FIGURE (mandatory; this is the change)
+═══════════════════════════════════════════════════════════════
+The figures in the composite are pasted with their original neutral poses (arms at sides, no interaction). THIS IS WRONG. You MUST repose every single figure as listed below. Do not return the input poses. Do not preserve the arms-at-sides default. Every line below is a hard requirement:
+
+- the leftmost figure (the elderly figure): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: RIGHT ARM raised and wrapped around the second-from-left figure (the adult)'s shoulders, pulling that figure close. Body angled slightly to the right toward the second-from-left figure (the adult). NOT standing with arms at sides.
+- the second-from-left figure (the adult): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: RIGHT ARM raised and wrapped around the centre figure (the small child)'s shoulders, pulling that figure close. Body angled slightly to the right toward the centre figure (the small child). NOT standing with arms at sides.
+- the centre figure (the small child): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: BOTH HANDS rest on the Schatztruhe on the ground in front. Body leans slightly forward over the prop. Head tilts down to look at the prop, then up at the viewer. NOT standing with arms at sides.
+- the second-from-right figure (the older child): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: LEFT HAND placed on the centre figure (the small child)'s shoulder, fingers visible. Body angled slightly to the left toward the centre figure (the small child). NOT standing with arms at sides.
+- the rightmost figure (the adult): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: LEFT HAND placed on the second-from-right figure (the older child)'s shoulder, fingers visible. Body angled slightly to the left toward the second-from-right figure (the older child). NOT standing with arms at sides.
+
+If your output has any figure still standing with arms at their sides, the task has FAILED. The whole point of this edit is to put the family into the warm interacting group portrait described above.
+
+═══════════════════════════════════════════════════════════════
+JOB C — UNIFY THE STYLE
+═══════════════════════════════════════════════════════════════
+- Re-render every figure, every prop, and the landmark in this art style: traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, soft paint edges, visible artistic brushstrokes, luminous flowing colors. NOT photoreal.
+- Match a single global lighting direction across all figures, props, and the scene.
+- Add natural ground shadows under feet and props.
+- Soften cutout edges so the figures and props sit naturally on the ground.
+- Composition fills the canvas edge-to-edge — no borders, no panels.
+
+═══ JOB D — TITLE TEXT ═══
+Render this exact title across the UPPER THIRD of the canvas: "Das Geheimnis der Flaschenpost".
+- Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator.
+- Letters have depth, slight irregularity, integrated with the watercolor scene above the figures.
+- Do not place title text on or over the figures' faces. Title goes in the sky / upper background area.
+- This is the ONLY text in the image. No other letters, signs, or symbols.
+
+═══════════════════════════════════════════════════════════════
+CHARACTERS (preserve identity from the composite — face, hair, skin, clothing exactly):
+═══════════════════════════════════════════════════════════════
+- the leftmost figure (the elderly figure), age 68.
+- the second-from-left figure (the adult), age 38.
+- the centre figure (the small child), age 5. (main / centre — anchor of the group)
+- the second-from-right figure (the older child), age 7.
+- the rightmost figure (the adult), age 36.
+
+FOREGROUND PROPS (already in the composite — keep them in front of the family, painted as shown):
+- Schatztruhe: on the ground in front of the centre character, partially in front of their legs.
+
+═══════════════════════════════════════════════════════════════
+HARD CONSTRAINTS:
+═══════════════════════════════════════════════════════════════
+- DO NOT add or remove characters.
+- DO NOT swap which face goes where.
+- DO NOT redraw the landmark scenery from scratch — preserve it from the composite.
+- DO NOT skip the pose redraw — every figure's pose changes per the JOB B lines above.
+- Other than the title (Job D), NO text, no letters, no signage anywhere in the image.

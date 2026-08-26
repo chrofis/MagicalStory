@@ -1,0 +1,39 @@
+Re-render this composite as a unified watercolor children's-book INTRODUCTION PAGE illustration in this art style: traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, soft paint edges, visible artistic brushstrokes, luminous flowing colors. NOT photoreal.
+
+THE INPUT COMPOSITE shows 5 character cutouts and 1 prop cutout(s) pasted onto a landmark photo. THE FIGURES IN THE INPUT ARE STANDING NEUTRALLY WITH ARMS AT THEIR SIDES. THIS IS WRONG. You MUST redraw their poses per the POSE block below — this is the most important change.
+
+═══ POSE REDRAW (REQUIRED — do every line) ═══
+- the leftmost figure (the elderly figure): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: RIGHT ARM raised and wrapped around the second-from-left figure (the adult)'s shoulders, pulling that figure close. Body angled slightly to the right toward the second-from-left figure (the adult). NOT standing with arms at sides.
+- the second-from-left figure (the adult): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: RIGHT ARM raised and wrapped around the centre figure (the small child)'s shoulders, pulling that figure close. Body angled slightly to the right toward the centre figure (the small child). NOT standing with arms at sides.
+- the centre figure (the small child): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: BOTH HANDS rest on the Schatztruhe on the ground in front. Body leans slightly forward over the prop. Head tilts down to look at the prop, then up at the viewer. NOT standing with arms at sides.
+- the second-from-right figure (the older child): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: LEFT HAND placed on the centre figure (the small child)'s shoulder, fingers visible. Body angled slightly to the left toward the centre figure (the small child). NOT standing with arms at sides.
+- the rightmost figure (the adult): REDRAW the pose. Currently shown standing neutrally with arms at sides — this is wrong. New pose: LEFT HAND placed on the second-from-right figure (the older child)'s shoulder, fingers visible. Body angled slightly to the left toward the second-from-right figure (the older child). NOT standing with arms at sides.
+
+═══ CHARACTERS — preserve identity exactly from the cutout ═══
+- the leftmost figure (the elderly figure), age 68.
+- the second-from-left figure (the adult), age 38.
+- the centre figure (the small child), age 5. (main / centre — anchor of the group)
+- the second-from-right figure (the older child), age 7.
+- the rightmost figure (the adult), age 36.
+
+BACKGROUND (CRITICAL — do NOT redraw): the landmark behind the figures is ALREADY in the composite. Keep it pixel-faithful — do not invent a new background, do not generalise to a generic "old town", do not move buildings. Repaint only enough to apply the watercolor style on top of the existing structure. For reference, the depicted landmark is described below; this is supplementary, not an instruction to redraw:
+  >  A photograph shows the Haus zum Rüden building in Zurich, Switzerland, during a parade with people in historical costumes.
+
+FOREGROUND PROPS (already in the composite — keep them in front of the family, painted as shown):
+- Schatztruhe: on the ground in front of the centre character, partially in front of their legs.
+
+═══ OTHER REQUIRED CHANGES ═══
+- Render every figure, every prop, and the landmark in unified watercolor — textured paper, pencil underpainting, soft brushstrokes, luminous flowing colour. NOT photoreal.
+- Match a single global lighting direction across all figures, props, and the scene.
+- Add natural ground shadows under feet and props.
+- Soften cutout edges — figures and props sit naturally on the ground, not pasted-on.
+- All faces visible, opaque, age-appropriate proportions (children visibly shorter than adults).
+- Fill the entire canvas edge-to-edge — no borders, no white edges, no panels.
+
+═══ PRESERVE EXACTLY ═══
+- Every character's face, hair colour, skin tone, clothing colour and detail.
+- Every prop's silhouette and material as shown in the composite.
+- Number of characters and their approximate left-to-right order.
+- THE LANDMARK BACKGROUND from the composite — do not redraw it from a description. Watercolor-style it IN PLACE.
+
+DO NOT add or remove characters. DO NOT swap faces. DO NOT redraw the background scenery from scratch. NO TEXT, no letters, no signage. The pose redraw is NON-NEGOTIABLE — if you return characters with arms still at their sides, you have failed the task.

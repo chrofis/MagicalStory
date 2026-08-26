@@ -1,0 +1,225 @@
+{
+  "storyId": "job_1777701999612_we3rb9u7b",
+  "matches": [
+    {
+      "page": 3,
+      "shot": "close-up",
+      "isWide": false,
+      "phraseMatch": true,
+      "backgroundChars": [
+        {
+          "name": "Werner",
+          "position": "far left background at the crowd edge, arm slightly raised, facing toward the scene",
+          "depth": "background"
+        },
+        {
+          "name": "Franziska",
+          "position": "far left background, beside Werner, hand on his forearm",
+          "depth": "background"
+        }
+      ],
+      "foregroundChars": [
+        {
+          "name": "Lukas",
+          "position": "center foreground, facing the camera, chin raised",
+          "depth": "foreground"
+        }
+      ],
+      "triggerPhraseSamples": [
+        "far background"
+      ],
+      "scaleRepairCandidate": false
+    },
+    {
+      "page": 4,
+      "shot": "",
+      "isWide": false,
+      "phraseMatch": true,
+      "backgroundChars": [
+        {
+          "name": "Roger",
+          "position": "far left background, kneeling",
+          "depth": "background"
+        },
+        {
+          "name": "Lukas",
+          "position": "far right background, standing against bare tree",
+          "depth": "background"
+        }
+      ],
+      "foregroundChars": [
+        {
+          "name": "Sophie",
+          "position": "right midground, in crowd",
+          "depth": "midground"
+        },
+        {
+          "name": "Manuel",
+          "position": "right midground, in crowd",
+          "depth": "midground"
+        },
+        {
+          "name": "Verena",
+          "position": "right midground, in crowd",
+          "depth": "midground"
+        }
+      ],
+      "triggerPhraseSamples": [
+        "roughly a sixth"
+      ],
+      "scaleRepairCandidate": false
+    },
+    {
+      "page": 6,
+      "shot": "wide",
+      "isWide": true,
+      "phraseMatch": true,
+      "backgroundChars": [
+        {
+          "name": "Gessler",
+          "position": "right background, behind the soldiers, arms crossed, facing the scene",
+          "depth": "background"
+        },
+        {
+          "name": "Werner",
+          "position": "far right background at crowd edge, facing toward the scene",
+          "depth": "background"
+        }
+      ],
+      "foregroundChars": [
+        {
+          "name": "Roger",
+          "position": "center midground at dock edge, back partially to camera, head turned right",
+          "depth": "midground"
+        },
+        {
+          "name": "Lukas",
+          "position": "left foreground, facing toward Roger",
+          "depth": "foreground"
+        },
+        {
+          "name": "Soldier1",
+          "position": "midground, gripping Roger's left arm",
+          "depth": "midground"
+        },
+        {
+          "name": "Soldier2",
+          "position": "midground, gripping Roger's right arm",
+          "depth": "midground"
+        }
+      ],
+      "triggerPhraseSamples": [
+        "far background"
+      ],
+      "scaleRepairCandidate": true
+    },
+    {
+      "page": 7,
+      "shot": "wide",
+      "isWide": true,
+      "phraseMatch": false,
+      "backgroundChars": [
+        {
+          "name": "Soldier1",
+          "position": "inside the tilting boat at right background, gripping the boat's side",
+          "depth": "background"
+        },
+        {
+          "name": "Soldier2",
+          "position": "inside the tilting boat at right background, behind Soldier1",
+          "depth": "background"
+        }
+      ],
+      "foregroundChars": [
+        {
+          "name": "Roger",
+          "position": "center frame, mid-air, head and torso at mid-frame height, facing left toward the rock",
+          "depth": "foreground"
+        }
+      ],
+      "triggerPhraseSamples": [],
+      "scaleRepairCandidate": true
+    },
+    {
+      "page": 8,
+      "shot": "medium",
+      "isWide": false,
+      "phraseMatch": true,
+      "backgroundChars": [],
+      "foregroundChars": [
+        {
+          "name": "Lukas",
+          "position": "left foreground, sitting on rocky shore, legs extended, facing the water",
+          "depth": "foreground"
+        },
+        {
+          "name": "Verena",
+          "position": "center foreground, beside Lukas, sitting, slightly turned toward Lukas, facing the water",
+          "depth": "foreground"
+        }
+      ],
+      "triggerPhraseSamples": [
+        "far background"
+      ],
+      "scaleRepairCandidate": false
+    },
+    {
+      "page": 9,
+      "shot": "wide",
+      "isWide": true,
+      "phraseMatch": true,
+      "backgroundChars": [
+        {
+          "name": "Gessler",
+          "position": "upper-right background at the far end of the path at approximately 70% frame width, mounted on a dark horse, small and distant",
+          "depth": "background"
+        }
+      ],
+      "foregroundChars": [
+        {
+          "name": "Roger",
+          "position": "left foreground, pressed against a mossy rock, facing right down the path",
+          "depth": "foreground"
+        }
+      ],
+      "triggerPhraseSamples": [
+        "far background"
+      ],
+      "scaleRepairCandidate": true
+    },
+    {
+      "page": 10,
+      "shot": "medium",
+      "isWide": false,
+      "phraseMatch": true,
+      "backgroundChars": [
+        {
+          "name": "Manuel",
+          "position": "right background, leaning against the building facade, arms loosely crossed, facing toward the pole",
+          "depth": "background"
+        }
+      ],
+      "foregroundChars": [
+        {
+          "name": "Roger",
+          "position": "center midground, back to camera, walking toward the bare pole, beside Lukas",
+          "depth": "midground"
+        },
+        {
+          "name": "Lukas",
+          "position": "center midground, back to camera, beside Roger, walking toward the bare pole",
+          "depth": "midground"
+        },
+        {
+          "name": "Sophie",
+          "position": "right midground, facing the bare pole, arms at sides, looking up at it",
+          "depth": "midground"
+        }
+      ],
+      "triggerPhraseSamples": [
+        "far background"
+      ],
+      "scaleRepairCandidate": false
+    }
+  ]
+}

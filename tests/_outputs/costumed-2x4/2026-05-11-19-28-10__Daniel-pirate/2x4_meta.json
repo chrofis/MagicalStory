@@ -1,0 +1,59 @@
+{
+  "durationMs": 10350,
+  "tokensIn": 892,
+  "tokensOut": 1290,
+  "width": 1344,
+  "height": 768,
+  "cellW": 336,
+  "cellH": 384,
+  "cells": [
+    {
+      "idx": 1,
+      "row": 1,
+      "col": 1,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell1.png"
+    },
+    {
+      "idx": 2,
+      "row": 1,
+      "col": 2,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell2.png"
+    },
+    {
+      "idx": 3,
+      "row": 1,
+      "col": 3,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell3.png"
+    },
+    {
+      "idx": 4,
+      "row": 1,
+      "col": 4,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell4.png"
+    },
+    {
+      "idx": 5,
+      "row": 2,
+      "col": 1,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell5.png"
+    },
+    {
+      "idx": 6,
+      "row": 2,
+      "col": 2,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell6.png"
+    },
+    {
+      "idx": 7,
+      "row": 2,
+      "col": 3,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell7.png"
+    },
+    {
+      "idx": 8,
+      "row": 2,
+      "col": 4,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-28-10__Daniel-pirate\\2x4_cell8.png"
+    }
+  ]
+}

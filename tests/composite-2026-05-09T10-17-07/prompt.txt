@@ -1,0 +1,29 @@
+Re-render this composite as a unified watercolor children's-book INTRODUCTION PAGE illustration in this art style: traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, delicate color washes wet-on-wet, soft paint edges, visible artistic brushstrokes, luminous flowing colors, warm but not vibrant palette. NOT photoreal. The composite shows 5 character cutouts pasted onto a real photograph of "Zurich Old Town" — your job is to paint everything as ONE cohesive scene where all figures and the landmark belong together.
+
+This is an introduction-page group portrait — warm, inviting, sets the mood for the story. All characters stand together facing the reader, visible and recognisable. The image should feel like a family photo painted in watercolor.
+
+CHARACTERS, left to right — preserve identity from the composite exactly:
+- Emma (age 5, left of frame): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Noah (age 7, left of frame): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Daniel (age 38, center of frame): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Sarah (age 36, center of frame): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Hans (age 68, right of frame): match face/hair/skin/clothing exactly to the cutout in the composite.
+
+SCENE CONTEXT (paint these in if implied or natural to the scene):
+The Limmatquai promenade in Zürich with the Haus zum Rüden facade behind them — stone front, red dragon sign, Swiss flags. Grey cobblestones in foreground. A wooden treasure chest with iron strap fittings sits on the cobblestones between the family. A glass bottle with a rolled parchment inside rests near it. Bright daylight, clear sky, cheerful outdoor atmosphere.
+
+REQUIRED CHANGES (do all of these):
+- Render every figure AND the landmark in unified watercolor style — textured paper, pencil underpainting, soft brushstrokes, luminous flowing colour, visible paper texture. NOT photoreal.
+- Match a single global lighting direction across all figures and the scene (one sun, consistent shadows).
+- Add natural ground shadows under each character's feet on the surface they stand on.
+- Soften the cutout edges so figures sit naturally on the ground — no pasted-on feel.
+- All characters fully OPAQUE — never transparent or fading into the background.
+- All faces clearly visible, age-appropriate proportions (children look like children, adults look like adults).
+- Composition fills the entire canvas edge-to-edge — no borders, no white edges, no panels.
+
+PRESERVE EXACTLY:
+- Every character's face, hair colour, skin tone, clothing colour and detail.
+- Number of characters and their approximate left-to-right order.
+- The landmark silhouette and architectural details behind them.
+
+DO NOT add or remove characters. DO NOT swap which face goes where. NO TEXT, no letters, no signage in the image.

@@ -1,0 +1,8 @@
+{
+  "face": "tests/fixtures/demo-photos/berger/Noah.jpg",
+  "phantom": "tests/_outputs/phantom/phantom_grok_watercolor_single_2026-05-11-20-08-16.png",
+  "costume": "pirate costume, striped red and white shirt, small tricorn hat, black eye patch, brown boots",
+  "style": "watercolor",
+  "name": "Noah-variantA",
+  "backend": "grok"
+}

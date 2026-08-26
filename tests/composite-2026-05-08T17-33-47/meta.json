@@ -1,0 +1,100 @@
+{
+  "user": "1764881868108",
+  "story": "job_1778013683956_j0i3jyen0",
+  "landmark": {
+    "id": 304,
+    "name": "Marktplatz Altdorf",
+    "attribution": "MagicalStory curated watercolor"
+  },
+  "characters": [
+    {
+      "name": "Lukas",
+      "age": 7,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "right",
+      "left": 57,
+      "top": 973,
+      "width": 89,
+      "height": 365
+    },
+    {
+      "name": "Manuel",
+      "age": 14,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "right",
+      "left": 182,
+      "top": 853,
+      "width": 114,
+      "height": 485
+    },
+    {
+      "name": "Franziska",
+      "age": 52,
+      "depth": "midground",
+      "view": "body-front",
+      "facing": "camera-up",
+      "left": 300,
+      "top": 790,
+      "width": 149,
+      "height": 493
+    },
+    {
+      "name": "Sophie",
+      "age": 12,
+      "depth": "midground",
+      "view": "body-front",
+      "facing": "camera-up",
+      "left": 443,
+      "top": 861,
+      "width": 137,
+      "height": 422
+    },
+    {
+      "name": "Roger",
+      "age": 45,
+      "depth": "midground",
+      "view": "body-front",
+      "facing": "camera-up",
+      "left": 554,
+      "top": 790,
+      "width": 189,
+      "height": 493
+    },
+    {
+      "name": "Werner",
+      "age": 80,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "left",
+      "left": 733,
+      "top": 844,
+      "width": 103,
+      "height": 494
+    },
+    {
+      "name": "Verena",
+      "age": 77,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "left",
+      "left": 865,
+      "top": 844,
+      "width": 114,
+      "height": 494
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "watercolor children's storybook illustration, soft brushwork, gentle colors",
+  "runs": {
+    "grok": {
+      "elapsedMs": 9037,
+      "slots": 1
+    },
+    "gemini": {
+      "elapsedMs": 8396,
+      "refs": 7
+    }
+  }
+}

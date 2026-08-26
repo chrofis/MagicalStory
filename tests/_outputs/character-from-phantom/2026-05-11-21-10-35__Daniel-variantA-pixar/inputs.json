@@ -1,0 +1,8 @@
+{
+  "face": "tests/fixtures/demo-photos/berger/Daniel.jpg",
+  "phantom": "tests/_outputs/phantom/phantom_grok_watercolor_single_2026-05-11-20-08-16.png",
+  "costume": "medieval knight — chainmail tunic, leather belt with sword, brown trousers, tall leather boots",
+  "style": "pixar",
+  "name": "Daniel-variantA-pixar",
+  "backend": "grok"
+}

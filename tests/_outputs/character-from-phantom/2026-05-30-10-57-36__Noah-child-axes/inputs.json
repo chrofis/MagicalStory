@@ -1,0 +1,8 @@
+{
+  "face": "tests/fixtures/demo-photos/berger/Noah.jpg",
+  "phantom": "server/assets/phantom-watercolor-child-axes.png",
+  "costume": "pirate costume, white shirt, red sash, dark breeches, brown boots",
+  "style": "watercolor",
+  "name": "Noah-child-axes",
+  "backend": "grok"
+}

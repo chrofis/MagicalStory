@@ -1,0 +1,82 @@
+{
+  "user": "1764881868108",
+  "story": "job_1778013683956_j0i3jyen0",
+  "landmark": {
+    "id": 304,
+    "name": "Marktplatz Altdorf",
+    "attribution": "MagicalStory curated watercolor"
+  },
+  "characters": [
+    {
+      "name": "Lukas",
+      "age": 7,
+      "depth": "midground",
+      "left": 123,
+      "top": 1052,
+      "width": 105,
+      "height": 286
+    },
+    {
+      "name": "Manuel",
+      "age": 14,
+      "depth": "midground",
+      "left": 232,
+      "top": 958,
+      "width": 134,
+      "height": 380
+    },
+    {
+      "name": "Franziska",
+      "age": 52,
+      "depth": "midground",
+      "left": 341,
+      "top": 927,
+      "width": 124,
+      "height": 411
+    },
+    {
+      "name": "Sophie",
+      "age": 12,
+      "depth": "midground",
+      "left": 449,
+      "top": 986,
+      "width": 115,
+      "height": 352
+    },
+    {
+      "name": "Roger",
+      "age": 45,
+      "depth": "midground",
+      "left": 558,
+      "top": 927,
+      "width": 158,
+      "height": 411
+    },
+    {
+      "name": "Werner",
+      "age": 80,
+      "depth": "midground",
+      "left": 667,
+      "top": 951,
+      "width": 134,
+      "height": 387
+    },
+    {
+      "name": "Verena",
+      "age": 77,
+      "depth": "midground",
+      "left": 776,
+      "top": 951,
+      "width": 126,
+      "height": 387
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "watercolor children's storybook illustration, soft brushwork, gentle colors",
+  "runs": {
+    "grok": {
+      "elapsedMs": 8655,
+      "slots": 1
+    }
+  }
+}

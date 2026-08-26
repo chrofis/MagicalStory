@@ -1,0 +1,34 @@
+Re-render this composite as a unified watercolor children's-book INTRODUCTION PAGE illustration in this art style: traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, soft paint edges, visible artistic brushstrokes, luminous flowing colors. NOT photoreal. The composite shows 5 character cutouts and 1 prop cutout(s) on a landmark photo — your job is to paint everything as ONE cohesive scene where the figures, the props, and the landmark belong together.
+
+This is an introduction-page group portrait — warm, inviting, sets the mood for the story. The family is clustered together, INTERACTING with each other and with the props in front of them. Not a stiff line-up — they touch, hold, lean toward each other.
+
+CHARACTERS, left to right (mains in centre, other children flank them, adults on the wings):
+- Hans, age 68, left of frame (adult): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Daniel, age 38, centre of frame (adult): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Emma, age 5, centre of frame (main character — anchor of the group): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Noah, age 7, right of frame (child): match face/hair/skin/clothing exactly to the cutout in the composite.
+- Sarah, age 36, right of frame (adult): match face/hair/skin/clothing exactly to the cutout in the composite.
+
+SCENE (description of the real landmark — paint the background to match this, NOT some generic Old Town):
+A photograph shows the Haus zum Rüden building in Zurich, Switzerland, during a parade with people in historical costumes.
+
+FOREGROUND PROPS (already painted into the composite at the bottom — keep them in front of the family):
+- Schatztruhe: paint as the cutout shows it, on the ground in front of the characters.
+
+REQUIRED CHANGES (do all of these):
+- Render every figure, every prop, and the landmark in unified watercolor — textured paper, pencil underpainting, soft brushstrokes, luminous flowing colour. NOT photoreal.
+- ADD INTERACTION between adjacent characters: hands held, arm around shoulder, gentle hug, lean into each other. Children near the centre may rest a hand on a prop. Adults on the wings may have an arm around the next character. NOBODY just stands still — every figure is connected to a neighbour or a prop.
+- Keep the foreground props clearly IN FRONT of the family on the ground (cobblestones, etc.), partially overlapping the legs / waist line of the nearest figures.
+- Match a single global lighting direction across all figures, props, and the scene.
+- Add natural ground shadows under feet and props.
+- Soften cutout edges — figures and props sit naturally on the ground, not pasted-on.
+- All faces visible, opaque, age-appropriate proportions (children visibly shorter than adults).
+- Fill the entire canvas edge-to-edge — no borders, no white edges, no panels.
+
+PRESERVE EXACTLY:
+- Every character's face, hair colour, skin tone, clothing colour and detail.
+- Every prop's silhouette and material as shown in the composite.
+- Number of characters and their approximate left-to-right order.
+- The landmark architectural details from the SCENE description above.
+
+DO NOT add or remove characters. DO NOT swap which face goes where. NO TEXT, no letters, no signage in the image.

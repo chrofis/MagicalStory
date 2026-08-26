@@ -51,7 +51,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
        FROM landmark_index
       WHERE photo_url IS NULL
         AND type = ANY($1)
-      ORDER BY id${LIMIT ? ` LIMIT ${LIMIT}` : ''}`, [BACKDROP])).rows;
+      -- Newest first. The OLDEST photoless rows are the ones the 2026-06 A→Z
+      -- gap-fill already tried and failed on — art museums whose Commons
+      -- category holds the artworks not the building, stub QIDs, demolished
+      -- sites. Ordering by id ascending spends the whole run re-failing on
+      -- those and never reaches the rows that actually need filling.
+      ORDER BY id DESC${LIMIT ? ` LIMIT ${LIMIT}` : ''}`, [BACKDROP])).rows;
 
   console.log(`${STAGING ? 'STAGING' : 'PROD'}: ${rows.length} photoless backdrop landmark(s)`);
   if (DRY) { rows.slice(0, 10).forEach(r => console.log(`   ${r.type} — ${r.name}`)); await pool.end(); return; }

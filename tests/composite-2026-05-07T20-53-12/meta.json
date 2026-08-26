@@ -1,0 +1,55 @@
+{
+  "user": "1764881868108",
+  "story": "job_1778132269378_l6zq2m7b3",
+  "landmark": {
+    "id": 304,
+    "name": "Marktplatz Altdorf",
+    "attribution": "MagicalStory curated watercolor"
+  },
+  "characters": [
+    {
+      "name": "Lukas",
+      "age": 7,
+      "left": 24,
+      "top": 669,
+      "width": 279,
+      "height": 641
+    },
+    {
+      "name": "Manuel",
+      "age": 14,
+      "left": 214,
+      "top": 458,
+      "width": 420,
+      "height": 852
+    },
+    {
+      "name": "Franziska",
+      "age": 52,
+      "left": 404,
+      "top": 390,
+      "width": 435,
+      "height": 920
+    },
+    {
+      "name": "Sophie",
+      "age": 12,
+      "left": 594,
+      "top": 521,
+      "width": 406,
+      "height": 789
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "watercolor children's storybook illustration, soft brushwork, gentle colors",
+  "runs": {
+    "grok": {
+      "elapsedMs": 10287,
+      "slots": 5
+    },
+    "gemini": {
+      "elapsedMs": 8936,
+      "refs": 4
+    }
+  }
+}

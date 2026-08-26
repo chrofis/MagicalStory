@@ -1,0 +1,49 @@
+Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. Do NOT add any text, letters, words, labels, signatures, or watermarks.
+
+When a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the characters onto that background — do not redraw the environment. Preserve any calm, low-detail areas — they are reserved for text overlay.
+
+The attached reference photos are the source of truth for each character's face, hair, build, and clothing. Match them exactly. Where a text description and a reference photo disagree, follow the photo. The text descriptions below are supplementary.
+
+
+**CHARACTER REFERENCE PHOTOS (in order) — EXACTLY 3 characters, no more:**
+1. Uschi, Looks: middle aged, woman, Build: stocky. Age cues: adult proportions, mature bone structure with subtle signs of age, full adult height. Eyes: brown. Hair: brown, straight, ear-length, layered, side part right. Face: rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Distinctive marks: small pearl stud earrings, blue beaded necklace. Wearing: Hellviolettes langes Oberteil mit breitem silbernem Gürtel, dunkelgraue Hose, silberne Manschetten an beiden Handgelenken
+2. Werner, Looks: elderly, elderly man, Build: stocky. Age cues: older adult proportions, visible age markers (fine lines, softer musculature), often silver or graying hair. Eyes: brown. Hair: white, straight. Face: rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: Kastanienbraune Jacke mit breiten Schulterstreifen und goldenen Knöpfen, beige lange Hose, ein schmaler kastanienbrauner Umhang bis zur Schulter
+3. Verena, Looks: elderly, elderly woman, Build: average. Age cues: older adult proportions, visible age markers (fine lines, softer musculature), often silver or graying hair. Eyes: brown. Hair: silver, straight, chin-length, bangs below eyebrows, side part right. Face: soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Distinctive marks: Oval face with a gentle smile and glasses.. Wearing: Korallenfarbenes Oberteil mit breitem Rückenpaneel das wie gespreizten Flügeln wirkt, weisse lange Hose, korallenfarbene Manschetten
+INCLUDE ALL 3 characters above AND NO OTHERS. Every person in the image must match one of these references. Do NOT add extra figures, background people, or supporting characters.
+
+**HEIGHT ORDER (shortest to tallest):** Uschi (shortest) -> Verena (similar height) -> Werner (taller)
+
+
+
+**CHARACTER REFERENCE PHOTOS (in order) — EXACTLY 3 characters, no more:**
+1. Uschi, Looks: middle aged, woman, Build: stocky. Age cues: adult proportions, mature bone structure with subtle signs of age, full adult height. Eyes: brown. Hair: brown, straight, ear-length, layered, side part right. Face: rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Distinctive marks: small pearl stud earrings, blue beaded necklace. Wearing: Hellviolettes langes Oberteil mit breitem silbernem Gürtel, dunkelgraue Hose, silberne Manschetten an beiden Handgelenken
+2. Werner, Looks: elderly, elderly man, Build: stocky. Age cues: older adult proportions, visible age markers (fine lines, softer musculature), often silver or graying hair. Eyes: brown. Hair: white, straight. Face: rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: Kastanienbraune Jacke mit breiten Schulterstreifen und goldenen Knöpfen, beige lange Hose, ein schmaler kastanienbrauner Umhang bis zur Schulter
+3. Verena, Looks: elderly, elderly woman, Build: average. Age cues: older adult proportions, visible age markers (fine lines, softer musculature), often silver or graying hair. Eyes: brown. Hair: silver, straight, chin-length, bangs below eyebrows, side part right. Face: soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Distinctive marks: Oval face with a gentle smile and glasses.. Wearing: Korallenfarbenes Oberteil mit breitem Rückenpaneel das wie gespreizten Flügeln wirkt, weisse lange Hose, korallenfarbene Manschetten
+INCLUDE ALL 3 characters above AND NO OTHERS. Every person in the image must match one of these references. Do NOT add extra figures, background people, or supporting characters.
+
+**HEIGHT ORDER (shortest to tallest):** Uschi (shortest) -> Verena (similar height) -> Werner (taller)
+
+
+Werner stands at the center of a cobblestone street junction with both arms extended outward in a commanding gesture. To his left, Verena stands mid-turn toward the left lane. To his right, Uschi stands facing the right lane. Medieval Altstadt buildings rise on both sides, and the ruins of Stein castle are visible on the hillside above. Afternoon light casts long shadows down both diverging street lanes.
+
+- Werner:, middle-center midground, Commanding gesture with arms spread: left arm extended toward left lane (Verena), right arm extended toward right lane (Uschi), Direct gaze, authoritative presence, sharp focus, holding: extended outward in gesture
+- Verena:, middle-left midground, Turning/pivoting toward the left lane (Engelgasse direction) in response to Werner's direction, Focused attention, acknowledging direction, eyes clear and alert
+- Uschi:, middle-right midground, Standing prepared and attentive on the right side, ready to take her assigned position, Calm readiness, focused determination, eyes open and engaged
+
+Setting: Altstadt-Gassen Baden [Kirchgasse junction]. Cobblestone street junction in the medieval Altstadt of Baden. Cream and ochre plaster buildings with narrow windows and shutters frame both sides. Wrought-iron street lanterns stand sentinel at the corner. Above the slate rooflines, the rocky hillside rises with grey stone ruins of Stein castle visible against blue sky.
+Camera: Medium shot at street level, framed looking down the junction, showing all three figures in sharp focus against architectural geometry
+Depth: Characters in midground/foreground at junction center. Medieval buildings form middle-distance walls. Castle ruins visible in top-right background above roofline. Open cobblestone plaza extends outward from center point.
+Weather visibility: directly on scene - warm golden light, clear visibility
+
+**COMPOSITION:**
+- Characters must INTERACT with the scene — facing and engaging with objects, landmarks, or each other. NOT standing in front of a backdrop looking at the viewer.
+- Characters face TOWARD what they interact with. Eyes look at objects or other characters, NOT at the camera.
+- If a landmark, building, or object is in the BACKGROUND, characters must face AWAY from the camera toward it — we see their backs or sides as they look at it.
+- Each character must be DOING something specific (reaching, looking at, holding, walking toward). No static posing.
+- Foreground characters must be LARGER than background characters. Use size difference to show depth and perspective.
+
+
+
+
+
+**ART STYLE:** A photorealistic children's book illustration. Real people in real settings. Natural lighting, cinematic composition, shallow depth of field. Characters are real humans — natural proportions, real skin texture with pores, natural hair. NOT illustrated, NOT stylized, NOT animated. Think professional children's photography with storybook staging. Faces: real human faces with visible skin texture, natural eye size, defined features, warm natural lighting. Never cartoonish or stylized. Preserve each character's actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Lukas",
+    "photoType": "costumed-mittelalterlich",
+    "clothingCategory": "costumed",
+    "clothingDescription": "Kurze braune Wolltunika mit Lederriemen als Gürtel, beigefarbene Leinenhose, braune Lederschuhe mit Riemenverschluss, dunkelgrüne Wollkapuze"
+  },
+  {
+    "name": "Manuel",
+    "photoType": "costumed-mittelalterlich",
+    "clothingCategory": "costumed",
+    "clothingDescription": "Dunkelgrauer Wolljerkin über einem weissen Leinenhemd, graubraune Wollhosen, schwerer Ledergürtel mit Schnalle, Lederstiefel bis zum Knie, an einem Riemen über der Schulter eine hölzerne Armbrust"
+  }
+]

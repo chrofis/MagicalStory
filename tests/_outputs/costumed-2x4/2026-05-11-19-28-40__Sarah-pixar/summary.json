@@ -1,0 +1,17 @@
+{
+  "runStarted": "2026-05-11T19:28:40.565Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Sarah.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Sarah.jpg",
+    "costume": "medieval villager dress, apron, ankle boots",
+    "style": "pixar",
+    "name": "Sarah-pixar"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "error": "No image in response (finish=IMAGE_OTHER, text=\"\", safety=[])"
+    }
+  ],
+  "runFinished": "2026-05-11T19:28:52.701Z"
+}

@@ -1,0 +1,8 @@
+{
+  "model": "gemini-2.5-flash-image",
+  "style": "watercolor",
+  "durationMs": 7064,
+  "tokensIn": 630,
+  "tokensOut": 1290,
+  "finish": "STOP"
+}

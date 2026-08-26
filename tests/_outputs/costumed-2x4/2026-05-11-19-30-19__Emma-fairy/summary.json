@@ -1,0 +1,20 @@
+{
+  "runStarted": "2026-05-11T19:30:19.287Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Emma.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Emma.jpg",
+    "costume": "forest fairy costume — gauzy green dress, leaf-pattern wings, flower crown",
+    "style": "watercolor",
+    "name": "Emma-fairy"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 12042,
+      "tokensIn": 892,
+      "tokensOut": 1290,
+      "cells": 8
+    }
+  ],
+  "runFinished": "2026-05-11T19:30:32.006Z"
+}

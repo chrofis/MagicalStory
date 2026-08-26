@@ -1,0 +1,87 @@
+{
+  "scene": "G_holzbruecke_3img",
+  "mode": "three-image",
+  "bboxes": {
+    "Hans": {
+      "x": 778,
+      "y": 176,
+      "width": 319,
+      "height": 592,
+      "pixels": 84771
+    },
+    "Daniel": {
+      "x": 677,
+      "y": 245,
+      "width": 120,
+      "height": 443,
+      "pixels": 33256
+    },
+    "Emma": {
+      "x": 546,
+      "y": 346,
+      "width": 82,
+      "height": 270,
+      "pixels": 13788
+    },
+    "Noah": {
+      "x": 395,
+      "y": 399,
+      "width": 83,
+      "height": 294,
+      "pixels": 16284
+    }
+  },
+  "orientations": {
+    "Hans": {
+      "pose": "threeQuarter",
+      "flip": false,
+      "asymmetry": -0.7529850833032984,
+      "aspect": 1.8557993730407523,
+      "tierWidths": [
+        162,
+        317,
+        308
+      ],
+      "totalMass": 86011
+    },
+    "Daniel": {
+      "pose": "front",
+      "flip": false,
+      "asymmetry": 0.029287948039451527,
+      "aspect": 3.691666666666667,
+      "tierWidths": [
+        111,
+        111,
+        87
+      ],
+      "totalMass": 33256
+    },
+    "Emma": {
+      "pose": "front",
+      "flip": false,
+      "asymmetry": 0.05816652161299681,
+      "aspect": 3.292682926829268,
+      "tierWidths": [
+        77,
+        82,
+        74
+      ],
+      "totalMass": 13788
+    },
+    "Noah": {
+      "pose": "front",
+      "flip": false,
+      "asymmetry": 0.03413975193417659,
+      "aspect": 3.5421686746987953,
+      "tierWidths": [
+        68,
+        82,
+        79
+      ],
+      "totalMass": 16286
+    }
+  },
+  "bgMs": 4171,
+  "blockingMs": 5455,
+  "pass1Ms": 10092
+}

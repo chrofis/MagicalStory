@@ -1,0 +1,33 @@
+Create a 2x4 character sheet — 2 rows, 4 columns, 8 cells total. SAME person in every cell.
+
+TOP ROW — FACE-ONLY (forehead to chin), keep the ORIGINAL reference art style:
+- Cell 1 (top-left): face FRONT (0°, nose pointing at camera).
+- Cell 2: face turned 45° to the camera's right (three-quarter view, nose pointing right-forward).
+- Cell 3: face in profile, turned 90° to the camera's right (nose pointing right, ear visible).
+- Cell 4 (top-right): back of the head (180°, viewer sees the rear of the hair, no face).
+
+BOTTOM ROW — FULL BODY, NEW art style with costume. watercolor children's storybook illustration, soft brushwork, gentle colors, warm friendly mood Wearing: pirate costume — wide-brimmed brown tricorn hat with a feather, white shirt, red sash at the waist, dark breeches, brown boots
+- Cell 5 (bottom-left): full body FRONT (0°), feet planted, arms relaxed at sides.
+- Cell 6: full body turned 45° to the camera's right (three-quarter body view, leading shoulder forward).
+- Cell 7: full body side profile, turned 90° right (one shoulder closest to camera, the other in front of it).
+- Cell 8 (bottom-right): full body BACK view (180°, viewer sees back of the head and back of the costume; heels closer to camera than toes).
+
+LAYOUT:
+- 2 rows × 4 columns. Equal cell sizes. Plain light-grey studio background in every cell.
+- Top row stays in the reference image's art style (exact face copies, just at the listed angles).
+- Bottom row uses the new watercolor children's storybook illustration, soft brushwork, gentle colors, warm friendly mood style and shows the costume.
+
+CRITICAL CONSISTENCY:
+- All 8 cells show the SAME person. Same identity, same face, same hair.
+- Top row angles are face-only — no shoulders, no clothing.
+- Bottom row shows the FULL body from head to feet in every cell, costume always visible.
+- The 180° (back) cells must clearly show the back of the head / back of the costume — no face peeking, no over-shoulder glance.
+- No hats or head coverings unless the costume requires one. Face must remain visible in cells 1, 2, 3.
+
+PHYSICAL TRAITS TO PRESERVE (must match reference exactly):
+See reference photos — preserve face, hair colour, build, skin tone, glasses, and any visible distinguishing features exactly.
+
+REQUIREMENTS:
+- GLASSES: If the reference person wears glasses, all 8 cells show glasses. If no glasses in reference, no glasses anywhere.
+- HAIR COLOR: Match the reference photo exactly. Blonde stays blonde, brown stays brown, red stays red.
+- Body proportions: use the EXACT age and head-to-body ratio from PHYSICAL TRAITS. A toddler, child, teenager, and adult all look very different — do not make the figure look younger or older than stated.

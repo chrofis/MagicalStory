@@ -1,0 +1,27 @@
+[
+  {
+    "framing": "A_before_manuel_ready",
+    "status": "ok",
+    "elapsedMs": 7368
+  },
+  {
+    "framing": "B_before_lukas_tense_scared",
+    "status": "ok",
+    "elapsedMs": 8419
+  },
+  {
+    "framing": "C_pov_distant_lukas",
+    "status": "ok",
+    "elapsedMs": 8092
+  },
+  {
+    "framing": "D2_over_shoulder_distant_kid",
+    "status": "ok",
+    "elapsedMs": 8666
+  },
+  {
+    "framing": "E_aftermath_pierced_apple",
+    "status": "ok",
+    "elapsedMs": 9013
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "scene": "E_appleshot_blocking",
+  "mode": "blocking",
+  "bboxes": {
+    "Hans": {
+      "x": 608,
+      "y": 278,
+      "width": 388,
+      "height": 490,
+      "pixels": 83360
+    },
+    "Emma": null,
+    "Daniel": null,
+    "Noah": {
+      "x": 385,
+      "y": 454,
+      "width": 80,
+      "height": 288,
+      "pixels": 14573
+    }
+  },
+  "blockingMs": 4554,
+  "cleanMs": 3311,
+  "pass1Ms": 5606
+}

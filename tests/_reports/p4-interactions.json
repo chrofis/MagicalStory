@@ -1,0 +1,52 @@
+{
+  "interactions": [
+    {
+      "character": "Roger",
+      "object": "Rogers Armbrust",
+      "where": "holds horizontal, aims across the square"
+    },
+    {
+      "character": "Lukas",
+      "object": "Der Apfel",
+      "where": "balanced on top of head"
+    }
+  ],
+  "objects": [
+    "Rogers Armbrust",
+    "Der Apfel"
+  ],
+  "characters": [
+    {
+      "name": "Roger",
+      "clothing": "costumed:mittelalterlich",
+      "position": "far left background, kneeling",
+      "perspective": "facing right",
+      "depth": "background"
+    },
+    {
+      "name": "Lukas",
+      "clothing": "costumed:mittelalterlich",
+      "position": "far right background, standing against bare tree",
+      "perspective": "facing the camera",
+      "depth": "background"
+    },
+    {
+      "name": "Sophie",
+      "clothing": "costumed:mittelalterlich",
+      "position": "right midground, in crowd",
+      "depth": "midground"
+    },
+    {
+      "name": "Manuel",
+      "clothing": "costumed:mittelalterlich",
+      "position": "right midground, in crowd",
+      "depth": "midground"
+    },
+    {
+      "name": "Verena",
+      "clothing": "costumed:mittelalterlich",
+      "position": "right midground, in crowd",
+      "depth": "midground"
+    }
+  ]
+}

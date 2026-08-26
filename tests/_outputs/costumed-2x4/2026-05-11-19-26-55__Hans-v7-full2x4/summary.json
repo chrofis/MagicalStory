@@ -1,0 +1,20 @@
+{
+  "runStarted": "2026-05-11T19:26:55.023Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Hans.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Hans.jpg",
+    "costume": "pirate costume — wide-brimmed brown tricorn hat with feather, white shirt, red sash at waist, dark breeches, brown boots",
+    "style": "watercolor",
+    "name": "Hans-v7-full2x4"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 11830,
+      "tokensIn": 905,
+      "tokensOut": 1290,
+      "cells": 8
+    }
+  ],
+  "runFinished": "2026-05-11T19:27:07.554Z"
+}

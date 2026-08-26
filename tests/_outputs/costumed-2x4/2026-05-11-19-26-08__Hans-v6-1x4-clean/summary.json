@@ -1,0 +1,20 @@
+{
+  "runStarted": "2026-05-11T19:26:08.071Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Hans.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Hans.jpg",
+    "costume": "pirate costume, white shirt, red sash, dark breeches",
+    "style": "watercolor",
+    "name": "Hans-v6-1x4-clean"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 12131,
+      "tokensIn": 745,
+      "tokensOut": 1290,
+      "cells": 8
+    }
+  ],
+  "runFinished": "2026-05-11T19:26:20.811Z"
+}

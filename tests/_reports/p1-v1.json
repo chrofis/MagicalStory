@@ -1,0 +1,41 @@
+{
+  "title": "Zwei Bolzen für die Freiheit",
+  "artStyle": "watercolor",
+  "versions": 7,
+  "bestSource": "inpaint-round-3",
+  "v1": {
+    "source": "original",
+    "modelId": "grok-imagine-image",
+    "qualityScore": 0,
+    "semanticScore": 60,
+    "fixableIssues": [
+      {
+        "fix": "Remove the hand-holding interaction between the boy in the center and the soldier on the right. Ensure the boy is only holding the hand of the man on the left.",
+        "type": "physics",
+        "severity": "MAJOR",
+        "character": "Lukas",
+        "description": "Lukas is holding Soldier1's hand, and Soldier1 is holding Lukas's hand, which was not requested in the prompt. The prompt only specified Lukas holding Roger's hand."
+      },
+      {
+        "fix": "Reposition the soldier to the centre background, behind the man and boy, and adjust his scale to be consistent with a background figure.",
+        "type": "position",
+        "severity": "CRITICAL",
+        "character": "Soldier1",
+        "description": "Soldier1 is rendered in the right-foreground, but the prompt specified 'centre background'."
+      },
+      {
+        "fix": "Recolour Roger's hair to dark brown/black with grey only at the temples, and adjust facial rendering to reduce apparent age from elderly to middle-aged (reduce deep wrinkles, adjust skin texture).",
+        "type": "age_and_hair",
+        "severity": "MAJOR",
+        "description": "Roger reads as elderly (grey hair, aged appearance) rather than middle-aged with dark hair greying only at the temples. His hair should be predominantly dark with grey restricted to the temples."
+      },
+      {
+        "fix": "Move Soldier1 to the centre-background near the base of the pole, remove his hand-holding connection to Lukas, and pose him with mouth open as if calling out/proclaiming to the crowd.",
+        "type": "position_and_role",
+        "severity": "MODERATE",
+        "description": "Soldier1 is in the right-foreground holding Lukas's hand instead of standing at the base of the central pole in the background calling out to townsfolk. This makes him appear as a companion rather than an authority figure enforcing the hat-salute decree."
+      }
+    ],
+    "sceneDescription": "Roger, a middle-aged man with a sturdy build, dark hair greying at the temples, and a weathered face etched with quiet resolve, walks across the Marktplatz Altdorf holding the small hand of Lukas, a school-age boy with light brown hair and curious eyes, dressed in a simple linen tunic. The November afternoon is cool and grey; the air carries the smell of wood smoke and wet fallen leaves scattered across the stone square. In the centre of the plaza, dominating the composition, stands a tall wooden pole planted vertically in the ground—roughly three times a man's height—with Gesslers Hut auf der Stange secured at its very top: a wide-brimmed dark wool hat with a rounded crown, tied on with a visible cord looped around the pole tip, swaying slightly in the breeze. At the base of the pole, a Soldier1—an adult of average stocky build with short dark brown hair, brown eyes, and a clean-shaven square jaw—stands alert in his dark iron chain mail hauberk worn over a dark olive padded linen gambeson, dark brown leather gauntlets, a plain iron skullcap, dark wool trousers, and heavy leather boots; his mouth is open as if calling out in proclamation to the gathered townsfolk. Lukas gazes upward at the hat on the pole, his small face turning back toward Roger with a puzzled expression as he squeezes his father's hand. Roger faces left, looking down at his son with a calm, measured expression, his posture steady and protective. The square stretches wide behind them, with anonymous market-goers in rust, brown, and grey wool cloaks and tunics visible in soft focus at the margins—a distant crowd of villagers moving slowly through the plaza, some pausing to acknowledge the pole. Medium-wide shot capturing the tension between the intimate moment of father and child and the imposing symbol of authority at the square's heart.\n\n---METADATA---\n\n```json\n{\n  \"characters\": [\n    {\"name\": \"Roger\", \"clothing\": \"standard\", \"position\": \"centre-left foreground\"},\n    {\"name\": \"Lukas\", \"clothing\":"
+  }
+}

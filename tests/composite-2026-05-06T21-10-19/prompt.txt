@@ -1,0 +1,19 @@
+Reference image 1 is a real photograph of "Tellsplatte (boat jump)" — that landmark IS the background of the illustration you must produce.
+Reference images 2 onwards are individual character photos. Each one is the IDENTITY reference for one character.
+
+Generate ONE unified illustration in this art style: watercolor children's storybook illustration, soft brushwork, gentle colors.
+
+CHARACTERS (left to right) and their placement:
+- Emma (age 5) stands in the left foreground (~11% across), small full-body. Use reference image 2 for Emma's face, hair, skin tone, and clothing.
+- Noah (age 7) stands in the center foreground (~33% across), medium full-body. Use reference image 3 for Noah's face, hair, skin tone, and clothing.
+- Daniel (age 38) stands in the right foreground (~68% across), tall full-body. Use reference image 4 for Daniel's face, hair, skin tone, and clothing.
+- Sarah (age 36) stands in the right foreground (~89% across), tall full-body. Use reference image 5 for Sarah's face, hair, skin tone, and clothing.
+
+REQUIREMENTS:
+- Render the landmark from reference 1 as the background.
+- Each character's face, hair, skin tone, and clothing must match their numbered reference photo.
+- All characters stand on the ground (natural ground shadows under each one). Heights age-proportional (children shorter than adults).
+- Render in the named art style, NOT photoreal.
+- Match lighting direction and color temperature consistently across the whole scene.
+
+DO NOT add or remove characters. DO NOT swap which face goes where. DO NOT make characters stand in lines like a group photo — let them face the scene with subtle interactions.

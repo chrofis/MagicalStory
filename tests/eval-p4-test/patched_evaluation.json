@@ -1,0 +1,27 @@
+{
+  "qualityScore": 80,
+  "verdict": "PASS",
+  "issuesSummary": "Soldiers' clothing and hair do not match references.; THREE-STAGE: Sophie's primary declared interaction is missing: her right hand should be pressing flat against the wooden stall frame upright, but inventory shows both hands holding nothing at her sides. This is a CRITICAL mismatch of the declared interaction. The character, clothing, position, and facing direction are all correct, but the interaction detail is not present.",
+  "fixableIssues": [
+    {
+      "description": "Soldier 1 has incorrect clothing and hair",
+      "severity": "MAJOR",
+      "type": "clothing",
+      "character": "Soldier 1",
+      "fix": "Change clothing to match reference and adjust hair to match reference"
+    },
+    {
+      "description": "Soldier 2 has incorrect clothing and hair",
+      "severity": "MAJOR",
+      "type": "clothing",
+      "character": "Soldier 2",
+      "fix": "Change clothing to match reference and adjust hair to match reference"
+    },
+    {
+      "description": "Right hand should be pressing flat against the wooden upright of the market stall frame at her side, but both hands are shown at rest with nothing held",
+      "severity": "CRITICAL",
+      "type": "interaction_pose",
+      "fix": "Reposition Sophie's right hand to press flat against the wooden stall frame upright to her right side"
+    }
+  ]
+}

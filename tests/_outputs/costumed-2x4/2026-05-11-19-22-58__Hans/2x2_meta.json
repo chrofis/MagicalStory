@@ -1,0 +1,35 @@
+{
+  "durationMs": 11064,
+  "tokensIn": 1184,
+  "tokensOut": 1290,
+  "width": 1024,
+  "height": 1024,
+  "cellW": 512,
+  "cellH": 512,
+  "cells": [
+    {
+      "idx": 1,
+      "row": 1,
+      "col": 1,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-22-58__Hans\\2x2_cell1.png"
+    },
+    {
+      "idx": 2,
+      "row": 1,
+      "col": 2,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-22-58__Hans\\2x2_cell2.png"
+    },
+    {
+      "idx": 3,
+      "row": 2,
+      "col": 1,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-22-58__Hans\\2x2_cell3.png"
+    },
+    {
+      "idx": 4,
+      "row": 2,
+      "col": 2,
+      "outPath": "C:\\Users\\roger\\MagicalStory\\tests\\_outputs\\costumed-2x4\\2026-05-11-19-22-58__Hans\\2x2_cell4.png"
+    }
+  ]
+}

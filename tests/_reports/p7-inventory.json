@@ -1,0 +1,68 @@
+{
+  "page": 7,
+  "bestSource": "iterate-round-1",
+  "versions": [
+    {
+      "i": 0,
+      "type": "original",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 0,
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    },
+    {
+      "i": 1,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 80,
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    },
+    {
+      "i": 2,
+      "type": "repair",
+      "modelId": "grok-imagine",
+      "qualityScore": 50,
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    },
+    {
+      "i": 3,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 80,
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    },
+    {
+      "i": 4,
+      "type": "repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "qualityScore": null,
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    },
+    {
+      "i": 5,
+      "type": "entity-repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "qualityScore": 50,
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    },
+    {
+      "i": 6,
+      "type": "scale-repair",
+      "modelId": "grok-imagine-image",
+      "visionInventoryLen": 0,
+      "visionInventory": null,
+      "availableKeys": []
+    }
+  ]
+}

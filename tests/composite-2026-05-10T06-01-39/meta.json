@@ -1,0 +1,68 @@
+{
+  "user": "cc14c57c-a9c6-4682-87b2-f75b4c8610e2",
+  "story": "job_1778268595639_n3v7erasi",
+  "title": "Das Geheimnis der Flaschenpost",
+  "landmark": {
+    "id": 138,
+    "name": "Zurich Old Town",
+    "attribution": "Photo by Der Wolf im Wald via Wikimedia Commons"
+  },
+  "characters": [
+    {
+      "name": "Hans",
+      "age": 68,
+      "depth": "foreground",
+      "left": 58,
+      "top": 590,
+      "width": 262,
+      "height": 720
+    },
+    {
+      "name": "Daniel",
+      "age": 38,
+      "depth": "foreground",
+      "left": 252,
+      "top": 568,
+      "width": 277,
+      "height": 742
+    },
+    {
+      "name": "Emma",
+      "age": 5,
+      "depth": "foreground",
+      "left": 476,
+      "top": 844,
+      "width": 151,
+      "height": 466
+    },
+    {
+      "name": "Noah",
+      "age": 7,
+      "depth": "foreground",
+      "left": 583,
+      "top": 793,
+      "width": 196,
+      "height": 517
+    },
+    {
+      "name": "Sarah",
+      "age": 36,
+      "depth": "foreground",
+      "left": 728,
+      "top": 568,
+      "width": 215,
+      "height": 742
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, soft paint edges, visible artistic brushstrokes, luminous flowing colors",
+  "runs": {
+    "grok": {
+      "elapsedMs": 8743,
+      "slots": 1
+    },
+    "grokPass2": {
+      "elapsedMs": 5802
+    }
+  }
+}

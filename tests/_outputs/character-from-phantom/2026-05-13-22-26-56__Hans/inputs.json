@@ -1,0 +1,8 @@
+{
+  "face": "tests/fixtures/demo-photos/berger/Hans.jpg",
+  "phantom": "server/assets/phantom-watercolor.png",
+  "costume": "pirate costume, white shirt, red sash, dark breeches, black tricorn hat",
+  "style": "watercolor",
+  "name": "Hans",
+  "backend": "grok"
+}

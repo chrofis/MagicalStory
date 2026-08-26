@@ -1,0 +1,30 @@
+{
+  "Hans": {
+    "x": 769,
+    "y": 203,
+    "width": 300,
+    "height": 565,
+    "pixels": 75497
+  },
+  "Daniel": {
+    "x": 676,
+    "y": 244,
+    "width": 125,
+    "height": 524,
+    "pixels": 43914
+  },
+  "Emma": {
+    "x": 538,
+    "y": 368,
+    "width": 78,
+    "height": 285,
+    "pixels": 14772
+  },
+  "Noah": {
+    "x": 368,
+    "y": 387,
+    "width": 95,
+    "height": 284,
+    "pixels": 17305
+  }
+}

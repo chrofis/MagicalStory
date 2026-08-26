@@ -1,0 +1,8 @@
+{
+  "face": "tests/fixtures/demo-photos/berger/Hans.jpg",
+  "phantom": "tests/_outputs/phantom/phantom_grok_watercolor_single_2026-05-11-20-08-16.png",
+  "costume": "pirate costume, white shirt, red sash, dark breeches, brown boots, tricorn hat with feather",
+  "style": "watercolor",
+  "name": "Hans-variantB",
+  "backend": "grok"
+}

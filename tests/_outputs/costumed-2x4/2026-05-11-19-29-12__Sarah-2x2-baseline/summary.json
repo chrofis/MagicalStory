@@ -1,0 +1,21 @@
+{
+  "runStarted": "2026-05-11T19:29:12.661Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Sarah.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Sarah.jpg",
+    "costume": "medieval villager dress, apron",
+    "style": "watercolor",
+    "name": "Sarah-2x2-baseline"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "error": "No image in response (finish=IMAGE_OTHER, text=\"\", safety=[])"
+    },
+    {
+      "shape": "2x2",
+      "error": "No image in response (finish=IMAGE_OTHER, text=\"\", safety=[])"
+    }
+  ],
+  "runFinished": "2026-05-11T19:29:35.664Z"
+}

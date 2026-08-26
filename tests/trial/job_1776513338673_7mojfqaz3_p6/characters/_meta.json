@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Lukas",
+    "photoType": "clothing-summer",
+    "clothingCategory": "summer",
+    "clothingDescription": "blue and light blue striped short-sleeve t-shirt, dark blue shorts, green and black flip-flops"
+  },
+  {
+    "name": "Franziska",
+    "photoType": "clothing-summer",
+    "clothingCategory": "summer",
+    "clothingDescription": "white and blue floral print v-neck midi dress, brown sandals"
+  }
+]

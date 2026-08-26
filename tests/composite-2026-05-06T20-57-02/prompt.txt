@@ -1,0 +1,16 @@
+This is a composite image: bg-removed character photographs pasted onto a real photograph of "Tellsplatte (boat jump)". Re-render the entire image as ONE unified illustration in this art style: watercolor children's storybook illustration, soft brushwork, gentle colors.
+
+PRESERVE EXACTLY (do not change):
+- Each character's face, hair, skin tone, body shape, and clothing.
+- The number of characters and their approximate position.
+- The landmark's silhouette, architecture, geography.
+
+FIX (this is your job):
+- Render everything in the named art style — NOT photoreal.
+- Match lighting direction and color temperature on every character to the landmark's lighting.
+- Add ground shadows so each character stands on the ground.
+- COMPLETE any character whose legs or feet were cropped in the source photo so they stand naturally on the ground.
+- Soften the cutout edges so figures blend with the environment.
+- Add small environmental interaction (dust, foliage at feet, shadow on cobblestone) so characters belong in the scene.
+
+DO NOT add or remove characters. DO NOT replace any face.

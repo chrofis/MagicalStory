@@ -1,0 +1,13 @@
+{
+  "storyId": "job_1778268595639_n3v7erasi",
+  "hintKey": "initialPage",
+  "title": "Das Geheimnis der Flaschenpost",
+  "sequence": [
+    "Noah",
+    "Daniel",
+    "Hans",
+    "Emma",
+    "Sarah"
+  ],
+  "modelId": "grok-imagine-image"
+}

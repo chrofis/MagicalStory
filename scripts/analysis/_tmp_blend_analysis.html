@@ -1,0 +1,104 @@
+<title>Blend Prompt — Faults &amp; Rewrites</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1c1b19;--mut:#6d6a65;--line:#e3e0da;--card:#fff;--acc:#b4442e;--ok:#2f6f4e;--warn:#8a6d1f;}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;--warn:#c9a227;}}
+:root[data-theme="dark"]{--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;--warn:#c9a227;}
+body{background:var(--bg);color:var(--fg);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:34px 24px 90px;}
+.wrap{max-width:1000px;margin:0 auto;} h1{font-size:27px;margin:0 0 6px;letter-spacing:-.02em;}
+h2{font-size:19px;margin:38px 0 14px;padding-top:14px;border-top:1px solid var(--line);}
+.lede{color:var(--mut);max-width:78ch;margin:0 0 18px;}
+.sum{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:14px 18px;margin:0 0 8px;font-size:14px;}
+.issue{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:14px 18px;margin:0 0 12px;}
+.issue.bug{border-left:3px solid var(--acc);} .issue.contradiction{border-left:3px solid var(--warn);} .issue.design{border-left:3px solid var(--mut);}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:99px;color:#fff;vertical-align:2px;margin-right:8px;}
+.tag.bug{background:var(--acc);} .tag.contradiction{background:var(--warn);} .tag.design{background:var(--mut);}
+.issue h3{font-size:15.5px;margin:0 0 8px;display:inline;}
+.ev{font-size:13.5px;color:var(--mut);margin:9px 0 0;padding-left:12px;border-left:2px solid var(--line);}
+.why{font-size:14px;margin:9px 0 0;}
+.appr{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:16px 20px;margin:0 0 14px;}
+.appr h3{font-size:16.5px;margin:0 0 10px;}
+.appr .k{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:6px;background:var(--fg);color:var(--bg);font-weight:700;margin-right:9px;font-size:14px;}
+.appr dl{display:grid;grid-template-columns:max-content 1fr;gap:5px 14px;margin:10px 0 0;font-size:13.5px;}
+.appr dt{color:var(--mut);font-weight:600;} .appr dd{margin:0;}
+code{background:var(--line);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+</style>
+<div class="wrap">
+<h1>The blend prompt: what is wrong with it, and three ways out</h1>
+<p class="lede">Everything below is measured against the exact prompt that ran in Lab exp 848 (5451 chars, 41 lines) and the image it produced — a duplicated character and a re-framed shot, on a page where every step before the blend was correct.</p>
+<div class="sum"><b>Two are outright bugs</b> — a blind mid-word truncation and a reference to an image that was never attached. <b>Three are internal contradictions</b>, where the prompt asks for opposite things in two places. <b>Five are structural</b>, and no amount of extra prompt text will fix them: the two failures exp 848 actually produced were both already forbidden, in writing, in that prompt.</div>
+
+<h2>The ten faults</h2>
+<div class="issue bug">
+  <span class="tag bug">BUG</span><h3>1. THE SCENE is cut mid-word at exactly 900 chars</h3>
+  <p class="ev"><code>sceneComposite.js:1704</code> — <code>.slice(0, 900)</code>. The block ends <i>"…chin-length straight bl"</i>. Sarah's description dies mid-sentence and Hans never appears in that block at all. The prompt measured <b>5451 chars against an 8000 cap — 2549 chars of headroom</b>, so nothing forced the cut.</p>
+  <p class="why">It is the blind-cut pattern already logged as an incident: <code>images.js:635-642</code> records a 9.4k prompt cut at 7.5k that "lost its entire ART STYLE block and rendered photographic on every roll (3/3 measured)". The plate builder next door does this properly via <code>shrinkSetting</code>, which measures and protects. The blend does not.</p>
+</div><div class="issue bug">
+  <span class="tag bug">BUG</span><h3>2. The prompt cites an Image 2 that was never attached</h3>
+  <p class="ev"><i>"Faces, hair, age and clothing stay as Image 1 <b>and the labelled portrait grid</b> show them."</i> That page has no grid — <code>visualBibleGrid</code> absent, <code>hasVisualBibleGrid</code> undefined, zero grid rows in <code>story_images</code>. So <code>blendRefs</code> was <code>[composited]</code> alone.</p>
+  <p class="why">The one instruction anchoring identity points at an image that is not in the call. A dangling reference does not merely fail to help — it invites the model to supply the missing reference itself.</p>
+</div><div class="issue contradiction">
+  <span class="tag contradiction">CONTRADICTION</span><h3>3. "cinematic composition" invites the re-framing the DO-NOT forbids</h3>
+  <p class="ev">Art style block: <i>"…warm natural light, real-world textures, <b>cinematic composition</b>."</i> DO NOT block: <i>"Do not re-frame: same camera distance, same borders, same crop."</i></p>
+  <p class="why">Composition IS framing. The style line asks for a well-composed shot and the constraint forbids changing the shot. In exp 848 the camera pulled in and cropped out the bridge and tower — the style line won. This is the same class of defect as the one <code>3ad9e1a12</code> just fixed: two clauses in one prompt asking for opposite things.</p>
+</div><div class="issue design">
+  <span class="tag design">DESIGN</span><h3>4. Four different edit classes in one pass</h3>
+  <p class="ev">Turn bodies · adjust heads, arms and hands · repaint faces to named expressions · soften edges, match light, add contact shadows.</p>
+  <p class="why">A single Grok edit call is being asked to do a pose pass, an expression pass and a compositing pass at once. The more simultaneous latitude a whole-frame edit is given, the more it re-imagines rather than adjusts.</p>
+</div><div class="issue design">
+  <span class="tag design">DESIGN</span><h3>5. The constraints are negations, and the two that mattered were ignored</h3>
+  <p class="ev">Four <code>DO NOT</code> bullets. Exp 848 <b>added a character</b> (forbidden explicitly) and <b>re-framed</b> (forbidden explicitly).</p>
+  <p class="why">Both failures were already named in the prompt. Adding more prohibition text cannot fix a failure whose prohibition is already there and already ignored — image models weight negation poorly, and naming a thing can prime it.</p>
+</div><div class="issue design">
+  <span class="tag design">DESIGN</span><h3>6. The change signal is duplicated; the preservation signal is not</h3>
+  <p class="ev">Each character's action appears <b>twice</b> — once as <code>doing:</code> under WHO IS IN THE PICTURE and again under CHANGE THESE. Clothing appears twice — once in THE SCENE, once as <code>wearing:</code>. "kneels at the gap in the bridge railing" appears twice; "stands at the water" appears twice.</p>
+  <p class="why">Roughly a third of the prompt is restated content, and what gets restated is what to CHANGE. "Do not move anyone" is said once.</p>
+</div><div class="issue contradiction">
+  <span class="tag contradiction">CONTRADICTION</span><h3>7. Repaint the faces, but keep the faces</h3>
+  <p class="ev"><i>"repaint their faces so that each one is doing what the scene asks"</i> versus <i>"Faces, hair, age and clothing stay as Image 1."</i></p>
+  <p class="why">Both are wanted — new expression, same identity — but the prompt states them as a flat contradiction and leaves the model to find the seam.</p>
+</div><div class="issue design">
+  <span class="tag design">DESIGN</span><h3>8. The occlusion clause never names the occluder</h3>
+  <p class="ev"><i>"<b>something</b> in the scene crosses in FRONT of them, so only part of them shows."</i> The occluder is the bridge parapet, and the prompt knows it — the same prompt says Daniel kneels "at a gap in the bridge's railing".</p>
+  <p class="why">The model must infer which element is doing the hiding before it can preserve the relationship. In 848 it resolved the ambiguity by drawing a second, unoccluded Daniel.</p>
+</div><div class="issue design">
+  <span class="tag design">DESIGN</span><h3>9. The key spatial constraint is the last line, after the art style</h3>
+  <p class="ev"><i>"Depths as staged: Daniel is in the background — small and distant…"</i> sits below the style block, detached from the WHO block it describes.</p>
+  <p class="why">The one line that pins relative size is orphaned at the bottom, while per-character depth already appears in WHO as prose ("in the distance"). Two half-statements in two places instead of one authoritative one.</p>
+</div><div class="issue design">
+  <span class="tag design">DESIGN</span><h3>10. The prompt is framed as a deficit, not as a target</h3>
+  <p class="ev">It opens: <i>"What is wrong is that they were pasted in: they stand stiff, blank-faced and disengaged."</i></p>
+  <p class="why">It tells the model the picture is broken, then hands it the whole frame. A model told an image is wrong is licensed to fix whatever it judges wrong — including the framing and the cast.</p>
+</div>
+
+<h2>Three ways to do it better</h2>
+<p class="lede">These are not variations on wording. Each changes <i>what the model is allowed to touch</i> — because the evidence says wording alone is not the lever.</p>
+<div class="appr">
+  <h3><span class="k">A</span>Masked per-figure edits — make the violations impossible</h3>
+  <p>Stop editing the whole frame. Run one small masked edit per figure, confined to that figure's bounding box, with a two-line prompt: the action, the expression, and "match the surrounding light". The background, the framing and the cast list are physically outside every write region.</p>
+  <dl>
+    <dt>fixes</dt><dd>1, 3, 4, 5, 8, 10 — re-framing and character-duplication become structurally unreachable rather than forbidden by text.</dd>
+    <dt>leaves open</dt><dd>Identity anchoring still needs the grid (issue 2) attached per-crop.</dd>
+    <dt>cost</dt><dd>N calls instead of 1. Three figures = 3 edits ≈ the same $0.06, but more wall-clock. Edge blending has to come from the existing feathering rather than the model.</dd>
+    <dt>risk</dt><dd>Per-figure edits cannot produce cross-figure interaction (two characters looking at each other reads as two independent edits). Seams at mask borders. The machinery exists — <code>faceRepair.js</code> and <code>samBlend.js</code> both do masked writes with the 70%-revert guard.</dd>
+  </dl>
+</div><div class="appr">
+  <h3><span class="k">B</span>Describe the finished picture, not the repairs</h3>
+  <p>Rewrite as a single positive description of the output, in the shape of an ordinary generation prompt: "A photograph of a woman at the water's edge in the left foreground…, an elderly man in the middle distance…, and a small distant man kneeling behind the bridge parapet, only his upper body visible above it. Same framing as the input image." No DO-NOTs, no deficit framing, no repeated action lines, occluder named, depth stated once inside each character's own sentence.</p>
+  <dl>
+    <dt>fixes</dt><dd>3, 5, 6, 7, 8, 9, 10 — every contradiction and the entire negation dependency.</dd>
+    <dt>leaves open</dt><dd>Still a whole-frame edit, so re-framing stays possible in principle — it just is not being invited any more.</dd>
+    <dt>cost</dt><dd>One prompt rewrite. Same 3 model calls, same $0.06 per run. By far the cheapest to test.</dd>
+    <dt>risk</dt><dd>Least structural. If Grok re-frames anyway, this tells us the whole-frame blend is unsalvageable — which is itself a decisive answer worth $0.06.</dd>
+  </dl>
+</div><div class="appr">
+  <h3><span class="k">C</span>Two passes, one job each: pose+face on crops, then a 3-line settle</h3>
+  <p>Pass 1 edits each figure on a tight crop (pose and expression only — no scene text at all, so nothing to re-frame), pasted back. Pass 2 is a whole-image call whose entire prompt is: soften the pasted edges, match everyone to the scene light, add contact shadows. No characters named, no actions, no depths, nothing to re-interpret.</p>
+  <dl>
+    <dt>fixes</dt><dd>3, 4, 5, 6, 7, 9, 10 — each call gets one job and a prompt short enough to have no room for ambiguity.</dd>
+    <dt>leaves open</dt><dd>Crops still need identity refs (issue 2).</dd>
+    <dt>cost</dt><dd>N+1 calls. Four figures = 5 calls, roughly double today. Call it ~$0.10-0.12 per page.</dd>
+    <dt>risk</dt><dd>The most work to build. But it is the only option that keeps a genuine global blending pass while removing every reason for that pass to touch content — the settle prompt would be short enough to read in one breath.</dd>
+  </dl>
+</div>
+<div class="sum" style="border-left-color:var(--ok);margin-top:20px"><b>Regardless of which:</b> fault 1 and fault 2 are bugs that should be fixed under any of the three, and both are small. Fixing them alone changes what the model sees — the blend has never yet run with a complete scene description or an identity reference attached, so no verdict so far has tested the prompt as designed.</div>
+</div>

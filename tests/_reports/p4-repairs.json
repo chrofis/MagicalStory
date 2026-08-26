@@ -1,0 +1,191 @@
+{
+  "page": 4,
+  "bestSource": "inpaint-round-3",
+  "versions": [
+    {
+      "i": 0,
+      "type": "original",
+      "modelId": "grok-imagine-image",
+      "promptLen": 6411,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "aracters fill roughly the lower half of the frame, large, with feet on the ground. \"midground\" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. \"background\" characters are small, distant, far behind. Foreground larger than midground larger than background.\n- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled \"foreground\". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: holds horizontal, aims across the square\n- Lukas: balanced on top of head",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 1,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "promptLen": 8218,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "\nEXACT POSES:\n- Roger: both hands gripping stock, horizontal hold, aimed diagonally right across plaza\n- Lukas: balanced on top of head\n- Lukas: standing motionless against tree, back of body near trunk\n\nIMPORTANT — fix these issues from the previous generation:\n- Roger is described as being in the 'far left background' and should be rendered significantly smaller to convey the 'vast distance' and relative scale to Lukas. He is currently in the midground and too large.\n- Lukas is described as 'roughly a sixth the size of Roger across the vast distance'. He is rendered too large relative to Roger, failing to convey the intended scale and distance, and the 'dwarfed' effect.\n- The scene lacks the 'vast grey cobblestone Marktplatz Altdorf' and 'vast distance' between the main characters, which is crucial for the 'tension mounting' aspect and the overall 'ultra-wide shot' description. This is a direct consequence of the character scale and placement issues.\n- Roger is rendered in the foreground at full scale rather than in the far left background as a small figure, undermining the vast-distance composition central to the scene's drama\n- Lukas stands on a raised wooden platform/box not described in the prompt; prompt specifies he stands against a bare tree at ground level\n- Glasses appear wire-rimmed in vision; prompt specifies black-framed glasses\n- Sophie, Manuel, and Verena appear in the foreground rather than pressed back into the midground crowd on the right flank as described",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 2,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "promptLen": 8295,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "S:\n- Roger: both hands holding stock, weapon horizontal and level, aimed diagonally across square\n- Lukas: balanced atop head\n- Lukas: standing motionless against bare tree at edge of cobblestone square\n\nIMPORTANT — fix these issues from the previous generation:\n- Roger is described as being in the 'far left background' and should be rendered significantly smaller to convey the 'vast distance' and relative scale to Lukas. He is currently in the midground and too large.\n- Lukas is described as 'roughly a sixth the size of Roger across the vast distance'. He is rendered too large relative to Roger, failing to convey the intended scale and distance, and the 'dwarfed' effect.\n- The scene lacks the 'vast grey cobblestone Marktplatz Altdorf' and 'vast distance' between the main characters, which is crucial for the 'tension mounting' aspect and the overall 'ultra-wide shot' description. This is a direct consequence of the character scale and placement issues.\n- Roger is rendered in the foreground at full scale rather than in the far left background as a small figure, undermining the vast-distance composition central to the scene's drama\n- Lukas stands on a raised wooden platform/box not described in the prompt; prompt specifies he stands against a bare tree at ground level\n- Glasses appear wire-rimmed in vision; prompt specifies black-framed glasses\n- Sophie, Manuel, and Verena appear in the foreground rather than pressed back into the midground crowd on the right flank as described",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 3,
+      "type": "repair",
+      "modelId": "grok-imagine",
+      "promptLen": 6411,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "aracters fill roughly the lower half of the frame, large, with feet on the ground. \"midground\" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. \"background\" characters are small, distant, far behind. Foreground larger than midground larger than background.\n- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled \"foreground\". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: holds horizontal, aims across the square\n- Lukas: balanced on top of head",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 4,
+      "type": "repair",
+      "modelId": "grok-imagine (grok_inpaint)",
+      "promptLen": 6411,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "aracters fill roughly the lower half of the frame, large, with feet on the ground. \"midground\" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. \"background\" characters are small, distant, far behind. Foreground larger than midground larger than background.\n- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled \"foreground\". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: holds horizontal, aims across the square\n- Lukas: balanced on top of head",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 5,
+      "type": "repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "promptLen": 6411,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "aracters fill roughly the lower half of the frame, large, with feet on the ground. \"midground\" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. \"background\" characters are small, distant, far behind. Foreground larger than midground larger than background.\n- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled \"foreground\". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: holds horizontal, aims across the square\n- Lukas: balanced on top of head",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 6,
+      "type": "entity-repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "promptLen": 6411,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "aracters fill roughly the lower half of the frame, large, with feet on the ground. \"midground\" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. \"background\" characters are small, distant, far behind. Foreground larger than midground larger than background.\n- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled \"foreground\". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: holds horizontal, aims across the square\n- Lukas: balanced on top of head",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    },
+    {
+      "i": 7,
+      "type": "edit",
+      "promptLen": 6411,
+      "promptHead": "\n\nGenerate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.\n\nWhen a [Background] reference image is provided, copy its composition, layout, lighting, colors, camera angle, and depth. Place the charact",
+      "promptTail": "aracters fill roughly the lower half of the frame, large, with feet on the ground. \"midground\" characters occupy the MIDDLE BAND — heads do NOT reach the top edge, feet do NOT reach the bottom edge. \"background\" characters are small, distant, far behind. Foreground larger than midground larger than background.\n- **KEEP THE FOREGROUND (LOWER STRIP) EMPTY** unless a character is explicitly labelled \"foreground\". When all characters are midground or background the bottom portion shows only the natural ground of this scene (cobblestones, floor, water, grass, sand, snow). When any character IS labelled foreground, that character's body and feet belong in this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: holds horizontal, aims across the square\n- Lukas: balanced on top of head",
+      "referencePhotoNames": [],
+      "grokRefImageCount": 0,
+      "hasVisualBibleGrid": false
+    }
+  ],
+  "retryHistory": [
+    {
+      "i": 0,
+      "source": "original",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp",
+        "bboxDetection"
+      ]
+    },
+    {
+      "i": 1,
+      "source": "iterate-round-1",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp",
+        "bboxDetection"
+      ]
+    },
+    {
+      "i": 2,
+      "source": "iterate-round-2",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp",
+        "bboxDetection"
+      ]
+    },
+    {
+      "i": 3,
+      "source": "inpaint-round-3",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp",
+        "bboxDetection"
+      ]
+    },
+    {
+      "i": 4,
+      "source": "character-fix:Sophie",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp"
+      ]
+    },
+    {
+      "i": 5,
+      "source": "character-fix:Verena",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp"
+      ]
+    },
+    {
+      "i": 6,
+      "source": "character-fix",
+      "iterationFeedback": "",
+      "preRepairTopIssues": [],
+      "keys": [
+        "type",
+        "score",
+        "source",
+        "attempt",
+        "timestamp",
+        "bboxDetection"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+Re-render this composite as a single unified watercolor children's-book illustration in this art style: watercolor children's storybook illustration, soft brushwork, gentle colors. NOT photoreal. The composite shows pasted bg-removed character cutouts on a real photograph of "Marktplatz Altdorf" — your job is to re-render it cleanly so all figures and the landmark belong in the same painted scene.
+
+THE FOCAL POINT is the tall wooden pole topped with the feathered hat at roughly (50%, 30%) of the canvas — every character's GAZE must look UP at it.
+
+Per-character placement and facing (left to right):
+- Lukas (age 7) in the left (~10% across), facing right toward the central pole.
+- Manuel (age 14) in the left (~23% across), facing right toward the central pole.
+- Franziska (age 52) in the center (~37% across), facing the camera with chin tilted UP toward the pole at top-centre.
+- Sophie (age 12) in the center (~50% across), facing the camera with chin tilted UP toward the pole at top-centre.
+- Roger (age 45) in the center (~63% across), facing the camera with chin tilted UP toward the pole at top-centre.
+- Werner (age 80) in the right (~77% across), facing left toward the central pole.
+- Verena (age 77) in the right (~90% across), facing left toward the central pole.
+
+REQUIRED CHANGES (do all of these):
+- Render every character in unified watercolor style — soft brushwork, gentle storybook colors. NOT photoreal.
+- Make every character's eyes look UP at the central pole and feathered hat. Every face must show this upward gaze.
+- The leftmost characters face right; the centre group faces the camera with chin tilted up; the rightmost characters face left. This forms a half-circle of attention around the pole.
+- Add natural ground shadows beneath each character's feet on the cobblestones.
+- Match medieval Altdorf afternoon lighting (warm, soft, long shadows) consistently across all figures and the scene.
+- Soften the cutout edges — figures must blend into the cobblestone surface naturally, not look pasted.
+
+PRESERVE EXACTLY:
+- Every character's face, hair, skin tone, clothing.
+- The number of characters and their approximate left-to-right order.
+- The landmark's silhouette (pole position, hat, church tower, mountains).
+
+DO NOT add or remove characters. DO NOT swap faces.

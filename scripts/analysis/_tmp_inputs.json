@@ -1,0 +1,45 @@
+{
+ "rossa": {
+  "name": "Kapitänin Rossa",
+  "desc": "adult woman, mid-thirties. tall, sturdy. hair: dark red, straight, jaw-length, worn loose. brown eyes, warm medium skin tone, sharp cheekbones, no facial hair. Signature: a long dark green oilskin coat worn open over her pirate outfit. Clothing: a black linen collarless wide-sleeved pirate shirt, dark brown wide-leg linen trousers cut to mid-calf, black leather buckle boots to the ankle, a wide red leather belt at the waist, a long dark green oilskin coat worn open over the top",
+  "file": "rossa-vb-sheet.png"
+ },
+ "crew": {
+  "name": "Rossa crew member"
+ },
+ "p14": {
+  "file": "fiona-p14-shipped.jpg",
+  "chars": [
+   "Fiona (foreground)",
+   "Sarah (midground)",
+   "Facundo (midground)",
+   "Lorena (midground)",
+   "Rossa (background)"
+  ]
+ },
+ "dragon": {
+  "name": "Drachenmutter",
+  "desc": "dragon, large forest dragon. large — the body mass of a draft horse, four-legged, with two broad membranous wings folded against the flanks when at rest. deep forest-green scales across the body shading to dark charcoal on the back ridges, soft pale grey-green on the underbelly; two eyes that glow amber-gold like candlelight. large fan-shaped ears that lie flat when wary, a blunt rounded snout with wide nostrils, a heavy tail tapering to a rounded tip, wing membranes a translucent dark olive-green with visible vein ridges, no spines or horns — smooth rounded head",
+  "file": "dragon-vb-sheet.png"
+ },
+ "creatures": [
+  {
+   "id": "ANI001",
+   "name": "Drachenmutter",
+   "description": "dragon, large forest dragon. large — the body mass of a draft horse, four-legged, with two broad membranous wings folded against the flanks when at rest. deep forest-green scales across the body shading to dark charcoal on the back ridges, soft pale grey-green on the underbelly; two eyes that glow amber-gold like candlelight. large fan-shaped ears that lie flat when wary, a blunt rounded snout with wide nostrils, a heavy tail tapering to a rounded tip, wing membranes a translucent dark olive-green with visible vein ridges, no spines or horns — smooth rounded head"
+  }
+ ],
+ "p17": {
+  "file": "dasei-p17-shipped.png",
+  "objects": [
+   "LOC002",
+   "ANI001",
+   "ART001",
+   "ART002",
+   "ART003",
+   "ART005",
+   "ART006"
+  ],
+  "interaction": "stand together as a small wet group on the left, watching the dragon and Julian across the clearing"
+ }
+}

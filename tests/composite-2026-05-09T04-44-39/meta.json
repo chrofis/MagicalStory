@@ -1,0 +1,67 @@
+{
+  "user": "cc14c57c-a9c6-4682-87b2-f75b4c8610e2",
+  "story": "job_1778268595639_n3v7erasi",
+  "landmark": {
+    "id": 138,
+    "name": "Zurich Old Town",
+    "attribution": "Photo by Der Wolf im Wald via Wikimedia Commons"
+  },
+  "characters": [
+    {
+      "name": "Emma",
+      "age": 5,
+      "depth": "foreground",
+      "left": 106,
+      "top": 951,
+      "width": 116,
+      "height": 359
+    },
+    {
+      "name": "Noah",
+      "age": 7,
+      "depth": "foreground",
+      "left": 258,
+      "top": 912,
+      "width": 151,
+      "height": 398
+    },
+    {
+      "name": "Daniel",
+      "age": 38,
+      "depth": "foreground",
+      "left": 411,
+      "top": 740,
+      "width": 213,
+      "height": 570
+    },
+    {
+      "name": "Sarah",
+      "age": 36,
+      "depth": "foreground",
+      "left": 563,
+      "top": 740,
+      "width": 165,
+      "height": 570
+    },
+    {
+      "name": "Hans",
+      "age": 68,
+      "depth": "foreground",
+      "left": 716,
+      "top": 756,
+      "width": 202,
+      "height": 554
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "watercolor children's storybook illustration, soft brushwork, gentle colors",
+  "runs": {
+    "grok": {
+      "elapsedMs": 7847,
+      "slots": 1
+    },
+    "gemini": {
+      "error": "no image"
+    }
+  }
+}

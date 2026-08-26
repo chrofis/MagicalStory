@@ -1,0 +1,23 @@
+Reference image 1 is a real photograph of "Tellsplatte (boat jump)" — that landmark is the BACKGROUND of the illustration you must produce.
+Reference images 2 onwards are STYLED character portraits (already in illustration form). Each is the IDENTITY of one character.
+
+Generate ONE unified illustration in this art style: watercolor children's storybook illustration, soft brushwork, gentle colors.
+
+Characters left to right, with age-correct heights:
+- Werner (age 80, 165cm tall) in the left foreground (~8% across).
+- Verena (age 77, 165cm tall) in the left foreground (~21% across).
+- Uschi (age 75, 170cm tall) in the center foreground (~34% across).
+- Köbi (age 70, 170cm tall) in the center foreground (~47% across).
+- Franziska (age 52, 175cm tall) in the center foreground (~61% across).
+- Roger (age 45, 175cm tall) in the right foreground (~76% across).
+- Marcel (age 45, 175cm tall) in the right foreground (~91% across).
+
+REQUIREMENTS:
+- Render the landmark from reference 1 as the background.
+- Each character must match their numbered reference photo (face, hair, skin tone, clothing).
+- All characters stand on the ground (natural ground shadows).
+- Heights MUST be age-proportional — children visibly shorter than adults, no flattening.
+- Render in the named art style. NOT photoreal.
+- Match lighting direction and color temperature consistently across the whole scene.
+
+DO NOT add or remove characters. DO NOT swap which face goes where.

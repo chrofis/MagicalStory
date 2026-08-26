@@ -1,0 +1,14 @@
+{
+  "runId": "002",
+  "tag": "none_nomask",
+  "overlay": "none",
+  "maskOn": false,
+  "posOverride": null,
+  "opacity": 0.55,
+  "extraPrefix": null,
+  "elapsedMs": 16076,
+  "modelId": "grok-imagine-image",
+  "coveragePct": 27.3,
+  "textPos": "top-left",
+  "detectedPos": "top-left"
+}

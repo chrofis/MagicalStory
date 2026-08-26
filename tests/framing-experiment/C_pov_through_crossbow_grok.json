@@ -1,0 +1,10 @@
+{
+  "framing": "C_pov_through_crossbow",
+  "description": "POV through the crossbow sight — Lukas in far distance with apple on head (like a mini B).",
+  "elapsedMs": 10009,
+  "modelId": "grok-imagine-image",
+  "cost": 0.02,
+  "characters": [
+    "Lukas"
+  ]
+}

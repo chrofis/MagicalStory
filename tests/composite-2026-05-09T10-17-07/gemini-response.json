@@ -1,0 +1,26 @@
+{
+  "candidates": [
+    {
+      "finishReason": "IMAGE_OTHER",
+      "index": 0,
+      "finishMessage": "Unable to show the generated image. The model could not generate the image based on the prompt provided. You will not be charged for this request. Try rephrasing the prompt. If you think this was an error, [send feedback](https://ai.google.dev/gemini-api/docs/troubleshooting)."
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 340,
+    "totalTokenCount": 340,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 82
+      },
+      {
+        "modality": "IMAGE",
+        "tokenCount": 258
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "modelVersion": "gemini-2.5-flash-image",
+  "responseId": "tAn_aZzqFcWEkdUPm7vF0Q4"
+}

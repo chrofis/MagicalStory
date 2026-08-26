@@ -1,0 +1,15 @@
+{
+  "runId": "004",
+  "tag": "none_nomask_nochars",
+  "overlay": "none",
+  "maskOn": false,
+  "posOverride": null,
+  "opacity": 0.55,
+  "noChars": true,
+  "extraPrefix": "**SCALE — CHARACTERS MUST BE TINY:** Manuel and Franziska together occupy NO MORE than 1/8 of the frame height, feet to head. They are distant silhouettes at the lakeshore, NOT foreground portraits. Do NOT paint their faces in detail — they are too far away to see features. If you catch yourself drawing large figures, SHRINK THEM.\n\n**REQUIRED OBJECT — SMALL ROWBOAT IN MIDGROUND:** A small wooden rowboat must be visible on the churning lake, in the left midground, pushing away from shore. Three figures inside: one rowing (soldier), one seated in the stern (soldier), one seated in the middle (Roger, the prisoner — no weapons, hands visible, passive). The boat is small, the figures within it even smaller than Manuel/Franziska on shore. Rain partially obscures the boat.\n\n**NO CROWD AT THE SHORE OR ON THE DOCK.** Only Manuel + Franziska at the water's edge. Any dock is EMPTY.",
+  "elapsedMs": 7276,
+  "modelId": "grok-imagine-image",
+  "coveragePct": 67.3,
+  "textPos": "top-left",
+  "detectedPos": "top-left"
+}

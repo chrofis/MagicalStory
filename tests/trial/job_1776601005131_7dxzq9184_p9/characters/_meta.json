@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Manuel",
+    "photoType": "costumed-mittelalterlich",
+    "clothingCategory": "costumed",
+    "clothingDescription": "Graugrüner Wollkittel, breiter Ledergürtel, dunkelgraue Wollhose, einfache Lederstiefel"
+  },
+  {
+    "name": "Franziska",
+    "photoType": "costumed-mittelalterlich",
+    "clothingCategory": "costumed",
+    "clothingDescription": "Terrakotta-oranges Wollkleid, weisses Leinenschürze, grauer Wollschal, einfache Lederschuhe"
+  }
+]

@@ -1,0 +1,1185 @@
+[
+ {
+  "book": "Drache",
+  "p": 1,
+  "sem": 80,
+  "final": 85,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "reaches one arm forward toward the glowing egg in the root hollow",
+    "flagged": true
+   },
+   {
+    "group": "GAZE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "gazes at the glowing egg from close beside Levin",
+    "flagged": false
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p1/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 2,
+  "sem": 100,
+  "final": 100,
+  "versions": 1,
+  "cast": 0,
+  "rows": [],
+  "nInt": 0,
+  "nTypes": 0,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 0,
+  "nStoryRel": 0,
+  "nActorRows": 0,
+  "peopleInRows": 0,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p2/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 3,
+  "sem": 25,
+  "final": 55,
+  "versions": 2,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": false,
+    "where": "one hand resting flat on the warm brown earth",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "crouches beside the hatchling dragon",
+    "flagged": false
+   },
+   {
+    "group": "GESTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "shouts upward at two retreating adult dragons high above the treetops",
+    "flagged": true
+   }
+  ],
+  "nInt": 3,
+  "nTypes": 3,
+  "nHands": 1,
+  "nPosture": 1,
+  "nEssential": 3,
+  "nStoryRel": 2,
+  "nActorRows": 3,
+  "peopleInRows": 3,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p3/v1.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 4,
+  "sem": 80,
+  "final": 95,
+  "versions": 1,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "GROUP",
+    "who": "Max + Kiaan",
+    "n_people": 2,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "run together between the trees toward the clearing, facing right",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands beside the hatchling in the clearing",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands close to the hatchling in the clearing",
+    "flagged": false
+   }
+  ],
+  "nInt": 3,
+  "nTypes": 2,
+  "nHands": 0,
+  "nPosture": 2,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 3,
+  "peopleInRows": 4,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p4/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 5,
+  "sem": 60,
+  "final": 55,
+  "versions": 4,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "POSTURE",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stands at the bank's edge looking left along the water for a way across",
+    "flagged": true
+   },
+   {
+    "group": "POSTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands just behind Levin looking along the bank",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands with the hatchling at his feet on the bank",
+    "flagged": false
+   }
+  ],
+  "nInt": 3,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 3,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 3,
+  "peopleInRows": 3,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p5/v3.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 6,
+  "sem": 100,
+  "final": 100,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "points one arm toward the fallen log spanning the brook upstream",
+    "flagged": false
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p6/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 7,
+  "sem": 80,
+  "final": 60,
+  "versions": 2,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "GROUP",
+    "who": "Max + Kiaan + Levin + Julian",
+    "n_people": 4,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "each walks carefully along the log one behind the other, arms out for balance, expressions of concentration",
+    "flagged": true
+   },
+   {
+    "group": "GAZE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "glances back over the right shoulder at the distant Grossmünster towers across the valley",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 2,
+  "nStoryRel": 2,
+  "nActorRows": 2,
+  "peopleInRows": 5,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p7/v1.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 8,
+  "sem": 80,
+  "final": 70,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Kiaan",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "holds both palms open on his knees toward the creeping hatchling, a short distance apart",
+    "flagged": false
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p8/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 9,
+  "sem": 70,
+  "final": 75,
+  "versions": 1,
+  "cast": 1,
+  "rows": [],
+  "nInt": 0,
+  "nTypes": 0,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 0,
+  "nStoryRel": 0,
+  "nActorRows": 0,
+  "peopleInRows": 0,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p9/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 10,
+  "sem": 40,
+  "final": 70,
+  "versions": 4,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "POSTURE",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stands stopped short facing the goat blocking the gap, several paces apart",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Kiaan",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands just behind Levin watching the goat",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Max",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands beside Kiaan watching the goat",
+    "flagged": false
+   },
+   {
+    "group": "GAZE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "peeks from the back of the group toward the goat in the gap",
+    "flagged": false
+   }
+  ],
+  "nInt": 4,
+  "nTypes": 2,
+  "nHands": 0,
+  "nPosture": 3,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 4,
+  "peopleInRows": 4,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p10/v3.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 11,
+  "sem": 50,
+  "final": 75,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "steps cautiously toward the goat in the gap, one hand out, a short distance apart",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p11/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 12,
+  "sem": 0,
+  "final": 60,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "holds a piece of the Weggli flat on an open palm toward the goat stepping off the stone",
+    "flagged": true
+   },
+   {
+    "group": "POSTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands with his empty open hand at his side, watching Levin lead the goat",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 1,
+  "nPosture": 1,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p12/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 13,
+  "sem": 40,
+  "final": 50,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Max",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "points one arm up toward the bright sky notch above the trees where the sun sits on the peaks",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p13/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 14,
+  "sem": 80,
+  "final": 75,
+  "versions": 3,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "POSTURE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stands facing the valley, his expression drawing the other boys’ attention to the glowing towers and city lights",
+    "flagged": false
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 1,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p14/v2.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 15,
+  "sem": 80,
+  "final": 95,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "GAZE",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stares toward the glowing towers and city lights in the valley behind him, visible over his shoulder",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p15/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 16,
+  "sem": 45,
+  "final": 60,
+  "versions": 3,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Levin",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "pushes both hands flat against the hatchling's back, propelling it up the slope from behind",
+    "flagged": true
+   },
+   {
+    "group": "HANDS_ON",
+    "who": "Julian",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "presses one hand flat against the hatchling's left flank, helping it up the slope",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 1,
+  "nHands": 2,
+  "nPosture": 0,
+  "nEssential": 2,
+  "nStoryRel": 2,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p16/v2.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 17,
+  "sem": 70,
+  "final": 55,
+  "versions": 1,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "GROUP",
+    "who": "Levin + Julian + Kiaan + Max",
+    "n_people": 4,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stand together in the foreground watching the hatchling run toward the two adult dragons in the meadow",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 4,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p17/v0.jpg"
+ },
+ {
+  "book": "Drache",
+  "p": 18,
+  "sem": 70,
+  "final": 60,
+  "versions": 1,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "GROUP",
+    "who": "Levin + Julian + Kiaan + Max",
+    "n_people": 4,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stand together on the ridge path watching the three dragons fly toward the mountain peaks",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 4,
+  "url": "https://images.magicalstory.ch/stories/job_1787436913379_mfedxinwqd/scene/p18/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 1,
+  "sem": 60,
+  "final": 55,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "POSTURE",
+    "who": "Facundo",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "sleeps slumped in the rope railing on deck",
+    "flagged": false
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 1,
+  "nEssential": 0,
+  "nStoryRel": 0,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p1/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 2,
+  "sem": 70,
+  "final": 85,
+  "versions": 1,
+  "cast": 1,
+  "rows": [],
+  "nInt": 0,
+  "nTypes": 0,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 0,
+  "nStoryRel": 0,
+  "nActorRows": 0,
+  "peopleInRows": 0,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p2/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 3,
+  "sem": 30,
+  "final": 60,
+  "versions": 1,
+  "cast": 3,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Sarah",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "points at Rossa's sail loosening at the next landing, a gap of open quay between them",
+    "flagged": true
+   },
+   {
+    "group": "POSTURE",
+    "who": "Facundo",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "sits up in the rope railing of the Goldene Möwe below the quay edge, listening",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 0,
+  "nPosture": 1,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p3/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 4,
+  "sem": 50,
+  "final": 60,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Facundo",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "grips the rigging on the Goldene Möwe's deck, watching Rossa's sail across the open water",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 1,
+  "nPosture": 0,
+  "nEssential": 0,
+  "nStoryRel": 0,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p4/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 5,
+  "sem": 0,
+  "final": 60,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Saira",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "grips a rope railing post near the bow, glancing back over her shoulder at the empty dock",
+    "flagged": true
+   },
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "steers the Goldene Möwe at the stern tiller with one hand",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 1,
+  "nHands": 2,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p5/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 6,
+  "sem": 30,
+  "final": 70,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": true,
+    "where": "stands at the stern tiller and guides the Goldene Möwe alongside the low wooden jetty",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 1,
+  "nPosture": 0,
+  "nEssential": 0,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p6/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 7,
+  "sem": 20,
+  "final": 70,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Lorena",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "points at the open right channel across the forked bay entrance from the bow",
+    "flagged": true
+   },
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "steers the Goldene Möwe at the stern tiller with her free hand",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 1,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p7/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 8,
+  "sem": 0,
+  "final": 70,
+  "versions": 4,
+  "cast": 3,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Saira",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "presses both hands flat against the hull at the bow while standing on the exposed sandbank",
+    "flagged": true
+   },
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "presses both palms flat against the hull at the stern side while standing on the sandbank",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 1,
+  "nHands": 2,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p8/v3.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 9,
+  "sem": 100,
+  "final": 80,
+  "versions": 1,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "GAZE",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "holds Lorena's gaze steadily, standing still on the wet sand a step apart",
+    "flagged": false
+   },
+   {
+    "group": "GAZE",
+    "who": "Lorena",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "gives Fiona one long steady look, standing on the wet sand directly before her",
+    "flagged": false
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 0,
+  "nEssential": 2,
+  "nStoryRel": 2,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p9/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 10,
+  "sem": 75,
+  "final": 43,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "POSTURE",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stands a step ahead of the group on the wet sand, one fist closed at her side, stopped mid-step facing the inland path",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Rossa crew member",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "sprints far up the narrow dirt path carrying the dark-grey iron-bladed shovel",
+    "flagged": false
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 1,
+  "nHands": 0,
+  "nPosture": 2,
+  "nEssential": 2,
+  "nStoryRel": 2,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p10/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 11,
+  "sem": 30,
+  "final": 60,
+  "versions": 1,
+  "cast": 3,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Rossa",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "hammers both fists against the stone door, mid-blow",
+    "flagged": true
+   },
+   {
+    "group": "GESTURE",
+    "who": "Sarah",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "calls something across to Rossa standing a step apart at the door",
+    "flagged": false
+   },
+   {
+    "group": "GAZE",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "arrives at the Höhlentor and studies the four carved symbols",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Lorena",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "stands at Fiona's shoulder facing the carved stone door",
+    "flagged": false
+   }
+  ],
+  "nInt": 4,
+  "nTypes": 4,
+  "nHands": 1,
+  "nPosture": 1,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 4,
+  "peopleInRows": 4,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p11/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 12,
+  "sem": 60,
+  "final": 60,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "presses her left palm against one carved stone on the door, right hand open in the air before the final symbol without touching it",
+    "flagged": true
+   }
+  ],
+  "nInt": 1,
+  "nTypes": 1,
+  "nHands": 1,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 1,
+  "peopleInRows": 1,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p12/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 13,
+  "sem": 60,
+  "final": 80,
+  "versions": 3,
+  "cast": 2,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "presses her right palm against a different carved stone on the door as the dark vertical line opens down its left edge",
+    "flagged": true
+   },
+   {
+    "group": "GAZE",
+    "who": "Lorena",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "watches the gap opening in the stone door from just behind Fiona's shoulder",
+    "flagged": false
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 1,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p13/v2.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 14,
+  "sem": 50,
+  "final": 60,
+  "versions": 4,
+  "cast": 4,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Rossa",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "holds the shovel across her body in the cave mouth, blocking the exit",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "stands before the open Schatzkiste facing Rossa in the cave",
+    "flagged": false
+   },
+   {
+    "group": "GAZE",
+    "who": "Sarah",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "watches Rossa from the midground behind Fiona",
+    "flagged": false
+   },
+   {
+    "group": "GAZE",
+    "who": "Facundo",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "watches Rossa from the midground behind Fiona",
+    "flagged": false
+   },
+   {
+    "group": "GAZE",
+    "who": "Lorena",
+    "n_people": 1,
+    "priority": "low",
+    "storyRelevant": false,
+    "where": "watches Rossa from the midground behind Fiona",
+    "flagged": false
+   }
+  ],
+  "nInt": 5,
+  "nTypes": 3,
+  "nHands": 1,
+  "nPosture": 1,
+  "nEssential": 2,
+  "nStoryRel": 2,
+  "nActorRows": 5,
+  "peopleInRows": 5,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p14/v3.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 15,
+  "sem": 80,
+  "final": 85,
+  "versions": 1,
+  "cast": 1,
+  "rows": [
+   {
+    "group": "GESTURE",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "holds her right hand open and empty out toward Rossa, standing a step apart inside the cave",
+    "flagged": false
+   },
+   {
+    "group": "POSTURE",
+    "who": "Rossa",
+    "n_people": 1,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "turns her left shoulder toward the cave mouth while her head inclines back toward Fiona's extended empty hand",
+    "flagged": true
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 0,
+  "nPosture": 1,
+  "nEssential": 2,
+  "nStoryRel": 2,
+  "nActorRows": 2,
+  "peopleInRows": 2,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p15/v0.jpg"
+ },
+ {
+  "book": "Fiona",
+  "p": 16,
+  "sem": 0,
+  "final": 63,
+  "versions": 5,
+  "cast": 5,
+  "rows": [
+   {
+    "group": "HANDS_ON",
+    "who": "Fiona",
+    "n_people": 1,
+    "priority": "normal",
+    "storyRelevant": false,
+    "where": "steers the Goldene Möwe at the stern tiller with one hand, mostly back to the camera",
+    "flagged": true
+   },
+   {
+    "group": "GROUP",
+    "who": "Sarah + Saira + Facundo + Lorena",
+    "n_people": 4,
+    "priority": "essential",
+    "storyRelevant": true,
+    "where": "gather around the lashed Schatzkiste on the deck, each near or touching the chest",
+    "flagged": false
+   }
+  ],
+  "nInt": 2,
+  "nTypes": 2,
+  "nHands": 1,
+  "nPosture": 0,
+  "nEssential": 1,
+  "nStoryRel": 1,
+  "nActorRows": 2,
+  "peopleInRows": 5,
+  "url": "https://images.magicalstory.ch/stories/job_1787423677246_r9llf5yi9/scene/p16/v4.jpg"
+ }
+]

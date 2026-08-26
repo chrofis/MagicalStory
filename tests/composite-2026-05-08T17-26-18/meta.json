@@ -1,0 +1,100 @@
+{
+  "user": "1764881868108",
+  "story": "job_1778013683956_j0i3jyen0",
+  "landmark": {
+    "id": 304,
+    "name": "Marktplatz Altdorf",
+    "attribution": "MagicalStory curated watercolor"
+  },
+  "characters": [
+    {
+      "name": "Lukas",
+      "age": 7,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "right",
+      "left": 55,
+      "top": 932,
+      "width": 94,
+      "height": 406
+    },
+    {
+      "name": "Manuel",
+      "age": 14,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "right",
+      "left": 176,
+      "top": 792,
+      "width": 125,
+      "height": 528
+    },
+    {
+      "name": "Franziska",
+      "age": 52,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "right",
+      "left": 308,
+      "top": 742,
+      "width": 133,
+      "height": 559
+    },
+    {
+      "name": "Sophie",
+      "age": 12,
+      "depth": "midground",
+      "view": "body-front",
+      "facing": "camera-up",
+      "left": 435,
+      "top": 814,
+      "width": 153,
+      "height": 469
+    },
+    {
+      "name": "Roger",
+      "age": 45,
+      "depth": "midground",
+      "view": "body-front",
+      "facing": "camera-up",
+      "left": 542,
+      "top": 742,
+      "width": 214,
+      "height": 559
+    },
+    {
+      "name": "Werner",
+      "age": 80,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "left",
+      "left": 731,
+      "top": 782,
+      "width": 107,
+      "height": 538
+    },
+    {
+      "name": "Verena",
+      "age": 77,
+      "depth": "midground",
+      "view": "body-profile",
+      "facing": "left",
+      "left": 861,
+      "top": 789,
+      "width": 122,
+      "height": 549
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "watercolor children's storybook illustration, soft brushwork, gentle colors",
+  "runs": {
+    "grok": {
+      "elapsedMs": 7264,
+      "slots": 1
+    },
+    "gemini": {
+      "elapsedMs": 8069,
+      "refs": 7
+    }
+  }
+}

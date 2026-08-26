@@ -1,0 +1,156 @@
+{
+  "page": 7,
+  "text": "Auf dem See brach ein Sturm los. Die Wellen wurden gross und schwarz, und das Boot schwankte wild. Die Soldaten wussten nicht mehr, wohin. Einer von ihnen schrie: «Tell! Du kennst den See! Steuere uns!»",
+  "versions": 6,
+  "bestSource": "iterate-round-1",
+  "sceneDescription": "Roger — an adult man with shoulder-length wavy brown hair in a ponytail, brown eyes, clean-shaven, wearing dark-rimmed glasses, dressed in an earth-brown wool tunic with a leather jerkin and wool trousers — leaps mid-air from the right side of the flat wooden boat toward the flat grey rock of the Tellsplatte, his body extended in a wide forward leap, both feet tucked slightly, his head and torso at center-frame height, one hand gripping the forearm-length crossbow. The crossbow in his right hand is held roughly horizontal — its two short curved bow limbs mounted perpendicular to the wooden stock at the front end forming a T-shape, the slack gut bowstring visible across the limbs, the groove on top of the stock now empty. Roger faces left toward the rock, his body fully in the center frame with head at mid-frame, arms and body in the lower-center of the frame. The flat-topped grey rock of the Tellsplatte juts from the churning dark-green water in the left midground; white-capped waves crash at its base. The flat wooden boat is visible at the right of the frame, riding a large wave, tilting sharply. Soldier1 and Soldier2 — two adults in dark chain mail and leather armour — are visible inside the tilting boat at the right background, gripping the boat's sides. Heavy dark storm clouds fill the upper sky across the full top band of the frame. Rain streaks fall diagonally. The churning dark-green lake fills the lower half of the frame in every direction.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Roger leaps from the boat mid-air toward the Tellsplatte rock in the middle of a storm on Lake Lucerne, crossbow in hand.\",\n  \"characters\": [\n    { \"name\": \"Roger\", \"position\": \"center frame, mid-air, head and torso at mid-frame height, facing left toward the rock\", \"clothing\": \"costumed:mittelalterlich\", \"depth\": \"foreground\" },\n    { \"name\": \"Soldier1\", \"position\": \"inside the tilting boat at right background, gripping the boat's side\", \"clothing\": \"costumed:mittelalterlich\", \"depth\": \"background\" },\n    { \"name\": \"Soldier2\", \"position\": \"inside the tilting boat at right background, behind Soldier1\", \"clothing\": \"costumed:mittelalterlich\", \"depth\": \"background\" }\n  ],\n  \"objects\": [\"VEH001\", \"LOC003\", \"ART002\"],\n  \"interactions\": [\n    { \"character\": \"Roger\", \"object\": \"ART002\", \"where\": \"grips the crossbow in his right hand during the mid-air leap toward the Tellsplatte rock\" },\n    { \"character\": \"Roger\", \"object\": \"LOC003\", \"where\": \"leaps toward the flat grey Tellsplatte rock jutting from the churning water in the left midground\" }\n  ],\n  \"background\": \"heavy dark storm clouds fill the full upper band of the sky; rain streaks fall diagonally across the frame; churning dark-green waves with white caps fill the lower half of the frame\",\n  \"setting\": \"outdoor\",\n  \"time\": \"midday\",\n  \"weather\": \"rainy\",\n  \"shot\": \"wide\",\n  \"framingPattern\": null,\n  \"textPosition\": \"top-full\",\n  \"textZoneDescription\": \"heavy dark storm clouds fill the full upper band of the sky across the entire top of the frame\",\n  \"era\": \"medieval Switzerland, ~1307\",\n  \"emptyScenePrompt\": \"Wide view of Lake Lucerne in violent storm. A flat-topped grey rock — the Tellsplatte — juts from the churning dark-green water in the left midground, white waves crashing at its base. A flat wooden boat with dark hull rides a large tilting wave at the right of the frame. Heavy dark storm clouds fill the full upper band of the sky, spanning the entire width of the frame — deep charcoal grey and dense.",
+  "retryHistorySources": [
+    "original",
+    "iterate-round-1",
+    "inpaint-round-2",
+    "iterate-round-3",
+    "character-fix:Roger",
+    "character-fix"
+  ],
+  "imageVersions": [
+    {
+      "i": 0,
+      "type": "original",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 0,
+      "semanticScore": 10,
+      "promptLen": 5897,
+      "promptTail": "e dishes, air conditioners, or modern pedestrians — anywhere in the frame.\n\n**COMPOSITION — CALM ZONE:** Render the upper third of the image (roughly 30%) as: heavy dark storm clouds fill the full upper band of the sky across the entire top of the frame. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong below this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: grips the crossbow in his right hand during the mid-air leap toward the Tellsplatte rock\n- Roger: leaps toward the flat grey Tellsplatte rock jutting from the churning water in the left midground",
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": null,
+          "description": "The landmark 'Tellsplatte rock' (LOC003) is described as a 'flat-topped grey rock' but is rendered as a building on a rocky outcrop."
+        },
+        {
+          "severity": "CRITICAL",
+          "character": "Roger",
+          "description": "Roger is declared to leap toward the 'flat grey Tellsplatte rock', but due to the incorrect rendering of the landmark, he appears to be leaping toward a building on a rocky outcrop, which is a fundamental mismatch for the interaction."
+        },
+        {
+          "severity": "CRITICAL",
+          "description": "The Tellsplatte flat grey rock jutting from the churning water in the left midground is absent; a stone building with a tiled roof and stone dock appears in its place. Replace the building and dock with a flat-topped grey rock emerging from the stormy water."
+        },
+        {
+          "severity": "MAJOR",
+          "description": "Roger is leaping toward the right side of the frame but should be leaping toward the left (toward the Tellsplatte rock on the left). His facing direction is reversed relative to the prompt."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Soldier1 wears grey metallic plate armour instead of dark chain mail and leather armour as specified."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Soldier2 wears grey metallic plate armour instead of dark chain mail and leather armour as specified."
+        }
+      ]
+    },
+    {
+      "i": 1,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 80,
+      "semanticScore": 100,
+      "promptLen": 7339,
+      "promptTail": " color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: right hand gripping stock, held roughly horizontal\n- Soldier1: both hands gripping left gunwale edge\n- Soldier2: both hands gripping right gunwale edge\n\nIMPORTANT — fix these issues from the previous generation:\n- The landmark 'Tellsplatte rock' (LOC003) is described as a 'flat-topped grey rock' but is rendered as a building on a rocky outcrop.\n- Roger is declared to leap toward the 'flat grey Tellsplatte rock', but due to the incorrect rendering of the landmark, he appears to be leaping toward a building on a rocky outcrop, which is a fundamental mismatch for the interaction.\n- The Tellsplatte flat grey rock jutting from the churning water in the left midground is absent; a stone building with a tiled roof and stone dock appears in its place. Replace the building and dock with a flat-topped grey rock emerging from the stormy water.\n- Roger is leaping toward the right side of the frame but should be leaping toward the left (toward the Tellsplatte rock on the left). His facing direction is reversed relative to the prompt.\n- Soldier1 wears grey metallic plate armour instead of dark chain mail and leather armour as specified.\n- Soldier2 wears grey metallic plate armour instead of dark chain mail and leather armour as specified.",
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "description": "Soldier1's red long-sleeved tunic should be dark (grey/black) chain mail or dark leather armour to match the prompt specification of 'dark chain mail and leather armour'"
+        }
+      ]
+    },
+    {
+      "i": 2,
+      "type": "repair",
+      "modelId": "grok-imagine",
+      "qualityScore": 50,
+      "semanticScore": 100,
+      "promptLen": 5897,
+      "promptTail": "e dishes, air conditioners, or modern pedestrians — anywhere in the frame.\n\n**COMPOSITION — CALM ZONE:** Render the upper third of the image (roughly 30%) as: heavy dark storm clouds fill the full upper band of the sky across the entire top of the frame. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong below this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: grips the crossbow in his right hand during the mid-air leap toward the Tellsplatte rock\n- Roger: leaps toward the flat grey Tellsplatte rock jutting from the churning water in the left midground",
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": "Roger",
+          "description": "The crossbow held by Roger is significantly smaller than 'forearm-length' or 'arm-length' as described in the prompt and object scale reference."
+        },
+        {
+          "severity": "MODERATE",
+          "character": null,
+          "description": "An unrequested second, smaller, broken boat is visible in the far right background."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Roger is placed in the right-foreground rather than center frame; he should be centered horizontally in the composition with his head and torso at mid-frame height"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Soldier1 and Soldier2 are seated in the same foreground boat as Roger rather than in a separate tilting boat visible at the right background; they should appear smaller, in the background right, gripping the sides of a sharply tilting boat"
+        }
+      ]
+    },
+    {
+      "i": 3,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 80,
+      "semanticScore": 100,
+      "promptLen": 6485,
+      "promptTail": "aterial (sky, wall, water, foliage, or ground). Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong below this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: right hand grips crossbow held horizontally\n- Soldier1: both hands grip right side gunwale during boat tilt\n- Soldier2: both hands grip left side gunwale during boat tilt\n\nIMPORTANT — fix these issues from the previous generation:\n- Soldier1's red long-sleeved tunic should be dark (grey/black) chain mail or dark leather armour to match the prompt specification of 'dark chain mail and leather armour'",
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "description": "Roger faces right instead of left — he should be facing left toward the Tellsplatte rock in the left midground during his leap"
+        }
+      ]
+    },
+    {
+      "i": 4,
+      "type": "repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "qualityScore": null,
+      "semanticScore": null,
+      "promptLen": 5897,
+      "promptTail": "e dishes, air conditioners, or modern pedestrians — anywhere in the frame.\n\n**COMPOSITION — CALM ZONE:** Render the upper third of the image (roughly 30%) as: heavy dark storm clouds fill the full upper band of the sky across the entire top of the frame. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong below this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: grips the crossbow in his right hand during the mid-air leap toward the Tellsplatte rock\n- Roger: leaps toward the flat grey Tellsplatte rock jutting from the churning water in the left midground",
+      "fixableIssues": []
+    },
+    {
+      "i": 5,
+      "type": "entity-repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "qualityScore": 50,
+      "semanticScore": 100,
+      "promptLen": 5897,
+      "promptTail": "e dishes, air conditioners, or modern pedestrians — anywhere in the frame.\n\n**COMPOSITION — CALM ZONE:** Render the upper third of the image (roughly 30%) as: heavy dark storm clouds fill the full upper band of the sky across the entire top of the frame. Keep this area calm — gentle gradient, minimal texture, low contrast, painted continuously through the same scene material as its surroundings. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong below this strip.\n\n**ART STYLE:** A traditional watercolor painting in the style of Inga Moore. Realistic human proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Textured paper with pencil underpainting, delicate color washes with wet-on-wet technique, soft paint edges, visible artistic brushstrokes, and luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant color palette with visible paper texture throughout. Faces: watercolor wash rendering with visible brushstroke texture, age-appropriate features with defined bone structure. Eyes naturally sized. Never sharp or digitally rendered.\n\n\nEXACT POSES:\n- Roger: grips the crossbow in his right hand during the mid-air leap toward the Tellsplatte rock\n- Roger: leaps toward the flat grey Tellsplatte rock jutting from the churning water in the left midground",
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": "Roger",
+          "description": "Roger's crossbow has a taut bowstring, but the prompt specifies a 'slack gut bowstring' and 'groove on top of the stock now empty'."
+        },
+        {
+          "severity": "MINOR",
+          "character": null,
+          "description": "An additional boat is present in the right background that was not explicitly requested in the prompt."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Roger has a graying beard and mustache in the illustration but the prompt specifies clean-shaven."
+        },
+        {
+          "severity": "MINOR",
+          "description": "Roger's hair appears graying/gray-brown instead of brown as specified in the prompt."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Soldier1 wears plate armor (cuirass and pauldrons) instead of dark chain mail and leather armour as specified in the prompt."
+        }
+      ]
+    }
+  ]
+}

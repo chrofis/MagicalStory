@@ -1,0 +1,39 @@
+{
+  "qualityScore": 10,
+  "semanticScore": 70,
+  "issuesSummary": "THREE-STAGE: Fundamental compositional mismatch. Prompt describes boy running down path toward market square with crowd standing with BACKS TURNED facing a wooden pole (focal point). Image shows boy at market stalls with villagers attending stalls and facing toward camera. Lukas holds elephant in wrong arm (right vs left). Child positioned center-right instead of left-center. Missing: wooden pole with hat, church tower, timber buildings, dirt path, proper crowd arrangement. Scene structure inverted from prompt intent.",
+  "fixableIssues": [
+    {
+      "fix": "Reposition Eli to left arm grip, remove from right arm",
+      "type": "interaction_placement",
+      "severity": "CRITICAL",
+      "description": "Move stuffed elephant from right arm to left arm tucked tight against ribs"
+    },
+    {
+      "fix": "Recolor trousers darker, replace boots with simpler shoes",
+      "type": "clothing_color",
+      "severity": "MAJOR",
+      "description": "Change dark green trousers to dark brown or dark wool trousers; replace brown boots with simple leather shoes"
+    },
+    {
+      "fix": "Remove or redraw cloak without hood",
+      "type": "clothing_detail",
+      "severity": "MAJOR",
+      "description": "Remove hood from dark cloak or replace with plain dark cloak without hood"
+    },
+    {
+      "fix": "Full background repaint required; current market stall scene fundamentally incompatible with prompt's pole-focused composition",
+      "type": "scene_composition",
+      "severity": "CRITICAL",
+      "description": "Entire background replacement needed: Remove market stalls. Add wooden pole at far center of square. Reposition all villagers with backs to camera, arranged around pole facing it. Add timber-framed buildings and stone church tower. Add dirt path in foreground descending to stone square. Add shadowed stone wall and dead leaves in bottom-left corner."
+    }
+  ],
+  "semanticIssues": [
+    {
+      "item": "Eli (Stoffelefant)",
+      "type": "wrong_interaction",
+      "problem": "The stuffed elephant is held, but not tucked under the left arm and held tight against the ribs as declared. It is held in front of the chest, not specifically the left arm.",
+      "severity": "MAJOR"
+    }
+  ]
+}

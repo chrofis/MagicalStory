@@ -1,0 +1,20 @@
+{
+  "runStarted": "2026-05-11T19:27:26.520Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Emma.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Emma.jpg",
+    "costume": "pirate costume — red sash, white blouse, dark breeches, tricorn hat",
+    "style": "watercolor",
+    "name": "Emma-pirate"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 13048,
+      "tokensIn": 892,
+      "tokensOut": 1290,
+      "cells": 8
+    }
+  ],
+  "runFinished": "2026-05-11T19:27:40.501Z"
+}

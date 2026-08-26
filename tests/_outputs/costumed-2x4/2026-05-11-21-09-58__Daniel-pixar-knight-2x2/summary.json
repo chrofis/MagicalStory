@@ -1,0 +1,27 @@
+{
+  "runStarted": "2026-05-11T21:09:58.388Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Daniel.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Daniel.jpg",
+    "costume": "medieval knight — chainmail tunic, leather belt with sword, brown trousers, tall leather boots, NO helmet",
+    "style": "pixar",
+    "name": "Daniel-pixar-knight-2x2"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 10467,
+      "tokensIn": 898,
+      "tokensOut": 1290,
+      "cells": 8
+    },
+    {
+      "shape": "2x2",
+      "durationMs": 9006,
+      "tokensIn": 1118,
+      "tokensOut": 1290,
+      "cells": 4
+    }
+  ],
+  "runFinished": "2026-05-11T21:10:19.144Z"
+}

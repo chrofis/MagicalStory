@@ -1,0 +1,19 @@
+{
+  "scene": "A_appleshot",
+  "description": "A medieval Swiss village square at midday — Altdorf marketplace. Wide cobblestone square framed by half-timbered houses. A wooden pole rises in the centre-right background with a brimmed hat mounted on top (the Gessler hat). No people in this image — leave the foreground empty across the full width. Watercolor children's storybook style.",
+  "finalAction": "Wilhelm Tell (left foreground, large) aims a wooden crossbow toward the right side of the frame. His young son (right midground, smaller and farther away) stands very still with a round red apple balanced on top of his head. The two figures are clearly far apart across the square — roughly thirty paces between them.",
+  "cast": [
+    {
+      "name": "Hans",
+      "pose": "profile",
+      "position": "left foreground, aiming crossbow toward the right"
+    },
+    {
+      "name": "Emma",
+      "pose": "front",
+      "position": "right midground, small in the distance, standing still with an apple on her head"
+    }
+  ],
+  "bgMs": 3154,
+  "pass1Ms": 7875
+}

@@ -1,0 +1,27 @@
+{
+  "runStarted": "2026-05-11T21:29:18.029Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Noah.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Noah.jpg",
+    "costume": "pirate costume — small tricorn hat, striped red and white shirt, dark breeches, brown boots, black eye patch over left eye",
+    "style": "watercolor",
+    "name": "Noah-pirate-2x2"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 11797,
+      "tokensIn": 903,
+      "tokensOut": 1290,
+      "cells": 8
+    },
+    {
+      "shape": "2x2",
+      "durationMs": 12814,
+      "tokensIn": 1128,
+      "tokensOut": 1290,
+      "cells": 4
+    }
+  ],
+  "runFinished": "2026-05-11T21:29:43.636Z"
+}

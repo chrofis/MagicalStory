@@ -1,0 +1,20 @@
+Reference image 1 is a real photograph of "Marktplatz Altdorf" — that landmark is the BACKGROUND of the illustration you must produce.
+Reference images 2 onwards are STYLED character portraits (already in illustration form). Each is the IDENTITY of one character.
+
+Generate ONE unified illustration in this art style: watercolor children's storybook illustration, soft brushwork, gentle colors.
+
+Characters left to right, with age-correct heights:
+- Lukas (age 7, 122cm tall) in the left foreground (~16% across).
+- Manuel (age 14, 162cm tall) in the center foreground (~41% across).
+- Franziska (age 52, 175cm tall) in the center foreground (~61% across).
+- Sophie (age 12, 150cm tall) in the right foreground (~78% across).
+
+REQUIREMENTS:
+- Render the landmark from reference 1 as the background.
+- Each character must match their numbered reference photo (face, hair, skin tone, clothing).
+- All characters stand on the ground (natural ground shadows).
+- Heights MUST be age-proportional — children visibly shorter than adults, no flattening.
+- Render in the named art style. NOT photoreal.
+- Match lighting direction and color temperature consistently across the whole scene.
+
+DO NOT add or remove characters. DO NOT swap which face goes where.

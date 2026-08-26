@@ -1,0 +1,19 @@
+{
+  "qualityScore": 95,
+  "verdict": "PASS",
+  "issuesSummary": "The figures in the far left background are not clearly defined as soldiers, but their presence and scale are consistent with the prompt.; THREE-STAGE: Sophie's primary characteristics (position, clothing, age, hair, facing direction) match the prompt well. However, the prompt explicitly requires hands visible and drawn in tight at her sides with curled fingers—these are not visible in the inventory. Additionally, the image contains 8 extra background figures not mentioned in the prompt, which shifts focus away from the close-up framing requested. The prompt emphasizes 'close-up framing on Sophie' but the presence of multiple detailed background figures suggests a wider composition than intended.",
+  "fixableIssues": [
+    {
+      "description": "Hands not visible; prompt requires both hands drawn in tight at her sides with fingers curled toward palms",
+      "severity": "MAJOR",
+      "type": "missing_detail",
+      "fix": "Inpaint Sophie's hands visible at her sides with tight, curled fingers as specified in prompt"
+    },
+    {
+      "description": "8 extra figures present in background (Figures 2-9); prompt focuses on close-up of Sophie with only distant soldiers visible near a pole in far left background",
+      "severity": "MAJOR",
+      "type": "composition",
+      "fix": "Remove or significantly reduce detail/prominence of the 8 background figures; simplify midground to dimmer covered market area as specified"
+    }
+  ]
+}

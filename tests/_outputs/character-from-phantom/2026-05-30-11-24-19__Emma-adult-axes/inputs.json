@@ -1,0 +1,8 @@
+{
+  "face": "tests/fixtures/demo-photos/berger/Emma.jpg",
+  "phantom": "server/assets/phantom-watercolor-adult-axes.png",
+  "costume": "pirate costume, white shirt, red sash, dark breeches, brown boots",
+  "style": "watercolor",
+  "name": "Emma-adult-axes",
+  "backend": "grok"
+}

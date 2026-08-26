@@ -14,16 +14,21 @@ export interface CoverTextStyle {
 // css mirrors the server's family/weight/style/uppercase so the preview shows
 // what the baked cover will actually look like.
 interface FontOption { id: string; label: string; family: string; weight: number; italic?: boolean; upper?: boolean }
+// Fredoka, Baloo 2 and Bungee were cut from the title pool (owner, 2026-08-18):
+// on a painted cover they read as a UI typeface. The server drops any fontId it
+// does not know, so an entry here that is missing there is a silently ignored
+// pick — these two lists must stay identical.
 const TITLE_FONTS: FontOption[] = [
-  { id: 'fredoka', label: 'Fredoka', family: 'Fredoka', weight: 600 },
-  { id: 'baloo', label: 'Baloo', family: 'Baloo 2', weight: 800 },
-  { id: 'luckiest', label: 'Luckiest Guy', family: 'Luckiest Guy', weight: 400, upper: true },
-  { id: 'bungee', label: 'Bungee', family: 'Bungee', weight: 400, upper: true },
-  { id: 'titan', label: 'Titan One', family: 'Titan One', weight: 400 },
-  { id: 'lilita', label: 'Lilita One', family: 'Lilita One', weight: 400, upper: true },
+  { id: 'caveat', label: 'Caveat', family: 'Caveat', weight: 600 },
+  { id: 'kalam', label: 'Kalam', family: 'Kalam', weight: 400 },
+  { id: 'patrick', label: 'Patrick Hand', family: 'Patrick Hand', weight: 400 },
+  { id: 'gochi', label: 'Gochi Hand', family: 'Gochi Hand', weight: 400 },
+  { id: 'pacifico', label: 'Pacifico', family: 'Pacifico', weight: 400 },
   { id: 'chewy', label: 'Chewy', family: 'Chewy', weight: 400 },
   { id: 'shrikhand', label: 'Shrikhand', family: 'Shrikhand', weight: 400 },
-  { id: 'pacifico', label: 'Pacifico', family: 'Pacifico', weight: 400 },
+  { id: 'titan', label: 'Titan One', family: 'Titan One', weight: 400 },
+  { id: 'lilita', label: 'Lilita One', family: 'Lilita One', weight: 400, upper: true },
+  { id: 'luckiest', label: 'Luckiest Guy', family: 'Luckiest Guy', weight: 400, upper: true },
 ];
 const DEDICATION_FONTS: FontOption[] = [
   { id: 'Caveat', label: 'Caveat', family: 'Caveat', weight: 600 },

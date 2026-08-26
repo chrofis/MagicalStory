@@ -1,0 +1,106 @@
+{
+  "page": 6,
+  "title": "Roger und der zweite Bolzen",
+  "artStyle": "watercolor",
+  "text": "Soldaten binden Rogers Hände vor seiner Brust und bringen ihn zum Ufer des Vierwaldstättersees.\n\nLukas ruft hinter ihm her, aber die Menge hält ihn zurück. Er drückt Eli an sich und blickt zu, wie Roger auf ein Holzboot geschoben wird.\n\nDer See liegt dunkel und ruhig. Am Horizont häufen sich Wolken wie Fäuste. Gessler befiehlt: \"Bringt ihn nach Küssnacht. Er kommt nie mehr zurück.\"\n\nRoger sitzt im Boot und blickt über das Wasser. Er sieht die Wolken. Er erinnert sich, wie er als Kind auf diesem ",
+  "versions": 3,
+  "bestSource": "iterate-round-2",
+  "sceneDescription": "Roger — an adult man with brown wavy shoulder-length hair tied in a ponytail with a side part on the left, a clean-shaven face, brown eyes, and a schwarze Brille — sits in the bow of a wide flat-bottomed wooden boat pulled up at the stone lakeshore, facing the viewer, wrists bound together in front of his chest with a length of brown rope. He wears his huntsman's leather jerkin, brown wool tunic, dark wool trousers, and leather boots. The wooden boat — a wide flat-bottomed lake transport roughly four paces long, with low wooden sides and no sail, resting at the grey stone shore — sits with its stern still touching the pebbled bank. Behind Roger in the midground, two soldiers in leather armor and Habsburg red-and-yellow colors stand inside the boat's stern, each holding a wooden oar, facing Roger with their backs to the open water. The grey pebbled lakeshore fills the near right foreground, with the dark calm surface of the Vierwaldstättersee extending from midground to background. On the upper left of the frame, a band of heavy dark grey storm clouds masses on the horizon above the lake, thick and dense, their undersides bruised violet. The far shore mountains are faint grey silhouettes in the left background under the approaching clouds.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Roger sits bound in the bow of the wooden boat at the lakeshore while two soldiers stand in the stern ready to row, and a storm builds on the upper-left horizon above the lake.\",\n  \"characters\": [\n    { \"name\": \"Roger\", \"position\": \"bow of the wooden boat, center foreground, facing the viewer\", \"clothing\": \"costumed:medieval\", \"depth\": \"foreground\" },\n    { \"name\": \"Soldier1\", \"position\": \"stern of the wooden boat, midground, facing Roger\", \"clothing\": \"costumed:medieval\", \"depth\": \"midground\" },\n    { \"name\": \"Soldier2\", \"position\": \"stern of the wooden boat, midground, beside Soldier1, facing Roger\", \"clothing\": \"costumed:medieval\", \"depth\": \"midground\" }\n  ],\n  \"objects\": [\"VEH001\", \"LOC002\"],\n  \"interactions\": [\n    { \"character\": \"Roger\", \"object\": \"VEH001\", \"where\": \"sits in the bow of the wooden boat, wrists bound with brown rope in front of his chest\" },\n    { \"character\": \"Soldier1\", \"object\": \"VEH001\", \"where\": \"stands in the stern of the wooden boat holding a wooden oar\" },\n    { \"character\": \"Soldier2\", \"object\": \"VEH001\", \"where\": \"stands in the stern of the wooden boat beside Soldier1, holding a wooden oar\" }\n  ],\n  \"background\": \"dark calm Vierwaldstättersee extending to background; heavy dark grey and violet storm clouds massing on the upper-left horizon; faint grey mountain silhouettes on the left far shore\",\n  \"setting\": \"outdoor\",\n  \"time\": \"midday\",\n  \"weather\": \"cloudy\",\n  \"shot\": \"medium\",\n  \"framingPattern\": null,\n  \"textPosition\": \"top-right\",\n  \"textZoneDescription\": \"pale overcast sky fading to dark storm grey in the upper-right corner above the lake horizon\",\n  \"era\": \"medieval Switzerland, ~1307\",\n  \"emptyScenePrompt\": \"Medieval Swiss lakeshore in 1307, grey pebbled shore in the right foreground with a wide flat-bottomed wooden boat — roughly four paces long, low wooden sides, no sail — its stern resting on the pebbled bank and its bow pointing out onto the dark calm water of the Vierwaldstättersee. The dark lake surface extends to the background. On the upper left, heavy dark grey and violet storm clouds mass on the horizon above the lake. Faint grey mountain silhouettes line the left far shore under the clouds. Upper-right of the frame is pale overcast sky fading to storm grey, suitable for white text overlay.\"\n}",
+  "retryHistorySources": [
+    "original",
+    "inpaint-round-1",
+    "iterate-round-2"
+  ],
+  "imageVersions": [
+    {
+      "i": 0,
+      "type": "original",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 45,
+      "semanticScore": 90,
+      "threeStageScore": 90,
+      "threeStageVerdict": "PASS",
+      "promptLen": 5805,
+      "visionInventoryLen": 5048,
+      "visionInventoryPreview": "This is a watercolor illustration depicting a scene on a lake with mountains in the background and a stormy sky.\n\n**Human Figures:**\n\n*   **Figure 1 (Man in boat):**\n    *   Zone: center-foreground\n    *   Facing direction: toward viewer\n    *   Hair color, length, style: Graying, medium length, wavy, parted on the left side.\n    *   Clothing: He wears a dark brown, long-sleeved tunic or shirt with a textured appearance, and light brown trousers. A light brown rope is tied around his neck, crosses his chest, and binds his wrists together in front of him.\n    *   What they are doing: Sitting upright in the wooden boat, with his bound hands resting on his lap.\n    *   What they hold in each hand: Nothing, his hands are bound together by a rope.\n    *   Expression: Neutral and calm, looking d",
+      "complianceIssuesSummary": "Scene is accurate and well-executed. Only minor issue: Roger's hair is depicted as grey/graying rather than the brown specified in the prompt. All other character features, positions, clothing, interactions, and environmental elements match the prompt and story text closely.",
+      "fixableIssues": [
+        {
+          "severity": "MODERATE",
+          "character": "Roger",
+          "description": "Roger's hair is loose, not tied in a ponytail with a side part on the left as described."
+        },
+        {
+          "severity": "MODERATE",
+          "character": "Roger",
+          "description": "Roger's upper body clothing appears as a single leather-like garment, not distinctly a 'leather jerkin' AND a 'brown wool tunic'."
+        },
+        {
+          "severity": "MODERATE",
+          "character": "Soldier1",
+          "description": "Soldier1's clothing is a red and yellow tunic, but does not clearly read as 'leather armor' as specified."
+        },
+        {
+          "severity": "MODERATE",
+          "character": "Soldier2",
+          "description": "Soldier2's clothing is a red and yellow tunic, but does not clearly read as 'leather armor' as specified."
+        },
+        {
+          "severity": "MINOR",
+          "source": "three-stage",
+          "description": "Roger's hair is rendered as grey/graying rather than brown as specified; should be brown wavy hair tied in a ponytail"
+        }
+      ]
+    },
+    {
+      "i": 1,
+      "type": "repair",
+      "modelId": "grok-imagine",
+      "qualityScore": 0,
+      "semanticScore": 10,
+      "threeStageScore": 60,
+      "threeStageVerdict": "PASS",
+      "promptLen": 5805,
+      "visionInventoryLen": 5501,
+      "visionInventoryPreview": "This illustration depicts three human figures in a wooden rowboat on a lake, near a rocky shore, with mountains and an overcast sky in the background. The style resembles a watercolor painting.\n\n**Human Figures:**\n\n*   **Figure 1 (Left):**\n    *   **Zone:** left-midground\n    *   **Facing direction:** Right, looking slightly past the center figure.\n    *   **Hair color, length, style:** Brown, short, straight, visible under the helmet.\n    *   **Clothing:** A silver-colored conical helmet with a nasal guard. A red tunic with yellow cross-like patterns on the chest and sleeves. White long sleeves are visible at the wrists. Light blue trousers. Brown boots.\n    *   **What they are doing:** Sitting in the boat, holding an oar, appearing to row.\n    *   **What they hold in each hand:** Both ha",
+      "complianceIssuesSummary": "Both soldiers are depicted sitting rather than standing in the stern as declared in the prompt and declared interactions (-2 MAJOR each = -4 total deducted). All other core elements — Roger's appearance, bound wrists, boat, lakeshore, storm clouds, Habsburg-colored soldiers with oars — are correctly rendered.",
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": "Roger",
+          "description": "Roger's rope is also tied around his neck, which was not specified in the prompt for his binding."
+        },
+        {
+          "severity": "MAJOR",
+          "source": "three-stage",
+          "description": "Soldier1 (Figure 1, left-midground) is seated in the boat rather than standing as specified in the prompt and declared interaction"
+        },
+        {
+          "severity": "MAJOR",
+          "source": "three-stage",
+          "description": "Soldier2 (Figure 2, center-midground) is seated in the boat rather than standing as specified in the prompt and declared interaction"
+        }
+      ]
+    },
+    {
+      "i": 2,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 80,
+      "semanticScore": 90,
+      "threeStageScore": 100,
+      "threeStageVerdict": "PASS",
+      "promptLen": 7241,
+      "visionInventoryLen": 5003,
+      "visionInventoryPreview": "The image is an illustration, likely a watercolor painting, depicting three male figures in a landscape setting by a lake.\n\n**Human Figures:**\n\n*   **Figure 1 (Center-foreground):**\n    *   **Zone:** Center-foreground\n    *   **Facing direction:** Toward viewer\n    *   **Hair:** Dark brown, medium length, wavy, parted on the left side.\n    *   **Clothing:** Wearing dark-rimmed rectangular eyeglasses. He has a long-sleeved, light brown tunic or shirt under a dark brown, leather-like sleeveless vest with lacing down the front. He wears dark grey trousers and tall, dark brown leather-like boots.\n    *   **What they are doing:** Sitting on the edge of a wooden boat, with his hands clasped in front of him.\n    *   **What they hold in each hand:** His hands are bound together by a coiled rope.\n ",
+      "complianceIssuesSummary": "All characters correctly positioned, clothed, and interacting as specified. Roger sits bound in the bow facing the viewer, both soldiers stand in the stern/midground holding oars in Habsburg red-and-yellow colors, wooden boat is present on the pebbled lakeshore, and storm clouds mass on the upper-left horizon above the dark calm lake. No deductions warranted.",
+      "fixableIssues": [
+        {
+          "severity": "MODERATE",
+          "character": "Roger",
+          "description": "Roger's brown wavy shoulder-length hair is down, but the prompt requested it tied in a ponytail."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "framing": "A_before_manuel_closeup",
+  "description": "BEFORE — close-up on Manuel preparing the crossbow (checking it, not aiming). Calm readiness.",
+  "elapsedMs": 8448,
+  "modelId": "grok-imagine-image",
+  "cost": 0.02,
+  "characters": [
+    "Manuel"
+  ]
+}

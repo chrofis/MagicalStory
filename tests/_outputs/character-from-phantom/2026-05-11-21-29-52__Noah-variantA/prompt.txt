@@ -1,0 +1,20 @@
+Treat Image 1 (POSE TEMPLATE) as a paint-by-numbers template. The wooden mannequin in each of its 8 cells defines a POSE and an ANGLE. Your job is to REPLACE the mannequin in each cell with the character from Images 2 and 3 while keeping the mannequin's exact silhouette, pose, and head/body direction unchanged.
+
+Image 2 (STYLED 2×2 AVATAR) — authoritative reference for the costume worn in the bottom row and the art style of the rendering.
+Image 3 (CHARACTER PHOTO) — authoritative reference for the face identity.
+
+Output a 2×4 grid with thin black dividing lines and pure white background, same dimensions and cell layout as Image 1.
+
+Cell-by-cell content:
+  Cell 1 (top-left): the character's head and neck only, facing the camera straight on. No shoulders, no clothing.
+  Cell 2 (top): head and neck only, in the SAME three-quarter angle as Image 1's cell 2 — both eyes still visible, head clearly rotated. No shoulders, no clothing.
+  Cell 3 (top): head and neck only, in the SAME profile angle as Image 1's cell 3 — one eye, sharp side silhouette. No shoulders, no clothing.
+  Cell 4 (top-right): BACK OF THE HEAD ONLY — the camera is behind the character. The viewer sees the BACK of the hair, the BACK of the neck, and nothing of the face. NO eye, NO nose, NO mouth, NO hat, NO clothing. Match cell 4 of Image 1.
+  Cell 5 (bottom-left): full body from head to feet in the costume — pirate costume, striped red and white shirt, small tricorn hat, black eye patch, brown boots. Every costume element from Image 2 (especially headwear if Image 2 shows one) must be present here. Facing the camera straight on.
+  Cell 6 (bottom): full body in the SAME costume, in the SAME three-quarter angle as Image 1's cell 6 — leading shoulder forward, both feet visible, chest partly facing the viewer. Same hat and accessories as cell 5.
+  Cell 7 (bottom): full body in the SAME costume, in the SAME profile angle as Image 1's cell 7. Same hat and accessories as cell 5.
+  Cell 8 (bottom-right): FULL BODY BACK VIEW — camera is behind the character. The viewer sees the BACK of the costume: back of the hat, back of the shirt, sash tied behind, back of the breeches, back of the boots, heels closer to camera than toes. Match cell 8 of Image 1.
+
+Costume continuity is mandatory: cells 5, 6, 7, and 8 must show the SAME costume worn by the character — every accessory (hat, sash, etc.) visible in cell 5 must also appear in cells 6, 7, and 8.
+
+Render in soft watercolor children's storybook illustration style — gentle washes, simple outlines. ABSOLUTELY NO TEXT — no numbers, no degree symbols, no labels.

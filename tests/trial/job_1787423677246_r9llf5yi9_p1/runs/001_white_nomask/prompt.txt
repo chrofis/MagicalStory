@@ -1,0 +1,39 @@
+**THIS IMAGE DEPICTS:** Fiona stands at the Quaibrücke balustrade holding the Schatzkarte open in both hands, looking out. Below on the Goldene Möwe Facundo sleeps tangled in ropes beside a heap of gear with an oar sticking out, and two swans push away from the bow. Bright Hochsommer midday light, deep blue-green lake, the Fraumünster spire dark across the water.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No surface carries letters, numbers, or symbols — walls, garments, paper, signs, screens — unless the scene description names the text to show. Paper props — maps, letters, books — show only pictorial marks (routes, arrows, a compass rose), never handwriting or captions. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+
+**HEIGHT ORDER (shortest to tallest):** Fiona (shortest) -> Facundo (taller)
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Facundo: young adult proportions about 7.5-8 heads tall, full adult height, clearly taller and more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age
+- Fiona: adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age
+
+REFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):
+- RED frame = Facundo
+- BLUE frame = Fiona
+The frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.
+
+
+Fiona — an adult woman with light brown straight neck-length hair brushed back with a center part, blue eyes, a soft jawline, wearing a white linen pirate shirt with full sleeves gathered at the wrist and a laced V-neckline, a black felt tricorn hat with a shallow brim worn back from the face, a brown leather wide belt with a large square brass buckle, deep blue linen knee-length breeches, and brown leather calf-high folded-cuff boots, a silver necklace with a heart pendant at the neckline and a silver bracelet on her left wrist — stands at the stone balustrade of the Quaibrücke, facing the camera, both hands gripping the Schatzkarte open wide, the cream-coloured paper with its left half dense with crisp dark-brown coastlines and compass rose and its right half a pale faded wash held up at chest height. The wide grey stone pedestrian bridge stretches behind her, its low stone balustrade running along both sides, the deep blue-green lake water below catching full Hochsommer light and a pale blue summer sky overhead. Directly below at the low quay landing tied to the mooring point at the bridge's edge sits the Goldene Möwe — the dark brown wooden hull sitting low in the water, its single mast rising from the centre of the deck, its cream-white square sail with the black crossed-bones shape furled on the horizontal yard, bow blunt and rounded, dressed with a triangle of additional bunting along the rope railings to pass as a pirate vessel. Facundo — a young adult man with short tousled dark brown wavy hair, brown eyes, an angular jawline and a clean-shaven face, wearing an orange linen pirate shirt with full sleeves rolled to the elbow and a laced V-neckline, a black leather wide belt with a large square brass buckle, charcoal grey linen knee-length breeches, and black leather calf-high folded-cuff boots, a beaded necklace at the neckline — lies tangled in the rope railing near the Goldene Möwe's stern, eyes closed, his body slumped and limbs loose in sleep, his kit heaped beside him with the wooden oar — a pale natural-wood shaft roughly twice a person's height, its broad oval blade angled upward at a diagonal — sticking out of the pile. Two mute swans, large fully white waterbirds with orange-red bills and black knobs at the base, wings slightly raised as they push off, long curved necks extended forward, slide away from the blunt rounded bow and move out onto the open water. Across the blue-green lake the Fraumünster shows as a dark silhouette — a Gothic church with a steeply pitched dark slate-grey roof and a single slender tapering spire rising from the roof ridge — above pale stone walls. Wide establishing shot, bright high-summer midday light, open sky.
+
+**Perspective:**
+- Facundo: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.
+
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- When the scene description declares a close-up, the bottom frame edge cuts characters at the waist — legs, knees and feet lie below the frame edge and cannot appear. Never widen a close-up into a full-figure or establishing shot.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly.
+- Depth: `foreground` is large and dominates the lower half; `midground` sits in the middle band, smaller and further back; `background` is small and distant. Foreground > midground > background in size.
+
+
+
+
+
+
+
+**COMPOSITION — OPEN AREA:** In the upper-left corner of the image (roughly 30%) the scene continues as pale blue summer sky above the bridge balustrade left edge, the same paint carrying through it with no edge, band or panel where it meets the rest of the picture. Keep character heads, faces, and high-contrast detail (hats, embroidery, patterns, weapon edges) out of this area — figures belong down and to the right of it.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps

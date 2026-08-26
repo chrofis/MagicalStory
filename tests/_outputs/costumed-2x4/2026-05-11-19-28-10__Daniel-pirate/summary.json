@@ -1,0 +1,20 @@
+{
+  "runStarted": "2026-05-11T19:28:10.268Z",
+  "inputs": {
+    "face": "tests/fixtures/demo-photos/berger/Daniel.jpg",
+    "avatar": "tests/fixtures/demo-photos/berger/Daniel.jpg",
+    "costume": "pirate costume, dark coat, brown breeches, leather boots, tricorn hat",
+    "style": "watercolor",
+    "name": "Daniel-pirate"
+  },
+  "runs": [
+    {
+      "shape": "2x4",
+      "durationMs": 10350,
+      "tokensIn": 892,
+      "tokensOut": 1290,
+      "cells": 8
+    }
+  ],
+  "runFinished": "2026-05-11T19:28:21.365Z"
+}

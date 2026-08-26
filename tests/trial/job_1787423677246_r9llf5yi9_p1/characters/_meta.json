@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Facundo",
+    "photoType": "cell-back",
+    "clothingCategory": "costumed",
+    "clothingDescription": "an orange linen pirate shirt with full sleeves rolled to the elbow and a laced V-neckline, a black leather wide belt with a large square brass buckle at the waist, charcoal grey linen knee-length breeches, black leather calf-high folded-cuff boots with low heels; beaded necklace at the neckline."
+  },
+  {
+    "name": "Fiona",
+    "photoType": "cell-threeQuarter-headbody",
+    "clothingCategory": "costumed",
+    "clothingDescription": "a white linen pirate shirt with full sleeves gathered at the wrist and a laced V-neckline, a black felt tricorn hat with a shallow brim worn back from the face, a brown leather wide belt with a large square brass buckle at the waist, deep blue linen knee-length breeches, brown leather calf-high folded-cuff boots with low heels; silver necklace with heart pendant at the neckline, silver bracelet on the left wrist."
+  }
+]

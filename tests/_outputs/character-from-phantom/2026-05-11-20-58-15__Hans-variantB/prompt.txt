@@ -1,0 +1,16 @@
+Render an 8-cell character reference sheet (2 rows × 4 columns, thin black dividing lines, pure white background, 16:9 image).
+
+You have THREE reference images: Image 1 = pose template (2×4 mannequin grid), Image 2 = styled 2×2 character sheet showing the costume and rendered style, Image 3 = the person's face photo.
+
+For each cell below, the WHOLE FIGURE described must appear, framed and angled exactly as written. Same character (face from Image 3) in every cell. Cells 5–8 wear the costume from Image 2: pirate costume, white shirt, red sash, dark breeches, brown boots, tricorn hat with feather.
+
+CELL 1 (top-left): head + neck. Camera sees both eyes equally far from centre, full nose, full mouth, no clothing.
+CELL 2 (top, 2nd from left): head + neck. Camera sees three-quarters of the face — both eyes visible but the further eye sits near the cheek edge; the nose points diagonally off-centre, not straight; the far side of the head and the further ear are visible BEHIND the face. NO clothing. Distinctly different from cell 1 (asymmetric face) and from cell 3 (both eyes still visible).
+CELL 3 (top, 3rd from left): head + neck. Camera sees the side of the face — only one eye visible, the far eye fully hidden, nose sticking out perpendicular to the camera as a clear silhouette. No clothing.
+CELL 4 (top-right): head + neck. CAMERA IS BEHIND THE CHARACTER. The viewer sees only the back of the head — back of the hair, back of the neck. The face is fully hidden. NO eye, NO nose, NO mouth, NO ear in front, NO hat, NO costume. Match the back-of-head pose in cell 4 of Image 1.
+CELL 5 (bottom-left): full body, head to feet, facing camera. Wearing the COMPLETE costume from Image 2 — hat, shirt, sash, breeches, boots — every accessory present.
+CELL 6 (bottom, 2nd from left): full body, three-quarter view. Same costume as cell 5 with every accessory. Leading shoulder forward, chest still partly facing camera, both feet still visible. Clearly NOT a profile (chest still visible to camera).
+CELL 7 (bottom, 3rd from left): full body, profile view. Same costume as cell 5. Only one shoulder visible from the front; both feet point the same direction.
+CELL 8 (bottom-right): full body, BACK VIEW. CAMERA IS BEHIND THE CHARACTER. Same costume as cell 5 seen from behind — back of the hat, back of the shirt collar, sash tied behind the body, back of the breeches, back of the boots, heels closer to camera than toes. NO face visible.
+
+Identity from Image 3. Costume + art style from Image 2. Layout + per-cell angles from Image 1. Render in soft watercolor children's storybook illustration style — gentle washes, simple outlines. ABSOLUTELY NO TEXT — no numbers, no degree symbols, no labels.

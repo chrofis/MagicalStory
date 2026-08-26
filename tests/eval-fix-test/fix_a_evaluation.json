@@ -1,0 +1,12 @@
+{
+  "qualityScore": 100,
+  "issuesSummary": "THREE-STAGE: Lukas faces toward viewer rather than toward the distant market square, which slightly contradicts the directional flow of the prompt ('runs down a dirt path toward market square'). Running pose is present but could show more dynamic forward momentum. All objects present and interactions correctly placed. Setting, background characters, and overall scene composition match prompt well.",
+  "fixableIssues": [
+    {
+      "description": "Child's facing direction and body lean should orient more toward the distant square (downward/forward in frame) rather than directly toward viewer; arm pump should be more dynamic to show momentum down the path",
+      "severity": "MAJOR",
+      "type": "pose/direction",
+      "fix": "Adjust Lukas's head and torso to face slightly downward/away from camera toward the square in midground; increase arm swing amplitude to suggest forward momentum"
+    }
+  ]
+}

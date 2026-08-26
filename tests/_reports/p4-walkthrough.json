@@ -1,0 +1,247 @@
+{
+  "title": "Zwei Bolzen für die Freiheit",
+  "page": 4,
+  "versions": 7,
+  "bestSource": "inpaint-round-3",
+  "sceneDescription": "Roger, an adult man of average build with brown wavy hair in a shoulder-length ponytail and clean-shaven soft features, kneels in the far left background of the vast grey cobblestone Marktplatz Altdorf, his body angled to face right across the open square. He wears a deep forest green felt hat with a small grey feather, an earth-brown rough-woven wool tunic with a laced neckline, dark olive wool trousers, tall dark brown leather boots, and a dark tawny sleeveless leather jerkin over the tunic; black-framed glasses sit on his straight-nosed face with rounded tip and medium cheekbones. His arms are raised and extended forward as he holds Rogers Armbrust — a forearm-length wooden crossbow with two short curved bow limbs mounted perpendicular to the stock in a T-shape, a taut gut bowstring, and a wooden bolt with grey fletching resting in the groove along the stock — horizontal and level, aimed diagonally across the square toward the far right. His left eye closes in concentration as he sights down the weapon. In the far right background, a slim young school-age boy, Lukas, stands motionless against a bare tree, his short straight brown hair and brown eyes fixed forward, his rounded child features frozen in a moment of stillness. He wears a simple off-white linen tunic with a slightly rounded neckline, brown rough-woven wool trousers to the calf, simple dark brown leather shoes with a single strap, and a thin brown rope belt knotted at the front — and balanced atop his head sits Der Apfel, a fist-sized round apple with smooth bright red skin and a short brown stem. Lukas is roughly a sixth the size of Roger across the vast distance, a small figure dwarfed by the empty cobblestone expanse between them. The midground on both flanks is lined with a dense crowd of medieval villagers in ochre, brown, and rust tunics, pressed back from the open square in silence. Among them on the right flank, three small named figures are visible: Sophie, a young teen girl with light brown wavy shoulder-length hair, light freckles on her nose and cheeks, and brown eyes, wears a sage green linen overdress with a wide square neckline falling to mid-shin and soft flat brown leather shoes; Manuel, a teenage boy with dark brown wavy tousled hair, brown eyes, and lean teenage proportions, wears a mid-blue rough-woven linen tunic with wide sleeves, dark grey wool trousers, and flat dark brown leather shoes; and Verena, an elderly woman with silver straight chin-length hair with bangs, kind brown eyes behind glasses, and soft facial features, wears a dark olive green heavy wool tunic with long sleeves and a round neckline falling to the ankle and flat soft dark brown leather shoes, with a coarse undyed natural wool outer cloak draped over her shoulders. All three hold their breath in silence, Sophie's jaw clenched slightly. The flat overcast pale grey sky of November stretches unbroken across the full upper band of the frame, casting a cool diffuse light across the entire square.",
+  "text": "Ein Soldat stellte Lukas weit weg an einen Baum am Rand des Platzes und legte ihm einen Apfel auf den Kopf. Lukas schluckte. Er dachte an Eli, seinen Kuschelelefanten, der zu Hause auf seinem Bett wartete. Dann dachte er an seinen Vater.",
+  "retryHistorySources": [
+    "original",
+    "iterate-round-1",
+    "iterate-round-2",
+    "inpaint-round-3",
+    "character-fix:Sophie",
+    "character-fix:Verena",
+    "character-fix"
+  ],
+  "imageVersions": [
+    {
+      "i": 0,
+      "type": "original",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 0,
+      "semanticScore": 100,
+      "promptLen": 6411,
+      "fixableIssues": [
+        {
+          "severity": "CRITICAL",
+          "character": "Roger",
+          "description": "Roger is described as being in the 'far left background' and should be rendered significantly smaller to convey the 'vast distance' and relative scale to Lukas. He is currently in the midground and too large."
+        },
+        {
+          "severity": "CRITICAL",
+          "character": "Lukas",
+          "description": "Lukas is described as 'roughly a sixth the size of Roger across the vast distance'. He is rendered too large relative to Roger, failing to convey the intended scale and distance, and the 'dwarfed' effect."
+        },
+        {
+          "severity": "MAJOR",
+          "character": null,
+          "description": "The scene lacks the 'vast grey cobblestone Marktplatz Altdorf' and 'vast distance' between the main characters, which is crucial for the 'tension mounting' aspect and the overall 'ultra-wide shot' description. This is a direct consequence of the character scale and placement issues."
+        },
+        {
+          "severity": "MINOR",
+          "description": "Roger is rendered in the foreground at full scale rather than in the far left background as a small figure, undermining the vast-distance composition central to the scene's drama"
+        },
+        {
+          "severity": "MINOR",
+          "description": "Lukas stands on a raised wooden platform/box not described in the prompt; prompt specifies he stands against a bare tree at ground level"
+        },
+        {
+          "severity": "MINOR",
+          "description": "Glasses appear wire-rimmed in vision; prompt specifies black-framed glasses"
+        },
+        {
+          "severity": "MINOR",
+          "description": "Sophie, Manuel, and Verena appear in the foreground rather than pressed back into the midground crowd on the right flank as described"
+        }
+      ]
+    },
+    {
+      "i": 1,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 0,
+      "semanticScore": 100,
+      "promptLen": 8218,
+      "fixableIssues": [
+        {
+          "severity": "CRITICAL",
+          "character": "Roger",
+          "description": "Roger is rendered in the midground/foreground instead of the far left background as specified, impacting the sense of vast distance."
+        },
+        {
+          "severity": "CRITICAL",
+          "character": "Lukas",
+          "description": "Lukas is not rendered at roughly a sixth the size of Roger, making the 'vast distance' between them less apparent."
+        },
+        {
+          "severity": "MODERATE",
+          "character": "Roger",
+          "description": "Roger's hair is shoulder-length but not clearly styled as a ponytail."
+        },
+        {
+          "severity": "MODERATE",
+          "character": null,
+          "description": "The left flank of the square is not lined with a dense crowd as described, appearing sparse."
+        },
+        {
+          "severity": "MINOR",
+          "description": "Roger has a beard and mustache; prompt specifies clean-shaven soft features"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Roger is positioned center-foreground; prompt places him in the far left background to create the vast open square between him and Lukas"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Sophie is positioned center-midground; prompt places her on the right flank among the crowd"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Manuel is positioned center-midground; prompt places him on the right flank among the crowd"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Sophie reads as a young child; prompt specifies a young teen girl"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Manuel reads as a young child; prompt specifies a teenage boy with lean teenage proportions"
+        }
+      ]
+    },
+    {
+      "i": 2,
+      "type": "repair",
+      "modelId": "grok-imagine-image",
+      "qualityScore": 0,
+      "semanticScore": 100,
+      "promptLen": 8295,
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": "Manuel",
+          "description": "Manuel's tunic is dark brown/rust, but the prompt requested a mid-blue rough-woven linen tunic."
+        },
+        {
+          "severity": "MAJOR",
+          "character": "Verena",
+          "description": "Verena is missing her glasses, which were specified in the prompt."
+        },
+        {
+          "severity": "MODERATE",
+          "character": "Roger",
+          "description": "Roger's hair is shoulder-length and wavy, but the prompt specified a shoulder-length ponytail."
+        },
+        {
+          "severity": "CRITICAL",
+          "character": null,
+          "description": "The scene fails to convey the vast distance and scale relationships described. Roger and Lukas are placed in the midground instead of the far background, and Lukas is rendered much larger relative to Roger (closer to 1/2-1/3 size) instead of roughly 1/6th, diminishing the 'vast grey cobblestone Marktplatz Altdorf' and 'empty cobblestone expanse between them'."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Both figures appear in the center of the frame rather than Roger at far left background and Lukas at far right background with vast empty cobblestone expanse between them. The scale difference (Lukas being a sixth the size of Roger) is not apparent."
+        },
+        {
+          "severity": "MAJOR",
+          "description": "Manuel's tunic is rendered in dark brown instead of the specified mid-blue rough-woven linen tunic."
+        }
+      ]
+    },
+    {
+      "i": 3,
+      "type": "repair",
+      "modelId": "grok-imagine",
+      "qualityScore": 40,
+      "semanticScore": 100,
+      "promptLen": 6411,
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": "Roger",
+          "description": "Roger is rendered in the left-midground and is too large, contradicting the prompt's 'far left background' placement and the scale relationship where Lukas should be 'roughly a sixth the size of Roger across the vast distance'."
+        },
+        {
+          "severity": "MINOR",
+          "character": "Roger",
+          "description": "Roger's tunic has a simple round neckline instead of the 'laced neckline' specified in the prompt."
+        },
+        {
+          "severity": "MINOR",
+          "character": "Roger",
+          "description": "Roger's deep forest green felt hat is missing the 'small grey feather' specified in the prompt."
+        },
+        {
+          "severity": "MINOR",
+          "character": "Sophie",
+          "description": "Sophie's sage green linen overdress has a rounded neckline instead of the 'wide square neckline' specified in the prompt."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Figure 2 (Sophie) placed in center-foreground rather than right-flank midground crowd as specified by prompt"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Figure 3 (Manuel) placed in center-foreground rather than right-flank midground crowd as specified by prompt"
+        },
+        {
+          "severity": "MINOR",
+          "description": "Trousers appear green rather than dark olive wool as specified; minor colour drift"
+        }
+      ]
+    },
+    {
+      "i": 4,
+      "type": "repair",
+      "modelId": "grok-imagine (grok_inpaint)",
+      "qualityScore": null,
+      "semanticScore": null,
+      "promptLen": 6411,
+      "fixableIssues": []
+    },
+    {
+      "i": 5,
+      "type": "repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "qualityScore": null,
+      "semanticScore": null,
+      "promptLen": 6411,
+      "fixableIssues": []
+    },
+    {
+      "i": 6,
+      "type": "entity-repair",
+      "modelId": "grok-imagine (grok_blended)",
+      "qualityScore": 15,
+      "semanticScore": 100,
+      "promptLen": 6411,
+      "fixableIssues": [
+        {
+          "severity": "MAJOR",
+          "character": "Roger",
+          "description": "Roger's right hand holding the crossbow has fused/blurry fingers."
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Sophie is rendered in the center foreground as a prominent figure rather than in the right-flank midground crowd at reduced scale"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Manuel is rendered in the center-right foreground as a prominent figure rather than in the right-flank midground crowd at reduced scale"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Verena is rendered in the right foreground as a prominent figure rather than in the right-flank midground crowd at reduced scale"
+        },
+        {
+          "severity": "MODERATE",
+          "description": "Lukas stands on a raised wooden platform rather than against a bare tree as specified in the prompt; the platform is not part of the scene description"
+        },
+        {
+          "severity": "MINOR",
+          "description": "Roger's hair is shown worn down/straight rather than tied back in a shoulder-length ponytail as specified"
+        }
+      ]
+    }
+  ]
+}

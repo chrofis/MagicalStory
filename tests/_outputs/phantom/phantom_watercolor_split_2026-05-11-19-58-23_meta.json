@@ -1,0 +1,58 @@
+{
+  "mode": "split",
+  "model": "gemini-2.5-flash-image",
+  "style": "watercolor",
+  "totalMs": 44399,
+  "totalTokensIn": 1496,
+  "totalTokensOut": 10320,
+  "cells": [
+    {
+      "id": 1,
+      "kind": "head",
+      "angle": "0",
+      "ms": 5553
+    },
+    {
+      "id": 2,
+      "kind": "head",
+      "angle": "45",
+      "ms": 5454
+    },
+    {
+      "id": 3,
+      "kind": "head",
+      "angle": "90",
+      "ms": 5537
+    },
+    {
+      "id": 4,
+      "kind": "head",
+      "angle": "180",
+      "ms": 7219
+    },
+    {
+      "id": 5,
+      "kind": "body",
+      "angle": "0",
+      "ms": 5031
+    },
+    {
+      "id": 6,
+      "kind": "body",
+      "angle": "45",
+      "ms": 5475
+    },
+    {
+      "id": 7,
+      "kind": "body",
+      "angle": "90",
+      "ms": 4923
+    },
+    {
+      "id": 8,
+      "kind": "body",
+      "angle": "180",
+      "ms": 5207
+    }
+  ]
+}

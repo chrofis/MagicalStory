@@ -1,0 +1,21 @@
+SYSTEM:
+You are creating a clean pose-reference template for a children's book character pipeline. The image must contain exactly 8 figures showing 8 distinct viewing angles — 4 head views in the top row, 4 full-body views in the bottom row. NEVER write text, numbers, panel labels, or degree symbols into the image. The background is pure white. The figure has neutral hair and basic facial features so face direction is readable, but no clothing and no distinctive identity.
+
+PROMPT:
+Create a pose reference sheet showing 8 panels arranged as 2 rows and 4 columns. Equal panel sizes. The ENTIRE background is pure white (#FFFFFF) — no grey cards, no panel borders, no frames between panels, just empty white space separating the figures.
+
+Every panel shows the SAME generic figure: a simple genderless person with short neutral hair, basic eyes and a simple mouth (so the viewer can immediately tell which way the face is pointing), and NO clothing — only a smooth beige body shape. NO clothing details, NO accessories, NO skin texture, NO ethnic features, NO age cues beyond "adult". The figure's only purpose is to show the ANGLE.
+
+Row 1 (top) — HEAD AND NECK ONLY (no shoulders, no torso, no clothing). The angles MUST be visually distinct from each other:
+  Panel 1: head straight FRONT. Both eyes equally visible, nose centred, both ears either visible or symmetrically hidden by hair.
+  Panel 2: head turned 45° to camera's right (three-quarter view). Nose clearly points OFF-CENTRE to the right; right side of face foreshortened; both eyes visible but the right eye is closer to the head's edge.
+  Panel 3: head in strict PROFILE — turned 90° to the camera's right. Only ONE eye visible. Nose points fully to the right, perpendicular to the camera. One ear visible.
+  Panel 4: BACK of head — viewer sees the rear of the hair. No face visible. No eyes, no nose, no mouth.
+
+Row 2 (bottom) — FULL BODY head to feet, standing upright, arms relaxed at sides, feet hip-width apart. Smooth beige body, no clothing.
+  Panel 5: full body FRONT (0°).
+  Panel 6: full body turned 45° right (three-quarter, leading shoulder closer to camera).
+  Panel 7: full body strict PROFILE, 90° right (only one shoulder visible at the front, the other directly behind it).
+  Panel 8: full body BACK view (180°, viewer sees the back of the head, back of the body, heels closer to camera than toes).
+
+Render in soft watercolor children's storybook illustration style — gentle washes, simple outlines, light beige paper feel. ABSOLUTELY NO TEXT in the image — no numbers, no degree symbols, no panel labels, no captions, no watermarks. Just figures on pure white.

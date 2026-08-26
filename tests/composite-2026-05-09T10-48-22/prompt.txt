@@ -1,0 +1,39 @@
+Re-render this composite as a unified watercolor children's-book INTRODUCTION PAGE illustration in this art style: traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, soft paint edges, visible artistic brushstrokes, luminous flowing colors. NOT photoreal.
+
+THE INPUT COMPOSITE shows 5 character cutouts and 1 prop cutout(s) pasted onto a landmark photo. THE FIGURES IN THE INPUT ARE STANDING NEUTRALLY WITH ARMS AT THEIR SIDES. THIS IS WRONG. You MUST redraw their poses per the POSE block below — this is the most important change.
+
+═══ POSE REDRAW (REQUIRED — do every line) ═══
+- Hans (currently shown standing neutrally with arms at sides) → REDRAW the pose: RIGHT ARM raised and around Daniel's shoulders, pulling them close. Body angled slightly toward Daniel. NOT standing with arms at sides.
+- Daniel (currently shown standing neutrally with arms at sides) → REDRAW the pose: RIGHT ARM raised and around Emma's shoulders, pulling them close. Body angled slightly toward Emma. NOT standing with arms at sides.
+- Emma (currently shown standing neutrally with arms at sides) → REDRAW the pose: BOTH HANDS rest on the Schatztruhe on the ground in front. Body leans slightly forward over the prop. Eyes look down at the prop, then up at the viewer. NOT standing with arms at sides.
+- Noah (currently shown standing neutrally with arms at sides) → REDRAW the pose: LEFT HAND on Emma's shoulder. Body angled slightly toward Emma. NOT standing with arms at sides.
+- Sarah (currently shown standing neutrally with arms at sides) → REDRAW the pose: LEFT HAND on Noah's shoulder. Body angled slightly toward Noah. NOT standing with arms at sides.
+
+═══ CHARACTERS — preserve identity exactly from the cutout ═══
+- Hans, age 68, left of frame (adult).
+- Daniel, age 38, centre of frame (adult).
+- Emma, age 5, centre of frame (main / centre).
+- Noah, age 7, right of frame (child).
+- Sarah, age 36, right of frame (adult).
+
+SCENE (description of the real landmark — paint the background to match this, NOT some generic location):
+A photograph shows the Haus zum Rüden building in Zurich, Switzerland, during a parade with people in historical costumes.
+
+FOREGROUND PROPS (already in the composite — keep them in front of the family, painted as shown):
+- Schatztruhe: on the ground in front of the centre character, partially in front of their legs.
+
+═══ OTHER REQUIRED CHANGES ═══
+- Render every figure, every prop, and the landmark in unified watercolor — textured paper, pencil underpainting, soft brushstrokes, luminous flowing colour. NOT photoreal.
+- Match a single global lighting direction across all figures, props, and the scene.
+- Add natural ground shadows under feet and props.
+- Soften cutout edges — figures and props sit naturally on the ground, not pasted-on.
+- All faces visible, opaque, age-appropriate proportions (children visibly shorter than adults).
+- Fill the entire canvas edge-to-edge — no borders, no white edges, no panels.
+
+═══ PRESERVE EXACTLY ═══
+- Every character's face, hair colour, skin tone, clothing colour and detail.
+- Every prop's silhouette and material as shown in the composite.
+- Number of characters and their approximate left-to-right order.
+- The landmark architectural details from the SCENE description above.
+
+DO NOT add or remove characters. DO NOT swap faces. NO TEXT, no letters, no signage. The pose redraw is NON-NEGOTIABLE — if you return characters with arms still at their sides, you have failed the task.

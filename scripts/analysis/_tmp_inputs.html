@@ -1,0 +1,65 @@
+<title>Composite Fixes — Inputs</title>
+<style>
+ :root{--bg:#fbfbfa;--fg:#1c1b19;--mut:#6d6a65;--line:#e3e0da;--card:#fff;--acc:#b4442e;--ok:#2f6f4e;}
+ @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;}}
+ :root[data-theme="dark"]{--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;}
+ body{background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:32px 24px 80px;}
+ .wrap{max-width:1120px;margin:0 auto;} h1{font-size:26px;margin:0 0 6px;letter-spacing:-.02em;}
+ .lede{color:var(--mut);max-width:74ch;margin:0 0 26px;}
+ .box{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:14px 18px;margin:0 0 30px;font-size:14px;}
+ h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:38px 0 6px;border-bottom:1px solid var(--line);padding-bottom:6px;}
+ .sub{color:var(--mut);font-size:13.5px;margin:0 0 16px;}
+ .row{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;}
+ @media(max-width:800px){.row{grid-template-columns:1fr;}}
+ figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+ figure.new{border:2px solid var(--ok);}
+ figure img{width:100%;display:block;background:#8a8a8a;}
+ figcaption{padding:9px 12px;font-size:13px;color:var(--mut);}
+ figcaption b{color:var(--fg);}
+ .desc{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 15px;margin:14px 0 0;font-size:13px;color:var(--mut);}
+ code{background:var(--line);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+ pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow-x:auto;font-size:12.5px;line-height:1.55;white-space:pre-wrap;}
+ .tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700;color:#fff;background:var(--ok);}
+ .tag.no{background:var(--acc);}
+</style>
+<div class="wrap">
+<h1>What the two fixes feed in</h1>
+<p class="lede">Nothing has been re-rendered yet — these are the <em>inputs</em> the composite would now receive, and the pages as they stand today. Both reference sheets are pulled live from the Visual Bible of the real production stories.</p>
+<div class="box">Neither fix invents anything. Each one takes an asset the story already built and had no way to reach the composite.</div>
+
+<h2>Fix 1 — the dragon</h2>
+<p class="sub">Das Ei im Wurzelnest, page 17. Declared <code>objects: [&quot;LOC002&quot;,&quot;ANI001&quot;,&quot;ART001&quot;,&quot;ART002&quot;,&quot;ART003&quot;,&quot;ART005&quot;,&quot;ART006&quot;]</code> · interaction: “stand together as a small wet group on the left, watching the dragon and Julian across the clearing”</p>
+<div class="row">
+ <figure><img src="_tmp_inputs/dasei-p17-plate-nodragon.jpg"><figcaption><b>The plate as built today</b> — coloured silhouettes for the four boys. The setting prose ends “No figures, no animals”, so no dragon is painted.</figcaption></figure>
+ <figure><img src="_tmp_inputs/dasei-p17-composite-nodragon.jpg"><figcaption><b>The composite that came out</b> (Lab exp 64) — dragonless, though the page says the boys are watching it.</figcaption></figure>
+</div>
+<div class="row" style="margin-top:18px">
+ <figure class="new"><img src="_tmp_inputs/dragon-vb-sheet.png"><figcaption><span class="tag">NOW USED</span> <b>Drachenmutter</b> — the Visual Bible reference sheet the story already generated, previously unreachable by the composite.</figcaption></figure>
+ <div>
+  <div class="desc"><b>Resolved by <code>resolveSceneCreatures()</code> and written into the plate prompt:</b><br><br>dragon, large forest dragon. large — the body mass of a draft horse, four-legged, with two broad membranous wings folded against the flanks when at rest. deep forest-green scales across the body shading to dark charcoal on the back ridges, soft pale grey-green on the underbelly; two eyes that glow amber-gold like candlelight. large fan-shaped ears that lie flat when wary, a blunt rounded snout with wide nostrils, a heavy tail tapering to a rounded tip, wing membranes a translucent dark olive-green with visible vein ridges, no spines or horns — smooth rounded head</div>
+ </div>
+</div>
+<pre>CREATURES IN THIS SCENE — paint each one, exactly as described:
+- Drachenmutter: dragon, large forest dragon. large — the body mass of a draft horse, four-legged, with two broad membranous wings folded against the flanks when at re…
+These creatures are part of the world plate and stay in it. If the SETTING DESCRIPTION
+above says to leave out figures or animals, that instruction does not apply to the
+creatures listed here — it exists to keep the human cast out, and they arrive
+separately. Paint no creature, animal or person that is not named above or drawn as a
+silhouette below.</pre>
+
+<h2>Fix 2 — the Visual Bible character</h2>
+<p class="sub">Kapitänin Fiona, page 14. Declared cast: Fiona (foreground), Sarah (midground), Facundo (midground), Lorena (midground), Rossa (background)</p>
+<div class="row">
+ <figure><img src="_tmp_inputs/fiona-p14-shipped.jpg"><figcaption><b>The page as shipped</b> — direct render. The composite never ran: one name it could not resolve returned <code>null</code> for the entire cast.</figcaption></figure>
+ <figure class="new"><img src="_tmp_inputs/rossa-vb-sheet.png"><figcaption><span class="tag">NOW USED</span> <b>Kapitänin Rossa</b> — her Visual Bible sheet. The page calls her “Rossa”, the VB calls her “Kapitänin Rossa”; token matching links them.</figcaption></figure>
+</div>
+<div class="desc"><b>Kapitänin Rossa:</b> adult woman, mid-thirties. tall, sturdy. hair: dark red, straight, jaw-length, worn loose. brown eyes, warm medium skin tone, sharp cheekbones, no facial hair. Signature: a long dark green oilskin coat worn open over her pirate outfit. Clothing: a black linen collarless wide-sleeved pirate shirt, dark brown wide-leg linen trousers cut to mid-calf, black leather buckle boots to the ankle, a wide red leather belt at the waist, a long dark green oilskin coat worn open over the top</div>
+<div class="desc" style="border-left:3px solid var(--acc)"><span class="tag no">STILL FALLS THROUGH</span> <b>Rossa crew member</b> — <code>referenceImageUrl: undefined</code>. No avatar and no VB sheet, so page 10 keeps its direct render rather than dropping a declared figure. Token matching deliberately does <b>not</b> link this entry to Kapitänin Rossa.</div>
+
+<h2>Cast built for page 14, measured offline</h2>
+<pre>Fiona    depth=foreground  sheet=349430B  singleImage=false  fromVB=false
+Sarah    depth=midground   sheet=374792B  singleImage=false  fromVB=false
+Facundo  depth=midground   sheet=364315B  singleImage=false  fromVB=false
+Lorena   depth=midground   sheet=413567B  singleImage=false  fromVB=false
+Rossa    depth=background  sheet=321948B  singleImage=true   fromVB=true   &lt;-- was: whole cast null</pre>
+</div>

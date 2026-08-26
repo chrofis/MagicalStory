@@ -1,0 +1,10 @@
+{
+  "framing": "B_before_lukas_solo_apple",
+  "description": "BEFORE — close-up on Lukas alone, apple on head, tense and frightened (eyes OPEN, afraid).",
+  "elapsedMs": 8516,
+  "modelId": "grok-imagine-image",
+  "cost": 0.02,
+  "characters": [
+    "Lukas"
+  ]
+}

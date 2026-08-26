@@ -1,0 +1,56 @@
+const fs=require('fs');
+const j=require('./_tmp_exp69.json');
+const dir='scripts/analysis/_tmp_c69', D='_tmp_c69/';
+const files=fs.readdirSync(dir);
+const f=(pre)=>{const hit=files.find(x=>x.startsWith(pre));return hit?D+hit:null;};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const p17=j.results[0], p14=j.results[1];
+const steps=(tag,r)=>(r.steps||[]).map((s,n)=>{
+  const src=f(`${tag}-${String(n+1).padStart(2,'0')}-`);
+  return src?`<figure><img src="${src}"><figcaption>${esc(s.label)}</figcaption></figure>`:'';
+}).join('');
+const html=`<title>Composite Fixes — Renders</title>
+<style>
+ :root{--bg:#fbfbfa;--fg:#1c1b19;--mut:#6d6a65;--line:#e3e0da;--card:#fff;--acc:#b4442e;--ok:#2f6f4e;}
+ @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;}}
+ :root[data-theme="dark"]{--bg:#171614;--fg:#eceae6;--mut:#a09b93;--line:#302d29;--card:#201e1b;--acc:#e07a5f;--ok:#6aa87f;}
+ body{background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:32px 24px 80px;}
+ .wrap{max-width:1160px;margin:0 auto;} h1{font-size:26px;margin:0 0 6px;letter-spacing:-.02em;}
+ .lede{color:var(--mut);max-width:74ch;margin:0 0 26px;}
+ h2{font-size:16px;margin:40px 0 4px;} .sub{color:var(--mut);font-size:13.5px;margin:0 0 16px;}
+ .row{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+ @media(max-width:820px){.row{grid-template-columns:1fr;}}
+ figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+ figure.win{border:2px solid var(--ok);} figure.warn{border:2px solid var(--acc);}
+ figure img{width:100%;display:block;background:#8f8f8f;}
+ figcaption{padding:9px 12px;font-size:13px;color:var(--mut);} figcaption b{color:var(--fg);}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px;}
+ .tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700;color:#fff;background:var(--ok);}
+ .tag.no{background:var(--acc);}
+ .note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:13px 17px;margin:16px 0;font-size:14px;}
+ code{background:var(--line);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+</style>
+<div class="wrap">
+<h1>Composite fixes — actual renders</h1>
+<p class="lede">Production experiment 69, both fixes live. One page composited; one refused and — for the first time — kept the plate that proves why.</p>
+
+<h2>Das Ei im Wurzelnest, page 17 — the dragon <span class="tag">COMPOSITED</span></h2>
+<p class="sub">Cast: Levin, Max, Kiaan (foreground) + Julian (background) · creature: Drachenmutter (ANI001) · cost $${p17.cost}</p>
+<div class="row">
+ <figure><img src="${f('p17-00-')}"><figcaption><b>The page as shipped</b> — direct render</figcaption></figure>
+ <figure class="win"><img src="${f('p17-99-')}"><figcaption><b>The composite, with the creature fix</b></figcaption></figure>
+</div>
+<div class="note">Look at step 1 below: the plate now carries the dragon alongside the four coloured silhouettes. Before the fix the plate prose said “No figures, no animals” and it was never painted.</div>
+<div class="grid">${steps('p17', p17)}</div>
+
+<h2>Kapitänin Fiona, page 14 — the VB character <span class="tag no">REFUSED at ${p14.depthSpread}×</span></h2>
+<p class="sub">Cast built: Fiona, Sarah, Facundo, Lorena + <b>Rossa from her Visual Bible sheet</b> — five figures where the old code produced none.</p>
+<div class="row">
+ <figure><img src="${f('p14-00-')}"><figcaption><b>The page as shipped</b> — direct render</figcaption></figure>
+ <figure class="warn"><img src="${f('p14-01-')}"><figcaption><b>The plate it got to before refusing</b> — five silhouettes including Rossa. Previously this run died at “cast is empty” and produced nothing at all.</figcaption></figure>
+</div>
+<div class="grid">${steps('p14', p14)}</div>
+<div class="note">The refusal is correct: tallest/shortest figure is <b>${p14.depthSpread}×</b>, under the 2× bar. Grok painted everyone at the same distance, so the declared foreground/background split is not real and there is nothing to correct. The page keeps its original render — but now the plate survives, so you can see the judgement instead of taking my word for it.</div>
+</div>`;
+fs.writeFileSync('scripts/analysis/_tmp_exp69.html',html);
+console.log('written');

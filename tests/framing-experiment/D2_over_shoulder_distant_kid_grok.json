@@ -1,0 +1,10 @@
+{
+  "framing": "D2_over_shoulder_distant_kid",
+  "description": "Over-the-shoulder on Manuel (foreground, big). Lukas tiny in the far-far distance — generic medieval kid with red apple.",
+  "elapsedMs": 13066,
+  "modelId": "grok-imagine-image",
+  "cost": 0.02,
+  "characters": [
+    "Manuel"
+  ]
+}

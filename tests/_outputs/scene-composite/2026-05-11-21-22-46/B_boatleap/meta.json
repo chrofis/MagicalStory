@@ -1,0 +1,14 @@
+{
+  "scene": "B_boatleap",
+  "description": "A stormy alpine lake at dusk. Dark grey clouds, choppy water, a wooden rowboat sits on rough waves in the left foreground, prow pointing right. Sharp rocky cliffs rise on the right side of the frame, with a flat ledge of rock close to the camera. Driving rain. No people in this image — leave the boat and the ledge empty.",
+  "finalAction": "Wilhelm Tell leaps from the wooden boat on the left toward the rocky ledge on the right — caught in mid-air, body angled forward, one foot pushing off from the boat's stern, arms outstretched for balance. Storm clouds, driving rain, dramatic dusk lighting.",
+  "cast": [
+    {
+      "name": "Hans",
+      "pose": "threeQuarter",
+      "position": "mid-air between the boat (left) and the rocky ledge (right), caught mid-leap"
+    }
+  ],
+  "bgMs": 3722,
+  "pass1Ms": 5820
+}

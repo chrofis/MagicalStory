@@ -1,0 +1,1090 @@
+{
+  "generatedAt": "2026-05-02T21:29:18.851Z",
+  "locations": [
+    {
+      "slug": "marktplatz-altdorf",
+      "location_name": "Marktplatz Altdorf",
+      "location_query": "Marktplatz Altdorf",
+      "location_type": "Square",
+      "aliases": [
+        "altdorf market square",
+        "tell square",
+        "altdorf-platz"
+      ],
+      "candidates": [
+        {
+          "file": "01-Altdorf_Schweiz_1900.jpg",
+          "title": "Altdorf Schweiz 1900.jpg",
+          "query": "Altdorf Uri lithograph",
+          "searchSnippet": "DescriptionAltdorf Schweiz 1900.jpg Deutsch: Altdorf um 1900. Date between 1890 and 1905 date QS:P,+1500-00-00T00:00:00Z/6,P1319,+1890-00-00T00:00:00Z/9",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Altdorf_Schweiz_1900.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 3546,
+          "height": 2566,
+          "description": "Altdorf um 1900.",
+          "artist": "Unknown authorUnknown author",
+          "license": "Public domain",
+          "dateOriginal": "between 1890 and 1905<div style=\"display: none;\">date QS:P,+1500-00-00T00:00:00Z/6,P1319,+1890-00-00T00:00:00Z/9,P1326,+1905-00-00T00:00:00Z/9</div>",
+          "bytes": 7655977
+        },
+        {
+          "file": "02-Wilhelm_Tell_Denkmal_Altdorf_um_1900-detail_2.jpg",
+          "title": "Wilhelm Tell Denkmal Altdorf um 1900-detail 2.jpeg",
+          "query": "Altdorf Uri lithograph",
+          "searchSnippet": "is a derivative work of the following images: File:Wilhelm_Tell_Denkmal_Altdorf_um_1900.jpeg licensed with LOC-pchrom, PD-US 2009-07-11T11:58:23Z Jan Arkesteijn",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/2/21/Wilhelm_Tell_Denkmal_Altdorf_um_1900-detail_2.jpeg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 637,
+          "height": 637,
+          "description": "",
+          "artist": "Wilhelm_Tell_Denkmal_Altdorf_um_1900.jpeg: (not named) derivative work: Romano1246 (talk)",
+          "license": "Public domain",
+          "dateOriginal": "2010-03-31 21:17",
+          "bytes": 85787
+        },
+        {
+          "file": "03-Heinzmann_Brand_zu_Altdorf_randlos.jpg",
+          "title": "Heinzmann Brand zu Altdorf randlos.jpg",
+          "query": "Altdorf historical engraving",
+          "searchSnippet": "DescriptionHeinzmann Brand zu Altdorf randlos.jpg Deutsch: Der Brand von Altdorf am 5. April 1799, bei dem 400 Gebäude betroffen waren, unter ihnen 225",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Heinzmann_Brand_zu_Altdorf_randlos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 704,
+          "height": 1134,
+          "description": "Der Brand von Altdorf am 5. April 1799, bei dem 400 Gebäude betroffen waren, unter ihnen 225 Wohnhäuser. Johann Georg Heinzmann: Kleine Schweizer-Chronik. 2. Theil, Selbstverlag, Bern 1801, Abb. XXIX, vor S. 657.",
+          "artist": "Unknown authorUnknown author",
+          "license": "Public domain",
+          "dateOriginal": "1801",
+          "bytes": 437729
+        },
+        {
+          "file": "04-Heinzmann_Brand_zu_Altdorf_randlos_2.jpg",
+          "title": "Heinzmann Brand zu Altdorf randlos 2.jpg",
+          "query": "Altdorf historical engraving",
+          "searchSnippet": "DescriptionHeinzmann Brand zu Altdorf randlos 2.jpg Deutsch: Der Brand von Altdorf am 5. April 1799, bei dem 400 Gebäude betroffen waren, unter ihnen 225",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/1/15/Heinzmann_Brand_zu_Altdorf_randlos_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 704,
+          "height": 1134,
+          "description": "Der Brand von Altdorf am 5. April 1799, bei dem 400 Gebäude betroffen waren, unter ihnen 225 Wohnhäuser. Johann Georg Heinzmann: Kleine Schweizer-Chronik. 2. Theil, Selbstverlag, Bern 1801, Abb. XXIX, vor S. 657.",
+          "artist": "Unknown authorUnknown author",
+          "license": "Public domain",
+          "dateOriginal": "1801",
+          "bytes": 298965
+        }
+      ],
+      "ai_candidates": [
+        {
+          "file": "ai-01-watercolor-v2-a4portrait-hat-pole.jpg",
+          "style": "watercolor-v2-a4portrait-hat-pole",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. Medieval marketplace of Altdorf in canton Uri, late 14th century. CENTER OF THE SQUARE: a tall wooden POLE planted upright in the cobblestones, roughly 4 metres high, and atop the pole sits a fine FEATHERED HAT — a wide-brimmed velvet hat with a long ostrich plume, clearly the hat of a nobleman (Gessler's hat of authority). The pole is the focal point, prominent in the middle of the square. Around it: cobblestoned town square, medieval timber-frame houses with steep shingled roofs ringing the square, a stone parish church bell tower visible behind the rooftops. A few peasant figures walk the periphery of the square in 14th-century Swiss costume — tunics, hooded cloaks — but the centre by the pole is open, empty, deliberately bare so the hat is unmissable. Background: snow-capped Uri Alps rising behind the village rooftops. Soft warm afternoon light. Style: 19th-century romantic Swiss watercolor, brown ink outlines, soft warm palette, atmospheric. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 494456
+        },
+        {
+          "file": "ai-02-composed-v3-real-church-real-bristen.jpg",
+          "style": "composed-v3-real-church-real-bristen",
+          "prompt": "Compose a single A4 PORTRAIT 3:4 medieval Swiss marketplace scene set in 14th-century Altdorf, canton Uri. The MAIN SUBJECT and the FOREGROUND of the canvas is the MARKETPLACE SQUARE: an open cobblestoned square dominating the lower two-thirds of the frame, with a tall wooden POLE standing prominently in the centre of the square — atop the pole sits a fine FEATHERED VELVET HAT (Gessler's hat of authority), wide-brimmed with a long ostrich plume, clearly the centrepiece of the square. A few medieval Swiss peasants and townsfolk in 14th-century costume (tunics, hooded cloaks) walk the periphery of the square, but the centre by the pole is open and bare. Around the square: medieval timber-frame houses with steep shingled roofs ringing it. BACKGROUND ELEMENTS (drawn from the supplied references): use the SECOND REFERENCE IMAGE (the church) — render the SAME church as it appears in that photo (its distinctive bell tower with onion dome, the pale stone facade, the steep roof) and place it in the BACKGROUND of the square, partly visible behind the rooftops, the tower rising clearly above the village. Use the FIRST REFERENCE IMAGE (the mountain) — render the SAME pyramidal Bristen peak in the FAR BACKGROUND of the scene, its distinctive snow-capped summit dominating the upper portion of the canvas behind the village. The church and the mountain must be recognisable matches to the references — same shape, same proportions — but stylised in 19th-century romantic Swiss watercolor style with brown ink outlines, soft warm afternoon light. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "church-altdorf-kirche-wide.jpg+bristen-from-altdorf.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 503193
+        },
+        {
+          "file": "ai-03-composed-v4-pole-30pct-shorter.jpg",
+          "style": "composed-v4-pole-30pct-shorter",
+          "prompt": "Edit only the wooden POLE in the centre of the marketplace square — leave the church, the Bristen mountain, the buildings, the cobblestones, the figures, the watercolor style and the A4 portrait composition exactly as they are. Make the POLE 30% SHORTER (reduce its overall height by about one-third). The feathered velvet hat (Gessler's hat) still sits on top of the pole, in the same position relative to the pole — just lower in the canvas because the pole is shorter. The pole still stands upright in the centre of the square, just less tall. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-02-composed-v3-real-church-real-bristen.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 467727
+        },
+        {
+          "file": "ai-04-composed-v5-pole-somewhat-shorter.jpg",
+          "style": "composed-v5-pole-somewhat-shorter",
+          "prompt": "Edit only the wooden pole with the feathered hat in the centre of the marketplace square — leave the church, the Bristen mountain, the buildings, the cobblestones, the figures, the watercolor style and the A4 portrait composition exactly as they are. Make the pole somewhat shorter — reduce its height a bit so it does not stand quite as tall above the square, but the pole and the feathered hat on top remain clearly present and visible as the centrepiece. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-02-composed-v3-real-church-real-bristen.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 472298
+        }
+      ]
+    },
+    {
+      "slug": "apple-shot-altdorf",
+      "location_name": "Apple Shot Scene (Altdorf marketplace)",
+      "location_query": "Marktplatz Altdorf apple shot",
+      "location_type": "Square",
+      "aliases": [
+        "altdorf market square apple shot",
+        "tell apfelschuss altdorf",
+        "altdorf platz hut on pole"
+      ],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-lithograph.jpg",
+          "style": "lithograph",
+          "prompt": "Empty 14th-century Altdorf market square in canton Uri, Switzerland. Wide cobblestone plaza surrounded by tall steep-roofed timber-frame houses with overhanging upper floors and small shuttered windows. A single tall wooden pole stands prominently in the center of the square with a felt hat resting on top. A medieval church spire visible on the left, the snow-capped Uri Alps rising in the background. NO PEOPLE, NO ANIMALS — empty plaza only. Style: 19th-century Swiss landscape lithograph, fine ink linework, restrained earthy color wash (sepia, ochre, slate grey), atmospheric distance haze, hand-engraved feel. Single illustration filling the canvas, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 615897
+        },
+        {
+          "file": "ai-02-watercolor.jpg",
+          "style": "watercolor",
+          "prompt": "Empty 14th-century Altdorf marketplace, canton Uri, Switzerland. Cobblestone square ringed by medieval timber-frame burgher houses with steep tiled roofs. A weathered wooden pole stands in the middle of the square topped with a green felt hat. Church tower in the background, alpine peaks beyond. NO PEOPLE, NO ANIMALS — landscape only. Style: 19th-century romantic Swiss landscape watercolor in the manner of J.J. Wetzel — soft light, muted earth-tone palette, brown ink outlines, washed sky. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 518715
+        },
+        {
+          "file": "ai-03-composition-lithograph.jpg",
+          "style": "composition-lithograph",
+          "prompt": "14th-century Altdorf market square in canton Uri. Cobblestone plaza ringed by tall steep-roofed timber-frame medieval houses. COMPOSITION GUIDE (silhouettes only, no faces or detail): in the FAR RIGHT BACKGROUND a small child SILHOUETTE stands with back against the trunk of a tall lime tree, an apple on top of his head. In the FOREGROUND-LEFT, a clear EMPTY SPACE — open ground reserved for a single archer figure to be added later. Behind and ringing the square, a CROWD of dim shadowy silhouette figures observe in tense stillness — these are dark backlit silhouettes only, no detail. A tall wooden pole with a felt hat stands in the middle distance to the right of center. Snow-capped Uri Alps in the far background, low overcast light. Style: 19th-century Swiss landscape lithograph, fine ink linework, sepia and grey wash, dramatic atmospheric depth. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 516174
+        },
+        {
+          "file": "ai-04-composition-watercolor.jpg",
+          "style": "composition-watercolor",
+          "prompt": "Medieval Altdorf market square, dramatic afternoon light. COMPOSITION: FAR RIGHT BACKGROUND — a small CHILD-SHAPED SILHOUETTE stands against the trunk of a tall lime tree, motionless, an apple balanced on his head. FOREGROUND-LEFT — a WIDE EMPTY SPACE on the open cobblestones, reserved space (no figure drawn) where the archer will stand. Behind and around the square, a SEMI-CIRCLE OF SHADOW SILHOUETTE FIGURES — Habsburg soldiers and townspeople rendered as dark mass silhouettes only, no faces, no detail, just the dark crowd shape conveying tense stillness. A wooden pole with a hat stands in the mid-right distance. Tall steep-roofed medieval timber houses ring the square; alpine peaks beyond. Style: 19th-century romantic Swiss watercolor, soft diffused light, brown ink outlines, restrained earth-tone wash, atmospheric haze. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 490238
+        },
+        {
+          "file": "ai-05-composition-watercolor-v2.jpg",
+          "style": "composition-watercolor-v2",
+          "prompt": "A wooded forest clearing at the edge of medieval Altdorf, NOT a town square — open grassy ground bordered by ancient lime and oak trees, the cobblestone marketplace just visible far behind through the trees. Late afternoon light filtering through leaves. COMPOSITION: FAR RIGHT BACKGROUND — a small CHILD-SHAPED SILHOUETTE stands with his back pressed against the trunk of a tall lime tree, motionless, an apple balanced on his head. FOREGROUND-LEFT — a WIDE EMPTY OPEN SPACE on the grass, no figure drawn, reserved space where an archer will stand and aim across the clearing toward the boy. Behind and around the clearing in the middle distance, a SEMI-CIRCLE of dark shadow silhouette figures — soldiers and townspeople rendered as featureless backlit shapes only, no faces, no detail, conveying tense stillness. The wide grassy distance between the empty front-left and the tree on the far right is the dramatic focus. Snow-capped Uri Alps just visible above the treetops in the far background. Style: 19th-century romantic Swiss watercolor, soft diffused afternoon light, brown ink outlines, restrained earth-tone wash, atmospheric haze. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 507230
+        },
+        {
+          "file": "ai-06-composition-watercolor-v3-treeback.jpg",
+          "style": "composition-watercolor-v3-treeback",
+          "prompt": "Edit this scene: move the lime tree (with the small child silhouette against its trunk) FURTHER BACK into the deep background — push the tree from its current right-background position even further back into the distance. The empty front-left space (reserved for the archer Tell) should now feel much larger and the distance between the front-left and the boy under the tree should feel dramatic and far. Keep everything else identical: medieval Altdorf marketplace setting, the wooden pole with hat in mid-distance, the shadow silhouette crowd ringing the square, the snow-capped Uri Alps behind, 19th-century Swiss watercolor style, brown ink outlines. Increase atmospheric haze on the distant tree to emphasize the distance. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine-edit",
+          "basedOn": "ai-04-composition-watercolor.jpg",
+          "bytes": 389458
+        },
+        {
+          "file": "ai-07-composition-v4-tree-no-pole.jpg",
+          "style": "composition-v4-tree-no-pole",
+          "prompt": "Edit this medieval Altdorf marketplace scene with these changes: REMOVE the wooden pole entirely from the middle of the square — paint over it so the cobblestones are clean and uninterrupted. ADD ONE BIG TREE on the RIGHT side of the composition — a single tall lime or oak tree, prominent thick trunk in clear view, the trunk is the visual focus on the right. Place a SMALL CHILD SILHOUETTE standing motionless against this tree trunk on the right, an apple balanced on the boy's head. The empty front-left of the composition stays empty (reserved space for the archer Tell figure). Keep everything else: medieval timber-frame houses ringing the square, the shadow silhouette crowd in the middle distance, snow-capped Uri Alps behind, 19th-century Swiss watercolor style with brown ink outlines, soft afternoon light. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine-edit",
+          "basedOn": "apple-shot-altdorf/ai-06-composition-watercolor-v3-treeback.jpg",
+          "bytes": 428929
+        },
+        {
+          "file": "ai-08-composition-v5-tree-back-observers-left.jpg",
+          "style": "composition-v5-tree-back-observers-left",
+          "prompt": "Edit this medieval Altdorf apple-shot scene with these adjustments: 1) Push the big lime tree (with the boy silhouette against its trunk) slightly further back into the right-background, increasing the depth of the scene. 2) Move the OBSERVER CROWD: place the shadow-silhouette observers on the LEFT side and across the BACK of the image, NOT behind the tree on the right. The observers form a crowd along the left edge and stretch across the back — leaving the right area around the tree clear except for the boy. 3) The observer figures should wear PERIOD-APPROPRIATE 14th-century Swiss medieval costumes — long tunics, hooded cloaks, simple peasant garb, soldiers in chainmail and tabards — but rendered as DIM SILHOUETTES with FACES NOT IDENTIFIABLE (hooded, in shadow, or distant). 4) Keep the empty front-left foreground space (reserved for the archer Tell). Keep the medieval timber-frame houses, snow-capped Uri Alps, watercolor style, brown ink outlines, soft afternoon light. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine-edit",
+          "basedOn": "apple-shot-altdorf/ai-07-composition-v4-tree-no-pole.jpg",
+          "bytes": 380102
+        },
+        {
+          "file": "ai-09-composition-v6-a4portrait-crowd-left.jpg",
+          "style": "composition-v6-a4portrait-crowd-left",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. Medieval Altdorf scene of the apple shot, late afternoon under soft warm light. RIGHT BACKGROUND (deep, far): a TALL LIME TREE — prominent thick trunk in clear view, the tree pushed FURTHER BACK into the middle-distance and made SLIGHTLY BIGGER (taller and more imposing) so it dominates the right side at depth. A small CHILD silhouette stands motionless against the trunk, an apple balanced on his head. CENTER FOREGROUND: open empty cobblestoned ground stretching across the bottom of the frame, EMPTY SPACE reserved for the archer Tell figure (NO figure drawn there). LEFT HALF ONLY: a CLUSTERED CROWD of medieval Swiss observers — peasants, soldiers, townsfolk all GROUPED TOGETHER as a tight informal cluster (NOT lined up, NOT in a row), tense and watching. The crowd fills only the LEFT HALF of the image, NEVER spilling onto the right side or behind the tree. The figures wear period 14th-century medieval Swiss costume — tunics, hooded cloaks, peasant garb, soldiers in chainmail and tabards — faces are SMALL but VISIBLE (not dominant, but you can see eyes and expressions of tension), distant enough to read as a crowd rather than portraits. Behind the crowd and tree: medieval timber-frame houses ringing the square, snow-capped Uri Alps in the far background. Style: 19th-century romantic Swiss watercolor, brown ink outlines, soft warm afternoon light, atmospheric depth. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 576222
+        },
+        {
+          "file": "ai-10-composition-v7-a4portrait-no-right-figures.jpg",
+          "style": "composition-v7-a4portrait-no-right-figures",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. Medieval Altdorf scene of the apple shot, late afternoon under soft warm light. RIGHT BACKGROUND (deep, far): a TALL LIME TREE — prominent thick trunk, set well back in the middle-distance, dominating the right side at depth. A small CHILD silhouette stands motionless against the trunk with an apple balanced on his head. ABSOLUTELY NO OTHER FIGURES anywhere on the right side or near the tree — the tree and the child are completely isolated, with empty space and cobblestones around them. CENTER FOREGROUND: open empty cobblestoned ground stretching across the bottom of the frame, EMPTY (no figure drawn). LEFT HALF ONLY: a CLUSTERED CROWD of medieval Swiss observers — peasants, soldiers, townsfolk grouped together as a tight informal cluster (NOT lined up, NOT in a row), tense and watching. The crowd fills only the LEFT third-to-half of the image, NEVER spilling into the centre or right side. The figures wear period 14th-century medieval Swiss costume — tunics, hooded cloaks, peasant garb, soldiers in chainmail and tabards. Faces are SMALL but VISIBLE (eyes and tense expressions readable, but not portraits). Behind the crowd: medieval timber-frame houses ringing the square, snow-capped Uri Alps in the far background. Style: 19th-century romantic Swiss watercolor, brown ink outlines, soft warm afternoon light, atmospheric depth. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 530035
+        },
+        {
+          "file": "ai-11-composition-v8-boy-facing-front-empty.jpg",
+          "style": "composition-v8-boy-facing-front-empty",
+          "prompt": "Edit this medieval Altdorf apple-shot scene with these adjustments. 1) The boy at the tree should now face the CAMERA directly — full frontal view of his small body and face standing in front of the lime tree trunk, apple still balanced on his head, calm expression. He stands flat against the trunk, but turned to face us. 2) Make the lime tree BIGGER — taller, fuller crown, thicker trunk — but DO NOT move it forward; keep it at the SAME middle-distance depth in the right background. The tree just becomes a larger presence at that depth. 3) Move the SPECTATOR CROWD further BACK in the image — push them deeper into the middle-distance on the left side, so they appear smaller and further away. They remain a clustered group on the left half only, never spilling to the right. 4) The FRONT FOREGROUND of the image (the entire bottom strip of cobblestones) must remain completely EMPTY — no figures, no objects, just the open square. Keep the medieval timber-frame houses, snow-capped Uri Alps, watercolor style, brown ink outlines, soft warm afternoon light, A4 portrait composition. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-10-composition-v7-a4portrait-no-right-figures.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 427600
+        },
+        {
+          "file": "ai-12-composition-v9-boy-against-trunk-more-crowd.jpg",
+          "style": "composition-v9-boy-against-trunk-more-crowd",
+          "prompt": "Edit this medieval Altdorf apple-shot scene with these adjustments. 1) Push the BOY further BACK so his BACK is touching the lime tree TRUNK — he stands flat against the trunk in the right background, his back pressed to the bark, still facing the camera with the apple balanced on his head. He is small in the frame because of the depth. 2) Add MORE SPECTATORS to the LEFT side of the image — increase the size of the clustered crowd on the left, more peasants, soldiers, townsfolk packed together as a tense informal cluster, still occupying only the LEFT third-to-half of the canvas. 3) Keep the right side around the tree COMPLETELY CLEAR of people — absolutely no figures right of the tree, no figures behind the tree, only the tree, the boy against its trunk, and the empty cobblestones around them. 4) Keep the empty front foreground (no figure in the bottom centre), the medieval timber-frame houses, snow-capped Uri Alps, watercolor style, brown ink outlines, soft warm afternoon light, A4 portrait composition. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-11-composition-v8-boy-facing-front-empty.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 428698
+        },
+        {
+          "file": "ai-13-composition-v10-crowd-market-chaotic.jpg",
+          "style": "composition-v10-crowd-market-chaotic",
+          "prompt": "Edit only the spectator crowd on the LEFT side of this medieval Altdorf apple-shot scene — leave the boy against the tree trunk, the lime tree, the timber-frame houses, the snow-capped Uri Alps, the empty foreground cobblestones, the watercolor style and A4 portrait composition exactly as they are. Adjustments to the crowd: 1) The crowd must NOT reach all the way back toward the tree on the right — leave clear empty cobblestones between the right edge of the crowd and the tree, a buffer zone of at least one-quarter of the canvas width with no people in it. 2) Make the crowd CHAOTIC and SCATTERED like a busy MARKET, not a tidy line of spectators. Figures stand at varied distances, varied angles, some facing the action, some turned to talk to a neighbour, some half-hidden behind others, a child looking up, an old woman gesturing — the natural disorder of a market crowd that has paused to watch. 3) Make the crowd LESS DENSE — fewer people overall, with visible gaps of cobblestones between small clusters of two or three figures. Not a wall of bodies — a loose scattering. 4) The crowd still occupies the LEFT third of the image only, never spilling to the right. Period 14th-century Swiss costume, faces small but visible. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-12-composition-v9-boy-against-trunk-more-crowd.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 410993
+        }
+      ]
+    },
+    {
+      "slug": "tellsplatte-boat-jump",
+      "location_name": "Tellsplatte (boat jump landscape)",
+      "location_query": "Tellsplatte Lake Uri",
+      "location_type": "Historic Site",
+      "aliases": [
+        "tell's leap",
+        "tellsplatte",
+        "tellsprung",
+        "tells sprung"
+      ],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-lithograph.jpg",
+          "style": "lithograph",
+          "prompt": "Rocky lakeshore on Lake Uri (Vierwaldstättersee) at dusk during a violent storm. A flat low rock shelf protrudes from steep wooded cliffs above the water, with a small wooden chapel-like structure in the trees on the cliff face. A single wooden rowing boat rocks on choppy dark grey-green waves a short distance from the shelf. Forested mountainsides rise sharply on the far shore, snow on the higher peaks. Heavy storm clouds, rain in the distance. NO PEOPLE — empty boat, empty rock. Style: 19th-century Swiss landscape lithograph, dramatic light, fine line engraving with subtle sepia and slate-blue wash, atmospheric perspective. Single illustration, edge-to-edge, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 514174
+        },
+        {
+          "file": "ai-02-watercolor.jpg",
+          "style": "watercolor",
+          "prompt": "Lake Uri at the Tellsplatte, Switzerland, dusk under storm. Steep wooded cliffs drop into dark choppy water; a low flat rock ledge juts out near the shore with a small alpine chapel set back among the trees on the cliff. A wooden rowboat drifts close to the rocks, oars trailing in the water, no one aboard. Low storm clouds, distant rain over the lake, snow-covered peaks of the Schwyz Alps in the far background. NO PEOPLE. Style: 19th-century romantic Swiss landscape watercolor, dramatic stormy atmosphere, brown ink outlines, blue-grey and forest-green washes. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 459208
+        },
+        {
+          "file": "ai-03-lithograph-v2.jpg",
+          "style": "lithograph-v2",
+          "prompt": "Lake Uri (Vierwaldstättersee) under a stormy dusk sky. Steep dark wooded cliffs along the shore. PROMINENT FOREGROUND: a LARGE flat rock platform — the Tellsplatte — juts out wide and low into the water occupying the full lower-right third of the image, smooth grey stone wet with spray. A LARGE wooden rowboat sits parallel to the platform, only 2-3 meters away, rocking on choppy dark green-grey waves — the boat is clearly close enough that a person standing in it could jump to the rock. The boat is sized similar to the rock platform, both dominate the foreground. Heavy rain clouds, distant lightning, snowy alps in far background. NO PEOPLE in the boat or on the rock — empty composition showing the JUMP-DISTANCE relationship. Style: 19th-century Swiss landscape lithograph, dramatic stormy light, fine ink linework, sepia and slate-blue wash. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 513510
+        },
+        {
+          "file": "ai-04-watercolor-v2.jpg",
+          "style": "watercolor-v2",
+          "prompt": "Tellsplatte on Lake Uri under storm dusk. The flat rock shelf is large and prominent in the right-foreground, smooth wet stone extending into the choppy lake. Right next to it, only a body-length away, sits a LARGE wooden rowboat with high curved prow, oars raised, rocking on the dark waves. Both the rock platform and the boat are huge in the composition — the viewer immediately reads \"a person could jump from the boat to the rock\". Steep wooded cliffs rise behind, alpine peaks in the storm clouds beyond. NO PEOPLE — empty boat, empty rock. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dark blue-green wash, dramatic stormy mood. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 392179
+        },
+        {
+          "file": "ai-05-watercolor-v3.jpg",
+          "style": "watercolor-v3",
+          "prompt": "Tellsplatte on Lake Uri (Vierwaldstättersee) in a violent rainstorm at dusk. Foreground RIGHT: a substantial RAISED ROCK SHELF — tall and craggy rather than flat, rising about a metre or more above the waterline with a flat top surface big enough for a person to stand on; smooth wet stone wrapping the elevated platform, dark crevices below. Foreground LEFT: a LARGE wooden rowboat with a high curved prow, riding HIGH CHOPPY WAVES with white spray and foam crests, only one body-length away from the rock shelf — clearly close enough that someone could leap from the boat onto the raised platform. The lake surface is alive with churning waves, whitecaps, dark green-grey water. Sky: dramatic dark grey storm clouds with broken light pushing through — moody and ominous but NOT pitch black, varied tones of slate, charcoal, dark plum, with a sliver of pale gold where weak light breaks through. Heavy diagonal rain visible across the scene, mist rising off the water. Steep wooded cliffs and a small cliffside chapel barely visible behind the rock through the rain; jagged alpine peaks deep in the storm clouds. NO PEOPLE, NO ANIMALS — empty boat, empty rock. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, atmospheric mist and rain, Caspar Wolf influence. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 427940
+        },
+        {
+          "file": "ai-06-watercolor-v4.jpg",
+          "style": "watercolor-v4",
+          "prompt": "Tellsplatte on Lake Uri (Vierwaldstättersee) in a heavy rainstorm at dusk. Foreground RIGHT: a LARGE natural BOULDER — a single big irregular weathered slab of grey stone rising out of the water, not architectural or geometric, with rough natural edges, lichen and moss patches, slightly higher than the waterline so a person could step up onto its sloped natural top. The boulder is massive and natural, like real lakeside rocks. Foreground LEFT: a LARGE wooden rowboat with a high curved prow, riding choppy whitecapped waves only one body-length from the boulder. Heavy DIAGONAL RAIN visible across the entire scene — long visible streaks of rain falling, water bouncing off the boulder and boat. Lake surface alive with churning waves, foam crests, dark green-grey water. Sky: dramatic moody storm — slate, charcoal, dark plum tones with weak light breaking through low clouds, NOT pitch black, atmospheric and ominous. Mist rising off the water. Steep wooded cliffs and a small chapel barely visible behind through the rain. NO PEOPLE. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, atmospheric mist and visible rain streaks, Caspar Wolf influence. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 412333
+        },
+        {
+          "file": "ai-07-watercolor-v5.jpg",
+          "style": "watercolor-v5",
+          "prompt": "Tellsplatte on Lake Uri (Vierwaldstättersee) in heavy rainstorm at dusk. RIGHT SIDE of the composition: a steep wooded SHORELINE rising out of the lake — dark forest on the cliff above, and at the waterline a LARGE NATURAL BOULDER outcrop that is PART OF THE SHORE itself, NOT a floating island in the water. The boulder is an irregular weathered slab of grey stone with lichen and moss, sloping naturally up from the lake into the steep tree-covered bank, clearly attached to and continuous with the shore behind it. LEFT-CENTER FOREGROUND: a LARGE wooden rowboat with a high curved prow oriented horizontally, facing RIGHT — the prow aimed directly TOWARD the shoreline boulder, only one body-length away across the choppy water. The boat is in the open lake, the boulder/shore on the right. Heavy diagonal RAIN STREAKS visible across the entire scene, whitecaps on the dark water, mist over the lake. Sky: dramatic stormy slate-charcoal-plum tones with weak light breaking through, ominous but NOT pitch black. A small alpine chapel just visible high on the cliff above the boulder through the rain. NO PEOPLE — empty boat, empty rock, only the boat aimed at the shore boulder is the visual story. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, atmospheric mist, visible rain streaks, Caspar Wolf influence. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 438728
+        },
+        {
+          "file": "ai-08-watercolor-v6.jpg",
+          "style": "watercolor-v6",
+          "prompt": "Tellsplatte on Lake Uri (Vierwaldstättersee) in heavy rainstorm at dusk. RIGHT SIDE: a steep wooded SHORELINE — a MEDIUM-SIZED natural BOULDER (not enormous, just bigger than a person — about a metre or two across) projecting from the shore into the water at the cliff base, lichen and moss on weathered grey stone, attached to and continuous with the wooded bank rising behind. The rock is part of the SHORE, not a floating island. CENTER FOREGROUND: a LARGE wooden rowboat shown FULL-WIDTH and HORIZONTAL across the lower-center of the composition (not angled, not in perspective — viewed from the side, broadside-on, the boat's long axis runs LEFT-TO-RIGHT across the image). The boat is positioned just BEHIND and slightly LEFT of the boulder, very close — only an arm's length of choppy water between the side of the boat and the boulder, so a person standing in the boat could step or leap out directly onto the rock. The boat's side rail is roughly level with the top of the boulder, suggesting feasible exit. Heavy diagonal rain streaks across the entire scene, whitecaps on the dark water, mist rising. Sky: dramatic stormy slate-charcoal-plum tones with weak light breaking through, ominous but NOT pitch black. NO PEOPLE — empty boat, empty rock, the visual story is the boat positioned for jumping out onto the shore boulder. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, atmospheric mist, visible rain streaks. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 442876
+        },
+        {
+          "file": "ai-09-watercolor-v7.jpg",
+          "style": "watercolor-v7",
+          "prompt": "Tellsplatte on Lake Uri (Vierwaldstättersee) in moderate rainstorm at dusk. RIGHT SIDE: a SHARPLY DESCENDING wooded shoreline that drops STEEPLY into the lake — most of the shore is a vertical small cliff about 2 metres tall, completely overgrown with thick ferns, brambles, ivy, and tangled bushes spilling down the cliff face into the water — IMPASSABLE green wall of vegetation, no foothold. ONLY ONE single LARGE NATURAL BOULDER projects out at the base of the cliff into the lake — a smooth grey rock with sloped flat top about 1-1.5 metres above the water — it is THE ONLY accessible landing point along this entire stretch of shore, the only break in the impassable plant-covered cliff. CENTER FOREGROUND: a LARGE wooden rowboat shown FULL-WIDTH and HORIZONTAL across the lower-center (broadside view, long axis runs left-to-right, NOT angled in perspective), positioned just behind the boulder, only an arm's length of choppy water between the boat's side and the rock — the boat is angled so a person could step or jump out directly onto the boulder. Lake surface alive with whitecaps, dark green-grey water, light diagonal rain streaks across the scene. Sky: STORMY but BRIGHTER — pale grey and silver-white clouds with broken light pushing through, atmospheric and moody but NOT dark, MUCH LIGHTER overall than dusk-black, late-afternoon storm rather than dusk. Steep wooded cliffs behind continue into the distance. NO PEOPLE — empty boat, empty rock, the visual story is the rock as the only escape from the boat. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, atmospheric stormy palette but generally lighter/airier than previous versions, mist and rain visible. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 522738
+        },
+        {
+          "file": "ai-10-watercolor-v8-alpine.jpg",
+          "style": "watercolor-v8-alpine",
+          "prompt": "Tellsplatte on Lake Uri (Vierwaldstättersee) in heavy alpine rainstorm at dusk. SHORE on the RIGHT: SHEER ALPINE CLIFF WALLS — sharply rising rocky mountainsides, exposed grey stone with patches of conifer (fir, spruce, pine) clinging to ledges, alpine character. NOT tropical, NOT jungle — clearly Swiss alpine. The cliff wall drops sharply into the lake. ONE single LARGE NATURAL BOULDER projects out from the cliff base into the water — smooth grey stone with sloped flat top about 1-1.5 metres above the waterline, the only landing point along the entire impassable cliff. The wooden ROWBOAT is positioned BEHIND the boulder, on the far side of the rock from the viewer — only the upper part of the boat visible above the rock, full-width broadside-on, boat rocking on choppy waves on the lake-side of the boulder. Foreground center-front: the boulder takes the focus, the boat partially hidden behind it. HEAVY DIAGONAL RAIN — long visible rain streaks across the entire scene, rain hitting the lake surface raising splash, mist rising. Lake surface alive with whitecaps. Sky: DARK STORM CLOUDS — heavy charcoal grey and slate clouds, threatening, but the overall image is NOT PITCH BLACK — there's diffused light filtering through the storm, atmospheric pale grey-silver patches behind the dark clouds, late afternoon storm light. Steep alpine peaks visible in the rain-haze beyond. NO PEOPLE. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, alpine cliff character (NOT lush vegetation), heavy visible rain. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 441371
+        },
+        {
+          "file": "ai-11-watercolor-v9-a4portrait.jpg",
+          "style": "watercolor-v9-a4portrait",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. Tellsplatte on Lake Uri in heavy alpine rainstorm, late afternoon stormy light. LEFT SIDE of the composition: a SHEER ALPINE CLIFF WALL rising tall up the entire left side of the canvas — exposed grey rock with conifers (fir, spruce) clinging to ledges, distinctly Swiss alpine character (NOT tropical, NOT jungle). The cliff drops sharply to the lake. EXTENDING OUT FROM THE BASE OF THE LEFT CLIFF: a single LARGE NATURAL BOULDER, smooth grey stone, sloped flat top about 1-1.5 metres above the waterline. The boulder is CONNECTED to and continuous with the left cliff at its base — clearly part of the shore, NOT a floating island. The boulder projects out into the water toward the right. RIGHT OF THE BOULDER: a LARGE wooden rowboat, full-width broadside view, oriented horizontally (long axis left-to-right), positioned RIGHT NEXT TO the boulder — almost TOUCHING the stone, only inches of choppy water between the boat's side and the rock — clearly close enough that a person could step or jump from boat to boulder. Lake surface alive with whitecaps, dark green-grey water. HEAVY DIAGONAL RAIN STREAKS visible across the entire scene. Sky: dark stormy charcoal-slate clouds with diffused light filtering through, dramatic but NOT pitch black, atmospheric pale silver patches behind the dark clouds. NO PEOPLE — empty boat, empty rock. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, alpine character, heavy visible rain. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 491019
+        },
+        {
+          "file": "ai-12-watercolor-v10-a4portrait-stone-fused.jpg",
+          "style": "watercolor-v10-a4portrait-stone-fused",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. Tellsplatte on Lake Uri in heavy alpine rainstorm, late afternoon stormy light. LEFT TWO-THIRDS of the canvas: a SHEER ALPINE CLIFF WALL of grey rock rising tall up the entire left side — exposed grey stone with conifers (fir, spruce) clinging to ledges, distinctly Swiss alpine character. The cliff continues DOWN to the waterline and EXTENDS OUT into the lake as a ROCKY PROMONTORY — the stone shelf is GEOLOGICALLY CONTINUOUS with the cliff, the SAME ROCK, no gap, no water between cliff and shelf, clearly one fused mass of stone. The promontory ends in a flat top about 1-1.5 metres above the choppy waterline, projecting toward the right. RIGHT OF THE PROMONTORY: a LARGE wooden rowboat shown broadside (long axis horizontal left-to-right), sitting in the water IMMEDIATELY TO THE RIGHT of the stone shelf — not in front of it, not behind it, but beside it on the right. The boat's gunwale (top edge) is at roughly the SAME HEIGHT as the top of the rock shelf, so a person could step or jump sideways from boat to rock. Only inches of choppy whitecapped water separate boat from rock. Lake surface alive with whitecaps, dark green-grey water. HEAVY DIAGONAL RAIN STREAKS visible across the entire scene. Sky: dark stormy charcoal-slate clouds with diffused light filtering through, dramatic but NOT pitch black, atmospheric pale silver patches behind the dark clouds. NO PEOPLE — empty boat, empty rock. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, dramatic stormy palette, alpine character, heavy visible rain. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 514474
+        },
+        {
+          "file": "ai-13-watercolor-v11-stone-rounder-cliff-right.jpg",
+          "style": "watercolor-v11-stone-rounder-cliff-right",
+          "prompt": "Edit this Tellsplatte scene with these adjustments. 1) The cliff and the rock shelf together must occupy ONLY THE LEFT HALF of the image. Shift the cliff and the projecting rock toward the RIGHT so the shelf ends near the HORIZONTAL CENTRE of the canvas — left half = cliff + stone, right half = open lake with the boat. 2) Make the projecting STONE more NATURAL and ROUND — a smooth, organic, weather-worn boulder shape rising from the water, not flat or angular. The stone is still GEOLOGICALLY CONTINUOUS with the cliff at its base — same rock, no gap, no water between cliff and stone. 3) The wooden ROWBOAT sits in the RIGHT HALF of the image, immediately to the RIGHT of the stone — broadside (long axis horizontal), close enough that only inches of choppy water separate boat hull from stone. The TOP of the boat (gunwale) is at the SAME HEIGHT as the top of the round stone — boat and stone are at matching heights. 4) Keep the alpine cliff character (grey rock, conifers on ledges), the heavy diagonal rain, dark stormy clouds with diffused silver light (not pitch black), choppy whitecapped lake. NO PEOPLE — empty boat, empty rock. Watercolor style, brown ink outlines, A4 portrait. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-12-watercolor-v10-a4portrait-stone-fused.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 408237
+        },
+        {
+          "file": "ai-14-watercolor-v12-stone-lower-boat-taller.jpg",
+          "style": "watercolor-v12-stone-lower-boat-taller",
+          "prompt": "Edit this Tellsplatte boat-and-stone scene with one height adjustment only — leave the cliff position, stone shape, boat position, alpine character, rain, stormy sky, and watercolor style exactly as they are. Make the projecting STONE noticeably LOWER — the top of the rounded boulder sits closer to the waterline, a smaller height above the choppy surface. At the same time, make the wooden ROWBOAT a bit TALLER — higher gunwales, deeper hull silhouette — so that the TOP of the boat and the TOP of the stone now ROUGHLY ALIGN at about the same horizontal level. The boat is still positioned immediately to the right of the stone with only inches of choppy water between them. NO PEOPLE — empty boat, empty rock. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-13-watercolor-v11-stone-rounder-cliff-right.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 393264
+        },
+        {
+          "file": "ai-15-watercolor-v13-stone-flat-top-boat-bow-to-stone.jpg",
+          "style": "watercolor-v13-stone-flat-top-boat-bow-to-stone",
+          "prompt": "Edit this Tellsplatte scene with two adjustments only — leave the cliff position, stone position, lake, rain, stormy sky, alpine character and watercolor style exactly as they are. 1) The TOP of the projecting STONE must be visibly FLAT — a level platform on top of the rounded boulder, broad enough that a person could stand on it. The stone keeps its rounded sides and natural weather-worn shape, but the upper surface is clearly a flat shelf, not domed. 2) ROTATE the wooden ROWBOAT so that the BOW (front, pointed end) is now POINTING TOWARD THE STONE, i.e. the boat's bow faces LEFT, the stern faces RIGHT. The boat is no longer broadside — it sits with its long axis aimed at the stone, so anyone standing in the bow could step or jump straight forward onto the flat top of the rock. The boat is still positioned immediately to the right of the stone with only inches of choppy water between bow and stone. NO PEOPLE — empty boat, empty rock. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-14-watercolor-v12-stone-lower-boat-taller.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 380618
+        },
+        {
+          "file": "ai-16-watercolor-v14-stone-natural-right-tilted-plate.jpg",
+          "style": "watercolor-v14-stone-natural-right-tilted-plate",
+          "prompt": "Edit this Tellsplatte scene with two adjustments to the projecting STONE only — leave the cliff, the boat, the lake, the rain, the stormy sky, the alpine character and the watercolor style exactly as they are. 1) Make the RIGHT EDGE of the stone look NATURAL and weather-worn — irregular, rounded, organic, with small fissures and rough boulder contours where the rock meets the water. No straight cuts, no sharp engineered edges, just a naturally eroded boulder profile. 2) The flat top of the stone is no longer perfectly horizontal — TILT THE PLATE so it slopes DOWNWARD TOWARD THE WATER on the right side, like a natural rock shelf angling gently toward the lake. The high edge of the plate sits where the stone meets the cliff (left), and the low edge slopes toward the water (right). The slope is gentle enough that a person could still stand on it but clearly not a level platform. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-15-watercolor-v13-stone-flat-top-boat-bow-to-stone.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 376413
+        },
+        {
+          "file": "ai-17-watercolor-v15-stone-natural-slight-tilt.jpg",
+          "style": "watercolor-v15-stone-natural-slight-tilt",
+          "prompt": "Edit only the projecting STONE in this scene — leave the boat completely untouched (do not change its position, orientation, size, or shape), and leave the cliff, lake, rain, sky, and watercolor style exactly as they are. Make the stone look more NATURAL: a weather-worn boulder with irregular, organic contours, rough natural texture, no engineered straight cuts. The top of the stone is still a usable platform but slightly TILTED DOWNWARD — a gentle slope where the high edge is on the left (against the cliff) and the surface tilts gently down toward the water on the right. Subtle tilt, not steep. Do not modify the boat. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-15-watercolor-v13-stone-flat-top-boat-bow-to-stone.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 374123
+        },
+        {
+          "file": "ai-18-watercolor-v16-stone-jagged-with-small-flat-shelf.jpg",
+          "style": "watercolor-v16-stone-jagged-with-small-flat-shelf",
+          "prompt": "Edit only the TOP of the projecting STONE in this scene — leave the boat completely untouched (do not change its position, orientation, size, or shape) and leave the cliff, lake, rain, sky and watercolor style exactly as they are. The top surface of the stone should be a mix of NATURAL JAGGED ROCK and one SMALL FLAT SHELF: most of the upper boulder is irregular, broken, weather-worn rock with rough jagged edges and bumps, but somewhere on the upper surface there is a clearly visible SMALL FLAT PORTION — just big enough for a person to stand on (roughly half a square metre). This small flat shelf is ANGLED slightly DOWNWARD TOWARD THE WATER on the right side, like a natural tilted slab of rock. The flat shelf reads as a deliberate landing spot amid the surrounding jagged rock. Do not modify the boat. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-17-watercolor-v15-stone-natural-slight-tilt.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 371179
+        },
+        {
+          "file": "ai-19-watercolor-v17-flat-shelf-aligned-with-boat-top.jpg",
+          "style": "watercolor-v17-flat-shelf-aligned-with-boat-top",
+          "prompt": "Edit only the height of the SMALL FLAT SHELF on top of the projecting stone — leave the boat completely untouched (do not change its position, orientation, size, or shape), and leave the rest of the stone, the cliff, the lake, the rain, the stormy sky and the watercolor style exactly as they are. Lower the small flat shelf on the stone so its height ALIGNS with the TOP EDGE (gunwale) of the boat — when you look across from boat to stone, the flat shelf and the boat's upper rim sit at roughly the SAME horizontal level. The surrounding jagged rock stays where it is; only the flat landing portion drops down to boat-gunwale height. The shelf remains slightly tilted toward the water on the right. Do not modify the boat. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-18-watercolor-v16-stone-jagged-with-small-flat-shelf.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 368663
+        },
+        {
+          "file": "ai-20-watercolor-v18-stone-abrupt-end-boat-fully-visible.jpg",
+          "style": "watercolor-v18-stone-abrupt-end-boat-fully-visible",
+          "prompt": "Edit this Tellsplatte scene with these adjustments — leave the cliff, lake, rain, stormy sky, alpine character and watercolor style exactly as they are. 1) Make the RIGHT END of the stone end more ABRUPTLY — instead of tapering or extending into the lake, the stone TERMINATES sharply: a near-vertical natural rock face on its right side dropping straight into the water, like a clean break in the boulder. This frees up horizontal space on the right. 2) The wooden ROWBOAT must be FULLY VISIBLE next to the stone — its entire hull from bow to stern, full broadside silhouette readable, not cut off by the canvas edge and not overlapping the stone. Position the boat just to the RIGHT of the stone's abrupt edge with only a TINY GAP of choppy water between them (a few inches' worth, just enough to see they are separate). 3) Top of the stone keeps the slight downward tilt toward the water; the boat's gunwale aligns roughly with the top of the stone. NO PEOPLE — empty boat, empty rock. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-16-watercolor-v14-stone-natural-right-tilted-plate.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 369590
+        },
+        {
+          "file": "ai-21-watercolor-v19-stone-lower-stronger-waves.jpg",
+          "style": "watercolor-v19-stone-lower-stronger-waves",
+          "prompt": "Edit this Tellsplatte scene with two adjustments — leave the cliff, the boat (do not change its position, orientation, size, or shape), the rain, the stormy sky and the watercolor style exactly as they are. 1) Move the projecting STONE slightly LOWER, closer to the water surface — the top of the stone now sits less high above the waterline, so the rock looks like a low natural shelf rising only a small distance out of the lake rather than a tall boulder. Keep its abrupt right edge and slight tilt toward the water. 2) Make the LAKE WAVES STRONGER and more dramatic — bigger whitecaps, more visible chop, splash where waves hit the base of the stone and the side of the boat, foam crests across the lake surface, sense of a turbulent storm sea rather than ripples. Heavier visual energy in the water. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-20-watercolor-v18-stone-abrupt-end-boat-fully-visible.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 404391
+        }
+      ]
+    },
+    {
+      "slug": "hohle-gasse-kuessnacht",
+      "location_name": "Hohle Gasse (Küssnacht sunken road)",
+      "location_query": "Hohle Gasse Küssnacht",
+      "location_type": "Historic Site",
+      "aliases": [
+        "sunken road küssnacht",
+        "tell ambush",
+        "hohle gasse"
+      ],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-lithograph.jpg",
+          "style": "lithograph",
+          "prompt": "A narrow, deep medieval sunken road carved into a mossy hillside near Küssnacht am Rigi, Switzerland. Steep grass-and-fern banks rise tall on both sides, mature beech trees lean in over the path, dappled forest light filtering through. Roots and rocks line the edges; the dirt path winds and disappears around a curve. NO PEOPLE, NO HORSES, NO BUILDINGS visible — only the deep wooded trench. Style: 19th-century Swiss landscape lithograph in the manner of Caspar Wolf — fine ink linework, restrained earth-tone wash (mossy green, brown, ochre), atmospheric depth and light shafts. Single illustration filling the canvas, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 648947
+        },
+        {
+          "file": "ai-02-watercolor.jpg",
+          "style": "watercolor",
+          "prompt": "A medieval Hohle Gasse near Küssnacht: a deep sunken cart-track cutting between high earth banks topped with old beeches, ferns and wild grass spilling over the edges, sunlight breaking through the canopy onto a quiet curved dirt path. NO PEOPLE, NO ANIMALS, NO STRUCTURES — landscape only. Style: 19th-century Swiss romantic landscape watercolor, soft diffused light, brown ink outlines, mossy green and warm brown washes, gentle atmospheric haze. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 506961
+        },
+        {
+          "file": "ai-03-lithograph-v2.jpg",
+          "style": "lithograph-v2",
+          "prompt": "A medieval Hohle Gasse near Küssnacht — a deep sunken cart-track running DIAGONALLY across the composition from the BOTTOM-LEFT corner up to the UPPER-RIGHT, curving slightly. Steep grass-and-fern earth banks rise tall on both sides of the track, mature beech trees lean over from the high banks. The dirt path is in deep shadow lower-left and brightens into dappled forest sunlight as it climbs into the upper-right distance, vanishing around a slight bend. NO PEOPLE, NO HORSES, NO BUILDINGS. Style: 19th-century Swiss landscape lithograph, fine ink linework, restrained earth-tone wash (mossy green, warm brown, ochre), atmospheric depth, light shafts breaking through the canopy. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 582896
+        },
+        {
+          "file": "ai-04-watercolor-v2.jpg",
+          "style": "watercolor-v2",
+          "prompt": "A deep wooded sunken road (Hohle Gasse) cutting DIAGONALLY across the canvas — starts at the lower-left in cool shadow, climbs and curves up to the upper-right where late afternoon sun breaks through old beeches onto the path. High grass-and-fern banks loom on both sides, roots and stones at the edges. The dirt cart-track is the clear leading line of the composition. NO PEOPLE, NO ANIMALS, NO STRUCTURES. Style: 19th-century romantic Swiss landscape watercolor, soft diffused light, brown ink outlines, mossy green and warm brown washes, gentle atmospheric haze. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 469599
+        },
+        {
+          "file": "ai-05-watercolor-v3.jpg",
+          "style": "watercolor-v3",
+          "prompt": "A medieval narrow FOOTPATH (not a road) cutting DIAGONALLY across the canvas from the lower-left in cool shadow up to the upper-right — barely wide enough for one person, dirt track snaking between high grass-and-fern banks. The path is single-file narrow throughout. Steep mossy banks rise tall on both sides, mature beech trees lean over from the high banks, dappled forest light filtering through the canopy. At the FAR UPPER-RIGHT END of the path, where it disappears around a bend, a TINY DISTANT SILHOUETTE of a horse and rider — just a small dark shape at the vanishing point, indicating a Habsburg knight slowly approaching down the path. Nothing else — no other figures, no other animals, no buildings. The narrow single path and the distant approaching rider are the entire focus. Style: 19th-century romantic Swiss landscape watercolor, soft diffused light, brown ink outlines, mossy green and warm brown washes, gentle atmospheric haze, fine detail at the distant rider. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 578820
+        },
+        {
+          "file": "ai-06-watercolor-v4.jpg",
+          "style": "watercolor-v4",
+          "prompt": "A medieval Hohle Gasse near Küssnacht — a deep CARVED-IN sunken footpath running DIAGONALLY from lower-left up to upper-right. The path is a NARROW SINGLE-FILE TRAP, only wide enough for one person. Earth-and-rock BANKS RISE STEEPLY AND HIGH on BOTH sides — at least 3-4 metres tall, almost vertical, packed with exposed roots, moss, and ferns clinging to the walls. The walls are so high and steep that there is NO ESCAPE possible left or right — a person walking the path is completely enclosed in the deep cut. Mature beech trees lean over from the very top of both banks far above, casting the path into deep dappled shade. At the FAR UPPER-RIGHT END where the path bends out of sight, a TINY DISTANT SILHOUETTE of a horse and rider — small dark shape at the vanishing point, a Habsburg knight slowly approaching down the trapped path. Style: 19th-century romantic Swiss landscape watercolor, soft diffused light filtering down from above, brown ink outlines, mossy green and warm brown washes, claustrophobic atmospheric depth, fine detail at the distant rider. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 607129
+        },
+        {
+          "file": "ai-07-watercolor-v5.jpg",
+          "style": "watercolor-v5",
+          "prompt": "A medieval Hohle Gasse near Küssnacht — a deep narrow VALLEY-CUT in the forest floor running DIAGONALLY from lower-left up to upper-right. The bottom of the cut IS the lowest point of the entire scene — both sides of the path rise UPWARD from the path floor. There is NO drop to either side; the path itself is the valley floor, and the wooded earth banks rise steeply UP from it on BOTH sides like a V-shape ravine, 3-4 metres tall, dense with moss, ferns, exposed roots, and rocks. The \"path\" itself is just a faint TRAMPELPFAD — a rough informal trail of trampled earth and matted grass between rocks and roots, NOT a defined road or carriage track, no clear edges, no compacted surface — it could easily be missed. Mature beech trees lean over from the high banks above, dappled forest light filtering down. At the FAR UPPER-RIGHT END where the trail bends out of sight, a TINY DISTANT SILHOUETTE of a horse and rider — a small dark shape at the vanishing point. Nothing else. Style: 19th-century romantic Swiss landscape watercolor, soft diffused light from above, brown ink outlines, mossy green and warm brown washes, claustrophobic atmospheric depth, the trampled trail barely distinct from the surrounding forest floor. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 537457
+        },
+        {
+          "file": "ai-08-watercolor-v6-animal-trail.jpg",
+          "style": "watercolor-v6-animal-trail",
+          "prompt": "PANORAMIC wide view of a medieval Hohle Gasse near Küssnacht — a deep narrow V-shape ravine in the forest floor running DIAGONALLY from lower-left up to upper-right across the wide canvas. The ravine bottom is the LOWEST POINT — wooded earth banks rise UPWARD steeply on BOTH sides like a V, 3-4 metres tall, dense with moss, ferns, exposed roots, and rocks. The trail is barely a path — an organic ANIMAL CROSSING, uneven, irregular, MEANDERING — flattened leaf litter, scattered loose stones, exposed roots crossing the route, NO defined edges, NO uniform width. Looks like deer or wild goats made it, NOT humans, NOT a road. In the FOREGROUND of the trail (lower-left area), a CLUSTER OF DENSE BUSHES grows partly across the path — head-height shrubs, ferns and brambles spilling onto the trail, forming a natural HIDING SPOT where a person could crouch behind to ambush someone passing. The bushes leave a small visible gap on one side. Mature beech trees lean over from the high banks above, dappled forest light filtering down. At the FAR UPPER-RIGHT END where the ravine bends out of sight, a TINY DISTANT SILHOUETTE of a horse and rider — a small dark shape at the vanishing point. Style: 19th-century romantic Swiss landscape watercolor, soft diffused light from above, brown ink outlines, mossy green and warm brown washes, wild untouched feel. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 651210
+        },
+        {
+          "file": "ai-09-watercolor-v7-a4portrait.jpg",
+          "style": "watercolor-v7-a4portrait",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. A medieval Hohle Gasse near Küssnacht — a deep V-shape ravine in the forest floor running DIAGONALLY from the lower-left up to the upper-right of the tall portrait canvas. The ravine bottom is the LOWEST POINT — wooded earth banks rise UPWARD steeply on BOTH sides like a V, 3-4 metres tall, dense with moss, ferns, exposed roots, and rocks. The trail along the ravine floor is barely a path — an ANIMAL CROSSING, uneven, irregular, MEANDERING — flattened leaf litter, scattered loose stones, exposed roots, NO defined edges, looks like deer or wild goats made it. In the FOREGROUND of the trail (lower portion of the canvas), a CLUSTER OF DENSE BUSHES grows partly across the path — head-height shrubs, ferns and brambles spilling onto the trail, forming a natural HIDING SPOT where a person could crouch behind to ambush someone passing. Mature beech trees lean over from the high banks above, dappled forest light filtering down. At the FAR UPPER-RIGHT END where the ravine bends out of sight, a TINY DISTANT SILHOUETTE of a horse and rider — small dark shape at the vanishing point. Style: 19th-century romantic Swiss landscape watercolor, soft diffused light from above, brown ink outlines, mossy green and warm brown washes, wild untouched feel. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 659348
+        },
+        {
+          "file": "ai-10-watercolor-v8-rider-bigger.jpg",
+          "style": "watercolor-v8-rider-bigger",
+          "prompt": "Edit this Hohle Gasse forest ravine scene with one adjustment: make the DISTANT HORSE AND RIDER at the upper-right end of the ravine LARGER and more VISIBLE. The rider should still be in the background at the bend of the ravine (not in the foreground), but big enough that you can clearly see the horse's body and the rider seated on top — recognisable as a mounted figure, not just a dark dot. Roughly 2-3x the previous size. Keep everything else exactly as it is: the V-shape ravine, the high mossy banks on both sides, the meandering animal trail along the bottom, the foreground hiding bushes spilling onto the path, the leaning beech trees, dappled forest light, watercolor style, brown ink outlines, A4 portrait composition. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-09-watercolor-v7-a4portrait.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 518584
+        },
+        {
+          "file": "ai-11-watercolor-v9-rider-recognisable-descending.jpg",
+          "style": "watercolor-v9-rider-recognisable-descending",
+          "prompt": "Edit this Hohle Gasse forest ravine scene with these adjustments to the horse and rider only — leave everything else (V-ravine, mossy banks, animal trail, foreground hiding bushes, leaning beech trees, dappled light, watercolor style, A4 portrait) exactly as it is. 1) The horse and rider must be RIDING DOWN THE PATH toward the viewer — coming forward along the trail from the upper-right bend toward the camera, not standing still and not facing away. The horse's head and chest face the viewer, body angled along the path. 2) Make horse and rider RECOGNISABLE and FULLY RENDERED — not silhouettes, not black blobs. The horse: warm brown/chestnut coat, visible mane and tail, four legs in mid-stride, eye and nostril readable. The rider: a medieval nobleman seated in the saddle wearing a dark cloak over chainmail, a feathered hat or steel helm, hands on the reins, facial features visible at distance. They should look like a real horse and a real person, painted with the same watercolor + brown ink outline style as the rest of the scene, just smaller because of distance. 3) Place them roughly one-third down the path from the upper-right bend — close enough to be clearly readable as horse-and-rider in motion, still in the middle-distance (not foreground). Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-10-watercolor-v8-rider-bigger.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 548470
+        },
+        {
+          "file": "ai-12-watercolor-v10-rider-tiny-far-end.jpg",
+          "style": "watercolor-v10-rider-tiny-far-end",
+          "prompt": "Edit this Hohle Gasse forest ravine scene with one adjustment to the horse and rider only — leave everything else (V-ravine, mossy banks, animal trail, foreground hiding bushes, leaning beech trees, dappled light, watercolor style, A4 portrait) exactly as it is. The horse and rider must now appear at the VERY FAR END of the path — at the most distant point of the ravine where the trail bends out of sight in the upper-right. Make them VERY SMALL, almost TINY — a small but recognisable horse-and-rider silhouette with horse in chestnut brown and rider in dark cloak, just large enough that the eye can identify \"horse with mounted rider\" but tiny enough to read as deeply distant. Roughly the size of a fingernail in the upper-right corner of the ravine. They are still riding down the path toward the viewer (horse facing forward) but seen from very far away. Remove any other rider/horse figures elsewhere in the path. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-11-watercolor-v9-rider-recognisable-descending.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 519960
+        },
+        {
+          "file": "ai-13-watercolor-v11-rider-2x-same-spot.jpg",
+          "style": "watercolor-v11-rider-2x-same-spot",
+          "prompt": "Edit this Hohle Gasse forest ravine scene with one adjustment to the horse and rider only — leave everything else (V-ravine, mossy banks, animal trail, foreground hiding bushes, leaning beech trees, dappled light, watercolor style, A4 portrait) exactly as it is. Make the distant horse and rider AT LEAST TWICE AS BIG (roughly 2x scale) while keeping them at THE EXACT SAME LOCATION on the path — same spot at the far end of the ravine where the trail bends out of sight in the upper-right, just rendered larger so they are more clearly readable as horse-and-rider. Still a small distant figure (not foreground), but no longer fingernail-tiny. Horse in chestnut brown coat, rider in dark cloak facing the viewer as he rides down the path. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-12-watercolor-v10-rider-tiny-far-end.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 499948
+        },
+        {
+          "file": "ai-14-watercolor-v12-rider-2x-again.jpg",
+          "style": "watercolor-v12-rider-2x-again",
+          "prompt": "Edit this Hohle Gasse forest ravine scene with one adjustment to the horse and rider only — leave everything else (V-ravine, mossy banks, animal trail, foreground hiding bushes, leaning beech trees, dappled light, watercolor style, A4 portrait) exactly as it is. DOUBLE THE SIZE of the horse and rider AGAIN (roughly 2x current scale, so about 4x the original tiny version), keeping them at THE EXACT SAME LOCATION at the far end of the ravine where the trail bends out of sight in the upper-right. Same pose: horse facing forward riding down the path toward the viewer, chestnut coat, dark-cloaked rider on top. Just larger. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-13-watercolor-v11-rider-2x-same-spot.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 480590
+        },
+        {
+          "file": "ai-15-watercolor-v13-rider-same-size-further-back.jpg",
+          "style": "watercolor-v13-rider-same-size-further-back",
+          "prompt": "Edit this Hohle Gasse forest ravine scene with one adjustment to the horse and rider only — leave everything else (V-ravine, mossy banks, animal trail, foreground hiding bushes, leaning beech trees, dappled light, watercolor style, A4 portrait) exactly as it is. KEEP THE HORSE AND RIDER AT THEIR CURRENT SIZE — do not shrink them, do not enlarge them. But MOVE them FURTHER BACK along the path: shift them deeper into the ravine, further away from the camera, closer to the bend where the trail vanishes in the upper-right. Same pose: horse facing forward riding down the path toward the viewer, chestnut coat, dark-cloaked rider. Just translated further back along the same path line, same scale. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-14-watercolor-v12-rider-2x-again.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 500543
+        }
+      ]
+    },
+    {
+      "slug": "tell-monument",
+      "location_name": "Tell Monument",
+      "location_query": "Wilhelm Tell Monument Altdorf",
+      "location_type": "Monument",
+      "aliases": [
+        "wilhelm tell statue",
+        "tell denkmal",
+        "apfelschuss monument"
+      ],
+      "candidates": [
+        {
+          "file": "01-Tell_Altdorf_Smithsonian.jpg",
+          "title": "Tell Altdorf Smithsonian.jpg",
+          "query": "Wilhelm Tell Denkmal Altdorf historical",
+          "searchSnippet": "DescriptionTell Altdorf Smithsonian.jpg Deutsch: Gips-Statue von Wilhelm Tell in Altdorf, c. 1861 (Postkarte von Johann Jakob Keller). Tell hebt den zweiten",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/8/83/Tell_Altdorf_Smithsonian.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1360,
+          "height": 1320,
+          "description": "Gips-Statue von Wilhelm Tell in Altdorf, c. 1861 (Postkarte von Johann Jakob Keller). Tell hebt den zweiten Pfeil in die Höhe (zu Schillers Anweisung: er zieht den Pfeil aus dem Goller und sieht den Landvogt mit einem furchtbaren Blick an), auf dem Sockel ist die Inschrift: Wohlan, Herr. Weil ihr mich meines Lebens habt geſichert — So will ich euch die Wahrheit gründlich ſagen. Mit diesem 2ten Pfeil durchſchoſs ich euch, Wen ich mein liebes Kind getroffen hätte, Und euer wahrlich hätt ich nicht ",
+          "artist": "J. Keller, Phot. a. Zürich [Johann Jakob Keller, 1811–1880]",
+          "license": "Public domain",
+          "dateOriginal": "circa 1861<div style=\"display: none;\">date QS:P,+1861-00-00T00:00:00Z/9,P1480,Q5727902</div>",
+          "bytes": 625388
+        },
+        {
+          "file": "02-SUI_1932_MiNr0206z_pm_B0012.jpg",
+          "title": "SUI 1932 MiNr0206z pm B0012.jpg",
+          "query": "Tell statue Altdorf engraving",
+          "searchSnippet": "issue &quot;Wilhelm Tell - new values&quot;; drawing with the portrait of Wilhelm Tell after a statue of the artist Richard Kissling in Altdorf (Switzerland); as",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/3/33/SUI_1932_MiNr0206z_pm_B0012.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 511,
+          "height": 585,
+          "description": "Stamp of Switzerland; 1932; definitive stamp of the issue \"Wilhelm Tell - new values\"; drawing with the portrait of Wilhelm Tell after a statue of the artist Richard Kissling in Altdorf (Switzerland); as mint stamp with grilled gum; this stamp postmarked Stamp: Michel: No. 206z Color: cinnabar to carmine (catagolues) to red-violet (this stamp) on light chrome yellow granite paper (fibrilled with silver fibres) Watermark: Switzerland No. 2 (multiple Swiss crosses) Nominal value: 20 (Rappen, Centi",
+          "artist": "\"Schweizerische Bundespost\"",
+          "license": "Public domain",
+          "dateOriginal": "1932",
+          "bytes": 170385
+        },
+        {
+          "file": "03-SUI_1921_MiNr0165x_pm_B002.jpg",
+          "title": "SUI 1921 MiNr0165x pm B002.jpg",
+          "query": "Tell statue Altdorf engraving",
+          "searchSnippet": "issue &quot;Wilhelm Tell - new values&quot;; drawing with the portrait of Wilhelm Tell after a statue of the artist Richard Kissling in Altdorf (Switzerland); stamp",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fb/SUI_1921_MiNr0165x_pm_B002.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 512,
+          "height": 591,
+          "description": "Stamp of Switzerland; 1921; definitive stamp of the issue \"Wilhelm Tell - new values\"; drawing with the portrait of Wilhelm Tell after a statue of the artist Richard Kissling in Altdorf (Switzerland); stamp postmarked in Frauenfeld, 1932 Stamp: Michel: No. 165x: Yvert et Tellier: No. 162; AFA: No. 159 Color: cinnabar to red (red violet) on pale greyish chrome yellow paper Watermark: Switzerland No. 2 (multiple Swiss crosses) Nominal value: 20 (Rappen, Centimes) Postage validity: from 1921 until ",
+          "artist": "\"Schweizerische Bundespost\"",
+          "license": "Public domain",
+          "dateOriginal": "1921",
+          "bytes": 140449
+        },
+        {
+          "file": "04-SUI_1930_MiNr0204x_pm_B002.jpg",
+          "title": "SUI 1930 MiNr0204x pm B002.jpg",
+          "query": "Tell statue Altdorf engraving",
+          "searchSnippet": "issue &quot;Wilhelm Tell - new values&quot;; drawing with the portrait of Wilhelm Tell after a statue of the artist Richard Kissling in Altdorf (Switzerland); stamp",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fb/SUI_1930_MiNr0204x_pm_B002.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 511,
+          "height": 598,
+          "description": "Stamp of Switzerland; 1930; definitive stamp of the issue \"Wilhelm Tell - new values\"; drawing with the portrait of Wilhelm Tell after a statue of the artist Richard Kissling in Altdorf (Switzerland); stamp postmarked Stamp: Michel: No. 204x; Yvert et Tellier: No. 243; AFA: No. 241 Color: violet on on light chrome yellow granite paper (fibrilled with silver fibres) Watermark: Switzerland No. 2 (multiple Swiss crosses) Nominal value: 10 (Rappen, Centimes) Postage validity: from July 1930 until 31",
+          "artist": "\"Schweizerische Bundespost\"",
+          "license": "Public domain",
+          "dateOriginal": "1930-07",
+          "bytes": 166871
+        }
+      ]
+    },
+    {
+      "slug": "tellskapelle",
+      "location_name": "Tellskapelle",
+      "location_query": "Tellskapelle Sisikon",
+      "location_type": "Chapel",
+      "aliases": [
+        "tell's chapel",
+        "tellsplatte chapel",
+        "chapelle de tell"
+      ],
+      "candidates": [
+        {
+          "file": "01-Chapelle_de_Tell_pres_de_Kussnacht__BM_1949_0203.154_.jpg",
+          "title": "Chapelle de Tell pres de Kussnacht (BM 1949,0203.154).jpg",
+          "query": "Tellskapelle lithograph 19th century",
+          "searchSnippet": "standing under the portico. Hand-coloured lithograph Depicted people Associated with: William Tell Date 19th century date QS:P571,+1850-00-00T00:00:00Z/7 Medium",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0d/Chapelle_de_Tell_pres_de_Kussnacht_%28BM_1949%2C0203.154%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1591,
+          "height": 1548,
+          "description": "A vignette depicting a small chapel, two women standing under the portico. Hand-coloured lithograph",
+          "artist": "",
+          "license": "Public domain",
+          "dateOriginal": "19<sup>th</sup> century<div style=\"display: none;\">date QS:P571,+1850-00-00T00:00:00Z/7</div>",
+          "bytes": 665285
+        }
+      ]
+    },
+    {
+      "slug": "tellsplatte",
+      "location_name": "Tellsplatte",
+      "location_query": "Tellsplatte Lake Uri",
+      "location_type": "Historic Site",
+      "aliases": [
+        "tell's leap",
+        "tells sprung",
+        "tellsplattfels"
+      ],
+      "candidates": [
+        {
+          "file": "01-History_of_Nebraska_from_the_earliest_explorations_of_the_trans-Mississippi_region__1918___14577567399_.jpg",
+          "title": "History of Nebraska from the earliest explorations of the trans-Mississippi region (1918) (14577567399).jpg",
+          "query": "Tells Platte engraving",
+          "searchSnippet": "themouth of the Platte where a chimney still marksits site. Merrills diary tells us in a vague waythat the Otoe villages were moved down thePlatte from the site",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/6/65/History_of_Nebraska_from_the_earliest_explorations_of_the_trans-Mississippi_region_%281918%29_%2814577567399%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1716,
+          "height": 2476,
+          "description": "Identifier: historyofnebrask00mort (find matches) Title: History of Nebraska from the earliest explorations of the trans-Mississippi region Year: 1918 (1910s) Authors: Morton, J. Sterling (Julius Sterling), 1832-1902 Watkins, Albert, 1848-1923 Thomas, Augustus Orloff, 1863-1935 Beattie, James A., 1845- Wakeley, Arthur Cooper, 1855- Subjects: Nebraska -- History Publisher: Lincoln, Neb., Western Publishing and Engraving Company Contributing Library: New York Public Library Digitizing Sponsor: MSN",
+          "artist": "Internet Archive Book Images",
+          "license": "No restrictions",
+          "dateOriginal": "1918",
+          "bytes": 609720
+        },
+        {
+          "file": "02-William_D._Brown__cropped_.jpg",
+          "title": "William D. Brown (cropped).jpg",
+          "query": "Tells Platte engraving",
+          "searchSnippet": "testimony of ourwhilom councilman and capital commissioner,James C. Mitchell, tells us of the populationof Florence at that time. It was charged byChapman that",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/3/32/William_D._Brown_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 906,
+          "height": 1204,
+          "description": "Identifier: historyofnebrask00mort (find matches) Title: History of Nebraska from the earliest explorations of the trans-Mississippi region Year: 1918 (1910s) Authors: Morton, J. Sterling (Julius Sterling), 1832-1902 Watkins, Albert, 1848-1923 Thomas, Augustus Orloff, 1863-1935 Beattie, James A., 1845- Wakeley, Arthur Cooper, 1855- Subjects: Nebraska -- History Publisher: Lincoln, Neb., Western Publishing and Engraving Company Contributing Library: New York Public Library Digitizing Sponsor: MSN",
+          "artist": "Internet Archive Book Images",
+          "license": "No restrictions",
+          "dateOriginal": "1918",
+          "bytes": 147910
+        },
+        {
+          "file": "03-History_of_Nebraska_from_the_earliest_explorations_of_the_trans-Mississippi_region__1918___14763934252_.jpg",
+          "title": "History of Nebraska from the earliest explorations of the trans-Mississippi region (1918) (14763934252).jpg",
+          "query": "Tells Platte engraving",
+          "searchSnippet": "Summers, Sr.Prominent army surgeon. Medical director depart-ment of the Platte, 1874 John Taffe Member of early legislatures and president of council Text",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1d/History_of_Nebraska_from_the_earliest_explorations_of_the_trans-Mississippi_region_%281918%29_%2814763934252%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1840,
+          "height": 1204,
+          "description": "Identifier: historyofnebrask00mort (find matches) Title: History of Nebraska from the earliest explorations of the trans-Mississippi region Year: 1918 (1910s) Authors: Morton, J. Sterling (Julius Sterling), 1832-1902 Watkins, Albert, 1848-1923 Thomas, Augustus Orloff, 1863-1935 Beattie, James A., 1845- Wakeley, Arthur Cooper, 1855- Subjects: Nebraska -- History Publisher: Lincoln, Neb., Western Publishing and Engraving Company Contributing Library: New York Public Library Digitizing Sponsor: MSN",
+          "artist": "Internet Archive Book Images",
+          "license": "No restrictions",
+          "dateOriginal": "1918",
+          "bytes": 318953
+        },
+        {
+          "file": "04-Sommer__Giorgio__1834-1914__-_n._12511_-_Vierwaldstaettersee_-_Tellscapelle.jpg",
+          "title": "Sommer, Giorgio (1834-1914) - n. 12511 - Vierwaldstaettersee - Tellscapelle.jpg",
+          "query": "Tellsplatte Vierwaldstaettersee",
+          "searchSnippet": "(1834-1914) - n. 12511 - Vierwaldstaettersee - Tellscapelle.jpg Italiano: Giorgio Sommer (1834-1914), &quot;Vierwaldstaettersee - Tellscapelle&quot;. Numero di",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/7/71/Sommer%2C_Giorgio_%281834-1914%29_-_n._12511_-_Vierwaldstaettersee_-_Tellscapelle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 800,
+          "height": 622,
+          "description": "Giorgio Sommer (1834-1914), \"Vierwaldstaettersee - Tellscapelle\". Catalogue #: 12511.",
+          "artist": "Giorgio Sommer",
+          "license": "Public domain",
+          "dateOriginal": "",
+          "bytes": 218761
+        }
+      ]
+    },
+    {
+      "slug": "hohle-gasse",
+      "location_name": "Hohle Gasse",
+      "location_query": "Hohle Gasse Küssnacht",
+      "location_type": "Historic Site",
+      "aliases": [
+        "sunken road",
+        "tell ambush",
+        "küssnacht hohle gasse"
+      ],
+      "candidates": []
+    },
+    {
+      "slug": "burg-zwing-uri",
+      "location_name": "Burg Zwing-Uri",
+      "location_query": "Zwing-Uri castle",
+      "location_type": "Castle",
+      "aliases": [
+        "gessler's castle",
+        "habsburg watchtower uri",
+        "zwing uri burg"
+      ],
+      "candidates": [
+        {
+          "file": "01-Castle_of_Zwing_Uri._-_Canton_of_Uri__BM_1938_0811.32_.jpg",
+          "title": "Castle of Zwing Uri. - Canton of Uri (BM 1938,0811.32).jpg",
+          "query": "Zwing-Uri castle ruins lithograph",
+          "searchSnippet": "Published by: N Chater &amp; Co Title Castle of Zwing Uri. - Canton of Uri Description English: View of the ruins of a castle on a hill in the background at centre",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/9/91/Castle_of_Zwing_Uri._-_Canton_of_Uri_%28BM_1938%2C0811.32%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 2500,
+          "height": 1926,
+          "description": "View of the ruins of a castle on a hill in the background at centre, a man on horseback on a road in the foreground with his back to the viewer. 1823 Lithograph on Chine collé",
+          "artist": "After: Agostino Aglio Print made by: N Chater Co Published by: N Chater Co",
+          "license": "Public domain",
+          "dateOriginal": "circa 1823<div style=\"display: none;\">date QS:P571,+1823-00-00T00:00:00Z/9,P1480,Q5727902</div>",
+          "bytes": 1477459
+        }
+      ]
+    },
+    {
+      "slug": "ruetli-meadow",
+      "location_name": "Rütli",
+      "location_query": "Rütli meadow oath",
+      "location_type": "Historic Site",
+      "aliases": [
+        "rütlischwur",
+        "rütli oath meadow",
+        "grütli meadow"
+      ],
+      "candidates": [
+        {
+          "file": "01-Swiss_R_tlischwur.jpg",
+          "title": "Swiss Rütlischwur.jpg",
+          "query": "Ruetlischwur",
+          "searchSnippet": "Q685367 Title Schwur auf dem Rütli Object type painting object_type QS:P31,Q3305213 Description Deutsch: Interpretation des Rütli-Schwurs. Öl auf Leinwand",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/9/91/Swiss_R%C3%BCtlischwur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 885,
+          "height": 1224,
+          "description": "Idealized Picture of the Rütlischwur. oil on canvas We shall be a single People of brethren, Never to part in danger nor distress. We shall be free, just as our fathers were, And rather die than live in slavery. We shall trust in the one highest God And never be afraid of human power",
+          "artist": "Jean Renggli",
+          "license": "Public domain",
+          "dateOriginal": "1891<div style=\"display: none;\">date QS:P571,+1891-00-00T00:00:00Z/9</div>",
+          "bytes": 124956
+        },
+        {
+          "file": "02-Johann_Heinrich_F_ssli_018.jpg",
+          "title": "Johann Heinrich Füssli 018.jpg",
+          "query": "Ruetlischwur",
+          "searchSnippet": "English Oath on the Rütli, 1780 Dutch De Rütlischwur, 1780 German Die drei Eidgenossen beim Schwur auf dem Rütli (Ölgemälde von Johann Heinrich Füssli",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/3/30/Johann_Heinrich_F%C3%BCssli_018.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1576,
+          "height": 2385,
+          "description": "",
+          "artist": "Henry Fuseli",
+          "license": "Public domain",
+          "dateOriginal": "1780<div style=\"display: none;\">date QS:P571,+1780-00-00T00:00:00Z/9</div>",
+          "bytes": 209391
+        },
+        {
+          "file": "03-650_Jahre_Eidgenossenschaft_Fel_018629-RE.jpg",
+          "title": "650 Jahre Eidgenossenschaft Fel 018629-RE.jpg",
+          "query": "Ruetlischwur",
+          "searchSnippet": "https://creativecommons.org/publicdomain/mark/1.0/PDMCreative Commons Public Domain Mark 1.0falsefalse English German 650 Jahre Eidgenossenschaft: Poststempel",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5b/650_Jahre_Eidgenossenschaft_Fel_018629-RE.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1317,
+          "height": 1804,
+          "description": "650 Jahre Eidgenossenschaft: Poststempel 1.8.1941. Schweizerfahne",
+          "artist": "Fotograf: nicht anwendbar Titel: 650 Jahre Eidgenossenschaft 1941 Beschreibung: Poststempel 1.8.1941. Schweizerfahne Datierung: vor 1.8.1941 Lizenz: Public Domain Mark Nutzung: Download und Nutzung fr",
+          "license": "Public domain",
+          "dateOriginal": "1941-08-01",
+          "bytes": 384695
+        },
+        {
+          "file": "04-Drei_Eidgenossen_1913.jpg",
+          "title": "Drei Eidgenossen 1913.jpg",
+          "query": "Ruetlischwur",
+          "searchSnippet": "https://creativecommons.org/publicdomain/mark/1.0/PDMCreative Commons Public Domain Mark 1.0falsefalse English determination method or standard: SHA-1",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/4/43/Drei_Eidgenossen_1913.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 1436,
+          "height": 2000,
+          "description": "1913 photograph of a study for the monumental statue of the \"Three Confederates\" at the Federal Palace of Switzerland, completed in 1914. The photograph is dated 26-12-1913 and signed by the artist with a dedication to \"Monsieur [Arnold] Flückiger, Directeur des Constructions Fédérales\".",
+          "artist": "James Vibert",
+          "license": "Public domain",
+          "dateOriginal": "1913",
+          "bytes": 800496
+        }
+      ]
+    },
+    {
+      "slug": "tellshaus-buerglen",
+      "location_name": "Tellshaus Bürglen",
+      "location_query": "Tellshaus Bürglen Uri",
+      "location_type": "Building",
+      "aliases": [
+        "tell's house bürglen",
+        "tellshaus uri",
+        "tell birthplace"
+      ],
+      "candidates": [
+        {
+          "file": "01-B-Buerglen-UR-Tellskapelle.jpg",
+          "title": "B-Buerglen-UR-Tellskapelle.jpg",
+          "query": "Tellskapelle Buerglen",
+          "searchSnippet": "DescriptionB-Buerglen-UR-Tellskapelle.jpg Deutsch: Tellskappelle in Bürglen (UR) Date 18 August 2011 Source Own work Author Roland Zumbuehl",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/e/ef/B-Buerglen-UR-Tellskapelle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 800,
+          "height": 1200,
+          "description": "Tellskappelle in Bürglen (UR)",
+          "artist": "Roland Zumbuehl",
+          "license": "CC BY 3.0",
+          "dateOriginal": "2011-08-18",
+          "bytes": 1207792
+        },
+        {
+          "file": "02-Buerglen-UR-Kapelle.jpg",
+          "title": "Buerglen-UR-Kapelle.jpg",
+          "query": "Tellskapelle Buerglen",
+          "searchSnippet": "DescriptionBuerglen-UR-Kapelle.jpg Deutsch: Tell-Kapelle in Bürglen (UR) Date 20111-08-18 Source Own work Author Roland Zumbuehl",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Buerglen-UR-Kapelle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 800,
+          "height": 1200,
+          "description": "Tell-Kapelle in Bürglen (UR)",
+          "artist": "Roland Zumbuehl",
+          "license": "CC BY 3.0",
+          "dateOriginal": "20111-08-18",
+          "bytes": 1181295
+        },
+        {
+          "file": "03-Buerglen-UR-Tell.jpg",
+          "title": "Buerglen-UR-Tell.jpg",
+          "query": "Wilhelm Tell Buerglen",
+          "searchSnippet": "DescriptionBuerglen-UR-Tell.jpg Deutsch: Tell-Denkmal in Bürglen (UR), Standbild von Josef Benedikt Curiger (1786), bis 1860 Brunnenfigur in Altdorf, 1891",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/2/21/Buerglen-UR-Tell.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 800,
+          "height": 1200,
+          "description": "Tell-Denkmal in Bürglen (UR), Standbild von Josef Benedikt Curiger (1786), bis 1860 Brunnenfigur in Altdorf, 1891 den Bürglern von den Altdorfern geschenkt.",
+          "artist": "Josef Benedikt Curiger (statue); Roland Zumbuehl (photograph)",
+          "license": "CC BY 3.0",
+          "dateOriginal": "1786",
+          "bytes": 760899
+        },
+        {
+          "file": "04-Buerglen-UR-Frau.jpg",
+          "title": "Buerglen-UR-Frau.jpg",
+          "query": "Wilhelm Tell Buerglen",
+          "searchSnippet": "DescriptionBuerglen-UR-Frau.jpg Deutsch: Frau Tell mit Wilhelm Date 20111-08-18 Source Own work Author Roland Zumbuehl",
+          "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Buerglen-UR-Frau.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "width": 800,
+          "height": 1200,
+          "description": "Frau Tell mit Wilhelm",
+          "artist": "Roland Zumbuehl",
+          "license": "CC BY 3.0",
+          "dateOriginal": "20111-08-18",
+          "bytes": 908259
+        }
+      ],
+      "ai_candidates": [
+        {
+          "file": "ai-01-watercolor.jpg",
+          "style": "watercolor",
+          "prompt": "A medieval stone-and-timber Swiss farmhouse — the legendary Tellshaus in Bürglen, Uri canton — based on the 1786 historical engraving. Sturdy two-storey building with thick whitewashed stone ground floor and dark timber-clad upper storey, small shuttered windows, steep wood-shingle roof with wide overhanging eaves, a wooden balcony along the front upper level, a low arched stone doorway. Set on a grassy alpine meadow with wildflowers in the foreground, a few traditional wooden hayracks (Heinzen) nearby, a low stone wall along the path. Behind the house, the steep wooded slopes of the Schächental valley rise sharply, snow-capped peaks of the Uri Alps in the distance under a mild summer sky with scattered clouds. NO PEOPLE, NO ANIMALS, NO MODERN ELEMENTS. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, soft warm earth-tone wash, atmospheric depth, gentle alpine light. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 546044
+        }
+      ]
+    },
+    {
+      "slug": "altdorf-panorama",
+      "location_name": "Altdorf Panorama",
+      "location_query": "Altdorf panorama Uri",
+      "location_type": "Town",
+      "aliases": [
+        "altdorf town panorama",
+        "altdorf canton uri",
+        "altdorf view"
+      ],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-watercolor.jpg",
+          "style": "watercolor",
+          "prompt": "WIDE PANORAMIC view of medieval Altdorf, capital of canton Uri, Switzerland — based on the historical 1900 panorama. The town nestles in a green alpine valley, ringed by tall steep snow-capped peaks of the Schwyz and Uri Alps. Compact cluster of medieval timber-frame houses with steep red-tiled roofs, a tall church spire rising in the centre, surrounded by cultivated fields and meadows in the foreground. The Reuss valley plain stretches into the distance toward Lake Uri (Vierwaldstättersee), barely visible as a sliver of grey water far in the back. Late afternoon golden light, soft mist rising from the valley floor. NO PEOPLE, NO MODERN ELEMENTS — no cars, no power lines, no paved roads, no signs. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, restrained earth-tone wash with green meadows and warm tile reds, atmospheric distance haze. Single edge-to-edge panoramic illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 543839
+        },
+        {
+          "file": "ai-02-watercolor-from-wiki.jpg",
+          "style": "watercolor-from-wiki",
+          "prompt": "Re-render this exact same panoramic view of Altdorf, Switzerland — preserve the town layout, building positions, valley shape, surrounding mountains, perspective, and overall composition exactly as in the source image. Convert to 19th-century romantic Swiss landscape WATERCOLOR style — soft brown ink outlines on the buildings and tree edges, gentle warm earth-tone wash (terracotta tile roofs, cream stone walls, green fields and meadows, blue-grey alpine peaks in the distance), atmospheric haze deep in the valley. Remove any modern elements (cars, paved roads, power lines, modern signs, modern vehicles, antennas) — replace with cobblestone paths, dirt tracks, traditional wooden hayracks, and natural meadow. Keep ALL the medieval and historic timber-frame buildings. NO PEOPLE. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine-edit",
+          "basedOn": "marktplatz-altdorf/01-Altdorf_Schweiz_1900.jpg",
+          "bytes": 442226
+        },
+        {
+          "file": "ai-03-watercolor-with-meadow.jpg",
+          "style": "watercolor-with-meadow",
+          "prompt": "Edit this Altdorf panorama: extend the bottom of the composition with a LARGE EMPTY GRASSY MEADOW (Wiese) — the lower one-third of the image should be soft green alpine pasture with wildflowers, low grass, no buildings, no figures, no fences. The town panorama and mountains stay in the upper two-thirds exactly as they are. The meadow is reserved space where characters will be placed later, so leave it empty and uncluttered. Keep the watercolor style, brown ink outlines, soft alpine light. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine-edit",
+          "basedOn": "altdorf-panorama/ai-02-watercolor-from-wiki.jpg",
+          "bytes": 377134
+        },
+        {
+          "file": "ai-04-watercolor-v3-a4portrait.jpg",
+          "style": "watercolor-v3-a4portrait",
+          "prompt": "A4 PORTRAIT 3:4 vertical composition. Panoramic view of medieval Altdorf in canton Uri, late 14th century, seen from a slight elevation. Foreground (lower third): wide alpine MEADOW with grasses and wildflowers, sloping gently toward the village. Middle ground: the medieval village of Altdorf — a cluster of timber-frame houses with steep shingled roofs, a stone parish church with a tall bell tower, narrow cobbled lanes between the buildings, smoke rising from a few chimneys. The settlement nestles at the base of the mountains. Background (upper half): TOWERING SNOW-CAPPED URI ALPS rising dramatically — sharp grey peaks with white snowfields, lower slopes of dark conifer forest. Soft afternoon alpine light, hazy atmospheric depth. Style: 19th-century romantic Swiss landscape watercolor, brown ink outlines, muted earth tones, soft warm light, atmospheric. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 472325
+        },
+        {
+          "file": "ai-05-watercolor-v4-from-1900-photo-portrait.jpg",
+          "style": "watercolor-v4-from-1900-photo-portrait",
+          "prompt": "Reinterpret this real 1900 photograph of Altdorf as an A4 PORTRAIT 3:4 vertical illustration in 19th-century romantic Swiss watercolor style. Keep the SAME town layout, the SAME church bell tower, the SAME timber-frame houses and steep shingled roofs visible in the photo, the SAME ring of mountains in the background. Recompose for a TALL portrait canvas: stack the village in the middle, snow-capped Uri Alps dominating the upper portion, and add an EMPTY ALPINE MEADOW in the lower portion of the canvas (open green pasture with wildflowers, no buildings, no figures, reserved foreground space). The whole scene rendered in soft warm afternoon light, brown ink outlines, muted earth tones, atmospheric haze in the distance. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "01-Altdorf_Schweiz_1900.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 436740
+        },
+        {
+          "file": "ai-06-watercolor-v5-1900-photo-same-skyline-portrait.jpg",
+          "style": "watercolor-v5-1900-photo-same-skyline-portrait",
+          "prompt": "Reinterpret the supplied 1900 photograph of Altdorf as a 19th-century romantic Swiss WATERCOLOR illustration in A4 PORTRAIT 3:4 vertical composition. CRITICAL: this must look like the SAME PLACE as the photo. The mountain skyline must match the photo exactly — same peak silhouettes, same snowcaps, same number and arrangement of summits along the horizon. The church bell tower must match the photo exactly — same shape, same proportions, same position relative to the surrounding buildings. The village rooftops, timber-frame houses, the village layout — all preserved as-is from the photo. Do not invent different mountains, do not change the church into a different church. To convert from the photo's landscape framing to portrait: keep the village + mountains in the upper two-thirds of the canvas at their photo-faithful proportions, then EXTEND the foreground DOWNWARD by adding an EMPTY ALPINE MEADOW (open green pasture with low grass and wildflowers) filling the lower third — empty space, no buildings, no figures. Render in soft warm afternoon light, brown ink outlines, muted earth tones. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "01-Altdorf_Schweiz_1900.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 430442
+        },
+        {
+          "file": "ai-07-watercolor-v6-2refs-skyline-and-church.jpg",
+          "style": "watercolor-v6-2refs-skyline-and-church",
+          "prompt": "Compose an A4 PORTRAIT 3:4 vertical illustration of Altdorf in 19th-century romantic Swiss watercolor style. The scene must look like the SAME PLACE shown in the supplied references. From REFERENCE 1 (the 1900 photograph of Altdorf): copy the EXACT mountain skyline — same peak silhouettes, same number and arrangement of summits, same snowcaps, same horizon line. Copy the village layout and the rooftops. From REFERENCE 2 (the wide photo of the Pfarrkirche St. Martin): place the SAME CHURCH BUILDING prominently in the village — its distinctive bell tower with the onion dome and the pale facade must be clearly visible above the rooftops, in the position shown by the 1900 photo. Do not invent a different church or different mountains; the church must be readable as Pfarrkirche St. Martin and the mountains must match the photo skyline. To convert from photo landscape to A4 portrait: place the village + church + mountains in the upper two-thirds of the canvas at faithful proportions, then EXTEND the foreground DOWNWARD by adding an EMPTY ALPINE MEADOW (open green pasture with low grass and wildflowers) filling the lower third — empty space, no buildings, no figures. Soft warm afternoon light, brown ink outlines, muted earth tones. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "01-Altdorf_Schweiz_1900.jpg+church-altdorf-kirche-wide.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 453103
+        },
+        {
+          "file": "ai-08-watercolor-v7-keep-church-and-mountains-add-meadow.jpg",
+          "style": "watercolor-v7-keep-church-and-mountains-add-meadow",
+          "prompt": "Take this real photograph of Altdorf and convert it into a 19th-century romantic Swiss watercolor illustration. Keep the church and the mountains exactly the same as in the photo — same shapes, same positions, same proportions. Then add a green alpine meadow (grüne Wiese) along the bottom of the image as the foreground. Nothing else changes. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "01-Altdorf_Schweiz_1900.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 436929
+        },
+        {
+          "file": "ai-09-watercolor-v8-anchor-church-mountains-from-photo.jpg",
+          "style": "watercolor-v8-anchor-church-mountains-from-photo",
+          "prompt": "Reference 1 is a watercolor draft of an Altdorf panorama with a green meadow in the foreground. Reference 2 is the original real photograph of Altdorf. Keep the watercolor style and the green meadow foreground from reference 1, but redraw the CHURCH and the MOUNTAINS exactly as they appear in reference 2 — same church silhouette, same bell tower, same mountain peaks, same skyline. The church and the mountains in the output must match the photo, not the draft. A4 portrait composition, single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-08-watercolor-v7-keep-church-and-mountains-add-meadow.jpg+01-Altdorf_Schweiz_1900.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 438722
+        }
+      ]
+    },
+    {
+      "slug": "lake-uri-storm-boat",
+      "location_name": "Lake Uri storm crossing (boat in stormy weather)",
+      "location_query": "Lake Uri storm crossing (boat in stormy weather)",
+      "location_type": "historical",
+      "aliases": [],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-watercolor-v1-storm-boat-points-left.jpg",
+          "style": "watercolor-v1-storm-boat-points-left",
+          "prompt": "Edit this Lake Uri scene with two changes — keep the same lake, the same mountain skyline, the same A4 portrait composition, the same watercolor style. 1) Rotate the WOODEN ROWBOAT so its BOW (front, pointed end) points to the LEFT — the boat is angled across the canvas with bow facing left, stern facing right, full broadside still readable. 2) Change the weather to a HEAVY ALPINE STORM: dark stormy charcoal-slate clouds across the sky (with diffused silver light filtering through, not pitch black), HEAVY DIAGONAL RAIN STREAKS visible across the entire scene, and BIG WHITECAPPED WAVES on the lake — turbulent storm swell, dramatic chop and foam crests around the boat, splash where waves hit the hull. Boat is empty, no people. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-22-watercolor-v20-boat-on-lake-from-bauen-pano.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 441830
+        },
+        {
+          "file": "ai-02-watercolor-v2-stormier-boat-clearly-left.jpg",
+          "style": "watercolor-v2-stormier-boat-clearly-left",
+          "prompt": "Edit this Lake Uri storm scene with two adjustments — keep the same mountain skyline, the same A4 portrait composition, the same watercolor style. 1) Make the ENTIRE lake surface stormy and turbulent — big whitecapped waves covering the whole canvas of the water, large foam crests across the foreground AND midground AND background near the cliffs, dramatic chop everywhere on the lake, no calm patches anywhere. The whole sea should look raging. 2) The wooden ROWBOAT must clearly POINT and MOVE TO THE LEFT — bow (pointed front) faces LEFT, stern is on the RIGHT, the boat is angled across the waves cutting toward the left side of the canvas, with a small wake or splash trailing behind on the right side to convey forward motion to the left. Keep heavy diagonal rain and dark stormy clouds with diffused silver light. Boat is empty, no people. Single edge-to-edge illustration, no borders, no text.",
+          "basedOn": "ai-01-watercolor-v1-storm-boat-points-left.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 442079
+        }
+      ]
+    },
+    {
+      "slug": "story-asset-hat",
+      "location_name": "Story asset — Gessler's feathered hat",
+      "location_query": "Story asset — Gessler's feathered hat",
+      "location_type": "asset",
+      "aliases": [],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-watercolor-v1-hat-isolated.jpg",
+          "style": "watercolor-v1-hat-isolated",
+          "prompt": "Take the FEATHERED VELVET HAT from the top of the pole in this marketplace scene and produce a NEW illustration showing JUST THAT HAT, isolated on a plain off-white background. The hat is the same wide-brimmed velvet hat with a long ostrich plume that sits on the pole — render it as a standalone object portrait, full hat visible, three-quarter view, the same 19th-century romantic Swiss watercolor style with brown ink outlines, soft warm light, no other elements (no pole, no square, no buildings, no figures). A4 portrait composition. Single edge-to-edge illustration on plain off-white watercolor background, no borders, no text.",
+          "basedOn": "ai-04-composed-v5-pole-somewhat-shorter.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 199441
+        }
+      ]
+    },
+    {
+      "slug": "story-asset-armbrust",
+      "location_name": "Story asset — Armbrust (medieval crossbow)",
+      "location_query": "Story asset — Armbrust (medieval crossbow)",
+      "location_type": "asset",
+      "aliases": [],
+      "candidates": [],
+      "ai_candidates": [
+        {
+          "file": "ai-01-watercolor-v1-armbrust-isolated.jpg",
+          "style": "watercolor-v1-armbrust-isolated",
+          "prompt": "Use the watercolor style of this reference image (19th-century romantic Swiss watercolor, brown ink outlines, soft warm light) but produce a completely NEW illustration of a SINGLE MEDIEVAL ARMBRUST (crossbow) — the kind Wilhelm Tell would have used in 14th-century Switzerland. Wooden stock with carved details, steel prod (the bow), drawstring, a single bolt loaded in the groove. The crossbow is shown in three-quarter view, full weapon visible from end to end, isolated on a plain off-white watercolor background. No other elements, no figures, no scene. A4 portrait composition. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "ai-13-composition-v10-crowd-market-chaotic.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 216807
+        },
+        {
+          "file": "ai-02-watercolor-v2-armbrust-simpler-bolt-string-top.jpg",
+          "style": "watercolor-v2-armbrust-simpler-bolt-string-top",
+          "prompt": "Replace the crossbow with a SIMPLER medieval Armbrust illustration on the same plain off-white watercolor background. Keep the 19th-century romantic Swiss watercolor style with brown ink outlines, but the weapon itself must be cleaner: a plain wooden stock with a steel prod (the bow) — NO decorative carvings, NO Swiss crosses, NO ornamentation, no engravings, just plain functional wood and steel. Orientation: the crossbow lies HORIZONTALLY across the canvas with the prod (steel bow) on top and the wooden stock below it. The DRAWN STRING runs along the TOP, taut between the two ends of the prod. A single wooden BOLT rests on top of the stock, in the groove, pointing AWAY from the viewer to the left or right (away horizontally), with its arrowhead at the front end. The TOP of the canvas does NOT show a sharp pointed tip — the prod's curve and the string are what occupy the upper portion of the image, not a vertical point. Single edge-to-edge illustration on plain off-white watercolor background, no borders, no text.",
+          "basedOn": "ai-01-watercolor-v1-armbrust-isolated.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 183404
+        },
+        {
+          "file": "ai-03-watercolor-v3-from-3-real-refs.jpg",
+          "style": "watercolor-v3-from-3-real-refs",
+          "prompt": "The three supplied images are real museum photographs of medieval/early-modern crossbows (Armbrust). Use them as anatomical references to draw ONE single, accurate medieval Armbrust as a 19th-century romantic Swiss watercolor illustration with brown ink outlines, on a plain off-white watercolor background. The weapon must combine the most authentic features visible across the three references: a long wooden stock (tiller) shaped like the museum pieces, a steel prod (the bow) at the front end, a taut string between the prod tips, a trigger and nut at the back, and a single bolt resting in the groove on top of the stock. Show the Armbrust in profile / three-quarter view, full weapon visible end-to-end, oriented horizontally across the canvas. No Swiss crosses, no fancy carving, no gold inlays — keep the wood and steel plain and functional, matching the museum pieces. The bolt points horizontally to one side (away from viewer along the stock), not upward. The string and prod sit at the FRONT end (the bow end), not at the top of the canvas. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "armborst-norwegian-1.jpg+ballesta-cerralbo.jpg+armbrust-1700-senftenberg.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 178121
+        },
+        {
+          "file": "ai-04-watercolor-v4-fresh-no-refs-simple-no-bolt.jpg",
+          "style": "watercolor-v4-fresh-no-refs-simple-no-bolt",
+          "prompt": "A simple 19th-century romantic Swiss watercolor illustration of a single medieval Armbrust (crossbow), with brown ink outlines on a plain off-white watercolor background. Side view, full weapon visible end-to-end, oriented horizontally across the canvas. Plain wooden stock, a steel prod (the bow) at the front end, a taut string between the two prod tips, a simple wooden trigger at the back. NO BOLT in the groove, NO arrow, NO pointed objects anywhere on or around the weapon. The weapon is empty / unloaded. Plain wood and steel only — no engravings, no carvings, no ornamentation, no Swiss crosses. Single edge-to-edge illustration, no borders, no text.",
+          "generatedBy": "grok-imagine",
+          "bytes": 126617
+        },
+        {
+          "file": "ai-05-watercolor-v5-no-front-point-no-extra-string-heavier.jpg",
+          "style": "watercolor-v5-no-front-point-no-extra-string-heavier",
+          "prompt": "Edit this medieval Armbrust illustration with three adjustments — keep the same plain off-white watercolor background, the same horizontal orientation, the same brown ink outline watercolor style. 1) Remove any pointed tip at the FRONT of the weapon — the front end (where the prod sits) should terminate cleanly with no spike, no arrowhead, no projecting point of any kind. 2) Remove any extra/additional string — there must be ONLY ONE STRING, the single drawn bowstring stretched between the two tips of the steel prod, nothing else. No second cord, no decorative laces, no slack lines. 3) Make the whole weapon HEAVIER and MORE SOLID — thicker, chunkier wooden stock with more visible mass, stouter steel prod, sturdier trigger and butt. The Armbrust should look like a heavy battlefield weapon, not a slim hunting piece. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "ai-04-watercolor-v4-fresh-no-refs-simple-no-bolt.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 134206
+        },
+        {
+          "file": "ai-06-watercolor-v6-massive-ragged-heavier-bowstring.jpg",
+          "style": "watercolor-v6-massive-ragged-heavier-bowstring",
+          "prompt": "Edit this medieval Armbrust illustration with these adjustments — keep the same plain off-white watercolor background, the same horizontal orientation, the same brown ink outline watercolor style. 1) Make the whole weapon MORE MASSIVE — bigger, thicker, chunkier wooden stock; stouter steel prod; heavier trigger and butt. A serious heavy battlefield Armbrust. 2) Make it look RAGGED and WELL-USED — like a real weapon carried by Tell for many years: weather-worn wood with scuffs, scratches and worn patches; chipped edges; faded oiled wood grain; a few small cracks and nicks; the steel prod showing patina, scratches and small rust spots. Battle-scarred but still functional. 3) Make the BOWSTRING THICKER and heavier — a substantial twisted-cord bowstring, visibly stout, stretched taut between the two prod tips. 4) ONLY ONE STRING in the entire image — the bowstring. Remove every other cord, lace, sling-strap, decorative thread or hanging line. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "ai-04-watercolor-v4-fresh-no-refs-simple-no-bolt.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 142434
+        },
+        {
+          "file": "ai-07-watercolor-v7-only-bogensehne-named-parts-removed.jpg",
+          "style": "watercolor-v7-only-bogensehne-named-parts-removed",
+          "prompt": "Edit this medieval Armbrust illustration. Keep the same plain off-white watercolor background, the same horizontal orientation, the same brown ink outline watercolor style, the same massive battle-worn weapon. Adjust ONLY the cords/strings: 1) Remove the Trageriemen (carrying sling / shoulder strap) — no leather strap or cord running across, around or hanging from the wooden stock. 2) Remove the Bogenbindung (prod lashing) — at the front, the wooden stock must join the steel prod cleanly with a metal bracket or wooden peg, no cord wrapping the joint where the prod meets the stock. 3) Remove any Spannschnur (spanning cord), any decorative lanyard, any hanging thread. 4) The ONLY string in the entire image is the Bogensehne (bowstring) — ONE single thick taut twisted cord stretched between the two tips of the steel prod, nothing else. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "ai-06-watercolor-v6-massive-ragged-heavier-bowstring.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 142478
+        },
+        {
+          "file": "ai-08-watercolor-v8-string-like-oip-only-one.jpg",
+          "style": "watercolor-v8-string-like-oip-only-one",
+          "prompt": "Reference 1 is the current Armbrust illustration to edit. Reference 2 is a real Armbrust photograph showing how the bowstring should look — note that there is ONLY ONE STRING in reference 2, the single Bogensehne stretched between the prod tips. Edit reference 1 so its string setup matches reference 2: keep the exact same massive battle-worn weapon, the same plain off-white watercolor background, the same brown ink outline watercolor style, the same horizontal orientation. Adjust ONLY the string: remove every cord, lashing, sling, lanyard or auxiliary line currently visible — leave just ONE single thick taut bowstring (Bogensehne) stretched between the two tips of the steel prod, exactly like reference 2. The wooden stock joins the steel prod cleanly, no cord wrapping the joint. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "ai-07-watercolor-v7-only-bogensehne-named-parts-removed.jpg+oip-user-string-reference.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 154558
+        },
+        {
+          "file": "ai-09-watercolor-v9-from-oip-watercolorized.jpg",
+          "style": "watercolor-v9-from-oip-watercolorized",
+          "prompt": "Take this Armbrust and redraw it in 19th-century romantic Swiss watercolor style with brown ink outlines on a plain off-white watercolor background. Keep the weapon exactly the same — same shape, same proportions, same single bowstring, same orientation. Only the rendering changes from photograph to watercolor illustration. Single edge-to-edge illustration on plain off-white background, no borders, no text.",
+          "basedOn": "oip-user-string-reference.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 268795
+        },
+        {
+          "file": "ai-10-watercolor-v10-3refs-a4-explicit-size.jpg",
+          "style": "watercolor-v10-3refs-a4-explicit-size",
+          "prompt": "OUTPUT FORMAT: A4 portrait 3:4 vertical illustration, 1200×1600 pixels — same dimensions as REFERENCE 1 (the blank white canvas). The output canvas must match reference 1 in size and aspect ratio exactly. DO NOT CROP. The full A4 portrait area must be filled. CONTENT: draw a single medieval Armbrust (crossbow) in the centre of the canvas, oriented horizontally across the page, with empty plain off-white watercolor background filling the rest. The Armbrust must look like the weapons in REFERENCE 2 and REFERENCE 3 — a real medieval crossbow with a long wooden stock, a steel prod (the bow) at the front, ONE single thick bowstring (Bogensehne) stretched between the two prod tips, a simple trigger at the back, no bolt loaded. Plain wood and steel, no decorations, no Swiss crosses, no extra cords or straps — only the bowstring. Render in 19th-century romantic Swiss watercolor style with brown ink outlines. Single edge-to-edge illustration on the full A4 portrait canvas, no borders, no text, no cropping.",
+          "basedOn": "blank-a4-portrait.jpg+oip-user-string-reference.jpg+medieval-crossbow-960.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 134119
+        },
+        {
+          "file": "ai-11-watercolor-v11-pointing-top-right.jpg",
+          "style": "watercolor-v11-pointing-top-right",
+          "prompt": "OUTPUT FORMAT: A4 portrait 3:4 vertical, 1200×1600 pixels — same dimensions as REFERENCE 1 (the blank white canvas). Fill the entire canvas, do not crop. CONTENT: take the medieval Armbrust from REFERENCE 2 and redraw it in the same 19th-century romantic Swiss watercolor style with brown ink outlines on plain off-white watercolor background — but ROTATE its orientation so the FRONT END (the steel prod + bowstring) POINTS TOWARD THE TOP-RIGHT CORNER of the A4 canvas, and the BACK END (trigger + butt of the wooden stock) sits in the bottom-left area. The Armbrust lies diagonally across the page from lower-left to upper-right. Keep the SAME weapon — same massive battle-worn wooden stock, same single thick bowstring (Bogensehne) between prod tips, no other strings, no bolt, no sling, no decorations. Single edge-to-edge illustration on the full A4 portrait canvas, no borders, no text, no cropping.",
+          "basedOn": "blank-a4-portrait.jpg+ai-10-watercolor-v10-3refs-a4-explicit-size.jpg",
+          "generatedBy": "grok-imagine-edit",
+          "bytes": 149374
+        }
+      ]
+    }
+  ]
+}

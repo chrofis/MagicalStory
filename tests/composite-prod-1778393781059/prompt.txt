@@ -1,0 +1,15 @@
+LANDMARK PROTECTION (CRITICAL — read first):
+The background of this image is a real photograph of a specific landmark. DO NOT redraw it. DO NOT move buildings. DO NOT change architecture. DO NOT change the skyline. DO NOT add or remove windows. The buildings, the position of every window, the roofline, and the silhouette must remain pixel-faithful to the input photograph. Your edit is a TEXTURE / STYLE pass on top of the existing pixels — not a regeneration of the scene.
+
+YOUR EDIT (in this order):
+1. Apply traditional watercolor in the style of Inga Moore — textured paper with pencil underpainting, soft paint edges, visible artistic brushstrokes, luminous flowing colors stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
+2. The figures (already painted in watercolor with interactive poses) are foreground — blend them into the scene by matching lighting and softening cutout edges. DO NOT change their poses.
+3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Make the transition invisible. Do not extend ground OVER the buildings.
+TITLE TEXT: render this exact title across the upper third of the canvas: "Das Geheimnis der Flaschenpost". Hand-painted watercolor letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the watercolor scene above the figures. Title goes in the sky / upper background area, never on faces. This is the only text in the image.
+
+PRESERVE EXACTLY:
+- Every building, window, roofline, doorway — they are correct in the input.
+- Every figure's pose, face, hair, skin tone, clothing.
+- Every prop's silhouette and material.
+
+DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.

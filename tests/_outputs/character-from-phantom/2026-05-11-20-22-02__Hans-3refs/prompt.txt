@@ -1,0 +1,14 @@
+You are given THREE reference images:
+  Image 1 (POSE TEMPLATE): a 2×4 grid of a wooden mannequin showing 8 viewing angles — top row 4 head-only views (front / 45° right / profile 90° / back), bottom row 4 full-body views (same four angles). Copy the LAYOUT and the ANGLES from this image. Do NOT copy the wood texture or featureless mannequin face.
+  Image 2 (STYLED 2×2 AVATAR): the existing 2×2 character sheet — top row is two face views in the source photo's style, bottom row is two full-body views in the target art style wearing the costume. Use this image as the authoritative reference for the costume colours, costume shape, and rendered art style of the body row.
+  Image 3 (CHARACTER PHOTO): the person's face photo — authoritative reference for face identity, hair colour, skin tone.
+
+Produce a NEW 2×4 grid that matches Image 1's layout exactly (thin black dividing lines, pure white background). The same person from Image 3 is rendered in 8 cells at the 8 angles from Image 1. Bottom-row clothing matches Image 2's costume.
+
+Top row — head only (cropped at the neck, no shoulders, no clothing visible).
+  Cell 1: head front. Cell 2: head 45° three-quarter right. Cell 3: head strict profile 90° right. Cell 4: back of head.
+
+Bottom row — full body, head to feet, arms relaxed at sides, wearing the costume from Image 2 (pirate costume, white shirt, red sash, dark breeches, brown boots).
+  Cell 5: full body front. Cell 6: full body 45° three-quarter right. Cell 7: full body strict profile 90° right. Cell 8: full body back view.
+
+Render in soft watercolor children's storybook illustration style — gentle washes, simple outlines. Identity from Image 3, costume from Image 2, angles + layout from Image 1. ABSOLUTELY NO TEXT in the output — no numbers, no degree symbols, no labels.

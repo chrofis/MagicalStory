@@ -1,0 +1,45 @@
+{
+  "user": "characters_bb2a91d0-6644-40dd-b025-70cfc5e70950",
+  "landmark": {
+    "id": 307,
+    "name": "Tellsplatte (boat jump)",
+    "attribution": "MagicalStory curated watercolor"
+  },
+  "characters": [
+    {
+      "name": "Emma",
+      "age": 5,
+      "left": 8,
+      "top": 750,
+      "width": 206,
+      "height": 560
+    },
+    {
+      "name": "Noah",
+      "age": 7,
+      "left": 222,
+      "top": 650,
+      "width": 224,
+      "height": 660
+    },
+    {
+      "name": "Daniel",
+      "age": 38,
+      "left": 454,
+      "top": 430,
+      "width": 488,
+      "height": 880
+    },
+    {
+      "name": "Sarah",
+      "age": 36,
+      "left": 789,
+      "top": 430,
+      "width": 235,
+      "height": 880
+    }
+  ],
+  "canvas": "1024x1365",
+  "style": "watercolor children's storybook illustration, soft brushwork, gentle colors",
+  "blender": "grok"
+}

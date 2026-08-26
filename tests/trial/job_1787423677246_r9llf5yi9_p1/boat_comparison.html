@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Goldene Möwe — boat fix comparison</title>
+<style>body{font-family:system-ui;background:#1a1a1f;color:#eee;margin:20px}
+h1{font-size:20px} .row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+figure{margin:0;max-width:420px}img{max-width:100%;border-radius:8px;border:1px solid #444}
+figcaption{font-size:13px;color:#bbb;padding:6px 2px}
+.bad{border:2px solid #c0392b!important}.good{border:2px solid #27ae60!important}</style>
+<h1>Kapitänin Fiona — page 1 boat: before / after the VEHICLES-block fix</h1>
+<h2>Visual Bible spec (what the boat should be)</h2>
+<div class="row"><figure><img src="VEH001_ref.jpg"><figcaption>VEH001 reference — 10m single mast, crossed-bones square sail (was always correct)</figcaption></figure></div>
+<h2>Empty-scene plate — the layer that failed</h2>
+<div class="row">
+<figure><img class="bad" src="empty_scene_OLD.jpg"><figcaption>SHIPPED plate (old code): Art Director wrote only "a boat sits tied" → mastless rowboat invented</figcaption></figure>
+<figure><img class="good" src="empty_scene_NEW.jpg"><figcaption>NEW plate (with VB vehicle injection): mast, crossed-bones sail, rope railings — matches VEH001</figcaption></figure>
+</div>
+<h2>Populated page</h2>
+<div class="row">
+<figure><img class="bad" src="page1_SHIPPED.jpg"><figcaption>SHIPPED page 1: placement kept the plate's rowboat → sail-less one-man boat</figcaption></figure>
+<figure><img src="runs/001_white_nomask/output.jpg"><figcaption>Harness render 1 on new plate (white overlay, 1 ref only) — Grok recomposed, boat cropped to hull</figcaption></figure>
+<figure><img src="runs/002_none_nomask/output.jpg"><figcaption>Harness render 2 (no overlay, 1 ref only) — recomposed again; end-to-end proof needs the full pipeline (Test Lab rerun)</figcaption></figure>
+<figure><img class="good" src="page1_NEWPLATE_3refs.jpg"><figcaption>NEW plate + production's full 3-ref set + current-template prompt: mast and crossed-bones sail SURVIVE into the populated page</figcaption></figure>
+</div><h2>Faithful rerun (landmark photo + fidelity block + character-space bands)</h2>
+<div class="row">
+<figure><img class="good" src="empty_scene_NEW2.jpg"><figcaption>Plate NEW2: real Quaibrücke geometry + VB boat (mast + rigging; sail furled this run, bones not visible)</figcaption></figure>
+<figure><img src="page1_NEWPLATE2_3refs.jpg"><figcaption>Page on plate NEW2: Facundo clearly ASLEEP in a boat with ropes + oar, landmark present — but the model split the vessel in two: masted boat in midground, characters in a mastless foreground dinghy; Fiona in the boat instead of on the bridge</figcaption></figure>
+</div><h2>THE PROOF — full production pipeline on staging (Lab #822 + #823)</h2>
+<div class="row">
+<figure><img class="good" src="plate_LAB822.jpg"><figcaption>Lab #822: plate via production builder with VEHICLES injection — correct vessel, real Quaibrücke + Grossmünster</figcaption></figure>
+<figure><img class="good" src="page1_LAB823.jpg"><figcaption>Lab #823: full production page render on that plate — Facundo ASLEEP ON THE DECK of the correct boat, one vessel, no duplication</figcaption></figure>
+</div>

@@ -1,0 +1,16 @@
+=== PAGES ===
+  page 1: lp[1] = Marktplatz Altdorf
+  page 2: lp[1] = Marktplatz Altdorf
+  page 3: lp[1] = Marktplatz Altdorf
+  page 4: lp[1] = Apple Shot Scene (Altdorf)
+  page 5: lp[1] = Apple Shot Scene (Altdorf)
+  page 6: lp[1] = Lake Uri storm crossing
+  page 7: lp[1] = Tellsplatte (boat jump)
+  page 8: lp[1] = Hohle Gasse Küssnacht
+  page 9: lp[1] = Hohle Gasse Küssnacht
+  page 10: lp[1] = Tellshaus Bürglen
+  page 11: lp[1] = Tellshaus Bürglen
+=== COVERS ===
+  frontCover: lp[0]
+  initialPage: lp[0]
+  backCover: lp[0]

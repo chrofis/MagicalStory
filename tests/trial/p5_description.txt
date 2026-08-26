@@ -1,0 +1,115 @@
+```json
+{
+  "previewMismatches": [
+    "Intent: Verena positioned LEFT of Werner, facing LEFT lane. Preview: Verena positioned RIGHT, facing camera.",
+    "Intent: Uschi positioned RIGHT of Werner, facing RIGHT lane. Preview: Uschi positioned LEFT (labeled Franziska), facing camera.",
+    "Intent: Werner arms extended OUTWARD in commanding gesture. Preview: Werner arms down, only gesturing.",
+    "Intent: Three characters in clear directional command formation. Preview: All three facing camera in static poses.",
+    "Intent: Character named 'Uschi' on right. Preview: Character identified as 'Franziska' (wrong person entirely)."
+  ],
+  "checks": {
+    "check1_scaleFeasibility": "Medium shot at street level, human scale, expressions visible. YES",
+    "check2_objectPlacement": "Stein castle ruins: top-right background. Street junction: center midground. Wrought-iron lanterns: top-center background. CONSISTENT",
+    "check3_actionCompatibility": "Werner directing with arm gestures toward two directions (left and right lanes). Verena turning toward left lane. Uschi addressing tourists then standing ready on right. VALID",
+    "check4_characterPositioning": "Werner center midground. Verena left of Werner, facing/turning toward left lane. Uschi right of Werner, facing/standing toward right. Story text confirms: 'Du nimmst die Engelgasse' (Verena left), 'Du bleibst hier' (Uschi right). MATCH",
+    "check5_cameraView": "Medium shot, three-quarter/front views allow expressions and gestures. YES",
+    "check6_differentiation": "Werner commanding with extended arms. Verena turning/pivoting toward left lane. Uschi recently turned from tourists, now standing ready. UNIQUE actions. YES",
+    "check7_physics": "Werner standing center with arms extended outward = natural commanding stance. Cobblestones provide solid ground. Afternoon light casts shadows naturally. YES",
+    "check8_weather": "OUTDOOR. Afternoon sunlight, golden light, shadows on cobblestones directly on scene. YES",
+    "check9_distanceSeparation": "All three characters in same foreground/midground depth (not far background). No extreme distance separation needed. Stein castle visible in top-right as landmark context. ADEQUATE",
+    "check10_locationContinuity": "Altstadt-Gassen Baden, junction of Kirchgasse (established Page 3), consistent location. YES",
+    "check11_storyFidelity": "Story: Werner directs Verena to Engelgasse (LEFT), Uschi stays (RIGHT), others move to assignments. Scene shows: Werner center commanding, Verena positioned/turning left, Uschi positioned right. MATCHES",
+    "check12_linearSpace": "Street junction with two lanes splitting left and right. Characters positioned along this junction. Werner center apex. YES",
+    "check13_sharedObjects": "N/A - no shared objects",
+    "check14_obstacleLogic": "N/A - no obstacles blocking movement",
+    "check15_holdingInventory": "Werner L:empty R:extended in gesture. Verena L:empty R:empty (turning posture). Uschi L:empty R:empty (standing). NO CONFLICTS",
+    "check16_backgroundFeasibility": "Outdoor Altstadt with cream/ochre plaster buildings on both sides, Stein castle ruins visible on hillside above, wrought-iron lanterns at street corner. FEASIBLE",
+    "check17_characterCount": "3 main characters (Werner, Verena, Uschi) with visible faces. PASS (within limit, story-required)",
+    "check18_compositionSimplicity": "3 characters, one focal point (Werner's command moment), street junction geometry provides strong composition. Clean and clear. PASS"
+  },
+  "issues": [
+    "Preview swapped Verena and Uschi positions (left/right reversed)",
+    "Preview identified right-side character as 'Franziska' when it should be 'Uschi'",
+    "Werner's gesture was underplayed - should show commanding extended arms, not just standing",
+    "All three characters facing camera instead of showing directional orientation toward assigned lanes"
+  ],
+  "corrections": [
+    "Repositioned Verena to LEFT of Werner with clear left-facing/turning orientation",
+    "Repositioned Uschi to RIGHT of Werner with right-facing orientation",
+    "Werner pose updated: arms extended outward in commanding gesture (left arm toward Verena/left lane, right arm toward Uschi/right lane)",
+    "Verena pose: mid-turn/pivoting toward left lane (Engelgasse direction)",
+    "Uschi pose: standing ready on right side, facing right lane direction",
+    "Clarified character identification: Uschi (not Franziska) on right side"
+  ],
+  "draftValidation": {
+    "poseActionCheck": "Werner standing center with arms extended outward = commanding stance CONSISTENT. Verena turning/pivoting left = CONSISTENT with 'takes left lane'. Uschi standing ready, facing right = CONSISTENT with 'stays here' (right side). YES",
+    "positionGazeCheck": "Werner center looking outward toward both directions = VALID. Verena position left of center, body angled/turning toward left lane = VALID geometry. Uschi position right of center, body angled toward right direction = VALID geometry. All positions support story's command moment.",
+    "contradictionsFound": [],
+    "fixesApplied": []
+  },
+  "scene": {
+    "sceneComplexity": "simple",
+    "landmarkPlacement": {
+      "strassenlaternen": "top-center background",
+      "steinCastleRuins": "top-right background",
+      "altstadt_buildings": "left-right background, framing junction"
+    },
+    "imageSummary": "Werner stands at the center of a cobblestone street junction with both arms extended outward in a commanding gesture. To his left, Verena stands mid-turn toward the left lane. To his right, Uschi stands facing the right lane. Medieval Altstadt buildings rise on both sides, and the ruins of Stein castle are visible on the hillside above. Afternoon light casts long shadows down both diverging street lanes.",
+    "setting": {
+      "location": "Altstadt-Gassen Baden [Kirchgasse junction]",
+      "indoorOutdoor": "outdoor",
+      "description": "Cobblestone street junction in the medieval Altstadt of Baden. Cream and ochre plaster buildings with narrow windows and shutters frame both sides. Wrought-iron street lanterns stand sentinel at the corner. Above the slate rooflines, the rocky hillside rises with grey stone ruins of Stein castle visible against blue sky.",
+      "lighting": "Afternoon, golden hour sunlight slanting across the uneven cobblestones, creating warm light and long shadows",
+      "weather": "Clear afternoon sky, no precipitation",
+      "weatherVisibility": "directly on scene - warm golden light, clear visibility",
+      "camera": "Medium shot at street level, framed looking down the junction, showing all three figures in sharp focus against architectural geometry",
+      "depthLayers": "Characters in midground/foreground at junction center. Medieval buildings form middle-distance walls. Castle ruins visible in top-right background above roofline. Open cobblestone plaza extends outward from center point."
+    },
+    "characters": [
+      {
+        "name": "Werner",
+        "position": "middle-center midground",
+        "pose": "Standing upright and centered at the junction, facing forward with both arms extended outward",
+        "action": "Commanding gesture with arms spread: left arm extended toward left lane (Verena), right arm extended toward right lane (Uschi)",
+        "holding": {
+          "leftHand": "extended outward in gesture",
+          "rightHand": "extended outward in gesture"
+        },
+        "expression": "Direct gaze, authoritative presence, sharp focus",
+        "clothing": "costumed:superhero",
+        "avatar": "Werner"
+      },
+      {
+        "name": "Verena",
+        "position": "middle-left midground",
+        "pose": "Standing with body angled to the left, mid-turn posture, head and torso pivoting toward left lane",
+        "action": "Turning/pivoting toward the left lane (Engelgasse direction) in response to Werner's direction",
+        "holding": {
+          "leftHand": "empty",
+          "rightHand": "empty"
+        },
+        "expression": "Focused attention, acknowledging direction, eyes clear and alert",
+        "clothing": "costumed:superhero",
+        "avatar": "Verena"
+      },
+      {
+        "name": "Uschi",
+        "position": "middle-right midground",
+        "pose": "Standing ready, body angled toward the right lane, facing right direction",
+        "action": "Standing prepared and attentive on the right side, ready to take her assigned position",
+        "holding": {
+          "leftHand": "empty",
+          "rightHand": "empty"
+        },
+        "expression": "Calm readiness, focused determination, eyes open and engaged",
+        "clothing": "costumed:superhero",
+        "avatar": "Uschi"
+      }
+    ],
+    "objects": [],
+    "reuseEmptyScene": false,
+    "emptyScenePrompt": "A medieval Altstadt street junction with uneven grey cobblestones. Cream and ochre plaster buildings with narrow windows and blue shutters frame both sides of the junction. Wrought-iron street lanterns stand at the corner. Above the slate rooflines, a rocky hillside is visible with grey stone castle ruins silhouetted against a clear blue sky. Afternoon golden sunlight slants across the junction, casting long shadows down both diverging street lanes. The cobblestone junction is empty and open. Medium shot at street level looking down the junction.",
+    "translatedSummary": "Werner steht in der Mitte einer Kopfsteinpflaster-Strassenkreuzung mit beiden Armen ausgestreckt in einer befehlenden Geste. Zu seiner Linken steht Verena und wendet sich dem linken Gässchen zu. Zu seiner Rechten steht Uschi und schaut in Richtung des rechten Gässchens. Die mittelalterliche Altstadt erhebt sich auf beiden Seiten, und die Ruine Stein ist auf dem Hügel oben sichtbar. Nachmittagslicht wirft lange Schatten auf die Kopfsteinpflaster-Gasse."
+  }
+}
+```
