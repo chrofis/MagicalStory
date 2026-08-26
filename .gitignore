@@ -181,3 +181,5 @@ drafts/
 # keep an `git add -A` from being the first time.
 scripts/seo/config.json
 .stagingtoken
+
+venv-pin-test/
