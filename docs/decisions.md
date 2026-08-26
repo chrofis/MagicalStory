@@ -224,6 +224,96 @@ category for a roster character's repair.
 runs while `PIPELINE_MODE=beats`; fixing `story-unified.txt` alone would have
 had no effect on staging.
 
+### Cross-story challenge memory + subject pages (owner, 2026-08-26)
+**Context:** Two separate complaints about the beats planner, both owner-approved.
+
+(1) *Repeat challenges.* Nothing carried across a family's books. Every run starts
+from the same commission shape with no memory of what the account already owns,
+and the arcs prove it. Measured on production user `1766770854972` (three
+consecutive books, arcs read out of `data.beatsReviewReport.arc`):
+
+- `job_1787436913379_mfedxinwqd`: "The Uetliberg path toward the high ridge is
+  blocked by a wide forest stream…" / "the little dragon stops following and
+  slips off the ridge path…" / "the group reaches the high ridge … but a thick
+  bank of fog…"
+- `job_1787514321173_gvs2ojo4o0n`: "a wide stream has drowned the stepping
+  stones…" / "the only short climb to the Lindenhof ridge runs through the garden
+  gate…" / "on the ridge above the Lindenhof … a thick summer fog rolls in…"
+- `job_1787689073034_1v6ew0y1kae`: "blocked by a great fallen tree…" / "hoping to
+  cross the old hill at the Lindenhof…" / "Feurio … breaks away toward the sound
+  of the fountain…"
+
+Three books, the same three challenges: a blocked path at a water/obstacle, a
+Lindenhof climb, a fog/lost-companion near-failure.
+
+(2) *No subject pages.* Every page carried the named children, so simple,
+beautiful, easy-to-render moments (an egg cracking open, a map by lantern light,
+an empty gate) were skipped or crowded out. A recent production book's strongest
+page was a creature-alone close-up.
+
+**Decision:**
+- Before the arc-plan call (`usageLabel: 'beats_arc_plan'` — the one call that
+  *invents* challenges; every later stage only divides and dresses what it
+  decided), `loadPriorChallenges()` reads the account's ≤3 most recent stories,
+  pulls each arc's `Challenges of …:` block with a tolerant regex, truncates each
+  numbered line to 120 chars and the whole injection to 600, and appends
+  "This reader's earlier books used these challenges — this story uses different
+  ones:". No prior stories → no block at all. Logged as `arc_variety`, stored as
+  `data.arcVarietyExclusions`.
+- `story-beats.txt` designates **one or two subject pages** in the PAGE PLAN (the
+  creature, artifact or place alone at a moment that matters, no named child in
+  frame, never a view that carries nothing) and licenses the beat form. The three
+  templates that would otherwise fault such a page were carved out, narrowly:
+  `story-beats-review.txt` check 4 (empty stage), `scene-review.txt` check 5
+  (cast), and both scene-expansion templates gained a `10b. Subject page` rule —
+  full physical detail, size named against a familiar object (no character to
+  give scale), `characters[]` left empty. An establishing shot that carries
+  nothing is still forbidden everywhere.
+
+**Rationale:**
+- *DB access:* the query lives in `beatsPipeline.js` behind the same lazy
+  `require('../services/database')` a dozen other lib modules already use, not
+  threaded in from `storyJobPipeline`. `jobId` — which the pipeline already has —
+  resolves the user; threading a pool would have meant a new parameter through
+  `storyJobPipeline`, `server.js` and the Test Lab for data none of them own.
+- *`data->'beatsReviewReport'->>'arc' IS NOT NULL` is the completeness filter,
+  not `story_jobs.status`.* A job that never reached the beats review has no
+  approved arc to contribute anyway, and `story_jobs` rows are pruned — joining
+  on job status would silently drop the older books that matter most here.
+- *Contained:* a failed lookup warns and plans with no memory, exactly as before.
+- *Verified by replay* (one `claude-sonnet` plan call, 5308 in / 2706 out, prod
+  dragon story's approved arc, 18 pages): the plan designated
+  `Page 2: close-up — subject page: the egg alone in tree roots, glowing warm
+  gold; the moment of discovery belongs to the egg` and
+  `Page 13: wide — subject beat: Feurio alone in the busy Bahnhofplatz near the
+  fountain … tiny dragon, big square; near-failure`. Both BEATS stage the subject
+  alone ("no child in frame", "No named child in frame"), both at real story
+  moments (discovery, the near-failure), neither filler scenery. Opening stayed
+  at two pages; travel/return pages 7, 11 and 16 survived.
+
+**Zero-cast pipeline audit (read-only, nothing changed):** `buildImagePrompt`,
+the bbox/figure detectors, the eval and semantic prompts, `sceneBriefCheck`,
+`clothingCheck`, the composite trigger and the avatar assembly all handle a
+zero-character page cleanly — `imageRouter.js:62` even routes `cast === 0` to
+`direct` with `refMode: 'off'` as a first-class case. Two `length === 0 → use
+everyone` fallbacks would now misfire and are on the backlog rather than
+blind-fixed: `entityConsistency.js:1587-1590` falls back to the whole story
+roster when a page's prose names nobody (one wasted detection call per subject
+page, and it asks the detector to find named children in a landscape), and
+`repairPipeline.js:283` (`wanted.size === 0`) selects every character as the
+style-reference pool. Both need `length === 0 → skip`. Note also that the
+`evaluateImageBatch` empty-inventory cap this work was told to check does not
+exist there — the only `sceneCharacters.length` guard in `images.js:2299` picks a
+description source, and the identity cap lives in `evalPipeline.js:492`,
+ungated on cast size.
+
+**Touched:** `server/lib/beatsPipeline.js` (`extractChallengeLines`,
+`loadPriorChallenges`, the arc-plan block, `arcVarietyExclusions` on the return),
+`storyJobPipeline.js` (persists `arcVarietyExclusions`), `prompts/story-beats.txt`,
+`prompts/story-beats-review.txt`, `prompts/scene-review.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`.
+**Status:** ✅ active.
+
 ---
 
 ## Email

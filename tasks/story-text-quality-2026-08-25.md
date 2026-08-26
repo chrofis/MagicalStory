@@ -435,6 +435,38 @@ sentences it deletes.
 
 ---
 
+## Corpus baseline — the defect is real, and much smaller than one story suggested
+
+Measured 2026-08-25 with `scripts/analysis/refine-damage-report.js`, which counts on the
+writer-vs-shipped diff: feeling sentences lost/gained, bookkeeping sentences added, clock
+stamps added, travelogue openers added.
+
+| Corpus | Pages | Pages changed | Feeling lost | Bookkeeping+ | Clock+ | Travelogue+ |
+|---|---|---|---|---|---|---|
+| **The motivating story alone** | 18 | 13 | **4** | **3** | **1** | **1** |
+| Production, 7 stories | 120 | 81 | 5 | 6 | 2 | 1 |
+| Staging, 8 stories | 112 | 76 | 2 | 5 | 3 | 1 |
+
+**Read this honestly.** The motivating story carries 4 of production's 5 feeling losses, half
+its bookkeeping additions, and its only travelogue opener. Across 232 pages of other stories
+the stage costs roughly **0.4 feeling sentences and 0.7 bookkeeping sentences per story** —
+real, reproduced on 5 separate stories, and an order of magnitude milder than the trace above
+implies. The mechanism is confirmed; the magnitude was not typical.
+
+Two consequences:
+- The prompt fixes are justified (the failure modes reproduce beyond the one story) but their
+  average benefit will be modest. Do not expect a visible quality jump on a random story.
+- The counter under-reports. On the motivating story it finds 4 of the 8 feeling deletions I
+  identified by reading — `sein kleiner Bruder`, `und sagt kein Wort` and two others carry
+  relationship or restraint rather than a feeling word, and no regex catches them. Treat the
+  numbers as a floor and a trend line, not a census.
+
+**A data fact worth keeping:** `data.storyText` is not reliably the writer's draft. It holds
+the draft on 5 of 7 corpus stories and the *refined* text on the two newest runs
+(`job_1787638394061`, `job_1787469664089`). Anything reconstructing pre-refine text must read
+`textRefineReport.pages[].before` — which lists only changed pages, so shipped text is the
+writer's text everywhere else. This bit the first Lab replay attempt (fixed in `043986728`).
+
 ## Review
 
-*(to be written after the fixes land)*
+*(to be written after the A/B lands — Lab experiment #846 and its successor)*

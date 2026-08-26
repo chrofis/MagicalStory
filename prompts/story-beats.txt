@@ -67,6 +67,7 @@ Requirements:
 - An obstacle exists for its own reasons: never shape one around a thing a character happens to carry, and never give a barrier exactly one solution that a character already holds. Where peril has to be softened, take the replacement from what the setting already contains.
 - An obstacle belongs to the story's own world: weather, distance, a rival, a broken or missing or guarded thing, a character's own flaw. No mechanism from other stories — a puzzle door, a riddle to answer, a lock with a trick, a test set by no one — unless the commission establishes it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle, close on the body and the barrier. The decision before and the relief after never replace it.
+- A beat may put the subject alone in frame — the creature, the artifact, the place — when the moment is the subject's: hatching, breaking, glowing, arriving, with the children just outside the frame.
 - A trait in the character details is not an introduction. A prop, pet or skill that solves a problem appears in an earlier scene with its owner, before it does the work — and anything introduced that way must later do work. Drop the introduction when you drop its purpose.
 - Use the fewest characters the STORY needs and the fewest any BEAT needs: invent no figure an existing character could be, merge two roles into one where the plot allows, and stage a beat with two people rather than three when two carry it.
 - Keep the group together unless a beat gives them a reason to separate and a reason to meet again.
@@ -103,7 +104,7 @@ Write the story, not the page plan. No page numbers anywhere in this block.
 One line per page, deciding how the book is drawn before any page is written:
 Page <N>: <shot> — <how many named characters> — <what the picture carries>
 
-Shots are wide, medium, close-up or distant. No two pages in a row share the same shot and the same number of characters. At least a third of the pages hold one character or none. A page with four or more named characters is wide or distant, and there are few of them: when the arc has the group doing one thing together, spread it — one face close, then a pair, then the rest — rather than lining everyone up. Name which part of the arc each page serves, and give the parts the pages the budget allows. The opening settles in at most two pages, and a story that journeys away from home keeps a page for the way back — cut opening pages before travel pages.
+Shots are wide, medium, close-up or distant. No two pages in a row share the same shot and the same number of characters. At least a third of the pages hold one character or none. One or two pages are subject pages: the creature, artifact or place alone at a moment that matters, no named child in frame — never a view that carries nothing. A page with four or more named characters is wide or distant, and there are few of them: when the arc has the group doing one thing together, spread it — one face close, then a pair, then the rest — rather than lining everyone up. Name which part of the arc each page serves, and give the parts the pages the budget allows. The opening settles in at most two pages, and a story that journeys away from home keeps a page for the way back — cut opening pages before travel pages.
 
 ---BEATS---
 ## Page 1
