@@ -2335,7 +2335,16 @@ const LANDMARK_CLASS_SQL = `(CASE
 // order — the judge answers "is this usable at all", pageviews answers "which
 // is more prominent". So the judge removes the construction sites and the
 // office blocks, and pageviews orders what survives.
-const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_pageviews DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
+// A landmark WITHOUT a reference photo ranks below every landmark that has one.
+//
+// The photo is the whole point downstream: the story can name the place either
+// way, but with no reference plate the illustrator draws whatever it imagines a
+// "Schloss X" looks like. Class alone put photoless rows on top — the
+// 2026-08-26 discovery run inserted 4,903 rows with no image (667 castles, 662
+// churches), and every one of them outranked a properly photographed landmark
+// in the same town purely for being typed Castle.
+const HAS_PHOTO_SQL = `(photo_url IS NOT NULL)`;
+const LANDMARK_RANK_SQL = `${HAS_PHOTO_SQL} DESC, ${LANDMARK_CLASS_SQL} DESC, fame_pageviews DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
 
 // A landmark is only offered as a town's OWN when it is actually in that town.
 //
@@ -2452,7 +2461,7 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
         -- finds nothing, the caller falls back to that aerial anyway.
         AND ${LANDMARK_CLASS_SQL} > 0
         AND ${JUDGED_USABLE_SQL}
-      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
+      ORDER BY ${SAME_CITY_SQL}, ${HAS_PHOTO_SQL} DESC, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 
@@ -3540,6 +3549,10 @@ module.exports = {
   getAllIndexedLandmarks,
   saveLandmarkToIndex,
   indexLandmarksForCities,
+  // The FREE half of the photo step (Wikipedia article images + Commons
+  // category). Exported so a photo backfill can run without the paid
+  // analyzeLandmarkPhoto that shares its `if (analyzePhotos)` guard.
+  findBestLandmarkImage,
   indexLandmarksForCity,  // Single city on-demand indexing
   getLandmarkIndexStats,
   SWISS_CITIES,  // Pre-configured Swiss cities list

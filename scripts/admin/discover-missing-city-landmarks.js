@@ -53,22 +53,35 @@ const BACKDROP = ['Cathedral', 'Church', 'Abbey', 'Monastery', 'Castle', 'Palace
   const { indexLandmarksForCity } = require('../../server/lib/landmarkPhotos');
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-  const cities = require('../../server/data/swiss-cities.json').cities;
-
-  // Which SEO cities have no landmark a scene can be set at?
-  const missing = [];
-  for (const c of cities) {
-    const name = c.name.de || c.name.en;
-    const r = await pool.query(
-      `SELECT COUNT(*) k FROM landmark_index
-        WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
-            = LOWER(translate($1, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
-          AND type = ANY($2)`, [name, BACKDROP]);
-    if (Number(r.rows[0].k) === 0) missing.push(name);
+  // --all: every Swiss town in the index, not just the 100 with landing pages.
+  // A town is "missing" when nothing in it can host a scene — the `(Stadt)`
+  // aerial does not count, which is the whole point.
+  let missing;
+  if (args.includes('--all')) {
+    missing = (await pool.query(
+      `SELECT nearest_city FROM landmark_index
+        WHERE (country ILIKE '%switzerland%' OR country ILIKE '%schweiz%' OR country = 'CH')
+          AND nearest_city IS NOT NULL AND btrim(nearest_city) <> ''
+          AND nearest_city NOT ILIKE 'Kanton %' AND nearest_city NOT ILIKE 'Bezirk %'
+        GROUP BY nearest_city
+       HAVING COUNT(*) FILTER (WHERE type = ANY($1)) = 0
+        ORDER BY nearest_city`, [BACKDROP])).rows.map(r => r.nearest_city);
+  } else {
+    const cities = require('../../server/data/swiss-cities.json').cities;
+    missing = [];
+    for (const c of cities) {
+      const name = c.name.de || c.name.en;
+      const r = await pool.query(
+        `SELECT COUNT(*) k FROM landmark_index
+          WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
+              = LOWER(translate($1, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
+            AND type = ANY($2)`, [name, BACKDROP]);
+      if (Number(r.rows[0].k) === 0) missing.push(name);
+    }
   }
 
   const todo = LIMIT ? missing.slice(0, LIMIT) : missing;
-  console.log(`SEO cities with no real landmark: ${missing.length}/100`);
+  console.log(`towns with no scene-settable landmark: ${missing.length}`);
   console.log(`processing ${todo.length}: ${todo.join(', ')}\n`);
   if (DRY) { await pool.end(); return; }
 
