@@ -671,20 +671,47 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const preGenAvatars = (inputData.characters || [])[0]?.preGeneratedStyledAvatars;
       if (preGenAvatars) {
         let seeded = 0;
+        // Seeding must write BOTH the module cache and the character object.
+        // setStyledAvatar writes only the cache, and prepareStyledAvatars then
+        // SKIPS an already-cached entry (`if (styledAvatarCache.has(cacheKey))
+        // continue`), so its own write-back to char.avatars.styledAvatars never
+        // ran for a seeded character. That object is the ONLY thing
+        // projectStoryCharacterAvatars reads, so the story-avatar map came back
+        // empty, applyStoryCellRefs bailed at `if (!story) continue`, and every
+        // trial page shipped the WHOLE 2×4 sheet as its reference instead of the
+        // one matching pose cell (verified on prod job_1787647410717_5dvfqu8jg
+        // p2). Shape mirrors the write-back in styledAvatars.js exactly.
+        const rememberOnCharacter = (charName, clothingCategory, imageData) => {
+          const char = (inputData.characters || []).find(c => c?.name === charName)
+            || (inputData.characters || []).find(c => String(c?.name || '').toLowerCase() === String(charName).toLowerCase());
+          if (!char || !imageData) return;
+          if (!char.avatars) char.avatars = {};
+          if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          if (clothingCategory.startsWith('costumed:')) {
+            const costumeType = clothingCategory.split(':')[1] || 'default';
+            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+            char.avatars.styledAvatars[artStyle].costumed[costumeType] = imageData;
+          } else {
+            char.avatars.styledAvatars[artStyle][clothingCategory] = imageData;
+          }
+        };
         for (const [charName, avatars] of Object.entries(preGenAvatars)) {
           for (const [category, imageData] of Object.entries(avatars)) {
             if (category === 'costumed' && typeof avatars.costumed === 'object') {
               for (const [costumeType, img] of Object.entries(avatars.costumed)) {
                 setStyledAvatar(charName, `costumed:${costumeType}`, artStyle, img);
+                rememberOnCharacter(charName, `costumed:${costumeType}`, img);
                 seeded++;
               }
             } else if (category !== 'costumed') {
               setStyledAvatar(charName, category, artStyle, imageData);
+              rememberOnCharacter(charName, category, imageData);
               seeded++;
             }
           }
         }
-        if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache`);
+        if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache (cache + character object)`);
       }
 
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
@@ -1045,17 +1072,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Get character photos with styled avatars applied
           let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', inputData.artStyle, sceneClothingRequirements);
           pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+
+          // Build the image prompt — trial uses rich scene hint as scene description
+          const sceneDescription = page.sceneHint || page.text || '';
+          // Parsed BEFORE the cell crop: its characters carry pose/perspective,
+          // and the crop needs them. `sceneCharacters` is the raw character
+          // record list from getCharactersInScene, which has no pose at all, so
+          // resolveCellPose fell through to 'threeQuarter' on every trial page —
+          // including declared back-view figures. Same inputs full mode passes.
+          const sceneMetadata = extractSceneMetadata(sceneDescription);
           // Phase 7: cell-crop refs from the story-scoped 2×4 sheet when one
           // exists. Mutates pagePhotos in place; characters without a story
           // sheet keep the styled-avatar URL produced above.
           {
             const sav = require('./server/lib/storyAvatars');
             const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
-            await sav.applyStoryCellRefs(pagePhotos, storyAvatars, sceneCharacters);
+            const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
+            await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars, {
+              closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+            });
           }
 
-          // Build the image prompt — trial uses rich scene hint as scene description
-          const sceneDescription = page.sceneHint || page.text || '';
           const pageImageModel = MODEL_DEFAULTS.simplePageImage;
           const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
           const isGrokImage = pageImageBackend === 'grok';
@@ -1066,7 +1103,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           );
 
           // Resolve landmarks and VB grid for Grok reference slots
-          const sceneMetadata = extractSceneMetadata(sceneDescription);
+          // (sceneMetadata is parsed above, before the cell crop that needs it)
           const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
           // Wait for the parallel ref-sheet generation (started in onVisualBible
           // alongside empty scenes + costumed avatars) before reading element
@@ -1850,20 +1887,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // landmark for the empty-scene render. Without this, empty scenes
           // get generated WITHOUT the landmark and the page render inherits a
           // landmark-free background plate.
-          const pageLandmarkLookup = {};
+          // Resolve each landmark's photo the SAME way pages do
+          // (resolveLandmarkPhotoForLocation, shared with
+          // getLandmarkPhotosForScene). This used to gate on
+          // `photoFetchStatus === 'success'`, which a variant-backed Swiss
+          // landmark NEVER reaches — those are excluded from
+          // prefetchLandmarkPhotos by its `!l.photoVariants?.length` filter and
+          // keep 'pending_lazy' forever. So no plate was ever built for the
+          // normal modern landmark, and the page then edited the RAW photograph
+          // (packReferences promotes it when there is no scene background),
+          // shipping a photographic page in a watercolour book. Measured on
+          // prod job_1787647410717_5dvfqu8jg p1 and staging
+          // job_1787696601288_bfgznq960: both 'pending_lazy', both zero plates.
+          // No scene view exists here (the plate is built from the VB
+          // background, before any brief), so the resolver picks an exterior —
+          // which is what a background plate wants.
+          // Photo resolution is async, and this callback is deliberately sync
+          // (making it async would leave an un-awaited promise on the stream
+          // handler). So resolve ONCE PER LOCATION into a promise here and await
+          // it inside the plate task that already runs async below.
+          const { resolveLandmarkPhotoForLocation, buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
+          const landmarkPromiseByPage = {};
           for (const loc of (vb.locations || [])) {
             if (!loc.isRealLandmark || !loc.pages?.length) continue;
-            if (!(loc.referencePhotoUrl || loc.referencePhotoData) || loc.photoFetchStatus !== 'success') continue;
+            const p = resolveLandmarkPhotoForLocation(vb, loc, { sceneView: null })
+              .catch(err => {
+                log.warn(`⚠️ [TRIAL] Landmark photo resolve failed for "${loc.name}": ${err.message}`);
+                return null;
+              });
             for (const pn of loc.pages) {
-              if (!pageLandmarkLookup[pn]) {
-                pageLandmarkLookup[pn] = {
-                  name: loc.name,
-                  photoUrl: loc.referencePhotoUrl || null,
-                  photoData: loc.referencePhotoData || null,
-                  attribution: loc.photoAttribution,
-                  source: loc.photoSource,
-                };
-              }
+              if (!landmarkPromiseByPage[pn]) landmarkPromiseByPage[pn] = p;
             }
           }
 
@@ -1873,17 +1926,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // pages — typically there's only one. Plumbing the photo into the
             // empty-scene render is the only way to anchor the building's
             // shape; the scene description alone doesn't carry visual identity.
-            const bgLandmark = bg.pages.map(pn => pageLandmarkLookup[pn]).find(Boolean);
-            const emptySceneLandmarkPhotos = bgLandmark ? [bgLandmark] : [];
-            // Strong landmark-fidelity block — only included when a landmark
-            // is actually attached. Shared builder (storyHelpers) anchors the
-            // photo by NAME so Grok knows which building it's looking at and
-            // preserves its silhouette; '' when no landmark.
-            const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-            const landmarkFidelityBlock = buildLandmarkFidelityBlock(bgLandmark);
+            const bgLandmarkPromise = bg.pages.map(pn => landmarkPromiseByPage[pn]).find(Boolean)
+              || Promise.resolve(null);
             for (const pageNum of bg.pages) {
               bgPromises.push(bgLimit(async () => {
                 try {
+                  const bgLandmark = await bgLandmarkPromise;
+                  const emptySceneLandmarkPhotos = bgLandmark ? [bgLandmark] : [];
+                  // Strong landmark-fidelity block — only included when a
+                  // landmark is actually attached. Shared builder anchors the
+                  // photo by NAME so Grok knows which building it's looking at
+                  // and preserves its silhouette; '' when no landmark.
+                  const landmarkFidelityBlock = buildLandmarkFidelityBlock(bgLandmark);
+                  log.info(`🎬 [TRIAL] Empty scene page ${pageNum}: ${bgLandmark ? `landmark "${bgLandmark.name}" variant ${bgLandmark.variantNumber ?? '?'} attached` : 'no landmark photo'}`);
                   const emptyPrompt = buildEmptyScenePrompt({
                     style: artStyleDesc,
                     description: bg.description,

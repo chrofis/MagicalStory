@@ -124,57 +124,114 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   }
 
   // Load photos for each matching location
+  const sceneView = sceneMetadata?.landmarkView || sceneMetadata?.fullData?.landmarkView || null;
   const results = [];
   for (const loc of matchingLocations) {
-    // Check if this location has photo variants (Swiss pre-indexed)
-    if (loc.photoVariants && loc.photoVariants.length > 0) {
-      // Load the selected variant on-demand (per-landmark variant from [LOC003.2] format)
-      // Variant 0 = "no photo matches this scene's vantage" (owner, 2026-08-11):
-      // the Art Director writes `.0` when the action is inside/under a landmark
-      // and no interior variant exists — attaching an exterior photo to an
-      // interior scene anchors the model to the wrong view (P6-P8 bridge:
-      // exterior photo, walkway action). Prose carries the setting instead.
-      // Explicit `.N` from the brief wins (`.0` = attach nothing). Without one,
-      // the scene's declared landmark view picks the photo by KIND — and a view
-      // the index has no photo for (underwater, an unphotographed interior)
-      // attaches nothing rather than falling back to slot 1, which is how a
-      // surface photo ended up anchoring underwater scenes.
-      const explicitVariant = perLandmarkVariants[loc.id];
-      const sceneView = sceneMetadata?.landmarkView || sceneMetadata?.fullData?.landmarkView || null;
-      const requestedVariant = explicitVariant ?? pickVariantForView(loc, sceneView);
-      if (requestedVariant === 0 || requestedVariant == null) {
-        log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}${explicitVariant === 0 ? ', explicit .0' : ''}) — prose carries the setting`);
-        continue;
-      }
-      const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, requestedVariant);
-      if (variant) {
-        results.push({
-          name: loc.name,
-          photoData: variant.photoData,
-          attribution: variant.attribution,
-          source: 'swiss-variant',
-          variantNumber: variant.variantNumber
-        });
-        log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${requestedVariant})`);
-      }
-    }
-    // Fall back to existing reference photo (referencePhotoUrl post-Phase-2,
-    // referencePhotoData on legacy entries).
-    else if ((loc.referencePhotoUrl || loc.referencePhotoData) && loc.photoFetchStatus === 'success') {
-      results.push({
-        name: loc.name,
-        photoUrl: loc.referencePhotoUrl || null,
-        photoData: loc.referencePhotoData || null,
-        attribution: loc.photoAttribution,
-        source: loc.photoSource,
-        variantNumber: 1
-      });
-    } else {
-      log.debug(`[LANDMARK-SCENE] "${loc.name}" (${loc.id}) matched but has no photos (variants=${loc.photoVariants?.length || 0}, fetchStatus=${loc.photoFetchStatus || 'none'})`);
-    }
+    const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
+      explicitVariant: perLandmarkVariants[loc.id],
+      sceneView,
+    });
+    if (photo) results.push(photo);
   }
 
   return results;
+}
+
+/**
+ * SINGLE resolver for "which photo does this landmark location get".
+ *
+ * Two storage shapes exist and only one of them uses `photoFetchStatus`:
+ *  - VARIANT landmarks (Swiss pre-indexed, 2-3 photos by kind) resolve
+ *    on-demand through pickVariantForView + loadLandmarkPhotoVariant. They are
+ *    deliberately EXCLUDED from prefetchLandmarkPhotos (see the
+ *    `!l.photoVariants?.length` filter at its call site), so their
+ *    photoFetchStatus stays 'pending_lazy' forever — checking it is always wrong.
+ *  - LEGACY/single-photo landmarks carry referencePhotoUrl/Data and DO get
+ *    'success' stamped by the prefetch.
+ *
+ * The trial empty-scene path implemented only the second shape and gated on
+ * `photoFetchStatus === 'success'`, so no plate was ever built for a
+ * variant-backed landmark. With no plate, packReferences promotes the RAW
+ * photograph into a page slot and the page renders photographically instead of
+ * in the story's art style (prod job_1787647410717_5dvfqu8jg p1: real
+ * bystanders, real signage, in a watercolour book). Both callers now share this
+ * resolver — never inline a third copy.
+ *
+ * Variant 0 = "no photo matches this scene's vantage" (owner, 2026-08-11): the
+ * Art Director writes `.0` when the action is inside/under a landmark and no
+ * interior variant exists — attaching an exterior photo to an interior scene
+ * anchors the model to the wrong view. Explicit `.N` from the brief wins
+ * (`.0` = attach nothing). Without one, the scene's declared landmark view
+ * picks the photo by KIND — and a view the index has no photo for (underwater,
+ * an unphotographed interior) attaches nothing rather than falling back to
+ * slot 1, which is how a surface photo ended up anchoring underwater scenes.
+ *
+ * @param {Object} visualBible
+ * @param {Object} loc - one VB location (isRealLandmark)
+ * @param {Object} [opts]
+ * @param {number} [opts.explicitVariant] - `.N` from the brief; 0 = attach nothing
+ * @param {string|null} [opts.sceneView] - declared landmark view; null picks an exterior
+ * @returns {Promise<Object|null>} landmark photo entry, or null to attach nothing
+ */
+async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
+  const decision = decideLandmarkPhotoSource(loc, opts);
+  if (!decision) return null;
+
+  if (decision.mode === 'variant') {
+    const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, decision.variantNumber);
+    if (!variant) return null;
+    log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${decision.variantNumber})`);
+    return {
+      name: loc.name,
+      photoData: variant.photoData,
+      attribution: variant.attribution,
+      source: 'swiss-variant',
+      variantNumber: variant.variantNumber,
+    };
+  }
+
+  // Legacy/single-photo landmark: referencePhotoUrl post-Phase-2,
+  // referencePhotoData on legacy entries.
+  return {
+    name: loc.name,
+    photoUrl: loc.referencePhotoUrl || null,
+    photoData: loc.referencePhotoData || null,
+    attribution: loc.photoAttribution,
+    source: loc.photoSource,
+    variantNumber: 1,
+  };
+}
+
+/**
+ * The POLICY half of resolveLandmarkPhotoForLocation, with no I/O — which
+ * shape of landmark is this, and which photo should it get?
+ *
+ * Split out so the rule that caused the bug is directly testable: a
+ * variant-backed landmark must be decided on its VARIANTS, never on
+ * `photoFetchStatus` (which only the legacy shape ever has stamped).
+ *
+ * @returns {{mode:'variant', variantNumber:number}|{mode:'legacy'}|null}
+ *   null = attach nothing.
+ */
+function decideLandmarkPhotoSource(loc, opts = {}) {
+  if (!loc) return null;
+  const { explicitVariant, sceneView = null } = opts;
+
+  if (loc.photoVariants && loc.photoVariants.length > 0) {
+    const requestedVariant = explicitVariant ?? pickVariantForView(loc, sceneView);
+    if (requestedVariant === 0 || requestedVariant == null) {
+      log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}${explicitVariant === 0 ? ', explicit .0' : ''}) — prose carries the setting`);
+      return null;
+    }
+    return { mode: 'variant', variantNumber: requestedVariant };
+  }
+
+  if ((loc.referencePhotoUrl || loc.referencePhotoData) && loc.photoFetchStatus === 'success') {
+    return { mode: 'legacy' };
+  }
+
+  log.debug(`[LANDMARK-SCENE] "${loc.name}" (${loc.id}) has no photos (variants=${loc.photoVariants?.length || 0}, fetchStatus=${loc.photoFetchStatus || 'none'})`);
+  return null;
 }
 
 /**
@@ -314,6 +371,8 @@ module.exports = {
 
   // Landmark helpers
   getLandmarkPhotosForScene,
+  resolveLandmarkPhotoForLocation,
+  decideLandmarkPhotoSource,
   buildAvailableLandmarksSection,
 
   // Location vantages (canvas-per-vantage pipeline)
