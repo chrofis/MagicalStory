@@ -20115,3 +20115,38 @@ continue to report hostile faults only.
 `docs/prompt-inventory.md`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-08-26 — CORRECTION: the clothing enumeration was verified in a configuration production does not use
+
+**Supersedes the verification claim in "The entity grid enumerates clothing per cell before it
+judges" (same day).** That entry reported 2 true positives / 0 false positives on 9 grids. Those
+runs passed the BODY grid as the primary image and no head grid. Production passes the HEAD grid
+as primary with the body grid second (`primaryIsHeadGrid: true`) — true on all 12 grids of
+`job_1787689073034_1v6ew0y1kae`.
+
+Re-measured in the production configuration, all 12 grids: **0 clothing findings**. The missing
+dungaree bib and straps on p12 and both remaining covers are still not reported. Pointing
+`clothing_check` explicitly at the full-body cells did not change it (0 again).
+
+What the same runs DO show, and what the harness had been hiding:
+- Identity is unaffected and healthy — 11 identity findings (`hair_change` on p-3/-2/-1/18,
+  p8, p10/12/13/14, p-1; `face_drift`; `hair_nuance`). The earlier report that hair findings
+  "disappeared" was the harness omitting the head grid, not the prompt. The face path was never
+  touched, exactly as the owner said.
+- No limb findings at all in the production configuration.
+
+**Two measurement traps recorded so nobody loses another hour to them:**
+1. `evaluateEntityConsistency` maps the model's `type` into `subType` and sets
+   `type: 'consistency'`. An A/B filtering findings on `type` sees zero clothing findings
+   whatever the prompt says.
+2. A failed eval returns `evalFailed: true` with `score: 10` and no issues. A harness that does
+   not check `evalFailed` prints twelve failures as twelve clean grids — which happened here when
+   the head-grid URLs were passed as if they were data URIs.
+
+**Status:** the entity check still does not report clothing in production. Reopened in
+`tasks/BACKLOG.md`. The `clothing_check` field stays in the prompt — it is measured effective
+only on the body-primary path (used when no head grid is built) and inert otherwise.
+
+**Touched:** `prompts/entity-consistency-check.txt`, `docs/decisions.md`, `tasks/BACKLOG.md`.
