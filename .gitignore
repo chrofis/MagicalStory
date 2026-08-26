@@ -173,3 +173,11 @@ drafts/
 # three things deliberately NOT built (reading level, refrain form, trial word
 # count). Untracked, those pointers dangle for the next agent.
 !tasks/toddler-mode-2026-08-25.md
+
+# ─── Credentials: never commit ────────────────────────────────────────────────
+# Google OAuth client secret + Search Console refresh token, minted by
+# scripts/seo/get-refresh-token.js and read by scripts/seo/report.js.
+# Neither file has ever been committed (verified 2026-08-26); these entries
+# keep an `git add -A` from being the first time.
+scripts/seo/config.json
+.stagingtoken
