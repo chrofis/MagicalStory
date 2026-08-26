@@ -19090,8 +19090,37 @@ records with no `pose`/`perspective`, so `resolveCellPose` returned
 `tests/unit/landmark-plate-resolve.test.ts` (11 tests, incl. the pending_lazy
 regression).
 
-**Status:** 🟡 conditional — unit-verified and pushed to staging; awaiting a live
-trial run to confirm a styled plate and a single-cell reference.
+**Live trial (staging `job_1787762276985_rog82sfh7`, Lausanne, fr) exposed two
+follow-on defects that the static reading missed. Both are now fixed:**
+
+1. **Plates were built and never used.** The landmark fix worked — the run
+   generated 6 plates (`trial_empty_scene`, $0.12) where the old gate produced
+   zero. But the plates are kicked off fire-and-forget, so the page render read
+   `sceneBackgrounds[n] || null`, found nothing yet, and `packReferences`
+   promoted the RAW photograph anyway: 4 of 6 pages still carried
+   `landmarkPhotos=1` while their styled plates landed moments later, unused and
+   paid for. Left alone this would have been a pure cost regression. Each page
+   now awaits its own plate, registered in `onVisualBible` — safe because the
+   VISUAL BIBLE section streams before STORY PAGES, so every entry exists before
+   any page renders.
+
+2. **Styled sheets reached the cell cropper too late — and this is NOT
+   trial-only.** `char.avatars.styledAvatars[artStyle]` was written ONLY in the
+   save block at the very end of a job, yet that field is the only thing
+   `projectStoryCharacterAvatars` reads. For the whole generation phase the map
+   was empty, `applyStoryCellRefs` bailed at `if (!story) continue`, and every
+   page shipped the WHOLE 8-panel sheet instead of one pose cell. The persisted
+   story proves the timing gap: it has `styledAvatars.watercolor.standard` set,
+   while every stored page reference is the full sheet. `prepareStyledAvatars`
+   now publishes the cache onto the character objects as soon as the sheets
+   exist (`publishStyledAvatarsToCharacters`), so all four call sites — trial,
+   cover, streaming and main — benefit; the save block stays and is idempotent.
+
+The seeding write-back from the first pass is still correct but was not what bit
+here: this trial had no `preGeneratedStyledAvatars`, so the sheets came from
+`prepareStyledAvatars` normally and the gap was purely when they were published.
+
+**Status:** 🟡 conditional — re-validating on a second live trial.
 
 ### CARRY_ROUTES fired in production (prod `job_1787689073034_1v6ew0y1kae`, 2026-08-25)
 
