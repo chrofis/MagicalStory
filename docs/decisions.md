@@ -20194,3 +20194,42 @@ character with both a face and a body box.
 `server/lib/testlab.js`.
 **Status:** 🟡 conditional — the blur-vs-whiteout matrix on the new benchmark set
 is the evidence this entry is missing.
+
+## 2026-08-26 — The generation spinner promised 5–10 minutes; it is an hour
+
+**Owner report:** the spinner says a story will be ready in ~5 minutes, reality
+is closer to an hour.
+
+**Measured, production, completed non-trial jobs:** 41, 54, 59, 59, 61 minutes
+(16–18 pages). Trials, which do NOT use this component, run ~3 minutes at 6
+pages. So the copy was wrong by 6–10x for every story that ever sees it.
+
+**The second sentence was worse than the number.** It read "The first pages will
+appear soon!". The stage log of `job_1787689073034_1v6ew0y1kae` (59 min total):
+
+    outline / text stages   0 → 37 min      no image exists yet
+    avatars                    37 min
+    page images                38 min
+    repair                     39 min
+    finalize                   59 min
+
+Nothing visual exists for the first ~37 minutes — more than half the wait — so
+the promise set someone watching a spinner for pages that could not arrive.
+
+**Decision (owner):** keep the spinner and the tip carousel, but let the
+standing message settle almost immediately and carry the real duration plus the
+email promise. `showCloseHint` already pinned a persistent banner; its delay
+drops 60s → 20s, and both it and the rotating `timeInfo` now state 30–60
+minutes. `timeInfo` also says the writing comes first and the pictures arrive
+in the second half, which is the honest form of what the old sentence claimed.
+
+**Checked before promising it:** `sendStoryCompleteEmail` is wired at
+`storyJobPipeline.js:6151` and fires for any user with a real address (only
+anonymous trial placeholders defer to the claim flow), and `GenerationProgress`
+is used ONLY by `StoryWizard` — `TrialWizard` has its own UI. So every reader of
+this banner does get an email, and no trial user sees the 30–60 minute figure.
+
+**Not fixed here:** the 37 imageless minutes are a product problem, not a copy
+problem. Backlogged separately at the owner's request.
+
+**Touched files:** `client/src/components/generation/GenerationProgress.tsx`.

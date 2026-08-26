@@ -74,17 +74,22 @@ export function GenerationProgress({
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
-  // After 60s of waiting, surface a persistent reassurance banner with the
-  // close-tab + email-on-completion message. Before 60s the same info still
-  // rotates through the tip carousel; after 60s it pins so the user has
-  // permission to walk away.
+  // Pin the persistent banner — duration + close-tab + email-on-completion —
+  // after 20s. It was 60s, set when a story was believed to take 5–10 minutes.
+  // Measured 2026-08-26 on production 16–18 page stories: 41, 54, 59, 59, 61
+  // minutes, with the first page image at ~38 min (stage log of
+  // job_1787689073034_1v6ew0y1kae: outline 0–37, images 38, finalize 59). A
+  // reader facing an hour needs the "you can walk away" message early, not a
+  // minute in, so the spinner and carousel still run but the standing message
+  // settles almost immediately. Anything longer leaves them watching a rotation
+  // for the wrong reason.
   const [showCloseHint, setShowCloseHint] = useState(false);
   useEffect(() => {
     if (!isGenerating) {
       setShowCloseHint(false);
       return;
     }
-    const timer = setTimeout(() => setShowCloseHint(true), 60_000);
+    const timer = setTimeout(() => setShowCloseHint(true), 20_000);
     return () => clearTimeout(timer);
   }, [isGenerating]);
 
@@ -461,7 +466,7 @@ export function GenerationProgress({
   const translations = {
     en: {
       title: 'Creating Your Story!',
-      timeInfo: 'Your story takes about 5–10 minutes depending on length. The first pages will appear soon!',
+      timeInfo: 'Your story takes 30–60 minutes. The writing comes first, so the pictures arrive in the second half.',
       tipCharacters: 'Children learn best when they see themselves in the story. That\'s the magic of personalized books!',
       tipStoryPlot: 'You can edit any text and regenerate any image after the story is created — make it perfect!',
       tipLocations: 'We include real photos of your hometown landmarks in the illustrations — select your location for a personal touch.',
@@ -478,12 +483,12 @@ export function GenerationProgress({
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
       canCloseTitle: 'We\'ll email you when it\'s ready',
-      canClose: 'You can close this tab — your story keeps generating on our servers.',
+      canClose: 'This takes 30–60 minutes. You can close this tab — your story keeps generating on our servers.',
       continueInBackground: 'Continue in Background',
     },
     de: {
       title: 'Geschichte wird erstellt!',
-      timeInfo: 'Deine Geschichte braucht etwa 5–10 Minuten je nach Länge. Die ersten Seiten erscheinen bald!',
+      timeInfo: 'Deine Geschichte braucht 30–60 Minuten. Zuerst wird geschrieben, die Bilder kommen in der zweiten Hälfte.',
       tipCharacters: 'Kinder lernen am besten, wenn sie sich selbst in der Geschichte sehen. Das ist die Magie personalisierter Bücher!',
       tipStoryPlot: 'Du kannst jeden Text bearbeiten und jedes Bild neu generieren — mach die Geschichte perfekt!',
       tipLocations: 'Wir verwenden echte Fotos deiner Heimat-Sehenswürdigkeiten in den Illustrationen — wähle deinen Ort für eine persönliche Note.',
@@ -500,12 +505,12 @@ export function GenerationProgress({
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
       canCloseTitle: 'Wir schicken dir eine E-Mail, sobald es so weit ist',
-      canClose: 'Du kannst den Tab schliessen — deine Geschichte wird auf unseren Servern weiter erstellt.',
+      canClose: 'Das dauert 30–60 Minuten. Du kannst den Tab schliessen — deine Geschichte wird auf unseren Servern weiter erstellt.',
       continueInBackground: 'Im Hintergrund fortsetzen',
     },
     fr: {
       title: 'Création de votre histoire!',
-      timeInfo: 'Votre histoire prend environ 5 à 10 minutes selon la longueur. Les premières pages apparaîtront bientôt !',
+      timeInfo: 'Votre histoire prend 30 à 60 minutes. Le texte s\'écrit d\'abord, les images arrivent dans la seconde moitié.',
       tipCharacters: 'Les enfants apprennent mieux quand ils se voient dans l\'histoire. C\'est la magie des livres personnalisés !',
       tipStoryPlot: 'Vous pouvez modifier chaque texte et regénérer chaque image après la création — rendez-la parfaite !',
       tipLocations: 'Nous incluons de vraies photos de vos monuments locaux dans les illustrations — choisissez votre lieu pour une touche personnelle.',
@@ -522,7 +527,7 @@ export function GenerationProgress({
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
       canCloseTitle: 'Nous vous enverrons un e-mail quand prêt',
-      canClose: 'Vous pouvez fermer cet onglet — votre histoire continue sur nos serveurs.',
+      canClose: 'Cela prend 30 à 60 minutes. Vous pouvez fermer cet onglet — votre histoire continue sur nos serveurs.',
       continueInBackground: 'Continuer en arrière-plan',
     },
   };
