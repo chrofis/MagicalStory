@@ -64,6 +64,7 @@ const {
   getCharactersInScene,
   getCharacterPhotoDetails,
   buildCharacterReferenceList,
+  buildReferenceCardColours,
   extractPageClothing,
   buildSceneExpansionPrompt,
   buildImagePrompt,
@@ -1553,7 +1554,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               excludeElementIds,
             })
           : '';
-        let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true });
+        // Same block as every other cover path and as pages: garment bound to
+        // its wearer, plus the legend saying which framed card is whom.
+        let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true })
+          + buildReferenceCardColours(
+              (inputData.characters || []).filter(c => clothingDedupedPhotos.some(ph => ph.name === c.name)),
+              clothingDedupedPhotos
+            );
 
         // Run the cover hint through scene expansion (same as pages) so covers get
         // a structured description with emptyScenePrompt and objects metadata.
@@ -2080,7 +2087,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const pageImageModel = MODEL_DEFAULTS.simplePageImage;
             const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
             const styleDescription = resolveArtStyle(artStyle, pageImageBackend) || resolveArtStyle('pixar');
-            const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters, { includeClothing: true });
+            const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters, { includeClothing: true })
+              + buildReferenceCardColours(
+                  (inputData.characters || []).filter(c => coverPhotos.some(ph => ph.name === c.name)),
+                  coverPhotos
+                );
             // KEY STORY ELEMENTS filtered to the cover hint's declared ids
             // (same fix as the full-account cover paths — without it every VB
             // artifact got dumped into the prompt and strays got painted).

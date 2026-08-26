@@ -388,6 +388,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     getCharacterPhotoDetails,
     parseClothingCategory,
     buildCharacterReferenceList,
+    buildReferenceCardColours,
     convertClothingToCurrentFormat,
     buildCharacterRestriction,
   } = getStoryHelpers();
@@ -626,7 +627,15 @@ async function iterateCover(coverKey, storyData, options = {}) {
         excludeElementIds,
       })
     : '';
-  const characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, storyData.characters, { includeClothing: true });
+  // Identical to the page path (owner, 2026-08-26): the per-character block
+  // binds each garment to its wearer, and the colour legend says which framed
+  // reference card is whom. grok.js frames cover cards exactly as it frames page
+  // cards; covers were the only consumer shipping those frames with no key.
+  const characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, storyData.characters, { includeClothing: true })
+    + buildReferenceCardColours(
+        (storyData.characters || []).filter(c => clothingDedupedPhotos.some(p => p.name === c.name)),
+        clothingDedupedPhotos
+      );
   const storyTitle = storyData.title || 'My Story';
   const coverDedication = storyData.dedication;
 

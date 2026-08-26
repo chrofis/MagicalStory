@@ -14022,6 +14022,65 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-26 — Covers build their character block with the SAME code as pages
+
+**Context.** The owner reported a child losing his dungarees on covers and said
+it could not be coincidence. It was not. Reproduced on all three covers of
+`job_1787689073034_1v6ew0y1kae` and on two covers of the previous book
+`job_1787638707796_x8272kcs22m`, where the entity check itself said "regular
+dark blue denim shorts ... instead of the expected dungaree shorts with a square
+bib panel and shoulder straps".
+
+Everything obvious checked out and was ruled out: the cover prompts DO carry the
+full dungaree text, the reference image actually attached to the cover call DOES
+show him wearing them, both paths use the same model, and page 14 of the same
+book puts all four boys shoulder to shoulder with the dungarees intact — so it
+is not a lineup effect either.
+
+The difference was in how the prompt binds a garment to a person.
+
+- **Page:** one self-contained sentence — "Julian — a toddler-proportioned little
+  boy, light blonde curly ear-length hair, blue eyes, yellow T-shirt, navy blue
+  denim dungaree shorts with square bib panel and crossing shoulder straps,
+  white sneakers — stands close to Levin's right, looking up..."
+- **Cover:** the character line carried NO clothing at all ("Julian, a toddler
+  little boy, stands in the left of Levin, standing, facing viewer"), and the
+  wardrobe sat in a DETACHED list of four near-identical outfits further down.
+  In a lineup, the odd garment out gets flattened into the majority pattern.
+
+Second divergence in the same area: `grok.js` frames every character reference
+card in a colour, and page prompts carry a REFERENCE CARD COLOURS legend saying
+which frame is whom. Covers packed the same framed cards and shipped **no legend
+at all** — the model was handed framed cards with no key.
+
+**Decision** (owner: "make them IDENTICAL to normal pages. IDENTICAL CODE...
+Covers get one more pass for text, that is it. Otherwise they are identical"):
+- The colour legend is now one shared builder, `buildReferenceCardColours`,
+  extracted verbatim from the page path and called by the page path AND all
+  three cover paths (coverIterate, the streaming cover, the trial cover).
+- `buildCharacterReferenceList({ includeClothing })` — which only covers set —
+  no longer emits a detached wardrobe list. It emits one line per character
+  through the SAME builder pages use (`buildCharacterPromptBlock` in `prose`
+  form), so the garment sits inside its wearer's own description.
+
+**Scope check.** `includeClothing` is set at exactly three call sites, all
+covers, so no page prompt changes shape.
+
+**Verified** by rebuilding the block from the affected story's stored data: each
+child now carries his own physique, hair and full wardrobe inline — the dungarees
+are inside Julian's sentence — followed by the height order and the colour
+legend (GREEN = Levin, RED = Julian, PURPLE = Max, BLUE = Kiaan), which matches
+the frames actually baked into the packed reference image.
+
+**Still divergent, deliberately not touched in this commit.** The cover
+TEMPLATES are still six separate files filled by `fillTemplate` rather than
+`buildImagePrompt`. Collapsing those is the remaining half of "identical code"
+and belongs in its own change with its own verification, not bolted onto this
+one.
+
+**Touched files.** `server/lib/promptBuilders.js`, `server/lib/coverIterate.js`,
+`server/lib/storyHelpers.js`, `storyJobPipeline.js`.
+
 ## 2026-08-25 — A hair difference of one shade is a nuance, and the type ceilings finally reach entity findings
 
 **Context.** The newest production book (`job_1787638707796_x8272kcs22m`) came

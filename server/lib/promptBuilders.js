@@ -1911,6 +1911,38 @@ function buildCharacterRestriction(selectedNames, excludedNames) {
  * @param {Array} characters - Original character data with physical descriptions
  * @returns {string} Formatted character reference list
  */
+/**
+ * REFERENCE CARD COLOURS legend — which colour-framed reference card is whom.
+ *
+ * Shared by pages AND covers (owner, 2026-08-26: "make them IDENTICAL to normal
+ * pages. IDENTICAL CODE"). grok.js frames every character card in a colour, and
+ * without this legend the model gets framed cards with no key. Pages have
+ * carried it for months; covers packed the SAME framed cards and shipped no
+ * legend at all — one half of why cover wardrobes drift while page wardrobes
+ * hold.
+ *
+ * grok.js frames cards ONLY for characters that actually have a reference photo
+ * on this image (after any OTS/background filtering), so the colour canon MUST
+ * be that same filtered set — building it from ALL characters diverges in
+ * membership and the colours bind to the wrong person.
+ */
+function buildReferenceCardColours(chars, referencePhotos) {
+  chars = Array.isArray(chars) ? chars.filter(Boolean) : [];
+  if (chars.length === 0) return '';
+  const cardNames = (referencePhotos || []).map(p => p && p.name).filter(Boolean);
+  const cardSet = new Set(cardNames.map(n => n.toLowerCase()));
+  const canonNames = cardNames.length ? cardNames : chars.map(c => c.name);
+  const frameLines = [];
+  for (const c of chars) {
+    // Only characters with a reference card get a colour line (matches grok.js).
+    if (cardNames.length && !cardSet.has(String(c.name).toLowerCase())) continue;
+    const col = frameColorForName(c.name, canonNames);
+    if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
+  }
+  if (frameLines.length === 0) return '';
+  return `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n`;
+}
+
 function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
   if (!photos || photos.length === 0) return '';
 
@@ -1927,11 +1959,30 @@ function buildCharacterReferenceList(photos, characters = null, { includeClothin
   let result = `\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below):** ${names}\n`;
 
   if (includeClothing) {
-    const clothingLines = photos
-      .filter(p => p.name && p.clothingDescription)
-      .map(p => `- ${p.name} wears: ${p.clothingDescription}`);
-    if (clothingLines.length > 0) {
-      result += `\n**CLOTHING (match the reference photos):**\n${clothingLines.join('\n')}\n`;
+    // BIND THE GARMENT TO THE PERSON, exactly as a page does (owner,
+    // 2026-08-26: covers must be identical to pages). A page brief dresses each
+    // character inside their own sentence — "Name — a toddler-proportioned
+    // little boy, <hair>, <eyes>, <every garment> — stands ...". Covers used to
+    // emit a DETACHED list of near-identical outfits instead, and in a lineup
+    // the odd garment out got flattened into the majority pattern: the same
+    // child kept his dungarees on every page and lost them on all three covers
+    // of two consecutive books, while the prompt text and the reference image
+    // both carried them.
+    //
+    // Same shape, same builder as the page path (buildCharacterPromptBlock
+    // 'prose' → buildCharacterPhysicalDescription), so there is one description
+    // format and no second, worse copy of the job.
+    const byName = new Map((characters || []).map(c => [String(c.name).toLowerCase(), c]));
+    const lines = [];
+    for (const p of photos) {
+      if (!p?.name || !p?.clothingDescription) continue;
+      const char = byName.get(String(p.name).toLowerCase());
+      lines.push(char
+        ? `- ${buildCharacterPromptBlock(char, { format: 'prose', includeClothing: true, clothingOverride: p.clothingDescription })}`
+        : `- ${p.name} wears: ${p.clothingDescription}`);
+    }
+    if (lines.length > 0) {
+      result += `\n**CHARACTERS IN THIS IMAGE (each person, then what that person wears):**\n${lines.join('\n')}\n`;
     }
   }
 
@@ -3056,19 +3107,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // filtering), so the colour canon MUST be that same filtered set. Building it
     // from ALL sceneCharacters diverges in membership → colours bind to the wrong
     // character (identity swap) whenever a character's photo is dropped.
-    const cardNames = (referencePhotos || []).map(p => p && p.name).filter(Boolean);
-    const cardSet = new Set(cardNames.map(n => n.toLowerCase()));
-    const canonNames = cardNames.length ? cardNames : sceneCharacters.map(c => c.name);
-    const frameLines = [];
-    for (const c of sceneCharacters) {
-      // Only characters with a reference card get a colour line (matches grok.js).
-      if (cardNames.length && !cardSet.has(String(c.name).toLowerCase())) continue;
-      const col = frameColorForName(c.name, canonNames);
-      if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
-    }
-    if (frameLines.length > 0) {
-      characterReferenceList += `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n`;
-      log.debug(`[IMAGE PROMPT] Added colour-frame mapping for ${frameLines.length} character(s)`);
+    const frameLegend = buildReferenceCardColours(sceneCharacters, referencePhotos);
+    if (frameLegend) {
+      characterReferenceList += frameLegend;
+      log.debug('[IMAGE PROMPT] Added colour-frame mapping');
     }
   }
 
@@ -5406,6 +5448,7 @@ module.exports = {
   buildRelativeHeightDescription,
   buildCharacterRestriction,
   buildCharacterReferenceList,
+  buildReferenceCardColours,
   buildBasePrompt,
   buildRecurringElementsText,
   buildSceneExpansionAllPrompt,
