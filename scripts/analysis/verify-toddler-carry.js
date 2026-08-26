@@ -62,8 +62,8 @@ function mark(ok) { return ok ? '✅' : '❌'; }
   console.log("\n2. Carried findings travel WITH the reviewer's rulings");
   const arcAudit = String(arc?.audit || '').trim();
   const beatsAudit = String(beats?.audit || '').trim();
-  const arcFaults = (arcAudit.match(/^FAULT:/gm) || []).length;
-  const beatsFaults = (beatsAudit.match(/^FAULT:/gm) || []).length;
+  const arcFaults = (arcAudit.match(/^FAULT(\[[A-Z]+\])?:/gm) || []).length;
+  const beatsFaults = (beatsAudit.match(/^FAULT(\[[A-Z]+\])?:/gm) || []).length;
   console.log(`   arc audit: ${arcFaults} fault(s)   beats audit: ${beatsFaults} fault(s)`);
 
   // The Art Director prompt is stored per page and is the one carry destination

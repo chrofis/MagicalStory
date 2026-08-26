@@ -5,4 +5,4 @@ Say nothing about story, style, pacing or content. A correct sentence gets no li
 # PAGES
 {PAGES}
 
-One line per defect: "FAULT: p<N> — <quote the faulty words> — <what is wrong>". After the list write one line: "FAULTS: <count>".
+One line per defect: "FAULT[LANGUAGE]: p<N> — <quote the faulty words> — <what is wrong>". After the list write one line: "FAULTS: <count>".

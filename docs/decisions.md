@@ -19682,3 +19682,45 @@ for `initialPage`.
 **Touched:** `server/lib/faceRepair.js`, `server/routes/regeneration.js`.
 **Status:** 🟡 conditional — pushed to staging; Lab exp 857 (char_repair on the
 same page) running to compare crop-space SAM against the full-page call.
+
+## 2026-08-26 — Audit fault taxonomy: tagged FAULT lines + LIMIT/AGENCY/PAYOFF/PULL questions
+
+**Context:** The three blind audits (arc, beats, text) and the proofread all emitted bare
+`FAULT:` lines — counts existed but nothing said WHICH question found what, so per-category
+regressions (e.g. the refiner reintroducing causality faults while fixing language) were
+invisible. Owner also approved four new question wordings.
+
+**Decision:**
+- Every fault line is now `FAULT[<QUESTION>]: ...` — the uppercase name of the question that
+  found it. The proofread always tags `[LANGUAGE]`; the text audit's text-vs-picture line tags
+  `[MISMATCH]`. The trailing `FAULTS: <count>` line is unchanged.
+- New questions (owner-approved verbatim): LIMIT (arc + text audits), AGENCY (arc audit only,
+  plus a matching "a moment must change something — an action whose removal changes the ending"
+  requirement folded into the Moments spec in story-beats.txt), PAYOFF and PULL (text audit only).
+  Arc audit 6→8 questions, text audit 7→10, beats audit unchanged at 6.
+- One shared parser (`countFaults` / `faultsByCategory` in `promptBuilders.js`, re-exported via
+  `storyHelpers`), regex `/^FAULT(?:\[([A-Z]+)\])?:/gm` — accepts bare legacy lines forever
+  (stored reports predate the tags; untagged lines tally under `UNTAGGED`). Every consumer swept:
+  beatsPipeline (local countFaults deleted), textRefine, testlab `beatsAuditFaults`,
+  verify-toddler-carry.
+- Per-category tallies land in the structured logs (`beats_arc_audit`, `beats_audit`, both
+  re-audits get `byCategory` in gl.info details; TEXT-AUDIT/TEXT-AUDIT2 log lines) and on the
+  stored reports: `arcReviewReport.auditByCategory`/`audit2ByCategory`, `beatsReviewReport`
+  likewise, `textRefineReport.auditByCategory`/`audit2ByCategory`.
+
+**Validation (replay on stored artifacts, grok-4.6, ~$0.25):** New arc audit on the prod draft
+arc of `job_1787689073034_1v6ew0y1kae` (old 6-question audit: 13 faults): 12 and 18 faults on two
+runs — no dilution; the expected `FAULT[LIMIT]` (hatchling's inability to fly never stated)
+appeared both runs; `FAULT[AGENCY]` on run 2 (a side character's distraction deletable without
+changing the ending); every line tagged. New text audit on staging
+`job_1787638394061_hs70901tfsn` shipped text: 22 faults, incl. `FAULT[PAYOFF]` "the treasure
+chest the voyage was for stays closed" — exactly the known unopened-chest defect; all tagged.
+AGENCY is stochastic on a healthy cast (0 then 1 across runs) — expected, it only fires on a
+deletable character.
+
+**Touched:** `prompts/story-arc-audit.txt`, `prompts/story-beats-audit.txt`,
+`prompts/story-text-audit.txt`, `prompts/story-text-proofread.txt`, `prompts/story-beats.txt`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `server/lib/beatsPipeline.js`,
+`server/lib/textRefine.js`, `server/lib/testlab.js`, `storyJobPipeline.js`,
+`scripts/analysis/verify-toddler-carry.js`.
+**Status:** ✅ kept — committed locally; not yet deployed.

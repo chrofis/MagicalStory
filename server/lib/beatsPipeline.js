@@ -2,9 +2,10 @@
 
 const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
 
-// One yardstick everywhere: audits emit "FAULT:" lines, counts compare only
-// when the same template and judge produced both sides.
-const countFaults = (s) => (String(s || '').match(/^FAULT:/gm) || []).length;
+// One yardstick everywhere: audits emit "FAULT[<QUESTION>]:" lines (bare
+// "FAULT:" accepted from older reports); counts compare only when the same
+// template and judge produced both sides. Parsers live in storyHelpers
+// (countFaults / faultsByCategory), imported below.
 
 /**
  * Beats-first story generation (pipelineMode: 'beats').
@@ -62,6 +63,8 @@ const {
   buildArcReviewPrompt,
   buildArcAuditPrompt,
   buildBeatsAuditPrompt,
+  countFaults,
+  faultsByCategory,
   parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,
@@ -273,7 +276,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         await stage(2, 'Auditing the story arc...', { next: 2, ms: 90000 });
         const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit' });
         arcAuditFindings = String(auditRes.text || '').trim();
-        gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${(arcAuditFindings.match(/^FAULT:/gm) || []).length} fault(s)`);
+        gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${countFaults(arcAuditFindings)} fault(s)`, null, { byCategory: faultsByCategory(arcAuditFindings) });
       }
     } catch (auditErr) {
       log.warn(`⚠️ [BEATS] Arc audit failed (${auditErr.message}) — review runs without audit findings`);
@@ -294,6 +297,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       changed: approvedArc !== drafted,
       drafted, analysis, prompt: arcReviewPrompt,
       audit: arcAuditFindings,
+      auditByCategory: faultsByCategory(arcAuditFindings),
     };
     gl.info('beats_arc', `Arc drafted by ${arcRes.modelId || planModel}, reviewed by ${arcRevRes.modelId || arcReviewModel} (${arcReviewReport.changed ? 'rewritten' : 'unchanged'})`, null, {
       changed: arcReviewReport.changed, model: arcRevRes.modelId || arcReviewModel,
@@ -315,7 +319,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const n1 = countFaults(arcAuditFindings);
         const n2 = countFaults(findings2);
         arcReviewReport.audit2 = findings2;
-        gl.info('beats_arc_audit2', `Arc re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2 });
+        arcReviewReport.audit2ByCategory = faultsByCategory(findings2);
+        gl.info('beats_arc_audit2', `Arc re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2, byCategory: arcReviewReport.audit2ByCategory });
         if (n2 > 0) {
           // The first review's ledger rides along so a trade-off it ruled to
           // stand is answered by citing the ruling, not churned.
@@ -400,7 +405,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       await stage(4, 'Auditing the story beats...', { next: 5, ms: 120000 });
       const auditRes = await textModels.callTextModelStreaming(beatsAuditPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_audit' });
       beatsAuditFindings = String(auditRes.text || '').trim();
-      gl.info('beats_audit', `Beats audit by ${auditRes.modelId || reviewModel}: ${(beatsAuditFindings.match(/^FAULT:/gm) || []).length} fault(s)`);
+      gl.info('beats_audit', `Beats audit by ${auditRes.modelId || reviewModel}: ${countFaults(beatsAuditFindings)} fault(s)`, null, { byCategory: faultsByCategory(beatsAuditFindings) });
     }
   } catch (auditErr) {
     log.warn(`⚠️ [BEATS] Beats audit failed (${auditErr.message}) — review runs without audit findings`);
@@ -440,6 +445,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         changedPages: beatsDiffs.map(r => r.pageNumber),
         analysis: beatsReviewAnalysis,
         audit: beatsAuditFindings,
+        auditByCategory: faultsByCategory(beatsAuditFindings),
         // The arc the planner committed to, and the contract this review judged
         // the pages against. Stored so a plan can be read back against it.
         arc: plan.arc || '',
@@ -490,7 +496,8 @@ SCENE: ${x.scene || ''}`.trim(),
           const n1 = countFaults(beatsAuditFindings);
           const n2 = countFaults(findings2);
           beatsReviewReport.audit2 = findings2;
-          gl.info('beats_audit2', `Beats re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2 });
+          beatsReviewReport.audit2ByCategory = faultsByCategory(findings2);
+          gl.info('beats_audit2', `Beats re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2, byCategory: beatsReviewReport.audit2ByCategory });
           if (n2 > 0) {
             const withRulings = `${findings2}\n\nThe previous review answered an earlier audit; its ledger follows. A fault it ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.\n\n${beatsReviewAnalysis || ''}`;
             const fixPrompt = buildBeatsReviewPrompt(inputData, beats, plan.arc, pagePlan, withRulings);

@@ -93,13 +93,13 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // refiner runs on its own checks alone.
   const auditModel = opts.auditModel || MODEL_DEFAULTS.arcReviewModel || defaultModel;
   try {
-    const { buildTextAuditPrompt } = require('./storyHelpers');
+    const { buildTextAuditPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
     const auditPrompt = buildTextAuditPrompt(storyData, current);
     if (auditPrompt && TEXT_MODELS[auditModel]) {
       const t0 = Date.now();
       const a = await callTextModelStreaming(auditPrompt, 12000, null, auditModel, { usageLabel: 'text_audit' });
       auditFindings = String(a.text || '').trim();
-      log.info(`🔎 [TEXT-AUDIT] ${auditModel}: ${(auditFindings.match(/^FAULT:/gm) || []).length} fault(s) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      log.info(`🔎 [TEXT-AUDIT] ${auditModel}: ${countFaults(auditFindings)} fault(s) ${JSON.stringify(faultsByCategory(auditFindings))} in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
   } catch (auditErr) {
     log.warn(`⚠️ [TEXT-AUDIT] failed (${auditErr.message}) — refinement runs without audit findings`);
@@ -192,7 +192,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // step, never the rounds already done.
   if (auditFindings) {
     try {
-      const { buildTextAuditPrompt, buildTextProofreadPrompt } = require('./storyHelpers');
+      const { buildTextAuditPrompt, buildTextProofreadPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
       const audit2Prompt = buildTextAuditPrompt(storyData, current);
       if (audit2Prompt && TEXT_MODELS[auditModel]) {
         const t0 = Date.now();
@@ -209,12 +209,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
           : Promise.resolve('');
         const a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
         const proofFindings = await proofPromise;
-        const proofFaults = (proofFindings.match(/^FAULT:/gm) || []).length;
+        const proofFaults = countFaults(proofFindings);
         if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);
         audit2 = [String(a2.text || '').trim(), proofFaults > 0 ? proofFindings : ''].filter(Boolean).join('\n');
-        const n1 = (auditFindings.match(/^FAULT:/gm) || []).length;
-        const n2 = (audit2.match(/^FAULT:/gm) || []).length;
-        log.info(`🔎 [TEXT-AUDIT2] ${auditModel}: ${n1} → ${n2} fault(s) after ${rounds.filter(r => r.ok).length} round(s), ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+        const n1 = countFaults(auditFindings);
+        const n2 = countFaults(audit2);
+        log.info(`🔎 [TEXT-AUDIT2] ${auditModel}: ${n1} → ${n2} fault(s) ${JSON.stringify(faultsByCategory(audit2))} after ${rounds.filter(r => r.ok).length} round(s), ${((Date.now() - t0) / 1000).toFixed(0)}s`);
         if (n2 > 0) {
           const modelKey = perRound[rounds.length] || defaultModel;
           const withRulings = `${audit2}\n\nEarlier rounds answered a previous audit in their ledgers. A fault ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.`;

@@ -5059,9 +5059,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           rounds: usable.rounds.length,
           changedPages: usable.changed,
           audit: usable.audit || '',
+          auditByCategory: require('./server/lib/storyHelpers').faultsByCategory(usable.audit || ''),
           // The re-audit of the FINAL text (2026-08-26) — same template and
           // judge as `audit`, so the two FAULT counts are one yardstick.
           audit2: usable.audit2 || '',
+          audit2ByCategory: require('./server/lib/storyHelpers').faultsByCategory(usable.audit2 || ''),
           durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
           model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
           pages: usable.pages

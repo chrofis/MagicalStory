@@ -4454,6 +4454,28 @@ function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '', audit
   });
 }
 
+/**
+ * Audit FAULT-line parsing — one yardstick for every consumer. The audit
+ * templates emit "FAULT[<QUESTION>]: ..." (tagged, 2026-08-26); older stored
+ * reports carry the bare "FAULT: ..." form, so both are accepted forever.
+ */
+const FAULT_LINE_RE = /^FAULT(?:\[([A-Z]+)\])?:/gm;
+
+/** Count FAULT lines (tagged or bare) in an audit's raw text. */
+function countFaults(text) {
+  return (String(text || '').match(FAULT_LINE_RE) || []).length;
+}
+
+/** Per-category tally of FAULT lines, e.g. { ASSUMED: 3, LIMIT: 1 }. Bare (untagged) lines count under UNTAGGED. */
+function faultsByCategory(text) {
+  const out = {};
+  for (const m of String(text || '').matchAll(FAULT_LINE_RE)) {
+    const cat = m[1] || 'UNTAGGED';
+    out[cat] = (out[cat] || 0) + 1;
+  }
+  return out;
+}
+
 /** Blind audit of the arc: the auditor sees ONLY the commission and the arc. */
 function buildArcAuditPrompt(inputData, arc) {
   const template = PROMPT_TEMPLATES.storyArcAudit;
@@ -5564,6 +5586,8 @@ module.exports = {
   buildBeatsAuditPrompt,
   buildTextAuditPrompt,
   buildTextProofreadPrompt,
+  countFaults,
+  faultsByCategory,
   buildStoryShapeSection,
   pickMainCharacters,
   resolveAgeMode,
