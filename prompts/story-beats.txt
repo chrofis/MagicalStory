@@ -61,6 +61,7 @@ Requirements:
 - Resolve what the commission conflates or leaves to coincidence — distinguish two things it treats as one, give every arrival a cause — and drop what earns nothing.
 - An animal or creature that travels with the children is given a name by them, where they decide to help it, and goes by that name after.
 - When the deadline is a time of day, the story starts at an hour the book's length can cross to reach it.
+- A beat may put the subject alone in frame — the creature, the artifact, the place — when the moment is the subject's: hatching, breaking, glowing, arriving, with the children just outside the frame.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - The last page shows them safe and together, and one of them feels something a child can name.
 - Match peril to the youngest named child in the cast: frightening is the right level, and nothing may be able to kill or injure a child — no drowning, no fall from a height. A refusal, a loss, a delay or a promise broken can carry it instead. Nobody in the story looks monstrous, and no familiar character turns frightening. When anyone is separated or lost, a later page shows the reunion and the last page shows them safe.
@@ -102,7 +103,7 @@ Write the story, not the page plan. No page numbers anywhere in this block.
 One line per page, deciding how the book is drawn before any page is written:
 Page <N>: <shot> — <how many named characters> — <what the picture carries>
 
-Shots are wide, medium, close-up or distant. No two pages in a row share the same shot and the same number of characters. At least a third of the pages hold one character or none. A page with four or more named characters is wide or distant, and there are few of them: when the arc has the group doing one thing together, spread it — one face close, then a pair, then the rest — rather than lining everyone up. Name which part of the arc each page serves, and give the parts the pages the budget allows.
+Shots are wide, medium, close-up or distant. No two pages in a row share the same shot and the same number of characters. At least a third of the pages hold one character or none. One or two pages are subject pages: the creature, artifact or place alone at a moment that matters, no named child in frame — never a view that carries nothing. A page with four or more named characters is wide or distant, and there are few of them: when the arc has the group doing one thing together, spread it — one face close, then a pair, then the rest — rather than lining everyone up. Name which part of the arc each page serves, and give the parts the pages the budget allows.
 
 ---BEATS---
 ## Page 1

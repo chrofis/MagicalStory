@@ -160,6 +160,96 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
   return text.replace(re, (_m, marker) => `${marker}${body}`);
 }
 
+// ── Cross-story challenge memory ────────────────────────────────────────────
+// A family buys several books. Nothing used to stop the planner giving them the
+// same challenge twice (the lost thing found, the storm crossed, the rival
+// out-argued) — every run starts from the same commission shape with no memory
+// of what the account already owns. These three caps keep the injection small
+// enough that it never competes with the commission itself.
+const PRIOR_STORY_LIMIT = 3;
+const CHALLENGE_LINE_MAX = 120;
+const ARC_VARIETY_MAX = 600;
+
+/**
+ * Pull the numbered challenge lines out of a stored arc.
+ *
+ * The arc's shape is "Challenges of <names>:" then numbered entries, then a
+ * "Moments:" (or "Blocker:") section. Tolerant on purpose: an arc written by an
+ * older template, or one the arc reviewer reshaped, must degrade to [] rather
+ * than throw or capture the whole arc.
+ *
+ * @returns {string[]} one truncated line per challenge; [] when the arc has no
+ *   Challenges section at all (the injection then skips).
+ */
+function extractChallengeLines(arc) {
+  const text = String(arc || '');
+  const start = text.search(/Challenges of[^:\n]*:/i);
+  if (start < 0) return [];
+  let block = text.slice(start);
+  const end = block.search(/^\s*(?:Moments|Blocker)\s*:/mi);
+  if (end > 0) block = block.slice(0, end);
+  return block
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => /^\d+[.)]\s+/.test(l))
+    .map(l => l.replace(/^\d+[.)]\s*/, '').trim())
+    .filter(Boolean)
+    .map(l => (l.length > CHALLENGE_LINE_MAX ? `${l.slice(0, CHALLENGE_LINE_MAX - 1).trimEnd()}…` : l));
+}
+
+/**
+ * The challenges this account's previous books already used.
+ *
+ * Reads the DB directly (same lazy `require('../services/database')` every other
+ * lib module uses) rather than threading a pool through the caller: the query
+ * needs nothing storyJobPipeline has that jobId does not already resolve, and a
+ * new parameter would have to be plumbed through server.js and the Test Lab too.
+ *
+ * `data->'beatsReviewReport'->>'arc'` doubles as the completeness filter — a job
+ * that never reached the beats review has no approved arc to contribute, and
+ * story_jobs rows are pruned, so joining on job status would silently drop the
+ * older books that matter most here.
+ *
+ * Never throws: a failed lookup means the arc is planned with no memory, which
+ * is exactly what happened before this existed.
+ *
+ * @returns {Promise<{lines: string[], stories: number}>}
+ */
+async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
+  if (!jobId) return { lines: [], stories: 0 };
+  try {
+    const { dbQuery } = require('../services/database');
+    const rows = await dbQuery(
+      `SELECT s.id, s.data->'beatsReviewReport'->>'arc' AS arc
+         FROM stories s
+        WHERE s.user_id = (SELECT user_id FROM story_jobs WHERE id = $1)
+          AND s.id <> $1
+          AND s.data->'beatsReviewReport'->>'arc' IS NOT NULL
+        ORDER BY s.created_at DESC
+        LIMIT ${PRIOR_STORY_LIMIT}`,
+      [String(jobId)]
+    );
+    const lines = [];
+    let stories = 0;
+    let budget = ARC_VARIETY_MAX;
+    for (const row of rows || []) {
+      const own = extractChallengeLines(row.arc);
+      if (own.length === 0) continue;
+      stories += 1;
+      for (const line of own) {
+        if (budget - (line.length + 3) < 0) return { lines, stories };
+        lines.push(line);
+        budget -= line.length + 3;
+      }
+    }
+    return { lines, stories };
+  } catch (err) {
+    log.warn(`⚠️ [BEATS] Prior-challenge lookup failed (${err.message}) — arc planned without cross-story memory`);
+    gl.warn('arc_variety_failed', `Prior-challenge lookup failed: ${err.message}`);
+    return { lines: [], stories: 0 };
+  }
+}
+
 /** Merge a reviewer's partial rewrite onto a base list keyed by pageNumber. */
 function mergeByPage(base, fixes, apply) {
   const byPage = new Map(fixes.map(f => [f.pageNumber, f]));
@@ -251,11 +341,24 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let approvedArc = '';
   let arcAuditFindings = '';
   let arcReviewReport = null;
+  // CROSS-STORY MEMORY: the challenges this account's previous books used. Only
+  // the arc-plan call sees them — that is the one call that invents challenges;
+  // every later stage divides and dresses what this one decided.
+  const priorChallenges = await loadPriorChallenges(jobId, gl);
+  const arcVarietyExclusions = priorChallenges.lines;
+  if (arcVarietyExclusions.length > 0) {
+    gl.info('arc_variety', `Excluding ${arcVarietyExclusions.length} challenge(s) from ${priorChallenges.stories} earlier book(s) on this account`, null, {
+      stories: priorChallenges.stories, challenges: arcVarietyExclusions,
+    });
+  }
+  const varietyBlock = arcVarietyExclusions.length > 0
+    ? `\n\nThis reader's earlier books used these challenges — this story uses different ones:\n${arcVarietyExclusions.map(l => `- ${l}`).join('\n')}`
+    : '';
   let t = Date.now();
   try {
     await stage(1, 'Shaping the story arc...', { next: 2, ms: 30000 });
     const arcRes = await textModels.callTextModelStreaming(
-      `${basePrompt}\n\nOutput the ---ARC--- block only. Omit the ---BEATS--- block entirely.`,
+      `${basePrompt}\n\nOutput the ---ARC--- block only. Omit the ---BEATS--- block entirely.${varietyBlock}`,
       null, onChunk, planModel, { usageLabel: 'beats_arc_plan' });
     const drafted = parseBeats(arcRes.text || '').arc || '';
     if (!drafted) throw new Error('planner returned no arc');
@@ -1249,7 +1352,7 @@ SCENE: ${x.scene || ''}`.trim(),
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, beats, pages, scenes, rawOutline, meta, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES };
+module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges };
