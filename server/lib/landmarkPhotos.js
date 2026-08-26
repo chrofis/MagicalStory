@@ -2324,7 +2324,18 @@ const LANDMARK_CLASS_SQL = `(CASE
 //
 // sitelinks and score stay as last resorts for the 10 rows with no pageviews.
 // A NULL anywhere means "unknown", never "bad".
-const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LAST, fame_pageviews DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
+// `story_score` deliberately does NOT appear here. It is a FILTER
+// (JUDGED_USABLE_SQL), never a sort key: ordering by it puts every judged row
+// above every unjudged one, so during a partial judging run a pleasant minor
+// square outranks a landmark nobody has looked at yet. Measured: Lindenhof
+// (judged 78, 425 monthly views) displaced the Grossmünster (unjudged, 2093)
+// as Zürich's first offer.
+//
+// The two signals answer different questions and must not be mixed into one
+// order — the judge answers "is this usable at all", pageviews answers "which
+// is more prominent". So the judge removes the construction sites and the
+// office blocks, and pageviews orders what survives.
+const LANDMARK_RANK_SQL = `${LANDMARK_CLASS_SQL} DESC, fame_pageviews DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
 
 // A landmark is only offered as a town's OWN when it is actually in that town.
 //
@@ -2435,13 +2446,13 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
             )) <= $6
         -- Proximity exists to find a REAL landmark when the town has none of
         -- its own. Class 0 is a municipality/event/organisation, and the town's
-        -- own `(Stadt|ville|città)` aerial sits at 0km, so without this it wins
+        -- own "(Stadt|ville|citta)" aerial sits at 0km, so without this it wins
         -- on distance every time: Locarno was served its own aerial while the
         -- Castello Visconteo, 500m away, was never offered. When proximity
         -- finds nothing, the caller falls back to that aerial anyway.
         AND ${LANDMARK_CLASS_SQL} > 0
         AND ${JUDGED_USABLE_SQL}
-      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, story_score DESC NULLS LAST, ${FAME_MINUS_DISTANCE_SQL}, score DESC
+      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 

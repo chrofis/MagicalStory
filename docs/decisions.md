@@ -19368,3 +19368,73 @@ same 3 pre-existing failures.
 
 **Touched files:** the three bible templates, both scene-expansion templates,
 `server/lib/referenceSheets.js`, `server/lib/visualBible.js`.
+
+---
+
+## 2026-08-26 — Landmark coverage: discovery for 57 cities, and the judge filters instead of ranking
+
+**Context (owner):** *"close the gaps for all major cities"*, *"do all in console, so
+no extra costs"*.
+
+### Coverage — 43 → 98 of the 100 SEO cities
+
+Only 43 of the 100 cities in `swiss-cities.json` had a single landmark a scene
+could be set at. Davos, Arosa, St. Moritz, Grindelwald, Lauterbrunnen, Gruyères,
+Locarno and Vevey had exactly ONE row each: the `(Stadt)` aerial.
+
+Three earlier passes all COMPLETED and all missed them, each blind in the same
+way: `broad-city-overviews.js` creates one aerial per town by design; the A→Z
+photo gap-fill improved photos on rows that already existed (89% of Swiss rows
+now carry a photo — that pass is visible in the data as ~2.2 photos/row on every
+letter); the famous-buildings fill was driven by Wikidata's top-1000 by SITELINK
+count, which no resort town reaches.
+
+`scripts/admin/discover-missing-city-landmarks.js` runs the per-landmark
+Wikipedia geosearch those passes never applied. **854 rows added.** Davos now has
+the Kirchner Museum. `analyzePhotos: false` is mandatory — the default path sends
+every photo to Gemini; this run was free.
+
+### `story_score` is a FILTER, never a sort key
+
+Ranking by it put every judged row above every unjudged one, so a partial judging
+run made the ranking WORSE than none: Lindenhof (judged 78, 425 monthly views)
+displaced the **Grossmünster** (unjudged, 2093) as Zürich's first offer.
+
+The signals answer different questions and must not be merged into one order —
+the judge answers "is this usable at all", pageviews answers "which is more
+prominent". So `JUDGED_USABLE_SQL` removes the construction sites and office
+blocks, and `fame_pageviews` orders what survives. `story_score` is gone from
+both ORDER BYs.
+
+### An aerial must not suppress the proximity search
+
+A town whose name-match returned ONLY its own class-0 aerial "succeeded", so the
+proximity fallback never ran: Locarno was served its own aerial while the
+Castello Visconteo sat 500m away, anchored to Ascona. (One landmark carries one
+`nearest_city`; neighbours 4km apart share a 10km discovery radius, so whichever
+town was indexed first keeps them — which is also why Locarno's own discovery run
+reported "Saved: 20" and added 0 rows.)
+
+"Only the overview matched" now counts as no match. Proximity also excludes
+class 0, since the town's own aerial sits at 0km and won on distance every time.
+When proximity genuinely finds nothing, the caller returns the aerial — the role
+it was built for.
+
+Measured: Locarno → Castello Visconteo; **Wiler bei Utzenstorf** → Schloss
+Landshut and the St. Ursenkathedrale instead of its own aerial.
+
+**A bug I introduced and caught:** the SQL comment explaining this used
+backticks, inside a JS template literal — it terminated the string and threw
+"Stadt is not defined", silently returning [] for EVERY proximity lookup. The
+catch logs it as a query error, which my own grep was filtering out. Backticks
+are now quotes.
+
+**Still open:** German/French/Italian exonyms split the index — `Schloss Greyerz`
+is anchored to "Greyerz" so a "Gruyères" lookup misses it, and the SEO catalog's
+"Neuenburg" misses 30 rows under "Neuchâtel". `swiss-cities.json` carries
+name.{de,fr,en}, so a name-alias lookup would close it.
+
+**Touched files:** `scripts/admin/discover-missing-city-landmarks.js`,
+`server/lib/landmarkPhotos.js`.
+
+**Status:** ✅ active.
