@@ -19774,3 +19774,120 @@ have no `figure_mask` rows and correctly fall back to a reported re-segmentation
 `server/lib/repairPipeline.js`, `server/routes/regeneration.js`.
 **Status:** 🟡 conditional — pushed to staging; first re-detection on a page will
 write the rows.
+
+## 2026-08-26 — The final-book audit: nothing read the finished book until now (reader's-eye pass, routed IMG/TEXT)
+
+**Context:** Every check in this pipeline reads ONE artefact. The evaluator sees
+an image against its brief. The text audit sees prose plus a one-line note of
+what the picture *depicts*. The style check sees thumbnails with no words at
+all. Not one of them can see the words and the picture **disagreeing** — which
+is the only failure the customer actually experiences, because the customer
+reads them together. Prod `job_1787689073034_1v6ew0y1kae` shipped p9 with text
+placing a character *sitting on a bench with a book on his knees* over a picture
+of him *standing, holding it*, and every existing gate passed the page.
+
+**Decision:** A vision judge reads the finished book the way a child receives
+it — per page, the page TEXT then that page's SHIPPED IMAGE, interleaved as
+message parts, in reading order, ~6 pages per Gemini flash call, chunks
+sequential. It runs AFTER covers and BEFORE persist: the first moment the
+finished book exists. Faults are **routed, not scored**: `FAULT[IMG]` when a
+different image would fix it, `FAULT[TEXT]` when different prose would.
+
+- **IMG route is MEASURE-ONLY** (owner). Nothing is repainted. The finding is
+  stored on the page as `page.bookAuditFaults[]` so the dev panel and the repair
+  endpoints can see it, and on `data.bookAuditReport` / `finalChecksReport.bookAudit`.
+- **TEXT route gets ONE corrective round** — the FAULT lines go into
+  `buildTextRefinePrompt` as its findings block (same shape the text audit
+  produces), the model returns only pages it rewrote, and the rewrites land in
+  **all three** stores the refine join writes: `expandedScenes[].text`,
+  `allImages[].text`, and the rebuilt `fullStoryText`. The rebuild reads
+  `allImages`, **not** `storyPages[].text` — `storyPages` still holds
+  pre-refinement prose, so falling back to it would revert every untouched page.
+- Never throws. A failed audit is a missing measurement, never a failed story.
+
+**BALANCE IS NEVER A FAULT** (owner's design constraint, stated in the template):
+the words and the picture tell the story together, so a page may carry its
+moment almost entirely in the picture with three words of text, or the reverse.
+A run that flags pages for being picture-heavy or word-heavy is a failed prompt.
+
+**Rationale / measured (3 replays on the prod dragon story, 18pp, ~$0.03 total):**
+- Replay 1 found 3 faults and **missed p9**. Two real defects, not judge error:
+  (a) the judge nests fault lines under the page it is reasoning about, and an
+  anchored `^FAULT` regex silently dropped exactly those; (b) `maxOutputTokens:
+  4000` truncated two of three chunks mid-sentence — the judge spends ~13k
+  tokens *thinking* before it writes. A truncated audit reads as a clean one,
+  which is the worst failure a measurement can have. Fixed: the regex tolerates
+  leading whitespace/bullets, the cap is 16000, and a `finishReason != STOP`
+  now logs a warning instead of under-reporting silently.
+- Replay 2 (17 faults): **p9 caught**, p16 missed.
+- Replay 3, after folding staging into the CONTRADICTION question in archetypal
+  terms ("an empty space where the words push through a crowd, figures side by
+  side facing the viewer where the words have them facing each other"): 30
+  faults, **p9 and p16 both caught**. **Zero balance-flags in all three runs.**
+- **p12 was never caught for the reason expected.** The staged confrontation
+  reads as flat because every figure faces the camera; the judge flags p12 only
+  for unexplained missing characters (a real finding). Two prompt iterations
+  were the budget; it was not spent a third time.
+- **Open: replay 3 is NOISY.** 17 → 30 faults, and much of the growth is
+  "the picture shows the moment slightly before/after the words" nitpicking
+  (a character's expression not conveying breathlessness, a figure "already
+  standing" rather than "entering"). Question 3 (ONPAGE) invites it. Measure-only
+  means this costs nothing yet, but it must be tightened before any IMG fault is
+  allowed to trigger a repaint. → `tasks/BACKLOG.md`.
+
+**Shipped-image resolution:** the version whose `source === bestSource`, NOT the
+highest index — a page can pick `original` after five repair passes. An explicit
+pin in `stories.image_version_meta` wins when the caller passes one, because a
+pinned version is what the reader actually sees. Measured on the replay story:
+17 of 18 pages agree, and **p14 diverges** (`bestSource=original` at index 0,
+`activeVersion=4`) — a real case where the two rules answer differently.
+
+**Touched:** `prompts/book-audit.txt` (new), `server/lib/bookAudit.js` (new),
+`server/services/prompts.js` (76 → 77 templates), `storyJobPipeline.js`
+(after covers, before persist), `server/lib/testlab.js` (`book_audit` story
+stage), `server/routes/admin/testlab.js` (`STAGE_TEMPLATE_KEYS`),
+`client/src/services/testlabService.ts`.
+**Status:** 🟡 conditional — committed locally, not pushed. Validated by replay
+against stored production data only; never run inside a live generation.
+
+## 2026-08-26 — Visual flow: time-of-day is judged against the page's DECLARED time, never against a story-wide day
+
+**Context:** The style-consistency grid already puts every page (and the three
+covers) in front of a vision judge. It never asked the one continuity question
+a reader notices without being told to look: does the light on the page match
+the hour the page's own brief ordered?
+
+**Decision:** The SAME grid call now also reports two OBSERVATIONS per cell —
+`renderedTime` (morning|midday|afternoon|evening|night|indoor-unclear) and
+`facing` (frame-left|frame-right|camera|none) — stored on
+`styleConsistency.timeFlow` as `[{page, declared, declaredText, rendered,
+mismatch, facing}]`. Extending the existing call rather than adding a second
+one: the cells, the grids and the per-cell JSON contract already exist, the two
+new fields are additive, and every parse path degrades to "no observation"
+rather than to an error.
+
+**A mismatch is only ever rendered-vs-DECLARED.** A book may span days, so
+"page 3 is morning and page 13 is evening" is a story, not a defect. Nothing
+infers an hour from the plot, from neighbouring pages, or from an assumed single
+day. The declaration comes from a deliberately **dumb and transparent**
+extractor (`extractDeclaredLight`): a keyword hit in the page's own brief picks
+a bucket, and the sentence carrying it is handed to the judge verbatim. Bare
+`light` and bare `dark` are banned as keywords — every brief opens with hair and
+clothing ("light blonde", "dark red") and keying on them classifies a
+character's hair as the hour. A page whose brief declares no time can never
+produce a mismatch; `indoor-unclear` never contradicts anything.
+
+**WARN-ONLY, measure-first, commented as such in the code.** No repair, no score
+change, no gate. `facing` is recorded and never judged — no rule says which way
+a figure should face.
+
+**Measured** (same prod story, one replay, ~$0.01): 17 of 21 cells declared a
+time; the extractor reproduced the story's real morning → afternoon → evening
+progression; **exactly 1 mismatch — p15, declared evening, rendered afternoon.**
+No false positive on p13–14, where a "midday" claim would have been the
+interesting failure. Incidentally corroborating the book audit: `facing` is
+`camera` on every page from 9 to 13, which is why the staged confrontation on
+p12 reads as flat.
+
+**Touched:** `server/lib/styleConsistency.js`.
+**Status:** 🟡 conditional — committed locally, not pushed. Measure-only by design.

@@ -36,6 +36,70 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const THUMB_SIZE = 448;        // px per cell — big enough for the model to judge medium (photographic vs painted) after it downscales the composite
 const COLS = 3;                // grid columns
 
+// ─────────────────────────────────────────────────────────────────────
+// VISUAL FLOW — time-of-day and facing, measured on the same grid pass.
+//
+// A book may span days. "Page 3 is morning and page 13 is evening" is not a
+// defect, it is a story, so a rendered time can only ever be wrong against the
+// time the page's own brief DECLARED. Everything below therefore compares
+// rendered-vs-declared and nothing else; a page whose brief declares no time
+// can never produce a mismatch.
+//
+// The extraction is deliberately dumb and readable: a keyword hit in the brief
+// picks a bucket, and the sentence carrying it is handed to the judge verbatim
+// as the declaration. Nothing infers a time from the plot, from neighbouring
+// pages, or from an assumed single day.
+//
+// WARN-ONLY, measure-first. Nothing here triggers a repair, changes a score, or
+// gates anything — the point of this pass is to find out how often the renders
+// contradict their briefs before anyone decides what to do about it.
+// ─────────────────────────────────────────────────────────────────────
+
+const TIME_BUCKETS = 'morning|midday|afternoon|evening|night|indoor-unclear';
+
+// Keywords are SPECIFIC on purpose. Bare "light" and bare "dark" are banned:
+// every brief opens with hair and clothing descriptions ("light blonde",
+// "dark red"), and keying on them classifies a character's hair as the hour.
+const TIME_KEYWORDS = [
+  ['morning', /\b(morning|early morning|sunrise|dawn|daybreak|morgens?|frühmorgens|morgendlich|sonnenaufgang)\b/i],
+  ['midday', /\b(midday|noon|middaylight|high sun|overhead sun|mittag(s|szeit)?)\b/i],
+  ['afternoon', /\b(afternoon|nachmittags?)\b/i],
+  ['evening', /\b(evening|dusk|sunset|twilight|golden hour|golden light|late day|shadows lengthen|lengthening shadows|long shadows|abends?|abendlich|dämmerung|sonnenuntergang|lange schatten)\b/i],
+  ['night', /\b(night|nighttime|midnight|moonlight|moonlit|starlight|starlit|dark sky|nachts?|mitternacht|mondlicht|sternenlicht)\b/i],
+];
+
+/**
+ * The time-of-day a page's brief DECLARED, plus the sentence that declared it.
+ * Returns { token: null, text: <first 200 chars> } when no keyword hits — the
+ * judge still sees the opening of the brief, but code can never call it a
+ * mismatch.
+ */
+function extractDeclaredLight(sceneDescription) {
+  const brief = String(sceneDescription || '').split(/---\s*METADATA/i)[0].trim();
+  if (!brief) return { token: null, text: '' };
+
+  // EARLIEST hit wins, so a brief that sets its hour in the first lighting
+  // sentence is not overruled by a stray word further down.
+  let best = null;
+  for (const [token, re] of TIME_KEYWORDS) {
+    const m = brief.match(re);
+    if (m && (best === null || m.index < best.index)) best = { token, index: m.index };
+  }
+  if (!best) return { token: null, text: brief.slice(0, 200) };
+
+  // The sentence carrying the keyword, verbatim — that is the declaration the
+  // judge is asked to check the pixels against.
+  const sentences = brief.split(/(?<=[.!?])\s+/);
+  let cursor = 0;
+  let sentence = '';
+  for (const s of sentences) {
+    const end = cursor + s.length;
+    if (best.index >= cursor && best.index <= end) { sentence = s; break; }
+    cursor = end + 1;
+  }
+  return { token: best.token, text: (sentence || brief).trim().slice(0, 200) };
+}
+
 /**
  * Build a labelled thumbnail-grid JPEG from a list of page images.
  * Each cell = label strip + 256x256 thumbnail. Layout = COLS columns.
@@ -136,7 +200,14 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
     .filter(s => s.imageData)
     .sort((a, b) => a.pageNumber - b.pageNumber);
   for (const s of pages) {
-    cells.push({ label: `Page ${s.pageNumber}`, imageData: s.imageData, page: s.pageNumber });
+    cells.push({
+      label: `Page ${s.pageNumber}`,
+      imageData: s.imageData,
+      page: s.pageNumber,
+      // Covers declare nothing (they have no brief), so they stay undefined and
+      // can never contribute a time mismatch.
+      declared: extractDeclaredLight(s.sceneDescription),
+    });
   }
 
   if (cells.length < 2) {
@@ -174,6 +245,13 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   // its per-cell answers instead of from its own aggregation.
   const buildPrompt = (batch) => {
     const codes = batch.map(c => c.page);
+    // Declarations are handed over verbatim, per cell. The judge is never told
+    // what the book's "overall" time is, and never asked to compare cells to
+    // each other — a story may legitimately span several days.
+    const declaredBlock = batch
+      .filter(c => c.declared?.text)
+      .map(c => `${c.page}: ${c.declared.text}`)
+      .join('\n');
     return `You are a visual-style auditor for a children's storybook.
 
 The image is a grid of pages from one storybook. Each cell has a small RED code in its top-left corner identifying it: -1 = front cover, -2 = initial page, -3 = back cover, and the page number (1, 2, 3, …) for every other page. Return these exact code numbers.
@@ -197,6 +275,15 @@ For each flagged page, name 2-4 SPECIFIC differences. Severity:
 - "moderate" — the commissioned medium, but a defining property named in the style is clearly absent
 - "minor"    — subtle inconsistency (slight colour cast, small edge-style variation)
 
+Separately, report two OBSERVATIONS per cell. These are descriptions, not judgments — never let them change a style verdict.
+- "renderedTime": the time of day the cell's own light shows, one of: ${TIME_BUCKETS}. Use "indoor-unclear" when the light gives no time.
+- "facing": which way the dominant figure faces — "frame-left", "frame-right", or "camera". Use "none" when no figure dominates.
+${declaredBlock ? `
+Each line below is the sentence a page's own brief used to set its light. Report only what the pixels show; do not let the sentence decide your answer, and do not assume the pages share one day.
+"""
+${declaredBlock}
+"""
+` : ''}
 ${requestedStyle ? `Separately from the per-cell verdicts, classify this grid's RENDERING MEDIUM against the commissioned art style above. Base it on the cells you judged as departing: only call it wrong for the whole grid when MOST cells departed.
 - "matches" — the same medium as commissioned. Use this even when the execution is imperfect: weaker brushwork, smoother shading, less texture, a missing named-artist mannerism, or any other fidelity shortfall is still "matches".
 - "drifted" — recognisably the commissioned medium, but a defining property named in the style is largely absent.
@@ -206,7 +293,7 @@ Judge only how it is DRAWN, never whether a scene suits its subject. A majority 
 ` : ''}Return ONLY this JSON, no prose. \`cells\` carries ONE entry per code listed above, in that order — never fewer, never merged, never a shared verdict:
 {
   "cells": [
-    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"] }
+    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"], "renderedTime": "${TIME_BUCKETS}", "facing": "frame-left"|"frame-right"|"camera"|"none" }
   ],${requestedStyle ? `
   "dominantStyleVerdict": "matches" | "drifted" | "wrong_medium",
   "requestedStyleDifferences": ["<how the departing cells depart; empty when they match>"],` : ''}
@@ -255,9 +342,29 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
       : (Array.isArray(parsed.outliers) ? parsed.outliers.map(o => ({ ...o, matchesStyle: false })) : []);
     const answered = new Set();
     const outliers = [];
+    const observations = [];
+    const TIME_SET = new Set(TIME_BUCKETS.split('|'));
+    const FACING_SET = new Set(['frame-left', 'frame-right', 'camera', 'none']);
+    const declaredByPage = new Map(batch.map(c => [c.page, c.declared || null]));
     for (const c of cellVerdicts) {
       if (typeof c?.page !== 'number' || !inBatch.has(c.page) || answered.has(c.page)) continue;
       answered.add(c.page);
+      // Observations, not judgments — recorded for every cell, outlier or not.
+      // An unrecognised value is dropped rather than coerced: a made-up bucket
+      // must not become a mismatch against a real declaration.
+      const rendered = TIME_SET.has(c.renderedTime) ? c.renderedTime : null;
+      const declared = declaredByPage.get(c.page) || null;
+      observations.push({
+        page: c.page,
+        declared: declared?.token || null,
+        declaredText: declared?.text || '',
+        rendered,
+        // A mismatch needs BOTH a declaration and a readable rendered hour.
+        // "indoor-unclear" is not a contradiction of anything — an interior can
+        // legitimately look like any hour.
+        mismatch: !!(declared?.token && rendered && rendered !== 'indoor-unclear' && rendered !== declared.token),
+        facing: FACING_SET.has(c.facing) ? c.facing : null,
+      });
       if (c.matchesStyle === false) {
         outliers.push({
           page: c.page,
@@ -271,6 +378,7 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     }
     return {
       outliers,
+      observations,
       dominantStyleVerdict: ['matches', 'drifted', 'wrong_medium'].includes(parsed.dominantStyleVerdict) ? parsed.dominantStyleVerdict : 'matches',
       requestedStyleDifferences: Array.isArray(parsed.requestedStyleDifferences) ? parsed.requestedStyleDifferences : [],
       reasoning: parsed.reasoning || '',
@@ -297,6 +405,13 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
   }
   const outliers = [...seen.values()];
   const outlierPages = new Set(outliers.map(o => o.page));
+
+  // VISUAL FLOW — one row per cell, in page order. Covers (-1/-2/-3) ride along
+  // with declared:null so they are never mismatches; `facing` is recorded and
+  // never judged (no rule says which way a figure should face).
+  const timeFlow = results
+    .flatMap(r => r.observations || [])
+    .sort((a, b) => a.page - b.page);
   const dominantCluster = cells.map(c => c.page).filter(p => !outlierPages.has(p));
   const anchorPage = dominantCluster.find(p => p >= 1) ?? dominantCluster[0] ?? (cells[0]?.page ?? null);
 
@@ -338,6 +453,7 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     // two grids (covers + p1-6, then p7-10) — showing only results[0] made the
     // UI look like pages 7+ were never checked.
     gridImages: results.map(r => `data:image/jpeg;base64,${r.gridBuffer.toString('base64')}`),
+    timeFlow,
     styleMatch: requestedStyle
       ? { requestedStyle, verdict: medium, differences: medium === 'matches' ? [] : mediumDiffs.slice(0, 4) }
       : null,
@@ -352,10 +468,21 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     log.info(`🎨 [STYLE-CHECK] outlier Page ${o.page} [${o.severity}]: ${(o.differences || []).slice(0, 2).join('; ')}`);
   }
 
+  // MEASURE-FIRST: a time mismatch is reported and nothing else. It does not
+  // enter the outlier list, does not touch a score, and does not trigger a
+  // repair — the pass exists to find out how often briefs and renders disagree.
+  const timeMismatches = timeFlow.filter(t => t.mismatch);
+  const declaredCount = timeFlow.filter(t => t.declared).length;
+  log.info(`🕑 [VISUAL-FLOW] ${declaredCount}/${timeFlow.length} cell(s) declared a time; ${timeMismatches.length} rendered against it`);
+  for (const t of timeMismatches) {
+    log.warn(`🕑 [VISUAL-FLOW] time-of-day mismatch on p${t.page}: declared ${t.declared}, rendered ${t.rendered}`);
+  }
+
   return out;
 }
 
 module.exports = {
   checkStoryStyleConsistency,
   buildStyleGrid,
+  extractDeclaredLight,
 };

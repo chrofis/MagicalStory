@@ -31,6 +31,7 @@ Three loading mechanisms feed these templates:
 | story-beats-audit.txt | storyHelpers.js `buildBeatsAuditPrompt` | Blind beats audit: page plan + beats only |
 | story-text-audit.txt | storyHelpers.js `buildTextAuditPrompt` | Blind text audit: back cover + pages + DEPICTS-only picture info |
 | story-text-proofread.txt | `storyTextProofread` | textRefine.js re-audit step | Sentence-level proofread of the FINAL text (article/gender, quote nesting, spelling, self-contradiction, non-words); findings merge into the corrective round |
+| book-audit.txt | bookAudit.js `auditStoryBook` (via `PROMPT_TEMPLATES.bookAudit`) | Final-book audit — the reader's-eye pass. Runs after covers, before persist: each page's TEXT then its SHIPPED IMAGE, interleaved as vision parts in reading order, ~6 pages per Gemini flash call. Emits `FAULT[IMG]:` / `FAULT[TEXT]:` routed by which artefact would fix it. Word/picture BALANCE is never a fault |
 | scene-review.txt | storyHelpers.js `buildSceneReviewPrompt` | Beats-first step 4: ONE review over ALL scene briefs (repetition, arc, continuity) |
 | clothing-review.txt | storyHelpers.js `buildClothingReviewPrompt` | Beats-first step 3b: wardrobe review over the bible's clothing contract, BEFORE the styled-avatar kickoff. Emits `---ANALYSIS---` + `---CLOTHING---`, parsed by `parseClothingReview` |
 | story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the locked beats. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |

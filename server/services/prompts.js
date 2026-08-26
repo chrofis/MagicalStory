@@ -196,6 +196,10 @@ async function loadPromptTemplates() {
     ['storyBeatsAudit', 'story-beats-audit.txt'],
     ['storyTextAudit', 'story-text-audit.txt'],
     ['storyTextProofread', 'story-text-proofread.txt'],
+    // Final-book audit: the reader's-eye pass. A vision judge receives every
+    // page's TEXT followed by that page's SHIPPED IMAGE, in reading order, and
+    // routes each fault to the artefact that would fix it (IMG or TEXT).
+    ['bookAudit', 'book-audit.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],
