@@ -401,12 +401,33 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
 
   // FINAL EVAL: the expected text AND the painted cover, one call.
   try {
-    const bandPad = Math.round(Math.min(W, H) * 0.03);
-    const bx = Math.max(0, minx - bandPad), by = Math.max(0, miny - bandPad);
+    // VERIFY THE STRIP WE SENT, NOT THE FLAT LOCKUP'S FOOTPRINT (owner,
+    // 2026-08-26). This crop used to be minx..maxx — the bounding box of the
+    // RENDERED glyphs — and then asked the judge whether the MODEL'S painting
+    // reads correctly inside it. Those are different geometries by design: the
+    // whole point of the repaint is bolder, wider, hand-lettered forms, which is
+    // why coverage/spill above are diagnostics rather than gates. A paint that
+    // legitimately runs wider than the flat lockup therefore got its right-hand
+    // words sliced off before the judge ever saw them, and the judge truthfully
+    // reported them missing.
+    //
+    // Measured on job_1787689073034_1v6ew0y1kae ("Feurio und die vier Buben"):
+    // the flat lockup spanned x 0.045-0.521, the painted title x 0.234-0.762, so
+    // 21% of the page width of correct lettering fell outside the crop. The
+    // judge was shown "Feurio / die vi / Bube" and answered 'the word "und" is
+    // missing'. It was right; the crop was wrong, and a perfect painted title
+    // was discarded for the flat one.
+    //
+    // The strip the model was handed is full cover width across the band rows —
+    // exactly the region it was allowed to paint in — so that is what gets
+    // verified. The page-fill check above already rejects ink outside it.
+    const evalPad = Math.round(H * 0.03);
+    const ey0 = Math.max(0, bandY0 - evalPad);
+    const ey1 = Math.min(H - 1, bandY1 + evalPad);
     const crop = await sharp(painted).extract({
-      left: bx, top: by,
-      width: Math.min(W, maxx + 1 + bandPad) - bx,
-      height: Math.min(H, maxy + 1 + bandPad) - by,
+      left: 0, top: ey0,
+      width: W,
+      height: ey1 - ey0 + 1,
     }).jpeg({ quality: 95 }).toBuffer();
     const verdict = await verifyTitleRender(`data:image/jpeg;base64,${crop.toString('base64')}`, title);
     if (!verdict.matches) {

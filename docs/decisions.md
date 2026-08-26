@@ -18993,3 +18993,31 @@ Dübendorf's offered list is now Lazariterkirche Gfenn (73), Flieger-Flab-Museum
 **Touched files:** `server/lib/landmarkPhotos.js`.
 
 **Status:** ✅ active.
+
+---
+
+## 2026-08-26 — The painted-title check verifies the strip we sent, not the flat lockup's footprint
+
+**Context:** Production story `job_1787689073034_1v6ew0y1kae` ("Feurio und die vier Buben")
+shipped with the flat overlay title even though Grok painted the title correctly. The record:
+`titlePaint: { ok: false, backend: 'grok', reason: 'eval: The word "und" is missing.',
+coverage: 0.28, spill: 0.66 }`.
+
+The final eval cropped the painted cover to `minx..maxx` — the bounding box of the RENDERED
+flat glyphs — and then asked the judge whether the MODEL'S painting reads correctly inside it.
+Those are different geometries by design: the repaint exists to produce bolder, wider,
+hand-lettered forms, which is exactly why coverage/spill were demoted to diagnostics in the
+2026-08-15 entry. Measured on this cover: the flat lockup spans x 0.045-0.521, the painted
+title x 0.234-0.762 — 21% of the page width of correct lettering fell outside the crop. The
+judge was shown "Feurio / die vi / Bube" and answered truthfully.
+
+**Decision:** The eval crop is the strip the model was actually handed — full cover width
+across the band rows (`bandY0..bandY1` ± 3%) — not the flat lockup's x-bounds. The page-fill
+check above it already rejects ink landing outside that strip.
+
+**Verified** by replaying the real `verifyTitleRender` on both crops of the shipped painting:
+full-width band → `{matches: true}`; narrow flat-lockup crop → `{matches: false, problem: 'The
+word "und" is missing. The word "vier" is partially cut off. The word "Buben" is partially cut
+off.'}` — reproducing the shipped rejection exactly.
+
+**Touched:** `server/lib/coverTitlePaint.js`.
