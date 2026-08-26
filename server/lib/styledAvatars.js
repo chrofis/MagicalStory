@@ -910,6 +910,15 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   // seeded (loudly). See ensureStyledAvatarCoverage.
   await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements);
 
+  // Publish the cache onto the character objects NOW, not at save time. The 2×4
+  // cell cropper reads char.avatars.styledAvatars and nothing else, so leaving
+  // this to the save block meant every page rendered with an empty map and got
+  // the WHOLE sheet as its reference. See publishStyledAvatarsToCharacters.
+  const published = publishStyledAvatarsToCharacters(characters, artStyle);
+  if (published > 0) {
+    log.debug(`📤 [STYLED AVATARS] Published ${artStyle} sheets onto ${published} character object(s) for the cell cropper`);
+  }
+
   return styledAvatarCache;
 }
 
@@ -1632,6 +1641,41 @@ function exportStyledAvatarsForPersistence(characters, artStyle) {
 }
 
 /**
+ * Publish the cache onto `char.avatars.styledAvatars[artStyle]` — the ONLY
+ * place `projectStoryCharacterAvatars` reads, and therefore the only thing that
+ * lets the 2×4 cell cropper find a sheet.
+ *
+ * This used to happen exclusively in the save block at the very END of a job, so
+ * for the whole generation phase the field was empty: `applyStoryCellRefs` found
+ * no sheet, bailed at `if (!story) continue`, and every page shipped the WHOLE
+ * 8-panel reference sheet instead of the one matching pose cell. Verified on
+ * staging job_1787762276985_rog82sfh7: the persisted story has
+ * `styledAvatars.watercolor.standard`, yet each page's stored reference is the
+ * full sheet — because the pages rendered before the save wrote it.
+ *
+ * Called at the end of prepareStyledAvatars so every call site (trial, cover,
+ * streaming and main) publishes as soon as the sheets exist. Idempotent: the
+ * save block runs the same export later and writes the same values.
+ *
+ * @returns {number} characters whose map was published
+ */
+function publishStyledAvatarsToCharacters(characters, artStyle) {
+  if (!Array.isArray(characters) || !artStyle) return 0;
+  const map = exportStyledAvatarsForPersistence(characters, artStyle);
+  if (map.size === 0) return 0;
+  let published = 0;
+  for (const char of characters) {
+    const avatars = map.get(char.name) || map.get(char.name?.trim());
+    if (!avatars) continue;
+    if (!char.avatars) char.avatars = {};
+    if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+    char.avatars.styledAvatars[artStyle] = avatars;
+    published++;
+  }
+  return published;
+}
+
+/**
  * Get the styled avatar generation log for developer mode auditing
  * @returns {Array} Array of generation log entries
  */
@@ -1690,6 +1734,7 @@ module.exports = {
   // Persistence
   getStyledAvatarsForCharacter,
   exportStyledAvatarsForPersistence,
+  publishStyledAvatarsToCharacters,
 
   // Developer mode auditing
   getStyledAvatarGenerationLog,

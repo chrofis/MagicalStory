@@ -580,6 +580,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // before reading element refs. Skipped for full mode (which has its own
     // scene-expansion + finalize-time gen path).
     let trialReferenceSheetPromise = null;
+    // Trial-only: pageNumber -> the empty-scene plate promise for that page,
+    // registered in onVisualBible (the VISUAL BIBLE section streams BEFORE
+    // STORY PAGES, so every entry exists before any page renders) and awaited by
+    // startTrialPageImageGeneration.
+    //
+    // Without this the plates were pure waste: they are kicked off
+    // fire-and-forget, the page render read `sceneBackgrounds[n] || null`, found
+    // nothing yet, and packReferences promoted the RAW landmark photograph into
+    // the slot instead — so the page edited a real photo while the styled plate
+    // it should have used finished moments later and was never looked at.
+    // Measured on staging job_1787762276985_rog82sfh7: 6 plates generated
+    // ($0.12), 0 used, 4 pages still carrying a raw landmark photo.
+    const trialEmptyScenePromises = new Map();
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -1028,6 +1041,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
           if (streamingAvatarStylingPromise) {
             await streamingAvatarStylingPromise;
+          }
+          // Wait for THIS page's styled background plate. The plate is the whole
+          // point of generating it: without the await the page read
+          // `sceneBackgrounds[n] || null`, found nothing yet, and packReferences
+          // promoted the raw landmark PHOTOGRAPH into the slot instead — so the
+          // page was an edit of a real photo while its styled plate landed
+          // moments later, unused and paid for.
+          const platePromise = trialEmptyScenePromises.get(page.pageNumber);
+          if (platePromise) {
+            await platePromise;
+            log.info(`🎬 [TRIAL-PAGE] Page ${page.pageNumber}: plate ${sceneBackgrounds[page.pageNumber] ? 'ready' : 'unavailable (rendering without it)'}`);
           }
 
           // Build per-character clothing for this page.
@@ -1929,7 +1953,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const bgLandmarkPromise = bg.pages.map(pn => landmarkPromiseByPage[pn]).find(Boolean)
               || Promise.resolve(null);
             for (const pageNum of bg.pages) {
-              bgPromises.push(bgLimit(async () => {
+              const platePromise = bgLimit(async () => {
                 try {
                   const bgLandmark = await bgLandmarkPromise;
                   const emptySceneLandmarkPhotos = bgLandmark ? [bgLandmark] : [];
@@ -1966,7 +1990,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 } catch (err) {
                   log.warn(`⚠️ [TRIAL] Empty scene for page ${pageNum} failed: ${err.message}`);
                 }
-              }));
+              });
+              // Registered BEFORE any page streams, so the page render can await
+              // its own plate instead of racing it. Never rejects (the task
+              // swallows its own errors), so an await here cannot break a page.
+              trialEmptyScenePromises.set(pageNum, platePromise);
+              bgPromises.push(platePromise);
             }
           }
           // Don't await — let them run in background while outline continues streaming
