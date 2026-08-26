@@ -259,72 +259,8 @@ function clearCostumedAvatarGenerationLog() {
 // records a dispute and keeps Gemini's value. Any verifier failure degrades
 // to today's single-model behaviour. Cost: ~$0.003 per character, once at
 // creation.
-const TRAIT_REVIEW_FIELDS = ['hairColor', 'hairStyle', 'hairLength', 'eyeColor', 'skinTone', 'facialHair'];
-const _TRAIT_HEX_ON_OVERRIDE = {
-  hairColor: { blond: '#E6D3A3', brown: '#6B4A2B', black: '#2A2321', red: '#A34A2A', grey: '#9C9C9C' },
-  eyeColor: { blue: '#4A78A0', brown: '#5B3B22', green: '#4A7A50', grey: '#7A8490', hazel: '#7A5B33' },
-};
-function _traitBucket(field, value) {
-  const v = String(value || '').toLowerCase();
-  if (!v || v === 'none' && field !== 'facialHair') return null;
-  const pick = (map) => { for (const [bucket, re] of map) { if (re.test(v)) return bucket; } return null; };
-  switch (field) {
-    case 'hairColor': return pick([
-      ['blond', /blond|golden|sandy|flaxen|fair/],
-      ['red', /red|ginger|auburn|copper|strawberry/],
-      ['black', /black|jet/],
-      ['grey', /gr[ae]y|white|silver/],
-      ['brown', /brown|brunette|chestnut/],
-    ]);
-    case 'eyeColor': return pick([
-      ['blue', /blue/], ['green', /green/], ['hazel', /hazel|amber/],
-      ['grey', /gr[ae]y/], ['brown', /brown|dark/],
-    ]);
-    case 'hairStyle': return pick([
-      ['curly', /curl|coil|kink/], ['wavy', /wav/], ['straight', /straight/],
-    ]);
-    case 'hairLength': return pick([
-      ['short', /short|crop|buzz/], ['long', /long|shoulder|waist/], ['medium', /medium|mid|ear|chin/],
-    ]);
-    case 'skinTone': return pick([
-      ['light', /light|fair|pale/], ['dark', /dark|deep/], ['medium', /medium|tan|olive|brown/],
-    ]);
-    case 'facialHair': return /none|clean|no\b|^$/.test(v) ? 'none' : 'some';
-    default: return null;
-  }
-}
-async function _traitProbe(vendor, b64, mimeType) {
-  const prompt = 'Analyze this person\'s photo. Return ONLY JSON: {"hairColor": "...", "hairStyle": "straight|wavy|curly", "hairLength": "...", "eyeColor": "...", "skinTone": "...", "facialHair": "..."}. Be precise about colours (e.g. "light blonde", "dark brown").';
-  let text = '';
-  if (vendor === 'qwen') {
-    const key = process.env.OPENROUTER_API_KEY;
-    if (!key) return null;
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0, max_tokens: 400,
-        messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } }, { type: 'text', text: prompt }] }] }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    text = j?.choices?.[0]?.message?.content || '';
-  } else if (vendor === 'haiku') {
-    const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) return null;
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, temperature: 0,
-        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } }, { type: 'text', text: prompt }] }] }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    text = (j?.content || []).map(c => c.text || '').join('');
-  }
-  const m = String(text).match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  try { return JSON.parse(m[0]); } catch { return null; }
-}
+const { TRAIT_REVIEW_FIELDS, _TRAIT_HEX_ON_OVERRIDE, _traitBucket, _traitProbe } = require('../lib/traitPanel');
+
 async function _panelReviewTraits(imageData, traits) {
   const b64 = stripDataUriPrefix(imageData);
   const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ? imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';

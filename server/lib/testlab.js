@@ -3333,7 +3333,7 @@ async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costO
     stageKind: 'beats_scenes',
     mode: 'stored_beats_carry_ab',
     storyId: storyData.id || null,
-    beatsAuditFaults: (beatsAudit.match(/^FAULT:/gm) || []).length,
+    beatsAuditFaults: (beatsAudit.match(/^FAULT(\[[A-Z]+\])?:/gm) || []).length,
     beatsAudit,
     pages: toExpand.length,
     arms: results,
@@ -5861,9 +5861,37 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   // eval report (ResultCard shows any result with imageType + versionIndex).
   const scoreForBadge = evalResult?.finalScore != null ? Math.round(evalResult.finalScore) : null;
   const evalVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, sheetForDisplay, experimentId, scoreForBadge);
+  // COLOUR CHECK (owner, 2026-08-26: prove it in the Lab before it gates
+  // anything). The production gate grades face GEOMETRY only — shape, spacing,
+  // proportion — and passed a visibly wrong avatar at 9/10 while its hair went
+  // browner and curlier and its eyes turned brown against a green-eyed spec.
+  // This reads the generated sheet with two independent model families and
+  // compares BUCKETS against the character's stored traits. Reported alongside
+  // the production verdict, never replacing it: params.colourCheck opts in.
+  let colourCheck = null;
+  if (params.colourCheck) {
+    try {
+      const { compareTraitsToImage } = require('./traitPanel');
+      const storedTraits = character.traits || character.avatars?.extractedTraits || character.physical || {};
+      const res = await compareTraitsToImage(sheetForDisplay, storedTraits);
+      colourCheck = {
+        ...res,
+        verdict: res.mismatches.length === 0 ? 'matches stored traits' : `${res.mismatches.length} field(s) disagree`,
+        storedTraits: Object.fromEntries(
+          ['hairColor', 'hairStyle', 'hairLength', 'eyeColor', 'skinTone']
+            .map(k => [k, storedTraits?.[k] ?? null])
+        ),
+      };
+    } catch (e) {
+      colourCheck = { error: e.message };
+      log.warn(`[AVATAR-EVAL] colour check failed: ${e.message}`);
+    }
+  }
+
   return {
     character: character.name, source: 'storedSheet', pass, styled: pass === 2, model, artStyle,
     imageType: 'tl_avatar', versionIndex: evalVersionIndex,
+    ...(colourCheck ? { colourCheck } : {}),
     ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
     ...(splitSteps ? { steps: splitSteps } : {}),
     ...(splitPromptUsed ? { promptUsed: splitPromptUsed } : {}),
