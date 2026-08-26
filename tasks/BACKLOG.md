@@ -490,3 +490,29 @@ Recorded so nobody re-proposes them as gaps.
 - [ ] **A watercolour page rendered as a photographed painting (2026-08-26).** Same story p2: the
       illustration is depicted as a physical painting lying on a white surface, with paper edges
       and margins inside the frame instead of filling it. → `prompts/image-generation.txt`
+- [ ] **Trial empty-scene plates never generate for Swiss landmarks, so the PAGE edits a raw photo (2026-08-26).**
+      `storyJobPipeline.js:1856` gates plate generation on `loc.photoFetchStatus !== 'success'`, but Swiss
+      pre-indexed landmarks are stamped `'pending_lazy'` (`visualBible.js:1703`) and nothing flips them before
+      that branch runs. Measured: 2 of 2 landmark trials (prod `job_1787647410717_5dvfqu8jg`, staging
+      `job_1787696601288_bfgznq960`) have `pending_lazy` and ZERO `empty_scene` rows. With no plate,
+      `packReferences` promotes the raw landmark photograph into a Grok slot (`grok.js:1113-1124`,
+      `!hasSceneBackground`), so the page becomes an EDIT of a real photo: prod p1 got 3 refs vs 2 on every
+      other page and is the only non-watercolour page (real bystanders, garbled SBB board). The trial
+      empty-scene feature believed active since `decisions.md:1514` is effectively inert.
+      NOTE: `decisions.md:12530` settled that the photo BELONGS in the plate's reference slot — so the fix is
+      to make the plate exist, not to remove the photo. Also: `validateEmptyScene` has no style/photorealism
+      check at all, so a photographic plate would pass QC even in full mode.
+      → `storyJobPipeline.js:1843-1917`, `server/lib/grok.js:1113-1124`, `server/lib/visualBible.js:1703`
+- [ ] **Trial sends the whole 2x4 character sheet as the page reference instead of the matching pose (2026-08-26).**
+      The intended design is already one-pose: `cropAvatarCell` (`sceneComposite.js:936`) exists and the full
+      pipeline uses it (`storyJobPipeline.js:3303-3310`). On the trial path it no-ops for two independent
+      reasons. (1) `projectStoryCharacterAvatars` reads ONLY `char.avatars.styledAvatars[artStyle]`
+      (`storyAvatars.js:62`); the DB reload clears that to `{}` (`storyJobPipeline.js:6267-6270`) and trial
+      seeds its sheets via `setStyledAvatar`, which writes the module cache only — so the map is empty and
+      `applyStoryCellRefs` hits `if (!story) continue` (`storyAvatars.js:237`) leaving the full sheet in
+      `photoUrl`. (2) Trial passes raw character records from `getCharactersInScene`, which carry no
+      `pose`/`perspective`, so `resolveCellPose` would return `threeQuarter` for every page anyway, and no
+      `closeUp` flag is passed. Verified on prod `job_1787647410717_5dvfqu8jg` p2: the stored reference image
+      is the full 8-panel sheet. Known cost of whole-sheet refs: Grok reproducing the sheet, scored -140
+      (`decisions.md:10189`, `:10703`).
+      → `storyJobPipeline.js:1046-1055`, `server/lib/storyAvatars.js:56-99,230-240`, `server/lib/styledAvatars.js:543,1149`
