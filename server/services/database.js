@@ -2119,7 +2119,12 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   // single-page rerun takes; without it the debug's base64 would ride into
   // the JSONB blob, which is the one thing images may never do.
   imagesSaved += await persistCompositeDebug(storyId, dataForStorage, pageNumber);
-  imagesSaved += await persistFigureMasks(storyId, dataForStorage, pageNumber);
+  // From the ORIGINAL sceneData, not dataForStorage: this function clones with
+  // JSON.parse(JSON.stringify(...)) at the top, and that drops the
+  // non-enumerable _gdinoMasks — persisting from the clone would always be a
+  // no-op. (saveStoryData deliberately avoids the JSON round-trip, so its own
+  // call is fine.)
+  imagesSaved += await persistFigureMasks(storyId, sceneData, pageNumber);
 
   // Push every remaining inline image to R2 first (Grok/inpaint refs,
   // entity grids, debug overlays, landmark photos), replacing inline
@@ -2192,6 +2197,13 @@ async function saveCoverData(storyId, coverType, coverData) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
   }
+  // BEFORE the clone below: JSON.stringify drops non-enumerable properties, and
+  // `_gdinoMasks` is one — cloning first would silently discard every cover
+  // silhouette. Covers are stored under their negative page number so a repair,
+  // which addresses the initial page as -2, finds the mask it asks for.
+  const { COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
+  await persistFigureMasks(storyId, coverData, COVER_PAGE_NUMBERS[coverType] ?? null);
+
   const dataForStorage = JSON.parse(JSON.stringify(coverData));
 
   // Version bytes → story_images (cover rows: image_type = coverType, NULL page)
