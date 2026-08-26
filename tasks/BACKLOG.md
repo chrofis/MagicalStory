@@ -535,3 +535,4 @@ Recorded so nobody re-proposes them as gaps.
       look for `[CELL REFS] ... sending the FULL reference image`. Two paid trials already spent; do not
       re-run blind. → `server/lib/storyAvatars.js:233-250`, `storyJobPipeline.js:1046-1095`
 - [ ] Verify the two-entry face-prop rule on a real story — that the bible emits a pair with matching identity, that the Art Director names exactly one per page (never both), and that a page needing the face gets it. Replaces referenceView, which was verified; the pair is not. → docs/decisions.md 2026-08-26
+- [ ] finalScore does not reconcile with its stored breakdown (prod dragon p18: 45 with visual 100, entity 0, no findings) — every deduction must be attributable from the stored record → `server/lib/scoring.js`

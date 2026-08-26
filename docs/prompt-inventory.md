@@ -30,6 +30,7 @@ Three loading mechanisms feed these templates:
 | story-arc-audit.txt | storyHelpers.js `buildArcAuditPrompt` | Blind arc audit: commission + arc only, exhaustive fault list for the reviewer ledger |
 | story-beats-audit.txt | storyHelpers.js `buildBeatsAuditPrompt` | Blind beats audit: page plan + beats only |
 | story-text-audit.txt | storyHelpers.js `buildTextAuditPrompt` | Blind text audit: back cover + pages + DEPICTS-only picture info |
+| story-text-proofread.txt | `storyTextProofread` | textRefine.js re-audit step | Sentence-level proofread of the FINAL text (article/gender, quote nesting, spelling, self-contradiction, non-words); findings merge into the corrective round |
 | scene-review.txt | storyHelpers.js `buildSceneReviewPrompt` | Beats-first step 4: ONE review over ALL scene briefs (repetition, arc, continuity) |
 | clothing-review.txt | storyHelpers.js `buildClothingReviewPrompt` | Beats-first step 3b: wardrobe review over the bible's clothing contract, BEFORE the styled-avatar kickoff. Emits `---ANALYSIS---` + `---CLOTHING---`, parsed by `parseClothingReview` |
 | story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the locked beats. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |

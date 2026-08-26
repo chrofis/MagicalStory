@@ -238,6 +238,11 @@ const MODEL_DEFAULTS = {
   // and were thrown away after charging $0.16. deepseek is the pre-switch model
   // and the fastest of the arms that measured best on text.
   textRefineModel: process.env.TEXT_REFINE_MODEL || 'deepseek-v4-pro',
+  // Proofreader for the FINAL text (2026-08-26): sentence-level defects only.
+  // A sixth question on the 16-page causality audit catches a different 1-2 of
+  // 4 known defects each run (measured twice on the same text) — too diluted.
+  // Sonnet: fast, cheap, and not the refiner (deepseek must not proof itself).
+  textProofreadModel: process.env.TEXT_PROOFREAD_MODEL || 'claude-sonnet',
   // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
   // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
   scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',

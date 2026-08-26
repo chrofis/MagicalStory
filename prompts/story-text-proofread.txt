@@ -1,0 +1,8 @@
+Proofread the pages of a children's book written in {LANGUAGE}. Read each page aloud in your head and name only sentence-level defects: a noun with the wrong article or gender, a quotation mark opened inside another of the same kind or never closed, a misspelled word, a sentence that contradicts itself, a compound or image no reader of the language would recognise, a word or phrase repeated from a neighbouring sentence.
+
+Say nothing about story, style, pacing or content. A correct sentence gets no line.
+
+# PAGES
+{PAGES}
+
+One line per defect: "FAULT: p<N> — <quote the faulty words> — <what is wrong>". After the list write one line: "FAULTS: <count>".

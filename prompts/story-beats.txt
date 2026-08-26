@@ -66,6 +66,7 @@ Requirements:
 - Match peril to the youngest named child in the cast: frightening is the right level, and nothing may be able to kill or injure a child — no drowning, no fall from a height. A refusal, a loss, a delay or a promise broken can carry it instead. Nobody in the story looks monstrous, and no familiar character turns frightening. When anyone is separated or lost, a later page shows the reunion and the last page shows them safe.
 - An obstacle exists for its own reasons: never shape one around a thing a character happens to carry, and never give a barrier exactly one solution that a character already holds. Where peril has to be softened, take the replacement from what the setting already contains.
 - An obstacle belongs to the story's own world: weather, distance, a rival, a broken or missing or guarded thing, a character's own flaw. No mechanism from other stories — a puzzle door, a riddle to answer, a lock with a trick, a test set by no one — unless the commission establishes it.
+- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle, close on the body and the barrier. The decision before and the relief after never replace it.
 - A trait in the character details is not an introduction. A prop, pet or skill that solves a problem appears in an earlier scene with its owner, before it does the work — and anything introduced that way must later do work. Drop the introduction when you drop its purpose.
 - Use the fewest characters the STORY needs and the fewest any BEAT needs: invent no figure an existing character could be, merge two roles into one where the plot allows, and stage a beat with two people rather than three when two carry it.
 - Keep the group together unless a beat gives them a reason to separate and a reason to meet again.
@@ -88,7 +89,7 @@ Challenges of <the main character, or the two of them>:
 Moments:
 <other character> — <the one moment where their own nature does something no one else would> (a second moment only if the budget allows)
 
-Blocker: <who or what stands in the way, and what they want — omit when nothing does>
+Blocker: <who or what stands in the way, what they want, and the named thing they bar — a gate, a stair, a narrow point; a blocker who bars nothing nameable is not a blocker>
 Threads: <the lines of action running at once, and where they meet — or "one line" when the book is short>
 Joining and parting: <who is there at the start; who arrives later and why then; who is separated from the others, and where they come back together>
 
@@ -102,7 +103,7 @@ Write the story, not the page plan. No page numbers anywhere in this block.
 One line per page, deciding how the book is drawn before any page is written:
 Page <N>: <shot> — <how many named characters> — <what the picture carries>
 
-Shots are wide, medium, close-up or distant. No two pages in a row share the same shot and the same number of characters. At least a third of the pages hold one character or none. A page with four or more named characters is wide or distant, and there are few of them: when the arc has the group doing one thing together, spread it — one face close, then a pair, then the rest — rather than lining everyone up. Name which part of the arc each page serves, and give the parts the pages the budget allows.
+Shots are wide, medium, close-up or distant. No two pages in a row share the same shot and the same number of characters. At least a third of the pages hold one character or none. A page with four or more named characters is wide or distant, and there are few of them: when the arc has the group doing one thing together, spread it — one face close, then a pair, then the rest — rather than lining everyone up. Name which part of the arc each page serves, and give the parts the pages the budget allows. The opening settles in at most two pages, and a story that journeys away from home keeps a page for the way back — cut opening pages before travel pages.
 
 ---BEATS---
 ## Page 1

@@ -195,6 +195,7 @@ async function loadPromptTemplates() {
     ['storyArcAudit', 'story-arc-audit.txt'],
     ['storyBeatsAudit', 'story-beats-audit.txt'],
     ['storyTextAudit', 'story-text-audit.txt'],
+    ['storyTextProofread', 'story-text-proofread.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],

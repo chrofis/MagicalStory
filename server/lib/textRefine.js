@@ -192,12 +192,26 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // step, never the rounds already done.
   if (auditFindings) {
     try {
-      const { buildTextAuditPrompt } = require('./storyHelpers');
+      const { buildTextAuditPrompt, buildTextProofreadPrompt } = require('./storyHelpers');
       const audit2Prompt = buildTextAuditPrompt(storyData, current);
       if (audit2Prompt && TEXT_MODELS[auditModel]) {
         const t0 = Date.now();
+        // Proofread runs alongside the re-audit: a narrow sentence-level pass
+        // (article/gender, quote nesting, spelling, self-contradiction,
+        // non-words) on a model that is not the refiner, merged into the same
+        // corrective round. Never blocks — a failure contributes nothing.
+        const proofModel = MODEL_DEFAULTS.textProofreadModel;
+        const proofPrompt = buildTextProofreadPrompt(storyData, current);
+        const proofPromise = (proofPrompt && TEXT_MODELS[proofModel])
+          ? callTextModelStreaming(proofPrompt, 8000, null, proofModel, { usageLabel: 'text_proofread' })
+            .then(r => String(r.text || '').trim())
+            .catch(e => { log.warn(`⚠️ [PROOFREAD] failed (${e.message}) — skipped`); return ''; })
+          : Promise.resolve('');
         const a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
-        audit2 = String(a2.text || '').trim();
+        const proofFindings = await proofPromise;
+        const proofFaults = (proofFindings.match(/^FAULT:/gm) || []).length;
+        if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);
+        audit2 = [String(a2.text || '').trim(), proofFaults > 0 ? proofFindings : ''].filter(Boolean).join('\n');
         const n1 = (auditFindings.match(/^FAULT:/gm) || []).length;
         const n2 = (audit2.match(/^FAULT:/gm) || []).length;
         log.info(`🔎 [TEXT-AUDIT2] ${auditModel}: ${n1} → ${n2} fault(s) after ${rounds.filter(r => r.ok).length} round(s), ${((Date.now() - t0) / 1000).toFixed(0)}s`);

@@ -19438,3 +19438,59 @@ name.{de,fr,en}, so a name-alias lookup would close it.
 `server/lib/landmarkPhotos.js`.
 
 **Status:** ✅ active.
+
+## 2026-08-26 — Twelve targeted rules from the full-chain provenance trace (creation, detection, repair-closure)
+
+**Context:** The stage-by-stage fault accounting of prod `job_1787689073034` and
+the two Fiona runs identified where faults are born, missed and mis-closed.
+Owner selected all proposed fixes except the style-repaint tie-break (C1, open).
+
+**Creation** — `story-beats.txt`: a physical challenge spends a page on the
+attempt itself (the squeeze was never drawn); the Blocker line requires a named
+barred thing (the gateless keeper); page plan caps the opening at two pages and
+reserves a return page (the 16→17 teleport was a budget casualty).
+`scene-expansion*.txt`: an obstacle page stages the obstacle blocking the route
+with a character acting against it (p5 trunk-beside-path vs p7); an
+action-required crowd is a required element (p16 empty plaza).
+`buildStoryShapeSection`: a joiner's first page states why they are there —
+being already there is not a reason (Kiaan).
+
+**Detection** — all three audits gain an ENTRANCE question (first appearances
+were structurally invisible: no prior placement, so TRANSITION never fires).
+`image-evaluation.txt`: D-19 exemption no longer covers a crowd a figure must
+act through; D-16 covers two figures declared facing each other who both face
+the viewer (explicitly not the settled N-02 mirror). Code floor in
+`evaluateImageBatch`: an empty figure inventory on a scene page with expected
+characters caps at 40 — silence is not perfection (p15 scored 100 on
+`figures: []`; severity-only change per SETTLED).
+
+**Repair-closure** — review prompts: close an unestablished-thing fault by
+establishing the thing when it does later work; deletion only for what carries
+nothing (the arc review deleted the gate). `text-refine.txt`: an unestablished
+ability/event is closed by establishing it earlier, never by describing the
+moment more vividly (the refiner embellished the flagged flying).
+
+**Proofread pass** — new `story-text-proofread.txt` + `textProofreadModel`
+(sonnet — not the refiner), run alongside the text re-audit, findings merged
+into the same corrective round. Measured on the shipped Fiona text with 4 known
+defects: caught 3/4 (nested guillemets, Pausenzelt, the zu-fünft class) plus a
+NEW real contradiction (p16 "zu viert" vs a five-person crew); missed the
+gender error. The causality audit's question 6 caught a different 1–2 of the
+same 4 per run — the narrow pass is the deterministic instrument.
+
+**Validated:** modules load, salvage + style-repair suites pass, proofread
+measured live. The eval clauses (crowd, facing) and ENTRANCE question are
+additive and structurally sound but unmeasured on a full run — the re-audit
+counters (`arc N → M`) measure them from the next story onward.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/story-arc-audit.txt`,
+`prompts/story-beats-audit.txt`, `prompts/story-text-audit.txt`,
+`prompts/image-evaluation.txt`, `prompts/story-arc-review.txt`,
+`prompts/story-beats-review.txt`, `prompts/text-refine.txt`,
+`prompts/story-text-proofread.txt` (new), `server/lib/promptBuilders.js`,
+`server/lib/storyHelpers.js`, `server/lib/textRefine.js`,
+`server/lib/images.js`, `server/config/models.js`,
+`server/services/prompts.js`.
+
+**Status:** ✅ active — C1 (style repaint can never win its tie) remains OPEN.

@@ -50,6 +50,8 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - When the Clothing Context provides an expected clothing description, judge outfits against that text — not against the reference photo's outfit
 - Example: If cell A has "winter" and cell B has "standard", different outfits are fine
 - Example: If both cells have "standard" but one shows a jacket and one shows a t-shirt, that's inconsistent
+- The expected clothing description is a checklist of garments and of the parts it names — a hood, a collar, straps, a fastening, a pocket. A named part missing from a cell, or present where none is named, is `clothing_inconsistent` MAJOR even when the category and colour read correctly.
+- Judge a part only from an angle that would show it.
 
 ## Visibility Rules
 
@@ -141,7 +143,7 @@ If a defect could match multiple `type` values, pick the most specific:
 - Same identity, hair differing only in shade within one colour family (dark blonde against light brown, mid against dark brown) or in texture between wavy and curly → `hair_nuance`
 - Same identity but the hair colour family or the style category differs → `hair_change`
 - Same identity but skin pigmentation differs → `skin_tone`
-- Outfit category mismatch → `clothing_inconsistent`
+- Outfit category mismatch, or a garment missing a part the expected description names → `clothing_inconsistent`
 - Object color drift → `color_change`
 - Object proportions drift → `shape_change`
 

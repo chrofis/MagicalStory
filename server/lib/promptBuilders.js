@@ -4488,6 +4488,22 @@ function buildBeatsAuditPrompt(beats, pagePlan = '') {
  * page prose, and what each picture shows (the DEPICTS block only — the rest
  * of a scene brief describes intent the viewer never sees).
  */
+// Sentence-level proofread of the FINAL text (2026-08-26): article/gender,
+// quote nesting, spelling, self-contradiction, non-words, repeats. Separate
+// from the causality audit — a sixth question there catches a different 1-2 of
+// 4 known defects per run (measured); a narrow pass is deterministic about them.
+function buildTextProofreadPrompt(inputData, pages = []) {
+  const template = PROMPT_TEMPLATES.storyTextProofread;
+  if (!template) {
+    log.error('[PROMPT] storyTextProofread template not loaded — proofread unavailable');
+    return null;
+  }
+  const langNames = { 'de-ch': 'Swiss Standard German (ss, never ß)', de: 'German', fr: 'French', it: 'Italian', en: 'English' };
+  const lang = langNames[String(inputData?.language || '').toLowerCase()] || inputData?.language || 'the language of the pages';
+  const body = pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n');
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
+}
+
 function buildTextAuditPrompt(inputData, pages = []) {
   const template = PROMPT_TEMPLATES.storyTextAudit;
   if (!template) {
@@ -5547,6 +5563,7 @@ module.exports = {
   buildArcAuditPrompt,
   buildBeatsAuditPrompt,
   buildTextAuditPrompt,
+  buildTextProofreadPrompt,
   buildStoryShapeSection,
   pickMainCharacters,
   resolveAgeMode,

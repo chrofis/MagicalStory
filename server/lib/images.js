@@ -2286,6 +2286,23 @@ async function evaluateImageBatch(images, options = {}) {
         } }
       );
 
+      // FLOOR (owner, 2026-08-26): an EMPTY figure inventory on a page whose
+      // brief names characters is a failed look, not a perfect page. prod
+      // job_1787689073034 p15 scored 100 with figures:[] on a page whose text
+      // put a character alone in a crowd — silence read as perfection, the
+      // same shape as the 2026-08-24 dead-evaluator bug. Severity-only change
+      // (code may cap a score; classification stays with the prompt): cap at
+      // 40 so the repair round looks at the page. Scene pages only.
+      if (qualityResult
+        && (img.evaluationType || 'scene') === 'scene'
+        && Array.isArray(img.sceneCharacters) && img.sceneCharacters.length > 0
+        && Array.isArray(qualityResult.figures) && qualityResult.figures.length === 0
+        && typeof qualityResult.score === 'number' && qualityResult.score > 40) {
+        log.warn(`⚠️ [BATCH EVAL] ${pageLabel}: figure inventory EMPTY while ${img.sceneCharacters.length} character(s) expected — score ${qualityResult.score} capped at 40`);
+        qualityResult.score = 40;
+        qualityResult.issuesSummary = `${qualityResult.issuesSummary ? qualityResult.issuesSummary + ' | ' : ''}figure inventory empty while ${img.sceneCharacters.length} character(s) expected — capped`;
+      }
+
       // Use pre-extracted scene metadata if available, otherwise extract from scene description
       const sceneMetadata = img.sceneMetadata || (img.sceneDescription
         ? getStoryHelpers().extractSceneMetadata(img.sceneDescription)
