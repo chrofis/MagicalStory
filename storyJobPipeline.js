@@ -5088,8 +5088,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // changed, and 10 of 14 pages were rewritten on the first real run.
         textRefineReport = {
           rounds: usable.rounds.length,
+          // Per-round trace (owner, 2026-08-27): the count alone made "what did
+          // round 2 change" unanswerable twice. Analyses capped — text only.
+          roundsDetail: usable.rounds.map(r => ({
+            round: r.round,
+            ok: r.ok,
+            reAudit: !!r.reAudit,
+            modelKey: r.modelKey || null,
+            modelId: r.modelId || null,
+            elapsedMs: r.elapsedMs || 0,
+            cost: r.cost ?? null,
+            changedPages: r.changedPages || [],
+            converged: r.converged ?? null,
+            error: r.error || null,
+            analysis: (r.analysis || '').slice(0, 15000),
+          })),
           changedPages: usable.changed,
           audit: usable.audit || '',
+          proofread: usable.proofread || '',
           auditByCategory: require('./server/lib/storyHelpers').faultsByCategory(usable.audit || ''),
           // The re-audit of the FINAL text (2026-08-26) — same template and
           // judge as `audit`, so the two FAULT counts are one yardstick.

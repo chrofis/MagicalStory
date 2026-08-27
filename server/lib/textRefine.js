@@ -60,6 +60,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // a `let` below its reader is the TDZ throw that killed the evaluator on
   // 2026-08-24. The re-audit at the bottom fills it.
   let audit2 = '';
+  // Proofread findings on their own — audit2 merges them for the corrective
+  // round, but traceability needs the two streams separable, and an empty
+  // string here still proves the proofread ran.
+  let proofread = '';
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so a finished audit and a
@@ -78,6 +82,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       .filter(n => n !== null),
     audit: auditFindings,
     audit2,
+    proofread,
     partial: true,
   });
   const publish = () => {
@@ -219,6 +224,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
           a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
         }
         const proofFindings = await proofPromise;
+        proofread = proofFindings;
         const proofFaults = countFaults(proofFindings);
         if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);
         audit2 = [String(a2.text || '').trim(), proofFaults > 0 ? proofFindings : ''].filter(Boolean).join('\n');
@@ -263,7 +269,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
-  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, partial: false };
+  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, proofread, partial: false };
 }
 
 /**
