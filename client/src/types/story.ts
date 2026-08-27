@@ -454,13 +454,22 @@ export interface FinalChecksTextCheck {
 }
 
 // Entity consistency check issue (from entity grid evaluation)
+export type EntityIssueSubType =
+  | 'face_mismatch' | 'face_drift' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
+  | 'clothing_inconsistent' | 'garment_colour' | 'color_change' | 'shape_change';
+
 export interface EntityConsistencyIssue {
   id: string;
   source: 'entity';
   pageNumber: number | null;
   region: null;
-  type: 'consistency';
-  subType: 'face_mismatch' | 'hair_change' | 'skin_tone' | 'age_shift' | 'clothing_inconsistent' | 'color_change' | 'shape_change';
+  /**
+   * The evaluator's own type. Older stored evaluations carry the constant
+   * 'consistency' here and keep the real type in `subType`; read `subType ||
+   * type` when you need the specific one.
+   */
+  type: 'consistency' | EntityIssueSubType;
+  subType: EntityIssueSubType;
   severity: 'minor' | 'major' | 'critical';
   description: string;
   fixInstruction: string;

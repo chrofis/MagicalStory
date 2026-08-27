@@ -2557,7 +2557,15 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
         source: 'entity',
         pageNumber: issue.pagesToFix?.[0] || null,
         region: null,  // Will be enriched later if needed
-        type: 'consistency',
+        // `type` CARRIES THE REAL TYPE (owner, 2026-08-27). It used to be the
+        // constant 'consistency' for every entity finding, with the actual type
+        // hidden in `subType`. Every consumer already reads `subType || type`
+        // (scoring.js, feedbackConsolidator.js, images.js), so the constant
+        // informed nothing and actively misled: an A/B filtering findings on
+        // `type` sees zero clothing findings whatever the evaluator reported,
+        // which is exactly how a working prompt fix was judged a failure.
+        // `subType` stays populated for stored evaluations and older readers.
+        type: issue.type || 'consistency',
         subType: issue.type,
         severity: issue.severity || 'major',
         description: issue.description,
@@ -2626,7 +2634,12 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
   return {
     consistent: false,
     evalFailed: true,
-    score: 10,
+    // A FAILURE MUST NOT READ AS A PERFECT GRID (owner, 2026-08-27). This
+    // returned 10 — the top of the scale — alongside zero issues, so a caller
+    // that did not also check `evalFailed` saw a flawless entity. Twelve
+    // consecutive API failures once printed as twelve clean grids. 0 matches
+    // what the aggregation already stores for a failed entity (overallScore: 0).
+    score: 0,
     issues: [],
     summary: `Evaluation failed: ${lastErr?.message || 'unknown error'}`,
     error: lastErr?.message || 'unknown'

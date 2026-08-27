@@ -20137,13 +20137,8 @@ What the same runs DO show, and what the harness had been hiding:
   touched, exactly as the owner said.
 - No limb findings at all in the production configuration.
 
-**Two measurement traps recorded so nobody loses another hour to them:**
-1. `evaluateEntityConsistency` maps the model's `type` into `subType` and sets
-   `type: 'consistency'`. An A/B filtering findings on `type` sees zero clothing findings
-   whatever the prompt says.
-2. A failed eval returns `evalFailed: true` with `score: 10` and no issues. A harness that does
-   not check `evalFailed` prints twelve failures as twelve clean grids — which happened here when
-   the head-grid URLs were passed as if they were data URIs.
+**Two measurement traps — now FIXED rather than documented (owner: "why write down traps. Fix
+them"), see the 2026-08-27 entry below.**
 
 **Status:** the entity check still does not report clothing in production. Reopened in
 `tasks/BACKLOG.md`. The `clothing_check` field stays in the prompt — it is measured effective
@@ -20266,3 +20261,35 @@ storyType. (4) Title judge and child critic hear at the READER's age
 `server/lib/promptBuilders.js`.
 
 **Status:** ✅ active — validated by the next pirate rerun.
+
+
+---
+
+## 2026-08-27 — The two entity-result footguns are removed, not documented
+
+**Context:** Yesterday's correction entry wrote down two traps in the entity-consistency result
+shape rather than fixing them. Owner: "why write down traps. Fix them." Both had already caused
+wrong conclusions to be reported as fact.
+
+**Decision:**
+1. `type` carries the evaluator's real type (`hair_change`, `clothing_inconsistent`, …) instead
+   of the constant `'consistency'`. Every consumer already read `subType || type`
+   (`scoring.js`, `feedbackConsolidator.js`, `images.js`), so the constant informed nothing and
+   actively misled — an A/B filtering on `type` saw zero clothing findings whatever the
+   evaluator reported. `subType` stays populated for stored evaluations and older readers, and
+   nothing branches on `type === 'consistency'` at runtime (checked across server and client;
+   the client had only a TS literal and a `|| 'consistency'` default).
+2. A failed evaluation returns `score: 0`, not `10`. It previously returned the top of the scale
+   with zero issues, so a caller that did not also check `evalFailed` read a flawless entity —
+   twelve consecutive API failures once printed as twelve clean grids. 0 matches what the
+   aggregation already stores for a failed entity (`overallScore: 0`), and nothing compared the
+   score against 10.
+
+**Rationale:** A trap written into a doc still fires; the next person has to have read the doc at
+the moment they need it. Both fixes are shape changes with no behavioural cost.
+
+**Verified:** 3 unit tests assert the shape so neither can silently return
+(`tests/unit/entity-issue-shape.test.ts`); client typecheck clean.
+
+**Touched:** `server/lib/entityConsistency.js`, `client/src/types/story.ts`,
+`tests/unit/entity-issue-shape.test.ts`.
