@@ -4459,7 +4459,8 @@ function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '', audit
  * templates emit "FAULT[<QUESTION>]: ..." (tagged, 2026-08-26); older stored
  * reports carry the bare "FAULT: ..." form, so both are accepted forever.
  */
-const FAULT_LINE_RE = /^FAULT(?:\[([A-Z]+)\])?:/gm;
+// Second optional bracket = the book audit's severity tag (FAULT[IMG][MAJOR]:).
+const FAULT_LINE_RE = /^FAULT(?:\[([A-Z]+)\])?(?:\[([A-Z]+)\])?:/gm;
 
 /** Count FAULT lines (tagged or bare) in an audit's raw text. */
 function countFaults(text) {

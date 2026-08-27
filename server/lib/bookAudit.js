@@ -37,7 +37,8 @@ const CHUNK_PAGES = 6;
 // purpose: the judge sometimes nests a fault under the page it was reasoning
 // about, and an anchored `^FAULT` silently dropped exactly those — the audit
 // reported 3 faults on a replay that had found 5.
-const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\]:\s*(?:p(-?\d+))?\s*(.*)$/gim;
+// Severity bracket is optional so pre-severity stored reports still parse.
+const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
 
 /**
  * Position of the SHIPPED image inside a scene's imageVersions[].
@@ -171,14 +172,16 @@ function parseRoutes(raw) {
   const byRoute = { IMG: [], TEXT: [] };
   for (const m of String(raw || '').matchAll(ROUTED_FAULT_RE)) {
     const route = m[1].toUpperCase();
-    const page = m[2] != null ? parseInt(m[2], 10) : null;
+    const severity = m[2] ? m[2].toUpperCase() : null;
+    const page = m[3] != null ? parseInt(m[3], 10) : null;
     byRoute[route].push({
       page,
+      severity,
       // The whole line, verbatim — the corrective text round is fed FAULT lines
       // in the same shape the text audit produces, so the refine template reads
       // them without a second format to learn.
       line: m[0].trim(),
-      detail: (m[3] || '').replace(/^[—–-]\s*/, '').trim(),
+      detail: (m[4] || '').replace(/^[—–-]\s*/, '').trim(),
     });
   }
   return byRoute;
