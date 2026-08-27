@@ -91,13 +91,19 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // the pages and what each picture shows names faults. Round 1's fix ledger
   // must answer every one. Never blocks — a failed audit just means the
   // refiner runs on its own checks alone.
-  const auditModel = opts.auditModel || MODEL_DEFAULTS.arcReviewModel || defaultModel;
+  const auditModel = opts.auditModel || MODEL_DEFAULTS.textAuditModel || MODEL_DEFAULTS.arcReviewModel || defaultModel;
   try {
     const { buildTextAuditPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
     const auditPrompt = buildTextAuditPrompt(storyData, current);
     if (auditPrompt && TEXT_MODELS[auditModel]) {
       const t0 = Date.now();
-      const a = await callTextModelStreaming(auditPrompt, 12000, null, auditModel, { usageLabel: 'text_audit' });
+      // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
+      // retry, same call; a second empty falls through to the no-findings path.
+      let a = await callTextModelStreaming(auditPrompt, 12000, null, auditModel, { usageLabel: 'text_audit' });
+      if (!String(a.text || '').trim()) {
+        log.warn(`⚠️ [TEXT-AUDIT] ${auditModel} returned empty output — retrying once`);
+        a = await callTextModelStreaming(auditPrompt, 12000, null, auditModel, { usageLabel: 'text_audit' });
+      }
       auditFindings = String(a.text || '').trim();
       log.info(`🔎 [TEXT-AUDIT] ${auditModel}: ${countFaults(auditFindings)} fault(s) ${JSON.stringify(faultsByCategory(auditFindings))} in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
@@ -207,7 +213,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
             .then(r => String(r.text || '').trim())
             .catch(e => { log.warn(`⚠️ [PROOFREAD] failed (${e.message}) — skipped`); return ''; })
           : Promise.resolve('');
-        const a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
+        let a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
+        if (!String(a2.text || '').trim()) {
+          log.warn(`⚠️ [TEXT-AUDIT2] ${auditModel} returned empty output — retrying once`);
+          a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
+        }
         const proofFindings = await proofPromise;
         const proofFaults = countFaults(proofFindings);
         if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);

@@ -218,6 +218,14 @@ const MODEL_DEFAULTS = {
   // negative five times out of five. Plan sonnet / review grok was the best
   // cell, and it matches what the beats stage already uses.
   arcReviewModel: process.env.ARC_REVIEW_MODEL || 'grok-4.6',
+  // Text audit judge (2026-08-27 bake-off on the shipped pirate text, hardened
+  // template, known-defect ground truth): gemini-3.1-pro tied claude-opus on
+  // real catches (8.5/10) and is independent of every writer/fixer vendor;
+  // grok-4.6 as auditor collapsed to 3/10 at 4x the wall clock. deepseek-v4-pro
+  // and qwen3.8-max emit only reasoning tokens on this prompt (0 bytes visible
+  // text, twice each) — unusable as auditors. Arc/beats audits are a separate
+  // decision with their own bake-off.
+  textAuditModel: process.env.TEXT_AUDIT_MODEL || 'gemini-3.1-pro',
   // Child critic of the arc — role-play quality and speed, not hostile judgment.
   childCriticModel: process.env.CHILD_CRITIC_MODEL || 'claude-sonnet',
   // The three reviews used to share outlineReviewModel, so switching the BEATS

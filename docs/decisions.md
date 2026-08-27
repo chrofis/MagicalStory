@@ -20732,3 +20732,21 @@ full-book rewrites (~2-8 min inside the image-parallel window, lower salvage
 risk).
 **Touched:** `storyJobPipeline.js`, `server/lib/textRefine.js`.
 **Status:** ✅ active
+
+---
+
+### Text audit judge is gemini-3.1-pro, not the arc reviewer (2026-08-27)
+**Context:** The text audit inherited grok-4.6 via the arcReviewModel fallback.
+Auditor bake-off on the shipped pirate text (job_1787812110559, hardened
+template, 10 known defects as ground truth): gemini-3.1-pro 8.5/10 real catches
+($0.15, 111s), claude-opus 8.5/10 ($0.22, same vendor as the writer),
+gpt-5.6-sol 7/10 ($0.08), grok-4.6 3/10 ($0.13, 433s). deepseek-v4-pro and
+qwen3.8-max emitted only reasoning tokens (0 bytes visible text, two attempts
+each) — unusable as auditors. No model caught the word-pun defect class.
+**Decision:** New MODEL_DEFAULTS.textAuditModel = gemini-3.1-pro (env
+TEXT_AUDIT_MODEL), used by text_audit and text_audit2. One retry-on-empty at
+both call sites (known intermittent empty body). Arc/beats audit models are a
+SEPARATE decision — text results must not be extrapolated (owner) — pending
+their own bake-off.
+**Touched:** `server/config/models.js`, `server/lib/textRefine.js`.
+**Status:** ✅ active
