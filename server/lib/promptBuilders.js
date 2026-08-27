@@ -5338,11 +5338,12 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     if (char.age) parts.push(`age ${char.age}`);
     if (char.gender) parts.push(char.gender);
     // Physical traits: Gemini extracts hair/eyes/skin from the uploaded photo
-    // (trial.js:737-745 stamps them on character.physical). Without surfacing
-    // them here Claude wrote scene prose like "Lukas stands at the gate" with
-    // zero visual anchors — Grok then either had to guess or fall back on the
-    // photo ref. Inlining the descriptors lets Claude write "Lukas's blond
-    // hair catches the sunlight" so even the text path carries identity.
+    // (trial.js stamps them on character.physical). Without surfacing them here
+    // the scene hints carry zero visual anchors ("the main character stands at
+    // the gate") and Grok has to guess or fall back on the photo ref. These
+    // descriptors are ILLUSTRATION context only — story-trial.txt forbids them
+    // in the reader-facing page text (owner: the parent doesn't need to be told
+    // the hair colour of their own child).
     const p = char.physical || {};
     const physicalParts = [];
     if (p.hairColor)   physicalParts.push(`${p.hairColor} hair`);
@@ -5500,7 +5501,7 @@ function buildAvailableLandmarksSection(landmarks) {
 
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
 
-  return `**REAL LANDMARKS — use every one the story plausibly passes (at least 2, and more when it stays in or near that place). Never bend the plot to fit one in:**
+  return `**REAL LANDMARKS — pick two to four for the whole story, and only ones that already belong to the world the story is in. Never bend the plot to fit one in; a landmark carried as background scenery counts as used:**
 
 ${landmarkList}
 

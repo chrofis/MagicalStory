@@ -14,11 +14,12 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - 100-140 words per page, flowing paragraphs
 - Start with action, not weather or waking up
 - Show character personality through actions
+- Never describe a character's hair, eye colour, skin or clothing in the story text — appearance belongs to the scene hints and the illustrations
 
 # Story Parameters
 
 - **Scenes**: {PAGES}
-- **Characters**: {CHARACTERS}
+- **Characters** (appearance is illustration context for the scene hints, never for the story text): {CHARACTERS}
 - **Story Idea**: {STORY_DETAILS}
 
 {TODDLER_MODE}

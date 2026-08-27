@@ -20450,3 +20450,29 @@ No pipeline code changed.
 **Status:** ✅ active for the five rules. ❌ a second corrective refine round is
 rejected — do not wire one. 🟡 PLANT and the (e) pun class are unproven and need
 a second story.
+
+---
+
+### Reader prose never describes hair, eyes, skin or clothing (trial writer)
+**Context:** Owner-reported on a trial story: the opening page narrated the main
+character's hair colour and jumper ("…mit ihren braunen Haaren und dem roten
+Pullover…"). `buildTrialStoryPrompt` inlines the photo-extracted physical traits
+(hair/eyes/skin/detailedHairAnalysis) into `{CHARACTERS}` so the trial's scene
+hints carry visual anchors — trial hints go straight to image generation with no
+Art Director expansion. `story-trial.txt` had no counter-rule, so the writer
+also spent that data in the reader-facing text. The parent does not need to be
+told the hair colour of their own child.
+**Decision:** Keep the injection (the hints need it) but label it illustration
+context at the `{CHARACTERS}` line, and add one rule beside the other writing
+rules: never describe a character's hair, eye colour, skin or clothing in the
+story text.
+**Rationale:** The other two writer paths already had this guard — the unified
+writer ("Do not repeat the visual traits of the character in the text",
+`story-unified.txt` Character Portrayal Guidelines) and the beats path (beats
+`CHARACTER_DETAILS` carries no appearance at all, and `story-text-from-beats.txt`
++ `text-refine.txt` both ban narrating staging/appearance). The trial was the
+only writer without it, so the leak was trial-only. Removing the traits instead
+would strip the scene hints' only identity anchor.
+**Touched:** `prompts/story-trial.txt` (rule + `{CHARACTERS}` label),
+`server/lib/promptBuilders.js` (`buildTrialStoryPrompt` comment).
+**Status:** ✅ active
