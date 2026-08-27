@@ -1331,7 +1331,13 @@ async function runCharRepairStage(ctx, opts) {
   // The legacy Grok blended/cutout/fullscene repair stays reachable via an
   // explicit repairMode (below); grok with no legacy repairMode = insert.
   const legacyGrokModes = ['blended', 'cutout', 'fullscene'];
-  if (params.backend === 'qwen' || (params.backend === 'grok' && !legacyGrokModes.includes(params.repairMode))) {
+  // An arm that names an AXIS is testing the spine, so it must not be routed to
+  // the insert pipeline — that path never calls repairCharacterFace and does its
+  // own whiteout regardless. Exps 862-865 asked for treatment blur vs whiteout,
+  // fell through to grok-insert because repairMode was 'auto', and ran the SAME
+  // treatment four times: a $1 comparison of nothing.
+  const wantsAxis = !!(params.treatment || params.regionSource || params.faceOnly !== undefined);
+  if (params.backend === 'qwen' || (params.backend === 'grok' && !legacyGrokModes.includes(params.repairMode) && !wantsAxis)) {
     const r = await runQwenInsertStage(ctx, {
       ...opts,
       params: { ...params, base: params.base || 'active', repairMode: true, cropPad: params.cropPad ?? 0.15 },
