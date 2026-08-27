@@ -20503,3 +20503,46 @@ instead of a pressure gauge.
 **Touched:** `prompts/story-arc-audit.txt`, `prompts/story-beats-audit.txt`,
 `prompts/story-text-audit.txt`.
 **Status:** ✅ active
+
+## 2026-08-27 — Repair convergence audit: three callers, three different requests
+
+**Context:** Owner: *"Is this code now the same for the lab, the automatic story
+repair and the manual repair? It must be."* Audited; it was not.
+
+**All four callers do reach the same spine** — `repairCharacterMismatch` →
+`repairCharacterMismatchWithGrok` → `legacyFlagsToAxes` → `repairCharacterFace`
+→ `samUnionBlend`, with the full gate battery. There is no second blend engine.
+What diverges is the REQUEST each caller builds, which is the same class of drift
+that `charRepairTarget.js` was created to end for targeting.
+
+| caller | builds request via | reuses stored SAM mask |
+|---|---|---|
+| automatic (`repairPipeline`) | `buildCharRepairRequest` ✅ | yes ✅ |
+| manual endpoint (`regeneration`) | hand-rolled object ❌ | yes ✅ |
+| Test Lab (`testlab`) | `buildCharRepairRequest` ✅ | **was hardcoded null** ❌ |
+| entity consistency | hand-rolled object ❌ | **not passed at all** ❌ |
+
+**Fixed now:** the Lab's `detectionBodyMask: null`. It was justified as "a Lab run
+has no detection pass" — true before masks were persisted, false since
+`figure_mask` rows exist. Left as null, the Lab re-segmented on a crop while
+production reused the stored silhouette, so **a Lab result was not evidence about
+production** — which is the Lab's entire purpose. It now calls the same
+`resolveFigureMask` both production paths use.
+
+**Still divergent (not fixed here):** `regeneration.js` and
+`entityConsistency.js` hand-roll their options object instead of calling
+`buildCharRepairRequest`. That builder exists to make the request uniform and to
+reject unknown keys; bypassing it is how a caller silently omits a field — the
+manual endpoint omitted `detectionBodyMask` entirely until 2026-08-26, which is
+why every manual repair re-segmented. Routing both through the builder is the
+remaining convergence work.
+
+**Also divergent by design, worth stating:** the Lab can route to the INSERT
+pipeline (`runQwenInsertStage`) which never touches the spine. That is a
+legitimate second pipeline under test, but it silently captured any arm whose
+`repairMode` was not a legacy grok mode — see the 862-865 entry. An arm naming an
+axis now stays on the spine.
+
+**Touched:** `server/lib/testlab.js`.
+**Status:** 🟡 partial — mask reuse converged; two hand-rolled request builders
+remain.

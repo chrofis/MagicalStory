@@ -1586,9 +1586,17 @@ async function runCharRepairStage(ctx, opts) {
     faceBbox: faceBbox || null,
     bodyBbox: bbox,
     whiteoutTarget,
-    // LAB DIVERGENCE (indexed): production reuses the detection SAM silhouette;
-    // a Lab run has no detection pass, so the gate re-runs /figure-mask.
-    detectionBodyMask: null,
+    // SAME AS PRODUCTION: reuse the stored detection silhouette. This was
+    // hardcoded null on the grounds that "a Lab run has no detection pass" —
+    // true before masks were persisted, false now that detection writes
+    // figure_mask rows. Left as null the Lab re-segmented on a crop while
+    // production reused, so a Lab result was not evidence about production.
+    // Resolves to null for a story with no stored mask, which is the old
+    // behaviour and is reported as a miss.
+    detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
+      charName, { figures: ctx.scene.bboxDetection?.figures || [] },
+      { storyId: ctx.storyId, pageNumber: ctx.pageNumber },
+    ),
     protectedFaces,
     protectedBodies,
     textPosition: ctx.textPosition,
