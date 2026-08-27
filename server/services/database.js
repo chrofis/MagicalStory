@@ -1821,7 +1821,8 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
 
   // Extract and save scene images to story_images table
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
-    for (const img of dataForStorage.sceneImages) {
+    for (let _pi = 0; _pi < dataForStorage.sceneImages.length; _pi++) {
+      const img = dataForStorage.sceneImages[_pi];
       if (img.imageData) {
         // imageVersions[0] (the original) also writes version_index 0 and, in
         // the old sequential code, deliberately landed LAST so the original is
@@ -1902,7 +1903,15 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
         img.hasEmptySceneImage = true;
       }
       imagesSaved += await persistCompositeDebug(storyId, img);
-      imagesSaved += await persistFigureMasks(storyId, img);
+      // FROM THE ORIGINAL, not the clone. cloneForStorage walks with `for...in`,
+      // which visits ENUMERABLE properties only — and `_gdinoMasks` is
+      // deliberately non-enumerable so it never reaches the JSONB blob. The
+      // clone therefore drops it silently, and this persister saw a detection
+      // with no masks: the whole generation path stored zero figure_mask rows
+      // while refresh-bbox (which never clones) stored them fine. Verified on
+      // staging job_1787863683671_6o3ulhuku — 4 pages, grounding-dino on every
+      // one, gdinoDiag present, and not a single mask row.
+      imagesSaved += await persistFigureMasks(storyId, storyData?.sceneImages?.[_pi] || img);
       delete img.originalImage;
       delete img.preEntityRepairImage;
       delete img.emptySceneImage;

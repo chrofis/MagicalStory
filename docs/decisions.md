@@ -20896,3 +20896,47 @@ prompt section; reader count in the zero-issue skip),
 **Status:** 🟡 conditional — committed locally, not pushed. Verified statically
 only (syntax, prompt-render path, consolidator output parsers untouched); never
 run inside a live generation.
+
+## 2026-08-27 — `cloneForStorage` walks `for...in`, so the generation path stored ZERO figure masks
+
+**Context:** A 4-page smoke story on staging (`job_1787863683671_6o3ulhuku`)
+completed cleanly — 4 illustrations, eval, 2 pages repaired, entity check, style
+audit — but wrote **no `figure_mask` rows at all**, while `refresh-bbox` on
+another story had written 4.
+
+**Cause:** `persistStoryToDatabase` persists from `cloneForStorage(storyData)`,
+and that clone is a `for...in` walk:
+
+```js
+for (const k in v) if (hasOwnProperty(v, k)) out[k] = cloneForStorage(v[k]);
+```
+
+`for...in` visits ENUMERABLE properties only. `_gdinoMasks` is deliberately
+non-enumerable (`bboxDetection.js:425`) precisely so it never reaches the JSONB
+blob — so the clone silently drops it, and `persistFigureMasks` was handed a
+detection with an empty mask list on every page of every generated story. The
+same trap already caught the cover and single-page paths (2026-08-26); this is
+the third site, and the one that mattered most.
+
+Ruled out along the way, all of which preserve the property: the
+`detectAllBoundingBoxes` stamping wrapper (mutates in place), the
+`detectionHistory` rebuild (re-attaches at `bboxDetection.js:1922`), the
+pipeline's whitelist mapping (`bboxDetection: img.bboxDetection` — a reference
+copy), `redetectVersionImage` and the final-pick refresh (both return the
+detection object itself).
+
+**Also worth recording as a method note:** the first diagnosis attempt checked
+the STORED JSON for `_gdinoMasks` and found it absent — which proves nothing,
+since a non-enumerable property can never be serialised. The evidence that
+mattered was the absence of `figure_mask` ROWS combined with
+`detectionBackend='grounding-dino'` and `gdinoDiag` present on all four pages:
+masks were produced, and lost between production and persistence.
+
+**Decision:** the sceneImages loop indexes, and `persistFigureMasks` reads
+`storyData.sceneImages[i]` — the ORIGINAL object — falling back to the clone.
+Everything else still persists from the clone, unchanged.
+
+**Touched:** `server/services/database.js`.
+**Status:** 🟡 conditional — unit suite green (218 passed, same 3 pre-existing
+failures); NOT pushed, owner asked to hold while a story runs. The proof is the
+next generated story writing `figure_mask` rows.
