@@ -1343,7 +1343,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             error: err.message,
             consistent: false,  // Fail closed — an errored check is NOT a pass
             evalFailed: true,
-            score: 10,
+            // 0, not 10: a failure must not read as a flawless entity to a
+            // caller that does not also check evalFailed. Same reason as the
+            // grid-eval return below.
+            score: 0,
             issues: []
           };
           // Fail closed at the REPORT level too — see the character branch.
@@ -2418,7 +2421,8 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     return {
       consistent: false,
       evalFailed: true,
-      score: 10,
+      // 0, not 10 — a missing template must not score as a perfect grid.
+      score: 0,
       issues: [],
       summary: 'Prompt template not available',
       error: 'Missing prompt template'

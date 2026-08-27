@@ -38,12 +38,21 @@ describe('entity issue shape', () => {
 });
 
 describe('failed entity evaluation', () => {
-  it('does not report a perfect score', () => {
-    // The fail-closed return sits next to evalFailed: true.
-    const at = source.indexOf('consistent: false,\n    evalFailed: true,');
-    expect(at, 'fail-closed return not found').toBeGreaterThan(-1);
-    const scoreLine = source.slice(at, at + 900).match(/score:\s*(\d+)/);
-    expect(scoreLine, 'no score on the fail-closed return').toBeTruthy();
-    expect(Number(scoreLine![1]), 'a failure must not score as a clean grid').toBeLessThan(10);
+  it('never reports a perfect score, at any of the fail-closed returns', () => {
+    // There are several: the grid eval, the per-object branch, and the
+    // missing-template guard. Every one of them must be checked — the first
+    // pass at this fix caught only one and left two scoring 10.
+    const sites = [...source.matchAll(/evalFailed: true,/g)].map(m => m.index!);
+    expect(sites.length, 'no fail-closed returns found').toBeGreaterThan(1);
+
+    for (const at of sites) {
+      const window = source.slice(at, at + 900);
+      const score = window.match(/score:\s*(\d+)/);
+      // Some sites carry overallScore instead; both must be non-perfect.
+      const overall = window.match(/overallScore:\s*(\d+)/);
+      const value = score ? Number(score[1]) : overall ? Number(overall[1]) : null;
+      if (value === null) continue;   // no score on this shape
+      expect(value, `a failure at offset ${at} must not score as a clean grid`).toBeLessThan(10);
+    }
   });
 });
