@@ -546,7 +546,7 @@ For EACH of the {PAGES} pages:
 {ANALYSIS_INSTRUCTIONS}
 
 ---TITLE---
-Now that you have written and analyzed the full story, propose 5 distinct title candidates. The server picks one at random — your job is to make every option strong enough to ship, with genuinely different angles.
+Now that you have written and analyzed the full story, propose 5 distinct title candidates and name the one to ship. Every option must be strong enough to ship, with genuinely different angles.
 
 Every candidate contains at least one of these names: {MAIN_CHARACTER_NAMES}.
 
@@ -566,12 +566,15 @@ VARY ANGLE — each of the 5 pairs the name with a different facet:
 
 Do not produce 5 variations of the same iconic phrase. Vary what the name is paired with, not whether the name appears.
 
+Pick the one to ship, judged in this order: it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud.
+
 TITLE_CANDIDATES:
 1. [first candidate]
 2. [second candidate]
 3. [third candidate]
 4. [fourth candidate]
 5. [fifth candidate]
+TITLE_PICK: <candidate number> — <one sentence>
 
 
 **Brief example:**

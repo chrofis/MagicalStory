@@ -1324,9 +1324,13 @@ SCENE: ${x.scene || ''}`.trim(),
     gl.warn('beats_text_incomplete', `Text writer omitted page(s) ${parsedText.missing.join(', ')}`);
   }
   // The title: nothing else in a beats run produces one. The writer emits three
-  // candidates so the best phrasing wins rather than the first one it thought
-  // of; stableCandidateIndex is the same deterministic pick the unified parser
-  // uses, so cover generation and the story save never diverge on the title.
+  // candidates AND names the one to ship (TITLE_PICK) — it is the only call in a
+  // beats run that has the candidates, the brief and the finished pages in one
+  // place, which is why the pick lives here instead of in a separate judge call
+  // (2026-08-27, owner: "the title can be judged in another prompt"). Without a
+  // parseable TITLE_PICK the hash pick stands: stableCandidateIndex is the same
+  // deterministic pick the unified parser uses, so cover generation and the
+  // story save never diverge on the title.
   const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z])/i) || [])[1] || '';
   const cleanTitle = s => String(s || '')
     .replace(/^\**\s*TITLE\s*:\s*/i, '')
@@ -1339,13 +1343,25 @@ SCENE: ${x.scene || ''}`.trim(),
     .filter(Boolean)
     .map(cleanTitle)
     .filter(Boolean);
+  // TITLE_PICK: 1-based candidate number + one sentence. Out of range or absent
+  // → titleJudge stays null and the hash pick below stands.
+  const pickMatch = titleSection.match(/^\s*TITLE_PICK\s*:\s*(\d+)\s*(?:[—–-]\s*(.*))?$/im);
+  const pickIdx = pickMatch ? parseInt(pickMatch[1], 10) - 1 : -1;
+  const titleJudge = (pickIdx >= 0 && pickIdx < titleCandidates.length)
+    ? { pick: pickIdx, reason: String(pickMatch[2] || '').trim(), candidates: titleCandidates }
+    : null;
+  if (pickMatch && !titleJudge) {
+    log.warn(`⚠️ [BEATS] TITLE_PICK ${pickMatch[1]} out of range (${titleCandidates.length} candidates) — falling back to the hash pick`);
+  }
   // Fall back to the first non-empty line for a writer that ignored the list
   // format — a run must never lose its title to a format miss.
-  const title = titleCandidates.length
-    ? titleCandidates[stableCandidateIndex(titleCandidates)]
-    : (cleanTitle(titleSection.split('\n').find(l => l.trim())) || null);
-  gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''}${titleCandidates.length ? ` (from ${titleCandidates.length} candidates)` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
-    pages: parsedText.pages.length, title, titleCandidates, model: textModelId,
+  const title = titleJudge
+    ? titleCandidates[titleJudge.pick]
+    : (titleCandidates.length
+      ? titleCandidates[stableCandidateIndex(titleCandidates)]
+      : (cleanTitle(titleSection.split('\n').find(l => l.trim())) || null));
+  gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''}${titleCandidates.length ? ` (from ${titleCandidates.length} candidates${titleJudge ? ', writer-picked' : ''})` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
+    pages: parsedText.pages.length, title, titleCandidates, titlePick: titleJudge?.pick ?? null, titleReason: titleJudge?.reason || null, model: textModelId,
   });
 
   /**
@@ -1453,11 +1469,16 @@ SCENE: ${x.scene || ''}`.trim(),
   const rawOutline = [
     '---TITLE---',
     // Candidates first: UnifiedStoryParser prefers the list and re-picks with
-    // the same stableCandidateIndex, so it lands on the title chosen above.
+    // TITLE_PICK when present (same 1-based number the writer emitted), else
+    // with the same stableCandidateIndex — either way it lands on the title
+    // chosen above. TITLE_PICK goes AFTER the `TITLE:` line: the parser's
+    // candidate-block regex ends at `TITLE:`, so the pick can never be read as
+    // a candidate.
     ...(titleCandidates.length
       ? ['TITLE_CANDIDATES:', ...titleCandidates.map((t, i) => `${i + 1}. ${t}`)]
       : []),
     `TITLE: ${title || '(none)'}`,
+    ...(titleJudge ? [`TITLE_PICK: ${titleJudge.pick + 1} — ${titleJudge.reason}`] : []),
     '',
     // Before ---BEATS--- on purpose: every beats extractor keys on that marker
     // with a lookahead to the next section, so a block ahead of it is invisible
@@ -1486,7 +1507,7 @@ SCENE: ${x.scene || ''}`.trim(),
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges };

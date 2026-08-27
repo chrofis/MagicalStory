@@ -4530,22 +4530,6 @@ function buildChildCriticPrompt(inputData, arc) {
   });
 }
 
-/** Picks the shipped title from the writer's candidates. */
-function buildTitleJudgePrompt(inputData, candidates = []) {
-  const template = PROMPT_TEMPLATES.titleJudge;
-  if (!template) {
-    log.error('[PROMPT] titleJudge template not loaded — title judge unavailable');
-    return null;
-  }
-  const list = (candidates || []).filter(Boolean);
-  if (list.length < 2) return null;
-  return fillTemplate(template, {
-    AGE: readerAge(inputData),
-    CANDIDATES: list.map((t, i) => `${i + 1}. ${t}`).join('\n'),
-    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
-  });
-}
-
 /** Blind audit of the beats: the auditor sees ONLY the page plan and the beats. */
 function buildBeatsAuditPrompt(beats, pagePlan = '') {
   const template = PROMPT_TEMPLATES.storyBeatsAudit;
@@ -4873,6 +4857,9 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     PAGE_COUNT: beats.length,
     BEATS: blocks,
     TITLE_RULE: buildTitleRule(inputData),
+    // The writer that produced the candidates also picks the shipped title
+    // (2026-08-27) — the reader age is the "can a child say it" yardstick.
+    AGE: readerAge(inputData),
     DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
   });
 }
@@ -5291,7 +5278,10 @@ ${adventureGuide}` : ''}`;
       PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
       CATEGORY_GUIDELINES: categoryGuidelines,
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
-      MAX_CHARACTERS_PER_SCENE: maxCharsPerScene
+      MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
+      // Reader age for the title pick the writer makes in its ---TITLE---
+      // section (2026-08-27, replaced the separate title-judge call).
+      AGE: readerAge(inputData)
     });
     // Hard gate for all text-overlay-only instructions. Layouts that render
     // text BELOW the image (square-below, advanced reading level) don't
@@ -5642,7 +5632,6 @@ module.exports = {
   buildArcReviewPrompt,
   buildArcAuditPrompt,
   buildChildCriticPrompt,
-  buildTitleJudgePrompt,
   youngestMainAge,
   buildBeatsAuditPrompt,
   buildTextAuditPrompt,

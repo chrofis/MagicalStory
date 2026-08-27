@@ -2462,31 +2462,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const parser = new UnifiedStoryParser(unifiedResponse, { isTrial: !!inputData.trialMode });
     let title = (beatsMode ? beatsResult.title : parser.extractTitle()) || streamingTitle || inputData.storyType || 'Untitled Story';
     const titleCandidates = parser.extractTitleCandidates();
-    // TITLE JUDGE. This is the first and only server-side point where the final
-    // title is fixed for BOTH pipelines — everything upstream (beatsPipeline's
-    // stableCandidateIndex, UnifiedStoryParser.extractTitle) picks a candidate by
-    // hash, which is deterministic but blind to what the title says. The judge
-    // reads the candidates against the brief and the age instead. Non-blocking:
-    // any failure keeps the hash pick exactly as it was.
+    // TITLE PICK. Which candidate ships is decided BY THE WRITER that produced
+    // the candidates — the beats page-text call, or the unified story call —
+    // both of which already hold the candidates, the brief and the reader age.
+    // It used to be a separate 300-token judge call here (usageLabel
+    // 'title_judge', prompts/title-judge.txt); the owner's directive (2026-08-27)
+    // was that the title can be judged inside another prompt rather than paying
+    // for its own call. The stored shape is unchanged: `data.titleJudge =
+    // {pick (array index), reason, candidates}`. Non-blocking — no parseable
+    // TITLE_PICK leaves `title` on the deterministic hash pick, exactly like the
+    // old judge's failure path.
+    const titlePick = beatsMode ? (beatsResult.titleJudge || null) : parser.extractTitlePick();
     let titleJudge = null;
-    if (Array.isArray(titleCandidates) && titleCandidates.length > 1) {
-      try {
-        const { buildTitleJudgePrompt } = require('./server/lib/storyHelpers');
-        const judgePrompt = buildTitleJudgePrompt(inputData, titleCandidates);
-        if (judgePrompt) {
-          const judgeRes = await callTextModelStreaming(judgePrompt, 300, null, 'claude-sonnet', { usageLabel: 'title_judge', temperature: 0 });
-          const raw = String(judgeRes?.text || '');
-          const parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
-          // The prompt numbers candidates from 1; `pick` is stored as the array index.
-          const idx = parseInt(parsed.pick, 10) - 1;
-          if (!(idx >= 0 && idx < titleCandidates.length)) throw new Error(`pick ${parsed.pick} out of range`);
-          titleJudge = { pick: idx, reason: String(parsed.reason || '').trim(), candidates: titleCandidates };
-          title = titleCandidates[idx];
-          log.info(`[TITLE-JUDGE] Picked "${title}" (${idx + 1}/${titleCandidates.length}): ${titleJudge.reason}`);
-        }
-      } catch (err) {
-        log.warn(`[TITLE-JUDGE] failed (${err.message}) — keeping "${title}"`);
-      }
+    if (titlePick && Array.isArray(titlePick.candidates) && titlePick.candidates.length > 1
+      && titlePick.pick >= 0 && titlePick.pick < titlePick.candidates.length) {
+      titleJudge = { pick: titlePick.pick, reason: String(titlePick.reason || '').trim(), candidates: titlePick.candidates };
+      title = titlePick.candidates[titlePick.pick];
+      log.info(`[TITLE-PICK] "${title}" (${titlePick.pick + 1}/${titlePick.candidates.length}) — ${titleJudge.reason || 'no reason given'}`);
+    } else if (Array.isArray(titleCandidates) && titleCandidates.length > 1) {
+      log.warn(`[TITLE-PICK] writer emitted no usable TITLE_PICK — keeping the hash pick "${title}"`);
     }
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements

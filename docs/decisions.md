@@ -20217,6 +20217,73 @@ continue to report hostile faults only.
 `storyJobPipeline.js` (title selection + `data.titleJudge`),
 `docs/prompt-inventory.md`.
 
+**Status:** ✅ active — except item 3 (TITLE JUDGE), 🗄 superseded 2026-08-27 by
+"The title is picked inside the call that writes the candidates" below.
+
+---
+
+## 2026-08-27 — The title is picked inside the call that writes the candidates (the standalone title judge is gone)
+
+**Context:** The title judge shipped 2026-08-26 as its own call: ~300 output
+tokens of `claude-sonnet` at temperature 0, `usageLabel 'title_judge'`,
+`prompts/title-judge.txt`, fired once per story from `storyJobPipeline.js`
+right after the outline parse. Owner directive (2026-08-27): *"The title can be
+judged in another prompt. No need for an own call."* Every story paid for a
+call whose entire input — the candidate list, the brief, the reader age — was
+already sitting in a call the pipeline had just made.
+
+**Decision:** The writer that produces the candidates also names the one to
+ship, as one extra output line in the section it already emits:
+
+```
+TITLE_PICK: <candidate number> — <one sentence>
+```
+
+- **Beats (primary pipeline):** host is the page-text call
+  (`prompts/story-text-from-beats.txt`, usageLabel `beats_story_text`) — the
+  only call in a beats run that holds the candidates, the brief and the
+  finished pages at once, and the same call whose `---TITLE---` section
+  `beatsPipeline.js` already parses. It returns `titleJudge` alongside `title`,
+  and writes the pick line into `rawOutline` **after** the `TITLE:` line so a
+  re-parse of `data.outline` lands on the shipped title.
+- **Unified (trials + legacy):** host is the story call itself
+  (`prompts/story-unified.txt` and `story-unified-imagefirst.txt`), whose
+  `TITLE_CANDIDATES` block `UnifiedStoryParser.extractTitle()` already reads.
+  The trial path has no other host — `splitOutlineReview` is skipped for
+  trials, so the outline review does not run there.
+- The judging criteria moved verbatim in spirit: names the adventure or the
+  bond rather than a vehicle/object/place that merely carries it, gives away no
+  ending, sayable by a child of `{AGE}` = `readerAge(inputData)` (the reading
+  level's age, **not** the cast's age).
+- Stored shape is unchanged: `data.titleJudge = {pick (array index), reason,
+  candidates}`, `data.titleCandidates` as before. Nothing else reads them
+  (server or client) besides the story save.
+- Failure path is unchanged: a missing or out-of-range `TITLE_PICK` is
+  non-blocking and leaves the deterministic `stableCandidateIndex` hash pick
+  standing, with a warning.
+
+**Rationale:** One fewer paid call and one fewer round-trip per story, with no
+loss of judgment: the writer sees strictly more than the old judge did (it has
+the finished pages, which the judge never received). The pick also becomes
+*self-consistent* — `extractTitle()` now honours `TITLE_PICK`, so the streaming
+parser (which delegates to it), the final parse and the stored outline all agree
+on the title, whereas the standalone judge left `data.outline` re-parsing to a
+hash pick that could differ from the shipped title. The alternative host for
+beats — the text audit in `textRefine.js` — was rejected: it runs in parallel
+with image generation, long after the title is fixed and used for cover
+generation, and it is subject to a join deadline.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/title-judge.txt` (deleted),
+`server/services/prompts.js` (registry line removed),
+`server/lib/promptBuilders.js` (`buildTitleJudgePrompt` deleted, `AGE` added to
+`buildStoryTextFromBeatsPrompt` + `buildUnifiedStoryPrompt`),
+`server/lib/storyHelpers.js` (facade), `server/lib/beatsPipeline.js`
+(`TITLE_PICK` parse, `titleJudge` returned, `rawOutline` line),
+`server/lib/outlineParser/unified.js` (`TITLE_PICK` preferred in
+`extractTitle`, new `extractTitlePick()`), `storyJobPipeline.js` (judge call
+removed), `docs/prompt-inventory.md`.
+
 **Status:** ✅ active
 
 ---

@@ -204,7 +204,6 @@ async function loadPromptTemplates() {
     // parallel with storyArcAudit and its faults join the same review ledger.
     ['storyChildCritic', 'story-child-critic.txt'],
     // Chooses the shipped title from the writer's candidates.
-    ['titleJudge', 'title-judge.txt'],
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],

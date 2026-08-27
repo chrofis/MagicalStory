@@ -69,6 +69,21 @@ class UnifiedStoryParser {
         })
         .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
       if (candidates.length > 0) {
+        // TITLE_PICK wins when the writer emitted one: the same call that wrote
+        // the candidates names the one to ship, against the brief and the reader
+        // age, which a hash cannot do (2026-08-27 — replaced a separate judge
+        // call). Written AFTER the `TITLE:` line, so the candidate-block regex
+        // above already stopped before it.
+        const pickMatch = section.match(/^\s*TITLE_PICK\s*:\s*(\d+)\s*(?:[—–-]\s*(.*))?$/im);
+        const pickIdx = pickMatch ? parseInt(pickMatch[1], 10) - 1 : -1;
+        if (pickIdx >= 0 && pickIdx < candidates.length) {
+          this._cache.title = candidates[pickIdx];
+          this._cache.titleCandidates = candidates;
+          this._cache.titlePick = { pick: pickIdx, reason: String(pickMatch[2] || '').trim(), candidates };
+          log.info(`[UNIFIED-PARSER] Title picked by the writer (${pickIdx + 1}/${candidates.length}): "${this._cache.title}"`);
+          return this._cache.title;
+        }
+        if (pickMatch) log.warn(`[UNIFIED-PARSER] TITLE_PICK ${pickMatch[1]} out of range (${candidates.length} candidates) — using the stable pick`);
         // Deterministic pick: stableCandidateIndex hashes the candidates and
         // picks the same index here as the streaming parser does. Without
         // this, two independent Math.random() calls produced two different
@@ -78,6 +93,7 @@ class UnifiedStoryParser {
         const pick = candidates[stableCandidateIndex(candidates)];
         this._cache.title = pick;
         this._cache.titleCandidates = candidates;
+        this._cache.titlePick = null;
         log.info(`[UNIFIED-PARSER] Picked title (stable) from ${candidates.length} candidates: "${pick}"`);
         return pick;
       }
@@ -92,12 +108,14 @@ class UnifiedStoryParser {
         .replace(/^"|"$/g, '')
         .trim();
       this._cache.titleCandidates = null;
+      this._cache.titlePick = null;
       log.debug(`[UNIFIED-PARSER] Title (legacy single-line): "${this._cache.title}"`);
       return this._cache.title;
     }
 
     this._cache.title = null;
     this._cache.titleCandidates = null;
+    this._cache.titlePick = null;
     return null;
   }
 
@@ -109,6 +127,16 @@ class UnifiedStoryParser {
   extractTitleCandidates() {
     if (this._cache.titleCandidates === undefined) this.extractTitle();
     return this._cache.titleCandidates ?? null;
+  }
+
+  /**
+   * The writer's own TITLE_PICK: `{pick (0-based index), reason, candidates}`,
+   * or null when it emitted none (older outlines, legacy single-line TITLE).
+   * This is what `data.titleJudge` is built from — no separate judge call.
+   */
+  extractTitlePick() {
+    if (this._cache.titlePick === undefined) this.extractTitle();
+    return this._cache.titlePick ?? null;
   }
 
   /**
