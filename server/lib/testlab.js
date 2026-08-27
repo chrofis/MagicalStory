@@ -3096,7 +3096,9 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   if (!['arc', 'beats', 'text'].includes(level)) throw new Error(`params.level must be arc | beats | text, got "${params.level}"`);
   const defaultModel = level === 'text'
     ? (MODEL_DEFAULTS.textAuditModel || MODEL_DEFAULTS.arcReviewModel)
-    : (level === 'arc' ? MODEL_DEFAULTS.arcReviewModel : MODEL_DEFAULTS.outlineReviewModel);
+    : (level === 'arc'
+      ? (MODEL_DEFAULTS.arcAuditModel || MODEL_DEFAULTS.arcReviewModel)
+      : (MODEL_DEFAULTS.beatsAuditModel || MODEL_DEFAULTS.outlineReviewModel));
   const models = String(params.models || params.model || defaultModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);

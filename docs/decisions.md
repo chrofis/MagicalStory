@@ -20791,3 +20791,25 @@ wardrobe pass emitted no identity findings.
 reported, while the covers on grid 6 are. 1 of 2 known defects, against 0 of 2 before.
 
 **Touched:** `server/lib/entityConsistency.js`, `prompts/entity-consistency-check.txt`.
+
+---
+
+### Arc audit = claude-opus, beats audit = gpt-5.6-sol (2026-08-27)
+**Context:** All three hostile audits ran on grok-4.6 by inheritance (arc audit
+via arcReviewModel, beats audit via outlineReviewModel) — the same model that
+writes the reviews, so grok graded its own fixes. Auditor bake-off in the Lab
+(experiments 876/877, frozen artifacts of job_1787812110559, known defects as
+ground truth): arc — opus 8/8 + 3 unique finds (only LIMIT catch), gemini ~6,
+sol ~5, grok 1; beats — sol ~6/7 at $0.08 (half gemini's cost), gemini ~7,
+opus ~6, grok 3. Text audit was decided separately (gemini-3.1-pro, same-day
+entry above); owner ruled text results must not be extrapolated across levels.
+**Decision:** MODEL_DEFAULTS.arcAuditModel = claude-opus (env ARC_AUDIT_MODEL),
+beatsAuditModel = gpt-5.6-sol (env BEATS_AUDIT_MODEL). Used by beats_arc_audit,
+beats_arc_audit2, beats_audit, beats_audit2. Review calls stay on
+arcReviewModel/outlineReviewModel (grok-4.6) — auditor and fixer are different
+models at every level. audit_replay Lab stage defaults follow the new keys.
+**Rationale:** Teeth per level per franc, measured; and no model audits its own
+rewrites anywhere in the chain.
+**Touched:** `server/config/models.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`.
+**Status:** ✅ active

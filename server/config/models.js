@@ -226,6 +226,14 @@ const MODEL_DEFAULTS = {
   // text, twice each) — unusable as auditors. Arc/beats audits are a separate
   // decision with their own bake-off.
   textAuditModel: process.env.TEXT_AUDIT_MODEL || 'gemini-3.1-pro',
+  // Arc/beats audit judges (2026-08-27 Lab experiments 876/877, frozen pirate
+  // artifacts, known-defect ground truth). Arc: opus caught 8/8 + 3 finds no
+  // other model made (incl. the only LIMIT catch); grok-4.6 caught 1. Beats:
+  // sol ~6/7 at half gemini's cost; grok caught 3. The REVIEW (fix) calls stay
+  // on arcReviewModel/outlineReviewModel — auditor and fixer are deliberately
+  // different models at every level.
+  arcAuditModel: process.env.ARC_AUDIT_MODEL || 'claude-opus',
+  beatsAuditModel: process.env.BEATS_AUDIT_MODEL || 'gpt-5.6-sol',
   // Child critic of the arc — role-play quality and speed, not hostile judgment.
   childCriticModel: process.env.CHILD_CRITIC_MODEL || 'claude-sonnet',
   // The three reviews used to share outlineReviewModel, so switching the BEATS

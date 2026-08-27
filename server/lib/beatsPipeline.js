@@ -331,6 +331,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const planModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
   const arcReviewModel = modelOverrides.arcReviewModel || MODEL_DEFAULTS.arcReviewModel || reviewModel;
+  // Auditors are separate from the reviewers that answer them (models.js:
+  // Lab 876/877) — the fixer never grades its own fix.
+  const arcAuditModel = modelOverrides.arcAuditModel || MODEL_DEFAULTS.arcAuditModel || arcReviewModel;
+  const beatsAuditModel = modelOverrides.beatsAuditModel || MODEL_DEFAULTS.beatsAuditModel || reviewModel;
   const childCriticModel = modelOverrides.childCriticModel || MODEL_DEFAULTS.childCriticModel || planModel;
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
@@ -339,9 +343,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, arcReviewModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcAuditModel, arcReviewModel, beatsAuditModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcReview=${arcReviewModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcAudit=${arcAuditModel} arcReview=${arcReviewModel} beatsAudit=${beatsAuditModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
 
   // ── Step 0: the arc, reviewed on its own ──────────────────────────────────
   // The arc is ~15 lines, so a review round here costs cents and measured +0.9
@@ -394,7 +398,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         try {
           const arcAuditPrompt = buildArcAuditPrompt(inputData, drafted);
           if (!arcAuditPrompt) return '';
-          const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit' });
+          const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcAuditModel, { usageLabel: 'beats_arc_audit' });
           const text = String(auditRes.text || '').trim();
           gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${countFaults(text)} fault(s)`, null, { byCategory: faultsByCategory(text) });
           return text;
@@ -460,7 +464,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     try {
       const audit2Prompt = buildArcAuditPrompt(inputData, approvedArc);
       if (audit2Prompt && arcAuditFindings) {
-        const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_audit2' });
+        const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, arcAuditModel, { usageLabel: 'beats_arc_audit2' });
         const findings2 = String(a2.text || '').trim();
         const n1 = countFaults(arcAuditFindings);
         const n2 = countFaults(findings2);
@@ -549,7 +553,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     const beatsAuditPrompt = buildBeatsAuditPrompt(plan.pages, pagePlan);
     if (beatsAuditPrompt) {
       await stage(4, 'Auditing the story beats...', { next: 5, ms: 120000 });
-      const auditRes = await textModels.callTextModelStreaming(beatsAuditPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_audit' });
+      const auditRes = await textModels.callTextModelStreaming(beatsAuditPrompt, null, onChunk, beatsAuditModel, { usageLabel: 'beats_audit' });
       beatsAuditFindings = String(auditRes.text || '').trim();
       gl.info('beats_audit', `Beats audit by ${auditRes.modelId || reviewModel}: ${countFaults(beatsAuditFindings)} fault(s)`, null, { byCategory: faultsByCategory(beatsAuditFindings) });
     }
@@ -637,7 +641,7 @@ SCENE: ${x.scene || ''}`.trim(),
       try {
         const audit2Prompt = buildBeatsAuditPrompt(beats, pagePlan);
         if (audit2Prompt && beatsAuditFindings) {
-          const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, reviewModel, { usageLabel: 'beats_audit2' });
+          const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, beatsAuditModel, { usageLabel: 'beats_audit2' });
           const findings2 = String(a2.text || '').trim();
           const n1 = countFaults(beatsAuditFindings);
           const n2 = countFaults(findings2);
