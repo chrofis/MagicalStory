@@ -20233,3 +20233,36 @@ this banner does get an email, and no trial user sees the 30–60 minute figure.
 problem. Backlogged separately at the owner's request.
 
 **Touched files:** `client/src/components/generation/GenerationProgress.tsx`.
+
+## 2026-08-27 — The review may not un-write the premise (post-mortem of the flattened pirate)
+
+**Context:** Staging `job_1787777447720_ll5dyf4k8g` shipped with no red line, no
+decisions, nothing to win or lose (owner: "utter catastrophe"). The DRAFT arc
+was the best any run produced — an imagination-play frame (Zürich as the crew's
+Mediterranean, the Lindenhof as an island), a perfectionist flaw, a forced
+split, a rival with a motive. The chain then destroyed it: the child critic
+flagged the frame as confusing ("real city or pretend?") and the bridge names;
+the arc review closed those faults the cheapest way — it DELETED the frame,
+moved the story onto a literal lake, and cut the old-town route, which took the
+map-misreading challenge with it. Every downstream stage faithfully executed
+the gutted arc. Secondary causes: cross-type variety exclusions injected
+toddler-story fragments and excluded the race/map mechanics; the title judge
+reasoned about "a 25-year-old" (cast age, not reader age) and blessed the
+ship-name title; the stake sentence survived the arc but died in the text and
+was falsified by the plot; an en-dash shipped on p14.
+
+**Decision:** (1) Arc/beats reviews: the draft's frame, main flaw, stake and
+challenges are FIXED MATERIAL — confusion faults are closed by clarifying where
+the thing first appears, never by cutting it or moving the world; the ledger
+must name what would have been LOST on failure and which turn shows that cost.
+(2) Child critic opens with a LIKED line a fix may never remove, and names
+confusion, never removals. (3) Prior-challenge memory filters to the same
+storyType. (4) Title judge and child critic hear at the READER's age
+(languageLevel-derived), never the cast's. (5) Proofread flags dashes.
+
+**Touched:** `prompts/story-arc-review.txt`, `prompts/story-beats-review.txt`,
+`prompts/story-child-critic.txt`, `prompts/story-text-proofread.txt`,
+`prompts/title-judge.txt`, `server/lib/beatsPipeline.js`,
+`server/lib/promptBuilders.js`.
+
+**Status:** ✅ active — validated by the next pirate rerun.

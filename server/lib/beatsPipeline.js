@@ -233,6 +233,11 @@ async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
         WHERE s.user_id = (SELECT user_id FROM story_jobs WHERE id = $1)
           AND s.id <> $1
           AND s.data->'beatsReviewReport'->>'arc' IS NOT NULL
+          -- Same story TYPE only (2026-08-27): the smoke account mixes toddler
+          -- and standard books, and cross-type exclusions injected toddler
+          -- fragments ("she reaches for the parrot") into a pirate plan while
+          -- excluding the race and map mechanics the new story needed.
+          AND s.data->>'storyType' IS NOT DISTINCT FROM (SELECT input_data->>'storyType' FROM story_jobs WHERE id = $1)
         ORDER BY s.created_at DESC
         LIMIT ${PRIOR_STORY_LIMIT}`,
       [String(jobId)]

@@ -4494,6 +4494,18 @@ function buildArcAuditPrompt(inputData, arc) {
  * to work for the youngest listener in the cast. Falls back to 5 when no main
  * character carries a usable age.
  */
+// Reader age from the reading level — the title (and the child critic's ear)
+// belong to the READER. Deriving age from the CAST broke on adult casts: a
+// 25-year-old heroine made the title judge reason "a 25-year-old can say it
+// effortlessly" and bless a ship-name title (2026-08-27).
+function readerAge(inputData) {
+  const lvl = String(inputData?.languageLevel || '').toLowerCase();
+  if (lvl === '1st-grade') return 6;
+  if (lvl === 'advanced') return 11;
+  if (lvl === 'standard') return 8;
+  return Math.min(8, youngestMainAge(inputData, 8));
+}
+
 function youngestMainAge(inputData, fallback = 5) {
   const mainIds = inputData?.mainCharacters || [];
   const chars = (inputData?.characters || []).filter(c => c && (!mainIds.length || mainIds.includes(c.id)));
@@ -4512,7 +4524,7 @@ function buildChildCriticPrompt(inputData, arc) {
     return null;
   }
   return fillTemplate(template, {
-    AGE: youngestMainAge(inputData),
+    AGE: readerAge(inputData),
     STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
     ARC: String(arc || '').trim(),
   });
@@ -4528,7 +4540,7 @@ function buildTitleJudgePrompt(inputData, candidates = []) {
   const list = (candidates || []).filter(Boolean);
   if (list.length < 2) return null;
   return fillTemplate(template, {
-    AGE: youngestMainAge(inputData),
+    AGE: readerAge(inputData),
     CANDIDATES: list.map((t, i) => `${i + 1}. ${t}`).join('\n'),
     STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
   });
