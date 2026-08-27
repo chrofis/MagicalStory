@@ -20544,5 +20544,23 @@ legitimate second pipeline under test, but it silently captured any arm whose
 axis now stays on the spine.
 
 **Touched:** `server/lib/testlab.js`.
-**Status:** 🟡 partial — mask reuse converged; two hand-rolled request builders
-remain.
+**UPDATE, same day — converged.** All four callers now build their request with
+`buildCharRepairRequest`, and all four resolve the silhouette through
+`resolveFigureMask`. What the two hand-rolled builders had been silently
+omitting, found only by converting them:
+
+| caller | was missing |
+|---|---|
+| manual endpoint | `bodyBbox` |
+| entity consistency | `artStyle`, `bodyBbox`, `protectedFaces`, `protectedBodies`, `detectionBodyMask`, `photoType`, `includeDebug` |
+
+The entity-consistency omission is the serious one: with no `artStyle` the
+prompt's "match this medium" block falls back to NOTHING, which decisions.md
+already records as 4 of 5 full-figure repairs losing the medium. It had been
+sending that on every single-page entity repair. This is precisely the failure
+the builder's unknown-key rejection exists to prevent — a field you never type
+is a field nobody notices is gone.
+
+**Status:** ✅ active — one spine, one blend engine, one request builder, one
+silhouette resolver. The Lab's insert pipeline remains a deliberate second
+pipeline under test, reachable only when no axis is named.

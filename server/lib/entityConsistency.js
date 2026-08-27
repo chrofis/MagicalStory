@@ -15,6 +15,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
+const { buildCharRepairRequest } = require('./charRepairRequest');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription, extractJsonFromText } = require('./storyHelpers');
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
@@ -2501,7 +2502,15 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
         // Head grid first (owner, 2026-08-24). Say which image answers which
         // question: a head crop cannot show a wrong outfit, and a body cell
         // renders the face at ~20 px, which is why identity drift went unscored.
-        ? 'The FIRST image shows each cell cropped to the head, at full size. Judge identity on it: face shape, facial features, hair colour, hair style, skin tone and apparent age. A SECOND image shows the same cells as full-body crops, with the same letters and the reference sheet as cell R. Judge clothing, garment colour and body build on the second image. Do not judge identity from the second image; the faces there are too small to compare.'
+        // `clothing_check` NAMES ITS IMAGE (owner, 2026-08-27). The clothing
+        // rules said "walk the checklist"; this block said "judge clothing on
+        // the second image"; neither told the model that the required
+        // per-cell enumeration is filled FROM that second image. Measured on
+        // all 12 grids of job_1787689073034_1v6ew0y1kae in this exact
+        // configuration: 0 clothing findings, while the same grids scored 2/2
+        // when the body image was primary. A garment cannot be enumerated from
+        // a head crop, so the rows came back empty and the findings with them.
+        ? 'The FIRST image shows each cell cropped to the head, at full size. Judge identity on it: face shape, facial features, hair colour, hair style, skin tone and apparent age. A SECOND image shows the same cells as full-body crops, with the same letters and the reference sheet as cell R. Judge clothing, garment colour and body build on the second image, and fill `clothing_check` from it — one row per cell, walking the expected-clothing checklist against that image before writing any other field. Do not judge identity from the second image; the faces there are too small to compare.'
         : 'A second image shows the same cells cropped to the head only, with the same letters. Judge facial features, hair colour and hair style on the second image; it shows each face at full size.',
     CLOTHING_CONTEXT: clothingContextInfo,
     CELL_INFO: JSON.stringify(cellInfo, null, 2),
@@ -3086,7 +3095,14 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
 
     const pageTextPosition = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
     const grokResult = await repairCharacterMismatch(
-      pageImage, avatarDataUri, bbox, charName, {
+      pageImage, avatarDataUri, bbox, charName,
+      // ONE request builder, same as the pipeline, the manual endpoint and the
+      // Lab. Hand-rolled here until 2026-08-27, which is how it silently sent
+      // NO artStyle (the prompt's medium block falls back to nothing — measured
+      // as 4 of 5 full-figure repairs losing the medium) and NO stored
+      // silhouette (so every entity repair re-segmented). The builder rejects
+      // unknown keys, so a field can no longer be dropped by omission.
+      buildCharRepairRequest({
         imageBackend: 'grok',
         // Default mode is picked from whiteoutTarget: body → cutout, face → blended
         whiteoutTarget,
@@ -3094,8 +3110,15 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         clothingDescription: clothingDescription || '',
         sceneDescription: sceneDesc,
         faceBbox: targetAppearance.faceBox || null,
+        bodyBbox: bbox,
+        artStyle,
         textPosition: pageTextPosition,
-      }
+        detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
+          charName,
+          { figures: (storyData.sceneImages || []).find(x => x.pageNumber === pageNumber)?.bboxDetection?.figures || [] },
+          { storyId: storyData.id, pageNumber },
+        ),
+      })
     );
 
     if (!grokResult?.imageData) {

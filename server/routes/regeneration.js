@@ -5507,6 +5507,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // what let "Sarah" land on a Visual Bible secondary and a face repair
           // white out the wrong person's head.
           const { buildPageCast, findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
+          const { buildCharRepairRequest } = require('../lib/charRepairRequest');
 
           let resolved = resolveCharBbox(characterName, {
             bestEval: { bboxDetection: sceneImage.bboxDetection, matches: sceneImage.matches },
@@ -5729,25 +5730,34 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             bbox,
             characterName,
             {
-              imageBackend: 'grok',
+              // ONE request builder, same as the automatic pipeline and the Lab.
+              // This endpoint used to hand-roll the object, which is how it
+              // silently omitted detectionBodyMask entirely and re-segmented on
+              // every manual repair. The builder rejects unknown keys, so a
+              // field can no longer be dropped by forgetting to type it.
+              ...buildCharRepairRequest({
+                imageBackend: 'grok',
+                issueDescription: issueDesc,
+                clothingDescription: clothingDesc,
+                sceneDescription: sceneDesc,
+                faceBbox,
+                bodyBbox: bbox,
+                protectedFaces,
+                protectedBodies,
+                // In-memory when this is the same run, else the stored
+                // figure_mask. Null → faceRepair re-runs SAM and reports it.
+                detectionBodyMask: figureMaskPng,
+                whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
+                includeDebug: req.user.role === 'admin',
+                photoType: avatarPhotoType,
+                artStyle,
+                textPosition: sceneImage.textPosition || null,
+              }),
+              // Mode flags are not part of the canonical request — they pick the
+              // method, and the adapter maps them onto the axes.
               useBlended: effectiveMode === 'blended',
               useCutout: effectiveMode === 'cutout',
               useFullScene: effectiveMode === 'fullScene',
-              issueDescription: issueDesc,
-              clothingDescription: clothingDesc,
-              sceneDescription: sceneDesc,
-              faceBbox,
-              protectedFaces,
-              protectedBodies,
-              // Reuse detection's silhouette instead of re-segmenting on the
-              // crop: in-memory when this is the same run, else the stored
-              // figure_mask. Null → faceRepair re-runs SAM and reports the miss.
-              detectionBodyMask: figureMaskPng,
-              whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
-              includeDebug: req.user.role === 'admin',
-              photoType: avatarPhotoType,
-              artStyle,
-              textPosition: sceneImage.textPosition || null,
               // Dev toggle: when explicitly false, skip the silhouette mask
               // composite and use Grok's bytes verbatim. Default = true.
               ...(featherComposite === false ? { featherComposite: false } : {}),
