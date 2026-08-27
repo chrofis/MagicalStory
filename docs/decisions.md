@@ -20750,3 +20750,44 @@ SEPARATE decision — text results must not be extrapolated (owner) — pending
 their own bake-off.
 **Touched:** `server/config/models.js`, `server/lib/textRefine.js`.
 **Status:** ✅ active
+
+---
+
+## 2026-08-27 — Entity consistency runs two calls per grid: identity on heads, wardrobe on bodies
+
+**Context:** The entity check reported no clothing findings in production, so a character's
+missing dungaree bib and shoulder straps shipped on three covers of
+`job_1787689073034_1v6ew0y1kae`. Measured over 12 stored grids:
+
+| configuration | clothing | identity |
+|---|---|---|
+| body grid only | 2 TP / 0 FP | weak (faces ~20px) |
+| head primary + body second (production) | 0 | 11 |
+| body primary + head second | 0 | 13 |
+
+Whenever TWO images were attached to one call, garment enumeration stopped happening — in both
+orders. Five prompt wordings failed to move it: a part-checklist rule, "the spec outranks
+majority", a per-part step in the task list, a required `clothing_check` output field, and
+binding that field explicitly to the second image. It is not perception (asked per-cell and
+per-part directly, the model names all five cells correctly) and not plumbing (the contract
+text arrives verbatim).
+
+**Decision:** two calls per grid, one image each. `focus: 'identity'` gets the head grid alone
+and is told to leave clothing silent; `focus: 'clothing'` gets the body grid alone and is told
+the faces are too small to judge. They run in parallel and merge: issues and garment-colour
+lists concatenated, score is the min, and `evalFailed` is sticky so a half-failure still fails
+closed. No head grid built → unchanged single call on the body grid.
+
+This supersedes the single-call intent recorded on 2026-08-26; the owner's "we can do this in
+one prompt" was tried five ways and does not hold. Cost is not the trade: the whole entity check
+for an 18-page book was $0.0062.
+
+**Verified** on 8 grids in the new path: covers caught (`clothing_inconsistent` MAJOR,
+`pagesToFix [-3,-2,-1]`), 0 false positives on 6 clean grids, 8 identity findings retained, and
+zero leakage in either direction — the identity pass emitted no clothing findings and the
+wardrobe pass emitted no identity findings.
+
+**Open remainder:** the same character's missing bib on p12 (grid 5, cell C) is still not
+reported, while the covers on grid 6 are. 1 of 2 known defects, against 0 of 2 before.
+
+**Touched:** `server/lib/entityConsistency.js`, `prompts/entity-consistency-check.txt`.

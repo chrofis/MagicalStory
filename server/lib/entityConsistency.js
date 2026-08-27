@@ -957,16 +957,54 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             // person. Both images still go in -- a head crop cannot show a
             // wrong outfit, so garment colour and type are judged on the body
             // grid, which also carries the reference sheet.
-            const evalResult = gridsOnly
-              ? { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' }
-              : await evaluateEntityConsistency(
-                  headGrid?.buffer || gridResult.buffer, gridResult.manifest,
-                  { entityType: 'character', entityName: charName, clothingCategory,
-                    expectedClothing,
-                    referencePhoto: refAvatar, cellCount: batchCrops.length,
-                    primaryIsHeadGrid: !!headGrid?.buffer },
-                  headGrid?.buffer ? gridResult.buffer : null
-                );
+            // TWO CALLS, ONE IMAGE EACH (owner, 2026-08-27). Attaching both
+            // images to one call silences the wardrobe half: measured over 12
+            // grids, 0 clothing findings with the head image primary and 0 with
+            // the body image primary, against 2 true positives / 0 false
+            // positives when the body grid was the ONLY image. Five prompt
+            // wordings failed to move it, so the split is structural: identity
+            // reads the head grid alone, wardrobe reads the body grid alone.
+            // The entity check costs ~$0.006 for a whole book; the second call
+            // is a rounding error against a garment defect reaching print.
+            const baseInfo = {
+              entityType: 'character', entityName: charName, clothingCategory,
+              expectedClothing, referencePhoto: refAvatar, cellCount: batchCrops.length,
+            };
+            const runPass = (buffer, focus) => evaluateEntityConsistency(
+              buffer, gridResult.manifest, { ...baseInfo, focus }, null);
+
+            let evalResult;
+            if (gridsOnly) {
+              evalResult = { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' };
+            } else if (headGrid?.buffer) {
+              const [identity, wardrobe] = await Promise.all([
+                runPass(headGrid.buffer, 'identity'),
+                runPass(gridResult.buffer, 'clothing'),
+              ]);
+              // A pass that FAILED must not be read as a clean half — keep
+              // evalFailed sticky so the report still fails closed.
+              const scores = [identity, wardrobe]
+                .filter(r => !r.evalFailed && typeof r.score === 'number')
+                .map(r => r.score);
+              evalResult = {
+                consistent: !!identity.consistent && !!wardrobe.consistent,
+                evalFailed: !!identity.evalFailed || !!wardrobe.evalFailed,
+                score: scores.length ? Math.min(...scores) : 0,
+                issues: [...(identity.issues || []), ...(wardrobe.issues || [])],
+                garmentColourMismatches: [
+                  ...(identity.garmentColourMismatches || []),
+                  ...(wardrobe.garmentColourMismatches || []),
+                ],
+                summary: [identity.summary, wardrobe.summary].filter(Boolean).join(' | '),
+                rawResponse: [identity.rawResponse, wardrobe.rawResponse].filter(Boolean).join('\n---\n'),
+                usage: [identity.usage, wardrobe.usage].filter(Boolean),
+              };
+            } else {
+              // No head grid built — the body grid alone answers both halves,
+              // which is the configuration clothing already worked in.
+              evalResult = await evaluateEntityConsistency(
+                gridResult.buffer, gridResult.manifest, baseInfo, null);
+            }
 
             gridResults.push({ gridResult, headGrid, evalResult, batchCrops });
             if (evalResult.issues) {
@@ -2411,7 +2449,7 @@ async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
  */
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
-          primaryIsHeadGrid = false } = entityInfo;
+          primaryIsHeadGrid = false, focus = null } = entityInfo;
 
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
@@ -2496,7 +2534,18 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     ENTITY_TYPE: entityType,
     ENTITY_NAME: entityName,
     REFERENCE_PHOTO_INFO: refPhotoInfo,
-    HEAD_GRID_INFO: !headGridBuffer
+    HEAD_GRID_INFO: focus === 'identity'
+      // TWO PASSES, ONE IMAGE EACH (owner, 2026-08-27). Whenever two images
+      // were attached, garment enumeration stopped happening: measured 0
+      // clothing findings across 12 grids with the head image primary AND 0
+      // with the body image primary, against 2/2 when the body grid was the
+      // ONLY image. Five prompt wordings failed to move it. So identity gets
+      // the head grid alone and wardrobe gets the body grid alone, each told
+      // to judge only its half and to leave the other silent.
+      ? 'This image shows each cell cropped to the head, at full size. Judge identity only: face shape, facial features, hair colour, hair style, skin tone and apparent age. A head crop cannot show an outfit — report no clothing or garment-colour findings and leave `clothing_check` an empty array; the wardrobe is judged separately.'
+      : focus === 'clothing'
+      ? 'This image shows each cell as a full-body crop, with the reference sheet as cell R. Judge the wardrobe only: clothing, garment colour and body build. The faces here are too small to compare — report no identity, hair, skin or age findings; those are judged separately.'
+      : !headGridBuffer
       ? ''
       : primaryIsHeadGrid
         // Head grid first (owner, 2026-08-24). Say which image answers which
