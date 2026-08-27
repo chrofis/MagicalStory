@@ -20353,3 +20353,100 @@ what it scored.
 
 **Touched:** `server/lib/images.js`.
 **Status:** ✅ active for the fix; the treatment verdict is still open.
+
+## 2026-08-27 — Five audit rules (INFERRED, PLANT, rival closure, cost receipts, cross-page repeats), measured on a shipped book — and the convergence experiment that says NOT to add another corrective round
+
+**Context:** Staging `job_1787812110559_n311ykfmin` ("Kapitänin Fiona und die
+Goldene Möwe", 16pp, de-ch) shipped with five defects no audit had named:
+(a) the rival Rossa ends up "auf dem falschen Kurs" because she skipped the
+map's stated order of signs — caused, but said on no page; (b) the hull scrapes
+the bridge arch on p14 with no stated cause, after p1 said the middle arches
+stood "weit offen"; (c) Lorena's ship compass is set up three times (empty brass
+ring p2, retrieval p4, the click into the mount) and never used again;
+(d) "Sie war am Marktstand gewesen, um Proviant zu holen." appears verbatim on
+p2 AND p3; (e) the map's rules pun *letzte Linie* (good) against *zuletzt
+ankommen* (bad). Four of the five are invisible to the audit questions that
+existed: they are not missing causes, they are causes the reader is silently
+asked to supply, plants that never pay, and repeats across a page turn.
+
+**Decision (shipped as c4595b671):**
+1. `story-arc-audit.txt` Q9 and `story-text-audit.txt` Q11 — **INFERRED**: name
+   each connection the reader must supply that no page says.
+2. `story-beats.txt` — a **rival's thread ends on a page**; the Closed list must
+   name the rival's ending and the later mark of every price paid.
+3. `story-beats-audit.txt` Q7 — **PLANT**: an object or skill shown more than
+   once before it matters and never doing work is a fault.
+4. `story-text-audit.txt` Q9 (PAYOFF) extended to **cost receipts**: a price
+   paid that vanishes without a later page showing its mark.
+5. `story-text-proofread.txt` — repeat window extended to the **previous page**.
+
+**Replay evidence (grok-4.6, the production audit judge, on the shipped book):**
+
+*Text audit, two samples:* 13 and 16 faults, every line tagged.
+- INFERRED found (a) in BOTH samples — *"FAULT[INFERRED]: p15 — nothing states
+  why Rossa, who holds the same map and overheard the second sign, sails off the
+  final line."*
+- INFERRED found (b) in sample 2 — *"FAULT[INFERRED]: p14 — the same arch Rossa
+  already cleared now scrapes the railing for an unstated reason."*
+- Cost receipts found the scrape's missing mark in BOTH — *"FAULT[PAYOFF]: p14 —
+  the deep scrape in the railing is never shown to leave any later mark."*
+- The cross-page repeat window found (d) in both — *"FAULT[LANGUAGE]: p3 — the
+  sentence about Sarah's market errand is repeated verbatim from page 2."*
+- Not found by any run: (e), the *letzte Linie* / *zuletzt* pun.
+
+*Arc audit on `arcReviewReport.drafted`:* 10 faults, including an INFERRED on
+exactly the rival question — *"the reader must supply why the rival fails"* —
+plus a LIMIT fault naming the faster hull as the unbroken limit that should have
+let Rossa win. The rule works at arc level, where it is cheapest to fix.
+
+*Beats audit on the reconstructed final beats:* 7 faults, **no PLANT line, and
+nothing about the compass**. The PLANT question did not fire on the one case it
+was written for. It is not dilution — the beats do give the compass a small job
+(p11 has Lorena "her eyes on the compass she brought"), so the object is not
+strictly inert in the beats even though it is inert in the shipped prose. **The
+compass class is still unproven; PLANT ships as written and needs a second
+story before anyone claims it works.**
+
+*On the "22 → 13 dilution" reading — it is not a valid comparison.* The stored
+`textRefineReport.audit` (22 faults) was measured on the PRE-refine text and
+`audit2` (19 causality faults) on the text after round 2; the shipped text is
+the output of a third, corrective round. Verified by phrase absence: all 8
+spot-checked audit2 findings («Schleife», «das zweite Mal war genommen», «die
+Ruder», «das Meer still dahinter», …) name strings that do not exist in the
+shipped book. There is no old-template baseline on the shipped text, so the new
+template's 13-16 cannot be read as a drop from 22.
+
+**Convergence experiment — one more corrective round: NO.** The conditional
+corrective round is already wired (`textRefine.js`, 451981ccc) and already fired
+on this story: `rounds: 3` = two refine rounds plus the audit2 corrective one,
+and it fixed every one of the eight language faults spot-checked above. Replaying
+ONE further round on the shipped text with the stored audit2 findings
+(deepseek-v4-pro, 64k cap, $0.117, 436s) rewrote 7 pages (2, 3, 4, 5, 9, 13, 15)
+and:
+- fixed **0 of the 5** known defects — (d) the Marktstand sentence is still
+  verbatim on p2 and p3; (e) untouched; (a) untouched; p14 not rewritten at all;
+  (c) made *worse* — p2 lost "zum Putzen", the only reason the compass was
+  ashore;
+- introduced **3 new problems** — p2 pre-empts the p13 reveal by adding
+  "Vielleicht zeigte er eine Richtung." to the map's own description, killing the
+  discovery the book is built on; p9 sends "Fiona, Facundo, Saira **und Sarah**"
+  ashore, changing an event and contradicting a scene brief that stages three
+  figures in the lane; p9 deletes the landmark name "Stüssibrunnen" for "Brunnen
+  mit dem niedrigen Trog".
+
+**Rationale:** the extra round was answering STALE findings — audit2 describes a
+text the corrective round had already replaced — so it invented work, and
+invented work in a refiner means rewritten events. That is the founding
+invariant of the stage (2026-08-05: prose only, never events) failing exactly
+where a second corrective pass would put it. Rounds are not the lever; the
+audit's QUESTIONS are. The five rules above find (a), (b) and (d) on the first
+pass, at the arc and beats stages where a fix is still cheap.
+
+**Touched:** `prompts/story-arc-audit.txt`, `prompts/story-beats-audit.txt`,
+`prompts/story-beats.txt`, `prompts/story-text-audit.txt`,
+`prompts/story-text-proofread.txt` (all in c4595b671); `docs/decisions.md`.
+No pipeline code changed.
+
+**Status:** ✅ active for the five rules. ❌ a second corrective refine round is
+rejected — do not wire one. 🟡 PLANT and the (e) pun class are unproven and need
+a second story.
