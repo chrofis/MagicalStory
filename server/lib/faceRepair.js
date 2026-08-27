@@ -453,7 +453,7 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
 
 // BLUR — shape-aware silhouette-clipped blur over the figure.
 // FAITHFULNESS-CHECK: images.js:11535-11582 (blurFace shapeAware branch).
-async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage, providedMaskPng = null }) {
+async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage, providedMaskPng = null, maskFetch = null }) {
   const sharp = require('sharp');
   const { fetchFaceHeadMaskPng, fetchSilhouettePng, fetchFigureMaskPng } = require('./imageCompositing');
   const fLeft = boxInCrop[0], fTop = boxInCrop[1];
@@ -476,12 +476,22 @@ async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCove
   // Same rule as whiteout: a caller holding the exact silhouette supplies it
   // and no segmenter runs. Without it a body blur falls back to blurring the
   // whole BOX, which smears the neighbouring figures too.
+  // THE BLUR IS CLIPPED TO THE SAM SILHOUETTE — never to the box (owner,
+  // 2026-08-27: "you now blur the box. You must blur only the SAM cutout part").
+  // Without a silhouette this used to fall through and blur the whole rectangle,
+  // which smears the background and any neighbour inside it: on Lab 867 that
+  // painted a blurred slab across the tower behind the target's head. A missing
+  // silhouette is a FAILURE, exactly as it is for whiteout — the retrying
+  // fetcher is tried first, and only then do we give up loudly, instead of
+  // shipping a different treatment under the same name.
   const silhouettePng = providedMaskPng
     ? await sharp(providedMaskPng).extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight }).png().toBuffer()
-    : (faceOnly
-      ? (await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg))
-      : (await fetchFigureMaskPng(cropJpeg, innerFaceBox, {}) || await fetchSilhouettePng(cropJpeg)));
-  if (silhouettePng) {
+    : (maskFetch ? await maskFetch(cropJpeg, innerFaceBox, {}) : null)
+      || (faceOnly
+        ? (await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg))
+        : (await fetchFigureMaskPng(cropJpeg, innerFaceBox, {}) || await fetchSilhouettePng(cropJpeg)));
+  if (!silhouettePng) throw new Error('SAM silhouette unavailable for blur — refusing to blur the raw box (MobileSAM down?)');
+  {
     const blurredWithAlpha = await sharp(blurred).ensureAlpha().composite([{ input: silhouettePng, blend: 'dest-in' }]).png().toBuffer();
     composite = { input: blurredWithAlpha, left: fLeft, top: fTop };
     const silAlpha = await sharp(silhouettePng).resize(fWidth, fHeight, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
@@ -922,6 +932,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     treated = await buildBlurTreatment({
       cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage,
       providedMaskPng: cropProvidedMask,
+      maskFetch,
     });
   } else {
     throw new Error(`${descriptor}: unknown treatment "${treatment}"`);
