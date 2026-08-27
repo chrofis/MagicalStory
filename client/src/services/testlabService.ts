@@ -475,6 +475,8 @@ export const TESTLAB_STAGES = [
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
   // Reader's-eye pass: each page's text next to the image that shipped on it.
   { id: 'book_audit', label: 'Book audit — page text + shipped image, in reading order', producesImage: false, overridable: true, storyLevel: true },
+  // Auditor bake-off: the frozen artifact of one level vs a list of models.
+  { id: 'audit_replay', label: 'Audit replay — arc/beats/text audit on stored artifact, per model', producesImage: false, overridable: true, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
   { id: 'beats_scenes', label: 'Beats + scenes → fast review (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },

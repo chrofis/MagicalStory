@@ -3075,6 +3075,92 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
 }
 
 /**
+ * Audit replay — run the hostile audit for one level (arc | beats | text) on a
+ * story's STORED artifact with one or more models. The artifact is frozen, so
+ * the only variable is the model (or an overridden prompt): this is the
+ * auditor bake-off as a repeatable Lab stage. Report only — writes nothing
+ * back to the story.
+ *
+ * params.level  : 'arc' | 'beats' | 'text' (required)
+ * params.models : comma list of TEXT_MODELS keys (default: the production
+ *                 auditor for that level)
+ */
+async function runAuditReplayStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, withTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const H = require('./storyHelpers');
+
+  const level = String(params.level || '').toLowerCase();
+  if (!['arc', 'beats', 'text'].includes(level)) throw new Error(`params.level must be arc | beats | text, got "${params.level}"`);
+  const defaultModel = level === 'text'
+    ? (MODEL_DEFAULTS.textAuditModel || MODEL_DEFAULTS.arcReviewModel)
+    : (level === 'arc' ? MODEL_DEFAULTS.arcReviewModel : MODEL_DEFAULTS.outlineReviewModel);
+  const models = String(params.models || params.model || defaultModel)
+    .split(',').map(x => x.trim()).filter(Boolean);
+  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const outline = String(storyData.outline || '');
+  let prompt = null;
+  let templateKey = null;
+  if (level === 'arc') {
+    templateKey = 'storyArcAudit';
+    const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
+    if (!arc.trim()) throw new Error('story has no stored arc to audit');
+    prompt = H.buildArcAuditPrompt(storyData, arc);
+  } else if (level === 'beats') {
+    templateKey = 'storyBeatsAudit';
+    const beatsSection = (outline.match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
+    const beats = H.parseBeats(beatsSection).pages;
+    if (!beats.length) throw new Error('story has no stored beats to audit');
+    const pagePlan = (outline.match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
+    prompt = H.buildBeatsAuditPrompt(beats, pagePlan);
+  } else {
+    templateKey = 'storyTextAudit';
+    const pages = (storyData.sceneImages || [])
+      .map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: p.sceneIntent || p.sceneDescription }))
+      .filter(p => String(p.text || '').trim());
+    if (!pages.length) throw new Error('story has no page text to audit');
+    prompt = H.buildTextAuditPrompt(storyData, pages);
+  }
+  if (!prompt) throw new Error(`${templateKey} template unavailable`);
+
+  const t0 = Date.now();
+  const runs = await Promise.all(models.map(async (model) => {
+    const t = Date.now();
+    try {
+      const res = await withTemplates({ [templateKey]: promptOverride }, () =>
+        callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 }));
+      const raw = String(res.text || '').trim();
+      return {
+        model,
+        modelId: res.modelId || TEXT_MODELS[model].modelId,
+        ok: raw.length > 0,
+        faults: H.countFaults(raw),
+        byCategory: H.faultsByCategory(raw),
+        faultLines: raw.split('\n').filter(l => /^FAULT/.test(l.trim())),
+        raw: raw.slice(0, 30000),
+        elapsedMs: Date.now() - t,
+        usage: { input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0 },
+        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+      };
+    } catch (e) {
+      return { model, ok: false, error: e.message, elapsedMs: Date.now() - t };
+    }
+  }));
+  return {
+    ok: runs.some(r => r.ok),
+    level,
+    elapsedMs: Date.now() - t0,
+    promptChars: prompt.length,
+    runs,
+    logLines: runs.flatMap(r => [`— ${r.model}: ${r.ok ? `${r.faults} fault(s), ${Math.round(r.elapsedMs / 1000)}s, $${(r.cost || 0).toFixed(3)}` : `FAILED ${r.error || 'empty output'}`}`, ...(r.faultLines || [])]),
+  };
+}
+
+/**
  * Outline-review model comparison (split outline review, Call 2). Target:
  * {storyId}. Compares how DIFFERENT models perform AS THE REVIEWER.
  *
@@ -7479,6 +7565,7 @@ const STORY_STAGES = {
   cover_title_paintin: runCoverTitlePaintinStage,
   style_check: runStyleCheckStage,
   book_audit: runBookAuditStage,
+  audit_replay: runAuditReplayStage,
   style_repair: runStyleRepairStage,
   outline_review: runOutlineReviewStage,
   text_refine: runTextRefineStage,
