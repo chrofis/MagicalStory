@@ -2424,6 +2424,30 @@ async function evaluateImageBatch(images, options = {}) {
         }
       }
 
+      // TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27). missing_character is
+      // the only finding built on NOT seeing something, so one blind spot can
+      // fabricate it. Here — and only here — both enumerations of this image
+      // exist: the detector's named figures and the evaluator's matches[]. If
+      // EITHER placed the character in the picture, the absence claim is
+      // contradicted and is dropped before it can be billed.
+      //
+      // The eval already deducts for a genuine absence; this does not add a
+      // second charge, it removes a wrong one. Both witnesses silent ->
+      // untouched, and the existing deduction stands.
+      let presenceDrops = [];
+      if (qualityResult) {
+        const { charactersSeenByAnyWitness, dropContradictedAbsences } = require('./identityAgreement');
+        const seen = charactersSeenByAnyWitness(qualityResult, bboxDetection?.figures);
+        if (seen.size > 0) {
+          presenceDrops = dropContradictedAbsences(
+            [qualityResult.fixableIssues, qualityResult.threeStageResult?.fixableIssues,
+             qualityResult.threeStageResult?.issues, qualityResult.semanticResult?.semanticIssues],
+            seen,
+            { pageLabel: `PAGE ${img.pageNumber}: ` }
+          );
+        }
+      }
+
       // Create bbox overlay image for dev mode display
       let bboxOverlayImage = null;
       if (bboxDetection) {
@@ -2446,6 +2470,10 @@ async function evaluateImageBatch(images, options = {}) {
         verdict: qualityResult?.verdict || null,
         issuesSummary: qualityResult?.issuesSummary || null,
         fixableIssues: qualityResult?.fixableIssues || [],
+        // Absence claims removed because a witness saw the character (see the
+        // two-witness block above). Recorded, not silent: a drop is evidence
+        // about the evaluator, not just a quieter score.
+        ...(presenceDrops.length ? { presenceDrops } : {}),
         fixTargets: qualityResult?.fixTargets || [],
         enrichedFixTargets,
         figures: qualityResult?.figures || [],

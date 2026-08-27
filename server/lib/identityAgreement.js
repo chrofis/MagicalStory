@@ -20,6 +20,8 @@
  * a face at picture-book scale.
  */
 
+const { log } = require('../utils/logger');
+
 
 // Pair on BODIES, not faces. Identity here is carried by clothing, and clothing
 // is on the body — a face box tests the weakest signal the two sides share, and
@@ -206,4 +208,75 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   return report;
 }
 
-module.exports = { checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity };
+/**
+ * TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27: "If both say a figure is
+ * missing it is missing. If only one sees the figure it is there.").
+ *
+ * `missing_character` is the one finding that rests on NOT seeing something,
+ * which makes it the one finding a single blind spot can fabricate. Two
+ * independent enumerations of the same image exist by this point:
+ *
+ *   the DETECTOR  — GroundingDINO figures, each carrying a resolved name
+ *   the EVALUATOR — qualityResult.matches[], a complete figure list with a
+ *                   `reference` name per figure, emitted whether or not the
+ *                   evaluator has any finding about that figure
+ *
+ * The compliance step already cross-checks matches[] against the vision
+ * inventory, but it never sees the detector. So a character the detector found
+ * and the evaluator overlooked could still be billed as absent. Measured case:
+ * on one page a child carrying another child on his shoulders was missed by the
+ * detector (the rider occludes him) — the mirror of this, and the reason a
+ * single witness must not convict.
+ *
+ * Returns the names of characters at least ONE witness placed in the image.
+ * A caller uses it to drop an absence claim; it never creates one.
+ */
+function charactersSeenByAnyWitness(evalLike, detFigures) {
+  const seen = new Set();
+  for (const f of (detFigures || [])) {
+    const n = String(f?.name || '').trim().toLowerCase();
+    if (n && n !== 'unknown') seen.add(n);
+  }
+  const matches = Array.isArray(evalLike?.matches) ? evalLike.matches
+    : Array.isArray(evalLike?.qualityResult?.matches) ? evalLike.qualityResult.matches : [];
+  for (const m of matches) {
+    const n = String(m?.reference || m?.name || '').trim().toLowerCase();
+    if (n && n !== 'unknown') seen.add(n);
+  }
+  return seen;
+}
+
+/**
+ * Drop `missing_character` claims about someone a witness actually saw.
+ *
+ * Type-driven, not text-driven: the bucket map owns which types are absence
+ * claims, and the character comes from the finding's own `character` field —
+ * no prose is read (scoring.js: NO TEXT MATCHING IN SCORING). A claim naming
+ * nobody is left alone, since there is nothing to check it against.
+ *
+ * Mutates the issue arrays in place and returns what it dropped, so the caller
+ * can log it and the Lab can show it.
+ */
+function dropContradictedAbsences(issueArrays, seenNames, { pageLabel = '' } = {}) {
+  const dropped = [];
+  const isAbsenceClaim = (i) => String(i?.type || i?.subType || '').toLowerCase() === 'missing_character';
+  for (const arr of issueArrays) {
+    if (!Array.isArray(arr)) continue;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const issue = arr[i];
+      if (!isAbsenceClaim(issue)) continue;
+      const who = String(issue.character || issue.affectedCharacter || '').trim().toLowerCase();
+      if (!who || !seenNames.has(who)) continue;
+      dropped.push({ character: issue.character || issue.affectedCharacter, severity: issue.severity, source: issue.source || null });
+      arr.splice(i, 1);
+    }
+  }
+  if (dropped.length) {
+    log.warn(`👥 [PRESENCE] ${pageLabel}dropped ${dropped.length} missing_character claim(s) contradicted by a witness: ${dropped.map(d => d.character).join(', ')}`);
+  }
+  return dropped;
+}
+
+module.exports = {
+  charactersSeenByAnyWitness,
+  dropContradictedAbsences, checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity };

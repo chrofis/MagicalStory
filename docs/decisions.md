@@ -14112,6 +14112,53 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-27 — An absence needs two witnesses
+
+**Context.** Task #38 asked for a finding when a character the outline puts in a
+scene is never drawn. Two constraints killed the obvious build:
+
+1. The agreed gate was "the prose names them AND detection finds no figure", but
+   `scoring.js` carries the owner's 2026-08-09 rule — NO TEXT MATCHING IN
+   SCORING. Reading the prose to decide is exactly that.
+2. The purely structured version (expected cast minus detected names) fires on
+   19% of production pages, and a verified sample shows why that is not a defect
+   rate: on `job_1787514321173_gvs2ojo4o0n` p17 the "missing" child is the boy
+   CARRYING another child on his shoulders. He is drawn; the rider occludes him
+   and the detector missed him, `unknownFigures: 0`, so nothing rescues him.
+   Charging that page would punish correct art for a detection blind spot.
+
+**Owner's rule.** "We have DINO detection and Eval detection. Both list all
+figures... If both say a figure is missing it is missing. If only one sees the
+figure it is there." And: the eval already deducts for a genuine absence, so this
+must not add a second charge.
+
+**Decision.** `missing_character` is the one finding built on NOT seeing
+something, which makes it the one finding a single blind spot can fabricate. At
+the single point where both enumerations of an image exist — the detector's named
+figures and the evaluator's `matches[]`, which lists every figure with a
+`reference` whether or not it has a finding about it — any `missing_character`
+claim naming someone a witness DID see is dropped before it can be billed. Both
+witnesses silent leaves the claim untouched and its existing deduction stands.
+
+Type-driven, not text-driven: the type decides what is an absence claim and the
+finding's own `character` field says who it is about. No prose is read.
+
+The compliance step already did half of this — it cross-checks `matches[]`
+against the vision inventory (`image-prompt-compliance.txt`) — but it never sees
+the detector, so a character the detector found and the evaluator overlooked
+could still be billed absent. This closes that side.
+
+Drops are recorded on the eval result as `presenceDrops` rather than being
+silent: a dropped claim is evidence about the evaluator, not just a quieter
+score.
+
+**Verified** on the shapes from the real p17 case: a character seen only by the
+evaluator, and one seen only by the detector, both dropped; a character seen by
+neither kept with its deduction; a non-absence finding about a seen character
+untouched.
+
+**Touched files.** `server/lib/identityAgreement.js`, `server/lib/images.js`.
+
 ## 2026-08-27 — A refreshed winner gets NAMED figures, not anonymous boxes
 
 **Context.** Task #37 started as "a style-repair version that wins the pick ships
