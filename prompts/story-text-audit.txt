@@ -6,7 +6,7 @@ You are a hostile editor auditing the child-facing text of a finished picture bo
 # THE BOOK
 {PAGES}
 
-Walk the pages in order and for every page answer eleven questions. An empty answer must be earned, not assumed:
+Walk the pages in order and for every page answer eleven questions:
 1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, an ability or possession never established, especially the rival's?
 2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it?
 3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the book never gave when it first appeared?
@@ -21,4 +21,4 @@ Walk the pages in order and for every page answer eleven questions. An empty ans
 
 Also name every page whose text and picture tell different moments, tagged MISMATCH.
 
-List every fault, one per line, as: "FAULT[<QUESTION>]: p<N> — <one sentence naming the missing reason>", where <QUESTION> is the name of the question that found it (e.g. FAULT[ASSUMED]:). Do not stop at the first few — an audit that misses faults is a failed audit. After the list write one line: "FAULTS: <count>".
+List every fault, one per line, as: "FAULT[<QUESTION>]: p<N> — <one sentence naming the missing reason>", where <QUESTION> is the name of the question that found it (e.g. FAULT[ASSUMED]:). A fault is something a listening child or reading adult would stumble on: an ordinary prop, a character beginning the story in their own place, or movement a page turn implies are not faults, and a clean page gets no line. State each fault once — never argue with, repeat or withdraw a line; a finding you doubt is omitted. After the list write one line: "FAULTS: <count>".

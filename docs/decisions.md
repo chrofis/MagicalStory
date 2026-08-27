@@ -20476,3 +20476,30 @@ would strip the scene hints' only identity anchor.
 **Touched:** `prompts/story-trial.txt` (rule + `{CHARACTERS}` label),
 `server/lib/promptBuilders.js` (`buildTrialStoryPrompt` comment).
 **Status:** ✅ active
+
+---
+
+### Audit judges: no forced fault floor, hardened list format (2026-08-27)
+**Context:** All three hostile audits (arc/beats/text) carried "An empty answer
+must be earned, not assumed" and "an audit that misses faults is a failed
+audit". Measured effect on job_1787812110559_n311ykfmin: audit2 rounds report a
+constant ~12-19 fault floor on any artifact, padded with immaterial findings (a
+pencil "never established", the captain already aboard her own ship at the
+book's opening, an unshown telescope handoff), and the text audit2 output
+degenerated late — argued with itself, left withdrawn findings in the list, and
+listed three faults twice each (30 counted, ~20 real). Reviews then spend
+rewrite effort answering noise. Owner: "Why do we force the judge to output a
+floor... it costs tokens for nothing... why produce it in the first place."
+**Decision:** Remove the forcing lines from the three audit prompts. Add a
+materiality rule (a fault is something a reader would stumble on; ordinary
+props, a character beginning in their own place, movement a page turn implies
+are not faults; a clean page gets no line) and a format rule (state each fault
+once; never argue with, repeat or withdraw a line; a doubted finding is
+omitted).
+**Rationale:** Fault-by-fault matching showed the review already closes ~90% of
+named faults; the stable count came from the judge regenerating a floor on new
+material, not from unfixed defects. The count becomes a real defect measure
+instead of a pressure gauge.
+**Touched:** `prompts/story-arc-audit.txt`, `prompts/story-beats-audit.txt`,
+`prompts/story-text-audit.txt`.
+**Status:** ✅ active
