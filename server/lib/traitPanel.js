@@ -80,86 +80,10 @@ async function _traitProbe(vendor, b64, mimeType) {
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-/**
- * Compare the traits VISIBLE IN AN IMAGE against a character's stored traits.
- *
- * Used to ask whether a generated avatar still looks like the child its traits
- * describe. Returns one entry per field where the buckets disagree, plus the
- * raw readings, so a caller can show its work.
- */
-async function compareTraitsToImage(imageData, storedTraits, { vendors = ['qwen', 'haiku'] } = {}) {
-  const b64 = String(imageData).replace(/^data:image\/\w+;base64,/, '');
-  const mimeType = (String(imageData).match(/^data:(image\/\w+);base64,/) || [])[1] || 'image/jpeg';
-  const readings = {};
-  for (const v of vendors) {
-    try { readings[v] = await _traitProbe(v, b64, mimeType); }
-    catch (e) { readings[v] = null; log.warn(`[TRAIT-COMPARE] ${v} probe failed: ${e.message}`); }
-  }
-  const available = Object.entries(readings).filter(([, r]) => r);
-  const mismatches = [];
-  for (const field of TRAIT_REVIEW_FIELDS) {
-    const expected = _traitBucket(field, storedTraits?.[field]);
-    if (!expected) continue;
-    const seen = available
-      .map(([vendor, r]) => ({ vendor, bucket: _traitBucket(field, r[field]), raw: r[field] }))
-      .filter(x => x.bucket);
-    if (seen.length === 0) continue;
-    // Only a UNANIMOUS disagreement counts — one vendor differing is noise.
-    const allDisagree = seen.every(x => x.bucket !== expected);
-    if (allDisagree) {
-      mismatches.push({
-        field,
-        expected,
-        expectedRaw: storedTraits?.[field] ?? null,
-        seen: seen.map(x => ({ vendor: x.vendor, bucket: x.bucket, raw: x.raw })),
-      });
-    }
-  }
-  return { mismatches, readings, vendorsAvailable: available.map(([v]) => v) };
-}
-
-/**
- * Resolve a character's stored traits into the panel's field names.
- *
- * They are NOT all in one place, and the naive `character.traits ||
- * character.physical` chain reads an empty `traits` object and stops there —
- * which is how the first Lab run compared against five nulls and reported a
- * trivial "matches" (experiment #859). Explicit mapping, no fallback chain:
- *   hairColor / eyeColor / skinTone   physical.*
- *   hairStyle                         physical.detailedHairAnalysis.type
- *   hairLength                        physical.detailedHairAnalysis.lengthTop
- * `traits` and `avatars.extractedTraits` win when they actually carry a value,
- * because the 3-model review writes its overrides there.
- */
-function resolveStoredTraits(character) {
-  const ph = character?.physical || {};
-  const dha = ph.detailedHairAnalysis || {};
-  const t = character?.traits || {};
-  const ex = character?.avatars?.extractedTraits || {};
-  const pick = (...vals) => vals.find(v => v != null && v !== '') ?? null;
-  return {
-    hairColor: pick(t.hairColor, ex.hairColor, ph.hairColor),
-    hairStyle: pick(t.hairStyle, ex.hairStyle, dha.type),
-    // hairLength is DELIBERATELY not resolved from detailedHairAnalysis.lengthTop
-    // (owner-confirmed 2026-08-26). They are different measurements on the same
-    // scale: lengthTop is "the longest hair ON TOP OF THE HEAD", while a vision
-    // model asked for "hairLength" answers with OVERALL length. On a child with
-    // a ponytail the top section legitimately reads ear-length while her hair is
-    // long, so comparing the two produced a phantom mismatch that flipped
-    // between identical runs (Lab #860 flagged it, #861 did not). Only compare
-    // fields that measure the same thing.
-    hairLength: pick(t.hairLength, ex.hairLength, ph.hairLength),
-    eyeColor: pick(t.eyeColor, ex.eyeColor, ph.eyeColor),
-    skinTone: pick(t.skinTone, ex.skinTone, ph.skinTone),
-    facialHair: pick(t.facialHair, ex.facialHair, ph.facialHair),
-  };
-}
 
 module.exports = {
   TRAIT_REVIEW_FIELDS,
   _TRAIT_HEX_ON_OVERRIDE,
   _traitBucket,
   _traitProbe,
-  compareTraitsToImage,
-  resolveStoredTraits,
 };

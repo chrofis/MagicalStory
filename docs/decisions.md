@@ -14112,6 +14112,39 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-27 — The avatar colour check is REJECTED and removed
+
+**Context.** The avatar gate grades face geometry only, and passed a visibly
+drifted avatar at 9/10 while its eyes came out brown against a green-eyed spec.
+A Lab-only check was built to test whether reading the avatar and the source
+photo with two other model families (Qwen, Haiku) and comparing bucketed traits
+could catch that.
+
+**Decision: rejected by the owner. Removed, not parked.** Do not rebuild it, and
+do not propose it again as a fix for avatar drift.
+
+Removed: `params.colourCheck` and its block in `runAvatarEvalStage`, the
+`tl_face_photo` Lab version, `compareTraitsToImage` and `resolveStoredTraits`.
+
+**Kept, because it is a different thing and it is live:** the 3-model trait
+review panel that runs at character creation (`TRAIT_REVIEW_FIELDS`,
+`_traitBucket`, `_traitProbe`), now in `server/lib/traitPanel.js` and required by
+`routes/avatars.js`. That is the owner-wanted best-of-3 on the START avatar's
+traits.
+
+**What it cost and what it bought**, recorded so the trade is not re-argued: it
+found two bugs in itself (a null trait resolution that reported a confident false
+"matches", and `hairLength` compared against `detailedHairAnalysis.lengthTop`,
+which measures the hair on top of the head, not overall length) and produced one
+true positive on a local run. It never produced a valid true positive inside the
+Lab across three runs (#859, #860, #861).
+
+**Still open, untouched by this:** the second half of the original task — the
+gate SHIPS an avatar anyway when its own face-match score is poor, rather than
+retrying. That behaviour is unchanged and unaddressed.
+
+**Touched files.** `server/lib/testlab.js`, `server/lib/traitPanel.js`.
+
 ## 2026-08-27 — An absence needs two witnesses
 
 **Context.** Task #38 asked for a finding when a character the outline puts in a
