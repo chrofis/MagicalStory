@@ -664,12 +664,33 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const { consolidateEvaluation } = require('./feedbackConsolidator');
   const consolidatorStoryId = storyData?.id || jobId || null;
   const consolidateLimit = pLimit(Math.min(evalConcurrency, 20));
+
+  // ---------------------------------------------------------------------
+  // Reader findings — the mid-loop book audit's IMG faults, page-scoped.
+  //
+  // Owner directive (supersedes "IMG faults are MEASURE-ONLY"): the book audit
+  // runs after EACH repair round and its IMG faults feed the NEXT round's
+  // consolidator. Every other evaluator reads ONE artefact; the audit is the
+  // only judge that reads the page's words and its picture together, so a
+  // "the text says the character is holding the lantern, the picture has empty
+  // hands" fault exists nowhere else. Measured on one production book
+  // (job_1787812110559): 27 IMG faults recorded, 0 acted on.
+  //
+  // Findings go into the consolidator's PROMPT as a labelled section and
+  // nothing more — the consolidator decides what becomes a fix target. No code
+  // reads the fault text. Rewritten wholesale after each audit: the faults
+  // describe the state that audit read, not an accumulating list.
+  // ---------------------------------------------------------------------
+  const readerFindingsByPage = new Map();   // pageNumber -> [{ severity, line }]
+  const bookAuditRounds = [];
+
   const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null) => {
     try {
       const orig = rawImages.find(i => i.pageNumber === pageNumber);
       const res = await consolidateEvaluation({
         evalResult: ev,
         entityIssues,
+        readerFindings: readerFindingsByPage.get(pageNumber) || [],
         // A repaired version is consolidated against ITS OWN contract (an
         // iterate rewrite resolves spec conflicts — checking the ORIGINAL
         // description would re-flag the fixed version and loop the repair).
@@ -2362,6 +2383,68 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       }
     }
+
+    // ── MID-LOOP BOOK AUDIT — the reader's-eye pass, fed forward ──────────
+    // Reads the CURRENT state of the book (each page's picked version + its
+    // text, in order) and hands its IMG faults to the next round's
+    // consolidator via readerFindingsByPage.
+    //
+    // Skipped on the LAST round: nothing would consume the findings, and the
+    // final audit at the end of generation already covers the shipped state.
+    //
+    // The text here may be PRE-REFINE. That is fine: refine rewrites wording,
+    // never events — a fault about the picture disagreeing with what happens
+    // on the page reads the same before and after.
+    //
+    // Non-blocking, exactly like the final call: auditStoryBook never throws,
+    // and a null result contributes nothing.
+    //
+    // Second spend guard: a round where every repair failed leaves the book
+    // byte-identical, so re-auditing it buys the same findings twice. It still
+    // runs when no audit has happened yet — those findings are new.
+    const bookUnchanged = roundSuccess.length === 0 && bookAuditRounds.length > 0;
+    if (round < maxRegenAttempts && !bookUnchanged) {
+      try {
+        const { auditStoryBook } = require('./bookAudit');
+        const auditPages = rawImages.map(img => {
+          const best = selectBestVersion(pageVersions.get(img.pageNumber) || []);
+          const imageData = best?.imageData || img.imageData;
+          if (!imageData) return null;
+          return { pageNumber: img.pageNumber, text: img.text, imageData };
+        }).filter(Boolean);
+        const audit = auditPages.length > 0
+          ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
+          : null;
+        if (audit) {
+          readerFindingsByPage.clear();
+          for (const f of audit.byRoute.IMG) {
+            // Page-scoped only — a fault with no page number cannot be routed
+            // to a consolidator call, which is per page.
+            if (f.page == null) continue;
+            if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
+            readerFindingsByPage.get(f.page).push({ severity: f.severity || null, line: f.line });
+          }
+          // Compact per-round record — same shape as entityHistory's entries.
+          // The full `raw` transcript is kept for the FINAL audit only.
+          bookAuditRounds.push({
+            round,
+            checkedAt: new Date().toISOString(),
+            modelId: audit.modelId,
+            faults: audit.faults,
+            byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
+            // IMG faults verbatim — the evidence for what the next round was
+            // told. TEXT faults are the final audit's business.
+            imgFaults: audit.byRoute.IMG,
+            pagesRead: audit.pagesRead,
+            pagesSkipped: audit.pagesSkipped,
+          });
+          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
+        }
+      } catch (auditErr) {
+        // A missing measurement never costs a paid-for repair round.
+        log.warn(`⚠️ [BOOK-AUDIT] Round ${round} mid-loop audit skipped: ${auditErr.message}`);
+      }
+    }
   }
 
   // =========================================================================
@@ -3255,7 +3338,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }
 
-  return { results, charFixDetails: charFixDetailsObj, styleConsistency };
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds };
 }
 
 module.exports = {

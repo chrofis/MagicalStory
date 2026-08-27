@@ -27,6 +27,10 @@ function buildFeedbackInput({
   complianceIssues = [],
   entityIssues = [],
   finalCheckIssues = [],
+  // Page-scoped IMG faults from the mid-loop book audit ({ severity, line }).
+  // Rendered verbatim — the consolidator decides what becomes a fix target;
+  // no code here reads the fault text.
+  readerFindings = [],
   bboxFigures = [],
   characterDescriptions = {},
 }) {
@@ -113,6 +117,20 @@ function buildFeedbackInput({
     }
   }
   parts.push('');
+
+  // Only rendered when this page HAS reader findings — an empty "(none)"
+  // section on every other page would teach the consolidator to expect one.
+  if (readerFindings.length > 0) {
+    parts.push('## READER FINDINGS — a judge who read the finished page (words + picture together) found:');
+    for (const f of readerFindings) {
+      // Severity is already the shared vocabulary (MINOR/MAJOR/CRITICAL/
+      // CATASTROPHIC); MAJOR is the default for pre-severity fault lines.
+      const sev = String(f?.severity || 'MAJOR').toUpperCase();
+      const line = String(f?.line || f?.detail || '').trim();
+      if (line) parts.push(`- [${sev}] ${line}`);
+    }
+    parts.push('');
+  }
 
   if (finalCheckIssues.length > 0) {
     parts.push('## Final checks issues');
@@ -220,6 +238,8 @@ async function consolidateFeedback({
   // page-filtering entityReport — the eval-consolidation path already has
   // the per-page issues from getEntityPenaltyAndIssues.
   entityIssues: entityIssuesInput = null,
+  // Mid-loop book-audit IMG faults for THIS page ({ severity, line }).
+  readerFindings = [],
   pageNumber = null,
   characters = [],
   // Per-scene clothing text keyed by character name. Overrides each
@@ -319,6 +339,7 @@ async function consolidateFeedback({
       semanticIssues,
       complianceIssues,
       entityIssues,
+      readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
       bboxFigures,
       characterDescriptions,
     });
@@ -567,6 +588,8 @@ function detectDeclaredSpecConflicts(sceneDescription) {
 async function consolidateEvaluation({
   evalResult,
   entityIssues = [],
+  // Page-scoped IMG faults from the previous round's book audit.
+  readerFindings = [],
   sceneDescription = '',
   characters = [],
   sceneClothing = null,
@@ -590,8 +613,11 @@ async function consolidateEvaluation({
   const semanticCount = (evalResult.semanticResult?.semanticIssues
     || evalResult.semanticResult?.issues || []).length;
   const entityCount = Array.isArray(entityIssues) ? entityIssues.length : 0;
+  // A page the evaluators like but the READER flagged must still reach the
+  // model — skipping on the evaluator counts alone would discard the audit.
+  const readerCount = Array.isArray(readerFindings) ? readerFindings.length : 0;
 
-  if (qualityCount + complianceCount + semanticCount + entityCount === 0) {
+  if (qualityCount + complianceCount + semanticCount + entityCount + readerCount === 0) {
     const plan = {
       per_character_fixes: [],
       scene_fix: { severity: 'NONE', instruction: '', preserve: [] },
@@ -608,6 +634,7 @@ async function consolidateEvaluation({
     sceneDescription,
     evaluation: evalResult,
     entityIssues: Array.isArray(entityIssues) ? entityIssues : [],
+    readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
     pageNumber,
     characters,
     sceneClothing,

@@ -3290,6 +3290,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let pipelineEntityHistory = null;
     let pipelineCharFixDetails = null;
     let pipelineStyleConsistency = null;
+    // Compact record of each mid-loop book audit (one per repair round that had
+    // a further round to feed). See the repair loop's MID-LOOP BOOK AUDIT block.
+    let pipelineBookAuditRounds = null;
 
     {
       // =======================================================================
@@ -4828,7 +4831,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dedication: inputData.dedication || '',
         };
 
-        const { results: pipelineResult, charFixDetails, styleConsistency } = await runUnifiedRepairPipeline(rawImages, {
+        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
           usageTracker: (provider, usage, funcName, modelId) => {
@@ -4870,6 +4873,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineEntityHistory = pipelineResult[0]?.entityHistory || null;
         pipelineCharFixDetails = charFixDetails;
         pipelineStyleConsistency = styleConsistency || null;
+        pipelineBookAuditRounds = (bookAuditRounds && bookAuditRounds.length) ? bookAuditRounds : null;
 
         // Map pipeline results to allImages format. Index rawImages by
         // pageNumber so per-page intermediates that the pipeline drops
@@ -5360,6 +5364,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       finalChecksReport.styleConsistency = pipelineStyleConsistency;
     }
 
+    // Mid-loop book audits — one compact record per repair round that had a
+    // further round to feed. Kept next to the final audit below so the dev
+    // panel can read the whole reader's-eye history in one place.
+    if (pipelineBookAuditRounds) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.bookAuditRounds = pipelineBookAuditRounds;
+    }
+
     // Deterministic scene metadata ↔ scene design consistency findings (see
     // check right after the final parse). Attached even when empty so the dev
     // panel can show "checked, clean" vs "not run".
@@ -5380,10 +5392,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // brief, the text audit prose with a one-line note of what the picture
     // depicts. None of them can see the two disagreeing.
     //
-    // IMG faults are MEASURE-ONLY (owner). Nothing is repainted: the finding is
-    // stored on the page so the dev panel and the repair endpoints can act on
-    // it. TEXT faults get ONE corrective round — prose is cheap to rewrite and
-    // nothing downstream has consumed it yet.
+    // This FINAL audit's IMG faults are stored, not repainted — no repair round
+    // remains to consume them, so the finding lands on the page for the dev
+    // panel and the repair endpoints. Acting on IMG faults happens EARLIER:
+    // the repair loop runs its own audit after each round and feeds those IMG
+    // faults into the next round's consolidator (owner directive superseding
+    // the old measure-only rule — see repairPipeline.js MID-LOOP BOOK AUDIT and
+    // docs/decisions.md 2026-08-27). TEXT faults get ONE corrective round here —
+    // prose is cheap to rewrite and nothing downstream has consumed it yet.
     let bookAuditReport = null;
     try {
       const { auditStoryBook } = require('./server/lib/bookAudit');

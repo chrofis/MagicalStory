@@ -20029,7 +20029,10 @@ sequential. It runs AFTER covers and BEFORE persist: the first moment the
 finished book exists. Faults are **routed, not scored**: `FAULT[IMG]` when a
 different image would fix it, `FAULT[TEXT]` when different prose would.
 
-- **IMG route is MEASURE-ONLY** (owner). Nothing is repainted. The finding is
+- **IMG route is MEASURE-ONLY** (owner). 🗄 **Superseded 2026-08-27** — see
+  "Book audit runs after each repair round and feeds the image consolidator"
+  below. Still true of the FINAL audit (no repair round remains to consume it);
+  no longer true of the pipeline. Nothing is repainted. The finding is
   stored on the page as `page.bookAuditFaults[]` so the dev panel and the repair
   endpoints can see it, and on `data.bookAuditReport` / `finalChecksReport.bookAudit`.
 - **TEXT route gets ONE corrective round** — the FAULT lines go into
@@ -20813,3 +20816,83 @@ rewrites anywhere in the chain.
 **Touched:** `server/config/models.js`, `server/lib/beatsPipeline.js`,
 `server/lib/testlab.js`.
 **Status:** ✅ active
+
+## 2026-08-27 — The book audit runs after EACH repair round and feeds the image consolidator (supersedes IMG measure-only)
+
+**Context:** The 2026-08-26 entry above shipped the reader's-eye audit as
+MEASURE-ONLY on the IMG route: faults were recorded on the page and nothing
+consumed them. Measured cost of that on one production book —
+`job_1787812110559` (the pirate story): **27 IMG faults recorded, 0 acted on.**
+Every one of those was a defect no other gate can see, because the audit is the
+only judge that reads a page's words and its picture *together*: the quality
+evaluator reads the image against its brief, the semantic evaluator reads the
+image against the scene contract, the entity check reads figures against
+reference sheets. A picture that contradicts the sentence printed under it
+passes all three. The audit ran once, at the very end, after the last repair
+round had already closed — so even a CATASTROPHIC finding had nothing left to
+act on it. Owner directive, explicitly reversing the measure-only ruling: "run
+the full book audit after each repair round and feed its result into the image
+repair consolidator."
+
+**Decision:**
+- The repair loop (`runUnifiedRepairPipeline`) runs `auditStoryBook` at the end
+  of **each** round, on the CURRENT state of the book: each page's
+  `selectBestVersion` bytes plus that page's text, in reading order — the same
+  `{ id, sceneImages }` shape the final call passes.
+- **Skipped on the last round.** Nothing would consume the findings, and the
+  final audit already covers the shipped state. This is the spend guard: the
+  audit costs ~$0.04 per pass on a 16-page book, so a 3-round run pays for two
+  extra passes, never three.
+- IMG faults are grouped by page into `readerFindingsByPage` and handed to the
+  **next** round's consolidator as a labelled input section in its PROMPT:
+  `## READER FINDINGS — a judge who read the finished page (words + picture
+  together) found:` followed by that page's fault lines verbatim, each prefixed
+  with its severity in the same `[SEV]` shape every other evaluator section
+  uses. The section is emitted only when that page has findings.
+- The consolidator decides what becomes a fix target, exactly as it does for
+  quality / semantic / compliance / entity findings. Per the eval-logic rule, no
+  code pattern-matches fault text; the only code touching severity maps the
+  audit's `MINOR|MAJOR|CRITICAL|CATASTROPHIC` into the consolidator's existing
+  vocabulary — which is the same vocabulary, so the map is identity plus a MAJOR
+  default for pre-severity fault lines.
+- `consolidateEvaluation`'s zero-issue short-circuit now counts reader findings.
+  Without that, a page the evaluators liked but the reader flagged would skip
+  the model call and the audit would be discarded.
+- Faults with no page number are dropped: a consolidator call is per page, so an
+  unrouted fault has nowhere to go.
+- Non-blocking, like the final call: `auditStoryBook` never throws, and a null
+  result contributes nothing to the next round.
+- Per-round record on `finalChecksReport.bookAuditRounds[]`:
+  `{ round, checkedAt, modelId, faults, byRouteCounts: {IMG, TEXT}, imgFaults[],
+  pagesRead, pagesSkipped }`. The full `raw` transcript is still kept for the
+  FINAL audit only.
+- The FINAL audit at the end of generation is **unchanged**: its IMG faults are
+  still stored-not-repainted (no round remains), and its TEXT route still gets
+  its one corrective round.
+
+**Rationale:** The alternative — keeping IMG measure-only and repairing only
+from the per-image evaluators — is what produced the 27-to-0 result. Feeding the
+findings into the consolidator rather than into a repair method directly is what
+keeps this inside the settled eval architecture: the consolidator is already the
+single place where findings from four evaluators are deduped, severity-ranked,
+capped at 3, and turned into instructions Grok can execute. A reader finding
+that duplicates a semantic finding gets merged there for free; one that
+duplicates nothing competes on severity like everything else. The noise concern
+logged in the 2026-08-26 entry ("the picture shows the moment slightly
+before/after the words") is handled by the same mechanism that handles noisy
+evaluator findings: the consolidator's drop policy and the cap-at-3, not by a
+filter in code.
+
+**Touched:** `server/lib/repairPipeline.js` (`readerFindingsByPage` +
+`bookAuditRounds`, the MID-LOOP BOOK AUDIT block at the end of the round body,
+`consolidatePageEval` passes the page's findings, return shape),
+`server/lib/feedbackConsolidator.js` (`readerFindings` threaded through
+`consolidateEvaluation` → `consolidateFeedback` → `buildFeedbackInput`; the new
+prompt section; reader count in the zero-issue skip),
+`prompts/feedback-consolidator.txt` (reader findings in the input list;
+`reader` added to the `sources` enum), `storyJobPipeline.js`
+(`pipelineBookAuditRounds` → `finalChecksReport.bookAuditRounds`; the stale
+"IMG faults are MEASURE-ONLY" comment at the final call site rewritten).
+**Status:** 🟡 conditional — committed locally, not pushed. Verified statically
+only (syntax, prompt-render path, consolidator output parsers untouched); never
+run inside a live generation.
