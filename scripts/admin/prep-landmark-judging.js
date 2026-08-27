@@ -32,6 +32,11 @@ const outArg = args.find(a => a.startsWith('--out='));
 const OUT = outArg ? outArg.split('=')[1]
   : path.join(process.env.TEMP || '/tmp', 'lm_judge');
 const BATCH = 25;
+// Wikimedia throttles sustained thumbnail pulls — a 120ms run lost 862 of 1100
+// downloads on 2026-08-27. Slower finishes sooner because failures are retried
+// on the next pass anyway.
+const delayArg = args.find(a => a.startsWith('--delay='));
+const DELAY = delayArg ? parseInt(delayArg.split('=')[1], 10) : 700;
 
 const CLASS = `(CASE WHEN coalesce(type,'x') IN ('City','Village','Event','Organisation','Other') THEN 0
   WHEN coalesce(type,'x') IN ('Cathedral','Church','Abbey','Monastery','Castle','Palace','Museum','Bridge','Tower','Fountain','Square','Theatre','Park','Monument','Library') THEN 2 ELSE 1 END)`;
@@ -62,7 +67,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const manifest = [];
   let ok = 0;
   for (const [i, l] of rows.entries()) {
-    const file = `${String(i).padStart(4, '0')}.jpg`;
+    // Filename is the LANDMARK ID, never the loop index. The row set shrinks as
+    // rows get judged, so on a restart index 0 is a DIFFERENT landmark — an
+    // index-named file would be reused for the wrong one and the agent would
+    // score a picture of somewhere else.
+    const file = `${l.id}.jpg`;
+    // Resume: a prep that died or was throttled must not re-download what it has.
+    const dest = path.join(OUT, file);
+    if (fs.existsSync(dest) && fs.statSync(dest).size > 2000) {
+      manifest.push({ id: l.id, file, name: l.name, type: l.type, city: l.nearest_city,
+        extract: (l.wikipedia_extract || '').slice(0, 180) });
+      ok++;
+      if (manifest.length % BATCH === 0) writeManifest();
+      continue;
+    }
     try {
       const r = await fetch(l.photo_url, {
         headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch) landmark-QA' },
@@ -87,7 +105,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // makes an interrupted prep still useful.
     if (manifest.length && manifest.length % BATCH === 0) writeManifest();
     if ((i + 1) % 100 === 0) { console.log(`  ${ok}/${i + 1} downloaded`); }
-    await sleep(120);
+    await sleep(DELAY);
   }
 
   writeManifest();
@@ -101,6 +119,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     })), null, 1));
   }
 
-  console.log(`\n✅ ${ok} thumbnails, ${batches.length} batches of ${BATCH} in ${OUT}`);
+  console.log(`\n✅ ${ok} thumbnails, ${Math.ceil(manifest.length / BATCH)} batches of ${BATCH} in ${OUT}`);
   await pool.end();
 })().catch(e => { console.error('ERR:', e.message); process.exit(1); });

@@ -33,6 +33,11 @@ const STAGING = args.includes('--staging');
 const GALLERY = args.includes('--gallery');
 const limitArg = args.find(a => a.startsWith('--limit='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
+// Wikimedia throttles a sustained run — measured 2026-08-26, throughput fell
+// from ~75/min to ~7/min after several hours of load. Slower is faster over a
+// long job, and there is no deadline on a free background pass.
+const delayArg = args.find(a => a.startsWith('--delay='));
+const DELAY = delayArg ? parseInt(delayArg.split('=')[1], 10) : 150;
 
 const BACKDROP = ['Cathedral', 'Church', 'Abbey', 'Monastery', 'Castle', 'Palace', 'Museum',
   'Bridge', 'Tower', 'Fountain', 'Square', 'Theatre', 'Park', 'Monument', 'Library'];
@@ -108,7 +113,7 @@ async function commonsFiles(qid, want = 3) {
     gallery.push({ name: l.name, type: l.type, city: l.nearest_city, url: urls[0] });
     filled++;
     if (filled % 50 === 0) console.log(`  ${filled} filled / ${none} with nothing (${filled + none}/${rows.length})`);
-    await sleep(150);
+    await sleep(DELAY);
   }
 
   console.log(`\n${DRY ? '[dry-run] ' : ''}${filled} given a photo, ${none} had none on Wikipedia or Commons.`);
