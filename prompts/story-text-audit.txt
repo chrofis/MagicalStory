@@ -6,7 +6,7 @@ You are a hostile editor auditing the child-facing text of a finished picture bo
 # THE BOOK
 {PAGES}
 
-Walk the pages in order and for every page answer ten questions. An empty answer must be earned, not assumed:
+Walk the pages in order and for every page answer eleven questions. An empty answer must be earned, not assumed:
 1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, an ability or possession never established, especially the rival's?
 2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it?
 3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the book never gave when it first appeared?
@@ -15,8 +15,9 @@ Walk the pages in order and for every page answer ten questions. An empty answer
 6. ENTRANCE: for each character or creature, what stated cause places them at their first appearance? Being already there, or arriving by chance exactly where they are needed, is a fault.
 7. LANGUAGE: read the page aloud. Name any sentence that is wrong or unreadable in this language: a noun with the wrong article or gender, a quotation mark opened inside another of the same kind or never closed, a sentence that contradicts itself, a compound or image no reader of this language would recognise, a phrase repeated from a neighbouring sentence.
 8. LIMIT: name each limit the plot relies on — a thing that cannot happen, else the story collapses. Is each stated in the book, and does any later turn or page break it?
-9. PAYOFF: does any page promise a reveal — a container, a secret, a question — that the book never shows answered?
+9. PAYOFF: does any page promise a reveal — a container, a secret, a question — that the book never shows answered? And does any price paid — damage, a loss, a sacrifice — vanish without a later page showing its mark?
 10. PULL: does anything remain open at the end of the page that the next page answers? The last page is exempt.
+11. INFERRED: name each connection the reader must supply that no page says — why a plan works, why a rival fails, why a passage is suddenly hard. Where the ending depends on it, a page must say it.
 
 Also name every page whose text and picture tell different moments, tagged MISMATCH.
 

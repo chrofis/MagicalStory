@@ -62,6 +62,7 @@ Requirements:
 - An animal or creature that travels with the children is given a name by them, where they decide to help it, and goes by that name after.
 - When the deadline is a time of day, the story starts at an hour the book's length can cross to reach it.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
+- A rival's thread ends on a page: they arrive too late, see what they lost, pay or learn. A rival who simply leaves the frame is an open thread.
 - The last page shows them safe and together, and one of them feels something a child can name.
 - Match peril to the youngest named child in the cast: frightening is the right level, and nothing may be able to kill or injure a child — no drowning, no fall from a height. A refusal, a loss, a delay or a promise broken can carry it instead. Nobody in the story looks monstrous, and no familiar character turns frightening. When anyone is separated or lost, a later page shows the reunion and the last page shows them safe.
 - An obstacle exists for its own reasons: never shape one around a thing a character happens to carry, and never give a barrier exactly one solution that a character already holds. Where peril has to be softened, take the replacement from what the setting already contains.
@@ -96,7 +97,7 @@ Joining and parting: <who is there at the start; who arrives later and why then;
 
 Shape: opening — <what settles the reader in> / building — <what tightens, and tightens again> / relief — <where it lets go> / ending — <what is different>
 
-Closed: <every thing introduced and where it is paid off — objects, questions, promises. Anything that cannot be named here is cut instead.>
+Closed: <every thing introduced and where it is paid off — objects, questions, promises, the rival's ending, and the later mark of every price paid. Anything that cannot be named here is cut instead.>
 
 Write the story, not the page plan. No page numbers anywhere in this block.
 
