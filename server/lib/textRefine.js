@@ -23,7 +23,7 @@ const { log } = require('../utils/logger');
  * @param {Object} storyData - story record fields (language, characters, brief, …)
  * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
  * @param {Object} [opts]
- * @param {number} [opts.rounds=4]      ceiling, not a target — stops when a round rewrites nothing
+ * @param {number} [opts.rounds=1]      ceiling, not a target — stops when a round rewrites nothing
  * @param {string} [opts.model]         model for every round
  * @param {string[]} [opts.roundModels] per-round model override
  * @param {string} [opts.promptOverride] replaces the round-1 prompt (Lab A/B only)
@@ -42,7 +42,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   }
   const expected = pages.map(p => p.pageNumber);
 
-  const roundCount = Math.max(1, Math.min(8, parseInt(opts.rounds, 10) || 4));
+  const roundCount = Math.max(1, Math.min(8, parseInt(opts.rounds, 10) || 1));
   const perRound = Array.isArray(opts.roundModels) ? opts.roundModels : [];
   // opts.model still wins (Lab A/B). Default is the dedicated text key — NOT the
   // beats reviewer: this stage is time-boxed against the image phase.

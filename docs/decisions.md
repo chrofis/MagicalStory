@@ -20644,3 +20644,24 @@ is a field nobody notices is gone.
 **Status:** ✅ active — one spine, one blend engine, one request builder, one
 silhouette resolver. The Lab's insert pipeline remains a deliberate second
 pipeline under test, reachable only when no axis is named.
+
+---
+
+### Text refine: one audit-fed round, no self-checklist loop (2026-08-27)
+**Context:** The refine stage ran up to TEXT_REFINE_ROUNDS=2 (function ceiling 4)
+rounds, but only round 1 receives the external audit findings — later rounds
+re-run the refiner's own checklist on its own output with no new information,
+until a round rewrites nothing. Measured: per-round scoring showed round 2 flat;
+the 2026-08-27 forced-extra-round experiment showed unfed refiner work invents
+changes (pre-empted a reveal, changed who goes ashore). audit2 + proofread now
+give the final text an independent external check with a corrective round, which
+fixed 8/8 language faults on job_1787812110559 — superseding the self-loop's
+safety role.
+**Decision:** Default rounds 1 (storyJobPipeline TEXT_REFINE_ROUNDS fallback and
+refineStoryText default). Chain: audit → fix → fresh audit + proofread →
+corrective fix. Env override still available.
+**Rationale:** Every rewrite pass is fed by real external findings; saves 1-3
+full-book rewrites (~2-8 min inside the image-parallel window, lower salvage
+risk).
+**Touched:** `storyJobPipeline.js`, `server/lib/textRefine.js`.
+**Status:** ✅ active

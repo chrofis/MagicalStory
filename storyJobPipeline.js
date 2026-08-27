@@ -3277,7 +3277,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (refinablePages.length > 0) {
         genLog.info('text_refine_start', `Refining text for ${refinablePages.length} page(s) in parallel with images`);
         textRefinePromise = startBackgroundRefine(inputData, refinablePages, {
-          rounds: parseInt(process.env.TEXT_REFINE_ROUNDS || '2', 10),
+          // 1 (owner, 2026-08-27): rounds past the first get no external
+          // findings — the audit feeds round 1, audit2+proofread feed the
+          // corrective round. Unfed self-checklist passes measured flat and
+          // invent work (see decisions.md).
+          rounds: parseInt(process.env.TEXT_REFINE_ROUNDS || '1', 10),
           usageLabel: 'text_refine',
           // Latest completed state, so the bounded join below can salvage the
           // audit and any finished round instead of discarding paid work when
