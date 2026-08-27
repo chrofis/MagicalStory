@@ -198,7 +198,18 @@ function resolveRegion({ regionSource, faceOnly, faceBbox, bodyBbox, sceneWidth,
 
 // WHITEOUT — SAM head/figure silhouette → binarized → whited out over the crop.
 // FAITHFULNESS-CHECK: images.js:11205-11220 (grokFaceInsertRepair head whiteout).
-async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage, providedMaskPng = null }) {
+/**
+ * THE region a face treatment acts on — one computation, shared by whiteout and
+ * blur so they cover EXACTLY the same pixels (owner, 2026-08-27: "you must blur
+ * the same region as whiteout"). Blur used to derive its own region from
+ * `boxInCrop` and clip with a different mask source, so the two treatments were
+ * not comparable: on Lab 867 the blur landed on a rectangle across the tower
+ * behind the head while the whiteout covered the head silhouette.
+ *
+ * Returns the hard 1-channel mask over the crop plus the white-RGBA PNG the
+ * blend engine consumes as `oldMaskPng`.
+ */
+async function buildFaceTreatmentMask({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, gateCoverage, providedMaskPng = null, label = 'treatment' }) {
   const sharp = require('sharp');
   const { fetchFigureHeadMaskPng } = require('./imageCompositing');
   // A caller that already KNOWS the figure's exact silhouette passes it in and
@@ -208,7 +219,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
   // /figure-mask 503 makes an otherwise valid repair impossible.
   const rawMask = providedMaskPng
     || await fetchFigureHeadMaskPng(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, maskFetch, { clipMode: 'bottom', hairBox });
-  if (!rawMask) throw new Error('SAM head mask unavailable for whiteout (MobileSAM down?)');
+  if (!rawMask) throw new Error(`SAM head mask unavailable for ${label} (MobileSAM down?)`);
   const a = await sharp(rawMask).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const stride = Math.max(1, Math.round(a.length / (crop.w * crop.h)));
   const hard = Buffer.alloc(crop.w * crop.h);
@@ -219,9 +230,24 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
     hard[i] = inClip && a[i * stride] > 128 ? 255 : 0;
   }
   let cov = 0; for (let i = 0; i < hard.length; i++) if (hard[i]) cov++;
-  if (gateCoverage && cov < 40) throw new Error('SAM head mask empty for whiteout');
+  if (gateCoverage && cov < 40) throw new Error(`SAM head mask empty for ${label}`);
   const oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
     .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+  return { hard, coverage: cov, oldMaskPng };
+}
+
+async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage, providedMaskPng = null }) {
+  const sharp = require('sharp');
+  const { fetchFigureHeadMaskPng } = require('./imageCompositing');
+  // A caller that already KNOWS the figure's exact silhouette passes it in and
+  // SAM is not consulted. The scene composite is that caller: it painted the
+  // placeholder itself, so its colour mask is pixel-exact, while asking a
+  // segmenter to re-find a flat blob is both wasteful and a failure point —
+  // /figure-mask 503 makes an otherwise valid repair impossible.
+  const { oldMaskPng, coverage: cov } = await buildFaceTreatmentMask({
+    cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, gateCoverage, providedMaskPng, label: 'whiteout',
+  });
+  // WHITE painted through the shared mask.
   const treatedBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).png().toBuffer();
   return { treatedBuf, oldMaskPng, coverage: cov };
 }
@@ -453,57 +479,28 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
 
 // BLUR — shape-aware silhouette-clipped blur over the figure.
 // FAITHFULNESS-CHECK: images.js:11535-11582 (blurFace shapeAware branch).
-async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage, providedMaskPng = null, maskFetch = null }) {
+async function buildBlurTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, faceOnly, gateCoverage, providedMaskPng = null, maskFetch = null }) {
   const sharp = require('sharp');
-  const { fetchFaceHeadMaskPng, fetchSilhouettePng, fetchFigureMaskPng } = require('./imageCompositing');
-  const fLeft = boxInCrop[0], fTop = boxInCrop[1];
-  const fWidth = boxInCrop[2] - boxInCrop[0], fHeight = boxInCrop[3] - boxInCrop[1];
+  // SAME REGION AS WHITEOUT — identical mask, different paint. The two
+  // treatments differ only in WHAT lands in the region: whiteout erases it,
+  // blur destroys the features while keeping head size, tilt and hair mass, so
+  // the pose survives and identity has to come from the reference avatar.
+  // Previously blur derived its own rectangle from `boxInCrop` and clipped with
+  // a different mask source, so an A/B compared two different regions and a
+  // missing silhouette silently blurred the raw box (Lab 867: a blurred slab
+  // across the tower behind the head).
+  const { hard, coverage: cov, oldMaskPng } = await buildFaceTreatmentMask({
+    cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, gateCoverage, providedMaskPng, label: 'blur',
+  });
   // FAITHFULNESS-CHECK: images.js:11524 + 11547 (FACE_BLUR_RADIUS_FACTOR 0.03, min 10).
-  const FACE_BLUR_RADIUS_FACTOR = 0.03;
-  const blurRadius = Math.max(10, Math.round(fWidth * FACE_BLUR_RADIUS_FACTOR));
-  const cropJpeg = await sharp(cropBuf).extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight }).jpeg({ quality: 90 }).toBuffer();
-  const blurred = await sharp(cropJpeg).blur(blurRadius).toBuffer();
-  let composite = { input: blurred, left: fLeft, top: fTop };
-  let oldMaskPng = null, cov = 0;
-  // FAITHFULNESS-CHECK: images.js:11558-11576 (head mask ∪ hair → dest-in clip of blur).
-  const innerFaceBox = [0, 0, fWidth, fHeight];
-  // FACE blur wants the HEAD mask; a BODY blur must segment the whole FIGURE.
-  // fetchFaceHeadMaskPng places face/hair dots and clips to a head — run on a
-  // full-body box it returns a head-shaped/partial mask, and that mask IS
-  // "SAM round 1" downstream (exp #304: red zone 51864px under blur vs 5032px
-  // under crosshatch on the SAME box, because round 1 covered only part of the
-  // figure). Body blur now uses the plain figure mask, like every other path.
-  // Same rule as whiteout: a caller holding the exact silhouette supplies it
-  // and no segmenter runs. Without it a body blur falls back to blurring the
-  // whole BOX, which smears the neighbouring figures too.
-  // THE BLUR IS CLIPPED TO THE SAM SILHOUETTE — never to the box (owner,
-  // 2026-08-27: "you now blur the box. You must blur only the SAM cutout part").
-  // Without a silhouette this used to fall through and blur the whole rectangle,
-  // which smears the background and any neighbour inside it: on Lab 867 that
-  // painted a blurred slab across the tower behind the target's head. A missing
-  // silhouette is a FAILURE, exactly as it is for whiteout — the retrying
-  // fetcher is tried first, and only then do we give up loudly, instead of
-  // shipping a different treatment under the same name.
-  const silhouettePng = providedMaskPng
-    ? await sharp(providedMaskPng).extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight }).png().toBuffer()
-    : (maskFetch ? await maskFetch(cropJpeg, innerFaceBox, {}) : null)
-      || (faceOnly
-        ? (await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg))
-        : (await fetchFigureMaskPng(cropJpeg, innerFaceBox, {}) || await fetchSilhouettePng(cropJpeg)));
-  if (!silhouettePng) throw new Error('SAM silhouette unavailable for blur — refusing to blur the raw box (MobileSAM down?)');
-  {
-    const blurredWithAlpha = await sharp(blurred).ensureAlpha().composite([{ input: silhouettePng, blend: 'dest-in' }]).png().toBuffer();
-    composite = { input: blurredWithAlpha, left: fLeft, top: fTop };
-    const silAlpha = await sharp(silhouettePng).resize(fWidth, fHeight, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const st = Math.max(1, Math.round(silAlpha.length / (fWidth * fHeight)));
-    const hard = Buffer.alloc(crop.w * crop.h);
-    for (let y = 0; y < fHeight; y++) for (let x = 0; x < fWidth; x++) {
-      if (silAlpha[(y * fWidth + x) * st] > 128) { hard[(fTop + y) * crop.w + (fLeft + x)] = 255; cov++; }
-    }
-    oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
-      .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
-  }
-  const treatedBuf = await sharp(cropBuf).composite([composite]).png().toBuffer();
+  const fWidth = Math.max(1, boxInCrop[2] - boxInCrop[0]);
+  const blurRadius = Math.max(10, Math.round(fWidth * 0.03));
+  const blurredFull = await sharp(cropBuf).blur(blurRadius).toBuffer();
+  const blurredWithAlpha = await sharp(blurredFull)
+    .ensureAlpha()
+    .joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } })
+    .png().toBuffer();
+  const treatedBuf = await sharp(cropBuf).composite([{ input: blurredWithAlpha, left: 0, top: 0 }]).png().toBuffer();
   return { treatedBuf, oldMaskPng, coverage: cov };
 }
 
@@ -930,7 +927,8 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     });
   } else if (treatment === 'blur') {
     treated = await buildBlurTreatment({
-      cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage,
+      cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, faceOnly,
+      gateCoverage: gates.coverage,
       providedMaskPng: cropProvidedMask,
       maskFetch,
     });
