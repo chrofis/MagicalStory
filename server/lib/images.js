@@ -4115,12 +4115,24 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     model: 'grok',
   });
 
+  // An EXPLICIT axis beats the legacy mapping. `...axes` is spread after
+  // `...options` to stop a stray same-named key leaking in, but that also threw
+  // away a deliberate override: a Test Lab arm asking for treatment 'blur' on a
+  // face got the mapping's answer instead, so a blur-vs-whiteout A/B silently
+  // ran the same treatment twice (exps 862/863). Only keys the caller actually
+  // set are re-applied, so production — which sets none — is unchanged.
+  const explicitAxes = {};
+  if (options.treatment) explicitAxes.treatment = options.treatment;
+  if (options.regionSource) explicitAxes.regionSource = options.regionSource;
+  if (options.faceOnly !== undefined) explicitAxes.faceOnly = !!options.faceOnly;
+
   return repairCharacterFace(imageData, characterPhoto, {
     ...options,      // issueDescription, clothingDescription, sceneDescription,
                      // photoType, protectedFaces/Bodies, textPosition, artStyle,
                      // includeDebug, characterDescription/richDescription, etc.
     ...axes,         // regionSource / treatment / model / faceOnly (override any
                      // stray same-named option keys).
+    ...explicitAxes, // ...unless the caller named one deliberately.
     charName,
     bbox,
     bodyBbox: bbox,

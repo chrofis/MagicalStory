@@ -20316,3 +20316,40 @@ the moment they need it. Both fixes are shape changes with no behavioural cost.
 
 **Touched:** `server/lib/entityConsistency.js`, `client/src/types/story.ts`,
 `tests/unit/entity-issue-shape.test.ts`.
+
+## 2026-08-27 — The treatment A/B ran the same arm twice: two bugs behind one wrong result
+
+**Context:** Owner, looking at Lab exp 862 labelled "FACE · blur": *"what the
+fuck is this. the face blur is a whiteout"* — and it was. Both face arms were
+byte-identical runs of the same treatment.
+
+**Bug 1 — the experiment never reached the axes (run-design error).**
+`runCharRepairStage` routes to the INSERT pipeline whenever
+`params.repairMode` is not one of `blended|cutout|fullscene`. The arms passed
+`repairMode:'auto'`, so all four went to `grok-insert`, a separate path that
+never calls `repairCharacterFace` and does its own whiteout. Both face arms
+report `repairMode=grok-insert` with the identical step-0 label. An arm that
+means to test an axis must use a LEGACY grok mode, or it is not testing the
+spine at all.
+
+**Bug 2 — an explicit axis could never win.** `images.js` builds `axes` from
+`legacyFlagsToAxes` and spreads it AFTER `...options`, deliberately, to stop a
+stray same-named key leaking in. That also discarded a deliberate override, so
+even on the legacy path a Lab arm asking for `treatment:'blur'` got the
+mapping's answer. Fixed by re-applying ONLY the keys the caller actually set
+(`explicitAxes`); production sets none, so its behaviour is unchanged.
+
+**Consequence for the record:** experiments 862-865 are VOID as a treatment
+comparison. They still prove the plumbing (48 repairs, 703 step images, gates
+firing, masks reused), but they do not compare blur against whiteout — the
+2026-08-26 face=blur entry remains without evidence, and the benchmark set
+(ids 21-32) is the harness for the re-run.
+
+**Lesson:** a green pass-rate table is not proof the arms differed. The tell was
+in the data all along — `repairMode=grok-insert` on an arm that was supposed to
+exercise the spine, and an identical step-0 label across two arms that should
+have shown a blurred head versus a whited one. Compare what an arm RAN, not just
+what it scored.
+
+**Touched:** `server/lib/images.js`.
+**Status:** ✅ active for the fix; the treatment verdict is still open.
