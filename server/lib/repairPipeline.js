@@ -2944,10 +2944,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       && images().bboxPairsWith(bestBbox, best?.imageData);
     if (best?.imageData && !hasFigures && best.source !== 'original') {
       try {
-        const fresh = await images().detectAllBoundingBoxes(best.imageData, {
-          pageContext: `P${pageNumber}-final-bbox`,
-          artStyle,
-        });
+        // IDENTIFIED re-detection, not anonymous boxes (task #37, 2026-08-27).
+        // This used to call detectAllBoundingBoxes with no expectedCharacters,
+        // so a winner that needed a refresh got figures with no NAMES — no SoM
+        // identity pass, no dressed cast lines, no VB secondaries. Everything
+        // downstream that keys on figure.name (entity crops, character repair,
+        // the consistency grid) then sees an unnamed page and skips it, which
+        // is barely better than the null detection it replaced.
+        // redetectVersionImage is the same builder the repair rounds use.
+        const fresh = await redetectVersionImage({ ...best, pageNumber }, 'final-pick');
         if (fresh && Array.isArray(fresh.figures) && fresh.figures.length > 0) {
           freshBboxMap.set(pageNumber, fresh);
           // Detection is part of every image version (owner decision): stamp

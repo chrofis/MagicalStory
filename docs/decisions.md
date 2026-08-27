@@ -14112,6 +14112,29 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-27 — A refreshed winner gets NAMED figures, not anonymous boxes
+
+**Context.** Task #37 started as "a style-repair version that wins the pick ships
+with no detection at all". Reading the finalize path, a refresh already existed:
+when the picked version has no figures paired to its own bytes and is not the
+original, `detectAllBoundingBoxes` runs on it and the result is stamped onto the
+version.
+
+But it was called with **no `expectedCharacters`** — so the refresh produced
+boxes with no NAMES. No SoM identity pass, no dressed cast lines, no Visual
+Bible secondaries. Everything downstream keys on `figure.name`: the entity
+crops, character repair, the consistency grid. An unnamed page is skipped by all
+of them, which is barely better than the null detection it replaced.
+
+**Decision.** The final pick calls `redetectVersionImage` — the same builder the
+repair rounds already use, which assembles the page cast (dressed lines +
+secondaries) and runs identity. One extra detection per affected page, only when
+the winner actually lacks figures for its own bytes, which is the "re-detect
+winners only" option the owner picked over re-detecting every style repair or
+re-detecting lazily on demand.
+
+**Touched files.** `server/lib/repairPipeline.js`.
+
 ## 2026-08-26 — The description must match the AVATAR, and lengthTop is not hair length
 
 **Context.** Chasing why a girl with a long ponytail was stored as `ear-length`,
