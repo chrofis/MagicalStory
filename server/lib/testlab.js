@@ -3163,6 +3163,118 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
 }
 
 /**
+ * Scene hazard count — the MEASUREMENT for the hazard-reduction loop. Target:
+ * {storyId}. A judge reads a book's Art Director briefs (all pages at once, so
+ * per-page hazards are counted against one frozen artifact) and emits one
+ * HAZARD[<CLASS>] line per finding plus a total. Report only: nothing is
+ * written back to the story, no image is produced.
+ *
+ * The artifact is frozen and temperature is 0, so the only variable is the
+ * model (or an overridden prompt) — same shape as audit_replay. Run it before
+ * and after a scene-expansion prompt change to see whether the hazard count
+ * actually moved.
+ *
+ * params.models : comma list of TEXT_MODELS keys (default sceneReviewModel)
+ * params.source : 'briefs' (default, data.sceneImages[].sceneDescription)
+ *                 | 'beats' (SCENE lines from the stored outline's ---BEATS---)
+ */
+const HAZARD_CLASSES = ['CROWD', 'MULTIACT', 'GAZE', 'CONTACT', 'FORCE', 'ELEV', 'UNHELD', 'NEG', 'SCALE', 'TEMPORAL', 'LOC', 'SHOT'];
+
+async function runSceneHazardCountStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { parseBeats } = require('./storyHelpers');
+
+  const source = String(params.source || 'briefs').toLowerCase();
+  if (!['briefs', 'beats'].includes(source)) throw new Error(`params.source must be briefs | beats, got "${params.source}"`);
+  const models = String(params.models || params.model || MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
+    .split(',').map(x => x.trim()).filter(Boolean);
+  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  let pages;
+  if (source === 'beats') {
+    const beatsSection = (String(storyData.outline || '')
+      .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
+    pages = parseBeats(beatsSection).pages
+      .filter(p => String(p.scene || '').trim())
+      .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
+    if (!pages.length) throw new Error('story has no stored beat SCENE lines to audit');
+  } else {
+    pages = (storyData.sceneImages || [])
+      .filter(s => String(s.sceneDescription || '').trim())
+      .map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
+    if (!pages.length) throw new Error('story has no stored scene briefs to audit');
+  }
+
+  // One prompt over ALL pages: a hazard count is only comparable when the judge
+  // sees the same book each run. Each brief is capped so a long book cannot
+  // push the call past the context the cheapest arm can take.
+  const briefs = pages
+    .sort((a, b) => a.pageNumber - b.pageNumber)
+    .map(p => `## Page ${p.pageNumber}\n${String(p.brief).slice(0, 2000)}`)
+    .join('\n\n');
+  const template = promptOverride || PROMPT_TEMPLATES.sceneHazardAudit;
+  if (!template) throw new Error('scene-hazard-audit template unavailable');
+  const prompt = fillTemplate(template, { PAGE_COUNT: pages.length, BRIEFS: briefs });
+
+  const t0 = Date.now();
+  const runs = await Promise.all(models.map(async (model) => {
+    const t = Date.now();
+    try {
+      const res = await callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_scene_hazard_count', temperature: 0 });
+      const raw = String(res.text || '').trim();
+      const lines = raw.split('\n').map(l => l.trim()).filter(l => /^HAZARD\[/.test(l));
+      const byClass = {};
+      for (const c of HAZARD_CLASSES) byClass[c] = 0;
+      for (const l of lines) {
+        const cls = (l.match(/^HAZARD\[([A-Z]+)\]/) || [])[1];
+        if (cls) byClass[cls] = (byClass[cls] || 0) + 1;
+      }
+      // The judge's own total is advisory; the line count is what a rerun
+      // compares, so a miscounted footer never moves the metric.
+      const declared = parseInt((raw.match(/^HAZARDS:\s*(\d+)/mi) || [])[1], 10);
+      return {
+        model,
+        modelId: res.modelId || TEXT_MODELS[model].modelId,
+        ok: raw.length > 0,
+        hazards: lines.length,
+        declaredHazards: Number.isFinite(declared) ? declared : null,
+        byClass,
+        lines,
+        raw: raw.slice(0, 30000),
+        elapsedMs: Date.now() - t,
+        usage: { input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0 },
+        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+      };
+    } catch (e) {
+      return { model, ok: false, error: e.message, elapsedMs: Date.now() - t };
+    }
+  }));
+
+  return {
+    ok: runs.some(r => r.ok),
+    stageKind: 'scene_hazard_count',
+    storyId: target.storyId,
+    title: storyData.title || null,
+    source,
+    pageCount: pages.length,
+    elapsedMs: Date.now() - t0,
+    promptChars: prompt.length,
+    runs,
+    totalCost: Number(runs.reduce((s, r) => s + (r.cost || 0), 0).toFixed(4)),
+    logLines: runs.flatMap(r => [
+      `— ${r.model}: ${r.ok
+        ? `${r.hazards} hazard(s) over ${pages.length} pages [${Object.entries(r.byClass).filter(([, n]) => n > 0).map(([c, n]) => `${c}:${n}`).join(' ') || 'none'}], ${Math.round(r.elapsedMs / 1000)}s, $${(r.cost || 0).toFixed(3)}`
+        : `FAILED ${r.error || 'empty output'}`}`,
+      ...(r.lines || []),
+    ]),
+  };
+}
+
+/**
  * Outline-review model comparison (split outline review, Call 2). Target:
  * {storyId}. Compares how DIFFERENT models perform AS THE REVIEWER.
  *
@@ -7568,6 +7680,7 @@ const STORY_STAGES = {
   style_check: runStyleCheckStage,
   book_audit: runBookAuditStage,
   audit_replay: runAuditReplayStage,
+  scene_hazard_count: runSceneHazardCountStage,
   style_repair: runStyleRepairStage,
   outline_review: runOutlineReviewStage,
   text_refine: runTextRefineStage,

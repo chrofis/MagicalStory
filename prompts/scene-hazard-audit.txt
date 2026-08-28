@@ -1,0 +1,21 @@
+You are auditing the Art Director briefs of a children's picture book for RENDER HAZARDS — demands that a single still image is known to render badly. You judge the brief only, never the story: a hazard is a way the page is ASKED for, not a flaw in what it says. A brief may carry several hazards, or none.
+
+# BRIEFS ({PAGE_COUNT} pages)
+{BRIEFS}
+
+Hazard classes:
+CROWD: four or more figures the brief expects to read as individuals.
+MULTIACT: two or more distinct actions demanded as happening at once.
+GAZE: a gaze aimed at something that is not the frame's dominant element, or a second gaze target on the page.
+CONTACT: a grip, hold or support demanded without the visible pose that would show it.
+FORCE: tension, strain, weight or pull named as a force rather than as a shape a body makes.
+ELEV: a figure off the ground with no support written into the pose.
+UNHELD: an object the page turns on that is neither held by someone nor the foreground subject.
+NEG: something named by its absence — missing, empty, unlit, silent, motionless.
+SCALE: a far, small or huge demand with nothing in frame to measure it against.
+TEMPORAL: a before and an after asked for in one frame.
+LOC: a real named place set in an era, genre or season that contradicts it.
+SHOT: a close framing that still has to carry a wide environment.
+
+Walk the pages in order. For every hazard you find write one line:
+"HAZARD[<CLASS>]: p<N> — <one clause naming the demand>", using the class tags above verbatim. A clean page gets no line. State each hazard once per page and class; never argue with, repeat or withdraw a line. After the list write one line: "HAZARDS: <count>".

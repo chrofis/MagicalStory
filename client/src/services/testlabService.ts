@@ -477,6 +477,9 @@ export const TESTLAB_STAGES = [
   { id: 'book_audit', label: 'Book audit — page text + shipped image, in reading order', producesImage: false, overridable: true, storyLevel: true },
   // Auditor bake-off: the frozen artifact of one level vs a list of models.
   { id: 'audit_replay', label: 'Audit replay — arc/beats/text audit on stored artifact, per model', producesImage: false, overridable: true, storyLevel: true },
+  // The measurement for the hazard-reduction loop: how many render hazards do
+  // this book's briefs (or beat SCENE lines) demand, by class.
+  { id: 'scene_hazard_count', label: 'Scene hazard count — render hazards per page in the briefs, by class', producesImage: false, overridable: true, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
   { id: 'beats_scenes', label: 'Beats + scenes → fast review (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
