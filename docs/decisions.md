@@ -14112,6 +14112,43 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-08-28 — One failing cover no longer destroys the other two
+
+**Context.** A 16-page staging story (`job_1787867402809_z9bwoo3yp`) shipped with
+`coverImages: {}` — no covers at all — while `skipCovers` was false and all three
+cover hints were present. The job completed with no error.
+
+**Why nothing could be diagnosed.** The cover assembly was
+`Promise.all(streamingCoverPromises.values())`. A single rejecting cover skips
+the whole `.then`, so the covers that SUCCEEDED were discarded with it, and the
+only trace was one generic line — no cover type, no message, no stack. By the
+time the story was inspected, that run's logs had rolled off.
+
+**What was ruled out first**, so this is not a guess dressed as a fix: the cover
+block IS reached (no beats guard, no swallowing try/catch above it, skipCovers
+false on the job); `buildCoverPrompt` does NOT throw — all three cover prompts
+rebuild cleanly from that story's own stored data (front 3566, initialPage 3225,
+back 3506 chars, no unfilled placeholders); no undefined variables
+(`check-no-undef --all` clean).
+
+Consistent with the shape: 6-page trials, which generate front + back only, kept
+producing covers throughout, while full runs — which add `initialPage` — produced
+none. One bad cover type takes the whole set down.
+
+**Decision.** `Promise.allSettled`, with each promise tagged by its cover type
+before it rejects. Survivors are kept and stored; each casualty is logged by NAME
+with its message and the top of its stack. The outer catch now only covers a
+throw in the assembly itself.
+
+This does not identify the original failure — it makes the next occurrence say
+what it is, at no cost, and stops a single failure from costing all three covers.
+
+**Two smoke reproductions were attempted and both died at 1-2% with "Server
+restarted during generation"** — another session deployed to staging mid-run,
+twice. Stopped there per the burn-loop rule rather than paying for a third.
+
+**Touched files.** `storyJobPipeline.js`.
+
 ## 2026-08-27 — The avatar colour check is REJECTED and removed
 
 **Context.** The avatar gate grades face geometry only, and passed a visibly

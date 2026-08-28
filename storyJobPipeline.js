@@ -3151,9 +3151,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // IMPORTANT: .catch() here prevents unhandled rejection crash if a cover fails
       // before coverAwaitPromise is awaited at line ~4214. Without this, a Grok 500
       // error between promise creation and await crashes the Node process.
-      coverAwaitPromise = Promise.all(
-        Array.from(streamingCoverPromises.values())
-      ).then(coverResults => {
+      // ONE BAD COVER MUST NOT DESTROY THE OTHERS (2026-08-28). This was
+      // Promise.all: a single rejecting cover skipped the whole .then, so every
+      // SUCCESSFUL cover was discarded too and the story shipped with
+      // coverImages {} — no per-cover error, one line in the log, nothing to
+      // diagnose from afterwards. Observed on job_1787867402809_z9bwoo3yp
+      // (16 pages, skipCovers false, three cover hints, zero covers stored).
+      // allSettled keeps the survivors and names the casualty.
+      coverAwaitPromise = Promise.allSettled(
+        Array.from(streamingCoverPromises.entries()).map(([type, promise]) =>
+          promise.catch(err => { err._coverType = type; throw err; })
+        )
+      ).then(settled => {
+        const coverResults = [];
+        for (const s of settled) {
+          if (s.status === 'fulfilled') { coverResults.push(s.value); continue; }
+          const err = s.reason || {};
+          log.error(`❌ [UNIFIED] Cover "${err._coverType || 'unknown'}" failed: ${err.message || err}`);
+          if (err.stack) log.error(`   ${String(err.stack).split('\n').slice(1, 3).join(' | ')}`);
+        }
+        return coverResults;
+      }).then(coverResults => {
         timing.coversEnd = Date.now();
         // Map results to coverImages object
         for (const result of coverResults) {
@@ -3181,7 +3199,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.debug(`⏱️ [UNIFIED] Cover images: ${((timing.coversEnd - (timing.coversStart || timing.storyGenEnd)) / 1000).toFixed(1)}s`);
       }).catch(err => {
         timing.coversEnd = Date.now();
-        log.error(`❌ [UNIFIED] Cover generation failed: ${err.message}`);
+        // Reached only if the assembly itself throws — a rejecting cover is
+        // already reported per-cover above and no longer lands here.
+        log.error(`❌ [UNIFIED] Cover assembly failed: ${err.message}`);
       });
     } else {
       log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
