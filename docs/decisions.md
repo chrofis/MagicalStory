@@ -21042,3 +21042,21 @@ that Lörrach is their home town.
 
 **Touched:** `scripts/admin/fix-landmark-country.js`.
 **Status:** ✅ active
+
+---
+
+### Hazard-count judge calibration round 1 (2026-08-28)
+**Context:** First A/B of the anti-hazard templates (Lab 880/881 old vs 886/887
+new, sol judge): beats 37→30, briefs 43→36; CROWD 7→1, ELEV→0. But the judge
+counted the new rules' own staging notes as hazards: out-of-frame exclusions
+("no second ship in view") filed as NEG, passive holds ("holds the map while
+another points") as MULTIACT/CONTACT — ~8 of 21 NEG lines and most new
+MULTIACT/CONTACT lines were this.
+**Decision:** scene-hazard-audit.txt: NEG = in-picture absence states only
+(empty hand, unlit lamp), staging notes excluded; MULTIACT and CONTACT exclude
+plain holds/carries of small objects; CONTACT = load-bearing grips only.
+**Rationale:** The metric must measure render hazards, not the anti-hazard
+phrasing that prevents them; otherwise every fix inflates the count it is
+supposed to lower.
+**Touched:** `prompts/scene-hazard-audit.txt`.
+**Status:** ✅ active
