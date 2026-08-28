@@ -21125,3 +21125,21 @@ portrait/arrival page (judge v3 — counts before/after this are different
 yardsticks).
 **Touched:** `prompts/story-beats.txt`, `prompts/scene-hazard-audit.txt`.
 **Status:** ✅ active
+
+---
+
+### Art Director model = gemini-3.1-pro (2026-08-29)
+**Context:** 3-story x 4-model AD bake-off on frozen shipped beats (Lab
+893-944, hazard judge v3, sol as counter): total hazards raw/reviewed —
+sonnet 91/65, gpt-5.6-sol 80/65, gemini-3.1-pro 49/32, claude-opus 40/51.
+Opus writes the cleanest raw briefs but the deepseek scene reviewer degrades
+them on 2 of 3 stories (+11 net); gemini pairs best with the reviewer
+(pirate 4, feurio 10, levin 18 — 11 of 32 are CROWD frozen in the old beats,
+which the new beats rules remove upstream). Judge variance ~±5 per cell
+(duplicate cells measured).
+**Decision:** MODEL_DEFAULTS.sceneDescription = gemini-3.1-pro (env
+SCENE_DESCRIPTION_MODEL). Scene reviewer stays deepseek-v4-pro — the pairing
+is what was measured. The Haiku-instability note stays true; sonnet was the
+default until this bake-off and is now the measured weakest raw AD.
+**Touched:** `server/config/models.js`.
+**Status:** ✅ active — validated by the pirate rerun on the optimal setting.

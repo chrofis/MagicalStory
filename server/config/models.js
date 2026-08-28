@@ -268,11 +268,13 @@ const MODEL_DEFAULTS = {
     ? process.env.SPLIT_OUTLINE_REVIEW !== 'false'
     : true,
   storyText: 'claude-sonnet',          // Story narrative text
-  sceneDescription: 'claude-sonnet',    // Initial scene expansion — Sonnet only. Haiku produced
-                                        // unstable clothing labels (e.g. "costumed:medieval swiss
-                                        // huntsman" instead of the canonical "costumed:medieval")
-                                        // and inconsistent metadata. Unified mode normally skips
-                                        // this call entirely; only used when prose is missing.
+  // Art Director (scene expansion). gemini-3.1-pro since 2026-08-29: 3-story x
+  // 4-model hazard bake-off on frozen beats (Lab 893-944, v3 judge): gemini
+  // 49 raw / 32 reviewed hazards vs sonnet 91/65, sol 80/65, opus 40/51 —
+  // opus writes the cleanest raw briefs but the reviewer degrades them (+11).
+  // Sonnet note kept for history: Haiku produced unstable clothing labels;
+  // sonnet was the default until this bake-off.
+  sceneDescription: process.env.SCENE_DESCRIPTION_MODEL || 'gemini-3.1-pro',
   // Scene iteration/retry — the full-scene re-expansion during repair. Moved to
   // Qwen for cost (2026-07-12): its diagnosis + fix quality matched Sonnet in the
   // A/B; the one gap (copying German Visual-Bible names into English prose) is
