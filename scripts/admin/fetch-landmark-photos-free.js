@@ -39,8 +39,14 @@ const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
 const delayArg = args.find(a => a.startsWith('--delay='));
 const DELAY = delayArg ? parseInt(delayArg.split('=')[1], 10) : 150;
 
-const BACKDROP = ['Cathedral', 'Church', 'Abbey', 'Monastery', 'Castle', 'Palace', 'Museum',
-  'Bridge', 'Tower', 'Fountain', 'Square', 'Theatre', 'Park', 'Monument', 'Library'];
+// Fetch a photo for everything the selector can actually OFFER, which is every
+// type except the three it never treats as a place. An earlier 15-type
+// "backdrop" allow-list looked equivalent but was not: it silently skipped
+// Building, Landmark, Mountain, River and Station, leaving 278 Swiss rows
+// photoless that were never once attempted (measured 2026-08-27). A row the
+// selector can offer but has no picture for is exactly the gap this fills, so
+// the two lists have to be the same list.
+const NEVER_A_SETTING = ['Event', 'Organisation', 'Other'];
 
 const UA = { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch; rogerfischer@hotmail.com) landmark-photos' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -85,8 +91,8 @@ async function commonsFiles(qid, want = 3) {
   const rows = (await pool.query(
     `SELECT id, name, type, lang, wikipedia_page_id, wikidata_qid, nearest_city
        FROM landmark_index
-      WHERE photo_url IS NULL AND type = ANY($1)
-      ORDER BY id DESC${LIMIT ? ` LIMIT ${LIMIT}` : ''}`, [BACKDROP])).rows;
+      WHERE photo_url IS NULL AND NOT (coalesce(type, 'x') = ANY($1))
+      ORDER BY id DESC${LIMIT ? ` LIMIT ${LIMIT}` : ''}`, [NEVER_A_SETTING])).rows;
 
   console.log(`${STAGING ? 'STAGING' : 'PROD'}: ${rows.length} photoless landmark(s) — no model calls`);
 

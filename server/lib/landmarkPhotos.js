@@ -2366,6 +2366,103 @@ const SAME_MUNICIPALITY_SQL = `(municipality IS NULL
   OR LOWER(translate(municipality, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))
      = LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')))`;
 
+/**
+ * landmarkId → the slot (1-6) whose photo was judged best.
+ *
+ * A landmark's story_score is min(best draw, best photo) across its slots, so
+ * the score can be earned by a photo that is NOT the lead one. Returning
+ * photo_url regardless would then deliver a picture the score never described —
+ * Ruine Stein rates 85 because slot 3 shows the ruin properly, while its lead
+ * image is the distant view that scored 55.
+ *
+ * FRAMING OUTRANKS SCORE. Most stories put the action at the place — in the
+ * castle courtyard, on the bridge — which needs the building filling the frame
+ * with room around it. A superb photograph of the same castle as a speck on a
+ * distant ridge scores higher and is useless for that scene, so a medium shot
+ * wins over a better-scored wide one. Wide and aerial still rank, last, for the
+ * stories that do want the far view.
+ *
+ * Unjudged landmarks are simply absent from the map and keep slot 1, so this is
+ * inert until images have been judged.
+ */
+const FRAMING_RANK_SQL = `CASE coalesce(framing, 'medium')
+  WHEN 'medium'    THEN 0
+  WHEN 'closeup'   THEN 1
+  WHEN 'interior'  THEN 2
+  WHEN 'wide'      THEN 3
+  WHEN 'view-from' THEN 4
+  WHEN 'aerial'    THEN 5
+  ELSE 2 END`;
+
+async function bestPhotoSlots(ids) {
+  const map = new Map();
+  const clean = (ids || []).filter(Number.isFinite);
+  if (!clean.length) return map;
+  try {
+    // Best slot PER FRAMING, not one winner overall. Collapsing to a single
+    // photo throws away the interior shot, and a lot of stories happen inside
+    // the castle, the church, the covered bridge — the scene needs that picture,
+    // not a better exterior. The caller takes the top row as the primary and
+    // keeps the rest as variants.
+    const { rows } = await getPool().query(
+      `SELECT DISTINCT ON (landmark_id, coalesce(framing, 'medium'))
+              landmark_id, slot, coalesce(framing, 'medium') framing, photo_score,
+              ${FRAMING_RANK_SQL} rank
+         FROM landmark_photo_scores
+        WHERE landmark_id = ANY($1) AND photo_score >= ${MIN_USABLE_PHOTO}
+        ORDER BY landmark_id, coalesce(framing, 'medium'), photo_score DESC, slot ASC`, [clean]);
+    for (const r of rows) {
+      const e = map.get(r.landmark_id) || { primary: null, byFraming: [] };
+      e.byFraming.push({ slot: r.slot, framing: r.framing, photoScore: r.photo_score, rank: r.rank });
+      map.set(r.landmark_id, e);
+    }
+    for (const e of map.values()) {
+      e.byFraming.sort((a, b) => a.rank - b.rank || b.photoScore - a.photoScore || a.slot - b.slot);
+      e.primary = e.byFraming[0]?.slot ?? null;
+    }
+  } catch (e) {
+    // Never let photo selection break the lookup — slot 1 is a valid answer.
+    log.warn(`[LANDMARK-INDEX] best-photo lookup failed, using lead images: ${e.message}`);
+  }
+  return map;
+}
+
+// A landmark answers to BOTH names it lives under: its village (locality) and
+// its political municipality. Name lookups match on either.
+//
+// Filtering by nearest_city and then excluding foreign municipalities is only
+// half the job: it correctly stops Zürich being offered a landmark that sits in
+// Buchs ZH, but nothing ever offers that landmark to BUCHS ZH either, because
+// its nearest_city still says Zürich. Measured 2026-08-27 after the P131 +
+// coordinate backfill, 61 Swiss towns had landmarks filed under a neighbour's
+// anchor and were reachable no other way.
+//
+// Why BOTH and not the village alone (decided 2026-08-28, owner's call):
+// a merger is not a move — Turgi merged into Baden in 2024 and a Turgi child
+// still lives in Turgi — but the geocoder cannot tell a former municipality
+// from an internal hamlet. Village-only matching was measured over the whole
+// index and it strands 327 municipalities with ZERO landmarks, because their
+// own monuments resolve to a hamlet inside them: Zug's Reformierte Kirche is
+// tagged 'Oberwil', Langnau's Kirche Heilig Kreuz is tagged 'Bärau'. Matching
+// either name covers 2373 towns against 2054, and hides nothing from anyone.
+//
+// Separation is preserved by ORDER, not by exclusion: LOCALITY_FIRST_SQL puts a
+// village's own landmarks above everything inherited from the wider commune, so
+// a Turgi story opens on the Turgi bridge. Baden may still be offered it, ranked
+// below Baden's own four.
+//
+// $1 is the normalised town name in every query that uses these.
+const TOWN_SQL = `coalesce(locality, municipality, nearest_city)`;
+const NORM_SQL = t => `LOWER(translate(${t}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))`;
+const TOWN_MATCHES_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
+  OR ${NORM_SQL('coalesce(municipality, nearest_city)')} = $1)`;
+
+// Own-village landmarks rank ahead of ones inherited from the municipality —
+// but BELOW having a photo at all, so this sorts after HAS_PHOTO_SQL. Ranked
+// above it, Langnau opened on photoless Burg Spitzenberg instead of its own
+// church, because "in the village" beat "can be illustrated".
+const LOCALITY_FIRST_SQL = `CASE WHEN ${NORM_SQL(`coalesce(locality, '')`)} = $1 THEN 0 ELSE 1 END`;
+
 // An EVENT or an ORGANISATION can never be a scene setting — a cyclocross
 // championship, a football federation, a company. 237 such rows.
 //
@@ -2388,7 +2485,20 @@ const NEVER_A_SETTING_SQL = `coalesce(type,'x') NOT IN ('Event','Organisation','
 // The bar is deliberately low. It removes what a photo shows to be an apartment
 // block, an office or a construction site, and keeps everything merely ordinary.
 // NULL is untouched: a city that has never been judged behaves exactly as before.
-const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= 30)`;
+// The lower cutoff for a PICTURE, and therefore for a landmark.
+//
+// 30 was too generous: the Stadtturm closeup scores 30 — "tight crop of the
+// scaffolded clock face" — and is simply not printable in a child's book. 40 is
+// where a photo stops being usable at all.
+//
+// One number governs both because they are the same judgement. story_score is
+// min(best draw, best photo), so a landmark scoring 35 has no photo above 35
+// either; letting it through would offer a place whose every picture selection
+// had already rejected, and the lookup would fall back to the unapproved lead
+// image. A landmark that cannot be illustrated is not a landmark we can use.
+const MIN_USABLE_PHOTO = 40;
+
+const JUDGED_USABLE_SQL = `(story_score IS NULL OR story_score >= ${MIN_USABLE_PHOTO})`;
 
 // Fame is a GLOBAL measure, so inside one town it ranks the wrong way round: a
 // synagogue 7km away in another village (5 language editions) beat the town's
@@ -2513,14 +2623,13 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // Normalize diacritics on both sides (e.g. "Zurich" matches "Zürich")
     const normalizedCity = normalizeForCompare(city);
 
-    // Try exact match first — the town's OWN landmarks only (see SAME_MUNICIPALITY_SQL)
+    // Exact match on either name the row lives under; own-village rows rank first.
     let result = await pool.query(`
       SELECT * FROM landmark_index
-      WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
-        AND ${SAME_MUNICIPALITY_SQL}
+      WHERE ${TOWN_MATCHES_SQL}
         AND ${NEVER_A_SETTING_SQL}
         AND ${JUDGED_USABLE_SQL}
-      ORDER BY ${LANDMARK_RANK_SQL}, name ASC
+      ORDER BY ${HAS_PHOTO_SQL} DESC, ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
 
@@ -2529,11 +2638,10 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       const inputNorm = normalizedCity.replace(/,/g, '').replace(/\s+/g, ' ').trim();
       result = await pool.query(`
         SELECT * FROM landmark_index
-        WHERE TRIM(REPLACE(LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
-          AND ${SAME_MUNICIPALITY_SQL}
+        WHERE TRIM(REPLACE(LOWER(translate(${TOWN_SQL}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
           AND ${NEVER_A_SETTING_SQL}
         AND ${JUDGED_USABLE_SQL}
-        ORDER BY ${LANDMARK_RANK_SQL}, name ASC
+        ORDER BY ${HAS_PHOTO_SQL} DESC, ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [inputNorm, limit]);
       if (result.rows.length > 0) {
@@ -2546,9 +2654,11 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       const firstWord = normalizedCity.split(/[\s,]+/)[0];
       result = await pool.query(`
         SELECT * FROM landmark_index
-        WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
-           OR LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) LIKE $1 || ',%'
-        ORDER BY ${LANDMARK_RANK_SQL}, name ASC
+        WHERE (${TOWN_MATCHES_SQL}
+               OR LOWER(translate(${TOWN_SQL}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) LIKE $1 || ',%')
+          AND ${NEVER_A_SETTING_SQL}
+          AND ${JUDGED_USABLE_SQL}
+        ORDER BY ${HAS_PHOTO_SQL} DESC, ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [firstWord, limit]);
       if (result.rows.length > 0) {
@@ -3464,15 +3574,44 @@ async function resolveAvailableLandmarks(location, opts = {}) {
 
   try {
     const indexed = await getIndexedLandmarks(location, limit);
+    const bestSlot = await bestPhotoSlots(indexed.map(l => l.id));
     landmarks = indexed.map(l => {
-      const photoVariants = [];
-      for (let n = 1; n <= 6; n++) {
-        const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
-        const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
-        if (l[urlKey] && l[descKey]) {
-          photoVariants.push({ variantNumber: n, vantage: n >= 4 ? 'interior' : 'exterior', description: l[descKey] });
-        }
-      }
+      // Serve the BEST-judged photo, not always slot 1. A landmark's score is
+      // derived from its best slot, so returning the lead image regardless would
+      // hand the story a picture the score never described: Ruine Stein rates 85
+      // on slot 3, while its lead photo is the distant one that scored 55.
+      // Every field below describes ONE image, so they all take the same slot.
+      // No cross-slot fallback: attribution is a CC licence condition, and
+      // pairing slot 3's photo with slot 1's credit names the wrong
+      // photographer. A missing description beats a wrong one.
+      const judged = bestSlot.get(l.id);
+      const served = judged?.primary || 1;
+      const at = key => l[served === 1 ? key : `${key}_${served}`] ?? null;
+      const col = (s, v) => l[v === 1 ? s : `${s}_${v}`] ?? null;
+
+      // One variant per framing, so a scene set INSIDE the castle can reach the
+      // interior shot even though a medium exterior is the primary. Falls back
+      // to every described slot when the landmark has not been judged yet.
+      const photoVariants = judged
+        ? judged.byFraming.map(f => ({
+          variantNumber: f.slot,
+          vantage: f.framing,
+          photoScore: f.photoScore,
+          url: col('photo_url', f.slot),
+          description: col('photo_description', f.slot),
+          attribution: col('photo_attribution', f.slot),
+        }))
+        : Array.from({ length: 6 }, (_, i) => i + 1)
+          .filter(v => col('photo_url', v) && col('photo_description', v))
+          .map(v => ({
+            variantNumber: v,
+            // photo_type is recorded per slot; the old v>=4 rule was a guess
+            // about how the indexer filled the columns, not the stored fact.
+            vantage: col('photo_type', v) || (v >= 4 ? 'interior' : 'exterior'),
+            url: col('photo_url', v),
+            description: col('photo_description', v),
+            attribution: col('photo_attribution', v),
+          }));
       return {
         name: l.name,
         query: l.name,
@@ -3480,9 +3619,11 @@ async function resolveAvailableLandmarks(location, opts = {}) {
         score: l.score,
         lat: parseFloat(l.latitude),
         lon: parseFloat(l.longitude),
-        photoUrl: l.photo_url,
-        photoDescription: l.photo_description,
-        attribution: l.photo_attribution,
+        photoUrl: at('photo_url') || l.photo_url,
+        photoDescription: at('photo_description'),
+        attribution: at('photo_attribution'),
+        photoType: at('photo_type'),
+        photoSlot: served,
         wikipediaExtract: l.wikipedia_extract,
         photoVariants,
         isIndexed: true,

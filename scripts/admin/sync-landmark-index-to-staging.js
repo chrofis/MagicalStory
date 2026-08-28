@@ -50,6 +50,7 @@ const COLUMNS = [
   // Enrichment lives on prod and must travel with the row, or staging silently
   // ranks on the old signals while prod ranks on the new ones.
   'municipality', 'municipality_updated_at',
+  'locality', 'locality_updated_at',
   'story_score', 'story_score_reason', 'story_score_at',
 ];
 
@@ -89,6 +90,32 @@ const COLUMNS = [
     await stg.query(sql, COLUMNS.map(c => row[c]));
     if (++done % 250 === 0) console.log(`  ${done}/${src.rows.length}`);
   }
+
+  // Per-image judgements live in their own table and must travel too. Without
+  // them staging keeps story_score but has no landmark_photo_scores, so
+  // bestPhotoSlots() finds nothing and every landmark silently falls back to
+  // its lead image — the exact behaviour the judging exists to replace.
+  //
+  // Keyed on the staging row's OWN id, resolved through wikidata_qid: ids are
+  // per-database and assuming they match would attach Zürich's scores to a
+  // Ticino church.
+  const scores = await prod.query(`
+    SELECT l.wikidata_qid, s.slot, s.draw_score, s.photo_score, s.framing, s.reason
+      FROM landmark_photo_scores s JOIN landmark_index l ON l.id = s.landmark_id
+     WHERE l.wikidata_qid IS NOT NULL`);
+  let sdone = 0, smiss = 0;
+  for (const r of scores.rows) {
+    const res = await stg.query(`
+      INSERT INTO landmark_photo_scores (landmark_id, slot, draw_score, photo_score, framing, reason, judged_at)
+      SELECT id, $2, $3, $4, $5, $6, NOW() FROM landmark_index WHERE wikidata_qid = $1
+      ON CONFLICT (landmark_id, slot) DO UPDATE
+        SET draw_score = EXCLUDED.draw_score, photo_score = EXCLUDED.photo_score,
+            framing = EXCLUDED.framing, reason = EXCLUDED.reason, judged_at = NOW()`,
+      [r.wikidata_qid, r.slot, r.draw_score, r.photo_score, r.framing, r.reason]);
+    if (res.rowCount) sdone++; else smiss++;
+    if ((sdone + smiss) % 500 === 0) console.log(`  scores ${sdone + smiss}/${scores.rows.length}`);
+  }
+  console.log(`image scores copied: ${sdone}${smiss ? ` (${smiss} had no matching staging row)` : ''}`);
 
   const after = await stg.query('SELECT COUNT(*) c, COUNT(DISTINCT nearest_city) cities FROM landmark_index');
   console.log(`\n✅ staging now: ${after.rows[0].c} rows across ${after.rows[0].cities} cities (was ${before.rows[0].c})`);

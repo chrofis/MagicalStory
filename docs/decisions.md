@@ -20940,3 +20940,105 @@ Everything else still persists from the clone, unchanged.
 **Status:** 🟡 conditional — unit suite green (218 passed, same 3 pre-existing
 failures); NOT pushed, owner asked to hold while a story runs. The proof is the
 next generated story writing `figure_mask` rows.
+
+## 2026-08-28 — Every landmark photo is judged by looking at it; two scores, a framing, and a 40 cutoff
+
+**Context:** `landmark_index` ranked a town's landmarks by `fame_pageviews`, a
+proxy that is decorrelated from both "is this a scene a child can play in" and
+"is this picture usable". Measured: Chur's four best landmarks have NO pageview
+data at all; Aarau's top two have ~1% of the views of a town aerial. Under that
+ranking a building site outranked a castle, and nothing had ever LOOKED at the
+16,232 stored images — so a plate of pasta, a circuit diagram, Mount Fuji filed
+under "Berg", and a 137 MB TIFF all sat in the index as valid town scenery.
+
+**Decision:** every stored image is judged visually, by a general-purpose
+subagent reading the file (no model API — $0). Each image gets three fields in
+the new `landmark_photo_scores` table:
+- `draw_score` — is the PLACE a scene worth drawing. **Fame must not raise it**:
+  a house where someone famous lived is still a house.
+- `photo_score` — does THIS picture show that place, usably.
+- `framing` — one of `medium | closeup | interior | wide | view-from | aerial`.
+
+`story_score` is **derived, never authored**: `LEAST(MAX(draw), MAX(photo))` per
+landmark. `MIN_USABLE_PHOTO = 40` is one constant governing both the per-image
+filter and the landmark filter, because they are the same judgement — min() means
+a landmark at 35 has no picture above 35 either.
+
+Serving picks the best slot **per framing**, ranked `medium → closeup → interior
+→ wide → view-from → aerial`; framing outranks score, because most stories put
+the action AT the place and a superb photo of the same castle as a distant speck
+cannot carry that scene. All served fields (url, description, attribution) come
+from the SAME slot — mixing them credits the wrong photographer, which is a CC
+licence condition, not a cosmetic issue.
+
+**Rationale:** the alternative was to keep ranking on metadata and judge only the
+top-ranked candidate. That fails on its own terms: you cannot know which
+candidate is best until you have seen them, and "top" was decided by the very
+proxy under suspicion. Judging every image cost one pass and is done. Measured
+over the full Swiss set: 16,224 of 16,232 images judged (8 fail to download),
+4,867 of 5,914 landmarks usable, and towns with a usable landmark rose from
+1,678 to 2,373. Roughly 8% of rejections were not bad photos but **not
+photographs at all** — district maps, coats of arms, engravings, floor plans,
+info boards, logos, a share certificate, a Hong Kong tram filed as Hauser &
+Wirth, a chamois for Parc Chasseral.
+
+**Touched:** `migrations/031_landmark_photo_scores.sql`,
+`migrations/033_landmark_photo_framing.sql`, `server/lib/landmarkPhotos.js`
+(`MIN_USABLE_PHOTO`, `JUDGED_USABLE_SQL`, `FRAMING_RANK_SQL`, `bestPhotoSlots`),
+`scripts/admin/prep-landmark-judging.js`,
+`scripts/admin/merge-landmark-judgments.js`,
+`docs/landmark-judging-instructions.md`.
+**Status:** ✅ active
+
+## 2026-08-28 — A landmark answers to BOTH its village and its municipality; the village ranks first
+
+**Context:** a landmark's town was `coalesce(municipality, nearest_city)`. Two
+failures. (1) `nearest_city` is the discovery ANCHOR, not the containing town, so
+61 Swiss towns had landmarks filed under a neighbour's anchor and unreachable.
+(2) Mergers: Turgi merged into Baden in 2024, so every Turgi landmark carries
+`municipality = 'Baden'` — a Turgi story got Baden's monuments and Turgi's own
+bridge was offered to Baden.
+
+**Decision:** added `locality` (village/hamlet, from Nominatim at zoom 14,
+`village`/`hamlet` only). A row matches a town when EITHER its `locality` OR its
+`coalesce(municipality, nearest_city)` matches. Separation is by ORDER, not
+exclusion: `LOCALITY_FIRST_SQL` ranks a village's own landmarks above ones
+inherited from the commune — and sorts AFTER `HAS_PHOTO_SQL`, so "can be
+illustrated" still beats "is in the village".
+
+**Rationale:** village-ONLY matching was implemented first and measured over the
+whole index before shipping — it strands **327 municipalities with zero
+landmarks**, because the geocoder cannot tell a former municipality from an
+internal hamlet: Zug's Reformierte Kirche resolves to `Oberwil`, Langnau's Kirche
+Heilig Kreuz to `Bärau`. Either-name matching covers 2,373 towns vs 2,054 and
+hides nothing. The residual cost, accepted by the owner 2026-08-28: a Baden story
+may still be offered the Turgi bridge, ranked below Baden's own four. The exact
+fix (withhold only genuine ex-municipalities, via a Wikidata pass over ~1,700
+localities) was offered and deferred — see BACKLOG.
+
+**Touched:** `migrations/032_landmark_locality.sql`,
+`server/lib/landmarkPhotos.js` (`TOWN_SQL`, `TOWN_MATCHES_SQL`,
+`LOCALITY_FIRST_SQL`), `scripts/admin/backfill-landmark-municipality.js`.
+**Status:** ✅ active
+
+## 2026-08-28 — Foreign landmarks keep their row, only `country` is corrected
+
+**Context:** discovery searched a radius around each Swiss town and stamped every
+hit `country = 'Switzerland'`. Near the border that radius crosses out of the
+country, so the Swiss index held real foreign places — Kapuzinerkloster
+Stühlingen, Heilige Familie in Lörrach, Nepomukkapelle in Hohenems.
+
+**Decision:** correct `country` from Wikidata P17 (free). Keep the row.
+Corrected 187 of 6,190 checked: Germany 109, Austria 24, Italy 22, France 18,
+Liechtenstein 14. Rows with no P17 claim, or a country outside the neighbour
+list, are left untouched — never guessed.
+
+**Rationale:** these cannot be caught geometrically — Stühlingen sits at
+47.74/8.44, inside any bounding box drawn around Switzerland. Only the stated
+country identifies them. The row is worth keeping because a landmark 2 km over
+the border is still genuinely near Basel and the proximity fallback may
+legitimately offer it; what must never happen is a story telling a Swiss child
+that Lörrach is their home town.
+
+**Touched:** `scripts/admin/fix-landmark-country.js`.
+**Status:** ✅ active
