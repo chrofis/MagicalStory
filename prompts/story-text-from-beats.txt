@@ -32,7 +32,7 @@ One block per page. BEAT is what happens on that page. SCENE is a one-line summa
 
 Write only events the ILLUSTRATION supports: if it shows an object coming free, it comes free on that page; if it shows one still stuck, it stays stuck. If the brief has a character doing something, the text may name it or stay silent, but it must never contradict it — a reader sees both on the same page. Where they disagree, the ILLUSTRATION wins over the SCENE line, and the SCENE line over the BEAT.
 
-Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's.
+Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's. Nor does the text assert a position, an action or an object the SCENE line and ILLUSTRATION do not stage: a figure they leave out of frame does nothing visible on that page, and an action they stage as its aftermath is told as its aftermath.
 
 {BEATS}
 
