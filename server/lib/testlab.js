@@ -3200,9 +3200,10 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
     // stored story — same judge, same template, only the artifact differs.
     const { dbQuery } = require('../services/database');
     const expId = parseInt(params.fromExperiment, 10);
+    // dbQuery returns the rows array itself (database.js).
     const rows = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [expId]);
-    if (!rows.rows.length) throw new Error(`fromExperiment ${expId}: not found`);
-    const out = (rows.rows[0].results || [])[0] || {};
+    if (!rows.length) throw new Error(`fromExperiment ${expId}: not found`);
+    const out = (rows[0].results || [])[0] || {};
     storyTitle = out.title || null;
     if (source === 'beats') {
       pages = (out.finalBeats || [])
