@@ -3539,7 +3539,7 @@ async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costO
     buildStoryTextFromBeatsPrompt } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
-  const { CARRY_ROUTES, withCarriedFindings } = require('./carryRoutes');
+  const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
   const { checkScenes, REVIEWABLE } = require('./sceneBriefCheck');
 
   const beatsAudit = String(params.beatsAudit || storyData?.beatsReviewReport?.audit || '').trim();
@@ -3574,7 +3574,7 @@ async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costO
 
   const arms = [
     { key: 'control', label: 'no carry', prompt: basePrompt },
-    { key: 'carry', label: 'beats audit carried', prompt: withCarriedFindings(basePrompt, beatsAudit, CARRY_ROUTES.beatsToArtDirector) },
+    { key: 'carry', label: 'beats audit carried', prompt: withCarriedRulings(basePrompt, beatsAudit, CARRY_ROUTES.beatsToArtDirector) },
   ];
 
   const results = [];
@@ -3606,7 +3606,7 @@ async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costO
     if (textBase) {
       const textArms = [
         { key: 'control', prompt: textBase },
-        { key: 'carry', prompt: withCarriedFindings(textBase, beatsAudit, CARRY_ROUTES.beatsToStoryText) },
+        { key: 'carry', prompt: withCarriedRulings(textBase, beatsAudit, CARRY_ROUTES.beatsToStoryText) },
       ];
       storyText = [];
       for (const a of textArms) {
@@ -3653,6 +3653,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
 
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
   const lockStart = Date.now();
+  let plainStoredBeats = null;
 
   // START FROM THE STORED BEATS (owner, 2026-08-25). The stage normally plans
   // and reviews beats from scratch, which measures the planner. To ask the
@@ -3661,7 +3662,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // shipped, not a fresh draft. Every page keeps its own beat in
   // `outlineExtract` ("BEAT: … SCENE: …"), so the shipped set is recoverable
   // without re-running anything.
-  if (params.useStoredBeats) {
+  if (params.useStoredBeats || params.plainStoredBeats) {
     const stored = (storyData.sceneImages || [])
       .map((s) => {
         const raw = String(s.outlineExtract || '');
@@ -3670,22 +3671,35 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         return beat ? { pageNumber: s.pageNumber, beat, scene } : null;
       })
       .filter(Boolean);
-    if (stored.length === 0) throw new Error('useStoredBeats: no page carries an outlineExtract BEAT');
-    return await runStoredBeatsScenes(storyData, stored, { params, experimentId: null, costOf, lockStart });
+    if (stored.length === 0) throw new Error('stored beats: no page carries an outlineExtract BEAT');
+    // plainStoredBeats: hold the beats constant and fall through to the NORMAL
+    // step-3 expansion + scene review — the Art Director bake-off path. The
+    // carry harness (useStoredBeats) stays what it was.
+    if (params.useStoredBeats) {
+      return await runStoredBeatsScenes(storyData, stored, { params, experimentId: null, costOf, lockStart });
+    }
+    plainStoredBeats = stored;
   }
 
   // ── Step 1: plan ────────────────────────────────────────────────────────
-  let plannerPrompt = buildBeatsPrompt(storyData, pageCount);
-  if (!plannerPrompt) throw new Error('story-beats template unavailable');
-  if (promptOverride) plannerPrompt = promptOverride;
+  // plainStoredBeats skips planning and review — the beats are the frozen input.
+  let plannerPrompt = null;
+  let planRes = null;
+  let planMs = 0;
+  let planParsed = null;
+  if (!plainStoredBeats) {
+    plannerPrompt = buildBeatsPrompt(storyData, pageCount);
+    if (!plannerPrompt) throw new Error('story-beats template unavailable');
+    if (promptOverride) plannerPrompt = promptOverride;
 
-  const t0 = Date.now();
-  const planRes = await callTextModelStreaming(plannerPrompt, null, null, beatsModel, { usageLabel: 'testlab_beats' });
-  const planMs = Date.now() - t0;
-  const planParsed = parseBeats(planRes.text || '', expected);
-  if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable beats');
+    const t0 = Date.now();
+    planRes = await callTextModelStreaming(plannerPrompt, null, null, beatsModel, { usageLabel: 'testlab_beats' });
+    planMs = Date.now() - t0;
+    planParsed = parseBeats(planRes.text || '', expected);
+    if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable beats');
+  }
 
-  const plan = {
+  const plan = plainStoredBeats ? { source: 'stored-beats', pages: plainStoredBeats } : {
     modelKey: beatsModel,
     modelId: planRes.modelId,
     provider: planRes.provider || null,
@@ -3702,8 +3716,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
 
   // ── Step 2: fast structural review ──────────────────────────────────────
   let review = null;
-  let finalBeats = planParsed.pages;
-  if (!params.skipReview) {
+  let finalBeats = plainStoredBeats || planParsed.pages;
+  if (!plainStoredBeats && !params.skipReview) {
     const tlPagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
     const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages, planParsed.arc, tlPagePlan);
     if (!reviewPrompt) throw new Error('story-beats-review template unavailable');

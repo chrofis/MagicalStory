@@ -289,6 +289,14 @@
       "status": "fixed",
       "fixedIn": "f5e62bf34",
       "note": "sceneMetadata.sceneIntent is the canonical one-line picture summary; extractRefinablePages now reads it first, buildTextAuditPrompt prefers p.sceneIntent over the depictsOf regex."
+    },
+    {
+      "id": "testlab-stale-withCarriedFindings",
+      "reported": "2026-08-28",
+      "summary": "runStoredBeatsScenes (testlab.js) required withCarriedFindings from carryRoutes, which exports withCarriedRulings since the carry-routes reduction — every useStoredBeats beats_scenes experiment crashed with \"withCarriedFindings is not a function\" (reproduced: Lab experiments 893-896).",
+      "status": "fixed",
+      "fixedIn": "3d1497d4a",
+      "note": "renamed to withCarriedRulings at all three call sites."
     }
   ]
 }
