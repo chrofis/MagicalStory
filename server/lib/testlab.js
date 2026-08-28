@@ -3211,10 +3211,13 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
         .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
       if (!pages.length) throw new Error(`fromExperiment ${expId}: no finalBeats SCENE lines in result`);
     } else {
-      // fromBeats = the regenerated brief (storedProduction is the old one).
+      // fromBeats = the raw expansion; reviewedBrief = after the scene review
+      // rewrote it. params.artifact picks the measurement: 'raw' isolates the
+      // Art Director, 'reviewed' (default) measures the AD+reviewer chain.
+      const useRaw = String(params.artifact || 'reviewed') === 'raw';
       pages = (out.sceneExpansions || [])
-        .filter(x => String(x.fromBeats || '').trim())
-        .map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats }));
+        .map(x => ({ pageNumber: x.pageNumber, brief: useRaw ? x.fromBeats : (x.reviewedBrief || x.fromBeats) }))
+        .filter(x => String(x.brief || '').trim());
       if (!pages.length) throw new Error(`fromExperiment ${expId}: no sceneExpansions in result`);
     }
   } else {
