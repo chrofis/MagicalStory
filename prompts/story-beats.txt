@@ -39,7 +39,8 @@ SCENE is what the illustration shows: who is present, where they are, what they 
 - Everyone stands on the ground. A figure in rigging, on a mast, a ladder, a roof or another's shoulders only when the beat's event IS that height — then one figure up there and no one else off the ground.
 - Never two characters interlocked at one instant — a shared grip on one object, an object in flight, a hand-over: show the moment before or after it. Never a thought or realization as the visual, or a climbing/stretching pose with hidden limbs. When the beat's event is internal or mechanical, the scene shows its visible result instead (the box open, the found object held up).
 - BEAT and SCENE agree on who is present and where each of them is. A figure the scene leaves out is not placed anywhere by the beat's wording either, and the beat never puts someone somewhere the scene does not show them.
-- The action at the moment it happens, never the state that follows it. Name the one condition that causes the action when the beat depends on it, and nothing else about the setting. Never compose the frame — what fills it, how large something looks, where it sits; a shot type is enough.
+- The action at the moment it happens, never the state that follows it. Name the one condition that causes the action when the beat depends on it, and nothing else about the setting. Never compose the frame — what fills it, how large something looks, where it sits; a shot type is enough, and a close shot names nothing beyond what fills that frame.
+- Name what is in the picture, never what is absent, empty or missing from it — an empty hand, a vanished object, a gap. When the absence is the story point, show its visible consequence (a hand reaching for the next hold), or make the empty place itself the page's subject.
 
 Requirements:
 - Each page follows causally from the one before it.

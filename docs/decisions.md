@@ -21073,3 +21073,18 @@ history — no "again"/"for the third time"/"already", no object both mid-motion
 and in its ended state.
 **Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`.
 **Status:** ✅ active; AD model bake-off measures the residual next.
+
+---
+
+### Hazard iteration round 3: beats negation + close-shot rule, judge v3 (2026-08-28)
+**Context:** New-beats residual (Lab 891, 19 hazards): NEG 7 — the beats writer
+names in-picture absences (empty hands, vanished objects); SHOT 2 — close-ups
+carrying horizons. The negation rule existed only in the AD templates. The
+judge also flagged the one allowed whole-cast portrait page as CROWD.
+**Decision:** story-beats.txt SCENE rules: name what is in the picture, never
+what is absent (consequence or empty-place-as-subject instead); a close shot
+names nothing beyond its frame. scene-hazard-audit.txt CROWD exempts the single
+portrait/arrival page (judge v3 — counts before/after this are different
+yardsticks).
+**Touched:** `prompts/story-beats.txt`, `prompts/scene-hazard-audit.txt`.
+**Status:** ✅ active
