@@ -284,8 +284,12 @@ function extractRefinablePages(sceneLike = []) {
   return sceneLike
     .filter(s => s && (s.text || '').trim())
     .map(s => {
-      let sceneIntent = '';
-      try { sceneIntent = JSON.parse(s.outlineExtract || '{}').sceneIntent || ''; } catch { /* not JSON */ }
+      // sceneMetadata.sceneIntent is where the one-line picture summary lives
+      // (sceneMetadata.js). The old outlineExtract JSON.parse never matched —
+      // outlineExtract holds "BEAT: …" prose — so every page silently fell to
+      // the brief slice and the text audit compared words against nothing.
+      let sceneIntent = String(s.sceneMetadata?.sceneIntent || '').trim();
+      if (!sceneIntent) { try { sceneIntent = JSON.parse(s.outlineExtract || '{}').sceneIntent || ''; } catch { /* not JSON */ } }
       if (!sceneIntent) sceneIntent = (s.sceneDescription || s.description || '').slice(0, 600);
       // The BRIEF as well as the one-line intent (2026-08-10). The compact
       // intent alone was chosen to avoid steering the prose with rendering

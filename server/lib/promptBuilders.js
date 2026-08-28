@@ -4578,8 +4578,11 @@ function buildTextAuditPrompt(inputData, pages = []) {
     const m = String(brief || '').match(/THIS IMAGE DEPICTS:\*{0,2}\s*([\s\S]*?)(?=\n\s*\n\s*(?:\*\*|#|[A-Z][A-Z ]{3,}:)|$)/);
     return (m ? m[1] : '').trim();
   };
+  // sceneIntent first: the DEPICTS header only ever exists in image prompts,
+  // never in briefs, so depictsOf alone left every page "(no picture
+  // description)" and the MISMATCH question could not fire.
   const body = pages.map(p =>
-    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${depictsOf(p.sceneBrief) || '(no picture description)'}`
+    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${String(p.sceneIntent || '').trim() || depictsOf(p.sceneBrief) || '(no picture description)'}`
   ).join('\n\n');
   return fillTemplate(template, {
     STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,

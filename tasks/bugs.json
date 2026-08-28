@@ -281,6 +281,14 @@
       "status": "fixed",
       "fixedIn": "bb933ca08",
       "note": "charRepairTarget.js sits in server/lib/ and the logger lives at server/utils/logger.js, exported as { log }. Every sibling uses const { log } = require(\"../utils/logger\"); this file had const log = require(\"./logger\"). Two lessons: (1) /api/health reports RAILWAY_GIT_COMMIT_SHA, which is the last SUCCESSFUL build — it cannot detect a failed deploy, so gating a validation run on it is unsound; check a boot-time side effect (a migration column) or the Railway deployment status instead. (2) check-no-undef in the pre-push hook does not resolve require() paths, so a bad module path passes every gate and only fails at container start."
+    },
+    {
+      "id": "text-audit-empty-depicts",
+      "reported": "2026-08-28",
+      "summary": "buildTextAuditPrompt reads the picture side via a THIS IMAGE DEPICTS regex that only ever matches image prompts, never briefs; extractRefinablePages sceneIntent JSON.parse on outlineExtract (BEAT prose) also always fails. Every page reached the text audit as THE PICTURE SHOWS: (no picture description) — verified on 9 pages across 3 staging stories (job_1787867402809, job_1787812110559, job_1787777447720). The MISMATCH question could never fire.",
+      "status": "fixed",
+      "fixedIn": "f5e62bf34",
+      "note": "sceneMetadata.sceneIntent is the canonical one-line picture summary; extractRefinablePages now reads it first, buildTextAuditPrompt prefers p.sceneIntent over the depictsOf regex."
     }
   ]
 }
