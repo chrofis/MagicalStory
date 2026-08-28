@@ -21060,3 +21060,16 @@ phrasing that prevents them; otherwise every fix inflates the count it is
 supposed to lower.
 **Touched:** `prompts/scene-hazard-audit.txt`.
 **Status:** ✅ active
+
+---
+
+### Hazard iteration round 2: temporal ban in the Art Director (2026-08-28)
+**Context:** Calibrated 4-cell A/B (Lab 889-892): beats 25→19, briefs 35→33;
+the expansion still ADDS hazards (TEMPORAL 0→4, FORCE 0→3, MULTIACT 5→6) —
+the beats template had the no-before-and-after rule, the expansion templates
+did not.
+**Decision:** Rule 5c in both scene-expansion templates: one instant, no
+history — no "again"/"for the third time"/"already", no object both mid-motion
+and in its ended state.
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`.
+**Status:** ✅ active; AD model bake-off measures the residual next.
