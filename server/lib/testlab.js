@@ -3193,20 +3193,45 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   let pages;
-  if (source === 'beats') {
-    const beatsSection = (String(storyData.outline || '')
-      .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
-    pages = parseBeats(beatsSection).pages
-      .filter(p => String(p.scene || '').trim())
-      .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
-    if (!pages.length) throw new Error('story has no stored beat SCENE lines to audit');
+  let storyTitle = null;
+  if (params.fromExperiment) {
+    // A/B leg: count a beats_scenes regeneration's output instead of the
+    // stored story — same judge, same template, only the artifact differs.
+    const { dbQuery } = require('../services/database');
+    const expId = parseInt(params.fromExperiment, 10);
+    const rows = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [expId]);
+    if (!rows.rows.length) throw new Error(`fromExperiment ${expId}: not found`);
+    const out = (rows.rows[0].results || [])[0] || {};
+    storyTitle = out.title || null;
+    if (source === 'beats') {
+      pages = (out.finalBeats || [])
+        .filter(p => String(p.scene || '').trim())
+        .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
+      if (!pages.length) throw new Error(`fromExperiment ${expId}: no finalBeats SCENE lines in result`);
+    } else {
+      // fromBeats = the regenerated brief (storedProduction is the old one).
+      pages = (out.sceneExpansions || [])
+        .filter(x => String(x.fromBeats || '').trim())
+        .map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats }));
+      if (!pages.length) throw new Error(`fromExperiment ${expId}: no sceneExpansions in result`);
+    }
   } else {
-    pages = (storyData.sceneImages || [])
-      .filter(s => String(s.sceneDescription || '').trim())
-      .map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
-    if (!pages.length) throw new Error('story has no stored scene briefs to audit');
+    const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+    storyTitle = storyData.title || null;
+    if (source === 'beats') {
+      const beatsSection = (String(storyData.outline || '')
+        .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
+      pages = parseBeats(beatsSection).pages
+        .filter(p => String(p.scene || '').trim())
+        .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
+      if (!pages.length) throw new Error('story has no stored beat SCENE lines to audit');
+    } else {
+      pages = (storyData.sceneImages || [])
+        .filter(s => String(s.sceneDescription || '').trim())
+        .map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
+      if (!pages.length) throw new Error('story has no stored scene briefs to audit');
+    }
   }
 
   // One prompt over ALL pages: a hazard count is only comparable when the judge
@@ -3258,7 +3283,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
     ok: runs.some(r => r.ok),
     stageKind: 'scene_hazard_count',
     storyId: target.storyId,
-    title: storyData.title || null,
+    title: storyTitle,
     source,
     pageCount: pages.length,
     elapsedMs: Date.now() - t0,
