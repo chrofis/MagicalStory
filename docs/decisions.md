@@ -21661,3 +21661,22 @@ flag resolves to `baked` under `RAILWAY_ENVIRONMENT_NAME=staging` and
 `server/lib/testlab.js`.
 **Status:** 🟡 conditional — live on staging; promotion to production needs
 covers from real staging runs, judged by the owner.
+
+---
+
+### Story-structure rules made un-cheatable + AI set-piece ration (owner, 2026-08-29)
+**Context:** job_1787991502308 rated 6.5 by an editor read and "horrible" by the
+owner: the portal frame never crossed or closed, the promised chest never
+opened (PAYOFF was flagged by audit2 and survived the corrective round), the
+rival absent after p5 with an off-page reported defeat, a race with no clock.
+Every failure satisfied an existing rule cheaply. Separately, the model's
+reflex rhetoric (paired negations, coined sayings, one-line drama paragraphs)
+recurs every book.
+**Decision:** story-beats.txt: a rival's ending happens with the rival IN the
+scene, plus one mid-book appearance; a race/deadline is scored on-page at least
+twice; a promised container opens before the end and a framed entry (doorway,
+portal) is returned through. Writer/refine/proofread: rhetorical set-pieces
+rationed to one use per book.
+**Touched:** `prompts/story-beats.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/text-refine.txt`, `prompts/story-text-proofread.txt`.
+**Status:** ✅ active
