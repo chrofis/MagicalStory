@@ -62,7 +62,6 @@ Requirements:
 - A page keeps its characters at one depth together. Separate a figure into the background only when the beat itself requires the separation (left behind, watching from afar, arriving in the distance) — keep such pages to the few the story needs.
 - Resolve what the commission conflates or leaves to coincidence — distinguish two things it treats as one, give every arrival a cause — and drop what earns nothing.
 - An animal or creature that travels with the children is given a name by them, where they decide to help it, and goes by that name after.
-- Vessel, vehicle and invented place names are made for this story alone. The main characters' vessel and the rival's vessel share no word between them. A name the commission itself gives stands as written.
 - When the deadline is a time of day, the story starts at an hour the book's length can cross to reach it.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A rival's thread ends on a page: they arrive too late, see what they lost, pay or learn. A rival who simply leaves the frame is an open thread.
@@ -101,8 +100,6 @@ Joining and parting: <who is there at the start; who arrives later and why then;
 Shape: opening — <what settles the reader in> / building — <what tightens, and tightens again> / relief — <where it lets go> / ending — <what is different>
 
 Closed: <every thing introduced and where it is paid off — objects, questions, promises, the rival's ending, and the later mark of every price paid. Anything that cannot be named here is cut instead.>
-
-Fresh this book: vessel — <the vessel or vehicle the main characters travel in, by name> / rival — <the rival's name and their vessel's name> / mechanic — <the one obstacle this book turns on, in four words> (write "none" for a part the story has not got)
 
 Write the story, not the page plan. No page numbers anywhere in this block.
 

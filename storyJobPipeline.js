@@ -3298,8 +3298,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // The challenges from this account's earlier books that the arc planner was
     // told to avoid. Stored so a repeat can be audited against what was excluded.
     const arcVarietyExclusions = beatsResult?.arcVarietyExclusions || null;
-    // The vessel/rival/mechanic names from those same books, excluded by name.
-    const arcVarietyNames = beatsResult?.arcVarietyNames || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     if (refineEnabled) {
@@ -5882,7 +5880,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       textRefineReport, // per-page before/after from the parallel refine pass
       arcReviewReport,   // drafted arc + arc-review analysis (beats mode)
       arcVarietyExclusions, // challenges from this account's earlier books, excluded at arc plan (beats mode)
-      arcVarietyNames, // vessel/rival/mechanic names from those books, excluded by name (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       sceneReviewReport, // per-page before/after from the scene review (beats mode)
