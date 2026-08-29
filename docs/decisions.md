@@ -21680,3 +21680,42 @@ rationed to one use per book.
 **Touched:** `prompts/story-beats.txt`, `prompts/story-text-from-beats.txt`,
 `prompts/text-refine.txt`, `prompts/story-text-proofread.txt`.
 **Status:** ✅ active
+
+## 2026-08-29 — An indexed town never triggers indexing again
+
+**Context.** `resolveAvailableLandmarks` fell through to `discoverLandmarksForLocation`
+whenever the index lookup returned zero servable landmarks — and that fired a
+background `indexLandmarksForCity(..., { analyzePhotos: true, maxLandmarks: 30 })`.
+"Zero servable" is not the same as "unknown", but the code could not tell them
+apart.
+
+A town whose landmarks were all judged below `MIN_USABLE_PHOTO` therefore looped:
+the lookup filtered them out → discovery re-found the SAME Wikipedia places →
+the indexer re-saved them → `saveLandmarkToIndex` preserves `story_score`, so the
+verdict was unchanged → the next cold in-memory cache did it all again. Paid
+Gemini analysis, ~30 landmarks a turn, producing nothing new by construction.
+Measured 2026-08-29: **146 of 2,264 Swiss towns** were in that loop, and the
+judging pass itself created them — scoring a town's only landmarks under 40 turns
+a served town into a looping one.
+
+It was also a correctness hole. Discovery returns raw Wikipedia hits rather than
+index rows, so its results never pass `JUDGED_USABLE_SQL` — the story was handed
+exactly the landmarks the judge had rejected.
+
+**Decision.** Discovery fires only where we have never looked. `townAlreadyIndexed()`
+asks whether the town has ANY row at all — deliberately with no class, photo or
+score filter — and a hit skips discovery entirely, returning empty. A DB error
+counts as "indexed": unknown must not unleash spending.
+
+**Rationale.** Re-indexing can only find something new if we never looked. Owner's
+rule, stated directly: "If we have indexed a location we do not trigger any new
+indexing again." The alternative — capping or rate-limiting the loop — keeps
+paying for a run whose outcome is fixed in advance.
+
+**Verified.** Merlischachen / Aefligen / Nuolen: 0 landmarks, **0 outbound calls**,
+~130 ms. Tromsø / Valparaíso / a nonsense name: discovery still attempted, so
+new and foreign locations are unaffected. Baden: 30 landmarks, unchanged.
+
+**Touched:** `server/lib/landmarkPhotos.js` (`townAlreadyIndexed`, the gate in
+`resolveAvailableLandmarks`), `docs/landmark-database.md` §8.
+**Status:** ✅ kept.

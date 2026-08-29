@@ -190,10 +190,24 @@ Consequences worth knowing before changing anything here:
 - It costs **paid Gemini calls per triggering request** — up to 30 landmarks ×
   every candidate image.
 - Every **foreign** location triggers it (nothing foreign is indexed).
-- Measured 2026-08-29: **146 of 2,264 Swiss towns** still resolve to zero and so
-  trigger it. All 146 *have* rows — they are filtered out by class or by judging.
-  Scoring a town's only landmarks below 40 turns a served town into a triggering
-  one.
+- Every **already-indexed** town is now barred from triggering it at all
+  (`townAlreadyIndexed()`), regardless of how little it has to offer.
+
+**Why the bar exists.** A town whose landmarks were all judged below 40 resolves
+to zero, so it used to re-trigger discovery on every cold cache. Discovery
+re-found the *same* Wikipedia places, the background indexer re-saved them, and
+`saveLandmarkToIndex` deliberately preserves `story_score` — so the rerun could
+not change the verdict. It just cost another ~30 landmarks of paid analysis,
+forever. Measured 2026-08-29: **146 of 2,264 Swiss towns** were in that loop.
+
+It also closed a correctness hole: discovery returns raw Wikipedia hits, not
+index rows, so its results bypassed `JUDGED_USABLE_SQL` entirely and handed the
+story exactly the landmarks the judge had rejected.
+
+Discovery now fires only where we have genuinely **never looked** — zero rows for
+the town. That keeps new/foreign locations working (verified: Tromsø, Valparaíso
+still discover) while Merlischachen, Aefligen and Nuolen return empty in ~130 ms
+with zero outbound calls.
 
 ---
 

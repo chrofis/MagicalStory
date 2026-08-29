@@ -2776,6 +2776,38 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
 }
 
 /**
+ * Has this town been indexed at all — regardless of whether anything survived
+ * the serving filters?
+ *
+ * "Nothing to offer" and "never looked" are different answers, and only the
+ * second one justifies discovery. Deliberately NO class, photo or score filter:
+ * a town whose landmarks were all judged below MIN_USABLE_PHOTO has been
+ * examined and the answer is "nothing good here" — re-discovering it finds the
+ * same places, and `saveLandmarkToIndex` preserves `story_score`, so the rerun
+ * cannot change the verdict. It just costs another 30 landmarks of paid
+ * analysis, every time the in-memory cache is cold.
+ *
+ * @param {Object} location - { city }
+ * @returns {Promise<boolean>} true when the town already has rows
+ */
+async function townAlreadyIndexed(location) {
+  const pool = getPool();
+  if (!pool || !location?.city) return false;
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM landmark_index WHERE ${TOWN_MATCHES_SQL} LIMIT 1`,
+      [normalizeForCompare(location.city)]
+    );
+    return rows.length > 0;
+  } catch (err) {
+    // Unknown is not "indexed" — but a DB error must not unleash discovery
+    // either, so treat it as indexed and stay quiet rather than spend money.
+    log.warn(`[LANDMARK-INDEX] indexed-check failed for "${location.city}": ${err.message}`);
+    return true;
+  }
+}
+
+/**
  * Get all indexed landmarks (for outline generation)
  * Returns top landmarks across all indexed cities
  * @param {number} limit - Maximum results (default 100)
@@ -3746,6 +3778,22 @@ async function resolveAvailableLandmarks(location, opts = {}) {
       landmarks = cached.landmarks;
       log.info(`[LANDMARK] 📍 ${landmarks.length} cached landmarks for ${location.city}`);
     }
+  }
+
+  // An already-indexed town never triggers discovery again, however little it
+  // has to offer. Without this the 146 Swiss towns whose landmarks were all
+  // judged below MIN_USABLE_PHOTO loop forever: the lookup filters them out,
+  // discovery re-finds the SAME places from Wikipedia, the background indexer
+  // re-saves them, `story_score` is preserved so they stay filtered out — and
+  // the next cold cache does it all again, at ~30 landmarks of paid analysis a
+  // turn. Re-indexing can only find something new if we never looked.
+  //
+  // It also closed a correctness hole: discovery's results are raw Wikipedia
+  // hits, not index rows, so they bypassed the judged-usable filter entirely
+  // and handed the story exactly the landmarks the judge had rejected.
+  if (landmarks.length === 0 && discoverOnMiss && await townAlreadyIndexed(location)) {
+    log.info(`[LANDMARK] ${location.city} is already indexed and has nothing servable — not re-discovering`);
+    return [];
   }
 
   if (landmarks.length === 0 && discoverOnMiss) {
