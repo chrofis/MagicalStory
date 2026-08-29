@@ -901,11 +901,19 @@ Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itse
           ]
         }],
         generationConfig: {
-          // 3-5 sentences (appearance + layout) needs more headroom than the
-          // old 2-3 sentence appearance-only prompt — 400 tokens covers it
-          // with margin and still costs ~$0.0002 per landmark variant.
-          maxOutputTokens: 400,
-          temperature: 0.3
+          // 3-5 sentences (appearance + layout) needs headroom — but the cap is
+          // a budget for THINKING PLUS ANSWER on 2.5-flash, and thinking is on
+          // by default. Measured 2026-08-29 with the old config (400, no
+          // thinkingConfig): finishReason MAX_TOKENS, thoughtsTokenCount 383,
+          // candidatesTokenCount 13 — a 60-character fragment. Unlike the
+          // quality check this one does not fail, it SUCCEEDS with a truncated
+          // sentence, which is then stored as the landmark's visual description
+          // and fed to the illustration prompt.
+          //
+          // Describing a picture in front of the model needs no reasoning chain.
+          maxOutputTokens: 600,
+          temperature: 0.3,
+          thinkingConfig: { thinkingBudget: 0 }
         }
       }),
       signal: AbortSignal.timeout(15000)
@@ -1089,8 +1097,22 @@ IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illust
           ]
         }],
         generationConfig: {
-          maxOutputTokens: 300,
-          temperature: 0.1
+          // maxOutputTokens is a budget for THINKING PLUS ANSWER on 2.5-flash,
+          // and thinking is on by default. Measured 2026-08-29 with the old
+          // config (300, no thinkingConfig): finishReason MAX_TOKENS,
+          // thoughtsTokenCount 284, candidatesTokenCount 12 — the reply died at
+          // `{ "photoQuality": 8`, the closing brace never came, the
+          // `/\{[\s\S]*\}/` match below failed, and EVERY image scored null.
+          // The caller reads null as "unusable" and logs "No good images found",
+          // so this silently stripped images off landmarks rather than erroring.
+          //
+          // Rating four criteria from one picture needs no reasoning chain, so
+          // the budget is zero rather than larger: with thinking left on it
+          // spends ~1000 thought tokens per image to return the same 75-token
+          // object, and this runs over thousands of images.
+          maxOutputTokens: 600,
+          temperature: 0.1,
+          thinkingConfig: { thinkingBudget: 0 }
         }
       }),
       signal: AbortSignal.timeout(15000)
@@ -1109,7 +1131,13 @@ IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illust
     // Parse JSON response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      log.debug(`[IMG-QUALITY] Could not parse JSON from: ${text.substring(0, 100)}`);
+      // WARN, not debug, and carry finishReason: an unparseable reply here is
+      // indistinguishable downstream from "this photo is bad" — the caller just
+      // reports "No good images found". At debug level a config fault that
+      // rejected every image for months looked exactly like ordinary rejection.
+      // finishReason names the cause directly (MAX_TOKENS = truncated).
+      const finish = data.candidates?.[0]?.finishReason || 'unknown';
+      log.warn(`[IMG-QUALITY] Unparseable reply (finishReason=${finish}) for "${landmarkName}": ${text.substring(0, 100)}`);
       return null;
     }
 
