@@ -21466,3 +21466,19 @@ offset stays exempt).
 **Touched:** `prompts/story-arc-audit.txt`, `prompts/story-text-audit.txt`,
 `prompts/book-audit.txt`.
 **Status:** ✅ active
+
+---
+
+### Diversity is pushed at generation time, not remembered (owner, 2026-08-29)
+**Context:** Same-brief reruns produced near-identical stories (rival vessel
+sharing the hero vessel's noun 3/7, the same obstacle mechanic 7/7): with the
+same commission the planner falls into the model's default completion. The
+declared-signature memory built earlier today (82b72eefc) was reverted as too
+complicated — no state is needed.
+**Decision:** Two beats-planner rules: commission names stand as written and
+every other vessel/vehicle/place name is invented fresh and distinctive (two
+vessels never share a word); where the commission leaves a choice open, do not
+take the first idea that fits the setting. The pre-existing challenge-exclusion
+memory stays as it was. This supersedes today's variety-memory entry.
+**Touched:** `prompts/story-beats.txt`.
+**Status:** ✅ active
