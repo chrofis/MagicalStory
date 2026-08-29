@@ -2741,12 +2741,21 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // discovery radius, so whichever town was indexed first keeps them.)
     //
     // Treat "no actual place among the matches" as no match, and let proximity
-    // run. The overview row is kept as the fallback-of-last-resort below, so a
+    // run. The weak rows are kept as the fallback-of-last-resort below, so a
     // village with genuinely nothing nearby still gets its aerial.
-    const overviewOnly = result.rows.length > 0 && !result.rows.some(r => !NON_PLACE_TYPES_SET.has(r.type || 'x'));
-    const overviewRows = overviewOnly ? result.rows : [];
-    if (overviewOnly) {
-      log.info(`[LANDMARK-INDEX] "${city}" name-matched only its overview row — trying proximity for a real landmark`);
+    //
+    // A PHOTOLESS row counts as no match for the same reason. `HAS_PHOTO_SQL`
+    // only sorts — it never filtered — so a town whose single row has no
+    // picture "matched", proximity was suppressed, and the story was set at a
+    // place nobody can draw. Ehrikon was served `Ruine Alt-Wildberg`, a castle
+    // that burned down around 1320 and has nothing standing: no photo exists
+    // because there is nothing to photograph, and the illustrator invented one.
+    // A real landmark a few km away beats a local one that cannot be drawn.
+    const isServable = r => !NON_PLACE_TYPES_SET.has(r.type || 'x') && r.photo_url;
+    const weakOnly = result.rows.length > 0 && !result.rows.some(isServable);
+    const weakRows = weakOnly ? result.rows : [];
+    if (weakOnly) {
+      log.info(`[LANDMARK-INDEX] "${city}" name-matched only unusable rows (overview or photoless) — trying proximity`);
       result = { rows: [] };
     }
 
@@ -2760,11 +2769,11 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       }
     }
 
-    // Nothing real anywhere near — hand back the town's own aerial rather than
-    // nothing, which is what broad-city-overviews.js created it for.
-    if (result.rows.length === 0 && overviewRows.length > 0) {
-      log.info(`[LANDMARK-INDEX] "${city}": no real landmark within 100km — using the town overview`);
-      return overviewRows;
+    // Nothing real anywhere near — hand back what the town does have rather than
+    // nothing, which is what broad-city-overviews.js created the aerial for.
+    if (result.rows.length === 0 && weakRows.length > 0) {
+      log.info(`[LANDMARK-INDEX] "${city}": no usable landmark within 100km — falling back to its own weak rows`);
+      return weakRows;
     }
 
     log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks for city "${city}"`);
