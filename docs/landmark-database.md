@@ -161,9 +161,15 @@ the ideas route and the story pipeline. `getIndexedLandmarks()` tries in order:
 4. **proximity** at 20 → 50 → 100 km (only when lat/lon are numbers)
 5. the town's own `(Stadt)` aerial, as last resort
 
-A name match that found **only** the town's aerial counts as *no match* and lets
-proximity run — otherwise Locarno was served its own aerial while the Madonna del
-Sasso sat 2 km away under Ascona's anchor.
+A name match containing **nothing servable** counts as *no match* and lets
+proximity run. Two cases fall under it: only the town's `(Stadt)` aerial —
+otherwise Locarno was served its own aerial while the Madonna del Sasso sat 2 km
+away under Ascona's anchor — and **only photoless rows**. `HAS_PHOTO_SQL` merely
+sorts, so before 2026-08-29 a single photoless row suppressed proximity and the
+story was set somewhere nobody can draw: Ehrikon was handed `Ruine Alt-Wildberg`,
+a castle burned down c.1320 with nothing standing. Measured across the index,
+42 towns were affected; 41 now get a photographed landmark and none lost one,
+because the weak rows are still returned when nothing is found within 100 km.
 
 Then `resolveAvailableLandmarks` layers on: best-slot photo selection, per-framing
 `photoVariants`, language-matched Wikidata name variants, and optional
@@ -274,6 +280,14 @@ a private one, so landmarks it discovered were invisible to the pipeline.
 `sync-landmark-index-to-staging.js` (prod → staging **only**; never the reverse) ·
 `clean-blind-run-landmark-rows.js`
 
+**Licensing.** Commons content is overwhelmingly CC BY / CC BY-SA, where credit is
+a licence CONDITION. `photo_attribution` is therefore not decoration, and it is
+stored per slot — pairing one slot's picture with another's author names the
+wrong photographer. `fetch-landmark-photos-free.js` once wrote `photo_url`
+alone, leaving 2,843 rows holding a usable picture with no lawful way to credit
+it; it now resolves Artist + licence from Commons `extmetadata` inline, and
+`backfill-landmark-attribution.js` repairs the historical rows (free, resumable).
+
 ### HTTP endpoints
 
 Mounted at `/api/admin/swiss-landmarks` (`server/routes/admin/swiss-landmarks.js`):
@@ -295,7 +309,7 @@ Measured on production, 2026-08-29 (6,093 Swiss rows, 2,264 towns):
 | Towns resolving to zero → auto-index trigger | 146 |
 | Rows judged unusable (< 40) | 841 |
 | Rows never judged | 384 |
-| Rows with no photo at all | 298 |
+| Rows with no photo at all | 292 |
 
 The largest single type is **1,508 `City`** rows — the `(Stadt)` aerials, which
 are overviews, not settings. Type assignment is unreliable on fresh discovery
