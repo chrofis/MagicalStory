@@ -21591,3 +21591,21 @@ story-idea requirement templates ask for a fresh obstacle mechanism, not the
 setting's most obvious one, named in one clause.
 **Touched:** `prompts/story-beats.txt`, `prompts/story-idea-requirements-*.txt`.
 **Status:** ✅ active
+
+---
+
+### Beats planner draws 15 random catalogue challenges, uses ~3 (owner, 2026-08-29)
+**Context:** "Choose a less obvious one" adds no entropy — the same brief finds
+the same second-most-obvious idea. Banning the obvious was rejected too: a
+pirate story may legitimately hunt treasure. The repo already had the curated
+challenge catalogue (prompts/challenge-catalogue.txt), used only at idea
+generation.
+**Decision:** buildBeatsPrompt injects a fresh random 15-entry sample (same
+age/peril/category filtering as the idea generator's 40-sample) with: build the
+story's challenges from about three that fit, adapt freely, ignore the rest, a
+commission-set challenge always stands. The "less obvious" lines were removed
+from story-beats.txt and the four idea requirement templates. Oversupply ~5x
+is the point: selection, not prohibition, and real randomness per run.
+**Touched:** `server/lib/promptBuilders.js`, `prompts/story-beats.txt`,
+`prompts/story-idea-requirements-*.txt`.
+**Status:** ✅ active

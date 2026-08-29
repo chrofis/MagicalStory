@@ -4416,6 +4416,63 @@ function buildStoryContextFields(inputData) {
 }
 
 /** Beats + one-line scene intents for N pages. Structure only, no prose. */
+// Random sample of the challenge catalogue for the beats planner (owner,
+// 2026-08-29). Same brief rerun = the model's default obstacle every time; the
+// cure is entropy, not instructions — a fresh random draw per run, oversupplied
+// ~5x so the planner selects what fits instead of forcing every entry. Same
+// filtering as the idea generator's sample (age bands, peril, default-zone
+// category caps).
+let challengeCatalogueCache = null;
+function buildChallengeIdeasSection(inputData, count = 15) {
+  if (resolveAgeMode(inputData) === 'toddler') return '';
+  try {
+    if (challengeCatalogueCache === null) {
+      challengeCatalogueCache = require('fs').readFileSync(
+        require('path').join(__dirname, '../../prompts/challenge-catalogue.txt'), 'utf-8');
+    }
+    const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
+    const youngest = ages.length ? Math.min(...ages) : 8;
+    const bands = youngest <= 5 ? ['3'] : youngest <= 8 ? ['3', '6'] : ['6', '9'];
+    const entries = challengeCatalogueCache.split('\n')
+      .filter(l => l && !l.startsWith('#'))
+      .map(l => l.split('|'))
+      .filter(f => f.length >= 6)
+      .filter(f => bands.some(b => f[4].startsWith(b)))
+      .filter(f => youngest > 5 || f[5].trim() !== '1');
+    const byCat = new Map();
+    for (const f of entries) {
+      if (!byCat.has(f[1])) byCat.set(f[1], []);
+      byCat.get(f[1]).push(`- ${f[2]} (tests: ${f[3]})`);
+    }
+    const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
+    const picked = [];
+    const cats = [...byCat.keys()].sort(() => Math.random() - 0.5);
+    let round = 0;
+    while (picked.length < count && round < 8) {
+      for (const c of cats) {
+        if (picked.length >= count) break;
+        const used = picked.filter(x => x.cat === c).length;
+        if (used >= (DEFAULT_ZONE.has(c) ? 1 : round + 1)) continue;
+        const pool = byCat.get(c);
+        if (!pool.length) continue;
+        const i = Math.floor(Math.random() * pool.length);
+        picked.push({ cat: c, line: pool.splice(i, 1)[0] });
+      }
+      round++;
+    }
+    if (!picked.length) return '';
+    return [
+      '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
+      'Build the story\'s challenges from about three of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.',
+      '',
+      ...picked.map(x => x.line),
+    ].join('\n');
+  } catch (err) {
+    log.warn(`[PROMPT] challenge catalogue unavailable: ${err.message}`);
+    return '';
+  }
+}
+
 function buildBeatsPrompt(inputData, pageCount) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
@@ -4428,6 +4485,7 @@ function buildBeatsPrompt(inputData, pageCount) {
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount),
     TODDLER_MODE: buildToddlerModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    CHALLENGE_IDEAS: buildChallengeIdeasSection(inputData),
   });
 }
 

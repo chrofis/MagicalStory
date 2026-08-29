@@ -4,4 +4,3 @@
 - If AVAILABLE LANDMARKS are provided, incorporate 1-2 of them into the story
 - Start in NORMAL LIFE, then transition into the adventure world
 - Example: Characters are at home/school/park, then discover a portal/magic item/hidden entrance
-- The central obstacle uses a fresh mechanism, not the most obvious one for its setting; name how it works in one clause
