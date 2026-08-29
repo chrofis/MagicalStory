@@ -2254,6 +2254,9 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
     // params.imageModel: A/B the cover render model (e.g. grok-imagine vs
     // gemini-2.5-flash-image) — style-adherence routing tests. Defaults to prod.
     imageModel: params.imageModel || MODEL_DEFAULTS.coverImage,
+    // params.skipTypography: don't stamp the app-side title over the render —
+    // required when the prompt under test bakes the title into the image.
+    skipTypography: params.skipTypography === true,
     freshCharacters,
     compositeCovers: params.composite === true,
     landmarkBufOverride,

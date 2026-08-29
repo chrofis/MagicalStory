@@ -1210,7 +1210,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       ? `🎨 [${logLabel}] Model ${modelId} uses Grok backend - routing to Grok`
       : `🎨 [${logLabel}] Model ${modelId} uses Grok backend`);
     try {
-      const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+      // Resolve the REAL model id from the registry. This was a two-way
+      // ternary — anything that was not 'grok-imagine-pro' collapsed to
+      // STANDARD — so a Lab arm asking for grok-imagine-2 logged
+      // "Model grok-imagine-2 uses Grok backend" and then rendered on
+      // grok-imagine-image. Exps 957/958 compared the same model twice.
+      const grokModel = IMAGE_MODELS[modelId]?.modelId || GROK_MODELS.STANDARD;
       const grokAspect = outputAspect;
 
       // Avatars: each reference (face, body, style) as its own slot; scenes: normal packing.
@@ -2782,7 +2787,29 @@ async function inpaintPage(imageData, evaluation, options = {}) {
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
     const sceneInstr = stripNames(sceneInstrRaw, null);
-    const perCharItems = (consolidatedPlan.per_character_fixes || [])
+    // THE PLAN PATH NEEDED THE SAME GATE AS THE FALLBACK (owner, 2026-08-28).
+    // NOT_INPAINTABLE_TYPES filtered `combinedIssues`, which only feeds the
+    // consolidator-failed fallback. A plan's `per_character_fixes` bypassed it
+    // entirely, and the consolidator's own rule 7 is verb-scoped ("replace the
+    // face", "swap the head") so an age change phrased as a repaint walked
+    // through: staging job_1787867402809_z9bwoo3yp p3 shipped "Repaint the
+    // woman … to match a 22-year-old young adult" to inpaint, from an
+    // `age_shift` finding.
+    //
+    // Filtering on the DECLARED types the consolidator now copies from
+    // deduped_issues — never on the instruction prose. An entry with no types
+    // is left alone: older plans predate the field, and silently dropping their
+    // fixes would lose real pose work.
+    const perCharSource = (consolidatedPlan.per_character_fixes || []).filter(p => {
+      const types = Array.isArray(p?.types) ? p.types.filter(Boolean) : [];
+      if (!types.length) return true;
+      const blocked = types.every(t => NOT_INPAINTABLE_TYPES.has(String(t).toLowerCase()));
+      if (blocked) {
+        log.info(`[INPAINT PAGE] P${pageNumber}: dropping "${types.join('/')}" fix for ${p.characterName || 'a character'} — not inpaintable, character repair owns it`);
+      }
+      return !blocked;
+    });
+    const perCharItems = perCharSource
       .map(p => {
         const visualId = p.visual_identifier || 'this character';
         const fixRaw = p.fix_instruction || (p.issues || []).join('; ');

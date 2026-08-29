@@ -28,6 +28,7 @@ if (XAI_API_KEY) {
 
 const GROK_MODELS = {
   STANDARD: 'grok-imagine-image',       // $0.02/image, 300 RPM
+  IMAGE_2: 'grok-imagine-image-2.0',    // $0.04/image, typography-aware (2026-08-07)
   PRO: 'grok-imagine-image-pro',        // $0.07/image, 30 RPM
 };
 

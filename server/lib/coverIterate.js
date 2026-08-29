@@ -377,6 +377,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // returned artImageData gets persisted by the caller, upgrading the old
     // story to editable cover text from that version on.
     forceRestampWhenUnbaked = false,
+    // Test Lab only: SUPPRESS the app-side typography composite. The pipeline
+    // renders textless art and stamps the title afterwards, so a run testing a
+    // prompt that BAKES the title in gets both — two titles on one cover,
+    // unreadable and unscoreable (exps 957/958). Never set in production: a
+    // served cover without its stamped title is a cover with no title.
+    skipTypography = false,
     // Pipeline callers (executeIterateAction) score round results themselves
     // (round detect + batch eval), so they pass skipEval to keep covers
     // evaluated exactly once. External callers (cover regen routes, Test Lab)
@@ -1087,7 +1093,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
       const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
       bakeAlreadyRan = rows.length > 0;
     } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
-    if (bakeAlreadyRan || forceRestampWhenUnbaked) {
+    if (skipTypography) {
+      log.info(`🅰️ [COVER-ITERATE] ${coverKey}: typography composite SKIPPED (Lab: baked-title test) — served bytes are the raw render`);
+    } else if (bakeAlreadyRan || forceRestampWhenUnbaked) {
       try {
         const { restampCover } = require('./coverTypography');
         const figures = existingCover.bboxDetection?.figures || [];

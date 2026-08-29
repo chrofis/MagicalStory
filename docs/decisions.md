@@ -21482,3 +21482,48 @@ take the first idea that fits the setting. The pre-existing challenge-exclusion
 memory stays as it was. This supersedes today's variety-memory entry.
 **Touched:** `prompts/story-beats.txt`.
 **Status:** ✅ active
+
+## 2026-08-29 — Grok model overrides were a two-way ternary; covers double-stamped a baked title
+
+**Context:** Owner asked to re-run the last 5 titles on `grok-imagine-image` vs
+the new `grok-imagine-image-2.0`, using the retired prompt that BAKES the title
+into the render. Two Lab arms (957/958) ran, both reported success, and both were
+void. The owner spotted the second fault from the pictures: *"You still have the
+old title composited on top, so hard to compare or read anything."*
+
+**Three independent blockers, all now fixed:**
+
+1. **The model override could not select anything new.** `images.js` resolved the
+   Grok model with
+   `modelId === 'grok-imagine-pro' ? PRO : STANDARD` — a two-way ternary, so any
+   third key collapsed to STANDARD. The logs showed the resolution succeeding
+   (`Model grok-imagine-2 uses Grok backend`) and then rendering on
+   `grok-imagine-image`, so the A/B compared one model against itself. Now
+   resolved from `IMAGE_MODELS[modelId].modelId`. `GROK_MODELS` gains
+   `IMAGE_2: 'grok-imagine-image-2.0'`.
+
+2. **The app stamped its title over the baked one.** Cover art is textless by
+   architecture since `c0d594a75` (2026-08-26) and `iterateCover` restamps the
+   title whenever `${key}Art` exists — which it did for all five stories. A
+   baked-title render therefore came back carrying TWO titles. New Lab-only
+   `skipTypography` flag suppresses the composite; never set in production,
+   where a cover without its stamped title is a cover with no title.
+
+3. **The premise itself was retired.** Baked titles are not a supported mode any
+   more; the request was effectively to re-enable an old architecture, not to
+   flip a config. Worth stating because the first two fixes only make the
+   comparison POSSIBLE — they do not make it a live option.
+
+**Cost of finding out:** ~$0.40 across ten covers that compared nothing. Both
+times the evidence was already in hand before the result was reported — the
+render-model line in the logs, and the `re-composited text` line. The lesson is
+the same as the 862-865 entry: check what an arm RAN, not what it scored.
+
+**Not evidence:** the HARD_FAIL scores (−20 to −90) on those ten covers. They
+were measured on images carrying a double title, so they say nothing about
+baked titles either way.
+
+**Touched:** `server/lib/grok.js`, `server/lib/images.js`,
+`server/lib/coverIterate.js`, `server/lib/testlab.js`.
+**Status:** 🟡 conditional — enables the comparison; the comparison itself is
+still unrun.
