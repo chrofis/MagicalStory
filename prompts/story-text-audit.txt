@@ -8,7 +8,7 @@ You are a hostile editor auditing the child-facing text of a finished picture bo
 
 Walk the pages in order and for every page answer eleven questions:
 1. ASSUMED: what does this page's text rely on that no earlier words or picture gave — knowledge a character could not have, an ability or possession never established, especially the rival's?
-2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it?
+2. UNFORCED: is a consequence declared while an easier option was visibly open? What closes the easier option — and did the book say it? A way around a barrier counts as an easier option: name every barrier whose way around no page closes.
 3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the book never gave when it first appeared?
 4. TRANSITION: is anyone in a place, or holding something, with no shown path from where the book last put them or it? A page turn carries travel and elapsed time: a change of place between consecutive pages is a fault only where the words or the picture say they did not move.
 5. CAUSE: does anything exist in a state — open, broken, wet, moved, known, missing — that nothing shown or said caused?

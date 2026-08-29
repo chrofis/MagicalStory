@@ -21449,3 +21449,20 @@ defect; until the copy is removed, they must agree.
 
 **Touched files:** `storyJobPipeline.js` (Phase 5a-pre-grid).
 **Status:** ✅ active
+
+---
+
+### Three guards from the final-pirate review (owner-approved 2026-08-29)
+**Context:** job_1787959478282: (1) the audit twice forced a cause for the
+un-bypassable barrier into the arc and no page carried it; (2) a barrier was
+solved by exactly the item a character wore, violating an existing beats rule
+no audit question owned; (3) p11's image showed the chest already free while
+the text still had it wedged — pre-empting p12's payoff.
+**Decision:** Arc audit question 10 CONVENIENT (possessed-item solutions +
+unbypassed barriers); text audit UNFORCED extended (a way around a barrier is
+an easier option a page must close); book audit question 6 FUTURE (a picture
+may not show a state a later page's text still establishes; within-page moment
+offset stays exempt).
+**Touched:** `prompts/story-arc-audit.txt`, `prompts/story-text-audit.txt`,
+`prompts/book-audit.txt`.
+**Status:** ✅ active

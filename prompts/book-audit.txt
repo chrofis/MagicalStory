@@ -4,12 +4,13 @@ This batch covers page(s) {PAGE_LIST}.
 
 The words and the picture tell the story together. Some pages carry the story mostly in the picture and use few words; others carry it mostly in the words. That balance is never a fault. Never report a page for having little text, sparse action, or a quiet moment.
 
-For every page, answer five questions:
+For every page, answer six questions:
 1. TOGETHER: taken together, do this page's words and picture tell one moment of the story a listener can follow? A picture may carry what the words do not say, and words may carry what the picture does not show.
 2. CONTRADICTION: does the picture show something the words make impossible on this page — a character seated where the text has them standing, an object present that the text says is gone, an empty space where the words push through a crowd, or figures side by side facing the viewer where the words have them facing each other?
 3. ONPAGE: does the event this page is for happen in the picture or in the words, or did it happen between pages?
 4. EMOTION: where the words name a feeling, does any visible body language carry it?
 5. CHANGE: could a five-year-old looking at the pictures alone say what changed since the previous page?
+6. FUTURE: does the picture show a state a later page's text still establishes — a thing already freed, opened, reached or arrived? A small moment offset inside this page's own words is not a fault.
 
 Answer the five questions for every page, but do not write the answers down. Output only the faults they found.
 
