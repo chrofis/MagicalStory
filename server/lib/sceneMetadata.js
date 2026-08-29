@@ -1487,22 +1487,37 @@ function extractPageClothing(outline, totalPages = 20) {
 /**
  * Extract the page's primary location vantage from scene metadata.
  *
- * Convention: the FIRST `LOC###` (or `LOC###.N`) entry in `metadata.objects[]`
- * is the page's primary backdrop. The N suffix names a vantage on that LOC.
+ * The primary LOC is the ground the CAMERA STANDS ON, which is not reliably the
+ * first `LOC###` entry in `metadata.objects[]` — the Art Director lists every
+ * location visible on the page, so a page shot from a boat deck routinely lists
+ * the shoreline village first and the boat's water LOC second. Selection order
+ * (owner-approved 2026-08-29, after 25/30 plates on two audited stories were
+ * built from the wrong ground/vantage):
+ *   1. a LOC whose vantage's own `pages[]` contains this page — the bible
+ *      assigns vantages to pages explicitly, so that assignment wins;
+ *   2. a LOC whose name appears in the Art Director's `emptyScenePrompt` (the
+ *      AD prose describes the backdrop it wants, i.e. the camera's ground);
+ *   3. the dotted reference in objects[], if any (`LOC002.3` is deliberate);
+ *   4. the first LOC in objects[] (the historical behaviour).
  *
- * Returns the resolved vantage object (with `id`, `name`, `shot`, `description`,
- * plus a `locId` and `locationName` from the parent), or null when the page
- * has no LOC reference or the LOC has no vantages defined (legacy stories).
+ * Within the chosen LOC the vantage is picked by, in order: the page's dotted
+ * `.N`, a vantage whose `pages[]` contains this page, then `vantages[0]`.
  *
  * @param {Object} sceneMetadata - per-page metadata, expected to have `objects: []`
  * @param {Object} visualBible   - story-level visual bible with `locations[]`
+ * @param {Object} [opts]
+ * @param {number} [opts.pageNumber]       - page this metadata belongs to (enables rules 1 + vantage `pages[]` match)
+ * @param {string} [opts.emptyScenePrompt] - the Art Director's plate prose for this page (enables rule 2)
  * @returns {Object|null} { locId, locationName, vantageId, name, shot, description, location } or null
  */
-function getPrimaryVantageForPage(sceneMetadata, visualBible) {
+function getPrimaryVantageForPage(sceneMetadata, visualBible, opts = {}) {
   if (!sceneMetadata?.objects || !Array.isArray(sceneMetadata.objects)) return null;
   if (!visualBible?.locations) return null;
 
-  // Find the first LOC###(.N) reference in objects[]. objects can be strings
+  const pageNumber = typeof opts.pageNumber === 'number' ? opts.pageNumber : null;
+  const adPrompt = (opts.emptyScenePrompt || '').toLowerCase();
+
+  // Find every LOC###(.N) reference in objects[]. objects can be strings
   // ("LOC001.2", "Burgruine Stein [LOC002]") or objects ({id: "LOC001"}).
   const extractLoc = (raw) => {
     if (!raw) return null;
@@ -1512,21 +1527,43 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible) {
     return { locId: `LOC${m[1].padStart(3, '0')}`, vantageNum: m[2] ? parseInt(m[2], 10) : null };
   };
 
-  let parsed = null;
+  const candidates = [];
   for (const obj of sceneMetadata.objects) {
-    parsed = extractLoc(obj);
-    if (parsed) break;
+    const p = extractLoc(obj);
+    if (!p) continue;
+    if (candidates.some(c => c.locId === p.locId && c.vantageNum === p.vantageNum)) continue;
+    candidates.push(p);
   }
-  if (!parsed) return null;
+  if (candidates.length === 0) return null;
 
-  const location = visualBible.locations.find(l => (l.id || '').toUpperCase() === parsed.locId);
+  const locFor = (c) => visualBible.locations.find(l => (l.id || '').toUpperCase() === c.locId) || null;
+  const vantagesOf = (loc) => (Array.isArray(loc?.vantages) ? loc.vantages : []);
+  const pagesInclude = (entry) => {
+    const pages = entry?.pages || entry?.appearsInPages;
+    return pageNumber != null && Array.isArray(pages) && pages.includes(pageNumber);
+  };
+
+  // Rule 1: a vantage that names this page.
+  let parsed = pageNumber == null ? null
+    : candidates.find(c => vantagesOf(locFor(c)).some(pagesInclude)) || null;
+  // Rule 2: the LOC the Art Director's plate prose is describing.
+  if (!parsed && adPrompt) {
+    parsed = candidates.find(c => {
+      const name = (locFor(c)?.name || '').trim().toLowerCase();
+      return name.length >= 4 && adPrompt.includes(name);
+    }) || null;
+  }
+  // Rule 3: an explicit dotted reference. Rule 4: first LOC listed.
+  if (!parsed) parsed = candidates.find(c => c.vantageNum != null) || candidates[0];
+
+  const location = locFor(parsed);
   if (!location) return null;
 
-  // Pick the vantage. If page specified .N → look it up by id. If page only
-  // gave the bare LOC, default to vantage 1. If the location has no vantages
-  // defined (legacy outline), return a synthetic single-vantage entry so the
+  // Pick the vantage. If page specified .N → look it up by id. Otherwise the
+  // vantage whose own `pages[]` names this page. Then vantage 1. If the
+  // location has no vantages defined (legacy outline), synthesize one so the
   // canvas grouping still works.
-  const vantages = Array.isArray(location.vantages) ? location.vantages : [];
+  const vantages = vantagesOf(location);
   let vantage = null;
   if (parsed.vantageNum && vantages.length > 0) {
     vantage = vantages.find(v => {
@@ -1535,14 +1572,19 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible) {
     });
   }
   if (!vantage && vantages.length > 0) {
-    vantage = vantages[0];
+    vantage = vantages.find(pagesInclude) || vantages[0];
   }
   if (!vantage) {
     // Legacy: synthesize a default vantage from the LOC's own description.
+    // The shot is the PAGE's shot — a hard-coded 'wide' overrode the Art
+    // Director's framing on every location without vantages, so a close-up
+    // page got a wide plate and the placement pass kept the plate's framing.
+    const pageShot = (sceneMetadata?.fullData?.shot || sceneMetadata?.shot
+      || sceneMetadata?.setting?.camera || '').trim();
     vantage = {
       id: `${parsed.locId}.1`,
       name: location.name || 'default view',
-      shot: 'wide',
+      shot: pageShot || 'wide',
       description: location.description
         || [location.setting, location.colors, location.features, location.signatureElement]
             .filter(Boolean).join('. '),
@@ -1565,7 +1607,7 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible) {
  * Group page numbers by primary vantage ID. Pages without a primary vantage
  * are returned in the special `__unassigned__` bucket.
  *
- * @param {Array<{pageNumber, sceneMetadata}>} pageDataArray
+ * @param {Array<{pageNumber, sceneMetadata, emptyScenePrompt}>} pageDataArray
  * @param {Object} visualBible
  * @returns {Map<string, {vantage, pageNumbers: number[]}>}
  *   key = vantageId, value = { vantage: getPrimaryVantageForPage result, pageNumbers }
@@ -1575,7 +1617,12 @@ function groupPagesByVantage(pageDataArray, visualBible) {
   const groups = new Map();
   const unassigned = [];
   for (const pd of pageDataArray) {
-    const v = getPrimaryVantageForPage(pd.sceneMetadata, visualBible);
+    // Pass the page number and the Art Director's plate prose — both feed the
+    // primary-LOC selection rules (vantage `pages[]` match, then AD-named LOC).
+    const v = getPrimaryVantageForPage(pd.sceneMetadata, visualBible, {
+      pageNumber: pd.pageNumber,
+      emptyScenePrompt: pd.emptyScenePrompt || pd.sceneMetadata?.emptyScenePrompt || '',
+    });
     if (!v) { unassigned.push(pd.pageNumber); continue; }
     const key = v.vantageId;
     if (!groups.has(key)) groups.set(key, { vantage: v, pageNumbers: [] });

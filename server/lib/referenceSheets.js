@@ -421,6 +421,16 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
  */
 async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos = []) {
   if (!visualBible) return null;
+  // ONE reference family per plate (owner, 2026-08-29): a landmark photo when
+  // the plate's location is a real landmark, otherwise the VB element
+  // render(s). Never both — two competing "this is the place" references on the
+  // same call make the model average them, and the photographic one wins on
+  // colour while the render wins on construction. The landmark photo is the
+  // stronger anchor, so it takes the slot and the grid is dropped.
+  if ((pageLandmarkPhotos || []).length > 0) {
+    log.debug(`🔲 [EMPTY-SCENE-GRID] Page ${pageNumber}: landmark photo attached — VB element grid dropped (one reference family per plate)`);
+    return null;
+  }
   const { getEmptySceneElementReferences } = require('./visualBible');
   const vehicleAndLocationRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9);
   // A landmark photo NEVER enters the grid (owner, 2026-08-18). The grid is a

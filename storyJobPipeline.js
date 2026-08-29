@@ -3652,14 +3652,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // (text overlay zone differs per page via spread rule). The per-page
             // image render handles those.
             const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
-            const shotPrefix = v.shot ? `**SHOT:** ${v.shot}\n\n` : '';
+            // HYBRID PLATE (owner-approved 2026-08-29): the Art Director's
+            // per-page emptyScenePrompt decides framing and foreground — it
+            // knows where the action has to sit — and the vantage/LOC prose is
+            // setting context underneath it. Before this the vantage path
+            // DISCARDED the AD prose entirely and built the plate from Visual
+            // Bible prose alone; 25 of 30 audited plates were prompt-wrong.
+            // Where several pages share a plate, the FIRST page's AD prose is
+            // the framing (same page whose model/aspect/landmarks we inherit).
+            const adEmptyPrompt = (repPageData.emptyScenePrompt
+              || repPageData.sceneMetadata?.emptyScenePrompt || '').trim();
+            // Shot follows the same precedence: the AD's page shot wins over
+            // the vantage's generic one.
+            const vantageShot = (repPageData.sceneMetadata?.fullData?.shot || v.shot || '').trim();
+            const shotPrefix = vantageShot ? `**SHOT:** ${vantageShot}\n\n` : '';
             // English-only empty-scene reference: the bare VB location name is
             // story-language and carries no visual info — emit it with the
             // entry's English visual fields inlined (same rule as covers /
             // sanitizeVbIdsInPrompt; docs/decisions.md 2026-07-31).
             const { englishLocationRef } = require('./server/lib/visualBible');
             const locationRef = englishLocationRef(v.location) || v.locationName || '';
-            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}\n\n${v.description || ''}`;
+            const emptySceneDesc = [
+              `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}`,
+              v.description || '',
+              adEmptyPrompt
+                ? `**FRAMING:** ${adEmptyPrompt}\n\nThe FRAMING paragraph decides the camera position, the composition and what fills the foreground. The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
+                : '',
+            ].filter(Boolean).join('\n\n');
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
@@ -3667,23 +3686,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
               : (repPageData.landmarkPhotos || []);
             const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-            const emptyPrompt = buildEmptyScenePrompt({
-              style: artStyleDesc,
-              description: emptySceneDesc,
-              characterSpace,
-              eraGuard,
-              // Named fidelity block whenever a landmark photo is attached
-              // below — '' otherwise (was trial-only; paid stories shipped
-              // the generic unnamed plate prompt).
-              landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
-              visualBible,
-              pageNumber: repPageData.pageNumber,
-            });
             try {
+              // Built BEFORE the prompt: which reference family is attached
+              // decides the REFERENCE line. Exactly one family per plate —
+              // buildEmptySceneVbGrid returns null when a landmark photo is
+              // present (owner, 2026-08-29).
               const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos);
               const emptySceneVbGridDataUrl = emptySceneVbGrid
                 ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
                 : null;
+              const emptyPrompt = buildEmptyScenePrompt({
+                style: artStyleDesc,
+                description: emptySceneDesc,
+                characterSpace,
+                eraGuard,
+                // Named fidelity block whenever a landmark photo is attached
+                // below — '' otherwise (was trial-only; paid stories shipped
+                // the generic unnamed plate prompt).
+                landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
+                referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
+                visualBible,
+                pageNumber: repPageData.pageNumber,
+              });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
                 imageModelOverride: repPageData.pageImageModel,
@@ -3862,6 +3886,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
             const pageLandmarkFidelity = buildLandmarkFidelityBlock(pageData.landmarkPhotos?.[0]);
 
+            // Build a FILTERED VB grid for empty-scene generation: vehicles + non-landmark
+            // locations only. Characters, animals, and artifacts are excluded — they should
+            // appear in the populated page, not in the background, and including them caused
+            // doubling (e.g. an artifact rendered both in the empty scene and in the
+            // character's hand on the page). Returns null when a landmark photo is
+            // attached — one reference family per plate (owner, 2026-08-29).
+            const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || []);
+            // Persist the filtered grid as a data URL so the dev UI can show what
+            // was actually attached to the empty-scene call (main-scene VB grid is
+            // different; before this, the UI was displaying the wrong one).
+            const emptySceneVbGridDataUrl = emptySceneVbGrid
+              ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
+              : null;
+            const emptySceneRefKind = (pageData.landmarkPhotos || []).length > 0
+              ? 'landmark'
+              : (emptySceneVbGrid ? 'element' : null);
+
             const emptyPrompt = buildEmptyScenePrompt({
               style: artStyleDesc,
               description: emptySceneDesc,
@@ -3869,23 +3910,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               textAreaInstruction: emptyTextAreaInstr,
               eraGuard,
               landmarkFidelity: pageLandmarkFidelity,
+              referenceKind: emptySceneRefKind,
               visualBible,
               pageNumber: pageData.pageNumber,
             });
 
             try {
-              // Build a FILTERED VB grid for empty-scene generation: vehicles + non-landmark
-              // locations only. Characters, animals, and artifacts are excluded — they should
-              // appear in the populated page, not in the background, and including them caused
-              // doubling (e.g. an artifact rendered both in the empty scene and in the
-              // character's hand on the page).
-              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || []);
-              // Persist the filtered grid as a data URL so the dev UI can show what
-              // was actually attached to the empty-scene call (main-scene VB grid is
-              // different; before this, the UI was displaying the wrong one).
-              const emptySceneVbGridDataUrl = emptySceneVbGrid
-                ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
-                : null;
 
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -3960,6 +3990,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     textAreaInstruction: retryTextInstr,
                     eraGuard,
                     landmarkFidelity: pageLandmarkFidelity,
+                    referenceKind: emptySceneRefKind,
                     visualBible,
                     pageNumber: pageData.pageNumber,
                   });
@@ -4054,7 +4085,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         let droppedCells = 0;
         for (const pageData of pageDataArray) {
           const refs = pageData.vbElementRefs || [];
-          const secLm = pageData.vbSecondaryLandmarks || [];
           const hasPlate = !!sceneBackgrounds[pageData.pageNumber]?.imageData;
           const kept = hasPlate
             ? refs.filter(e => e.type !== 'location' && e.type !== 'vehicle')
@@ -4063,8 +4093,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             filteredPages++;
             droppedCells += refs.length - kept.length;
           }
-          pageData.visualBibleGrid = (kept.length > 0 || secLm.length > 0)
-            ? await buildVisualBibleGrid(kept, secLm)
+          // Secondary landmarks are NOT passed: "a landmark photo NEVER enters
+          // the grid" (owner, settled 2026-08-18 — a real photograph composited
+          // among style-rendered cells corrupts a stylised render). This inline
+          // builder was still passing them while buildPageCompositeRefs, the
+          // documented single source of truth, correctly passes [].
+          pageData.visualBibleGrid = kept.length > 0
+            ? await buildVisualBibleGrid(kept, [])
             : null;
           log.debug(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length} cell(s)${hasPlate ? ` (plate set — dropped ${refs.length - kept.length} location/vehicle)` : ' (no plate — nothing filtered)'}`);
         }

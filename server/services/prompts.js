@@ -339,6 +339,9 @@ function fillTemplate(template, replacements) {
  *   (ART008 → "carved stone trail marker") before the prompt reaches the model.
  *   ALWAYS pass it — see the sanitizer note in the body.
  * @param {number} [opts.pageNumber]       - Page number, for sanitizer logging
+ * @param {'landmark'|'element'} [opts.referenceKind] - Which single reference family
+ *   is attached to this plate call (landmark photo XOR Visual Bible element render).
+ *   Adds the REFERENCE line telling the model to render the visible PART of it.
  * @returns {string} Filled prompt ready for the image model.
  */
 function buildEmptyScenePrompt(opts = {}) {
@@ -369,8 +372,22 @@ function buildEmptyScenePrompt(opts = {}) {
     });
     if (pageVehicles.length > 0) {
       const lines = pageVehicles.map(v => `- ${v.name || v.type || 'vehicle'}: ${v.description}`);
-      description += `\n\n**VEHICLES:** Any boat, ship, wagon, carriage, or other vehicle in this backdrop is one of the vessels described below — render it exactly to its description, never a generic substitute:\n${lines.join('\n')}`;
+      // Render only the visible PART, not the whole vessel. The old wording
+      // ("render it exactly to its description") demanded the full vehicle even
+      // when the camera stands on its deck, which shipped duplicate ships, a
+      // ship inside a cave, and wheels on dry land (audit 2026-08-29).
+      description += `\n\n**VEHICLES:** Any boat, ship, wagon, carriage, or other vehicle in this backdrop is one of the vessels described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
     }
+  }
+
+  // The plate call carries exactly ONE family of visual reference: a landmark
+  // photo when the location is real, otherwise the Visual Bible element
+  // render(s) — never both (owner, 2026-08-29; enforced in
+  // buildEmptySceneVbGrid). This line tells the model what the attached
+  // reference IS, and that it renders the visible part rather than the whole
+  // object. Same wording for both families.
+  if (opts.referenceKind === 'landmark' || opts.referenceKind === 'element') {
+    description += `\n\n**REFERENCE:** The place or vessel in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
   }
 
   const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {

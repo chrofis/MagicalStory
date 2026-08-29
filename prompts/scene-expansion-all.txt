@@ -170,7 +170,7 @@ Then a single-line JSON object:
 - Secondary characters visible in the scene go here by CHR id. Write their full appearance and their COMPLETE outfit into the prose on every page they appear on, copied from their Visual Bible entry — that entry is what their reference image is drawn from, so prose that disagrees with it fights the reference.
 - Include every recurring visual element visible in the scene.
 - Real-landmark LOCs are cited by their bare id (`LOC003`); the page's `landmarkView` decides which reference photo is attached.
-- Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001` — no dotted form, they have no vantages.
+- Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001`, or the dotted form `LOC001.2` when the Visual Bible gives that location `vantages[]` — cite the vantage whose `pages` list contains this page.
 
 **`depth` and `expression`** — required for every character. `depth` is `foreground`, `midground` or `background`; `expression` is 3-8 words naming brows, eyes and mouth ("brows pulled tight, eyes narrowed, jaw set"). Never write a bare mood word — "happy" and "sad" cannot be drawn. A character's expression may change page to page with the story; their depth follows the composition. On a `wide` shot, faces are too small to read — describe body language in the prose instead of facial detail.
 

@@ -21346,3 +21346,106 @@ the brief contradict each other on every rerun of a saved idea.
 `loadPriorChallenges`, `varietyBlock`), `prompts/story-beats.txt` (arc spec line +
 naming rule), `storyJobPipeline.js` (persist `arcVarietyNames`).
 **Status:** ✅ active
+
+## 2026-08-29 — Vantage plates are HYBRID (Art Director's framing + Visual Bible setting), and carry exactly ONE reference family
+
+**Context:** An audit of 32 pages across two stories found 25 of 30 shared
+"vantage" plates prompt-wrong. The vantage-canvas path
+(`storyJobPipeline.js`, Phase 5a-pre-vantage) built each plate from Visual
+Bible location prose alone and discarded `pageData.emptyScenePrompt` — the
+Art Director's per-page plate brief, which the per-page path at the same
+phase has always used. Three selection bugs compounded it: the primary
+location was the first `LOC###` in `objects[]` (the AD lists everything
+visible, so a page shot from a deck picked the shoreline), the vantage
+fallback took `vantages[0]` while ignoring each vantage's own `pages[]`
+assignment, and a location without vantages got a synthetic plate hard-coded
+to `shot: 'wide'`. Separately the **VEHICLES** block demanded the full vessel
+be rendered even when the camera stands on its deck, which shipped duplicate
+ships, a ship inside a cave, and wheels on dry land.
+
+**Decision:**
+1. **Hybrid plate.** Shared vantage plates stay (they are the reason a
+   location looks the same across the pages that share it), but the prompt
+   MERGES the Art Director's `emptyScenePrompt`: it is appended as a
+   `**FRAMING:**` block that explicitly outranks the LOCATION/VANTAGE lines
+   on camera, composition and foreground, while those lines remain the
+   setting context. Where several pages share a plate, the FIRST page's AD
+   prose is the framing — the same page whose model, aspect and landmark
+   refs the plate already inherits. The `**SHOT:**` line follows the page's
+   own shot, not the vantage's.
+2. **One reference family per plate.** The empty-scene call carries EITHER
+   the landmark photo (when the plate's location is a real landmark) OR the
+   Visual Bible element render(s) — never both. Enforced in
+   `buildEmptySceneVbGrid`, which returns null when a landmark photo is
+   attached, so every plate caller (page, vantage, cover plate, QC retry,
+   Test Lab) inherits the rule. `buildEmptyScenePrompt` gains
+   `referenceKind` and emits one REFERENCE line — identical wording for both
+   families: the place or vessel in the scene is the one in the reference,
+   render the part the camera sees, consistent in colour and construction.
+3. **VEHICLES asks for the visible part.** "Render it exactly to its
+   description" becomes "match its colour, construction and named parts",
+   plus a camera-aboard clause: when the camera stands on board, show the
+   deck, rail and fittings around it, never the vessel from outside.
+4. **Selection fixes.** Primary LOC = the ground the camera stands on,
+   resolved in order: a LOC whose vantage's `pages[]` names this page → the
+   LOC named in the AD's `emptyScenePrompt` → an explicit dotted reference →
+   first listed. Within the LOC: the page's dotted `.N` → a vantage whose
+   `pages[]` names the page → `vantages[0]`. Synthetic (vantage-less) plates
+   inherit the page's shot.
+5. **Template contradiction resolved.** `scene-expansion.txt` /
+   `scene-expansion-all.txt` forbade dotted vantage ids for invented LOCs
+   while `story-bible-from-beats.txt` instructs the bible to give any
+   location `vantages[]` when it is seen from fundamentally different camera
+   positions. The scene-expansion line now allows the dotted form and tells
+   the AD to cite the vantage whose `pages` list contains this page.
+
+**Rationale:** The Art Director alone knows where the action must sit on THIS
+page; the Visual Bible alone knows what the place looks like across pages.
+Dropping either produces a wrong plate, and the plate is what the placement
+pass paints on top of — a wrong plate is a wrong page. On the reference
+families: mixing them is possible in principle (a real castle photo for the
+background plus a VB tree render in the foreground) but is deferred, because
+the two kinds pull the render in opposite style directions — a landmark
+photograph drags the plate toward photorealism while a VB element render
+anchors it in the book's art style. **Mixed-family references are a deferred
+future option, not a rejected one**, and this is the reason to weigh when
+revisiting.
+
+**Verified:** p5 of staging `job_1787959478282_bz19gm36h` re-rendered from
+stored data ($0 harness, no image call): the merged plate prompt carries the
+AD's deck-filling FRAMING block, `SHOT: medium` (was `wide`), the camera-aboard
+VEHICLES clause and the REFERENCE line, with `referenceKind=element` (no
+landmark on that page).
+
+**Open, deliberately NOT done here:** the empty-scene QC pass
+(`validateEmptyScene` + feedback retry) still runs only on the per-page plate
+path, not on the vantage path. Wiring it there was not approved and is not in
+this change.
+
+**Touched files:** `storyJobPipeline.js` (Phase 5a-pre-vantage hybrid prompt +
+referenceKind on both plate paths + Phase 5a-pre-grid landmark fix),
+`server/lib/sceneMetadata.js` (`getPrimaryVantageForPage`,
+`groupPagesByVantage`), `server/lib/referenceSheets.js`
+(`buildEmptySceneVbGrid`), `server/services/prompts.js`
+(`buildEmptyScenePrompt`), `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `tasks/bugs.json`.
+**Status:** ✅ active
+
+## 2026-08-18 (re-applied 2026-08-29) — Phase 5a-pre-grid no longer passes secondary landmarks into the grid
+
+**Context:** The settled rule is "a landmark photo NEVER enters the grid" — a
+real photograph composited among style-rendered cells corrupts a stylised
+render, worst in realistic/concept styles. `buildPageCompositeRefs` honours it
+by passing `[]`, but the inline grid builder in `storyJobPipeline.js`
+(Phase 5a-pre-grid) was still passing `pageData.vbSecondaryLandmarks`.
+
+**Decision:** The inline builder passes `[]`, with a comment citing the settled
+line, and the "build a grid at all" test is now `kept.length > 0` alone.
+
+**Rationale:** Production page generation does not call
+`buildPageCompositeRefs` (only iterate + Test Lab do), so the documented single
+source of truth was not the code that shipped. Two copies of a filter is the
+defect; until the copy is removed, they must agree.
+
+**Touched files:** `storyJobPipeline.js` (Phase 5a-pre-grid).
+**Status:** ✅ active
