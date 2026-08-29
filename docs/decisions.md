@@ -21162,3 +21162,59 @@ but it must FAIL LOUDLY (page regenerated or flagged), never ship an empty
 page silently. Earlier face-specific wording superseded; CLAUDE.md updated.
 **Touched:** `CLAUDE.md`, this entry.
 **Status:** ✅ active
+
+## 2026-08-29 — A missing image is a loud failure: one retry, then a stored flag (never a silent ship)
+**Context:** `job_1787959478282_bz19gm36h` completed and shipped pages 1 and 3
+with `imageVersions[0].imageData = ''` — no `story_images` scene row, no eval,
+no score, and the book audit silently skipped both pages. The only trace of the
+failure anywhere was a Railway console `log.error` (long since rolled out of the
+buffer) and the `14/16` in `generation_complete`. `generateImageOnly` correctly
+THROWS when a provider returns no image (Grok primary fails → Gemini fallback →
+three sanitization levels → throw); the per-page catch in the Phase 5a loop
+returns `{ imageData: null }`, and everything downstream filters imageless pages
+out of detection/eval/repair, so the page reached persistence unnoticed.
+**Decision:** Three guards, all fail-safe:
+1. Immediately after Phase 5a, every `rawImages` entry with no bytes gets a
+   `genLog.error('page_image_missing', …)` carrying the generation error text,
+   then ONE more attempt through `generateImageOnly` (same options,
+   `skipCache: true`). Success logs `page_image_recovered` and records usage;
+   failure logs `page_image_retry_failed`. The retry is wrapped — it can never
+   crash the job.
+2. At save time, any page still without bytes writes
+   `genLog.error('pages_missing_images', …)`, and any expected-but-absent cover
+   writes `genLog.error('covers_missing', …)`.
+3. The stored story carries `data.missingImages` / `data.missingCovers`
+   (page-number list / cover-key list, `null` when clean), so an incomplete book
+   is visible in the data and not only in a console line.
+**Rationale:** The retry is the cheap half of the fix; the loud record is the
+important half. Image generation will occasionally fail — the defect was that a
+book could ship incomplete with nothing in the database saying so. Routing is
+deliberately UNCHANGED (owner, 2026-08-29): Grok stays the page primary because
+it is cheaper, Gemini stays the fallback and served most fallback requests in
+this very story. No "reduce the reference set for the Gemini fallback" and no
+"skip the fallback" logic was added — see `docs/SETTLED.md` on `IMAGE_OTHER`.
+**Touched:** `storyJobPipeline.js` (Phase 5a sweep, save-time flags, storyData
+fields), `tasks/bugs.json`.
+**Status:** ✅ active
+
+## 2026-08-29 — Cover failures are written to the stored genLog, not only to the console
+**Context:** Seven consecutive staging runs shipped `coverImages {}`. The cause
+was a plain regression (`const coverPrompt` reassigned by the VB-id sanitizer →
+`TypeError: Assignment to constant variable` on every cover, introduced by the
+cover-template retirement `c0d594a75`, present in BOTH the streaming cover path
+and `coverIterate`, so automatic AND manual cover generation were dead). What
+made it survive seven runs and three separate investigations is that the throw
+happened before any API call — zero usage rows, zero genLog entries — and the
+per-cover reason went to `log.error` only. The stored evidence therefore read as
+"cover generation never started", which sent two sessions looking for a missing
+beats-mode code path that does not exist.
+**Decision:** The `Promise.allSettled` cover handler writes each casualty to the
+stored generation log (`cover_failed` with the cover type and the error), plus
+`covers_all_failed` when nothing survived. `const` → `let` at both sites.
+**Rationale:** A cover reason that lives only in the Railway console is
+unavailable by the time anyone asks. The 2026-08-28 `allSettled` fix already
+established that one bad cover must not discard the survivors; this completes it
+by making the casualty diagnosable from the database alone.
+**Touched:** `storyJobPipeline.js`, `server/lib/coverIterate.js`,
+`tasks/bugs.json`.
+**Status:** ✅ active

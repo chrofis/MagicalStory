@@ -1623,7 +1623,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // 2026-08-26). Art is generated textless; the title, dedication and
         // branding are composited afterwards by coverTypography.js.
         const { buildInitialPageComposition } = require('./server/lib/coverIterate');
-        const coverPrompt = buildCoverPrompt(
+        // `let`, not `const`: the VB-id sanitizer below REASSIGNS this. The
+        // 2026-08-26 template retirement (c0d594a75) turned it into a const and
+        // every cover then threw "Assignment to constant variable" ten lines
+        // later — before the model was ever called, so three covers failed
+        // identically on every run with no usage, no genLog entry and an empty
+        // coverImages {} (job_1787959478282 and the six runs before it).
+        let coverPrompt = buildCoverPrompt(
           coverType === 'frontCover' ? 'front' : coverType === 'backCover' ? 'back' : 'initialPage',
           {
             sceneDescription,
@@ -3169,6 +3175,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const err = s.reason || {};
           log.error(`❌ [UNIFIED] Cover "${err._coverType || 'unknown'}" failed: ${err.message || err}`);
           if (err.stack) log.error(`   ${String(err.stack).split('\n').slice(1, 3).join(' | ')}`);
+          // The per-cover reason belongs in the STORED log, not only in the
+          // Railway console. Three covers failed identically on seven runs and
+          // the only record was a console line that had rolled out of the
+          // buffer by the time anyone looked — the stored genLog had zero
+          // cover entries, which read as "covers never ran".
+          genLog.error('cover_failed', `Cover ${err._coverType || 'unknown'} failed: ${err.message || err}`);
+        }
+        if (coverResults.length === 0 && settled.length > 0) {
+          genLog.error('covers_all_failed', `All ${settled.length} cover generation(s) failed — story ships with no covers`);
         }
         return coverResults;
       }).then(coverResults => {
@@ -3965,11 +3980,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
               return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
             } catch (err) {
+              // Loud, and in the STORED log (2026-08-29). A page whose plate
+              // failed still renders — the page path handles a null
+              // sceneBackground — but the failure used to leave nothing behind
+              // except a console warning, so "this page has no empty scene" was
+              // indistinguishable from "empty-scene gen was off"
+              // (job_1787959478282: p1 and p3 were the only two pages without a
+              // plate, and nothing in the story said why).
               log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
+              genLog.warn('empty_scene_failed', `Page ${pageData.pageNumber} empty-scene generation failed: ${err.message} — page will render without a background plate`);
               return null;
             }
           }))
         );
+
+        // Which pages ended up without a plate, and why, recorded once.
+        const platelessPages = pageDataArray
+          .map(pd => pd.pageNumber)
+          .filter(pn => !sceneBackgrounds[pn] && !emptyScenes.some(bg => bg?.pageNumber === pn && bg?.imageData));
+        if (platelessPages.length > 0) {
+          log.warn(`⚠️ [EMPTY SCENE] No background plate for page(s) ${platelessPages.join(', ')} — rendering without one`);
+          genLog.warn('empty_scene_missing', `No background plate for page(s) ${platelessPages.join(', ')} — those pages render without one`);
+        }
 
         for (const bg of emptyScenes) {
           if (bg?.imageData) {
@@ -4408,6 +4440,62 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       } finally {
         // Stop the liveness heartbeat whether generation succeeded or threw.
         clearInterval(heartbeat);
+      }
+
+      // ── A PAGE WITH NO IMAGE IS A LOUD FAILURE (2026-08-29) ──────────────
+      // The per-page catch above returns `imageData: null` and the story went
+      // on to ship that page as an imageless version entry — no genLog entry,
+      // no flag, the book audit silently skipped the page (job_1787959478282
+      // shipped pages 1 and 3 with zero bytes and the only trace was a
+      // "14/16" count). Record every casualty in the STORED log with its
+      // error, then give each ONE more generation attempt before giving up.
+      // Fail-safe: a failing retry is caught and never propagates.
+      const pageDataByNumber = new Map(pageDataArray.map(pd => [pd.pageNumber, pd]));
+      for (const raw of rawImages) {
+        if (raw.imageData || raw.pageNumber == null) continue;
+        genLog.error('page_image_missing', `Page ${raw.pageNumber} produced no image: ${raw.error || 'unknown error'} — retrying once`);
+        const pageData = pageDataByNumber.get(raw.pageNumber);
+        if (!pageData) continue;
+        try {
+          const retryResult = await generateImageOnly(
+            pageData.prompt,
+            pageData.characterPhotos,
+            {
+              aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+              imageModelOverride: pageData.pageImageModel,
+              imageBackendOverride: pageData.pageImageBackend,
+              landmarkPhotos: pageData.landmarkPhotos,
+              visualBibleGrid: pageData.visualBibleGrid,
+              pageNumber: pageData.pageNumber,
+              sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
+              // Never serve the failed attempt back out of the gen-only cache.
+              skipCache: true,
+              textAreaMask: (inputData?.layout?.textInImage !== false)
+                ? (sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null)
+                : null
+            }
+          );
+          if (retryResult?.imageData) {
+            raw.imageData = retryResult.imageData;
+            raw.modelId = retryResult.modelId;
+            raw.usage = retryResult.usage;
+            raw.thinkingText = retryResult.thinkingText || null;
+            raw.grokRefImages = retryResult.grokRefImages || null;
+            raw.error = null;
+            if (retryResult.usage) {
+              const m = retryResult.modelId || '';
+              const provider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
+              addUsage(provider, retryResult.usage, 'page_images', retryResult.modelId);
+            }
+            genLog.info('page_image_recovered', `Page ${raw.pageNumber} recovered on retry (${retryResult.modelId})`);
+            log.info(`♻️ [UNIFIED] Page ${raw.pageNumber} recovered on retry`);
+          } else {
+            genLog.error('page_image_retry_empty', `Page ${raw.pageNumber} retry returned no image`);
+          }
+        } catch (retryErr) {
+          genLog.error('page_image_retry_failed', `Page ${raw.pageNumber} retry failed: ${retryErr.message}`);
+          log.error(`❌ [UNIFIED] Page ${raw.pageNumber} retry failed: ${retryErr.message}`);
+        }
       }
 
       const genDuration = ((Date.now() - genStartTime) / 1000).toFixed(1);
@@ -5607,6 +5695,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const contentBlocked = allImages.reduce((sum, img) =>
       sum + (img.retryHistory?.filter(r => r.blocked)?.length || 0), 0);
 
+    // A page or cover that reaches persistence with no image bytes is a
+    // SHIPPED DEFECT — the story must say so instead of looking complete
+    // (2026-08-29). `missingImages` is a plain list the admin/audit surfaces
+    // and any future check can read; the matching genLog error is written here,
+    // before generationLog is snapshotted into storyData below.
+    const missingImages = (allImages || [])
+      .filter(img => img && img.pageNumber > 0 && !img.imageData)
+      .map(img => img.pageNumber)
+      .sort((a, b) => a - b);
+    const missingCovers = (!skipImages && !skipCovers)
+      ? coverTypesFor(inputData).filter(ct => !coverImages?.[ct]?.imageData)
+      : [];
+    if (missingImages.length > 0) {
+      log.error(`❌ [UNIFIED] Shipping with ${missingImages.length} imageless page(s): ${missingImages.join(', ')}`);
+      genLog.error('pages_missing_images', `Story ships with no image on page(s) ${missingImages.join(', ')}`);
+    }
+    if (missingCovers.length > 0) {
+      log.error(`❌ [UNIFIED] Shipping without cover(s): ${missingCovers.join(', ')}`);
+      genLog.error('covers_missing', `Story ships without cover(s): ${missingCovers.join(', ')}`);
+    }
+
     // Save story to stories table so it appears in My Stories
     const storyId = jobId; // Use jobId as storyId for consistency
     const storyData = {
@@ -5678,6 +5787,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
+      // Visible defect flags — non-empty means the book shipped incomplete.
+      missingImages: missingImages.length > 0 ? missingImages : null,
+      missingCovers: missingCovers.length > 0 ? missingCovers : null,
       coverHints: coverHints, // Cover scene hints with per-character clothing from outline
       pageClothing: pageClothingData, // Clothing per page
       clothingRequirements: clothingRequirements, // Per-character clothing requirements

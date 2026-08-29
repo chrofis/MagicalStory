@@ -648,7 +648,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const groupComposition = normalizedCoverType === 'initialPage'
     ? buildInitialPageComposition(coverCharacterPhotos.length)
     : '';
-  const coverPrompt = buildCoverPrompt(normalizedCoverType, {
+  // `let`, not `const`: the character restriction, the evaluation feedback and
+  // the VB-id sanitizer below all REASSIGN this. Same regression as the
+  // streaming cover path (c0d594a75) — as a const, every cover regeneration
+  // threw "Assignment to constant variable" before reaching the image model.
+  let coverPrompt = buildCoverPrompt(normalizedCoverType, {
     sceneDescription,
     inputData: { ...storyData, artStyle: artStyleId },
     characters: (storyData.characters || []).filter(c => clothingDedupedPhotos.some(p => p.name === c.name)),

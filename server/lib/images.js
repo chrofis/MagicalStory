@@ -1971,6 +1971,16 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
               usage,
               sanitizationLevel, // Track which level succeeded
               // Reconstruction record — refs were in parts but never stamped.
+              // NOTE ON THE COUNT (documented 2026-08-29): on this GEMINI
+              // FALLBACK path the field holds the UNPACKED part list — one
+              // image per character plus the scene plate plus the VB grid — so
+              // it routinely holds 4-7 entries. That is NOT a breach of Grok's
+              // 3-slot cap: the Grok branches above store `packedRefs`, which
+              // packReferences hard-limits to 3 (`slots.length >= 3`). A stored
+              // page with >3 refs is by definition a Gemini render, and
+              // `modelId` says so. Verified across job_1787959478282: every
+              // page with 4/5/7 refs is gemini-2.5-flash-image, every
+              // grok-imagine-image page has ≤3.
               grokRefImages: parts
                 .filter(p => p.inline_data)
                 .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
