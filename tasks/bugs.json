@@ -2,6 +2,15 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "vb-grid-shrinks-to-a-sliver-in-its-grok-slot",
+      "title": "VB reference grid arrives at Grok as a tiny thumbnail row (50x83px cells) instead of owning slot 3 at full size",
+      "reportedAt": "2026-08-29",
+      "source": "owner (staging job_1787959478282_bz19gm36h p5) + measured from the stored grokRefImages: slot 3 is 683x683 and the two VB cells in it measure 50x83px each (0.9% of the slot area), while 2 of the grid's 4 elements were dropped entirely",
+      "status": "fixed",
+      "fixedIn": "c80f87315",
+      "note": "Two defects in packReferences (server/lib/grok.js). (1) The own-slot gate `rawVbElements.length === visualBibleGrid.rawElements.length` abandoned the own slot whenever the grid still held a location, so the whole VB set fell back to composeCharWithVbRow's bundled thumbnail row and slot 3 went unused - inverting the owner's 2026-08-15 slot table on every such page. (2) Even when the own slot did fire it shipped buildVisualBibleGrid's 512px-wide SINGLE COLUMN through resize({height:1024}), so an N-element grid became a ~1024/N px sliver that the aspect-pad loop then pillarboxed inside a 1024-wide slot (4 elements -> 20% of the slot, 80% white bars). New composeVbSlot() re-flows the cells into the rows x columns closest to square for the target aspect and fills the slot edge to edge. Verified statically on the real stored p5 grid: per-element 50x83 -> 512x512, slot coverage 1.8% -> 100%."
+    },
+    {
       "id": "entity-cell-to-page-map-always-empty",
       "title": "Entity-consistency cell->page map is always empty (reads cell.metadata.pageNumber; createLabeledGrid flattens it), so every letter-only finding is dropped unscored",
       "reportedAt": "2026-08-24",

@@ -1212,11 +1212,22 @@ async function packReferences(refs = {}, options = {}) {
   // Grok copies that row into the artwork as corner insets — staging
   // job_1786815617426 p3 painted the scarf and a secondary character into the
   // picture's corners while slot 3 sat unused.
-  // Locations never ride a shared slot (they are the scene anchor); when the
-  // grid still holds one, keep the bundling path, which filters them out.
+  // Locations never ride a SHARED slot (they are the scene anchor) — but an
+  // own slot is not a shared slot, so they travel fine there. The guard used to
+  // be `rawVbElements.length === visualBibleGrid.rawElements.length`, i.e. the
+  // own slot was abandoned whenever the grid still held a location, and the
+  // whole VB set fell back to the bundled thumbnail row. That inverted the
+  // owner's 2026-08-15 slot table on every page whose grid carried a location:
+  // staging job_1787959478282_bz19gm36h p5 (2 characters, 4 VB elements, 2 of
+  // them locations) shipped its scroll and ship as ~60×90px cells under a
+  // character, with slot 3 unused. By the time a location survives into the
+  // grid at all, buildPageCompositeRefs has already established that nothing
+  // else covers it (no plate, no landmark photo) — so it belongs in the slot.
+  const vbSlotElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
+    ? visualBibleGrid.rawElements
+    : [];
   const availableCharSlots = 3 - slots.length;
-  const vbAvailable = rawVbElements.length > 0
-    && (visualBibleGrid?.rawElements || []).length === rawVbElements.length;
+  const vbAvailable = vbSlotElements.length > 0;
   let charGroups = [];
   let vbOwnSlot = false;
 
@@ -1245,12 +1256,14 @@ async function packReferences(refs = {}, options = {}) {
 
   if (vbOwnSlot) {
     try {
-      const resized = await sharp(visualBibleGrid)
-        .resize({ height: 1024, withoutEnlargement: true })
-        .jpeg({ quality: 90 })
-        .toBuffer();
-      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: ${rawVbElements.length} VB element(s) (own slot)`);
+      // Re-flow the cells to fill the slot at the target aspect. Sending
+      // buildVisualBibleGrid's 512-wide single column through a height cap
+      // left the grid as a ~25%-width sliver in a white-padded slot.
+      const composed = await composeVbSlot(vbSlotElements, aspectRatio);
+      if (!composed) throw new Error('no cells composed');
+      const cm = await sharp(composed).metadata();
+      slots.push(`data:image/jpeg;base64,${composed.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: ${vbSlotElements.length} VB element(s) (own slot, ${cm.width}x${cm.height})`);
     } catch (e) {
       log.warn(`⚠️ ${tag} VB own-slot compose failed (${e.message}) — elements not sent this render`);
     }
@@ -1532,6 +1545,75 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
     .toBuffer();
 }
 
+/**
+ * Lay VB elements out as their OWN reference slot, filling the whole slot at
+ * the target aspect ratio.
+ *
+ * The previous own-slot path shipped `buildVisualBibleGrid`'s buffer straight
+ * through `resize({ height: 1024 })`. That grid is a 512px-wide SINGLE COLUMN
+ * (commit ec0ec40f8 — full width per cell was the win back when the grid was
+ * sent to Gemini as a standalone image), so an N-element grid is 512×(N·~512).
+ * Height-capping it to 1024 shrinks it to ~1024/N px wide, and the aspect-pad
+ * loop below then pillarboxes that sliver inside a 1024-wide slot: 4 elements
+ * → the grid occupies ~25% of the slot's width and ~25% of its area, the rest
+ * white bars. The column layout that maximised size as a standalone image is
+ * the worst possible layout once it has to fit a near-square slot.
+ *
+ * Here the cells are re-flowed into the rows × columns whose cells come out
+ * closest to square for the requested aspect, so the slot is filled edge to
+ * edge and every element is as large as the slot allows. Output is exactly at
+ * the target aspect, so the aspect-pad loop is a no-op on this slot.
+ *
+ * Labels are intentionally omitted — same policy as buildVisualBibleGrid's
+ * labelMode='all' default and composeCharWithVbRow: captions leak into the
+ * rendered page.
+ */
+async function composeVbSlot(vbElements = [], aspectRatio = '1:1') {
+  const elements = vbElements.slice(0, 9).filter(e => e && e.imageData);
+  if (elements.length === 0) return null;
+
+  const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  const LONG_SIDE = 1024;
+  const W = targetRatio >= 1 ? LONG_SIDE : Math.round(LONG_SIDE * targetRatio);
+  const H = targetRatio >= 1 ? Math.round(LONG_SIDE / targetRatio) : LONG_SIDE;
+
+  // Pick the column count whose resulting cells are closest to square. VB
+  // reference cells are square-ish to mildly portrait, so square cells waste
+  // the least area to `contain` padding.
+  let cols = 1;
+  let bestScore = Infinity;
+  for (let c = 1; c <= elements.length; c++) {
+    const r = Math.ceil(elements.length / c);
+    const score = Math.abs(Math.log((W / c) / (H / r)));
+    if (score < bestScore - 1e-9) { bestScore = score; cols = c; }
+  }
+  const rows = Math.ceil(elements.length / cols);
+  const cellW = Math.floor(W / cols);
+  const cellH = Math.floor(H / rows);
+
+  const composites = [];
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    try {
+      const base64 = r2.stripDataUriPrefix(el.imageData);
+      const cell = await sharp(Buffer.from(base64, 'base64'))
+        .resize(cellW, cellH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
+        .toBuffer();
+      composites.push({ input: cell, left: (i % cols) * cellW, top: Math.floor(i / cols) * cellH });
+    } catch (err) {
+      log.warn(`⚠️ [GROK] composeVbSlot: failed cell ${i} (${el.name}): ${err.message}`);
+    }
+  }
+  if (composites.length === 0) return null;
+
+  log.debug(`🎨 [GROK] VB slot: ${elements.length} element(s) in ${cols}x${rows} @ ${cellW}x${cellH} → ${W}x${H} (${aspectRatio})`);
+  return sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+    .composite(composites)
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
 async function composeSceneWithVbBorder(sceneBuffer, vbElements = [], options = {}) {
   const SCENE = 1024;
   const CELL_W = 256;          // right-column cell width (and right-column cell height stays 256)
@@ -1704,6 +1786,7 @@ module.exports = {
   editWithGrok,
   isGrokConfigured,
   packReferences,
+  composeVbSlot,
   cropToFrontColumn,
   extractBottomBody3Columns,
   detectMinVarianceSeparator,
