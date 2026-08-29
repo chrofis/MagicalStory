@@ -725,6 +725,19 @@ const IMAGE_MODELS = {
     maxPromptLength: 7900,
     maxCharactersPerScene: 5
   },
+  // Imagine Image 2.0 — xAI's current recommended image model, shipped to the
+  // API 2026-08-07 as `grok-imagine-image-2.0` ($0.04/image). Typography-aware,
+  // which is the reason to test it: the cover today costs $0.04 ANYWAY as two
+  // calls (textless art + the title paint-in), so a single call that renders
+  // legible lettering is cost-neutral, not a 2x. Registered for Test Lab A/B
+  // only — no default routes here until an experiment says it should.
+  'grok-imagine-2': {
+    modelId: 'grok-imagine-image-2.0',
+    description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',
+    backend: 'grok',
+    maxPromptLength: 7900,
+    maxCharactersPerScene: 5
+  },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
     description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
@@ -834,6 +847,7 @@ const MODEL_PRICING = {
 
   // Grok Imagine models (fixed cost per image)
   'grok-imagine-image': { perImage: 0.02 },
+  'grok-imagine-image-2.0': { perImage: 0.04 },
   'grok-imagine-image-pro': { perImage: 0.07 },
 
   // Image generation models (fixed cost per image, not per token)
