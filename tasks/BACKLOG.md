@@ -381,6 +381,30 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
+- [ ] **Arc audit finds the "why not go around it?" fault, the fix never reaches the reader.**
+      In `job_1787959478282_bz19gm36h` audit-1 raised `FAULT[UNFORCED]` on the barrier, the review
+      answered it by assertion, audit-2 raised it AGAIN ("closed by assertion only"), and round 2
+      wrote a real cause into the arc World line — which then appeared on NO page. The reader sees a
+      rock passage on open sea with the island behind it and no reason not to sail round.
+      Proposed one-liner (owner's call, arc-audit prompt): every barrier the story does not go around
+      states, on a page, what closes the way around it. → `prompts/story-arc-audit.txt`
+- [ ] **The obstacle was shaped around a thing a character carries — the rule exists and did not fire.**
+      Same story: a line falls short by exactly the length of a belt a character is wearing.
+      `prompts/story-beats.txt` already forbids this ("never shape one around a thing a character
+      happens to carry"), and both audits treated it as an UNSTATED quantity, fixing it by stating
+      the quantity rather than by rejecting the shape. Proposed: the arc audit names the existing
+      rule as its own fault type instead of `INFERRED`. → `prompts/story-arc-audit.txt`
+- [ ] **The book audit read the payoff pages and found nothing: the picture shows the outcome one
+      page early.** `job_1787959478282_bz19gm36h` p11 (`pagesRead` includes 11 and 12, zero faults):
+      text has the chest still wedged and being worked loose, the image has it already free in both
+      hands — which is p12's beat — plus the belt floating unattached and still worn by its owner.
+      The audit catches within-page contradictions but has no rule about a page showing the NEXT
+      page's state. Proposed one-liner: a page may not show a state a later page's text still
+      establishes. Note the tension with the "IMG faults are noisy" item below, which names
+      "the picture shows the moment slightly before/after the words" as the nitpicking to suppress —
+      the distinction to draw is a page pre-empting a LATER page's beat, not a moment's offset within
+      its own. → `prompts/book-audit.txt`
+
 - [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
 - [ ] C1 targeted confirmation eval — yes or no → `tasks/eval-variance-backlog.md`
 - [ ] Trial: generate the 2×4 costumed sheet eagerly or lazily?

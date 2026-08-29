@@ -168,15 +168,24 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
   return text.replace(re, (_m, marker) => `${marker}${body}`);
 }
 
-// ── Cross-story challenge memory ────────────────────────────────────────────
+// ── Cross-story variety memory ──────────────────────────────────────────────
 // A family buys several books. Nothing used to stop the planner giving them the
 // same challenge twice (the lost thing found, the storm crossed, the rival
 // out-argued) — every run starts from the same commission shape with no memory
-// of what the account already owns. These three caps keep the injection small
-// enough that it never competes with the commission itself.
-const PRIOR_STORY_LIMIT = 3;
-const CHALLENGE_LINE_MAX = 120;
-const ARC_VARIETY_MAX = 600;
+// of what the account already owns. These caps keep the injection small enough
+// that it never competes with the commission itself.
+//
+// Caps raised 2026-08-29 after measuring what job_1787959478282_bz19gm36h
+// actually received: 600 chars bought FOUR lines from TWO of the three eligible
+// books, and 120 chars cut each one mid-sentence ("Rossa, who will not throw a
+// ship a…") — the setup survived, the mechanic it was meant to exclude did not.
+// 1200/200 carries the mechanic; 5 books covers a shelf rather than a weekend.
+const PRIOR_STORY_LIMIT = 5;
+const CHALLENGE_LINE_MAX = 200;
+const ARC_VARIETY_MAX = 1200;
+// Per-book share of the challenge budget. Without it one verbose arc spent the
+// whole allowance and the older books contributed nothing at all.
+const CHALLENGES_PER_STORY = 2;
 
 /**
  * Pull the numbered challenge lines out of a stored arc.
@@ -206,7 +215,35 @@ function extractChallengeLines(arc) {
 }
 
 /**
- * The challenges this account's previous books already used.
+ * Pull the arc's own variety signature — the named things a next book must not
+ * reuse: the main characters' vessel, the rival and the rival's vessel, and the
+ * obstacle mechanic the book turns on.
+ *
+ * The planner DECLARES these on a "Fresh this book:" line (story-beats.txt arc
+ * spec) rather than the extractor mining them out of the World prose. Names in
+ * prose are a classification problem — regexing capitalised words out of free
+ * text does not generalise past the story it was tuned on, and the repo's rule
+ * is that classification belongs to the prompt. A declared line parses exactly.
+ *
+ * Added 2026-08-29: challenge lines alone never carried a vessel or a rival
+ * name, so a rival's ship could be named with the same word as the hero's book
+ * after book and the memory had no way to see it.
+ *
+ * @returns {string[]} the parts, "none" entries dropped; [] for an arc written
+ *   before the field existed (the injection then falls back to challenges only).
+ */
+function extractVarietySignature(arc) {
+  const m = String(arc || '').match(/^\s*Fresh this book\s*:\s*(.+)$/mi);
+  if (!m) return [];
+  return m[1]
+    .split('/')
+    .map(part => part.trim().replace(/\s*\(.*?\)\s*$/, '').trim())
+    .filter(part => part && !/^\s*\w+\s*[—–-]\s*none\.?$/i.test(part) && !/^none\.?$/i.test(part))
+    .map(l => (l.length > CHALLENGE_LINE_MAX ? `${l.slice(0, CHALLENGE_LINE_MAX - 1).trimEnd()}…` : l));
+}
+
+/**
+ * The named things and the challenges this account's previous books already used.
  *
  * Reads the DB directly (same lazy `require('../services/database')` every other
  * lib module uses) rather than threading a pool through the caller: the query
@@ -221,10 +258,14 @@ function extractChallengeLines(arc) {
  * Never throws: a failed lookup means the arc is planned with no memory, which
  * is exactly what happened before this existed.
  *
- * @returns {Promise<{lines: string[], stories: number}>}
+ * @returns {Promise<{lines: string[], names: string[], stories: number}>}
+ *   `names` are the declared vessel/rival/mechanic signatures, `lines` the
+ *   challenge entries. They are injected as two separate lists because they are
+ *   forbidden differently: a name may not reappear at all, a challenge may not
+ *   reappear as a mechanic.
  */
 async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
-  if (!jobId) return { lines: [], stories: 0 };
+  if (!jobId) return { lines: [], names: [], stories: 0 };
   try {
     const { dbQuery } = require('../services/database');
     const rows = await dbQuery(
@@ -243,23 +284,38 @@ async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
       [String(jobId)]
     );
     const lines = [];
+    const names = [];
+    const seen = new Set();
     let stories = 0;
     let budget = ARC_VARIETY_MAX;
+    // Signatures first, from EVERY book: they are the short, high-value half of
+    // the memory, and letting a verbose arc's challenges crowd them out is how a
+    // rival's vessel got the hero vessel's name book after book.
     for (const row of rows || []) {
-      const own = extractChallengeLines(row.arc);
+      for (const name of extractVarietySignature(row.arc)) {
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        names.push(name);
+        budget -= name.length + 3;
+      }
+    }
+    // Then challenges, capped per book so the oldest still gets a voice.
+    for (const row of rows || []) {
+      const own = extractChallengeLines(row.arc).slice(0, CHALLENGES_PER_STORY);
       if (own.length === 0) continue;
       stories += 1;
       for (const line of own) {
-        if (budget - (line.length + 3) < 0) return { lines, stories };
+        if (budget - (line.length + 3) < 0) return { lines, names, stories };
         lines.push(line);
         budget -= line.length + 3;
       }
     }
-    return { lines, stories };
+    return { lines, names, stories };
   } catch (err) {
     log.warn(`⚠️ [BEATS] Prior-challenge lookup failed (${err.message}) — arc planned without cross-story memory`);
     gl.warn('arc_variety_failed', `Prior-challenge lookup failed: ${err.message}`);
-    return { lines: [], stories: 0 };
+    return { lines: [], names: [], stories: 0 };
   }
 }
 
@@ -360,18 +416,28 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let arcAuditFindings = '';
   let childCriticReport = null;
   let arcReviewReport = null;
-  // CROSS-STORY MEMORY: the challenges this account's previous books used. Only
-  // the arc-plan call sees them — that is the one call that invents challenges;
-  // every later stage divides and dresses what this one decided.
+  // CROSS-STORY MEMORY: the names and challenges this account's previous books
+  // used. Only the arc-plan call sees them — that is the one call that invents
+  // challenges; every later stage divides and dresses what this one decided.
+  //
+  // The commission always wins: a vessel, rival or premise the customer wrote
+  // into their own idea is theirs to repeat, and the block says so explicitly.
+  // Without that line the exclusion and the brief contradict each other on every
+  // rerun of a saved idea, and the planner has to guess which to obey.
   const priorChallenges = await loadPriorChallenges(jobId, gl);
   const arcVarietyExclusions = priorChallenges.lines;
-  if (arcVarietyExclusions.length > 0) {
-    gl.info('arc_variety', `Excluding ${arcVarietyExclusions.length} challenge(s) from ${priorChallenges.stories} earlier book(s) on this account`, null, {
-      stories: priorChallenges.stories, challenges: arcVarietyExclusions,
+  const arcVarietyNames = priorChallenges.names;
+  if (arcVarietyExclusions.length > 0 || arcVarietyNames.length > 0) {
+    gl.info('arc_variety', `Excluding ${arcVarietyNames.length} name(s) and ${arcVarietyExclusions.length} challenge(s) from ${priorChallenges.stories} earlier book(s) on this account`, null, {
+      stories: priorChallenges.stories, names: arcVarietyNames, challenges: arcVarietyExclusions,
     });
   }
-  const varietyBlock = arcVarietyExclusions.length > 0
-    ? `\n\nThis reader's earlier books used these challenges — this story uses different ones:\n${arcVarietyExclusions.map(l => `- ${l}`).join('\n')}`
+  const varietyBlock = (arcVarietyExclusions.length > 0 || arcVarietyNames.length > 0)
+    ? [
+      '\n\nThis reader already owns the books below. Nothing listed here appears in this story in any form — not the same word, not a variant of it, not the same thing renamed. Invent a new vessel name, a new rival, and an obstacle that works by a different mechanic. A name the commission itself writes is the exception: keep that one as given.',
+      arcVarietyNames.length > 0 ? `Names and mechanics already used:\n${arcVarietyNames.map(l => `- ${l}`).join('\n')}` : null,
+      arcVarietyExclusions.length > 0 ? `Challenges already used:\n${arcVarietyExclusions.map(l => `- ${l}`).join('\n')}` : null,
+    ].filter(Boolean).join('\n\n')
     : '';
   let t = Date.now();
   try {
@@ -1511,7 +1577,7 @@ SCENE: ${x.scene || ''}`.trim(),
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, arcVarietyNames, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges };
+module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, extractVarietySignature, loadPriorChallenges };

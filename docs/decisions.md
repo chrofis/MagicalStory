@@ -21285,3 +21285,64 @@ Phase 5a-pre-grid), `server/lib/referenceSheets.js` (cap at
 `buildPageCompositeRefs`), `server/lib/grok.js` (`composeVbSlot`, see the
 sibling entry), `tasks/bugs.json`.
 **Status:** ✅ active
+
+## 2026-08-29 — Cross-story variety memory carries NAMES, not only challenges; and the commission is exempt from it
+
+**Context:** Owner reported that ~10 consecutive books on the smoke account all
+sailed a vessel with the same name, raced the same rival, and turned on the same
+obstacle — "the variety memory is not working at all". Measured on the last
+seven same-type books of that account (arcs in `stories.data.beatsReviewReport.arc`):
+
+| story | hero vessel | rival | rival vessel | core mechanic |
+|---|---|---|---|---|
+| …bz19gm36h | same, from brief | same, from brief | (unnamed) | narrow cut + tide-sealed cave |
+| …z9bwoo3yp | same | same | **shares the hero vessel's word** | two inlets + ledge chest |
+| …n311ykfmin | same | same | **shares the hero vessel's word** | narrow channel + waypoints |
+| …ll5dyf4k8g | same | same | (unnamed) | narrow way + fountain |
+| …hs70901tfsn | same | same | **shares the hero vessel's word** | faster channel + sea cave |
+| …yw9qsv1vf | same | same | (unnamed) | single cleft + cave branch |
+| …r9llf5yi9 | same | same | (unnamed) | two ways in + lakeshore cave |
+
+Two different causes hide behind one complaint, and only one is ours:
+
+1. **Not a defect.** The hero vessel's name, the rival's name and the race
+   premise are written verbatim in the account's own `storyDetails`, identical
+   across all seven runs (`idea_source = 'user-written'`; the same saved brief
+   re-run). The planner is obeying the commission, and variety memory must never
+   override a name the customer wrote.
+2. **A real defect.** The rival's vessel — which the brief does NOT name — was
+   invented fresh each time and repeatedly given the *same noun as the hero's
+   vessel*, and the obstacle mechanic (a narrow passage) recurred 7/7. Those are
+   exactly what the memory existed to vary, and it could not see either:
+   `extractChallengeLines()` reads only the numbered `Challenges of …` entries,
+   so no vessel name, rival identity or mechanic ever entered the exclusion list.
+
+The injection was also starved. The stored `arcVarietyExclusions` for
+`job_1787959478282_bz19gm36h` is four lines: 600 chars bought lines from two of
+the three eligible books (one verbose arc spent the budget), and the 120-char cap
+cut each mid-sentence — the setup survived, the mechanic did not.
+
+**Decision:**
+- The arc DECLARES its own signature on a new `Fresh this book:` line (vessel /
+  rival + rival's vessel / mechanic), parsed by `extractVarietySignature()`.
+- `loadPriorChallenges()` collects signatures from every prior book FIRST, then
+  challenges round-robin at `CHALLENGES_PER_STORY = 2`.
+- Caps raised to 5 books / 1200 chars / 200 chars per line.
+- The injected block forbids reuse "in any form — not the same word, not a
+  variant" and states the exemption explicitly: a name the commission itself
+  writes is kept as given.
+- `prompts/story-beats.txt` gains one naming rule: vessel/vehicle/invented place
+  names are made per story, and the hero's and rival's vessels share no word.
+
+**Rationale:** The signature is declared by the planner rather than mined out of
+the World prose because recognising a vessel name in free text is classification,
+which per `CLAUDE.md` belongs to the prompt, not to a regex in code. Legacy arcs
+without the field degrade to challenges-only (verified against staging: 3 books,
+5 lines, 0 names — the names half populates from the next run onward). Making the
+commission exemption explicit matters because without it the exclusion block and
+the brief contradict each other on every rerun of a saved idea.
+
+**Touched files:** `server/lib/beatsPipeline.js` (caps, `extractVarietySignature`,
+`loadPriorChallenges`, `varietyBlock`), `prompts/story-beats.txt` (arc spec line +
+naming rule), `storyJobPipeline.js` (persist `arcVarietyNames`).
+**Status:** ✅ active
