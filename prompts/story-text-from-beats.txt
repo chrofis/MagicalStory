@@ -44,7 +44,7 @@ Each page covers its own beat and nothing from the next one.
 The illustration already shows the scene, so write what it cannot show: the interior, the dialogue, the turn.
 Never contradict a page's SCENE line, and never mention pages, beats or illustrations.
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
-Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene.
+Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene. Rhetorical set-pieces are rationed to one use in the whole book: a paired negation (kein X, kein Y), a coined saying or incantation, a one-sentence paragraph for drama — the second occurrence is written as plain narration.
 Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
 The arc's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
 Everything else works the other way: information neither the beats nor the pictures carry is cut, never added.

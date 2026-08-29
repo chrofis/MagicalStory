@@ -50,7 +50,7 @@ Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Repla
 
 Rewrite any page with a sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
 
-Unless the reading level asks for very short sentences, rewrite any page where several short sentences run in a row or consecutive sentences open with the same subject and verb: merge some so a short sentence sits among longer ones.
+Unless the reading level asks for very short sentences, rewrite any page where several short sentences run in a row or consecutive sentences open with the same subject and verb: merge some so a short sentence sits among longer ones. Rhetorical set-pieces are rationed to one use in the whole book — a paired negation (kein X, kein Y), a coined saying or incantation, a one-sentence paragraph for drama; rewrite every occurrence past the first as plain narration.
 
 Rewrite any page carrying a sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use.
 
