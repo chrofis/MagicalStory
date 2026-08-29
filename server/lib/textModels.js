@@ -301,6 +301,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     let buffer = '';
     let inputTokens = 0;
     let outputTokens = 0;
+    let stopReason = null;
     let firstChunkTime = null;
     resetInactivity(); // Start inactivity timer after connection established
 
@@ -337,6 +338,9 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
           try {
             const event = JSON.parse(data);
 
+            // Optional diagnostic hook: observe every SSE event type
+            if (options.onEvent) options.onEvent(event.type, event);
+
             // Handle different event types
             if (event.type === 'content_block_delta' && event.delta?.text) {
               const chunk = event.delta.text;
@@ -344,14 +348,21 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
               if (onChunk) {
                 onChunk(chunk, fullText);
               }
-            } else if (event.type === 'message_delta' && event.usage) {
-              // Final message with usage stats
-              outputTokens = event.usage.output_tokens || 0;
+            } else if (event.type === 'message_delta') {
+              // Final message with usage stats + stop_reason
+              if (event.usage) outputTokens = event.usage.output_tokens || 0;
+              if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
             } else if (event.type === 'message_start' && event.message?.usage) {
               // Initial message with input token count
               inputTokens = event.message.usage.input_tokens || 0;
+            } else if (event.type === 'error') {
+              // Mid-stream error event — fail loudly instead of silently skipping it
+              const streamErr = new Error(`Anthropic streaming mid-stream error: ${JSON.stringify(event.error || event)}`);
+              streamErr.isStreamError = true;
+              throw streamErr;
             }
-          } catch {
+          } catch (e) {
+            if (e && e.isStreamError) throw e;
             // Skip malformed JSON
           }
         }
@@ -371,6 +382,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
 
     return {
       text: responseText,
+      stop_reason: stopReason,
       usage: {
         input_tokens: inputTokens,
         output_tokens: outputTokens
