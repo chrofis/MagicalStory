@@ -20,6 +20,26 @@ const { frameColorForName } = require('./characterFrames');
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
 
+// Credit-exhaustion siren (2026-08-29). A 403 credits/spending-limit error
+// means EVERY further Grok call in the run will fail in ~170ms and the whole
+// book degrades to Gemini fallbacks (which safety-refuse covers/avatars). One
+// run-level line in the story log names the billing cause instead of leaving
+// it to be inferred from refusal patterns. Logged once per process-hour.
+let creditsWarnedAt = 0;
+function warnIfCreditsExhausted(status, errorText) {
+  if (status !== 403 && !/credits|spending limit|permission-denied/i.test(String(errorText))) return;
+  if (!/credits|spending limit/i.test(String(errorText))) return;
+  log.error('🚨 [GROK] CREDITS EXHAUSTED — every further Grok call will fail; images degrade to Gemini fallbacks. Top up xAI credits.');
+  if (Date.now() - creditsWarnedAt > 3600000) {
+    creditsWarnedAt = Date.now();
+    try {
+      const { getCurrentLogger } = require('./generationLogger');
+      getCurrentLogger()?.error('grok_credits_exhausted',
+        'xAI credits exhausted or spending limit reached — all Grok image calls fail; pages/covers/avatars degrade to Gemini fallbacks until credits are topped up');
+    } catch { /* no job logger in scope */ }
+  }
+}
+
 if (XAI_API_KEY) {
   log.info(`🎨 Grok Imagine API: ✅ Configured (key: ${XAI_API_KEY.substring(0, 8)}...)`);
 } else {
@@ -31,6 +51,18 @@ const GROK_MODELS = {
   IMAGE_2: 'grok-imagine-image-2.0',    // $0.04/image, typography-aware (2026-08-07)
   PRO: 'grok-imagine-image-pro',        // $0.07/image, 30 RPM
 };
+
+// Per-image price by model id. Both call sites used
+// `model === PRO ? 0.07 : 0.02`, which books EVERY non-pro model at $0.02 — so
+// Imagine 2.0 was reported at half what xAI actually bills ($0.04). A table
+// means a new model is priced by adding a row, not by remembering to widen a
+// ternary in two places.
+const GROK_IMAGE_PRICE = {
+  [GROK_MODELS.STANDARD]: 0.02,
+  [GROK_MODELS.IMAGE_2]: 0.04,
+  [GROK_MODELS.PRO]: 0.07,
+};
+const grokImageCost = (model) => GROK_IMAGE_PRICE[model] ?? 0.02;
 
 function isGrokConfigured() {
   return !!XAI_API_KEY;
@@ -89,6 +121,7 @@ async function generateWithGrok(prompt, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      warnIfCreditsExhausted(response.status, errorText);
       const err = new Error(`Grok API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
       log.error(`❌ [GROK] API error ${response.status}: ${errorText.substring(0, 300)}`);
@@ -121,7 +154,7 @@ async function generateWithGrok(prompt, options = {}) {
 
     const imageBase64 = data.data[0].b64_json;
     const imageData = `data:image/jpeg;base64,${imageBase64}`;
-    const cost = model === GROK_MODELS.PRO ? 0.07 : 0.02;
+    const cost = grokImageCost(model);
 
     log.info(`✅ [GROK] Generation complete in ${elapsed}ms. Cost: $${cost}`);
 
@@ -373,6 +406,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const err = new Error(`Grok edit API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
       log.error(`❌ [GROK] Edit API error ${response.status}: ${errorText.substring(0, 300)}`);
+      warnIfCreditsExhausted(response.status, errorText);
       throw err;
     }
     return response;
@@ -402,7 +436,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 
     const imageBase64 = data.data[0].b64_json;
     let imageData = `data:image/jpeg;base64,${imageBase64}`;
-    const cost = model === GROK_MODELS.PRO ? 0.07 : 0.02;
+    const cost = grokImageCost(model);
 
     // Verify output aspect ratio. Grok edit output is *supposed* to follow the
     // aspect_ratio param, but empirically it sometimes returns a different
