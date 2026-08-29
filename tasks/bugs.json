@@ -331,6 +331,14 @@
       "status": "fixed",
       "fixedIn": "f1a92b312",
       "note": "Phase 5a now sweeps rawImages for missing bytes: genLog.error(page_image_missing) with the error text, ONE retry through generateImageOnly (skipCache), then genLog.error at save time plus data.missingImages / data.missingCovers on the stored story. Retry is fully guarded — it can never crash the job."
+    },
+    {
+      "id": "gemini-thinking-budget-truncates-image-analysis",
+      "reported": "2026-08-29",
+      "summary": "gemini-2.5-flash spends maxOutputTokens on THINKING before the answer. landmarkPhotos.js analyzeImageQuality (cap 300) measured finishReason=MAX_TOKENS, thoughts=284, answer=12 — the JSON died at {\"photoQuality\": 8, the /{[sS]*}/ match failed, and EVERY image returned null. The caller reads null as unusable and logs \"No good images found from any source\", so landmarks were indexed with no picture and no error; with forceReanalyze it can overwrite a stored photo with nothing. Likely origin of the 210 photoless Swiss rows. Sibling call analyzeLandmarkPhoto (cap 400) does not fail — it stores a 60-character truncated description that feeds the illustration prompt.",
+      "status": "fixed",
+      "fixedIn": "37646a21a",
+      "note": "thinkingConfig { thinkingBudget: 0 } + cap 600 on both; verified after fix finishReason=STOP, thoughts=0, answer 75/105 tok, JSON parses. Same defect patched in 4 historical-image admin scripts. server/routes/avatars.js left alone: 4096 has headroom, works, only wastes thinking tokens. Parse failure raised from log.debug to log.warn carrying finishReason, because at debug a config fault was indistinguishable from ordinary photo rejection."
     }
   ]
 }
