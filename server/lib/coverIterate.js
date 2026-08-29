@@ -383,6 +383,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // unreadable and unscoreable (exps 957/958). Never set in production: a
     // served cover without its stamped title is a cover with no title.
     skipTypography = false,
+    // Test Lab: force 'baked' or 'composited' regardless of environment.
+    coverTitleMode = null,
     // Pipeline callers (executeIterateAction) score round results themselves
     // (round detect + batch eval), so they pass skipEval to keep covers
     // evaluated exactly once. External callers (cover regen routes, Test Lab)
@@ -658,6 +660,20 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // the VB-id sanitizer below all REASSIGN this. Same regression as the
   // streaming cover path (c0d594a75) — as a const, every cover regeneration
   // threw "Assignment to constant variable" before reaching the image model.
+  // COVER TITLE MODE (runtime). 'baked' renders the title INTO the artwork in one
+  // typography-aware call; 'composited' (production) renders textless art and
+  // stamps the title afterwards. Only the front cover has a title. A Lab run may
+  // force either side via opts, so an experiment does not depend on which
+  // environment it happens to run in.
+  const { runtime } = require('../config/runtime');
+  const titleMode = coverTitleMode || runtime('coverTitleMode');
+  const bakeTitle = (titleMode === 'baked' && normalizedCoverType === 'front')
+    ? String(storyData.title || '').trim()
+    : '';
+  if (bakeTitle) {
+    log.info(`[COVER-ITERATE] ${coverKey}: BAKED title mode — "${bakeTitle}" rendered into the artwork, typography composite skipped`);
+  }
+
   let coverPrompt = buildCoverPrompt(normalizedCoverType, {
     sceneDescription,
     inputData: { ...storyData, artStyle: artStyleId },
@@ -667,6 +683,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     groupComposition,
     options: {
       customStyleDescription: styleDescription,
+      // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
+      bakeTitle,
       characterReferenceListOverride: characterRefList,
       visualBibleOverride: visualBiblePrompt,
       promptTemplateOverride,
@@ -904,7 +922,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // configured cover aspect (never inferred from an evaluationType).
     const genResult = await generateImageOnly(coverPrompt, coverCharacterPhotos, {
       previousImage,
-      imageModelOverride: imageModel || null,
+      imageModelOverride: (bakeTitle ? runtime('coverTitleBakedModel') : null) || imageModel || null,
       landmarkPhotos: coverLandmarkPhotos,
       visualBibleGrid: coverVbGrid,
       sceneBackground: coverSceneBackground,
@@ -1093,7 +1111,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
       bakeAlreadyRan = rows.length > 0;
     } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
-    if (skipTypography) {
+    if (skipTypography || bakeTitle) {
       log.info(`🅰️ [COVER-ITERATE] ${coverKey}: typography composite SKIPPED (Lab: baked-title test) — served bytes are the raw render`);
     } else if (bakeAlreadyRan || forceRestampWhenUnbaked) {
       try {

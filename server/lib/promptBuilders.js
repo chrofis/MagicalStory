@@ -1966,9 +1966,27 @@ function buildCoverPrompt(coverType, {
     }
     return m.slice(m.indexOf('\n') + 1).trim();
   })();
-  const composition = section
+  let composition = section
     ? `**COMPOSITION GUIDELINES:**\n${section.replace('{GROUP_COMPOSITION}', groupComposition || '').trim()}`
     : '';
+
+  // BAKED TITLE (runtime `coverTitleMode`). The front cover is rendered WITH its
+  // title by a typography-aware model instead of textless + a stamped plate.
+  // Only the front cover carries a title, so the other two are untouched.
+  //
+  // The title text is passed EXPLICITLY. The retired front-cover.txt had a
+  // {STORY_TITLE} placeholder no builder fills any more, so a revived copy of it
+  // renders `Paint ""` — the model is asked to paint an empty string and the
+  // cover comes back with no title at all (Lab exps 957/958: ten covers, every
+  // one titleless). Never reintroduce that placeholder.
+  const bakedTitle = key === 'front' ? String(options.bakeTitle || '').trim() : '';
+  if (bakedTitle) {
+    const titleBlock = [
+      '**TITLE:**',
+      `Paint "${bakedTitle}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`,
+    ].join('\n');
+    composition = composition ? `${composition}\n\n${titleBlock}` : titleBlock;
+  }
 
   return buildImagePrompt(
     sceneDescription,

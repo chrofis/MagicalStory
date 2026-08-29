@@ -49,6 +49,30 @@ const SETTINGS = {
   // falls back to the Gemini bbox while cold, which is deliberate resilience.
   figureDetectionBackend: 'grounding-dino',
 
+  // ── Cover title ────────────────────────────────────────────────────────
+  // 'composited' (production): art is rendered TEXTLESS and the title is
+  // stamped afterwards by composeCover, then restyled on a white plate by
+  // coverTitlePaint. Spelling is safe by construction because the glyphs come
+  // from a real font. Two image calls: textless art + the letter plate = $0.04.
+  //
+  // 'baked' (staging): ONE call renders the artwork WITH the title in it, on
+  // grok-imagine-image-2.0, which is typography-aware. Also $0.04, so this is
+  // cost-neutral — it trades a call for ~12s more latency and drops the plate
+  // extraction entirely. Measured 2026-08-29 over 5 stories in 5 art styles:
+  // spelling correct in all five including umlauts, lettering built from the
+  // scene's own materials, full-bleed honoured (Imagine 1 broke the no-border
+  // rule and produced flat outline type).
+  //
+  // Staging-only ON PURPOSE: the composited path is safe by construction and
+  // the baked path trusts a model with spelling. Staging carries the risk while
+  // real books keep the guarantee, until there is enough evidence to promote it.
+  coverTitleMode: perEnvironment({ staging: 'baked', default: 'composited' }),
+
+  // Model used when coverTitleMode is 'baked'. Imagine 2.0 is the only Grok
+  // model that renders legible lettering; the standard model produces flat
+  // outline type and ignores the full-bleed rule.
+  coverTitleBakedModel: 'grok-imagine-2',
+
   // Styles GDINO is allowed on. It grounds on clothed-figure shape + clothing
   // colour, so any style rendering a recognisable human works (measured
   // 2026-07-15: realistic 0.69, anime 0.59, watercolor 0.63). The exclusions

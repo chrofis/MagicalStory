@@ -21609,3 +21609,55 @@ is the point: selection, not prohibition, and real randomness per run.
 **Touched:** `server/lib/promptBuilders.js`, `prompts/story-beats.txt`,
 `prompts/story-idea-requirements-*.txt`.
 **Status:** ✅ active
+
+## 2026-08-29 — Cover titles: `coverTitleMode` flag, baked ON for staging
+
+**Context:** Imagine Image 2.0 is typography-aware. Measured over 5 stories in 5
+art styles (oil, pixar, steampunk, concept, realistic), one call each, title
+baked into the render: spelling correct in all five including umlauts,
+lettering built from each scene's own materials (brass and rivets on the
+steampunk cover, painted wood on the watercolour one), full bleed honoured.
+Imagine 1 on the identical prompts spelled the titles correctly too but produced
+flat outline type over the sky and broke the no-border rule.
+
+**Cost is neutral, which is the point.** Production renders a cover in TWO image
+calls — textless art, then the letter plate that coverTitlePaint restyles —
+$0.02 + $0.02. One baked 2.0 call is $0.04. Same money, one fewer call, and the
+whole white-plate extraction path is skipped. It costs ~12s more latency.
+
+**Decision:** `coverTitleMode` in `runtime.js`, `perEnvironment({ staging:
+'baked', default: 'composited' })`, with `coverTitleBakedModel:
+'grok-imagine-2'`. Staging-only on purpose: the composited path is safe BY
+CONSTRUCTION (glyphs come from a real font, so spelling cannot drift), while
+baked trusts a model with spelling. Staging carries that risk while real books
+keep the guarantee, until there is enough evidence to promote it.
+
+Baked mode implies three things together, all from the one flag: the TITLE block
+is appended to the cover composition, the render is routed to Imagine 2.0, and
+the typography composite is skipped (otherwise the cover carries two titles —
+which is exactly what Lab exps 957/958 produced). Front cover only; back and
+initial page have no title. `opts.coverTitleMode` lets a Lab arm force either
+side regardless of environment.
+
+**The bug this also fixes:** the retired `front-cover.txt` had a `{STORY_TITLE}`
+placeholder that no current builder fills. Reviving that template rendered
+`Paint ""` — the model was asked to paint an empty string, and all ten covers in
+exps 957/958 came back titleless while the composited title sat on top. The
+title is now passed explicitly as `options.bakeTitle`; the placeholder must
+never be reintroduced.
+
+**Also fixed:** `grok.js` computed cost as `model === PRO ? 0.07 : 0.02`, so
+every Imagine 2.0 call was booked at half what xAI bills. Replaced by a
+`GROK_IMAGE_PRICE` table — a new model is priced by adding a row, not by
+remembering to widen a ternary in two places.
+
+**Verified:** baked prompt contains the real title and the TITLE block, no
+`Paint ""`; composited prompt has no TITLE block; back cover never bakes; the
+flag resolves to `baked` under `RAILWAY_ENVIRONMENT_NAME=staging` and
+`composited` elsewhere. Unit suite 225 passed, same 3 pre-existing failures.
+
+**Touched:** `server/config/runtime.js`, `server/lib/promptBuilders.js`,
+`server/lib/coverIterate.js`, `server/lib/grok.js`, `server/lib/images.js`,
+`server/lib/testlab.js`.
+**Status:** 🟡 conditional — live on staging; promotion to production needs
+covers from real staging runs, judged by the owner.
