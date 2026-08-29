@@ -21577,3 +21577,17 @@ run; failing silently cost 405 rows nobody noticed for three days.
 `scripts/admin/backfill-landmark-photos.js`,
 `tests/unit/landmark-analysis-guard.test.ts` (both directions pinned, offline).
 **Status:** ✅ kept.
+
+---
+
+### Landmark opening anchor + obstacle diversity at idea level (owner, 2026-08-29)
+**Context:** The 2-4 landmark cap with "only where one belongs to the world"
+produced ZERO landmarks on sea-world stories (userLocation Zurich present and
+resolved; the planner judged nothing fits). And the same-obstacle question:
+diversity should also be asked where ideas are born, not only at planning.
+**Decision:** Beats landmark rule gains an opening anchor — the first page may
+set the story at one landmark before the adventure leaves home. All four
+story-idea requirement templates ask for a fresh obstacle mechanism, not the
+setting's most obvious one, named in one clause.
+**Touched:** `prompts/story-beats.txt`, `prompts/story-idea-requirements-*.txt`.
+**Status:** ✅ active

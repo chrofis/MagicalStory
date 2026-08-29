@@ -12,3 +12,4 @@ Examples of observer roles:
 - Characters observe, help, or are inspired by the historical figures
 - They can interact with the event but don't replace the famous people
 - Focus on the child's perspective and what they learn/experience
+- The central obstacle uses a fresh mechanism, not the most obvious one for its setting; name how it works in one clause
