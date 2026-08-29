@@ -21534,7 +21534,50 @@ baked titles either way.
 **Touched:** `server/lib/grok.js`, `server/lib/images.js`,
 `server/lib/coverIterate.js`, `server/lib/testlab.js`.
 **Status:** 🟡 conditional — enables the comparison; the comparison itself is
-still unrun.
+still unrun. **Fix 1 above was INERT until the entry below.**
+
+## 2026-08-29 — The Grok tier fix landed on the branch that never runs; one registry resolver now serves all three
+
+**Context:** The entry above resolved the Grok model id from
+`IMAGE_MODELS[modelId].modelId` — but it patched the **model-routed** Grok
+branch of `_dispatchImageGeneration`, which a Grok override never reaches.
+Backend resolution runs FIRST (`IMAGE_MODELS[imageModelOverride]?.backend`), so
+`grok-imagine-2` sets `imageBackend='grok'` and is taken by the **primary-Grok**
+branch ~230 lines earlier. That branch read a caller-supplied `grokPrimaryModel`,
+which was the same two-way ternary on the eval path
+(`callGeminiAPIForImage`) and a hardcoded `GROK_MODELS.STANDARD` on the gen-only
+path (`generateImageOnly`, commented "only used for page regeneration, so always
+STANDARD" — false: the Test Lab image stage and `coverIterate` both pass
+overrides through it). The model-routed branch is reachable only as a Grok
+fallback, so the previous fix changed nothing observable.
+
+**Two consequences that were live in the tree:** the Test Lab image stage could
+not select a Grok tier at all (`params.imageModel: 'grok-imagine-2'` rendered on
+`grok-imagine-image`), and the baked-title cover path — `coverIterate` passes
+`runtime('coverTitleBakedModel')` = `'grok-imagine-2'` as `imageModelOverride` —
+never ran on 2.0 either, which is the whole point of a typography-aware model.
+
+**Decision:** One registry-derived resolver,
+`resolveGrokImageModel(modelKey)` in `server/config/models.js`, returns
+`{ key, modelId, isExplicit }`. All three Grok tier decisions call it: the
+primary branch, the model-routed branch, and the clothing-avatar route in
+`server/routes/avatars.js` (which carried its own copy of the ternary). The
+`grokPrimaryModel` / `grokPrimaryModelKey` opts are deleted — a caller can no
+longer disagree with the registry. Adding a tier is one `IMAGE_MODELS` row.
+
+**Rationale:** Defaults are unchanged by construction — no override, or a
+non-grok override, resolves to `grok-imagine` → `grok-imagine-image`, which is
+what `MODEL_DEFAULTS.pageImage` / `coverImage` already name. An unknown or
+non-grok key falls back to Standard **and logs a warning** (`isExplicit=false`)
+rather than silently mapping to something the caller did not ask for. Note the
+one intended behaviour change in production: a baked-title cover now genuinely
+bills 2.0 ($0.04) instead of quietly rendering Standard ($0.02).
+
+**Touched:** `server/config/models.js` (`resolveGrokImageModel`),
+`server/lib/images.js` (both Grok branches, both call sites),
+`server/routes/avatars.js`, `tests/unit/grok-image-tier.test.ts`,
+`tests/manual/test-images-dispatch-core.js`.
+**Status:** ✅ active
 
 ## 2026-08-29 — A failed photo analysis is not a verdict about the place
 

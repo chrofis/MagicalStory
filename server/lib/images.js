@@ -14,7 +14,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, GROK_MODELS } = require('./grok');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn } = require('./grok');
 const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
@@ -89,7 +89,7 @@ function recordImageApiUsage(modelId, evaluationType, imageUsage) {
     calls: 1
   }, perImage);
 }
-const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, resolveGrokImageModel, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
 
 const { createDiffImage } = require('./repairVerification');
 
@@ -922,8 +922,6 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     onImageReady = null,
     outputAspect,                        // pre-resolved aspect (eval: resolveOutputAspect(evalType, override); gen-only: aspectRatio option)
     evaluationType = null,               // used only for the primary-Grok log line (eval path)
-    grokPrimaryModel,                    // eval path honors pro override; gen-only forces STANDARD
-    grokPrimaryModelKey,                 // key for maxPromptLength lookup ('grok-imagine' | override)
     usePadExtension = false,             // gen-only pads scene-plate slot 0 (both Grok branches)
     avatarMode = false,                  // eval path avatar-slices refs in model-routed Grok
     pageLabel = '',                      // Grok packReferences pageLabel
@@ -975,12 +973,19 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   // ── Primary Grok Imagine ──────────────────────────────────────────────────
   if (imageBackend === 'grok' && isGrokConfigured()) {
-    const grokModel = grokPrimaryModel;
+    // Tier comes from the registry, never from a ternary or a hardcoded
+    // constant: an explicit grok-backend override picks its own tier, anything
+    // else falls back to Standard — announced, not silently.
+    const grokTier = resolveGrokImageModel(imageModelOverride);
+    if (imageModelOverride && !grokTier.isExplicit) {
+      log.warn(`⚠️ [${logLabel}] Model override "${imageModelOverride}" is not a Grok tier — using ${grokTier.modelId}`);
+    }
+    const grokModel = grokTier.modelId;
     const grokAspect = outputAspect;
     log.info(`🎨 [${logLabel}] Using Grok Imagine backend (model: ${grokModel}${verbose ? `, type: ${evaluationType}, aspect: ${grokAspect}` : ''})`);
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
-    const grokMaxPrompt = IMAGE_MODELS[grokPrimaryModelKey]?.maxPromptLength || 7500;
+    const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength || 7500;
     const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel);
 
     try {
@@ -1210,12 +1215,9 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       ? `🎨 [${logLabel}] Model ${modelId} uses Grok backend - routing to Grok`
       : `🎨 [${logLabel}] Model ${modelId} uses Grok backend`);
     try {
-      // Resolve the REAL model id from the registry. This was a two-way
-      // ternary — anything that was not 'grok-imagine-pro' collapsed to
-      // STANDARD — so a Lab arm asking for grok-imagine-2 logged
-      // "Model grok-imagine-2 uses Grok backend" and then rendered on
-      // grok-imagine-image. Exps 957/958 compared the same model twice.
-      const grokModel = IMAGE_MODELS[modelId]?.modelId || GROK_MODELS.STANDARD;
+      // Resolve the REAL model id from the registry — same resolver the
+      // primary-Grok branch above uses, so the two routes cannot drift.
+      const grokModel = resolveGrokImageModel(modelId).modelId;
       const grokAspect = outputAspect;
 
       // Avatars: each reference (face, body, style) as its own slot; scenes: normal packing.
@@ -1320,9 +1322,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     onImageReady,
     outputAspect,
     evaluationType,
-    // Honour the caller's model selection (imageModelOverride) — pro override → PRO.
-    grokPrimaryModel: imageModelOverride === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD,
-    grokPrimaryModelKey: imageModelOverride || 'grok-imagine',
     usePadExtension: false,
     avatarMode: evaluationType === 'avatar',
     pageLabel: pageNumber != null ? String(pageNumber) : pageContext,
@@ -1759,9 +1758,6 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     onImageReady,
     outputAspect: aspectRatio,
     evaluationType: null,
-    // generateImageOnly is only used for page regeneration, so always STANDARD.
-    grokPrimaryModel: GROK_MODELS.STANDARD,
-    grokPrimaryModelKey: 'grok-imagine',
     usePadExtension: true,
     avatarMode: false,
     pageLabel: pageNumber != null ? String(pageNumber) : '',

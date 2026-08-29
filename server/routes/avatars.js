@@ -14,7 +14,7 @@ const { log } = require('../utils/logger');
 const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
-const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
+const { IMAGE_MODELS, MODEL_DEFAULTS, resolveGrokImageModel } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
 const { editWithGrok } = require('../lib/grok');
 const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
@@ -3033,10 +3033,13 @@ These corrections OVERRIDE what is visible in the reference photo.
         // Use Grok Imagine for grok models
         const useGrok = modelConfig?.backend === 'grok' || selectedModel.startsWith('grok-imagine');
         if (useGrok) {
-          const { generateWithGrok, editWithGrok, isGrokConfigured, GROK_MODELS } = require('../lib/grok');
+          const { generateWithGrok, editWithGrok, isGrokConfigured } = require('../lib/grok');
           if (isGrokConfigured()) {
             try {
-              const grokModel = selectedModel === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+              // Same registry-derived tier resolution as the page/cover
+              // dispatcher — the two-way ternary this replaces collapsed
+              // grok-imagine-2 to Standard.
+              const grokModel = resolveGrokImageModel(selectedModel).modelId;
               // Use the body-clothed reference photo as input — Grok edits it.
               const refImages = [referencePhoto];
               const result = await editWithGrok(avatarPrompt, refImages, {

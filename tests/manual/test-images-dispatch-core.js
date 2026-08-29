@@ -63,13 +63,19 @@ function makeCore() {
     CONFIG_DEFAULTS: { imageBackend: 'grok', pageAspect: '3:4' },
     MODEL_DEFAULTS: { pageImage: 'gemini-2.5-flash-image', coverImage: 'gemini-3-pro-image-preview', pageAspect: '3:4', coverAspect: '4:3', avatarAspect: '9:16' },
     IMAGE_MODELS: {
-      'grok-imagine': { maxPromptLength: 7500 },
-      'grok-imagine-pro': { maxPromptLength: 7500, backend: 'grok' },
+      'grok-imagine': { maxPromptLength: 7500, backend: 'grok', modelId: 'grok-standard' },
+      'grok-imagine-pro': { maxPromptLength: 7500, backend: 'grok', modelId: 'grok-pro' },
       'gemini-2.5-flash-image': { maxPromptLength: 30000, backend: 'gemini', temperature: 0.8 },
       'flux-dev': { maxPromptLength: 3000, backend: 'runware' },
     },
     RUNWARE_MODELS: { FLUX_SCHNELL: 'flux-schnell-id', FLUX_DEV: 'flux-dev-id' },
-    GROK_MODELS: { STANDARD: 'grok-standard', PRO: 'grok-pro' },
+    // Mirrors the real registry-derived resolver in server/config/models.js.
+    resolveGrokImageModel: (key) => {
+      const cfg = key ? sandbox.IMAGE_MODELS[key] : null;
+      return cfg?.backend === 'grok'
+        ? { key, modelId: cfg.modelId, isExplicit: true }
+        : { key: 'grok-imagine', modelId: 'grok-standard', isExplicit: false };
+    },
 
     isRunwareConfigured: () => true,
     isGrokConfigured: () => true,
@@ -91,7 +97,12 @@ function makeCore() {
   const truncSrc = extractFunction(SRC, 'truncatePromptForModel');
   const coreSrc = extractFunction(SRC, '_dispatchImageGeneration');
 
-  const code = `${realExtractSrc}\n${truncSrc}\n${coreSrc}\nmodule.exports = _dispatchImageGeneration;`;
+  // The core now shrinks via `shrinkPromptForModel` (dedupe → LLM compression →
+  // hard truncate). Only its budget CONTRACT matters to dispatch faithfulness,
+  // so it is aliased to the deterministic truncate here — no model call.
+  const shrinkAlias = 'const shrinkPromptForModel = async (p, max, label, model) => truncatePromptForModel(p, max, label, model);';
+
+  const code = `${realExtractSrc}\n${truncSrc}\n${shrinkAlias}\n${coreSrc}\nmodule.exports = _dispatchImageGeneration;`;
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox);
   return { core: sandbox.module.exports, calls };
@@ -110,8 +121,6 @@ const BASE = {
   onImageReady: null,
   outputAspect: '3:4',
   evaluationType: 'scene',
-  grokPrimaryModel: 'grok-standard',
-  grokPrimaryModelKey: 'grok-imagine',
   usePadExtension: false,
   avatarMode: false,
   pageLabel: '5',

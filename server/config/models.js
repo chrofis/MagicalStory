@@ -752,6 +752,38 @@ const IMAGE_MODELS = {
   }
 };
 
+// Default Grok image tier: the registry entry every Grok call falls back to
+// when no model override names one. IMAGE_MODELS is the single source of
+// truth for tier ids — grok.js GROK_MODELS.STANDARD is the same string.
+const GROK_DEFAULT_IMAGE_KEY = 'grok-imagine';
+
+/**
+ * Resolve which Grok image tier an `imageModelOverride` selects.
+ *
+ * The Grok primary branch in `_dispatchImageGeneration` used to hardcode the
+ * tier (gen-only) or pick it with a two-way `=== 'grok-imagine-pro'` ternary
+ * (eval path), so `grok-imagine-2` collapsed to `grok-imagine-image` — a Lab
+ * arm asking for Imagine 2.0 rendered on Standard, and the typography-aware
+ * cover title bake (`coverTitleBakedModel`) never actually ran on 2.0.
+ * Derived from the registry so a new tier is one IMAGE_MODELS row.
+ *
+ * @param {string|null} modelKey - an IMAGE_MODELS key, or null/unknown
+ * @returns {{key: string, modelId: string, isExplicit: boolean}} — falls back
+ *   VISIBLY to the Standard tier when modelKey is absent or is not a
+ *   grok-backend model (isExplicit=false lets the caller log the fallback).
+ */
+function resolveGrokImageModel(modelKey) {
+  const cfg = modelKey ? IMAGE_MODELS[modelKey] : null;
+  if (cfg?.backend === 'grok') {
+    return { key: modelKey, modelId: cfg.modelId, isExplicit: true };
+  }
+  return {
+    key: GROK_DEFAULT_IMAGE_KEY,
+    modelId: IMAGE_MODELS[GROK_DEFAULT_IMAGE_KEY].modelId,
+    isExplicit: false
+  };
+}
+
 // Repair workflow thresholds — single source of truth for server-side pipeline.
 // scoreThreshold was previously 80, calibrated when Gemini quality eval was the
 // only scorer. Now finalScore subtracts THREE penalties (qualityScore −
@@ -1007,6 +1039,7 @@ module.exports = {
   resolveSceneRewriteModel,
   resolvePromptCompressModel,
   IMAGE_MODELS,
+  resolveGrokImageModel,
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,
   MODEL_PRICING,
