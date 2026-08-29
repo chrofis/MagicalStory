@@ -298,6 +298,14 @@ before touching that code:
 - **Test Models (Dev Mode)** — side-by-side model comparison, iterative placement, style transfer
 - **Image Model Comparison (Grok vs Gemini)** — strengths, when-to-use, Grok prompting tips
 
+**Landmark database → `docs/landmark-database.md`** (its own file, not in the guide). Read it
+before touching `server/lib/landmarkPhotos.js`, the `landmark_index` /
+`landmark_photo_scores` tables, or any `scripts/admin/*landmark*` tool: schema, the
+three-level place model, class/fame/judged-score ranking, the two-score + framing judging
+model, the serving fallback ladder, and the **user-reachable auto-index trigger** that spawns
+paid background indexing. Location→story flow (IP, Nominatim, VB injection) stays in
+`docs/landmarks.html`.
+
 ### Key Backend Files
 - `server.js` - Main Express app bootstrap, routes wiring, Stripe webhook, boot/stall recovery
 - `storyJobPipeline.js` - Story-generation pipeline (processStoryJob, processUnifiedStoryJob, checkpoints). Root-level on purpose: its inline `require('./server/lib/...')` paths must stay verbatim-valid
