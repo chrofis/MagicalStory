@@ -303,7 +303,7 @@
       "reported": "2026-08-29",
       "summary": "Every story since 2026-08-26 shipped with coverImages {} — zero covers on 7 consecutive staging runs (job_1787959478282_bz19gm36h, job_1787867402809_z9bwoo3yp, job_1787812110559_n311ykfmin and four more). The cover-template retirement (c0d594a75) declared 'const coverPrompt = buildCoverPrompt(...)' in the streaming cover path while the VB-id sanitizer ten lines below still reassigns it, so every cover threw TypeError: Assignment to constant variable BEFORE any image call — no usage, no genLog entry, no stored error. coverIterate.js:651 had the identical const (reassigned at 676/692/704), so manual cover regeneration was broken the same way. Last story with covers: 2026-08-25T20:23Z; first without: 2026-08-26T18:50Z, straddling the commit.",
       "status": "fixed",
-      "fixedIn": "PENDING",
+      "fixedIn": "f1a92b312",
       "note": "const -> let at storyJobPipeline.js:1626 and coverIterate.js:651. Per-cover failures now also written to the stored genLog (cover_failed / covers_all_failed) instead of console-only."
     },
     {
@@ -311,7 +311,7 @@
       "reported": "2026-08-29",
       "summary": "job_1787959478282_bz19gm36h shipped pages 1 and 3 with imageVersions[0].imageData = \"\" (no story_images scene row, no eval, no score). generateImageOnly THROWS when a provider returns no image (Grok primary fails -> Gemini fallback -> 3 sanitization levels -> throw); the per-page catch in the generation loop returns {imageData:null} and the story continued to persistence. Only trace was a console log.error and the \"14/16\" count in generation_complete — no genLog error, no retry, no flag, and the book audit silently skipped both pages.",
       "status": "fixed",
-      "fixedIn": "PENDING",
+      "fixedIn": "f1a92b312",
       "note": "Phase 5a now sweeps rawImages for missing bytes: genLog.error(page_image_missing) with the error text, ONE retry through generateImageOnly (skipCache), then genLog.error at save time plus data.missingImages / data.missingCovers on the stored story. Retry is fully guarded — it can never crash the job."
     }
   ]
