@@ -68,6 +68,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       best = await findBestLandmarkImage(
         l.name, l.type, l.lang, l.wikipedia_page_id, l.wikidata_qid, l.region, l.country);
     } catch (e) {
+      // The analyser could not look at ANY candidate. Every remaining landmark
+      // will fail the same way, and a long run of "had none available" reads as
+      // a measured result when it is really a blind one. Stop and say so.
+      if (e.analysisUnavailable) {
+        console.error(`\n🛑 ABORTING: image analysis is unavailable (${e.message}).`);
+        console.error('   Nothing was written. Fix the analyser, then re-run.');
+        await pool.end();
+        process.exit(1);
+      }
       console.log(`  ${l.name}: fetch failed (${e.message})`);
     }
     const ext = best?.exteriorImages || [];

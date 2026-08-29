@@ -1201,6 +1201,9 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
 
   let candidates = [];
   let allGoodImages = [];
+  // How many candidates the analyser actually managed to judge, across all
+  // three sources. Read at the "no good images" decision below.
+  const stats = { judged: 0, failed: 0 };
 
   // STEP 1: Try Commons category via Wikidata (best source - many correct images)
   if (qid) {
@@ -1210,7 +1213,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
       candidates = await fetchImagesFromCommonsCategory(commonsCategory, 20);  // Get more to find 3 exterior + 3 interior with diversity
 
       if (candidates.length > 0) {
-        allGoodImages = await analyzeAndFilterImages(candidates, landmarkName, null);
+        allGoodImages = await analyzeAndFilterImages(candidates, landmarkName, null, stats);
         log.debug(`[BEST-IMG] Commons category: ${allGoodImages.length} good images`);
       }
     }
@@ -1222,7 +1225,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     candidates = await fetchWikipediaArticleImages(lang, pageId, 12);  // More candidates for diversity
 
     if (candidates.length > 0) {
-      const articleImages = await analyzeAndFilterImages(candidates, landmarkName, null);
+      const articleImages = await analyzeAndFilterImages(candidates, landmarkName, null, stats);
       for (const img of articleImages) {
         if (!allGoodImages.some(g => g.url === img.url)) {
           allGoodImages.push(img);
@@ -1241,7 +1244,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
 
     if (candidates.length > 0) {
       const locationContext = region ? `${region}, ${country}` : country;
-      const searchImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext);
+      const searchImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext, stats);
 
       for (const img of searchImages) {
         if (!allGoodImages.some(g => g.url === img.url)) {
@@ -1252,7 +1255,30 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   }
 
   if (allGoodImages.length === 0) {
-    log.warn(`[BEST-IMG] No good images found for "${landmarkName}" from any source`);
+    // "No good images" is only a claim about the PICTURES if the analyser was
+    // able to look at some of them. If every candidate came back unjudgeable,
+    // the honest answer is "I don't know" — and it must not be recorded as a
+    // verdict on the place.
+    //
+    // On 2026-08-29 that distinction did not exist. A thinking-budget
+    // misconfiguration truncated every Gemini reply, `analyzeImageQuality`
+    // returned null for all of them, and this line called it "no good images"
+    // for landmark after landmark — writing 405 real Swiss places (Caumasee,
+    // Vanil de l'Ecri, Bahnhof Versam-Safien) into the staging index as
+    // photoless. Throwing stops the run loudly instead of filling a reference
+    // table with a lie that nothing downstream can tell from a fact.
+    if (stats.judged === 0 && stats.failed > 0) {
+      const err = new Error(
+        `image analysis unavailable — all ${stats.failed} candidate(s) for "${landmarkName}" ` +
+        `failed to analyse, so "no good images" cannot be concluded`
+      );
+      // Flagged, not prose-matched: callers must branch on this without
+      // regexing the message.
+      err.analysisUnavailable = true;
+      throw err;
+    }
+    log.warn(`[BEST-IMG] No good images found for "${landmarkName}" from any source ` +
+      `(judged ${stats.judged}, unjudgeable ${stats.failed})`);
     return null;
   }
 
@@ -1334,13 +1360,20 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
  * @param {string} locationContext - Expected location (null to skip location check)
  * @returns {Promise<Array>} - Filtered and sorted good images
  */
-async function analyzeAndFilterImages(candidates, landmarkName, locationContext) {
+async function analyzeAndFilterImages(candidates, landmarkName, locationContext, stats = null) {
   const analyzed = [];
 
   for (const img of candidates) {
     const analysis = await analyzeImageQuality(img.url, landmarkName, locationContext);
     if (analysis) {
       analyzed.push({ ...img, ...analysis });
+      if (stats) stats.judged++;
+    } else {
+      // null is NOT "this photo is bad" — a bad photo comes back as a low
+      // SCORE. null only ever means the analyser could not answer: API error,
+      // empty reply, or unparseable JSON. Counting the two separately is what
+      // lets the caller tell "nothing worth showing" from "could not look".
+      if (stats) stats.failed++;
     }
     await new Promise(r => setTimeout(r, 200));  // Rate limiting
   }
@@ -3033,8 +3066,17 @@ async function indexLandmarksForCities(options = {}) {
   let analyzedCount = 0;
   let errorCount = 0;
   let hitLimit = false;
+  // Circuit breaker for a dead image analyser. When Gemini stops returning
+  // usable answers it does so for EVERY landmark, and the old code read each
+  // silent failure as "this place has no photo" and wrote the row anyway —
+  // 405 real Swiss places were indexed as photoless on 2026-08-29 before anyone
+  // noticed. A run that cannot see must stop, not keep filling a reference
+  // table with unearned verdicts. Any successful analysis resets the count.
+  const ANALYSIS_FAILURES_BEFORE_ABORT = 3;
+  let consecutiveAnalysisFailures = 0;
+  let analyzerDown = false;
 
-  for (let i = 0; i < citiesToProcess && !hitLimit; i++) {
+  for (let i = 0; i < citiesToProcess && !hitLimit && !analyzerDown; i++) {
     const { city, country = 'Switzerland', region } = cities[i];
 
     if (onProgress) {
@@ -3057,6 +3099,7 @@ async function indexLandmarksForCities(options = {}) {
       log.info(`[LANDMARK-INDEX] Found ${landmarks.length} landmarks near ${city}`);
 
       for (const landmark of landmarks) {
+        if (analyzerDown) break;
         // Check if we hit the limit
         if (savedCount >= maxLandmarks) {
           log.warn(`[LANDMARK-INDEX] ⚠️ Reached maxLandmarks limit (${maxLandmarks}), stopping`);
@@ -3110,6 +3153,11 @@ async function indexLandmarksForCities(options = {}) {
                 region,             // Region for location context
                 country             // Country for location context
               );
+
+              // Returned at all (a result, or an honest "nothing good here")
+              // means the analyser is answering. Only an unbroken streak of
+              // failures trips the breaker.
+              consecutiveAnalysisFailures = 0;
 
               if (bestResult) {
                 const { exteriorImages, interiorImages } = bestResult;
@@ -3188,12 +3236,33 @@ async function indexLandmarksForCities(options = {}) {
               }
             }
           } catch (err) {
-            log.debug(`[LANDMARK-INDEX] Photo fetch failed for "${landmark.name}": ${err.message}`);
+            if (err.analysisUnavailable) {
+              // We could not look at this landmark's photos — so we know
+              // nothing about them. Saving now would freeze "photoless" into
+              // the index for a place that may be perfectly well illustrated,
+              // and nothing downstream could ever tell that guess from a fact.
+              consecutiveAnalysisFailures++;
+              log.warn(`[LANDMARK-INDEX] ⚠️ Cannot judge photos for "${landmark.name}" ` +
+                `(${consecutiveAnalysisFailures}/${ANALYSIS_FAILURES_BEFORE_ABORT}) — not saving: ${err.message}`);
+              landmark.skipSave = true;
+              if (consecutiveAnalysisFailures >= ANALYSIS_FAILURES_BEFORE_ABORT) {
+                analyzerDown = true;
+                log.error(`[LANDMARK-INDEX] 🛑 ABORTING RUN: image analysis has failed on ` +
+                  `${consecutiveAnalysisFailures} landmarks in a row. The analyser is down or ` +
+                  `misconfigured — indexing further would record places as photoless without ` +
+                  `ever having seen their photos.`);
+              }
+            } else {
+              consecutiveAnalysisFailures = 0;
+              log.debug(`[LANDMARK-INDEX] Photo fetch failed for "${landmark.name}": ${err.message}`);
+            }
           }
         }
 
         // Save to database (unless dry run)
-        if (dryRun) {
+        if (landmark.skipSave) {
+          errorCount++;
+        } else if (dryRun) {
           savedCount++;
           if (landmark.qid) {
             allLandmarks.set(landmark.qid, landmark);
@@ -3230,7 +3299,11 @@ async function indexLandmarksForCities(options = {}) {
   }
 
   const total = allLandmarks.size;
-  log.info(`[LANDMARK-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Analyzed: ${analyzedCount}, Errors: ${errorCount}, HitLimit: ${hitLimit}`);
+  if (analyzerDown) {
+    log.error(`[LANDMARK-INDEX] 🛑 ABORTED (image analysis unavailable). Saved before abort: ${savedCount}`);
+  } else {
+    log.info(`[LANDMARK-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Analyzed: ${analyzedCount}, Errors: ${errorCount}, HitLimit: ${hitLimit}`);
+  }
 
   return {
     totalDiscovered: total,
@@ -3238,6 +3311,8 @@ async function indexLandmarksForCities(options = {}) {
     totalAnalyzed: analyzedCount,
     errors: errorCount,
     hitLimit,
+    // An aborted run must not read as a completed one to any caller or UI.
+    abortedAnalyzerDown: analyzerDown,
     dryRun
   };
 }

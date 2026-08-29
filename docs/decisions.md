@@ -21527,3 +21527,45 @@ baked titles either way.
 `server/lib/coverIterate.js`, `server/lib/testlab.js`.
 **Status:** 🟡 conditional — enables the comparison; the comparison itself is
 still unrun.
+
+## 2026-08-29 — A failed photo analysis is not a verdict about the place
+
+**Context.** `analyzeImageQuality` returns `null` on an API error, an empty
+reply, or unparseable JSON, while a genuinely *bad* photo comes back as a low
+score object. `findBestLandmarkImage` treated both the same way: it dropped
+`null`s silently and, when nothing survived, logged `No good images found` and
+returned `null`. `indexLandmarksForCities` then saved the landmark anyway.
+
+For months that never mattered, because the analyser answered. On 2026-08-29 it
+stopped: `gemini-2.5-flash` spends `maxOutputTokens` on *thinking first*, so a
+300-token cap produced `finishReason: MAX_TOKENS` with a truncated
+`{"photoQuality": 8` fragment for every single image. The index run went blind
+and kept writing — **405 real Swiss places** (Caumasee, Vanil de l'Ecri, Bahnhof
+Versam-Safien, Kulturplatz Davos) were recorded in the staging index as
+photoless. Nothing downstream could tell that guess from a measured fact.
+
+**Decision.** Three levels, so blindness can never again be written down as a
+finding:
+
+1. `analyzeAndFilterImages` counts judged vs unjudgeable candidates instead of
+   discarding failures into the same bucket as rejections.
+2. `findBestLandmarkImage` throws (`err.analysisUnavailable = true`, a flag —
+   never a regex on the message) when *zero* candidates could be judged. "No
+   good images" stays a legal answer only when something was actually seen.
+3. `indexLandmarksForCities` skips the save for such a landmark, and **aborts
+   the whole run** after 3 consecutive analysis failures, returning
+   `abortedAnalyzerDown: true` so an aborted run cannot read as a complete one.
+   Any successful analysis resets the counter.
+   `scripts/admin/backfill-landmark-photos.js` exits non-zero on the same flag.
+
+**Rationale.** The cheap fix was the token cap alone (done separately, see
+`tasks/bugs.json` → `gemini-thinking-budget-truncates-image-analysis`). But the
+cap was never the real defect: the pipeline had no way to *represent* "I could
+not look", so any future analyser outage — quota, key rotation, model change —
+would corrupt the index the same silent way. Failing loudly costs one aborted
+run; failing silently cost 405 rows nobody noticed for three days.
+
+**Touched:** `server/lib/landmarkPhotos.js`,
+`scripts/admin/backfill-landmark-photos.js`,
+`tests/unit/landmark-analysis-guard.test.ts` (both directions pinned, offline).
+**Status:** ✅ kept.
