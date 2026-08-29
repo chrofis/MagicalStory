@@ -1,0 +1,15 @@
+You are one voice on a small story panel for a children's picture-book pipeline.
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# THE CREATOR'S COMMITTED ARC (with the creator's own self-critique)
+
+{COMMITTED_ARC}
+
+# YOUR TASK
+
+Read the arc and its critique. Propose EXACTLY TWO solutions, marked "SOLUTION 1:" and "SOLUTION 2:". A solution is a concrete way to turn this material into one strong story: what to keep, and how to repair the flagged faults — at most 8 numbered points, each one sentence, factual register. Two genuinely different solutions, not variants. Do not write the story.

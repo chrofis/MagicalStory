@@ -4491,7 +4491,7 @@ function buildChallengeIdeasSection(inputData, count = 15) {
   }
 }
 
-function buildBeatsPrompt(inputData, pageCount) {
+function buildBeatsPrompt(inputData, pageCount, { challengeIdeas = null, arcWeakPoints = '' } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -4503,8 +4503,124 @@ function buildBeatsPrompt(inputData, pageCount) {
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount),
     TODDLER_MODE: buildToddlerModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
-    CHALLENGE_IDEAS: buildChallengeIdeasSection(inputData),
+    // The arc machine draws the challenge menu ONCE and passes it here, so the
+    // planner divides the same draw the arc was built on; callers without an
+    // arc stage (Lab) fall back to a fresh draw.
+    CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
+    // The final arc's own critique: the page division must not amplify what
+    // the creator already named as the arc's weakest points.
+    ARC_WEAK_POINTS: String(arcWeakPoints || '').trim()
+      ? `# ARC KNOWN WEAK POINTS (the creator's own critique of the final arc — the page division must not amplify these)\n${String(arcWeakPoints).trim()}`
+      : '',
   });
+}
+
+// ── THE ARC MACHINE (2026-08-30): create → panel → re-tell ─────────────────
+// Replaces the arc audit/review chain in the production beats pipeline; the
+// audit/review builders below stay for the Lab. See docs/decisions.md.
+
+/** CREATE: the creator writes two arcs with self-critiques and commits to one. */
+function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, priorChallenges = '' } = {}) {
+  const template = PROMPT_TEMPLATES.arcCreate;
+  if (!template) {
+    log.error('[PROMPT] arcCreate template not loaded — arc machine unavailable');
+    return null;
+  }
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: pageCount,
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount),
+    TODDLER_MODE: buildToddlerModeSection(inputData),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
+    PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
+  });
+}
+
+/** PANEL: one outside voice proposes exactly two solutions on the committed arc. */
+function buildArcPanelPrompt(inputData, committedBlock) {
+  const template = PROMPT_TEMPLATES.arcPanel;
+  if (!template) {
+    log.error('[PROMPT] arcPanel template not loaded — arc panel unavailable');
+    return null;
+  }
+  const ctx = buildStoryContextFields(inputData);
+  return fillTemplate(template, {
+    STORY_BRIEF: ctx.STORY_BRIEF,
+    CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
+    COMMITTED_ARC: String(committedBlock || '').trim(),
+  });
+}
+
+/** RE-TELL: the same creator re-tells the story whole from arc + critique + solutions. */
+function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutions) {
+  const template = PROMPT_TEMPLATES.arcRetell;
+  if (!template) {
+    log.error('[PROMPT] arcRetell template not loaded — arc re-tell unavailable');
+    return null;
+  }
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: pageCount,
+    STORY_SHAPE: buildStoryShapeSection(inputData, pageCount),
+    TODDLER_MODE: buildToddlerModeSection(inputData),
+    COMMITTED_ARC: String(committedBlock || '').trim(),
+    PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
+  });
+}
+
+/**
+ * Parse the arc-create output: "ARC 1:" + CRITIQUE, "ARC 2:" + CRITIQUE, then
+ * a "Stronger: Arc N — why" commitment line. Throws on a missing commitment or
+ * boundary — the caller re-creates once, then gives up.
+ */
+function parseArcCreate(raw) {
+  const full = String(raw || '');
+  const m = full.match(/Stronger:\s*(?:\*\*)?\s*Arc\s*(\d)/i);
+  if (!m) throw new Error('no "Stronger: Arc N" commitment line');
+  const n = parseInt(m[1], 10);
+  const strongerLine = (full.match(/^.*Stronger:.*$/mi) || [''])[0].replace(/\*\*/g, '').trim();
+  const arc2idx = full.search(/^\s*(?:\*\*|#+\s*)?ARC\s*2\s*:?/mi);
+  if (arc2idx < 0) throw new Error('cannot find the "ARC 2:" boundary');
+  const stripStronger = s => s.replace(/^.*Stronger:.*$/gmi, '').trim();
+  const block1 = stripStronger(full.slice(0, arc2idx));
+  const block2 = stripStronger(full.slice(arc2idx));
+  const chosen = n === 1 ? block1 : block2;
+  const critIdx = chosen.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
+  return {
+    n,
+    strongerLine,
+    // The block a panelist reads: the chosen arc, its critique, and why it won.
+    committed: `${chosen}\n\n${strongerLine}`,
+    discarded: n === 1 ? block2 : block1,
+    arc: (critIdx > 0 ? chosen.slice(0, critIdx) : chosen)
+      .replace(/^\s*(?:\*\*|#+\s*)?ARC\s*\d\s*:?\**\s*/i, '')
+      .trim(),
+    critique: critIdx >= 0 ? chosen.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim() : '',
+  };
+}
+
+/**
+ * Parse the arc-retell output: FINAL ARC (incl. its "Challenges taken:" list),
+ * the "Used:" line, and the fresh CRITIQUE. Throws when no FINAL ARC exists —
+ * the caller re-tells once, then gives up.
+ */
+function parseArcRetell(raw) {
+  const full = String(raw || '');
+  const fa = full.search(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?/mi);
+  if (fa < 0) throw new Error('no "FINAL ARC:" marker');
+  const after = full.slice(fa).replace(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?\**\s*/i, '');
+  const usedIdx = after.search(/^\s*(?:\*\*)?Used\s*:/mi);
+  const critIdx = after.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
+  const cuts = [usedIdx, critIdx].filter(i => i >= 0);
+  const arcEnd = cuts.length ? Math.min(...cuts) : after.length;
+  const finalArc = after.slice(0, arcEnd).trim();
+  if (!finalArc) throw new Error('FINAL ARC block is empty');
+  const used = (after.match(/^\s*(?:\*\*)?Used\s*:\s*(.*)$/mi) || [, ''])[1].replace(/\*\*/g, '').trim();
+  const critique = critIdx >= 0
+    ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
+    : '';
+  return { finalArc, used, critique };
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
@@ -5708,6 +5824,12 @@ module.exports = {
   parseRefinedText,
   buildStoryContextFields,
   buildBeatsPrompt,
+  buildChallengeIdeasSection,
+  buildArcCreatePrompt,
+  buildArcPanelPrompt,
+  buildArcRetellPrompt,
+  parseArcCreate,
+  parseArcRetell,
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
   buildArcAuditPrompt,

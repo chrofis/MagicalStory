@@ -188,6 +188,14 @@ async function loadPromptTemplates() {
     // rounds, and with which models" answerable at all.
     ['storyScorecardJudgeV4', 'story-scorecard-judge-v4.txt'],
     ['storyArcReview', 'story-arc-review.txt'],
+    // THE ARC MACHINE (2026-08-30): create (two arcs + self-critiques, commit
+    // to one), panel (outside models, exactly two solutions each), re-tell (the
+    // same creator re-tells the story whole — never patches). Replaces the arc
+    // audit/review chain in the production beats pipeline; the audit/review
+    // templates below stay for the Lab.
+    ['arcCreate', 'arc-create.txt'],
+    ['arcPanel', 'arc-panel.txt'],
+    ['arcRetell', 'arc-retell.txt'],
     ['storyArcJudge', 'story-arc-judge.txt'],
     // Blind audits: each stage's artifact interrogated with ONLY what its
     // audience would have, before the full-context reviewer runs. The audit

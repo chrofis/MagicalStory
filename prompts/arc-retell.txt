@@ -1,0 +1,38 @@
+You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). Work in ENGLISH.
+
+Reading level: {READING_LEVEL}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS (source of truth for who these characters are: never contradict a trait, never invent one)
+
+{CHARACTER_DETAILS}
+
+{STORY_SHAPE}
+
+{TODDLER_MODE}
+
+# RULES OF THE TELLING
+- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.
+- Every sentence follows from the one before — therefore, or but. Never "and then".
+- Each character's nature causes a problem or solves one.
+- Whoever or whatever stands in the way presses on the story to the end and stands in the scene at the turning point.
+- Names the commission gives stand as written.
+
+# YOUR OWN COMMITTED ARC (with your self-critique)
+
+{COMMITTED_ARC}
+
+# PANEL SOLUTIONS
+
+{PANEL_SOLUTIONS}
+
+# YOUR TASK
+
+You wrote this arc and its critique. A panel proposed solutions. Choose freely — one solution, a combination, or your own better judgment — and RE-TELL the story once, from the beginning: numbered sentences, roughly one per page, factual register, all the rules of the telling, none of your flagged faults surviving. Re-tell the whole story; never edit or patch the old arc.
+
+Output, in this order:
+- "FINAL ARC:" then the numbered sentences.
+- "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each.
+- One line "Used:" naming which solutions (by panelist and number) you drew on.
+- "CRITIQUE:" then a fresh blunt self-critique of the final arc — 3 to 6 numbered material faults in the same form, the weakest points that remain.

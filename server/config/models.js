@@ -26,7 +26,7 @@ const TEXT_MODELS = {
   'claude-opus': {
     provider: 'anthropic',
     modelId: 'claude-opus-5',
-    maxOutputTokens: 32000,
+    maxOutputTokens: 128000, // true model cap per Anthropic Models API (max_tokens on /v1/models/claude-opus-5)
     description: 'Claude Opus 5 - Strongest reviewer/critic ($5/$25 per 1M). Used for the split outline review (cross-model: Sonnet writes, Opus reviews).'
   },
   'claude-haiku': {
@@ -155,7 +155,14 @@ const TEXT_MODELS = {
   // empty/malformed responses this model returns (measured: fails and succeeds
   // at both 16384 and 32768). The fix is the retry in scoreArtifactsWithJudge.
   'gemini-3.1-pro': { provider: 'openrouter', modelId: 'google/gemini-3.1-pro-preview', maxOutputTokens: 16384, description: 'Gemini 3.1 Pro (Google) via OpenRouter (~$2.00/$12.00 per 1M) — neutral judge' },
-  'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 16384, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
+  // maxOutputTokens raised to OpenRouter's confirmed top_provider.max_completion_tokens
+  // (131072, checked 2026-08-29 via https://openrouter.ai/api/v1/models) after the
+  // 16384/32768 caps we'd been using turned out to be our own invention, not the
+  // model's real limit — see docs/decisions.md "qwen3.8-max zero-visible-output
+  // confound". This is a reasoning model whose thinking tokens count against the
+  // output budget, so the old caps could exhaust the budget before any visible
+  // text. Untested at this new limit — no paid call has been run against it yet.
+  'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 131072, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 16384, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
   'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
   'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 16384, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
@@ -231,8 +238,12 @@ const MODEL_DEFAULTS = {
   // real catches (8.5/10) and is independent of every writer/fixer vendor;
   // grok-4.6 as auditor collapsed to 3/10 at 4x the wall clock. deepseek-v4-pro
   // and qwen3.8-max emit only reasoning tokens on this prompt (0 bytes visible
-  // text, twice each) — unusable as auditors. Arc/beats audits are a separate
-  // decision with their own bake-off.
+  // text, twice each) — unusable as auditors AT THE 16384-TOKEN CAP THEN IN USE.
+  // qwen3.8-max failure reproduced again 2026-08-29 (contestant + judge in the
+  // story-arc tournament), also under an undersized cap (16384/32768) — see
+  // docs/decisions.md "qwen3.8-max zero-visible-output confound (verdict pending
+  // retest)". Cap has since been raised to the real OpenRouter max (131072);
+  // verdict on qwen3.8-max is open until a retest at the true limit is run.
   textAuditModel: process.env.TEXT_AUDIT_MODEL || 'gemini-3.1-pro',
   // Arc/beats audit judges (2026-08-27 Lab experiments 876/877, frozen pirate
   // artifacts, known-defect ground truth). Arc: opus caught 8/8 + 3 finds no
@@ -244,6 +255,28 @@ const MODEL_DEFAULTS = {
   beatsAuditModel: process.env.BEATS_AUDIT_MODEL || 'gpt-5.6-sol',
   // Child critic of the arc — role-play quality and speed, not hostile judgment.
   childCriticModel: process.env.CHILD_CRITIC_MODEL || 'claude-sonnet',
+  // ── THE ARC MACHINE (owner, 2026-08-30) ──
+  // Replaces the arc write→audit→child-critic→review→re-audit chain in the
+  // production beats pipeline. Review-chain forensics showed the patch step
+  // destroying stories (deleting the cause a turn depended on, adding alibi
+  // clauses to satisfy a fault line); the machine never patches. CREATE: the
+  // creator writes TWO arcs, each with a blunt numbered self-critique, and
+  // commits to one. PANEL: outside models each propose exactly two solutions
+  // on the committed arc. RE-TELL: the SAME creator re-tells the story whole,
+  // from the beginning. Validated in the 2026-08-30 experiments (scratchpad
+  // flow3); see docs/decisions.md. arcAuditModel / childCriticModel /
+  // arcReviewModel above are no longer called by the production pipeline —
+  // Lab stages still use them.
+  arcCreatorModel: process.env.ARC_CREATOR_MODEL || 'claude-opus',
+  arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
+    .split(',').map(s => s.trim()).filter(Boolean),
+  // Rounds of panel + re-tell. 1 = one pass; round k>1 feeds the previous
+  // FINAL ARC + its critique back to the same panel. ARC_ROUNDS for staging A/B.
+  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 1),
+  // The creator runs at the provider default (the Anthropic path sends no
+  // temperature); these apply on OpenRouter/xAI paths only.
+  arcPanelTemperature: 0.8,
+  arcRetellTemperature: 0.6,
   // The three reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the scene and wardrobe reviews too. They are
   // separate decisions with separate evidence and now separate keys.

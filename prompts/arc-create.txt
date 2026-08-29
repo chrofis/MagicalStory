@@ -1,0 +1,39 @@
+Plan the story of a {PAGE_COUNT}-page illustrated children's book. Work in ENGLISH: the arcs are working notes, never shown to a reader. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
+
+Reading level: {READING_LEVEL}
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS (source of truth for who these characters are: never contradict a trait, never invent one)
+
+{CHARACTER_DETAILS}
+
+{STORY_GUIDE_SECTION}
+
+{AVAILABLE_LANDMARKS_SECTION}
+
+{STORY_SHAPE}
+
+{CHALLENGE_IDEAS}
+
+{TODDLER_MODE}
+
+{PRIOR_CHALLENGES}
+
+# RULES OF THE TELLING
+- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.
+- Every sentence follows from the one before — therefore, or but. Never "and then".
+- Each character's nature causes a problem or solves one.
+- Whoever or whatever stands in the way presses on the story to the end and stands in the scene at the turning point.
+- Names the commission gives stand as written.
+
+# YOUR TASK
+
+Write TWO different arcs, marked exactly "ARC 1:" and "ARC 2:" — genuinely different stories, not variants. Each arc is numbered sentences, roughly one per page, never fewer than ten.
+
+After each arc, a blunt self-critique marked "CRITIQUE:" — 3 to 6 numbered material faults: impossible logic, unearned turns, knowledge nobody could have, a rival who never presses, a removable character, a stake that cannot be lost.
+
+No final version — stop after the second critique.
+
+Last line, exactly: "Stronger: Arc <N> — <one sentence why>". Commit to one.

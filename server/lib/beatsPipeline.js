@@ -13,8 +13,11 @@ const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
  * Replaces the single unified Sonnet call + outline review with staged
  * calls, so every stage is reviewable and only the faulted pages get rewritten:
  *
- *   0. beats_arc_plan        Sonnet    the arc alone: problem, attempts, who does what
- *   0b. beats_arc_review     Grok      reviews the arc before any page exists
+ *   0. THE ARC MACHINE       create → panel → re-tell (arc_create/arc_panel/
+ *      arc_retell): the creator writes two arcs + self-critiques and commits
+ *      to one, a panel of outside models proposes solutions, the same creator
+ *      re-tells the story whole. Replaces the old arc audit/review chain
+ *      (owner, 2026-08-30 — see docs/decisions.md)
  *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE, FROM the approved arc
  *   2. beats_review          Grok      structural review, rewrites faulted pages
  *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
@@ -56,17 +59,19 @@ const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
  */
 
 const textModels = require('./textModels');
-const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
 const {
   buildBeatsPrompt,
+  buildChallengeIdeasSection,
+  buildArcCreatePrompt,
+  buildArcPanelPrompt,
+  buildArcRetellPrompt,
+  parseArcCreate,
+  parseArcRetell,
   buildBeatsReviewPrompt,
-  buildArcReviewPrompt,
-  buildArcAuditPrompt,
-  buildChildCriticPrompt,
   buildBeatsAuditPrompt,
   countFaults,
   faultsByCategory,
-  parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,
   parseBeats,
@@ -191,10 +196,14 @@ const ARC_VARIETY_MAX = 600;
  */
 function extractChallengeLines(arc) {
   const text = String(arc || '');
-  const start = text.search(/Challenges of[^:\n]*:/i);
+  // "Challenges of <names>:" is the old structured-arc form; "Challenges
+  // taken:" is the arc machine's FINAL ARC form (2026-08-30). In old arcs the
+  // widened match lands on the one-line "Challenges taken:" summary first, and
+  // the numbered filter below still captures the same numbered entries.
+  const start = text.search(/Challenges (?:of[^:\n]*|taken)\s*:/i);
   if (start < 0) return [];
   let block = text.slice(start);
-  const end = block.search(/^\s*(?:Moments|Blocker)\s*:/mi);
+  const end = block.search(/^\s*(?:Moments|Blocker|Used|CRITIQUE)\s*:/mi);
   if (end > 0) block = block.slice(0, end);
   return block
     .split('\n')
@@ -330,12 +339,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   const planModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
-  const arcReviewModel = modelOverrides.arcReviewModel || MODEL_DEFAULTS.arcReviewModel || reviewModel;
-  // Auditors are separate from the reviewers that answer them (models.js:
-  // Lab 876/877) — the fixer never grades its own fix.
-  const arcAuditModel = modelOverrides.arcAuditModel || MODEL_DEFAULTS.arcAuditModel || arcReviewModel;
+  // THE ARC MACHINE (owner, 2026-08-30): creator + panel + rounds replace the
+  // old arcAuditModel/arcReviewModel/childCriticModel chain here.
+  const arcCreatorModel = modelOverrides.arcCreatorModel || MODEL_DEFAULTS.arcCreatorModel || planModel;
+  const arcPanelModels = (Array.isArray(MODEL_DEFAULTS.arcPanelModels) ? MODEL_DEFAULTS.arcPanelModels : [])
+    .filter(m => TEXT_MODELS[m]);
+  const arcRounds = Math.max(1, parseInt(modelOverrides.arcRounds, 10) || MODEL_DEFAULTS.arcRounds || 1);
   const beatsAuditModel = modelOverrides.beatsAuditModel || MODEL_DEFAULTS.beatsAuditModel || reviewModel;
-  const childCriticModel = modelOverrides.childCriticModel || MODEL_DEFAULTS.childCriticModel || planModel;
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
   const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
@@ -343,28 +353,37 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, arcAuditModel, arcReviewModel, beatsAuditModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcCreatorModel, arcPanelModels, arcRounds, beatsAuditModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcAudit=${arcAuditModel} arcReview=${arcReviewModel} beatsAudit=${beatsAuditModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreator=${arcCreatorModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} beatsAudit=${beatsAuditModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
 
-  // ── Step 0: the arc, reviewed on its own ──────────────────────────────────
-  // The arc is ~15 lines, so a review round here costs cents and measured +0.9
-  // to +1.3 across five lab cells (exp 23-28) on every judge — while the same
-  // review applied to finished beats measured negative five times out of five.
-  // The pages are then written FROM the reviewed arc: reviewing an arc the beats
-  // were not built on would leave the correction stranded in a header.
+  // ── Step 0: THE ARC MACHINE — create → panel → re-tell ────────────────────
+  // Replaces the arc write → audit → child critic → review → re-audit chain
+  // (owner, 2026-08-30). Forensics on that chain showed the patch step
+  // destroying stories: a fix deleted the cause a turn depended on, or bolted
+  // an alibi clause onto a sentence to satisfy a fault line (docs/decisions.md
+  // 2026-08-30). The machine never patches. CREATE: the creator writes TWO
+  // arcs, each with a blunt numbered self-critique, and commits to one. PANEL:
+  // outside models each propose exactly two solutions on the committed arc +
+  // critique — advisory, in parallel, a lost voice never blocks. RE-TELL: the
+  // SAME creator re-tells the story whole, from the beginning, and critiques
+  // the result again. Rounds are configurable (arcRounds); the final critique
+  // rides into the beats prompt as known weak points instead of being "fixed"
+  // out of existence.
   await checkCancellation();
-  const basePrompt = buildBeatsPrompt(inputData, pageCount);
-  if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
-  // The random catalogue draw is an INPUT like any other — persisted so "which
-  // challenges was this book offered / which did it take" is answerable from
-  // the story record (owner, 2026-08-29).
-  const challengeDraw = (basePrompt.match(/# CHALLENGE IDEAS[\s\S]*?(?=\n# |\n\*\*|$)/) || [''])[0]
-    .split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
+  // The random catalogue draw is an INPUT like any other — drawn ONCE, given to
+  // the arc creator AND the beats planner, and persisted so "which challenges
+  // was this book offered / which did it take" is answerable from the story
+  // record (owner, 2026-08-29).
+  const challengeIdeas = buildChallengeIdeasSection(inputData);
+  const challengeDraw = challengeIdeas.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
   if (challengeDraw.length) gl.info('challenge_draw', `Drew ${challengeDraw.length} challenge idea(s) for the arc plan`, null, { challengeDraw });
   let approvedArc = '';
-  let arcAuditFindings = '';
-  let childCriticReport = null;
+  // The FINAL ARC's own critique — handed to the beats prompt as the known
+  // weak points the page division must not amplify.
+  let arcWeakPoints = '';
+  // The machine's full trail. Kept under the arcReviewReport key so the
+  // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
   // CROSS-STORY MEMORY: the challenges this account's previous books used. Only
   // the arc-plan call sees them — that is the one call that invents challenges;
@@ -377,151 +396,168 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     });
   }
   const varietyBlock = arcVarietyExclusions.length > 0
-    ? `\n\nThis reader's earlier books used these challenges — this story uses different ones:\n${arcVarietyExclusions.map(l => `- ${l}`).join('\n')}`
+    ? `This reader's earlier books used these challenges — this story uses different ones:\n${arcVarietyExclusions.map(l => `- ${l}`).join('\n')}`
     : '';
   let t = Date.now();
   try {
-    await stage(1, 'Shaping the story arc...', { next: 2, ms: 30000 });
-    const arcRes = await textModels.callTextModelStreaming(
-      `${basePrompt}\n\nOutput the ---ARC--- block only. Omit the ---BEATS--- block entirely.${varietyBlock}`,
-      null, onChunk, planModel, { usageLabel: 'beats_arc_plan' });
-    const drafted = parseBeats(arcRes.text || '').arc || '';
-    if (!drafted) throw new Error('planner returned no arc');
+    // OpenRouter/xAI take a temperature; the Anthropic path sends none.
+    const tempFor = (model, temp) =>
+      (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
 
-    // Blind audit: a reader with only the commission and the arc names faults.
-    // The reviewer's fix ledger must answer every one. Never blocks — a failed
-    // audit just means the review runs on its own findings alone.
-    //
-    // The CHILD CRITIC runs beside it, on the same arc, at the same time. The
-    // hostile audit asks whether the arc holds up; the child asks whether a
-    // listener followed it, cared, and was not frightened past fun — two
-    // different failure modes, so they are two different readers. Its faults are
-    // tagged FAULT[CHILD] and appended to the SAME findings block, because one
-    // review answering one ledger is cheaper and never leaves a stream unanswered.
-    await stage(2, 'Auditing the story arc...', { next: 2, ms: 90000 });
-    const [auditFindings, childFindings] = await Promise.all([
-      (async () => {
+    /** Creator-side call: one retry, then throw — the creator is not advisory. */
+    const creatorCall = async (prompt, label, temp) => {
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const arcAuditPrompt = buildArcAuditPrompt(inputData, drafted);
-          if (!arcAuditPrompt) return '';
-          const auditRes = await textModels.callTextModelStreaming(arcAuditPrompt, null, onChunk, arcAuditModel, { usageLabel: 'beats_arc_audit' });
-          const text = String(auditRes.text || '').trim();
-          gl.info('beats_arc_audit', `Arc audit by ${auditRes.modelId || arcReviewModel}: ${countFaults(text)} fault(s)`, null, { byCategory: faultsByCategory(text) });
-          return text;
-        } catch (auditErr) {
-          log.warn(`⚠️ [BEATS] Arc audit failed (${auditErr.message}) — review runs without audit findings`);
-          gl.warn('beats_arc_audit_failed', `Arc audit failed: ${auditErr.message}`);
-          return '';
-        }
-      })(),
-      (async () => {
-        try {
-          const childPrompt = buildChildCriticPrompt(inputData, drafted);
-          if (!childPrompt) return '';
-          const childRes = await textModels.callTextModelStreaming(childPrompt, null, onChunk, childCriticModel, { usageLabel: 'beats_child_critic' });
-          const text = String(childRes.text || '').trim();
-          gl.info('beats_child_critic', `Child critic by ${childRes.modelId || childCriticModel}: ${(text.match(/^FAULT\[CHILD\]:/gm) || []).length} fault(s)`);
-          return text;
-        } catch (childErr) {
-          // Non-blocking by design: a missing child critic contributes nothing.
-          log.warn(`⚠️ [BEATS] Child critic failed (${childErr.message}) — review runs without child findings`);
-          gl.warn('beats_child_critic_failed', `Child critic failed: ${childErr.message}`);
-          return '';
-        }
-      })(),
-    ]);
-    childCriticReport = childFindings || null;
-    // Only the FAULT[CHILD] lines join the ledger — the retell is the child's
-    // working, kept in the report rather than handed to the reviewer as a fault.
-    const childFaultLines = (childFindings.match(/^FAULT\[CHILD\]:.*$/gm) || []).join('\n');
-    arcAuditFindings = [auditFindings, childFaultLines].filter(s => s && s.trim()).join('\n');
-
-    const arcReviewPrompt = buildArcReviewPrompt(inputData, drafted, arcAuditFindings);
-    if (!arcReviewPrompt) throw new Error('story-arc-review template unavailable');
-    await stage(2, 'Reviewing the story arc...', { next: 3, ms: 45000 });
-    const arcRevRes = await textModels.callTextModelStreaming(arcReviewPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_review' });
-    const { analysis, arc: revised } = parseArcReview(arcRevRes.text || '');
-    approvedArc = (revised && revised.trim()) ? revised.trim() : drafted;
-    meta.timings.arcMs = Date.now() - t;
-    arcReviewReport = {
-      model: arcRevRes.modelId || arcReviewModel,
-      planModel: arcRes.modelId || planModel,
-      durationMs: meta.timings.arcMs,
-      changed: approvedArc !== drafted,
-      drafted, analysis, prompt: arcReviewPrompt,
-      audit: arcAuditFindings,
-      auditByCategory: faultsByCategory(arcAuditFindings),
-      // Raw child output, retell included — the report is where a reader sees
-      // what the listener actually took away, not just what it faulted.
-      childCritic: childCriticReport,
-    };
-    gl.info('beats_arc', `Arc drafted by ${arcRes.modelId || planModel}, reviewed by ${arcRevRes.modelId || arcReviewModel} (${arcReviewReport.changed ? 'rewritten' : 'unchanged'})`, null, {
-      changed: arcReviewReport.changed, model: arcRevRes.modelId || arcReviewModel,
-    });
-
-    // FRESH JUDGMENT (owner, 2026-08-26). The SAME blind audit runs again on
-    // the reviewed arc — same template, same judge, so the before/after fault
-    // counts are one yardstick. A fault the review truly fixed vanishes on its
-    // own; a botched fix and a review-INTRODUCED fault both surface as plain
-    // faults, which no carried fault list ever could (an introduction has no
-    // finding to carry — the deleted Lindenhof gate crossed three carries
-    // untouched on job_1787689073034). Faults found here get ONE targeted
-    // re-review; no convergence loop.
-    try {
-      const audit2Prompt = buildArcAuditPrompt(inputData, approvedArc);
-      if (audit2Prompt && arcAuditFindings) {
-        const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, arcAuditModel, { usageLabel: 'beats_arc_audit2' });
-        const findings2 = String(a2.text || '').trim();
-        const n1 = countFaults(arcAuditFindings);
-        const n2 = countFaults(findings2);
-        arcReviewReport.audit2 = findings2;
-        arcReviewReport.audit2ByCategory = faultsByCategory(findings2);
-        gl.info('beats_arc_audit2', `Arc re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2, byCategory: arcReviewReport.audit2ByCategory });
-        if (n2 > 0) {
-          // The first review's ledger rides along so a trade-off it ruled to
-          // stand is answered by citing the ruling, not churned.
-          const withRulings = `${findings2}\n\nThe previous review answered an earlier audit; its ledger follows. A fault it ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.\n\n${arcReviewReport.analysis || ''}`;
-          const fixPrompt = buildArcReviewPrompt(inputData, approvedArc, withRulings);
-          const fixRes = await textModels.callTextModelStreaming(fixPrompt, null, onChunk, arcReviewModel, { usageLabel: 'beats_arc_review2' });
-          const fix = parseArcReview(fixRes.text || '');
-          if (fix.arc && fix.arc.trim()) {
-            approvedArc = fix.arc.trim();
-            arcReviewReport.analysis2 = fix.analysis || '';
-            arcReviewReport.changed2 = true;
-            gl.info('beats_arc_review2', `Arc re-review resolved the re-audit's ${n2} fault(s)`);
-          }
+          const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp) });
+          if (!String(res?.text || '').trim()) throw new Error('empty response');
+          return res;
+        } catch (err) {
+          lastErr = err;
+          log.warn(`⚠️ [ARC] ${label} attempt ${attempt} failed: ${err.message}`);
         }
       }
-    } catch (e2) {
-      log.warn(`⚠️ [BEATS] Arc re-audit failed (${e2.message}) — reviewed arc kept as-is`);
-      gl.warn('beats_arc_audit2_failed', `Arc re-audit failed: ${e2.message}`);
+      throw new Error(`${label} failed after retry: ${lastErr?.message || 'unknown error'}`);
+    };
+
+    // CREATE. A parse miss (no commitment line, no ARC 2 boundary) gets one
+    // full re-create, then throws into the outer containment.
+    await stage(1, 'Shaping the story arc...', { next: 2, ms: 90000 });
+    const createPrompt = buildArcCreatePrompt(inputData, pageCount, { challengeIdeas, priorChallenges: varietyBlock });
+    if (!createPrompt) throw new Error('arc-create template unavailable');
+    let createRes = null;
+    let commit = null;
+    for (let attempt = 1; attempt <= 2 && !commit; attempt++) {
+      createRes = await creatorCall(createPrompt, 'arc_create', null);
+      try {
+        commit = parseArcCreate(createRes.text);
+      } catch (parseErr) {
+        log.warn(`⚠️ [ARC] create parse failed (${parseErr.message})${attempt === 1 ? ' — one re-create' : ''}`);
+        if (attempt === 2) throw parseErr;
+      }
     }
+    gl.info('arc_create', `Arc creator ${createRes.modelId || arcCreatorModel} wrote two arcs and committed to Arc ${commit.n}`, null, {
+      model: createRes.modelId || arcCreatorModel, committed: commit.n, stronger: commit.strongerLine,
+    });
+    // Defaults if every panel round comes back empty: the committed arc stands,
+    // its own critique as the known weak points.
+    approvedArc = commit.arc;
+    arcWeakPoints = commit.critique;
+
+    // PANEL + RE-TELL rounds. Round k>1 feeds the previous FINAL ARC + its
+    // critique back to the same panel, then the same creator re-tells again.
+    let currentBlock = commit.committed;
+    const roundReports = [];
+    for (let round = 1; round <= arcRounds; round++) {
+      await checkCancellation();
+      await stage(2, 'Convening the story panel...', { next: 2, ms: 120000 });
+      const panelPrompt = buildArcPanelPrompt(inputData, currentBlock);
+      if (!panelPrompt) throw new Error('arc-panel template unavailable');
+      const settled = await Promise.allSettled(arcPanelModels.map(async (m) => {
+        const res = await textModels.callTextModelStreaming(panelPrompt, null, onChunk, m, { usageLabel: 'arc_panel', ...tempFor(m, MODEL_DEFAULTS.arcPanelTemperature) });
+        const text = String(res?.text || '').trim();
+        if (!text) throw new Error('empty panel response');
+        return { model: res.modelId || m, text };
+      }));
+      const panel = [];
+      const failedPanelists = [];
+      settled.forEach((r, i) => {
+        if (r.status === 'fulfilled') { panel.push(r.value); return; }
+        // Advisory by design: a lost voice narrows the panel, it never blocks.
+        failedPanelists.push(arcPanelModels[i]);
+        log.warn(`⚠️ [ARC] Panelist ${arcPanelModels[i]} failed (round ${round}): ${r.reason?.message}`);
+        gl.warn('arc_panel_failed', `Panelist ${arcPanelModels[i]} failed in round ${round}: ${r.reason?.message} — panel is advisory, continuing without them`);
+      });
+      if (panel.length === 0) {
+        // No voices at all: nothing to re-tell against. Whatever arc is current
+        // (the committed one, or the previous round's re-telling) stands.
+        log.warn(`⚠️ [ARC] Entire panel failed in round ${round} — arc ships without this re-telling round`);
+        gl.warn('arc_panel_empty', `Entire panel failed in round ${round} — arc ships without this re-telling round`);
+        break;
+      }
+      gl.info('arc_panel', `Round ${round}: ${panel.length}/${arcPanelModels.length} panelists proposed two solutions each`, null, {
+        round, panelists: panel.map(p => p.model), failed: failedPanelists,
+      });
+
+      // RE-TELL: same creator, committed arc + critique + all solutions, told
+      // again from the beginning. Never a patch. A parse miss (no FINAL ARC)
+      // gets one more telling, then throws.
+      await stage(2, 'Re-telling the story arc...', { next: 3, ms: 90000 });
+      const solutionsText = panel.map(p => `## PANELIST: ${p.model}\n${p.text}`).join('\n\n');
+      const retellPrompt = buildArcRetellPrompt(inputData, pageCount, currentBlock, solutionsText);
+      if (!retellPrompt) throw new Error('arc-retell template unavailable');
+      let retellRes = null;
+      let retold = null;
+      for (let attempt = 1; attempt <= 2 && !retold; attempt++) {
+        retellRes = await creatorCall(retellPrompt, 'arc_retell', MODEL_DEFAULTS.arcRetellTemperature);
+        try {
+          retold = parseArcRetell(retellRes.text);
+        } catch (parseErr) {
+          log.warn(`⚠️ [ARC] re-tell parse failed (${parseErr.message})${attempt === 1 ? ' — one more telling' : ''}`);
+          if (attempt === 2) throw parseErr;
+        }
+      }
+      approvedArc = retold.finalArc;
+      arcWeakPoints = retold.critique;
+      roundReports.push({
+        round,
+        panel,
+        failedPanelists,
+        retellModel: retellRes.modelId || arcCreatorModel,
+        finalArc: retold.finalArc,
+        used: retold.used,
+        critique: retold.critique,
+      });
+      gl.info('arc_retell', `Round ${round}: ${retellRes.modelId || arcCreatorModel} re-told the story (used: ${retold.used || 'not stated'})`, null, {
+        round, used: retold.used, critiqueFaults: (retold.critique.match(/^\s*\d+[.)]/gm) || []).length,
+      });
+      currentBlock = `FINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
+    }
+
+    meta.timings.arcMs = Date.now() - t;
+    // Everything the machine produced, verbatim — storage is cheap,
+    // debuggability is the point. Text only, no images.
+    arcReviewReport = {
+      machine: 'create-panel-retell',
+      creatorModel: createRes.modelId || arcCreatorModel,
+      panelModels: arcPanelModels,
+      roundsConfigured: arcRounds,
+      roundsRun: roundReports.length,
+      durationMs: meta.timings.arcMs,
+      create: createRes.text,
+      committedArc: commit.n,
+      committed: commit.committed,
+      discarded: commit.discarded,
+      rounds: roundReports,
+      finalArc: approvedArc,
+      critique: arcWeakPoints,
+    };
+    gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
+      rounds: roundReports.length, creatorModel: arcCreatorModel,
+    });
   } catch (err) {
     // Never block a story on the arc step: without it the planner writes the
     // arc inline exactly as it did before this stage existed.
-    log.warn(`🚨 [BEATS] Arc stage failed (${err.message}) — planning beats without a reviewed arc`);
-    gl.warn('beats_arc_failed', `Arc stage failed: ${err.message} — beats planned without a reviewed arc`);
+    log.warn(`🚨 [BEATS] Arc machine failed (${err.message}) — planning beats without an arc`);
+    gl.warn('beats_arc_failed', `Arc machine failed: ${err.message} — beats planned without an arc`);
     approvedArc = '';
+    arcWeakPoints = '';
   }
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
-  // RULINGS-ONLY CARRY (owner, 2026-08-26 — supersedes the 2026-08-25
-  // fault-carry). Whether the review answered each fault is now the re-audit's
-  // job above; carrying the fault list forward was noise (all 10 carried
-  // faults on the first prod run were already marked fixed) and, worse, gave a
-  // defective fix downstream authority. Only the reviewer's LEDGER travels,
-  // framed as precedent, so a "stands, with reason" ruling is not re-litigated
-  // by a stage that never saw the reason.
-  const planPrompt = withCarriedRulings(
-    approvedArc
-      ? `${basePrompt}\n\nThis arc has been reviewed and approved. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
-      : basePrompt,
-    [arcReviewReport?.analysis || '', arcReviewReport?.analysis2 || ''],
-    CARRY_ROUTES.arc
-  );
-  if (arcReviewReport?.analysis) {
-    gl.info('beats_carry_arc', 'Arc review rulings carried into the beats plan');
+  // Built AFTER the arc machine on purpose: the planner sees the SAME challenge
+  // draw the creator was offered, and the final arc's critique enters as the
+  // ARC KNOWN WEAK POINTS section — the machine's replacement for the old
+  // rulings carry (the re-telling already answered the critique; what remains
+  // travels as a warning, never as work).
+  const basePrompt = buildBeatsPrompt(inputData, pageCount, { challengeIdeas, arcWeakPoints });
+  if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
+  const planPrompt = approvedArc
+    ? `${basePrompt}\n\nThis arc is final — it was told, challenged by a panel, and re-told. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
+    : basePrompt;
+  if (arcWeakPoints) {
+    gl.info('beats_carry_arc', 'Final arc critique carried into the beats plan as known weak points');
   }
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });

@@ -21833,3 +21833,109 @@ dropped dead params), `server/routes/regeneration.js` (page-redo tier),
 (page row + plate row), `tests/unit/page-render-tier.test.ts`.
 **Status:** 🟡 conditional — staging only, unscored. Production stays on
 `grok-imagine` until a scored A/B promotes it.
+
+## 2026-08-29 — qwen3.8-max zero-visible-output confound (verdict pending retest)
+
+**Context.** During the 2026-08-29 story-arc tournament (9 contestant arms + 5-judge
+panel, run from a local harness), qwen3.8-max returned zero visible characters as
+BOTH contestant and judge, on first call and on full-cap retry (4 calls, ~$0.42
+wasted): it burned its entire output budget on reasoning tokens. `server/config/models.js`
+already documents the same behaviour from the text-audit bake-off (2026-08-27). All
+three failures, however, ran under `TEXT_MODELS['qwen3.8-max'].maxOutputTokens` = 16384
+(models.js:158) — a number we picked, not the model's real completion limit — and the
+tournament retry used 32768, also our invention. Checked 2026-08-29 against OpenRouter's
+`/api/v1/models` endpoint: `qwen/qwen3.8-max`'s real `top_provider.max_completion_tokens`
+is **131,072**, roughly 4-8x what every failing call was capped at. qwen3.8-max is a
+reasoning model whose thinking tokens count against the output budget, so "all reasoning,
+no visible text" is exactly what an undersized cap produces — the three reproductions are
+confounded by our own config, not independent evidence of a model property.
+
+**Decision.** qwen3.8-max produced zero visible output in three bake-offs, but ALL ran
+under our 16k/32k caps, which its reasoning tokens can exhaust before any visible text
+is emitted. Verdict is **"unusable under current config"**, NOT "unusable, property of
+the model." A definitive verdict needs one retest at the model's true OpenRouter
+completion limit (131,072, now set as `maxOutputTokens` in models.js:158) and/or with
+the OpenRouter reasoning-effort parameter lowered — that retest is pending owner
+approval (no paid qwen3.8-max call has been made since this write-up). The roster
+decision (include/exclude from future bake-offs and judge panels) awaits that retest.
+
+**Rationale.** Three reproductions is real signal that something breaks, but all three
+share the identical undersized-cap confound, so it cannot yet be attributed to the
+model rather than to our config. Money was spent for zero bytes either way, but the
+fix path differs completely depending on which explanation is true — raising the cap
+costs nothing to test and must be ruled out before spending more on bake-offs that
+exclude a model that might work fine.
+
+**Touched:** `docs/decisions.md` (this entry), `server/config/models.js:158`
+(`maxOutputTokens` raised from 16384 to 131072 for `qwen3.8-max`, plus a comment
+pointing here).
+**Status:** 🟡 pending retest — not excluded from rosters, cap corrected, no paid
+call run yet.
+
+## 2026-08-30 — The arc stage is the ARC MACHINE (create → panel → re-tell), not a review chain
+
+**Context.** The arc stage ran write → blind audit + child critic → review →
+re-audit → targeted re-review. Forensics on recent runs showed the PATCH step of
+that chain destroying stories rather than improving them: a fix deleted the
+cause a later turn depended on, or bolted an alibi clause onto a sentence purely
+to satisfy a fault line (see the preceding 2026-08-29/30 entries and the
+job_1787991502308 post-mortem). The failure is structural — a patcher optimises
+for the fault list, not for the story, and every patch is applied without
+re-deriving the whole. Tonight's experiments (scratchpad `flow3/run-flow3.js`,
+owner-reviewed 2026-08-30) validated an alternative that never patches.
+
+**Decision.** The beats pipeline's arc stage is now the arc machine:
+1. **CREATE** (`arcCreatorModel`, default claude-opus): writes TWO genuinely
+   different arcs in factual register, each with a blunt numbered self-critique
+   (3-6 material faults), and commits — "Stronger: Arc N — why".
+2. **PANEL** (`arcPanelModels`, default grok-4.6 + deepseek-v4-pro +
+   gpt-5.6-luna-pro, temperature 0.8, parallel): each proposes EXACTLY TWO
+   solutions on the committed arc + critique (≤8 one-sentence points each).
+   Advisory: a failed panelist is skipped with a genLog warning; an entirely
+   failed panel leaves the committed arc standing.
+3. **RE-TELL** (same creator, temperature 0.6 on non-Anthropic paths): receives
+   its committed arc + critique + all solutions and re-tells the story whole,
+   from the beginning — FINAL ARC + "Challenges taken:" + "Used:" + a fresh
+   CRITIQUE. Re-telling, never patching.
+4. **ROUNDS** (`arcRounds`, default 1, env `ARC_ROUNDS`): round k>1 feeds the
+   previous FINAL ARC + critique back to the same panel, then re-tells again.
+
+The FINAL ARC lands exactly where the old reviewed arc landed (`approvedArc` →
+`plan.arc`), so everything downstream of the beats plan is untouched. The final
+critique is NOT "fixed away": it enters `story-beats.txt` as the new
+`{ARC_WEAK_POINTS}` section ("the page division must not amplify these"). The
+challenge draw is made once and shown to both the creator and the planner.
+Creator/re-tell calls throw after one retry (one re-create/re-telling on a parse
+miss); the outer containment still degrades to arc-less planning rather than
+blocking a story. No output caps — every call runs at the model's
+`maxOutputTokens`. Full trail (both created arcs + critiques, commitment, every
+panel solution, each round's FINAL ARC + critique) persists under the existing
+`arcReviewReport` key (`machine: 'create-panel-retell'`), so storyJobPipeline
+persistence and the dev-mode wiring are untouched. Usage labels: `arc_create`,
+`arc_panel`, `arc_retell`.
+
+**Not a settled-verdict reversal:** the settled finding (Lab 23-28: review the
+ARC, not the beats — arc-level correction is where a round pays) stands; this
+changes the correction MECHANISM at that same level, by owner order, on the
+patch-destruction evidence above. `arcAuditModel` / `arcReviewModel` /
+`childCriticModel` and their templates stay for the Lab; the production
+pipeline no longer calls them. `extractChallengeLines` (cross-story challenge
+variety) was widened to read the machine's "Challenges taken:" list as well as
+the old "Challenges of <names>:" section — verified on both forms.
+
+**Rationale.** A creator re-telling its own story after outside critique keeps
+the causal chain whole by construction; a patcher provably does not. Two arcs +
+forced commitment make the self-critique material instead of ceremonial. The
+panel is cross-vendor so the creator's blind spots are not shared. Weak points
+that survive are carried forward as warnings instead of being cosmetically
+erased.
+
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-panel.txt`,
+`prompts/arc-retell.txt` (new), `prompts/story-beats.txt` (`{ARC_WEAK_POINTS}`),
+`server/services/prompts.js`, `server/config/models.js` (`arcCreatorModel`,
+`arcPanelModels`, `arcRounds`, `arcPanelTemperature`, `arcRetellTemperature`),
+`server/lib/promptBuilders.js` (`buildArcCreatePrompt` / `buildArcPanelPrompt` /
+`buildArcRetellPrompt` / `parseArcCreate` / `parseArcRetell`, `buildBeatsPrompt`
+opts), `server/lib/storyHelpers.js` (re-exports), `server/lib/beatsPipeline.js`
+(the machine; old chain removed), `docs/prompt-inventory.md`.
+**Status:** ✅ active (staging; first validation run = the pirate story rerun, owner-ordered).

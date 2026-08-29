@@ -25,6 +25,8 @@ Characters: {CHARACTER_NAMES}
 
 {TODDLER_MODE}
 
+{ARC_WEAK_POINTS}
+
 # YOUR TASK
 
 First write the ARC: the whole story, with no pages in it. Then divide that story across {PAGE_COUNT} pages — first as a PAGE PLAN that decides how each page is drawn, then as the pages themselves.
