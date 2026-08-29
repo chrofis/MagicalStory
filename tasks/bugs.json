@@ -2,6 +2,15 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "vb-grid-plate-filter-is-unreachable-code",
+      "title": "The 'drop locations when an empty-scene plate exists' filter has never fired on any non-trial story - it reads sceneBackgrounds before Phase 5a-pre fills it",
+      "reportedAt": "2026-08-29",
+      "source": "reproduced on staging job_1787959478282_bz19gm36h: 14/14 pages with a grid shipped their locations AND the ship as grid cards despite every one of those pages having a plate. Census replayed getElementReferenceImagesForPage against the stored visualBible and matched the stored grid images cell-for-cell (stable ~639px cell pitch: 1920=3 cells, 2560=4, 3191=5, 3831=6) - every page's stored grid equals the UNFILTERED selection.",
+      "status": "fixed",
+      "fixedIn": "eb4bb3ef2",
+      "note": "storyJobPipeline.js had `if (sceneBackgrounds[pageNum]) elementReferences = filter(type !== 'location')` inside the pageData map that PRODUCES pageDataArray. sceneBackgrounds is populated by Phase 5a-pre-vantage and Phase 5a-pre, which both CONSUME that array - so the map is {} at that point on every non-trial story and the branch is unreachable. Fix separates selection from construction: the map now stores vbElementRefs/vbSecondaryLandmarks only, and a new Phase 5a-pre-grid pass (placed after the plates exist, before every pageData.visualBibleGrid reader) applies the filter and builds the buffer. Filter now matches buildPageCompositeRefs: a plate drops BOTH location and vehicle cells; plateless pages keep everything. Same commit caps selection at 4 (was 6) at both page-grid call sites. Verified statically on the real story: 3-6 cells with a location on every page -> 1-4 cells, zero locations, no vehicle on any plated page. Related: buildPageCompositeRefs calls itself the 'single source of truth' for these filters but production page generation never calls it (only iteratePageCore + Test Lab do) - the pipeline keeps an inline copy. Also NOT fixed here: that inline copy passes secondaryLandmarks into buildVisualBibleGrid, contradicting the 2026-08-18 'a landmark photo NEVER enters the grid' decision."
+    },
+    {
       "id": "vb-grid-shrinks-to-a-sliver-in-its-grok-slot",
       "title": "VB reference grid arrives at Grok as a tiny thumbnail row (50x83px cells) instead of owning slot 3 at full size",
       "reportedAt": "2026-08-29",

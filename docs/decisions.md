@@ -21218,3 +21218,70 @@ by making the casualty diagnosable from the database alone.
 **Touched:** `storyJobPipeline.js`, `server/lib/coverIterate.js`,
 `tasks/bugs.json`.
 **Status:** ✅ active
+
+## 2026-08-29 — The VB reference grid: cap 4 cells, and the plate filter runs where the plate is actually known
+**Context:** The owner reported that the Visual Bible grid reaching Grok on page
+5 of staging `job_1787959478282_bz19gm36h` was tiny. Measuring the stored
+`grokRefImages` found three separate causes stacked on each other, and the
+grid's *contents* were the largest of them. A census of all 16 pages of that
+story (`getElementReferenceImagesForPage` replayed against the stored
+`visualBible` + `sceneMetadata.objects`, matched cell-for-cell against the
+stored grid images — cell pitch is a stable ~639px, so 1920px = 3 cells,
+2560 = 4, 3191 = 5, 3831 = 6):
+
+- **10 of 14** pages with a grid selected **5–6 elements**.
+- **14 of 14** carried at least one `location`, and every one also carried the
+  ship `VEH001` — on pages that already had an empty-scene plate painting both.
+
+The pipeline had a filter for exactly this
+(`if (sceneBackgrounds[pageNum]) drop locations`, `storyJobPipeline.js`), but it
+sat inside the pageData map that **produces** `pageDataArray` — and
+`sceneBackgrounds` is populated by Phase 5a-pre-vantage and Phase 5a-pre, which
+both **consume** that array. The map is therefore `{}` at that point on every
+non-trial story, and the filter had never fired for any of them. It was not a
+weak filter; it was unreachable code.
+
+Two further divergences the same trace exposed:
+`referenceSheets.js:buildPageCompositeRefs` documents itself as "the canonical
+filter rules (single source of truth)", but production page generation never
+calls it — it only serves `iteratePageCore` and the Test Lab, while the pipeline
+keeps its own inline copy. And that inline copy passes
+`secondaryLandmarks` into `buildVisualBibleGrid`, which contradicts the
+2026-08-18 "a landmark photo NEVER enters the grid" decision. The second is left
+alone here (it needs its own verdict) but is recorded so it is not rediscovered
+from scratch.
+
+**Decision:**
+1. **Cap 4, not 6.** `getElementReferenceImagesForPage` is called with
+   `maxRefs = 4` at both page-grid call sites (`storyJobPipeline.js` and
+   `referenceSheets.js:buildPageCompositeRefs`). The empty-scene grid keeps its
+   own cap of 9 (`buildEmptySceneVbGrid`) — a different grid, sent to a call
+   with no character slots competing for room.
+2. **Selection and grid construction are separated.** The pageData map now only
+   *selects* (`vbElementRefs`, `vbSecondaryLandmarks`); a new **Phase
+   5a-pre-grid** pass, placed after the plates exist, applies the filter and
+   builds the buffer. Anything that reads `pageData.visualBibleGrid` runs later
+   still, so nothing else moved.
+3. **The filter matches `buildPageCompositeRefs`:** when a page has a plate,
+   both `location` **and** `vehicle` cells drop. Pages whose plate failed keep
+   everything — there is no plate depicting it.
+
+**Rationale:** the entire grid occupies ONE of Grok's three reference slots, so
+per-cell size scales as 1/n. Six cells is four elements' worth of unreadable,
+and spending two of them on scenery the plate already paints is the worst
+possible trade. Capping without fixing the dead filter would have been the wrong
+half: the cap alone would have kept the ship and a location and evicted real
+props by priority order (`artifact` outranks `vehicle` outranks `location`, so
+the junk sorts last but still displaces nothing until the list is truncated).
+
+**Verified statically** on the real stored data, no model calls: across all 16
+pages the grid goes from 3–6 cells with a location on every page, to **1–4
+cells with zero locations and no vehicle on any plated page**. Page 5 goes
+6 candidate elements → 4 selected → **1 kept** (`ART003`, the map tube), which
+then fills its reference slot at 574×1024 instead of the 50×83px it shipped at.
+
+**Touched files:** `storyJobPipeline.js` (selection cap, deferred build, new
+Phase 5a-pre-grid), `server/lib/referenceSheets.js` (cap at
+`buildPageCompositeRefs`), `server/lib/grok.js` (`composeVbSlot`, see the
+sibling entry), `tasks/bugs.json`.
+**Status:** ✅ active

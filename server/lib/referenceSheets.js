@@ -446,7 +446,15 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
  */
 async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null } = {}) {
   const { getElementReferenceImagesForPage } = require('./visualBible');
-  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneObjectIds);
+  // Cap 4, not 6 (owner, 2026-08-29). The whole grid shares ONE of Grok's three
+  // reference slots, so cell size scales as 1/n — a 6-cell grid renders each
+  // element too small to carry identity. Census of staging
+  // job_1787959478282_bz19gm36h: 10 of 14 pages selected 5-6 elements, and
+  // every page spent cells on the vehicle and the locations its plate already
+  // painted. The empty-scene grid keeps its own cap of 9
+  // (buildEmptySceneVbGrid) — it is a different grid, sent to a call with no
+  // character slots competing for space.
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 4, sceneObjectIds);
   // Landmarks never ride in the grid — a real photograph composited among
   // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
   // landmark reaches the image only as its own reference photo, and when a

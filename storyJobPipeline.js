@@ -3492,13 +3492,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // The page prompt lists the scene's objects[] (the Art Director's pick);
         // pass the same ids so a prop the prompt describes brings its reference
         // image even when the VB filed it under a different page.
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6, sceneMetadata?.objects || null);
-        // Drop location elements when an empty scene background exists — the location
-        // is already painted into the background, so a VB grid cell showing the same
-        // location is redundant and wastes a reference slot.
-        if (sceneBackgrounds[pageNum]) {
-          elementReferences = elementReferences.filter(e => e.type !== 'location');
-        }
+        // Cap 4, not 6 (owner, 2026-08-29). Census of staging
+        // job_1787959478282_bz19gm36h: 10 of 14 pages sent 5-6 grid cells, and
+        // every page also spent one of them on the ship and one or two on
+        // locations the plate already paints. The grid shares ONE Grok
+        // reference slot, so every extra cell shrinks all the others —
+        // 6 cells is 4 elements' worth of unreadable.
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4, sceneMetadata?.objects || null);
+        // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
+        // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
+        // this pageData map (they iterate the pageDataArray it produces), so at
+        // this point the map is `{}` on every non-trial story and a filter here
+        // is structurally dead — which is exactly what shipped: all 14 pages of
+        // job_1787959478282_bz19gm36h sent their locations AND the ship as grid
+        // cards despite every page having a plate. Selection happens here;
+        // filtering + grid construction happen in Phase 5a-pre-grid below, once
+        // we know which pages actually got a plate.
         // Fallback: also match by IDs found in scene hint (covers page mismatch between VB and scene)
         if (sceneMetadata?.fullData) {
           const sceneIds = [];
@@ -3517,15 +3526,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
             if (newRefs.length > 0) {
               log.info(`🔗 [VB-MATCH] Page ${pageNum}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
-              elementReferences = [...elementReferences, ...newRefs].slice(0, 6);
+              elementReferences = [...elementReferences, ...newRefs].slice(0, 4);
             }
           }
         }
         const secondaryLandmarks = pageLandmarkPhotos.slice(1);
-        let visualBibleGrid = null;
-        if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-          visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-        }
         // Determine per-page image model based on scene complexity
         const sceneComplexity = sceneMetadata?.sceneComplexity || 'simple';
         const sceneRouting = modelOverrides.sceneRouting || 'auto';
@@ -3572,7 +3577,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           prompt: imagePrompt,
           characterPhotos: pagePhotos,
           landmarkPhotos: pageLandmarkPhotos,
-          visualBibleGrid,
+          // Built in Phase 5a-pre-grid, once the plates are known.
+          visualBibleGrid: null,
+          vbElementRefs: elementReferences,
+          vbSecondaryLandmarks: secondaryLandmarks,
           sceneCharacters,
           sceneMetadata,
           perCharClothing,
@@ -4022,6 +4030,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
+      }
+
+      // Phase 5a-pre-grid: build each page's Visual Bible reference grid, NOW
+      // that we know which pages actually got a background plate.
+      //
+      // This used to happen inside the pageData map above, where the filter
+      // `if (sceneBackgrounds[pageNum]) drop locations` could never fire —
+      // sceneBackgrounds is filled by 5a-pre-vantage and 5a-pre, both of which
+      // consume the pageDataArray that map produces. So on every non-trial
+      // story the map was `{}` and the filter was dead code. Measured on
+      // staging job_1787959478282_bz19gm36h: 14/14 pages shipped their
+      // locations and the ship as grid cards even though every one had a plate.
+      //
+      // Same rule as buildPageCompositeRefs (referenceSheets.js), which is the
+      // documented single source of truth for these filters: a plate already
+      // paints the setting AND the vehicle, so both drop out of the grid; the
+      // grid is for props, animals and secondary characters the plate omits.
+      {
+        let filteredPages = 0;
+        let droppedCells = 0;
+        for (const pageData of pageDataArray) {
+          const refs = pageData.vbElementRefs || [];
+          const secLm = pageData.vbSecondaryLandmarks || [];
+          const hasPlate = !!sceneBackgrounds[pageData.pageNumber]?.imageData;
+          const kept = hasPlate
+            ? refs.filter(e => e.type !== 'location' && e.type !== 'vehicle')
+            : refs;
+          if (hasPlate && kept.length < refs.length) {
+            filteredPages++;
+            droppedCells += refs.length - kept.length;
+          }
+          pageData.visualBibleGrid = (kept.length > 0 || secLm.length > 0)
+            ? await buildVisualBibleGrid(kept, secLm)
+            : null;
+          log.debug(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length} cell(s)${hasPlate ? ` (plate set — dropped ${refs.length - kept.length} location/vehicle)` : ' (no plate — nothing filtered)'}`);
+        }
+        if (filteredPages > 0) {
+          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} plate-covered location/vehicle cell(s) across ${filteredPages} page(s)`);
+        }
       }
 
       // Phase 5a continued: Generate ALL images (no evaluation)
