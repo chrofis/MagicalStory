@@ -256,7 +256,7 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 | Image Generation | Gemini (Google) + Grok (xAI) | Page illustrations, covers, avatars |
 | Character Repair | Grok Imagine (xAI) | Cutout + blended character repair ($0.02/img) |
 | Cheap Images | Runware | Dev mode, inpainting (SDXL $0.002/img) |
-| Avatar Faces | Grok Imagine (xAI) | Clothing + costumed avatars: both passes (identity sheet + style transfer) default to Grok (env `AVATAR_STYLE_BACKEND`). Gemini is NOT used by default (it returns `IMAGE_OTHER` — a safety refusal, no image — on a share of realistic-face inputs; the trigger is a content combination, NOT the subject's age). Full history + rationale: `docs/decisions.md` → "Avatar style transfer (pass-2) uses Grok, not Gemini" and the avatar-guarantee entry. |
+| Avatar Faces | Grok Imagine (xAI) | Clothing + costumed avatars: both passes (identity sheet + style transfer) default to Grok (env `AVATAR_STYLE_BACKEND`). Grok is the default because it is CHEAPER ($0.02 vs $0.04) — that is the routing reason, nothing else. Gemini stays as the fallback and works for most requests; its `IMAGE_OTHER` safety refusal (no image returned) triggers on a COMBINATION of factors — clothing, art style, age, and similar — so an occasional request is refused unpredictably. A refusal must fail loudly, never ship an empty page. Full history + rationale: `docs/decisions.md` → "Avatar style transfer (pass-2) uses Grok, not Gemini" and the avatar-guarantee entry. |
 | Face Detection | Python service (MediaPipe/Haar) | Cascade face detection for illustrations |
 
 ### Story Generation Pipeline (Unified Mode)

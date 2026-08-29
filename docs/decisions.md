@@ -21143,3 +21143,22 @@ is what was measured. The Haiku-instability note stays true; sonnet was the
 default until this bake-off and is now the measured weakest raw AD.
 **Touched:** `server/config/models.js`.
 **Status:** ✅ active — validated by the pirate rerun on the optimal setting.
+
+---
+
+### Gemini IMAGE_OTHER refusals are broad, not face-specific (owner correction, 2026-08-29)
+**Context:** Earlier entries attributed Gemini image refusals (IMAGE_OTHER) to
+realistic-face reference inputs / content combinations. Owner correction: the
+trigger is a COMBINATION of factors — clothing, art style, age, and similar —
+so refusals are frequent and unpredictable per request; faces alone are not
+the discriminator. Evidence in line with this: the
+final pirate run (job_1787959478282) shipped pages 1 and 3 with no image; the
+reconstructed chain is Grok primary failure → silent Gemini fallback with
+unpacked references → IMAGE_OTHER → empty version shipped (fix in flight).
+**Decision:** Grok stays primary because it is CHEAPER — that is the routing
+reason. Gemini remains the fallback and served most fallback requests fine in
+this very story; the occasional combination-triggered refusal is acceptable,
+but it must FAIL LOUDLY (page regenerated or flagged), never ship an empty
+page silently. Earlier face-specific wording superseded; CLAUDE.md updated.
+**Touched:** `CLAUDE.md`, this entry.
+**Status:** ✅ active
