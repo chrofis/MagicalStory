@@ -21188,11 +21188,17 @@ out of detection/eval/repair, so the page reached persistence unnoticed.
    is visible in the data and not only in a console line.
 **Rationale:** The retry is the cheap half of the fix; the loud record is the
 important half. Image generation will occasionally fail — the defect was that a
-book could ship incomplete with nothing in the database saying so. Routing is
-deliberately UNCHANGED (owner, 2026-08-29): Grok stays the page primary because
-it is cheaper, Gemini stays the fallback and served most fallback requests in
-this very story. No "reduce the reference set for the Gemini fallback" and no
-"skip the fallback" logic was added — see `docs/SETTLED.md` on `IMAGE_OTHER`.
+book could ship incomplete with nothing in the database saying so. Routing was
+left UNCHANGED because it was OUT OF SCOPE for this fix and a routing change is
+the owner's call — NOT because anyone ruled on it. To be explicit for whoever
+reads this next: **no owner sign-off was given on routing on 2026-08-29.** Grok
+remains the page primary and Gemini the fallback exactly as before; no "reduce
+the reference set for the Gemini fallback" and no "skip the fallback" logic was
+added. See `docs/SETTLED.md` on `IMAGE_OTHER` before proposing any of it.
+**Open question this run raised (not decided):** on job_1787959478282, 8 of 16
+pages failed their Grok primary — 6 were rescued by the Gemini fallback and 2
+were lost. Whether that failure rate warrants a routing change belongs in
+`docs/image-routing.md` with the owner, not here.
 **Touched:** `storyJobPipeline.js` (Phase 5a sweep, save-time flags, storyData
 fields), `tasks/bugs.json`.
 **Status:** ✅ active
