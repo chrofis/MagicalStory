@@ -7,7 +7,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
@@ -1200,8 +1200,10 @@ async function buildCoverReferences({
   sceneDescription,
   coverHint = null,
   sceneMetadata: sceneMetadataInput = null,
-  imageModel = null,
-  imageBackend = null,
+  // NOTE: no imageModel/imageBackend params. The only thing they ever selected
+  // was the empty-scene plate's model, and the plate is now pinned to the
+  // Standard tier via emptyScenePlateRouting(). The cover ART itself is
+  // rendered by the caller, not here.
   emptyScenePromptOverride = null,
   usageTracker = null,
   logLabel = null,
@@ -1346,8 +1348,9 @@ async function buildCoverReferences({
         skipCache: true,
         aspectRatio: MODEL_DEFAULTS.coverAspect
       };
-      if (imageModel) emptyOptions.imageModelOverride = imageModel;
-      if (imageBackend) emptyOptions.imageBackendOverride = imageBackend;
+      // Plates stay on the Standard tier regardless of the cover tier — a
+      // cover's empty scene is still a people-free style anchor.
+      Object.assign(emptyOptions, emptyScenePlateRouting());
       emptyOptions.stripBorder = false; // cover asset — keep full frame
       const emptyResult = await generateImageOnly(emptyPrompt, [], emptyOptions);
       if (emptyResult?.imageData) {

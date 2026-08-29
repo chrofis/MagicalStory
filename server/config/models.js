@@ -184,6 +184,14 @@ const TEXT_MODELS = {
   }
 };
 
+// Which Grok image tier renders a final page / a cover in THIS environment.
+// Declared in server/config/runtime.js, where every deliberate prod/staging
+// difference is written down in one place (staging: Imagine 2.0 $0.04,
+// everywhere else: Standard $0.02). Read once at load so the whole process
+// agrees on the tier, exactly like REPAIR_MAX_PASSES below.
+const PAGE_RENDER_IMAGE_MODEL = require('./runtime').runtime('pageRenderModel');
+const COVER_RENDER_IMAGE_MODEL = require('./runtime').runtime('coverRenderModel');
+
 // Default model selections for each task
 const MODEL_DEFAULTS = {
   // Text generation models
@@ -300,16 +308,38 @@ const MODEL_DEFAULTS = {
   complianceModel: process.env.COMPLIANCE_MODEL || 'qwen3-max',
 
   // Image models
-  pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
-  coverImage: 'grok-imagine',                // Cover images ($0.02/image)
+  //
+  // pageImage is the EDIT-AND-INPAINT key, NOT the page render. It is the
+  // default model for editImageWithPrompt (images.js) and the live mask-inpaint
+  // dispatch (imageInpainting.js), plus the prompt-budget lookups in
+  // promptBuilders. It stays on Standard in every environment: doubling it
+  // would double every inpaint. The final page render reads pageRenderImage.
+  pageImage: 'grok-imagine',                 // Edit/inpaint tier ($0.02/image)
+  // The tier a final page render — and every redo/repair regeneration of a
+  // page — uses. Per-environment (see runtime.js): Imagine 2.0 on staging,
+  // Standard everywhere else. Redos read this same key so a page cannot change
+  // tier mid-repair.
+  pageRenderImage: PAGE_RENDER_IMAGE_MODEL,
+  coverImage: COVER_RENDER_IMAGE_MODEL,      // Cover render tier (per-environment, see runtime.js)
+  // Empty-scene background plates stay on Standard in EVERY environment,
+  // deliberately. The plate path is a shipped-and-correct verdict
+  // (docs/image-routing.md, the empty-scene row) and a plate is a
+  // people-free background whose job is style anchoring, not typography or
+  // figure fidelity — the two things the 2.0 tier is being paid for. Plate
+  // call sites used to pass the page's resolved model verbatim, so plates
+  // silently inherited any page-tier change; they read this key instead.
+  emptyScenePlateModel: 'grok-imagine',
   avatar: 'grok-imagine',                    // Character avatars (clothing variants). Switched from
                                               // Gemini 2.5 Flash Image because Gemini's safety filter
                                               // rejects adult-face photos with IMAGE_OTHER, leaving
                                               // characters stuck at avatars.status='pending' forever.
 
-  // Per-page routing by scene complexity (sceneRouting = 'auto')
-  simplePageImage: 'grok-imagine',            // Simple scenes: all chars foreground ($0.02)
-  complexPageImage: 'grok-imagine',           // Complex scenes: also Grok by default ($0.02, was Gemini $0.04)
+  // Per-page routing by scene complexity (sceneRouting = 'auto').
+  // Both tiers resolve to pageRenderImage — complexity has not selected a
+  // different model since Gemini was dropped from the complex branch; the two
+  // keys survive as the routing seam, not as two different models.
+  simplePageImage: PAGE_RENDER_IMAGE_MODEL,   // Simple scenes: all chars foreground
+  complexPageImage: PAGE_RENDER_IMAGE_MODEL,  // Complex scenes (was Gemini $0.04)
 
   // Quality evaluation models
   // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
@@ -784,6 +814,26 @@ function resolveGrokImageModel(modelKey) {
   };
 }
 
+/**
+ * Model + backend an empty-scene background PLATE renders on.
+ *
+ * Every plate call site used to pass the page's already-resolved
+ * `pageImageModel` / `pageImageBackend` verbatim, so a plate silently inherited
+ * whatever tier the page render used. That coupling is wrong: a plate is a
+ * people-free background used as a style anchor, and the reasons to pay for a
+ * higher tier (typography, figure fidelity) do not apply to it. Spread this at
+ * every plate call site instead. Backend is DERIVED from IMAGE_MODELS so the
+ * tier stays a single registry row, never a second hardcoded string.
+ *
+ * @returns {{imageModelOverride: string, imageBackendOverride: string|null}}
+ */
+function emptyScenePlateRouting() {
+  const key = MODEL_DEFAULTS.emptyScenePlateModel;
+  const cfg = IMAGE_MODELS[key];
+  if (!cfg) throw new Error(`[MODELS] emptyScenePlateModel "${key}" is not an IMAGE_MODELS key.`);
+  return { imageModelOverride: key, imageBackendOverride: cfg.backend || null };
+}
+
 // Repair workflow thresholds — single source of truth for server-side pipeline.
 // scoreThreshold was previously 80, calibrated when Gemini quality eval was the
 // only scorer. Now finalScore subtracts THREE penalties (qualityScore −
@@ -1040,6 +1090,7 @@ module.exports = {
   resolvePromptCompressModel,
   IMAGE_MODELS,
   resolveGrokImageModel,
+  emptyScenePlateRouting,
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,
   MODEL_PRICING,

@@ -43,7 +43,8 @@ const {
 const {
   MODEL_PRICING,
   IMAGE_MODELS,
-  REPAIR_DEFAULTS
+  REPAIR_DEFAULTS,
+  emptyScenePlateRouting
 } = require('./server/config/models');
 const {
   filterMainCharactersFromVisualBible,
@@ -1672,8 +1673,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneDescription,
           coverHint: hint, // hint.objects carries LOC + ART IDs from the unified prompt
           sceneMetadata: coverExpandedMetadata, // pre-computed by scene expansion
-          imageModel: skipEmptyScene ? null : coverImageModel,
-          imageBackend: skipEmptyScene ? null : coverImageBackend,
           emptyScenePromptOverride: coverExpandedMetadata?.emptyScenePrompt || null,
           usageTracker: skipEmptyScene ? null : (usage, modelId) => {
             const isRunware = modelId?.startsWith('runware:');
@@ -1962,6 +1961,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageNumber: pageNum,
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
+                    // Plates stay on the Standard tier regardless of the page
+                    // tier. Was implicit (no override → the pageImage default);
+                    // pinned so it cannot drift with a page-tier change.
+                    ...emptyScenePlateRouting(),
                     landmarkPhotos: emptySceneLandmarkPhotos,
                     skipCache: true,
                     // The plate IS the page's scene slot, and Grok edit inherits
@@ -3709,8 +3712,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
-                imageModelOverride: repPageData.pageImageModel,
-                imageBackendOverride: repPageData.pageImageBackend,
+                // Plates stay on the Standard tier regardless of the page tier.
+                ...emptyScenePlateRouting(),
                 landmarkPhotos,
                 visualBibleGrid: emptySceneVbGrid,
                 pageNumber: repPageNum,
@@ -3918,8 +3921,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
-                imageModelOverride: pageData.pageImageModel,
-                imageBackendOverride: pageData.pageImageBackend,
+                // Plates stay on the Standard tier regardless of the page tier.
+                ...emptyScenePlateRouting(),
                 landmarkPhotos: pageData.landmarkPhotos,
                 visualBibleGrid: emptySceneVbGrid,
                 textAreaMask,
@@ -3995,8 +3998,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
-                    imageModelOverride: pageData.pageImageModel,
-                    imageBackendOverride: pageData.pageImageBackend,
+                    // Plates stay on the Standard tier regardless of the page tier.
+                    ...emptyScenePlateRouting(),
                     visualBibleGrid: emptySceneVbGrid,
                     landmarkPhotos: pageData.landmarkPhotos,
                     textAreaMask,
@@ -6829,7 +6832,11 @@ async function _processStoryJobImpl(jobId) {
       textModel: MODEL_DEFAULTS.storyText,
       sceneDescriptionModel: MODEL_DEFAULTS.sceneDescription,
       sceneIterationModel: MODEL_DEFAULTS.sceneIteration,
-      imageModel: MODEL_DEFAULTS.pageImage,
+      // The PAGE RENDER tier, not the edit/inpaint tier: this value is what the
+      // repair loop hands to generateImageOnly / iteratePage when it redoes a
+      // page, so a page must not change model mid-repair. Dev-mode user
+      // overrides still win (filteredUserOverrides is spread last).
+      imageModel: MODEL_DEFAULTS.pageRenderImage,
       coverImageModel: MODEL_DEFAULTS.coverImage,
       qualityModel: MODEL_DEFAULTS.qualityEval,
       bboxModel: MODEL_DEFAULTS.bboxDetection,

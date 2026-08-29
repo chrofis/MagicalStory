@@ -21762,3 +21762,74 @@ new and foreign locations are unaffected. Baden: 30 landmarks, unchanged.
 **Touched:** `server/lib/landmarkPhotos.js` (`townAlreadyIndexed`, the gate in
 `resolveAvailableLandmarks`), `docs/landmark-database.md` §8.
 **Status:** ✅ kept.
+
+## 2026-08-30 — Staging renders pages + covers on Imagine 2.0; plates get their own key and stay on Standard
+
+**Context.** `grok-imagine-2` (`grok-imagine-image-2.0`, $0.04/image) has been in
+the registry since 2026-08-07 as a Test Lab arm only, with no default routing to
+it. An eyeballed sample of Lab runs suggested it renders pages better than
+Standard. Two facts about the code made "just switch the model" wrong:
+
+1. The final page render does NOT read `MODEL_DEFAULTS.pageImage`. `sceneRouting`
+   defaults to `'auto'`, so pages resolve through `simplePageImage` /
+   `complexPageImage` and the `pageImage` branch is unreachable. `pageImage` is
+   the EDIT/INPAINT key — `editImageWithPrompt` (images.js) and the live
+   mask-inpaint dispatch (imageInpainting.js) both default to it. Moving it would
+   have doubled every inpaint while leaving the page render untouched.
+2. **Empty-scene plates had no key of their own.** Every plate call site passed
+   the page's already-resolved `pageImageModel` / `pageImageBackend` verbatim, so
+   a plate silently inherited whatever tier the page used. Any page-tier change
+   would have doubled the plate cost too, for no benefit.
+
+**Decision.** Three separate tiers, declared where each belongs:
+- `runtime.js` gains `pageRenderModel` and `coverRenderModel`, both
+  `perEnvironment({ staging: 'grok-imagine-2', default: 'grok-imagine' })` — the
+  same mechanism `coverTitleMode` uses. Production and local are unchanged at
+  $0.02.
+- `models.js` reads them into `MODEL_DEFAULTS.pageRenderImage` (also feeding
+  `simplePageImage` / `complexPageImage`) and `MODEL_DEFAULTS.coverImage`. Page
+  REDOS read the same `pageRenderImage`, so a page cannot change tier
+  mid-repair: `storyJobPipeline` `modelOverrides.imageModel`, the repair loop's
+  regenerate-from-prompt, `iteratePageCore`'s fallback, and the UI regenerate
+  endpoint all resolve to it.
+- `models.js` gains `emptyScenePlateModel: 'grok-imagine'`, pinned in EVERY
+  environment, plus `emptyScenePlateRouting()` which derives the backend from
+  `IMAGE_MODELS` and is spread at all six plate call sites. `buildCoverReferences`
+  loses its now-dead `imageModel` / `imageBackend` params — the plate was the only
+  thing they selected.
+- `pageImage` (edit/inpaint) and `avatar` stay on Standard everywhere. The 2×4
+  avatar sheet hardcodes `GROK_MODELS.STANDARD` and cannot follow a config key at
+  all; that is verified by a test rather than trusted.
+- `/api/health/config` now reports the resolved page / cover / plate / edit /
+  avatar model ids, so "what is this environment paying for" is one free GET.
+
+**Rationale — and the honest state of the evidence.** **There is NO scored
+evidence for the upgrade.** Lab experiments 959, 963 and 965 all ran with
+`autoEval: false`, so their score arrays are empty; the entire basis is an
+eyeballed sample of those runs. That is exactly why the change is **staging
+only**: staging carries a 2× per-image cost on the dominant cost line while a
+scored A/B is run, and production keeps the $0.02 tier until that A/B says
+otherwise. Promoting this to production requires the scored comparison, not
+another look at the same pictures.
+
+The plate split is not a cost dodge, it is the correct routing: a plate is a
+people-free background whose job is style anchoring, and the two things the 2.0
+tier is being paid for — typography and figure fidelity — do not appear on it.
+`docs/image-routing.md` records the plate path as a shipped-and-correct verdict
+(2026-08-09 A/B), so inheriting a tier change would have been an unreviewed
+change to a settled path.
+
+This is not a reversal: `docs/SETTLED.md` contains no line settling which model
+renders pages (checked).
+
+**Touched:** `server/config/runtime.js` (`pageRenderModel`, `coverRenderModel`),
+`server/config/models.js` (`pageRenderImage`, `coverImage`, `simplePageImage`,
+`complexPageImage`, `emptyScenePlateModel`, `emptyScenePlateRouting()`),
+`storyJobPipeline.js` (4 plate sites + `modelOverrides.imageModel` +
+`buildCoverReferences` args), `server/lib/images.js` (`iteratePageCore` model
+fallback + its plate site), `server/lib/coverIterate.js` (cover plate site,
+dropped dead params), `server/routes/regeneration.js` (page-redo tier),
+`server/routes/health.js` (`imageModels` block), `docs/image-routing.md`
+(page row + plate row), `tests/unit/page-render-tier.test.ts`.
+**Status:** 🟡 conditional — staging only, unscored. Production stays on
+`grok-imagine` until a scored A/B promotes it.

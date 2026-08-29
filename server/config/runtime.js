@@ -73,6 +73,20 @@ const SETTINGS = {
   // outline type and ignores the full-bleed rule.
   coverTitleBakedModel: 'grok-imagine-2',
 
+  // ── Page + cover render tier ───────────────────────────────────────────
+  // IMAGE_MODELS key for the FINAL page render, every page redo/repair
+  // regeneration, and the cover render. Staging renders on Imagine 2.0
+  // ($0.04/image), production stays on Standard ($0.02) — a straight 2× on the
+  // dominant per-story image cost.
+  //
+  // Staging-only ON PURPOSE: there is NO scored evidence for the upgrade yet.
+  // Lab experiments 959/963/965 all ran with autoEval:false, so their score
+  // arrays are empty; the basis is an eyeballed sample of those runs. Staging
+  // carries the cost and the risk until a scored A/B says production should
+  // follow. Redos read the same key so a page cannot change tier mid-repair.
+  pageRenderModel: perEnvironment({ staging: 'grok-imagine-2', default: 'grok-imagine' }),
+  coverRenderModel: perEnvironment({ staging: 'grok-imagine-2', default: 'grok-imagine' }),
+
   // Styles GDINO is allowed on. It grounds on clothed-figure shape + clothing
   // colour, so any style rendering a recognisable human works (measured
   // 2026-07-15: realistic 0.69, anime 0.59, watercolor 0.63). The exclusions

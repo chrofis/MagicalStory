@@ -38,6 +38,23 @@ router.get('/health/config', (req, res) => {
     // discover by generating a paid avatar and finding no score. Reporting the
     // threshold here makes "is the gate deployed at all" a free GET.
     arcfaceGate: ARCFACE_MIN,
+    // The image tiers that actually render, resolved to the model id xAI bills
+    // for. pageRenderModel/coverRenderModel above are the runtime KEYS; this is
+    // what those keys, plus the two deliberately-pinned tiers, resolve to. The
+    // page/cover tier differs per environment and the plate tier does not —
+    // "which model is this environment paying for" should be one free GET, not
+    // a read of three files.
+    imageModels: (() => {
+      const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+      const resolve = (key) => ({ key, modelId: IMAGE_MODELS[key]?.modelId || null });
+      return {
+        page: resolve(MODEL_DEFAULTS.pageRenderImage),
+        cover: resolve(MODEL_DEFAULTS.coverImage),
+        emptyScenePlate: resolve(MODEL_DEFAULTS.emptyScenePlateModel),
+        editInpaint: resolve(MODEL_DEFAULTS.pageImage),
+        avatar: resolve(MODEL_DEFAULTS.avatar),
+      };
+    })(),
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || '(unset)',
   });
 });

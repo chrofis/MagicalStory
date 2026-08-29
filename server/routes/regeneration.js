@@ -754,7 +754,10 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
     // Use same model as initial generation for consistency
-    const imageModelId = MODEL_DEFAULTS.pageImage;
+    // Same tier the page was rendered on — pageRenderImage, not the
+    // edit/inpaint tier (MODEL_DEFAULTS.pageImage). A redo must not switch
+    // model mid-page.
+    const imageModelId = MODEL_DEFAULTS.pageRenderImage;
     // Preserve the page's saved aspect (e.g. 1:1 for advanced/Jugendbuch);
     // without this, regen falls through to the global 3:4 default and crops
     // square pages to portrait.

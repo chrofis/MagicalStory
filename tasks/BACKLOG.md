@@ -138,6 +138,11 @@ The first two are corroborated by more than one source, which is why they lead.
       triggers across two finished stories (2026-08-24) all aborted; earlier audit found 11
       gate-true pages / 161 with no record. Whether the gates are right or the plate is too weak
       is the open question → `docs/decisions.md` 2026-08-24 stage-frames entry
+- [ ] **Scored A/B for `grok-imagine-2` pages/covers before production can follow staging.**
+      Staging renders pages + covers on Imagine 2.0 ($0.04) since 2026-08-30; production stays
+      on `grok-imagine` ($0.02). The switch has NO scored evidence — Lab 959/963/965 all ran
+      `autoEval:false` and their score arrays are empty, so the basis is an eyeballed sample.
+      → `docs/decisions.md` 2026-08-30 page-tier entry, `docs/image-routing.md:17`
 - [ ] Composite cover with the new Pixar avatars is untested, and the Lab toggle for
       `params.composite` is not exposed → `docs/image-routing.md:160`
 - [ ] Direct-vs-composite thresholds are intuition, never measured → `docs/image-routing.md:161`

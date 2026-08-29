@@ -89,7 +89,7 @@ function recordImageApiUsage(modelId, evaluationType, imageUsage) {
     calls: 1
   }, perImage);
 }
-const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, resolveGrokImageModel, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, resolveGrokImageModel, emptyScenePlateRouting, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
 
 const { createDiffImage } = require('./repairVerification');
 
@@ -3702,7 +3702,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
 
   // Determine image model and backend (needed before empty scene generation)
-  let imageModelOverride = modelOverrides?.imageModel || null;
+  // A page REDO renders on the page tier, not on the edit/inpaint tier. Falling
+  // through to null meant generateImageOnly's defaultModel (MODEL_DEFAULTS
+  // .pageImage = the edit tier), so an iterate could redo on a different model
+  // than the one that produced V1. pageRenderImage is that same page tier.
+  let imageModelOverride = modelOverrides?.imageModel || CONFIG_DEFAULTS.pageRenderImage;
   // The rewrite's metadata is the working copy, but scene-iteration.txt does
   // not emit `era` or `textZoneDescription` — context fields iterate has no
   // business re-deciding. Read them from the rewrite when present, else from
@@ -3776,8 +3780,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
-          imageModelOverride,
-          imageBackendOverride: iterBackend,
+          // Plates stay on the Standard tier regardless of the page tier.
+          ...emptyScenePlateRouting(),
           landmarkPhotos: pageLandmarkPhotos,
           visualBibleGrid: emptySceneVbGrid,
           pageNumber,
