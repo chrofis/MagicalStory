@@ -192,6 +192,70 @@ async function generateWithGrok(prompt, options = {}) {
 }
 
 /**
+ * The magenta-extension instruction prepended when slot 0 was magenta-padded.
+ * Names the exact pixel counts so Grok has unambiguous anchors. Without this
+ * prefix the magenta survives into the output as visible bars.
+ *
+ * @param {{top:number,bottom:number,left:number,right:number}} pad
+ * @returns {string}
+ */
+function buildMagentaExtensionPrefix(pad) {
+  const parts = [];
+  if (pad.top > 0) parts.push(`${pad.top}px at the TOP`);
+  if (pad.bottom > 0) parts.push(`${pad.bottom}px at the BOTTOM`);
+  if (pad.left > 0) parts.push(`${pad.left}px on the LEFT`);
+  if (pad.right > 0) parts.push(`${pad.right}px on the RIGHT`);
+  return `The first input image has SOLID BRIGHT MAGENTA (pure #FF00FF) placeholder padding: ${parts.join(', ')}. Extend the existing scene content INTO these magenta regions so the output is a continuous illustration filling the entire canvas — paint matching sky above, matching ground/foreground below, matching scene continuation on the sides. The non-magenta center region must remain pixel-faithful in composition and geometry. DO NOT preserve any magenta. DO NOT add a magenta/pink/purple border, frame, or vignette. The final output must have NO visible magenta and NO visible padding boundary.\n\n`;
+}
+
+/**
+ * Fit `prefix + body` into the prompt budget of the Grok tier being called.
+ *
+ * The caller (`generateImageOnly` / `_dispatchImageGeneration`) already fits the
+ * prompt to `IMAGE_MODELS[tier].maxPromptLength` — but `editWithGrok` then
+ * UNCONDITIONALLY prepends the magenta-extension instruction (~612 chars for a
+ * left/right pad), and nothing re-checked the total. Measured on staging page 2
+ * of job_1778929895710_ta7mtyd16 (Lab #963/#965): a 7,871-char prompt passed the
+ * 7,900 fit untouched, +612 = 8,483 → `Grok edit API error (400): Prompt length
+ * exceeds the maximum allowed length of 8000`, and the page silently fell back
+ * to Gemini. Any prompt in the ~7,289-7,900 window failed the same way.
+ *
+ * The cap can only be enforced here, because the prefix length depends on the
+ * pad pixel counts computed in this function. Two invariants:
+ *  - The PREFIX SURVIVES BY CONSTRUCTION. It is held out of the fit and
+ *    reattached verbatim — the same holdout trick `shrinkPromptForModel` uses
+ *    for its REQUIRED OBJECTS / ART STYLE tail. Passing `prefix + body` through
+ *    the shrinker would put the prefix in the compressible HEAD, where the LLM
+ *    pass or the section-aware cut could drop it — and losing it bakes the
+ *    magenta bars into the output.
+ *  - Prompts that already fit are returned untouched: no shrink, no log, no
+ *    behaviour change.
+ *
+ * @param {string} prefix - magenta-extension instruction, kept verbatim
+ * @param {string} body - the caller's prompt
+ * @param {string} model - Grok model id (e.g. 'grok-imagine-image-2.0')
+ * @returns {Promise<string>} final prompt, <= the tier's maxPromptLength
+ */
+async function fitGrokPromptWithPrefix(prefix, body, model) {
+  const { IMAGE_MODELS, resolveGrokImageModel } = require('../config/models');
+  // Derive the tier from the model id — never a ternary, never a hardcoded
+  // number. Unknown id → the registry's default Grok tier, same as the
+  // dispatcher's fallback.
+  const tier = Object.values(IMAGE_MODELS).find(m => m.backend === 'grok' && m.modelId === model)
+    || IMAGE_MODELS[resolveGrokImageModel(null).key];
+  const budget = tier.maxPromptLength;
+  if (prefix.length + body.length <= budget) return prefix + body;
+
+  // Lazy require: images.js requires this module, so a top-level import would
+  // be circular (same pattern as sceneComposite.js).
+  const { shrinkPromptForModel } = require('./images');
+  const fitted = await shrinkPromptForModel(body, budget - prefix.length, 'GROK EDIT', model);
+  log.warn(`✂️ [GROK] Magenta-extension prefix (${prefix.length} chars) pushed the prompt over the ${budget} budget `
+    + `— body refitted ${body.length}→${fitted.length}, final ${prefix.length + fitted.length}`);
+  return prefix + fitted;
+}
+
+/**
  * Generate image with reference images using Grok Imagine edit endpoint
  *
  * Accepts up to 3 reference images. If a visual bible grid is provided,
@@ -346,13 +410,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   // the exact pixel counts so Grok has unambiguous anchors. Without this
   // prefix the magenta would survive into the output as visible bars.
   if (slot0Pad && (slot0Pad.top + slot0Pad.bottom + slot0Pad.left + slot0Pad.right) > 0) {
-    const parts = [];
-    if (slot0Pad.top > 0) parts.push(`${slot0Pad.top}px at the TOP`);
-    if (slot0Pad.bottom > 0) parts.push(`${slot0Pad.bottom}px at the BOTTOM`);
-    if (slot0Pad.left > 0) parts.push(`${slot0Pad.left}px on the LEFT`);
-    if (slot0Pad.right > 0) parts.push(`${slot0Pad.right}px on the RIGHT`);
-    const prefix = `The first input image has SOLID BRIGHT MAGENTA (pure #FF00FF) placeholder padding: ${parts.join(', ')}. Extend the existing scene content INTO these magenta regions so the output is a continuous illustration filling the entire canvas — paint matching sky above, matching ground/foreground below, matching scene continuation on the sides. The non-magenta center region must remain pixel-faithful in composition and geometry. DO NOT preserve any magenta. DO NOT add a magenta/pink/purple border, frame, or vignette. The final output must have NO visible magenta and NO visible padding boundary.\n\n`;
-    prompt = prefix + prompt;
+    prompt = await fitGrokPromptWithPrefix(buildMagentaExtensionPrefix(slot0Pad), prompt, model);
     log.info(`🎨 [GROK] Magenta-extension active on slot 0: pad top=${slot0Pad.top} bottom=${slot0Pad.bottom} left=${slot0Pad.left} right=${slot0Pad.right}`);
   }
 
@@ -1831,5 +1889,10 @@ module.exports = {
   // mean rendering every candidate just to observe which one won.
   chooseCardArrangement,
   frameCharacterImage,
+  // Exported for its unit test: the magenta-extension prefix + budget fit is
+  // the part that broke in production, and reaching it through editWithGrok
+  // would mean a live xAI call.
+  fitGrokPromptWithPrefix,
+  buildMagentaExtensionPrefix,
   GROK_MODELS,
 };
