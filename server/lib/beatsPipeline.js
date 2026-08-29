@@ -356,6 +356,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   const basePrompt = buildBeatsPrompt(inputData, pageCount);
   if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
+  // The random catalogue draw is an INPUT like any other — persisted so "which
+  // challenges was this book offered / which did it take" is answerable from
+  // the story record (owner, 2026-08-29).
+  const challengeDraw = (basePrompt.match(/# CHALLENGE IDEAS[\s\S]*?(?=\n# |\n\*\*|$)/) || [''])[0]
+    .split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
+  if (challengeDraw.length) gl.info('challenge_draw', `Drew ${challengeDraw.length} challenge idea(s) for the arc plan`, null, { challengeDraw });
   let approvedArc = '';
   let arcAuditFindings = '';
   let childCriticReport = null;
@@ -1511,7 +1517,7 @@ SCENE: ${x.scene || ''}`.trim(),
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges };

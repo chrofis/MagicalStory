@@ -88,6 +88,8 @@ World: <where this happens and what is true about it that matters>
 Main challenge: <what the main character(s) must face — it comes from who they are, not from the setting>
 Stake, said aloud: <ONE sentence a character can say, early, that tells what must happen and why — the sentence the whole book answers>
 
+Challenges taken: <when a CHALLENGE IDEAS list is present, name the two to four entries this story builds on, each in a few words; otherwise omit this line>
+
 Challenges of <the main character, or the two of them>:
 1. <the challenge> — <how they meet it, and what it costs them>
 2. <the next one, harder, and failing to solve the first is why it exists>
