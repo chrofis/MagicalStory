@@ -84,6 +84,37 @@ async function commonsFiles(qid, want = 3) {
     .map(t => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(t.replace(/^File:/, ''))}`);
 }
 
+/**
+ * Who took it and under what licence — a licence CONDITION, not a nicety.
+ *
+ * Commons content is overwhelmingly CC BY / CC BY-SA, both of which require
+ * credit. An earlier version of this script stored `photo_url` alone, so six
+ * rows landed with a usable picture and no way to credit it. Storing the URL
+ * without the author is the one thing a free image source does not permit.
+ *
+ * `extmetadata` carries the uploader's own Artist and licence string; the
+ * `user` field is the fallback when a file has no structured author.
+ */
+async function attributionFor(fileUrl) {
+  const m = /Special:FilePath\/([^?]+)|\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?]+)/.exec(fileUrl || '');
+  const file = decodeURIComponent(m?.[1] || m?.[2] || '');
+  if (!file) return null;
+  try {
+    const j = await api('commons.wikimedia.org', {
+      action: 'query', titles: `File:${file}`, prop: 'imageinfo', iiprop: 'user|extmetadata',
+    });
+    const info = Object.values(j?.query?.pages || {})[0]?.imageinfo?.[0];
+    if (!info) return null;
+    const meta = info.extmetadata || {};
+    const artist = String(meta.Artist?.value || '').replace(/<[^>]*>/g, '').trim();
+    const licence = meta.LicenseShortName?.value || '';
+    const who = artist || info.user || 'Unknown';
+    return `Photo by ${who}${licence ? `, ${licence}` : ''}, Wikimedia Commons`;
+  } catch {
+    return null;
+  }
+}
+
 (async () => {
   const url = STAGING ? process.env.STAGING_DATABASE_URL : process.env.DATABASE_URL;
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
@@ -109,10 +140,16 @@ async function commonsFiles(qid, want = 3) {
     if (!DRY) {
       const cols = [];
       const vals = [l.id];
-      urls.slice(0, 4).forEach((u, i) => {
+      for (const [i, u] of urls.slice(0, 4).entries()) {
+        const s = i === 0 ? '' : `_${i + 1}`;
         vals.push(u);
-        cols.push(`photo_url${i === 0 ? '' : `_${i + 1}`} = $${vals.length}`);
-      });
+        cols.push(`photo_url${s} = $${vals.length}`);
+        // Credit travels with the picture, in the SAME slot — pairing one
+        // slot's photo with another's author names the wrong photographer.
+        vals.push(await attributionFor(u));
+        cols.push(`photo_attribution${s} = $${vals.length}`);
+        await sleep(120);
+      }
       await pool.query(
         `UPDATE landmark_index SET ${cols.join(', ')}, photo_source = 'wikipedia-lead', updated_at = NOW() WHERE id = $1`, vals);
     }
