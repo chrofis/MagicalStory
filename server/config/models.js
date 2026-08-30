@@ -270,9 +270,12 @@ const MODEL_DEFAULTS = {
   arcCreatorModel: process.env.ARC_CREATOR_MODEL || 'claude-opus',
   arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
     .split(',').map(s => s.trim()).filter(Boolean),
-  // Rounds of panel + re-tell. 1 = one pass; round k>1 feeds the previous
-  // FINAL ARC + its critique back to the same panel. ARC_ROUNDS for staging A/B.
-  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 1),
+  // Rounds of panel + re-tell. Round k>1 feeds the previous FINAL ARC + its
+  // critique back to the same panel. Default 3: the 2026-08-30 iteration study
+  // peaked at v3 and regressed at v4, so the pipeline clamps any value above 3
+  // (owner cap 2026-08-30) and stops early once the critique holds nothing
+  // above MINOR. ARC_ROUNDS for staging A/B.
+  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 3),
   // The creator runs at the provider default (the Anthropic path sends no
   // temperature); these apply on OpenRouter/xAI paths only.
   arcPanelTemperature: 0.8,

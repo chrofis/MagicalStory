@@ -4479,9 +4479,13 @@ function buildChallengeIdeasSection(inputData, count = 15) {
       round++;
     }
     if (!picked.length) return '';
+    // Structural budget scales with the book (owner, 2026-08-30): a short book
+    // cannot pay off three challenges, a long one starves on two.
+    const pages = parseInt(inputData?.pages, 10) || 10;
+    const challengeBudget = pages <= 10 ? 'one or two' : pages <= 17 ? 'about three' : 'three or four';
     return [
       '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
-      'Build the story\'s challenges from about three of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.',
+      `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
       '',
       ...picked.map(x => x.line),
     ].join('\n');
@@ -4519,6 +4523,15 @@ function buildBeatsPrompt(inputData, pageCount, { challengeIdeas = null, arcWeak
 // Replaces the arc audit/review chain in the production beats pipeline; the
 // audit/review builders below stay for the Lab. See docs/decisions.md.
 
+/**
+ * Arc sentence budget, scaled to the book: roughly 0.8-1.0 numbered sentences
+ * per page (owner, 2026-08-30). 10 pages → "8-10", 16 → "13-16", 20 → "16-20".
+ */
+function arcLengthRange(pageCount) {
+  const pages = Math.max(4, parseInt(pageCount, 10) || 10);
+  return `${Math.round(pages * 0.8)}-${pages}`;
+}
+
 /** CREATE: the creator writes two arcs with self-critiques and commits to one. */
 function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, priorChallenges = '' } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
@@ -4534,6 +4547,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
+    ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
 
@@ -4566,6 +4580,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     TODDLER_MODE: buildToddlerModeSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
+    ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
 
@@ -4618,6 +4633,8 @@ function parseArcRetell(raw) {
     (src.match(new RegExp(`^\\s*(?:\\*\\*)?${label}\\s*:\\s*(.*)$`, 'mi')) || [, ''])[1].replace(/\*\*/g, '').trim();
   const fixing = contractLine(head, 'Fixing') || contractLine(full, 'Fixing');
   const keeping = contractLine(head, 'Keeping') || contractLine(full, 'Keeping');
+  // A stray "Changing:" block (briefly in the contract, dropped by owner
+  // reversal 2026-08-30) sits ahead of FINAL ARC and is simply ignored.
   const after = full.slice(fa).replace(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?\**\s*/i, '');
   const usedIdx = after.search(/^\s*(?:\*\*)?Used\s*:/mi);
   const critIdx = after.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
@@ -4630,6 +4647,23 @@ function parseArcRetell(raw) {
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
   return { finalArc, used, critique, fixing, keeping };
+}
+
+/**
+ * Worst severity among a critique's numbered fault lines: 'CRITICAL' >
+ * 'MAJOR' > 'MINOR'. Untagged lines count as MAJOR (pre-tag output keeps
+ * working); null when the critique has no numbered fault lines at all.
+ */
+function critiqueMaxSeverity(critique) {
+  const rank = { CRITICAL: 3, MAJOR: 2, MINOR: 1 };
+  let max = null;
+  for (const line of String(critique || '').split('\n')) {
+    if (!/^\s*\d+[.)]/.test(line)) continue;
+    const m = line.match(/\[(CRITICAL|MAJOR|MINOR)\]/i);
+    const sev = m ? m[1].toUpperCase() : 'MAJOR';
+    if (!max || rank[sev] > rank[max]) max = sev;
+  }
+  return max;
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
@@ -5839,6 +5873,7 @@ module.exports = {
   buildArcRetellPrompt,
   parseArcCreate,
   parseArcRetell,
+  critiqueMaxSeverity,
   buildBeatsReviewPrompt,
   buildArcReviewPrompt,
   buildArcAuditPrompt,

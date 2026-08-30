@@ -21960,3 +21960,32 @@ and passed to the beats prompt inside {ARC_WEAK_POINTS} alongside the critique.
 `prompts/arc-retell.txt`, `server/lib/promptBuilders.js` (parseArcRetell),
 `server/lib/beatsPipeline.js`.
 **Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).
+
+### Arc-machine refinement 2: severity budget, adaptive rounds, suspense target, page-scaled budgets, arc-level landmarks (owner, 2026-08-30)
+**Context:** The iteration study peaked at v3 and regressed at v4 — late rounds
+kept rewriting structure to satisfy detail-level or minor critiques.
+**Decision:** (1) Critique faults are tagged [CRITICAL] (story broken) /
+[MAJOR] (repairable inside the structure) / [MINOR] (blemish); the re-tell's
+change budget matches the worst fault, panel solutions to MAJOR faults stay
+inside the structure, and a suspense target line rules that a fix costing
+suspense is worse than the fault it repairs. (2) `arcRounds` default 1 → 3,
+hard-clamped at 3 in the pipeline; ADAPTIVE EARLY STOP skips remaining rounds
+when a round's critique holds nothing above MINOR (`critiqueMaxSeverity`,
+untagged lines count MAJOR so pre-tag output still works; per-round
+`maxSeverity` persisted; genLog `arc_rounds_early_stop`). (3) Arc length and
+challenge count scale with the book: `{ARC_LENGTH}` = round(pages*0.8)-pages
+sentences (10→8-10, 16→13-16, 20→16-20); challenge draw guidance = one or two
+(≤10 pages) / about three (11-17) / three or four (18+), computed in
+`buildChallengeIdeasSection` from `inputData.pages` so the arc creator and the
+beats planner read the same budget. (4) Landmarks enter the arc stage:
+arc-create carries `{AVAILABLE_LANDMARKS_SECTION}` plus an arc-level two-to-four
+rule; the re-tell keeps the arc's landmarks under the Keeping contract unless
+Fixing names them; story-beats.txt's landmark rule now inherits the arc's
+choices instead of re-choosing. A "Changing:" declaration was added and dropped
+the same day by owner reversal — Fixing/Keeping are sufficient; the parser
+ignores a stray Changing block.
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-panel.txt`,
+`prompts/arc-retell.txt`, `prompts/story-beats.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`server/config/models.js`.
+**Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).

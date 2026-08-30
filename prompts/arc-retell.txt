@@ -1,4 +1,4 @@
-You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). Work in ENGLISH.
+You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). The goal of the arc is a story full of suspense that stays coherent. Work in ENGLISH.
 
 Reading level: {READING_LEVEL}
 
@@ -29,12 +29,14 @@ Reading level: {READING_LEVEL}
 
 # YOUR TASK
 
-You wrote this arc and its critique. A panel proposed solutions. Choose freely — one solution, a combination, or your own better judgment — and RE-TELL the story once, from the beginning: numbered sentences, roughly one per page, factual register, all the rules of the telling, none of your flagged faults surviving. Re-tell the whole story; never edit or patch the old arc.
+You wrote this arc and its critique. A panel proposed solutions. Choose freely — one solution, a combination, or your own better judgment — and RE-TELL the story once, from the beginning: {ARC_LENGTH} numbered sentences, factual register, all the rules of the telling, none of your flagged faults surviving. Re-tell the whole story; never edit or patch the old arc.
+
+The size of the change matches the worst fault: a CRITICAL fault may rebuild the story; MAJOR faults are repaired inside the kept structure, and Keeping covers everything the faults do not implicate; when nothing above MINOR remains, the re-telling reuses the previous telling nearly unchanged, touching only the flagged sentences. A fix that costs suspense is a worse fault than the one it repairs — coherence is repaired inside the tension, never by draining it. The re-telling changes only what Fixing names; everything under Keeping appears unchanged.
 
 Output, in this order:
 - One line "Fixing:" — which faults, by what approach.
-- One line "Keeping:" — the scenes and turns that must survive untouched.
+- One line "Keeping:" — the scenes and turns that must survive untouched; the arc's landmarks are kept unless Fixing names them.
 - "FINAL ARC:" then the numbered sentences, told under those two lines.
 - "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each.
 - One line "Used:" naming which solutions (by panelist and number) you drew on.
-- "CRITIQUE:" then a fresh blunt self-critique of the final arc — 3 to 6 numbered story-level faults in the same form, the weakest points that remain: an event without a cause, a stake that cannot be lost or is decided by something other than the announced rule, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids. Numeric precision, the sourcing of measurements and times, and the physical plausibility of a mechanism that could be swapped without changing who does what and why are not arc faults — later stages fix those; never list one.
+- "CRITIQUE:" then a fresh blunt self-critique of the final arc — 3 to 6 numbered story-level faults in the same form, the weakest points that remain: an event without a cause, a stake that cannot be lost or is decided by something other than the announced rule, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids. Numeric precision, the sourcing of measurements and times, and the physical plausibility of a mechanism that could be swapped without changing who does what and why are not arc faults — later stages fix those; never list one. Tag every fault [CRITICAL] — the story is broken: a premise the commission forbids, a stake that cannot be lost, an uncaused climax; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.

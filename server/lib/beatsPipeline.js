@@ -68,6 +68,7 @@ const {
   buildArcRetellPrompt,
   parseArcCreate,
   parseArcRetell,
+  critiqueMaxSeverity,
   buildBeatsReviewPrompt,
   buildBeatsAuditPrompt,
   countFaults,
@@ -344,7 +345,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const arcCreatorModel = modelOverrides.arcCreatorModel || MODEL_DEFAULTS.arcCreatorModel || planModel;
   const arcPanelModels = (Array.isArray(MODEL_DEFAULTS.arcPanelModels) ? MODEL_DEFAULTS.arcPanelModels : [])
     .filter(m => TEXT_MODELS[m]);
-  const arcRounds = Math.max(1, parseInt(modelOverrides.arcRounds, 10) || MODEL_DEFAULTS.arcRounds || 1);
+  // Hard cap at 3 (owner, 2026-08-30): the iteration study peaked at v3 and
+  // regressed at v4. The adaptive early stop below usually ends sooner.
+  const arcRoundsRequested = parseInt(modelOverrides.arcRounds, 10) || MODEL_DEFAULTS.arcRounds || 1;
+  const arcRounds = Math.max(1, Math.min(3, arcRoundsRequested));
+  if (arcRoundsRequested > 3) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to 3 (owner cap 2026-08-30 — iteration study regressed at round 4)`);
   const beatsAuditModel = modelOverrides.beatsAuditModel || MODEL_DEFAULTS.beatsAuditModel || reviewModel;
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
@@ -508,6 +513,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         retold.fixing ? `Fixing (already addressed in the re-telling): ${retold.fixing}` : '',
         retold.keeping ? `Keeping (must survive the page division untouched): ${retold.keeping}` : '',
       ].filter(Boolean).join('\n');
+      // Worst surviving fault (untagged lines count as MAJOR, so pre-tag
+      // output keeps working); null = the critique names no faults at all.
+      const maxSeverity = critiqueMaxSeverity(retold.critique);
       roundReports.push({
         round,
         panel,
@@ -518,10 +526,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         fixing: retold.fixing,
         keeping: retold.keeping,
         critique: retold.critique,
+        maxSeverity,
       });
-      gl.info('arc_retell', `Round ${round}: ${retellRes.modelId || arcCreatorModel} re-told the story (used: ${retold.used || 'not stated'})`, null, {
-        round, used: retold.used, critiqueFaults: (retold.critique.match(/^\s*\d+[.)]/gm) || []).length,
+      gl.info('arc_retell', `Round ${round}: ${retellRes.modelId || arcCreatorModel} re-told the story (used: ${retold.used || 'not stated'}; worst surviving fault: ${maxSeverity || 'none'})`, null, {
+        round, used: retold.used, maxSeverity, critiqueFaults: (retold.critique.match(/^\s*\d+[.)]/gm) || []).length,
       });
+      // ADAPTIVE EARLY STOP (owner, 2026-08-30): another round only earns its
+      // cost while a CRITICAL or MAJOR fault survives. When nothing above
+      // MINOR remains, more rounds are where the study's regression came from.
+      if (round < arcRounds && (maxSeverity === null || maxSeverity === 'MINOR')) {
+        gl.info('arc_rounds_early_stop', `Round ${round}: critique has nothing above MINOR — skipping ${arcRounds - round} remaining round(s)`, null, {
+          round, maxSeverity, reason: 'nothing above MINOR',
+        });
+        break;
+      }
       currentBlock = `FINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
     }
 
@@ -543,6 +561,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       finalArc: approvedArc,
       fixing: roundReports.length ? roundReports[roundReports.length - 1].fixing : '',
       keeping: roundReports.length ? roundReports[roundReports.length - 1].keeping : '',
+      maxSeverity: roundReports.length ? roundReports[roundReports.length - 1].maxSeverity : null,
       critique: roundReports.length ? roundReports[roundReports.length - 1].critique : arcWeakPoints,
     };
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {

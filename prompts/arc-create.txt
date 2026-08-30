@@ -1,4 +1,4 @@
-Plan the story of a {PAGE_COUNT}-page illustrated children's book. Work in ENGLISH: the arcs are working notes, never shown to a reader. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
+Plan the story of a {PAGE_COUNT}-page illustrated children's book. The goal of the arc is a story full of suspense that stays coherent. Work in ENGLISH: the arcs are working notes, never shown to a reader. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
 
 Reading level: {READING_LEVEL}
 Characters: {CHARACTER_NAMES}
@@ -27,12 +27,13 @@ Characters: {CHARACTER_NAMES}
 - Each character's nature causes a problem or solves one.
 - Whoever or whatever stands in the way presses on the story to the end and stands in the scene at the turning point.
 - Names the commission gives stand as written.
+- When a landmarks list is present, the arc builds two to four of them into the story where they belong to its world — the opening may anchor at one before the adventure leaves home; a landmark may be scenery; a story that happens on the water happens on the water.
 
 # YOUR TASK
 
-Write TWO different arcs, marked exactly "ARC 1:" and "ARC 2:" — genuinely different stories, not variants. Each arc is numbered sentences, roughly one per page, never fewer than ten.
+Write TWO different arcs, marked exactly "ARC 1:" and "ARC 2:" — genuinely different stories, not variants. Each arc is {ARC_LENGTH} numbered sentences.
 
-After each arc, a blunt self-critique marked "CRITIQUE:" — 3 to 6 numbered story-level faults only: an event without a cause, a stake that cannot be lost or is decided by something other than the announced rule, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids. Numeric precision, the sourcing of measurements and times, and the physical plausibility of a mechanism that could be swapped without changing who does what and why are not arc faults — later stages fix those; never list one.
+After each arc, a blunt self-critique marked "CRITIQUE:" — 3 to 6 numbered story-level faults only: an event without a cause, a stake that cannot be lost or is decided by something other than the announced rule, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids. Numeric precision, the sourcing of measurements and times, and the physical plausibility of a mechanism that could be swapped without changing who does what and why are not arc faults — later stages fix those; never list one. Tag every fault [CRITICAL] — the story is broken: a premise the commission forbids, a stake that cannot be lost, an uncaused climax; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.
 
 No final version — stop after the second critique.
 
