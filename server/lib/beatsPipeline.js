@@ -498,7 +498,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
       }
       approvedArc = retold.finalArc;
-      arcWeakPoints = retold.critique;
+      // The critique travels to the beats prompt together with the re-telling's
+      // contract lines: what was already fixed, and which scenes and turns must
+      // survive the page division untouched (owner refinement, 2026-08-30 —
+      // the study's round-4 regression deleted a story's best scene because
+      // the fault list had no keep column).
+      arcWeakPoints = [
+        retold.critique,
+        retold.fixing ? `Fixing (already addressed in the re-telling): ${retold.fixing}` : '',
+        retold.keeping ? `Keeping (must survive the page division untouched): ${retold.keeping}` : '',
+      ].filter(Boolean).join('\n');
       roundReports.push({
         round,
         panel,
@@ -506,6 +515,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         retellModel: retellRes.modelId || arcCreatorModel,
         finalArc: retold.finalArc,
         used: retold.used,
+        fixing: retold.fixing,
+        keeping: retold.keeping,
         critique: retold.critique,
       });
       gl.info('arc_retell', `Round ${round}: ${retellRes.modelId || arcCreatorModel} re-told the story (used: ${retold.used || 'not stated'})`, null, {
@@ -530,7 +541,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       discarded: commit.discarded,
       rounds: roundReports,
       finalArc: approvedArc,
-      critique: arcWeakPoints,
+      fixing: roundReports.length ? roundReports[roundReports.length - 1].fixing : '',
+      keeping: roundReports.length ? roundReports[roundReports.length - 1].keeping : '',
+      critique: roundReports.length ? roundReports[roundReports.length - 1].critique : arcWeakPoints,
     };
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, creatorModel: arcCreatorModel,

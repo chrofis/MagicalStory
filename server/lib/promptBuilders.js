@@ -4601,14 +4601,23 @@ function parseArcCreate(raw) {
 }
 
 /**
- * Parse the arc-retell output: FINAL ARC (incl. its "Challenges taken:" list),
- * the "Used:" line, and the fresh CRITIQUE. Throws when no FINAL ARC exists —
- * the caller re-tells once, then gives up.
+ * Parse the arc-retell output: the "Fixing:" / "Keeping:" contract lines, the
+ * FINAL ARC (incl. its "Challenges taken:" list), the "Used:" line, and the
+ * fresh CRITIQUE. Fixing/Keeping are optional (older or non-compliant tellings
+ * yield ''); throws only when no FINAL ARC exists — the caller re-tells once,
+ * then gives up.
  */
 function parseArcRetell(raw) {
   const full = String(raw || '');
   const fa = full.search(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?/mi);
   if (fa < 0) throw new Error('no "FINAL ARC:" marker');
+  // The contract lines precede FINAL ARC; take them from the head so a
+  // critique line that happens to start with the same word cannot shadow them.
+  const head = full.slice(0, fa);
+  const contractLine = (src, label) =>
+    (src.match(new RegExp(`^\\s*(?:\\*\\*)?${label}\\s*:\\s*(.*)$`, 'mi')) || [, ''])[1].replace(/\*\*/g, '').trim();
+  const fixing = contractLine(head, 'Fixing') || contractLine(full, 'Fixing');
+  const keeping = contractLine(head, 'Keeping') || contractLine(full, 'Keeping');
   const after = full.slice(fa).replace(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?\**\s*/i, '');
   const usedIdx = after.search(/^\s*(?:\*\*)?Used\s*:/mi);
   const critIdx = after.search(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?/mi);
@@ -4620,7 +4629,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique };
+  return { finalArc, used, critique, fixing, keeping };
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */

@@ -32,7 +32,7 @@ Characters: {CHARACTER_NAMES}
 
 Write TWO different arcs, marked exactly "ARC 1:" and "ARC 2:" — genuinely different stories, not variants. Each arc is numbered sentences, roughly one per page, never fewer than ten.
 
-After each arc, a blunt self-critique marked "CRITIQUE:" — 3 to 6 numbered material faults: impossible logic, unearned turns, knowledge nobody could have, a rival who never presses, a removable character, a stake that cannot be lost.
+After each arc, a blunt self-critique marked "CRITIQUE:" — 3 to 6 numbered story-level faults only: an event without a cause, a stake that cannot be lost or is decided by something other than the announced rule, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids. Numeric precision, the sourcing of measurements and times, and the physical plausibility of a mechanism that could be swapped without changing who does what and why are not arc faults — later stages fix those; never list one.
 
 No final version — stop after the second critique.
 

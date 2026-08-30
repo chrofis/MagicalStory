@@ -21939,3 +21939,24 @@ erased.
 opts), `server/lib/storyHelpers.js` (re-exports), `server/lib/beatsPipeline.js`
 (the machine; old chain removed), `docs/prompt-inventory.md`.
 **Status:** ✅ active (staging; first validation run = the pirate story rerun, owner-ordered).
+
+### Arc-machine refinement: arc critiques are story-level only, re-tell under a Fixing/Keeping contract (owner, 2026-08-30)
+**Context:** The iteration study showed a round-4 regression: detail-level
+critiques (numeric precision, mechanism plausibility) forced structural
+rewrites, and one re-telling deleted the story's best scene because the fault
+list had no keep column.
+**Decision:** The arc stage owns LOGIC and SUSPENSE only — a fault belongs in
+an arc critique only if it is unfixable downstream. arc-create/arc-retell
+critiques list only: an event without a cause, a stake that cannot be lost or
+is decided by something other than the announced rule, a removable character, a
+rival who stops pressing, knowledge nobody could have, a premise the commission
+forbids — with an explicit exclusion for numeric precision, measurement/time
+sourcing, and swappable-mechanism plausibility. arc-panel solutions repair
+story logic, never re-architect physics or renumber a timetable. The re-tell
+declares "Fixing:" and "Keeping:" before the FINAL ARC; both lines are parsed
+(parseArcRetell), persisted in the trail (arcReviewReport rounds + top level),
+and passed to the beats prompt inside {ARC_WEAK_POINTS} alongside the critique.
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-panel.txt`,
+`prompts/arc-retell.txt`, `server/lib/promptBuilders.js` (parseArcRetell),
+`server/lib/beatsPipeline.js`.
+**Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).
