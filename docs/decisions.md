@@ -21989,3 +21989,17 @@ ignores a stray Changing block.
 `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
 `server/config/models.js`.
 **Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).
+
+### Arc-machine refinement 3: character-truth faults in the arc critique (owner, 2026-08-30)
+**Context:** The critiques hunted story logic and (before the scope fix)
+real-world pedantry — but an eight-year-old's absorption hangs on people, not
+tide tables. Nothing asked whether the figures feel like persons.
+**Decision:** Two fault types added to the arc-create and arc-retell critique
+taxonomy: "a character who is anyone — nothing they do comes from who they
+are" and "an interaction no real person would have — a reaction the plot
+needs but the person would not give." Both MAJOR by default; a main cast of
+interchangeable figures is CRITICAL. The real-world-accuracy exclusion stays.
+**Rationale:** Character genericity and plot-convenient reactions are
+arc-level faults (unfixable downstream); physics trivia is not.
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-retell.txt`.
+**Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).
