@@ -22219,3 +22219,14 @@ letter forms are backward-compatible by construction.
 `prompts/arc-panel.txt`, `server/lib/promptBuilders.js`
 (`buildStoryContextFields`, `buildStoryShapeSection`, `parseArcRetell`, both
 arc builders), `server/lib/beatsPipeline.js` (panelist letters).
+
+**Addendum (2026-08-31, same day).** The two severity-calibration sentences in
+point 2 (trait-reversal MAJOR floor; no-enforcement-is-not-a-fault) were
+REVOKED by the owner before validation and removed again — the critique keeps
+only the four reader questions, the fault vocabulary (with the softened stake
+clause), the downstream exclusion, and the three tags with short definitions.
+No severity case-law. A standing net-length rule was also applied ("Don't
+always add and make the prompt endless"): after the batch each arc template is
+no longer than before it (arc-create 2843/2844, arc-retell 3629/3629,
+arc-panel 957/985 chars), paid for by trimming restated rules (working-notes
+aside, landmark-rule restatement, Keeping-scope duplication, header verbosity).
