@@ -22230,3 +22230,26 @@ always add and make the prompt endless"): after the batch each arc template is
 no longer than before it (arc-create 2843/2844, arc-retell 3629/3629,
 arc-panel 957/985 chars), paid for by trimming restated rules (working-notes
 aside, landmark-rule restatement, Keeping-scope duplication, header verbosity).
+
+---
+
+## 2026-08-31 — Removed skin tone from secondary-character face slot in beats/trial/unified templates
+
+**Context.** job_1788123310558 produced a green-tinted Rossa; root cause traced to the
+secondaryCharacters `face` schema slot asking the writer model to invent a skin tone in prose
+("warm olive skin" etc.), which the image model then rendered literally off-colour.
+
+**Decision.** Owner ruling: do not request skin tone at all for secondary characters. Removed
+`skin tone` from the `face` field placeholder
+(`"[eye colour, distinctive features; for adults state facial hair]"`) in every template that
+carries this schema slot: `prompts/story-bible-from-beats.txt`, `prompts/story-trial.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-unified.txt`. No replacement wording, no
+hex value, no new rule text — the slot is just shorter.
+
+**Rationale.** Skin tone in free-text prose has no colour anchor and drifts; photo-derived
+characters already get a real `skinToneHex` from the photo-analysis pipeline (untouched by this
+change) — secondary characters invented by the writer have no such anchor and should not be
+asked to describe one.
+
+**Touched files.** `prompts/story-bible-from-beats.txt`, `prompts/story-trial.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-unified.txt`.
