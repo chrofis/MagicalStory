@@ -267,7 +267,7 @@ const MODEL_DEFAULTS = {
   // destroying stories (deleting the cause a turn depended on, adding alibi
   // clauses to satisfy a fault line); the machine never patches. CREATE: the
   // creator writes TWO arcs, each with a blunt numbered self-critique, and
-  // commits to one. PANEL: outside models each propose exactly two solutions
+  // commits to one. PANEL: outside models each propose exactly one solution
   // on the committed arc. RE-TELL: the SAME creator re-tells the story whole,
   // from the beginning. Validated in the 2026-08-30 experiments (scratchpad
   // flow3); see docs/decisions.md. arcAuditModel / childCriticModel /

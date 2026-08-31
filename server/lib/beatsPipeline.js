@@ -393,7 +393,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // an alibi clause onto a sentence to satisfy a fault line (docs/decisions.md
   // 2026-08-30). The machine never patches. CREATE: the creator writes TWO
   // arcs, each with a blunt numbered self-critique, and commits to one. PANEL:
-  // outside models each propose exactly two solutions on the committed arc +
+  // outside models each propose exactly one solution on the committed arc +
   // critique — advisory, in parallel, a lost voice never blocks. RE-TELL: the
   // SAME creator re-tells the story whole, from the beginning, and critiques
   // the result again. Rounds are configurable (arcRounds); the final critique
@@ -507,7 +507,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         gl.warn('arc_panel_empty', `Entire panel failed in round ${round} — arc ships without this re-telling round`);
         break;
       }
-      gl.info('arc_panel', `Round ${round}: ${panel.length}/${arcPanelModels.length} panelists proposed two solutions each`, null, {
+      gl.info('arc_panel', `Round ${round}: ${panel.length}/${arcPanelModels.length} panelists proposed one solution each`, null, {
         round, panelists: panel.map(p => p.model), failed: failedPanelists,
       });
 

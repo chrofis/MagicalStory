@@ -22251,6 +22251,24 @@ no longer than before it (arc-create 2843/2844, arc-retell 3629/3629,
 arc-panel 957/985 chars), paid for by trimming restated rules (working-notes
 aside, landmark-rule restatement, Keeping-scope duplication, header verbosity).
 
+### Arc-machine refinement 5: panel proposes ONE solution per panelist, not two (owner, 2026-09-01)
+**Context.** A/B measured the panel stage at 21% of total arc-stage cost, with
+heavy overlap between a panelist's two solutions.
+**Decision.** Each panelist now proposes exactly one committed solution
+("SOLUTION (answers faults <numbers>):", ≤8 one-sentence points) instead of
+two. The retell's "Used:" line cites panelists by letter only ("Panelist A"),
+not a solution number. `parseArcRetell` already stores the Used line as
+opaque text — no parser change needed.
+**Rationale.** One committed solution per panelist halves panel output and
+shortens the retell's input, at the cost of the (already largely overlapping)
+second option; panel stays cross-vendor at 3 models.
+**Touched files.** `prompts/arc-panel.txt`, `prompts/arc-retell.txt`,
+`server/lib/promptBuilders.js` (`buildArcPanelPrompt` comment),
+`server/lib/beatsPipeline.js` (panel-assembly comment + genLog message),
+`server/config/models.js` (`arcPanelModels` comment), `server/services/prompts.js`
+(arc-machine comment), `docs/prompt-inventory.md`.
+**Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).
+
 ---
 
 ## 2026-08-31 — Removed skin tone from secondary-character face slot in beats/trial/unified templates

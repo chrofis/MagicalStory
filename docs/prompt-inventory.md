@@ -28,7 +28,7 @@ Three loading mechanisms feed these templates:
 | story-beats.txt | storyHelpers.js `buildBeatsPrompt` | Beats-first pipeline step 1 (`pipelineMode: 'beats'`) + Test Lab `beats_scenes`: per-page BEAT + one-line SCENE |
 | story-beats-review.txt | storyHelpers.js `buildBeatsReviewPrompt` | Beats-first step 2: structural review, rewrites only faulted pages |
 | arc-create.txt | promptBuilders.js `buildArcCreatePrompt` | Arc machine step 1 (beats pipeline, 2026-08-30): the creator writes TWO arcs, each with a blunt numbered self-critique, and commits to one ("Stronger: Arc N") |
-| arc-panel.txt | promptBuilders.js `buildArcPanelPrompt` | Arc machine step 2: each panel model (arcPanelModels) proposes EXACTLY TWO solutions on the committed arc + critique; advisory, parallel |
+| arc-panel.txt | promptBuilders.js `buildArcPanelPrompt` | Arc machine step 2: each panel model (arcPanelModels) proposes EXACTLY ONE solution on the committed arc + critique; advisory, parallel |
 | arc-retell.txt | promptBuilders.js `buildArcRetellPrompt` | Arc machine step 3: the SAME creator re-tells the story whole (FINAL ARC + Challenges taken + Used + fresh CRITIQUE); the critique feeds story-beats.txt `{ARC_WEAK_POINTS}` |
 | story-arc-audit.txt | storyHelpers.js `buildArcAuditPrompt` | Blind arc audit: commission + arc only, exhaustive fault list for the reviewer ledger. Lab only since 2026-08-30 — the production arc stage is the arc machine |
 | story-beats-audit.txt | storyHelpers.js `buildBeatsAuditPrompt` | Blind beats audit: page plan + beats only |

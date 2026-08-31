@@ -4640,7 +4640,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
   });
 }
 
-/** PANEL: one outside voice proposes exactly two solutions on the committed arc. */
+/** PANEL: one outside voice proposes exactly one solution on the committed arc. */
 function buildArcPanelPrompt(inputData, committedBlock) {
   const template = PROMPT_TEMPLATES.arcPanel;
   if (!template) {

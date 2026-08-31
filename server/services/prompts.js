@@ -189,7 +189,7 @@ async function loadPromptTemplates() {
     ['storyScorecardJudgeV4', 'story-scorecard-judge-v4.txt'],
     ['storyArcReview', 'story-arc-review.txt'],
     // THE ARC MACHINE (2026-08-30): create (two arcs + self-critiques, commit
-    // to one), panel (outside models, exactly two solutions each), re-tell (the
+    // to one), panel (outside models, exactly one solution each), re-tell (the
     // same creator re-tells the story whole — never patches). Replaces the arc
     // audit/review chain in the production beats pipeline; the audit/review
     // templates below stay for the Lab.
