@@ -22053,7 +22053,7 @@ the line drives localization for every story): relabel the line as the
 reader's home for landmark use only, not the story's setting, when the
 user's own premise names a world. See tasks/BACKLOG.md.
 **Status:** ✅ active (prompt/rounds fixes shipped; Setting/location
-precedence still open).
+precedence shipped 2026-08-31 — see "Named location is binding" below).
 
 ## 2026-08-31 — Story-idea world split made explicit: labels, rerun steering, persisted `ideaWorld`
 
@@ -22097,3 +22097,57 @@ saw.
 (`IdeaWorld`, `IdeaWorldMode`), `client/src/services/storyService.ts`,
 `client/src/pages/StoryWizard.tsx`,
 `client/src/pages/wizard/WizardStep6Summary.tsx`.
+
+## 2026-08-31 — Named location is binding: `Setting/location:` demotes to "Reader's home" when the premise names its own world
+
+**Context.** Owner ruling: **"If a location is named it is binding."** When the
+user's premise (storyDetails / chosen idea) names its own world or location —
+a Mediterranean pirate island, a make-believe kingdom — THAT is the story's
+binding setting. But `buildStoryContextFields` (and the text-refine brief)
+injected the IP-geolocated `userLocation` as `Setting/location: <home city>`
+INSIDE the commission block, directly under "What this names is binding: … the
+world it happens in" — so the commission itself named the home city, and the
+2026-08-31 landmark-precedence prompt rules (which defer to "the world the
+commission names") could not beat it. 2/2 pirate validation arcs relocated the
+commissioned Mediterranean race to Zurich; all 3 judges flagged it
+MAJOR/CRITICAL (see "Arc-machine refinement 4" above).
+
+**Decision.** A `premiseNamedWorld` flag is stamped onto `inputData` at job
+start (`stampPremiseWorld`, new `server/lib/premiseWorld.js`, called in
+`storyJobPipeline.js` after the swiss-stories city override) and persisted on
+`stories.data` for Test Lab replays. Detection ladder, cheapest signal first:
+(1) `inputData.ideaWorld.world` ('fantasy'→true / 'location'→false) — the
+wizard's server-resolved per-idea world label (separate feature in flight, see
+entry above; safe no-op until it ships); (2) `ideaGeneration.selectedIndex`
+(1→true / 0→false — the wizard's positional convention; editing nulls the
+index, so a present index is trustworthy); (3) custom/edited premises: ONE
+YES/NO utility-model call (`premise_world_classify`, gemini-2.5-flash, temp 0,
+~$0.0002) — any failure logs a warning and yields false, never blocking
+generation. The new `buildSettingLine()` in `server/lib/promptBuilders.js` is
+shared by BOTH commission-brief builders: flag false → unchanged
+`Setting/location: <city>` (home city stays the binding setting — the
+localization feature); flag true → `Reader's home (NOT the setting — the
+story is set in the world the idea below names; use only for local landmarks
+that fit that world): <city>`.
+
+**Rationale.** A personalization feature must never override the commission;
+prompt-side precedence rules were proven insufficient while the commission
+block itself named the home city. Prefer existing structured data over
+classification; classification over a fragile geo-NER heuristic.
+
+**Validation (2026-08-31, local arc-machine rerun `piraterun/arc-v3-final`,
+same pirate commission, production builders/templates, arcRounds=2, opus
+creator, grok/deepseek/luna panel, 3 blind judges at temp 0).** The targeted
+fault is GONE: the classifier flagged the premise (signal `classified_yes`),
+the create prompt carried the relabeled line, and the arc opens on the
+Mediterranean — no judge flagged a relocation above MINOR (gemini's only
+location note: the Zürich chart-library backstory mention, MINOR). Overall
+verdicts: gemini 3, sol 3, kimi 7 — the owner's zero-MAJOR/CRITICAL-from-≥2-
+judges bar was MISSED on NEW, unrelated arc-quality faults (this run's draft
+cast commissioned crew member Lorena on the rival ship and ended bleak;
+density). Those are arc-machine story-quality issues, not location issues —
+reported honestly, no further validation attempt per the two-attempt rule.
+
+**Touched files.** `server/lib/premiseWorld.js` (new),
+`server/lib/promptBuilders.js` (`buildSettingLine` + both briefs),
+`storyJobPipeline.js` (stamp + persist), `docs/prompt-inventory.md`.

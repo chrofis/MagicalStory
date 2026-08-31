@@ -193,3 +193,4 @@ These act like templates but can only be edited in code:
 | `sceneComposite.js` `buildPopulatedPlatePrompt` | Coloured-silhouette plate for the page composite (hardcoded, not a template) |
 | `sceneComposite.js` `buildDepopulatePrompt` | Removes the silhouettes to leave a clean background plate (hardcoded) |
 | `sceneComposite.js` `buildBlendEditPrompt` | The composite BLEND prompt: goal + scene overview + cast (clothing/action) + interactions + emotions from metadata. **Never the page prompt** — that relocates characters (decisions.md 2026-08-15). Built from `buildBlendMetadata` (hardcoded) |
+| `premiseWorld.js` `detectPremiseNamedWorld()` | YES/NO utility-model classification: does the premise name its own world/location (other than the reader's home town)? Fallback rung only — structured wizard signals (`ideaWorld`, `selectedIndex`) are consulted first (decisions.md 2026-08-31, named location binding) |

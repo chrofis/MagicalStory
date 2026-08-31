@@ -4045,7 +4045,6 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '') {
   // writer had will drift away from the commission — storyDetails in particular
   // is the user's own idea in their own words and is the strongest anchor here.
   // Absent fields are omitted rather than sent as "undefined".
-  const loc = inputData.userLocation;
   const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
     ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
     : null;
@@ -4056,7 +4055,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '') {
     inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
     inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
     inputData.season ? `Season: ${inputData.season}` : null,
-    loc?.city ? `Setting/location: ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}` : null,
+    buildSettingLine(inputData),
     rel ? `Relationships:\n${rel}` : null,
     // The commission itself, last so it reads as the payload — wrapped the same
     // way the writer wraps it, since it is untrusted user text.
@@ -4352,9 +4351,26 @@ function buildStoryShapeSection(inputData, pageCount) {
   ].filter(Boolean).join('\n');
 }
 
+// Owner ruling (2026-08-31): "If a location is named it is binding." When the
+// premise names its own world (inputData.premiseNamedWorld, stamped at job
+// start by server/lib/premiseWorld.js), the IP-geolocated home city must not
+// appear as the story's setting inside the commission block — under the
+// "What this names is binding" header it made the commission itself name the
+// home city, so 2/2 validation arcs relocated a Mediterranean pirate premise
+// to the reader's town (docs/decisions.md, 2026-08-31). It demotes to the
+// reader's home, for landmark use only. A premise with no named world keeps
+// the home city as binding setting — the localization feature, unchanged.
+function buildSettingLine(inputData) {
+  const loc = inputData.userLocation;
+  if (!loc?.city) return null;
+  const place = [loc.city, loc.region, loc.country].filter(Boolean).join(', ');
+  return inputData.premiseNamedWorld
+    ? `Reader's home (NOT the setting — the story is set in the world the idea below names; use only for local landmarks that fit that world): ${place}`
+    : `Setting/location: ${place}`;
+}
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
-  const loc = inputData.userLocation;
   const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
     ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
     : null;
@@ -4365,7 +4381,7 @@ function buildStoryContextFields(inputData) {
     inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
     inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
     inputData.season ? `Season: ${inputData.season}` : null,
-    loc?.city ? `Setting/location: ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}` : null,
+    buildSettingLine(inputData),
     rel ? `Relationships:\n${rel}` : null,
     inputData.storyDetails ? `\nStory idea (the user's own words):\n${wrapUserInput(inputData.storyDetails)}` : null,
   ].filter(Boolean).join('\n') || '(no additional brief recorded)';
