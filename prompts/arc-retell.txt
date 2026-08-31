@@ -35,7 +35,7 @@ The size of the change matches the worst fault: a CRITICAL fault may rebuild the
 
 Output, in this order:
 - One line "Fixing:" — which faults, by what approach.
-- One line "Keeping:" — the scenes and turns that must survive untouched; the arc's landmarks are kept unless Fixing names them.
+- One line "Keeping:" — the scenes and turns that must survive untouched; landmarks the arc placed inside the commission's world are kept unless Fixing names them. Never add a landmark from outside that world, and never relocate the story to reach one.
 - "FINAL ARC:" then the numbered sentences, told under those two lines.
 - "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each.
 - One line "Used:" naming which solutions (by panelist and number) you drew on.

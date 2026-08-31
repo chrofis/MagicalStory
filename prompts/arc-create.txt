@@ -27,7 +27,7 @@ Characters: {CHARACTER_NAMES}
 - Each character's nature causes a problem or solves one.
 - Whoever or whatever stands in the way presses on the story to the end and stands in the scene at the turning point.
 - Names the commission gives stand as written.
-- When a landmarks list is present, the arc builds two to four of them into the story where they belong to its world — the opening may anchor at one before the adventure leaves home; a landmark may be scenery; a story that happens on the water happens on the water.
+- When a landmarks list is present, landmarks join the story only where they belong to the world the commission names — a story set elsewhere keeps its setting, and the landmarks appear at most on the opening page before the adventure leaves home, or not at all. Never relocate the commission's world to reach a landmark.
 
 # YOUR TASK
 

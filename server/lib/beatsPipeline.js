@@ -92,6 +92,29 @@ const { log } = require('../utils/logger');
 const PIPELINE_MODES = ['unified', 'beats'];
 
 /**
+ * True when a re-telling's "Fixing:" line addressed only MINOR faults of the
+ * critique it answered. Parses the fault numbers Fixing names and looks their
+ * severities up in that critique's numbered lines (untagged lines count as
+ * MAJOR, matching critiqueMaxSeverity). Tolerant by design: no parseable
+ * numbers, or numbers that match no critique line, return false — the caller
+ * must never stop a round on a guess.
+ */
+function fixingBelowMajor(fixing, prevCritique) {
+  const nums = [...String(fixing || '').matchAll(/\b(\d{1,2})\b/g)].map(m => parseInt(m[1], 10));
+  if (!nums.length) return false;
+  const severities = {};
+  for (const line of String(prevCritique || '').split('\n')) {
+    const m = line.match(/^\s*(\d+)[.)]/);
+    if (!m) continue;
+    const tag = line.match(/\[(CRITICAL|MAJOR|MINOR)\]/i);
+    severities[parseInt(m[1], 10)] = tag ? tag[1].toUpperCase() : 'MAJOR';
+  }
+  const known = nums.filter(n => severities[n] !== undefined);
+  if (!known.length) return false;
+  return known.every(n => severities[n] === 'MINOR');
+}
+
+/**
  * Which generation pipeline a job runs. `inputData.pipelineMode` overrides per
  * job (Test Lab A/B and one-off reruns need that); anything unrecognised falls
  * back to DEFAULT_PIPELINE_MODE.
@@ -452,6 +475,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // PANEL + RE-TELL rounds. Round k>1 feeds the previous FINAL ARC + its
     // critique back to the same panel, then the same creator re-tells again.
     let currentBlock = commit.committed;
+    // The critique the NEXT re-telling's Fixing line answers — the create
+    // critique for round 1, then each round's fresh critique.
+    let prevCritique = commit.critique;
     const roundReports = [];
     for (let round = 1; round <= arcRounds; round++) {
       await checkCancellation();
@@ -540,6 +566,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         });
         break;
       }
+      // SECOND EARLY STOP (owner, 2026-08-31): each fresh critique tends to
+      // mint a fresh MAJOR, so the trigger above rarely fires and max rounds
+      // burn (the pirate validation run: every round's MAJOR was new). When
+      // this re-telling's Fixing line addressed nothing above MINOR in the
+      // critique it answered, the arc has stopped materially changing —
+      // another round cannot earn its cost. Tolerant: unparseable Fixing
+      // never stops on this trigger.
+      if (round < arcRounds && fixingBelowMajor(retold.fixing, prevCritique)) {
+        gl.info('arc_rounds_early_stop', `Round ${round}: Fixing addressed nothing above MINOR — skipping ${arcRounds - round} remaining round(s)`, null, {
+          round, maxSeverity, reason: 'fixing_below_major',
+        });
+        break;
+      }
+      prevCritique = retold.critique;
       currentBlock = `FINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
     }
 

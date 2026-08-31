@@ -271,11 +271,16 @@ const MODEL_DEFAULTS = {
   arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
     .split(',').map(s => s.trim()).filter(Boolean),
   // Rounds of panel + re-tell. Round k>1 feeds the previous FINAL ARC + its
-  // critique back to the same panel. Default 3: the 2026-08-30 iteration study
-  // peaked at v3 and regressed at v4, so the pipeline clamps any value above 3
-  // (owner cap 2026-08-30) and stops early once the critique holds nothing
-  // above MINOR. ARC_ROUNDS for staging A/B.
-  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 3),
+  // critique back to the same panel. Default 2 (2026-08-31): both iteration
+  // studies concentrated the value in round 1 (the dragon study's judged
+  // winner was v1), and the 2026-08-31 pirate validation run showed every
+  // round's fresh critique minting a fresh MAJOR (R1 2M, R2 1M, R3 1M — each
+  // new), so the nothing-above-MINOR early stop never fired and max rounds
+  // always burned. The clamp stays 3 (owner cap 2026-08-30 — the study
+  // regressed at round 4); the pipeline also stops early once the critique
+  // holds nothing above MINOR, or once a re-telling's Fixing line addressed
+  // only MINOR faults. ARC_ROUNDS for staging A/B.
+  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 2),
   // The creator runs at the provider default (the Anthropic path sends no
   // temperature); these apply on OpenRouter/xAI paths only.
   arcPanelTemperature: 0.8,

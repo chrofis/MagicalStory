@@ -22003,3 +22003,54 @@ interchangeable figures is CRITICAL. The real-world-accuracy exclusion stays.
 arc-level faults (unfixable downstream); physics trivia is not.
 **Touched:** `prompts/arc-create.txt`, `prompts/arc-retell.txt`.
 **Status:** ✅ active (extends "The arc stage is the ARC MACHINE" above).
+
+### Arc-machine refinement 4: landmark precedence + rounds 3→2 + Fixing-based early stop (owner, 2026-08-31)
+**Context:** The 2026-08-31 pirate validation run (16 pages, commissioned
+Mediterranean treasure race) drew a unanimous judge CRITICAL: the arc moored
+the commissioned world in the user's home city because the arc-level landmark
+rule ("builds two to four of them into the story") read as an obligation.
+The same run showed adaptive early stop never firing: every round's fresh
+critique minted a fresh MAJOR (R1 2M+4m, R2 1M+5m, R3 1M+5m — each MAJOR
+new), so max rounds always burned.
+**Decision:** (1) LANDMARK PRECEDENCE — the commission's named world always
+wins. All four instruction sites rewritten together: arc-create's landmark
+rule (landmarks join only where they belong to the commission's world; a
+story set elsewhere keeps its setting, landmarks at most on the opening page
+before the adventure leaves home, or not at all; never relocate),
+arc-retell's Keeping contract line (kept landmarks are those inside the
+commission's world; never add one from outside it), story-beats' rule (an arc
+that names none has chosen none — zero is valid; same world/opening-page
+constraint), and the shared `buildAvailableLandmarksSection` header (the
+two-to-four count now applies only to a story set in the user's world; "may
+use none" is explicit). (2) `arcRounds` default 3 → 2 (clamp stays 3): both
+iteration studies concentrated value in round 1 (the dragon study's judged
+winner was v1) and the fresh-MAJOR-per-round pattern makes round 3 pure cost.
+(3) Second early-stop trigger `fixing_below_major`: after a re-tell, parse
+the fault numbers its Fixing line names and look up their severities in the
+critique it answered; when nothing above MINOR was addressed, the arc has
+stopped materially changing — skip remaining rounds (genLog
+`arc_rounds_early_stop`, reason `fixing_below_major`). Tolerant: unparseable
+Fixing never stops.
+**Rationale:** A personalization feature must never override the commission;
+rounds beyond the first buy little and each costs ~4 model calls.
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-retell.txt`,
+`prompts/story-beats.txt`, `server/lib/promptBuilders.js`
+(`buildAvailableLandmarksSection`), `server/lib/beatsPipeline.js`
+(`fixingBelowMajor` + loop), `server/config/models.js` (`arcRounds`).
+**Validation (2026-08-31, local run of the fixed templates on the same
+commission, 3 blind judges at temp 0):** partial. The landmark containment
+improved (home-city landmarks confined to the opening page; the adventure
+leaves home) but the arc still framed the story from the user's home city —
+no unanimous CRITICAL this time (gemini 8/9/9 with the relocation as its
+only MAJOR; sol 4.5, kimi 4 with relocation MAJOR/CRITICAL among others).
+ROOT CAUSE FOUND: `buildStoryContextFields` injects the IP-geolocated
+`userLocation` as a `Setting/location:` line INSIDE the commission block,
+directly under the header "What this names is binding: … the world it
+happens in" — so the commission itself names the home city, and a landmark
+rule that defers to "the world the commission names" cannot beat it. Both
+relocated runs (2/2) had that line. Fix candidate (owner decision pending —
+the line drives localization for every story): relabel the line as the
+reader's home for landmark use only, not the story's setting, when the
+user's own premise names a world. See tasks/BACKLOG.md.
+**Status:** ✅ active (prompt/rounds fixes shipped; Setting/location
+precedence still open).
