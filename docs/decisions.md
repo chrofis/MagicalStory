@@ -22299,3 +22299,31 @@ evaluator contract that the reference is the generation source, which covers alw
 **Touched files:** `server/config/models.js`, `server/lib/beatsPipeline.js`,
 `storyJobPipeline.js`, `server/lib/textRefine.js`, `server/lib/repairPipeline.js`,
 `server/routes/regeneration.js`, `server/lib/testlab.js`, `tasks/bugs.json`.
+
+## 2026-08-31 — VB character reference cells get a one-question render gate (cheapest vision model, one re-render, never blocks)
+
+**Context:** VB reference sheets are generated on the avatar path, where the quality
+evaluator is deliberately skipped (`images.js` avatar branches; accept-if-pixels in
+`referenceSheets.js`). Yet each split CHARACTER cell feeds every page its character
+appears on — one bad render poisons them all. Evidence: CHR001's green-skinned,
+comic-styled cell reached pages 2/9/14/16 of job_1788123310558.
+
+**Decision:** After the sheet split in `generateReferenceSheet`, each CHARACTER cell
+(only — not artifacts/locations/animals/vehicles) gets ONE yes/no vision check on
+`gemini-2.5-flash-lite` (cheapest vision-capable TEXT_MODELS entry, $0.10/$0.40 per 1M):
+plausible human skin color + rendered in the declared art style. On NO: genLog warn,
+re-render that one element as a single-cell sheet via the same `callGeminiAPIForImage`
+path, re-check once (informational), then accept whatever came back. No scores, no
+thresholds, no config flags, no loops; fail-open on any API error.
+
+**Rationale:** Owner mandate: "agreed, but really cheap. If bad we redo that image."
+The style anchor in the question is load-bearing — validated against the stored
+job_1788123310558 cell: without the declared style in the prompt flash-lite judged the
+green comic cell "natural"; with it, NO (green tint) while 3 known-good watercolor crew
+cells all pass. Cost ≈ $0.0002/cell (~2-4 cells/story); a re-render adds one image call
+only when a cell fails.
+
+**Touched files:** `server/lib/referenceSheets.js` (`checkCharacterCellRender` + gate
+loop in `generateReferenceSheet`).
+
+**Status:** ✅ active.
