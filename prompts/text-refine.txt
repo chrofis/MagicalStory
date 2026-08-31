@@ -20,13 +20,17 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
+# THE STORY (the whole story, for judgment — the beats divide it; a page's text carries only its own beat)
+
+{STORY_ARC}
+
 # SCENE OUTLINES — read-only
 
 What each page's illustration shows. The picture is already drawn from this and cannot change.
 
 You may rewrite how a page READS; you may never change what HAPPENS on it. Do not add, remove, reorder or reverse an event, an action or an outcome. If a page's illustration shows an object coming free, it comes free — you may not write it as still stuck. If a character is doing something in the outline, the prose may name it, describe it differently, or leave it unsaid, but it must never state the opposite. A reader sees the words and the picture together on one page.
 
-These outlines describe rendering as well as events — appearance, clothing, position in frame, expression, camera. **None of that is the prose's business.** Take the EVENTS from here and ignore the staging; never narrate where someone stands, what they are wearing or how they are framed, and never assert a position, an action or an object the outline does not stage — a figure it leaves out of frame does nothing visible on that page. Rewrite such a sentence to what the outline stages.
+These outlines describe rendering as well as events — appearance, clothing, position in frame, expression, camera. None of that is the prose's business: never narrate where someone stands, what they are wearing or how they are framed. The picture shows one instant; the text tells the whole beat. Events the beat carries and the picture doesn't show are the text's cargo — never cut them for image fidelity. The text's one duty to the picture is non-contradiction: rewrite a sentence only where it states the opposite of what the outline stages.
 
 {SCENE_OUTLINES}
 

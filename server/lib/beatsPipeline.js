@@ -18,7 +18,7 @@ const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
  *      to one, a panel of outside models proposes solutions, the same creator
  *      re-tells the story whole. Replaces the old arc audit/review chain
  *      (owner, 2026-08-30 — see docs/decisions.md)
- *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE, FROM the approved arc
+ *   1. beats_plan            Sonnet    PAGE PLAN + per-page BEAT, FROM the approved arc
  *   2. beats_review          Grok      structural review, rewrites faulted pages
  *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
  *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
@@ -76,6 +76,7 @@ const {
   buildClothingReviewPrompt,
   parseClothingReview,
   parseBeats,
+  parsePagePlan,
   buildSceneExpansionPrompt,
   buildSceneExpansionAllPrompt,
   buildSceneReviewPrompt,
@@ -622,30 +623,33 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
-  // Built AFTER the arc machine on purpose: the planner sees the SAME challenge
-  // draw the creator was offered, and the final arc's critique enters as the
-  // ARC KNOWN WEAK POINTS section — the machine's replacement for the old
-  // rulings carry (the re-telling already answered the critique; what remains
-  // travels as a warning, never as work).
-  const basePrompt = buildBeatsPrompt(inputData, pageCount, { challengeIdeas, arcWeakPoints });
-  if (!basePrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
-  const planPrompt = approvedArc
-    ? `${basePrompt}\n\nThis arc is final — it was told, challenged by a panel, and re-told. Divide it across ${pageCount} pages, keeping every commitment it makes:\n\n---ARC---\n${approvedArc}\n\nOutput the ---PAGE PLAN--- block and then the ---BEATS--- block. Do not restate the arc.`
-    : basePrompt;
-  if (arcWeakPoints) {
-    gl.info('beats_carry_arc', 'Final arc critique carried into the beats plan as known weak points');
-  }
+  // The beats stage divides the FINISHED story (owner redesign, 2026-08-31:
+  // "the beats gets the story"). The final arc enters the template as
+  // {FINAL_ARC}; the challenge draw and the arc critique no longer travel here
+  // — the arc machine consumed the one and answered the other.
+  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc });
+  if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
   meta.timings.planMs = Date.now() - t;
   const plan = parseBeats(planRes.text || '', expected);
   // The approved arc is the contract the reviewer checks the pages against.
-  if (approvedArc) plan.arc = approvedArc;
-  // The page plan decides shot and cast size per page BEFORE any page is written.
-  // It sits ahead of ---BEATS---, so every beats parser ignores it.
+  // parseBeats no longer authors one — the arc machine's finalArc is the only arc.
+  plan.arc = approvedArc || '';
+  // The page plan decides shot, cast and the picture's instant per page BEFORE
+  // any page is written. It sits ahead of ---BEATS---, so beats parsers ignore
+  // it; each page's own line rides on the beat as planLine (the SCENE field's
+  // replacement, 2026-08-31).
   const pagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
   if (pagePlan) log.info(`📐 [BEATS] page plan: ${pagePlan.split('\n').filter(Boolean).length} line(s)`);
+  const planLines = parsePagePlan(pagePlan);
+  for (const p of plan.pages) p.planLine = planLines.get(p.pageNumber) || p.planLine || '';
+  const unplanned = plan.pages.filter(p => !p.planLine).map(p => p.pageNumber);
+  if (unplanned.length > 0) {
+    log.warn(`⚠️ [BEATS] No page-plan line for page(s) ${unplanned.join(', ')} — those pages stage from the beat alone`);
+    gl.warn('beats_plan_lines_missing', `No page-plan line for page(s) ${unplanned.join(', ')}`);
+  }
   if (plan.pages.length === 0) throw new Error('Beats planner returned no parseable beats');
   if (plan.missing.length > 0) {
     log.warn(`⚠️ [BEATS] Planner omitted page(s) ${plan.missing.join(', ')} — story will be ${plan.pages.length} pages`);
@@ -694,11 +698,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // rewritten beat exist — capture the pair here or it is gone.
       const rewrites = [];
       const { merged, changed, stray } = mergeByPage(plan.pages, parsed.pages, (p, fix) => {
-        const next = { ...p, beat: fix.beat || p.beat, scene: fix.scene || p.scene };
+        const next = { ...p, beat: fix.beat || p.beat };
         rewrites.push({
           pageNumber: p.pageNumber,
-          before: `BEAT: ${p.beat}\nSCENE: ${p.scene}`,
-          after: `BEAT: ${next.beat}\nSCENE: ${next.scene}`,
+          before: `BEAT: ${p.beat}`,
+          after: `BEAT: ${next.beat}`,
         });
         return next;
       });
@@ -726,7 +730,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         briefsIn: plan.pages.map(x => ({
           pageNumber: x.pageNumber,
           brief: `BEAT: ${x.beat || ''}
-SCENE: ${x.scene || ''}`.trim(),
+PLAN: ${x.planLine || ''}`.trim(),
         })),
       };
       if (stray.length > 0) log.warn(`⚠️ [BEATS] Review returned page(s) ${stray.join(', ')} that are not in the plan — ignored`);
@@ -773,11 +777,11 @@ SCENE: ${x.scene || ''}`.trim(),
             const fixParsed = parseBeats(fixRes.text || '', []);
             const rewrites2 = [];
             const merged2 = mergeByPage(beats, fixParsed.pages, (p, fix) => {
-              const next = { ...p, beat: fix.beat || p.beat, scene: fix.scene || p.scene };
+              const next = { ...p, beat: fix.beat || p.beat };
               rewrites2.push({
                 pageNumber: p.pageNumber,
-                before: `BEAT: ${p.beat}\nSCENE: ${p.scene}`,
-                after: `BEAT: ${next.beat}\nSCENE: ${next.scene}`,
+                before: `BEAT: ${p.beat}`,
+                after: `BEAT: ${next.beat}`,
               });
               return next;
             });
@@ -1003,9 +1007,9 @@ SCENE: ${x.scene || ''}`.trim(),
    * the only remaining user of the per-page scene-expansion.txt template here.
    */
   async function expandOnePage(b) {
-    // BEAT + SCENE stands in for page.text: in a beats-first run the text does
-    // not exist yet, so the Art Director works from the locked plan.
-    const pageContent = `BEAT: ${b.beat}\nSCENE: ${b.scene}`;
+    // BEAT + PLAN line stands in for page.text: in a beats-first run the text
+    // does not exist yet, so the Art Director works from the locked plan.
+    const pageContent = `BEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`;
     const prompt = buildSceneExpansionPrompt(
       b.pageNumber, pageContent, inputData.characters || [], lang,
       visualBible, availableAvatars, null,
@@ -1045,6 +1049,9 @@ SCENE: ${x.scene || ''}`.trim(),
       visualBible,
       availableAvatars,
       maxCharactersPerScene,
+      // The whole story, read-only, for the Art Director's judgment — it
+      // stages only what each page's beat and plan line carry.
+      finalArc: approvedArc,
       // The Art Director needs the outfit TEXT, not just the category key — see
       // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
       // only source, and it is resolved by the time scenes are expanded.
@@ -1583,10 +1590,11 @@ SCENE: ${x.scene || ''}`.trim(),
     const characterClothing = sm?.characterClothing || {};
 
     // Same fields UnifiedStoryParser.extractPages() hands to server.js.
+    // sceneHint carries the page-plan line (the SCENE field's replacement).
     pages.push({
       pageNumber: b.pageNumber,
       text,
-      sceneHint: b.scene || '',
+      sceneHint: b.planLine || '',
       sceneProse: '',
       characterClothing,
       characters,
@@ -1595,14 +1603,14 @@ SCENE: ${x.scene || ''}`.trim(),
     scenes.push({
       pageNumber: b.pageNumber,
       text,
-      sceneHint: b.scene || '',
+      sceneHint: b.planLine || '',
       sceneDescription,
       sceneDescriptionPrompt: exp?.prompt || null,
       sceneDescriptionModelId: exp?.modelId || sceneModel,
       characterClothing,
       characters,
       outlineCharacters: characters,
-      outlineExtract: `BEAT: ${b.beat}\nSCENE: ${b.scene}`,
+      outlineExtract: `BEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`,
     });
   }
   if (pages.length === 0) throw new Error('Beats pipeline produced no usable pages');
@@ -1636,7 +1644,7 @@ SCENE: ${x.scene || ''}`.trim(),
     // in the transcript rather than letting a reader trust a stale map.
     ...(pagePlan ? ['---PAGE PLAN---', (beatsReviewReport?.changedPages?.length ? '(written before the beats review; rewritten pages may no longer match it)\n' : '') + pagePlan, ''] : []),
     '---BEATS---',
-    beats.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n'),
+    beats.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`).join('\n\n'),
     '',
     '---BEATS REVIEW---',
     beatsReviewAnalysis || '(no review)',

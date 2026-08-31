@@ -66,6 +66,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // beats reviewer: this stage is time-boxed against the image phase.
   const defaultModel = opts.model || MODEL_DEFAULTS.textRefineModel || MODEL_DEFAULTS.outlineReviewModel;
   const usageLabel = opts.usageLabel || 'text_refine';
+  // The whole story, read-only (owner redesign 2026-08-31): the refiner judges
+  // each page against the arc the beats divided, never against staging alone.
+  const arc = String(opts.arc || '').trim();
 
   const original = pages.map(p => ({ ...p }));
   let current = pages.map(p => ({ ...p }));
@@ -142,7 +145,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // Built fresh from CURRENT text each round — that is the whole mechanism.
     // Audit findings go to round 1 only: they were found on the delivered text,
     // and later rounds would mis-flag pages round 1 already fixed.
-    let prompt = buildTextRefinePrompt(storyData, current, i === 0 ? auditFindings : '');
+    let prompt = buildTextRefinePrompt(storyData, current, i === 0 ? auditFindings : '', arc);
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride && i === 0) prompt = opts.promptOverride;
 
@@ -257,7 +260,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         if (n2 > 0) {
           const modelKey = perRound[rounds.length] || defaultModel;
           const withRulings = `${audit2}\n\nEarlier rounds answered a previous audit in their ledgers. A fault ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.`;
-          const prompt2 = buildTextRefinePrompt(storyData, current, withRulings);
+          const prompt2 = buildTextRefinePrompt(storyData, current, withRulings, arc);
           const t1 = Date.now();
           const MAX_OUT = Math.min(64000, TEXT_MODELS[modelKey].maxOutputTokens || 64000);
           const r2 = await callTextModelStreaming(prompt2, MAX_OUT, null, modelKey, { usageLabel });

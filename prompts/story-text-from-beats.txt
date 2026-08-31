@@ -20,7 +20,7 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE ARC — THE CONTRACT (what the text must achieve: the stake said early and again later, the change visible at the end, nothing the arc closes left unsaid or unshown)
+# THE STORY (the whole story, for judgment — the beats divide it; write only what this page's beat carries. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown.)
 
 {STORY_ARC}
 
@@ -28,11 +28,11 @@ Characters: {CHARACTER_NAMES}
 
 The commission above was already delivered by these beats. Its licence to replace mechanics was spent upstream: take nothing from it that the beats do not carry.
 
-One block per page. BEAT is what happens on that page. SCENE is a one-line summary. ILLUSTRATION is the finished brief the artist is drawing from — it is already locked and the picture will match it.
+One block per page. BEAT is what happens on that page. INSTANT is the single moment the picture shows. ILLUSTRATION is the finished brief the artist is drawing from — it is already locked and the picture will match it.
 
-Write only events the ILLUSTRATION supports: if it shows an object coming free, it comes free on that page; if it shows one still stuck, it stays stuck. If the brief has a character doing something, the text may name it or stay silent, but it must never contradict it — a reader sees both on the same page. Where they disagree, the ILLUSTRATION wins over the SCENE line, and the SCENE line over the BEAT.
+The picture shows the named instant; the text tells the whole beat — above all what the picture cannot show. It never merely describes the picture, and never contradicts it: if the picture shows an object coming free, it comes free on that page; if it shows one still stuck, it stays stuck. Where BEAT and ILLUSTRATION disagree, the ILLUSTRATION wins.
 
-Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's. Nor does the text assert a position, an action or an object the SCENE line and ILLUSTRATION do not stage: a figure they leave out of frame does nothing visible on that page, and an action they stage as its aftermath is told as its aftermath.
+Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's.
 
 {BEATS}
 
@@ -41,8 +41,8 @@ Do not narrate staging. Zones, depths, camera angles, who stands where and what 
 Write the text for all {PAGE_COUNT} pages, in page order, plus a title.
 
 Each page covers its own beat and nothing from the next one.
-The illustration already shows the scene, so write what it cannot show: the interior, the dialogue, the turn.
-Never contradict a page's SCENE line, and never mention pages, beats or illustrations.
+The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the rest of the beat.
+Never contradict a page's illustration, and never mention pages, beats or illustrations.
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
 Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene. Rhetorical set-pieces are rationed to one use in the whole book: a paired negation (kein X, kein Y), a coined saying or incantation, a one-sentence paragraph for drama — the second occurrence is written as plain narration.
 Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
@@ -50,13 +50,13 @@ The arc's stake — what must happen and why — is stated plainly in the text: 
 Everything else works the other way: information neither the beats nor the pictures carry is cut, never added.
 Every word must be one a child at the reading level above already uses. Name a thing plainly instead of reaching for a rare compound or an unusual colour or material word, and keep a sentence to one idea when the word count is tight.
 No abbreviation or acronym reaches the page, even when a beat uses one: write the thing the way a child says it — the little train up the mountain, not its initials.
-Characters speak: at least a third of the pages carry a spoken line, and speech carries feeling and decision, not only what the pictures already show.
+Use dialogue where it fits — speech carries feeling and decision, not only what the pictures already show.
 {TITLE_RULE}
 Then name the candidate to ship, judged in this order: it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud.
 
 Work in two steps.
 
-Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it. End it with the pages that carry no spoken line, and their count against the floor above.
+Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it.
 
 Step 2 — write the pages, fixing what the analysis found. A problem the analysis names must change the page it names.
 

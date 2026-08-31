@@ -3180,7 +3180,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
  *
  * params.models : comma list of TEXT_MODELS keys (default sceneReviewModel)
  * params.source : 'briefs' (default, data.sceneImages[].sceneDescription)
- *                 | 'beats' (SCENE lines from the stored outline's ---BEATS---)
+ *                 | 'beats' (PLAN lines from the stored outline's ---BEATS---; legacy SCENE lines parse the same)
  */
 const HAZARD_CLASSES = ['CROWD', 'MULTIACT', 'GAZE', 'CONTACT', 'FORCE', 'ELEV', 'UNHELD', 'NEG', 'SCALE', 'TEMPORAL', 'LOC', 'SHOT'];
 
@@ -3211,9 +3211,9 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
     storyTitle = out.title || null;
     if (source === 'beats') {
       pages = (out.finalBeats || [])
-        .filter(p => String(p.scene || '').trim())
-        .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
-      if (!pages.length) throw new Error(`fromExperiment ${expId}: no finalBeats SCENE lines in result`);
+        .filter(p => String(p.planLine || p.scene || '').trim())
+        .map(p => ({ pageNumber: p.pageNumber, brief: p.planLine || p.scene }));
+      if (!pages.length) throw new Error(`fromExperiment ${expId}: no finalBeats PLAN lines in result`);
     } else {
       // fromBeats = the raw expansion; reviewedBrief = after the scene review
       // rewrote it. params.artifact picks the measurement: 'raw' isolates the
@@ -3231,9 +3231,9 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
       const beatsSection = (String(storyData.outline || '')
         .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
       pages = parseBeats(beatsSection).pages
-        .filter(p => String(p.scene || '').trim())
-        .map(p => ({ pageNumber: p.pageNumber, brief: p.scene }));
-      if (!pages.length) throw new Error('story has no stored beat SCENE lines to audit');
+        .filter(p => String(p.planLine || '').trim())
+        .map(p => ({ pageNumber: p.pageNumber, brief: p.planLine }));
+      if (!pages.length) throw new Error('story has no stored beat PLAN lines to audit');
     } else {
       pages = (storyData.sceneImages || [])
         .filter(s => String(s.sceneDescription || '').trim())
@@ -3559,7 +3559,7 @@ async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costO
 
   const basePrompt = buildSceneExpansionAllPrompt(
     { ...storyData, characters: storyData.characters || [], pageClothing: null },
-    toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, scene: b.scene })),
+    toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, planLine: b.planLine })),
     {
       visualBible: storyData.visualBible || null,
       availableAvatars,
@@ -3664,15 +3664,15 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // different question — can the Art Director and the text writer repair what
   // the beats left behind — the beats have to be the ones that actually
   // shipped, not a fresh draft. Every page keeps its own beat in
-  // `outlineExtract` ("BEAT: … SCENE: …"), so the shipped set is recoverable
+  // `outlineExtract` ("BEAT: … PLAN: …"; legacy "SCENE:"), so the shipped set is recoverable
   // without re-running anything.
   if (params.useStoredBeats || params.plainStoredBeats) {
     const stored = (storyData.sceneImages || [])
       .map((s) => {
         const raw = String(s.outlineExtract || '');
-        const beat = (raw.match(/BEAT:\s*([\s\S]*?)(?=\nSCENE:|$)/i) || [, ''])[1].trim();
-        const scene = (raw.match(/SCENE:\s*([\s\S]*)$/i) || [, ''])[1].trim();
-        return beat ? { pageNumber: s.pageNumber, beat, scene } : null;
+        const beat = (raw.match(/BEAT:\s*([\s\S]*?)(?=\n(?:PLAN|SCENE):|$)/i) || [, ''])[1].trim();
+        const planLine = (raw.match(/(?:PLAN|SCENE):\s*([\s\S]*)$/i) || [, ''])[1].trim();
+        return beat ? { pageNumber: s.pageNumber, beat, planLine } : null;
       })
       .filter(Boolean);
     if (stored.length === 0) throw new Error('stored beats: no page carries an outlineExtract BEAT');
@@ -3692,7 +3692,12 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let planMs = 0;
   let planParsed = null;
   if (!plainStoredBeats) {
-    plannerPrompt = buildBeatsPrompt(storyData, pageCount);
+    // The planner divides a finished story (2026-08-31): feed it the stored
+    // story's arc so the Lab measures the production shape.
+    plannerPrompt = buildBeatsPrompt(storyData, pageCount, {
+      finalArc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc
+        || parseBeats(String(storyData.outline || '')).arc || '',
+    });
     if (!plannerPrompt) throw new Error('story-beats template unavailable');
     if (promptOverride) plannerPrompt = promptOverride;
 
@@ -3700,6 +3705,11 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     planRes = await callTextModelStreaming(plannerPrompt, null, null, beatsModel, { usageLabel: 'testlab_beats' });
     planMs = Date.now() - t0;
     planParsed = parseBeats(planRes.text || '', expected);
+    {
+      const { parsePagePlan } = require('./storyHelpers');
+      const tlPlanLines = parsePagePlan((String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1]);
+      for (const pg of planParsed.pages) pg.planLine = tlPlanLines.get(pg.pageNumber) || pg.planLine || '';
+    }
     if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable beats');
   }
 
@@ -3723,7 +3733,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let finalBeats = plainStoredBeats || planParsed.pages;
   if (!plainStoredBeats && !params.skipReview) {
     const tlPagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
-    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages, planParsed.arc, tlPagePlan);
+    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages,
+      storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || parseBeats(String(storyData.outline || '')).arc || '', tlPagePlan);
     if (!reviewPrompt) throw new Error('story-beats-review template unavailable');
     const t1 = Date.now();
     const revRes = await callTextModelStreaming(reviewPrompt, null, null, reviewModel, { usageLabel: 'testlab_beats_review' });
@@ -3734,10 +3745,10 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const byPage = new Map(revParsed.pages.map(p => [p.pageNumber, p]));
     finalBeats = planParsed.pages.map(p => {
       const fix = byPage.get(p.pageNumber);
-      return fix ? { ...p, beat: fix.beat || p.beat, scene: fix.scene || p.scene } : p;
+      return fix ? { ...p, beat: fix.beat || p.beat } : p;
     });
     const changed = finalBeats
-      .filter((p, i) => p.beat !== planParsed.pages[i].beat || p.scene !== planParsed.pages[i].scene)
+      .filter((p, i) => p.beat !== planParsed.pages[i].beat)
       .map(p => p.pageNumber);
 
     review = {
@@ -3802,7 +3813,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll } = require('./storyHelpers');
       const allPrompt = buildSceneExpansionAllPrompt(
         { ...storyData, characters: storyData.characters || [], pageClothing: null },
-        toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, scene: b.scene })),
+        toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, planLine: b.planLine })),
         {
           visualBible: storyData.visualBible || null,
           availableAvatars,
@@ -3837,10 +3848,10 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     }
 
     if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(async b => {
-      // BEAT + SCENE stands in for page.text. No rawOutlineContext: in a
+      // BEAT + PLAN line stands in for page.text. No rawOutlineContext: in a
       // beats-first run there is no outline block yet, so this measures the
       // Art Director working from the plan alone.
-      const pageContent = `BEAT: ${b.beat}\nSCENE: ${b.scene}`;
+      const pageContent = `BEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`;
       const prompt = buildSceneExpansionPrompt(
         b.pageNumber, pageContent, storyData.characters || [], lang,
         storyData.visualBible || null, availableAvatars, null,
@@ -4025,6 +4036,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
   }
 
   const res = await refineStoryText(storyData, pages, {
+    arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
     rounds: params.rounds,
     model: params.model,
     roundModels: params.roundModels,
@@ -6960,7 +6972,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
 
   // "## Page N" so a stored round's artifact_text round-trips back through parseBeats
   // (needed to branch a new round off a selected round — params.fromText below).
-  const beatsToText = (bs) => bs.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n');
+  const beatsToText = (bs) => bs.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`).join('\n\n');
 
   // BRANCH MODE — continue a SPECIFIC round: review the selected round's stored
   // beats text (params.fromText) once with the chosen model, scoring it as the
@@ -6985,7 +6997,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     const branchAnalysis = (marker ? out.slice(0, marker.index) : out).trim();
     const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
     const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
-    const nextBeats = inBeats.map(b => byPage.get(b.pageNumber) || b);
+    const nextBeats = inBeats.map(b => { const r = byPage.get(b.pageNumber); return r ? { ...b, beat: r.beat || b.beat } : b; });
     const genCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
     const genMs = Date.now() - t;
     const chain = {
@@ -6994,7 +7006,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
       analysis: branchAnalysis.slice(0, 15000),
       rewrites: inBeats.filter(b => byPage.has(b.pageNumber)).map(b => {
         const r = byPage.get(b.pageNumber);
-        return { page: b.pageNumber, before: `BEAT: ${b.beat}\nSCENE: ${b.scene}`.slice(0, 2000), after: `BEAT: ${r.beat}\nSCENE: ${r.scene}`.slice(0, 2000) };
+        return { page: b.pageNumber, before: `BEAT: ${b.beat}`.slice(0, 2000), after: `BEAT: ${r.beat}`.slice(0, 2000) };
       }),
     };
     let scorecard = null;
@@ -7051,7 +7063,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         analysis: analysis.slice(0, 15000),
         rewrites: beats.filter(b => byPage.has(b.pageNumber)).map(b => {
           const r = byPage.get(b.pageNumber);
-          return { page: b.pageNumber, before: `BEAT: ${b.beat}\nSCENE: ${b.scene}`.slice(0, 2000), after: `BEAT: ${r.beat}\nSCENE: ${r.scene}`.slice(0, 2000) };
+          return { page: b.pageNumber, before: `BEAT: ${b.beat}`.slice(0, 2000), after: `BEAT: ${r.beat}`.slice(0, 2000) };
         }),
       };
       const entry = {
@@ -7117,10 +7129,10 @@ function resolveStoryBeats(storyData, helpers) {
   if (Array.isArray(briefs) && briefs.length > 0) {
     const parsed = briefs.map((b) => {
       const t = String(b.brief || '');
-      const beat = (t.match(/BEAT:\s*([\s\S]*?)(?=\nSCENE:|$)/i) || [])[1] || '';
-      const scene = (t.match(/SCENE:\s*([\s\S]*)$/i) || [])[1] || '';
-      return { pageNumber: b.pageNumber, beat: beat.trim(), scene: scene.trim() };
-    }).filter(b => b.beat || b.scene);
+      const beat = (t.match(/BEAT:\s*([\s\S]*?)(?=\n(?:PLAN|SCENE):|$)/i) || [])[1] || '';
+      const planLine = (t.match(/(?:PLAN|SCENE):\s*([\s\S]*)$/i) || [])[1] || '';
+      return { pageNumber: b.pageNumber, beat: beat.trim(), planLine: planLine.trim() };
+    }).filter(b => b.beat || b.planLine);
     if (parsed.length > 0) return { beats: parsed, source: 'briefsIn' };
   }
   const fullText = storyData.storyText || storyData.story || '';
@@ -7129,7 +7141,7 @@ function resolveStoryBeats(storyData, helpers) {
     return {
       pageNumber: sc.pageNumber,
       beat: (getPageText(fullText, sc.pageNumber) || '').slice(0, 600),
-      scene: (meta.sceneIntent || String(sc.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+      planLine: (meta.sceneIntent || String(sc.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
     };
   });
   return { beats, source: 'reconstructed-from-prose' };
@@ -7324,7 +7336,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
       .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
     const t = Date.now();
-    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch' });
+    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '' });
     const genMs = Date.now() - t;
     const genCost = (rr.rounds || []).reduce((s, r) => s + (r.cost || 0), 0);
     const storyText = rr.pages.map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
@@ -7461,7 +7473,7 @@ async function runWriterCompareStage(target, { params = {} }) {
     for (const stage of stages) {
       try {
         if (stage === 'plan') {
-          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages), model, 'plan');
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: SH.parseBeats(String(storyData.outline || '')).arc || '' }), model, 'plan');
           const parsed = SH.parseBeats(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
@@ -7590,13 +7602,14 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
     return { per, mean: nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null };
   };
 
-  // Round 0 — the arc as planned. The planner owns every arc rule already, so
-  // this asks the same prompt for its ARC block alone rather than duplicating
-  // those rules into a second template that would then drift.
-  let planPrompt = buildBeatsPrompt(storyData, pageCount);
+  // Round 0 — the arc as created. The arc rules live in arc-create (the beats
+  // template divides a finished story and authors none), so the authoring
+  // rounds build on that template and ask for one ---ARC--- block.
+  const { buildArcCreatePrompt } = require('./storyHelpers');
+  let planPrompt = buildArcCreatePrompt(storyData, pageCount);
   if (!planPrompt) throw new Error('story-beats template unavailable');
   if (promptOverride) planPrompt = promptOverride;
-  planPrompt += '\n\nOutput the ---ARC--- block only. Omit the ---BEATS--- block entirely.';
+  planPrompt += '\n\nInstead of the output contract above: write ONE arc and output it as an ---ARC--- block only — no critique, no commitment line.';
 
   const variantCount = Math.min(Math.max(parseInt(params.variants, 10) || 0, 0), 4);
   const trail = [];

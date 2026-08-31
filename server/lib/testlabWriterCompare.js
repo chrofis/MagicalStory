@@ -130,16 +130,16 @@ function scoreText(pages, expectedPages, language) {
   };
 }
 
-/** Beat plan: structure only — one beat and one scene intent per page. */
+/** Beat plan: structure only — one beat and one page-plan line per page. */
 function scorePlan(beats, expectedPages) {
   const n = beats.length;
   if (n === 0) return { score: 0, note: 'no beats' };
-  const withBoth = beats.filter(b => String(b.beat || '').trim() && String(b.scene || '').trim()).length;
+  const withBoth = beats.filter(b => String(b.beat || '').trim() && String(b.planLine || b.scene || '').trim()).length;
   const criteria = {
     completeness: rate(Math.min(n, expectedPages), Math.max(expectedPages, 1)),
     filled: rate(withBoth, n),
   };
-  return { ...criteria, score: avg(Object.values(criteria)), raw: `${n}/${expectedPages} pages, ${withBoth} with beat+scene` };
+  return { ...criteria, score: avg(Object.values(criteria)), raw: `${n}/${expectedPages} pages, ${withBoth} with beat+plan` };
 }
 
 module.exports = { ALL_STAGES, scoreScenes, scoreBible, scoreText, scorePlan, rate, avg };

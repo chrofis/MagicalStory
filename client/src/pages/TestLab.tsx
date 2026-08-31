@@ -1587,7 +1587,7 @@ function SentPromptsPanel({ prompts, onEdit }: { prompts: SentPrompt[]; onEdit?:
 function BeatsScenesView({ result }: { result: ExperimentResult }) {
   const plan = result.beatsPlan;
   const review = result.beatsReview;
-  const beats = (result.finalBeats || []) as { pageNumber: number; beat: string; scene: string }[];
+  const beats = (result.finalBeats || []) as { pageNumber: number; beat: string; planLine?: string; scene?: string }[];
   const changed = new Set(review?.changedPages || []);
   const lockSec = (result.timeToLockMs || 0) / 1000;
   // The stage this replaces: writer + review + scene expansion, measured at 5.5
@@ -1655,18 +1655,18 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
                   <div className="rounded border border-gray-200 bg-white p-2">
                     <div className="text-[10px] font-semibold text-gray-500 mb-0.5">BEFORE — {plan?.modelKey}</div>
                     <div><span className="text-gray-400">BEAT</span> {before.beat}</div>
-                    <div><span className="text-gray-400">SCENE</span> {before.scene}</div>
+                    <div><span className="text-gray-400">PLAN</span> {before.planLine ?? before.scene}</div>
                   </div>
                   <div className="rounded border border-indigo-200 bg-white p-2">
                     <div className="text-[10px] font-semibold text-indigo-600 mb-0.5">AFTER — {review?.modelKey}</div>
                     <div><span className="text-gray-400">BEAT</span> {b.beat}</div>
-                    <div><span className="text-gray-400">SCENE</span> {b.scene}</div>
+                    <div><span className="text-gray-400">PLAN</span> {b.planLine ?? b.scene}</div>
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="mt-0.5"><span className="text-gray-500">BEAT</span> {b.beat}</div>
-                  <div><span className="text-gray-500">SCENE</span> {b.scene}</div>
+                  <div><span className="text-gray-500">PLAN</span> {b.planLine ?? b.scene}</div>
                 </>
               )}
             </div>

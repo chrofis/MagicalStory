@@ -3310,6 +3310,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (refinablePages.length > 0) {
         genLog.info('text_refine_start', `Refining text for ${refinablePages.length} page(s) in parallel with images`);
         textRefinePromise = startBackgroundRefine(inputData, refinablePages, {
+          // The whole story, read-only, for the refiner's judgment (beats mode
+          // only — the unified path records no arc).
+          arc: arcReviewReport?.finalArc || beatsReviewReport?.arc || '',
           // 1 (owner, 2026-08-27): rounds past the first get no external
           // findings — the audit feeds round 1, audit2+proofread feed the
           // corrective round. Unfed self-checklist passes measured flat and
@@ -5756,7 +5759,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const refinePages = extractRefinablePages(allImages);
             const modelKey = MD.textRefineModel || MD.outlineReviewModel;
             const findings = `${audit.byRoute.TEXT.map(f => f.line).join('\n')}\nFAULTS: ${audit.byRoute.TEXT.length}`;
-            const prompt = buildTextRefinePrompt(inputData, refinePages, findings);
+            const prompt = buildTextRefinePrompt(inputData, refinePages, findings,
+              arcReviewReport?.finalArc || beatsReviewReport?.arc || '');
             if (!prompt) throw new Error('text-refine template unavailable');
             if (!TEXT_MODELS[modelKey]) throw new Error(`unknown model "${modelKey}"`);
             const MAX_OUT = Math.min(64000, TEXT_MODELS[modelKey].maxOutputTokens || 64000);

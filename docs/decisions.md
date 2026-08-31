@@ -22327,3 +22327,60 @@ only when a cell fails.
 loop in `generateReferenceSheet`).
 
 **Status:** ✅ active.
+
+## 2026-08-31 — Beats/AD/text redesign: the beats stage divides a finished story; SCENE replaced by the PAGE PLAN line
+
+**Context.** Live owner review of the pirate run (job_1788123310558; autopsies q3/q6/q7/q8 in the
+session scratchpad `piraterun/`). The beats stage still carried story-authoring machinery (its own
+---ARC--- block, STORY_SHAPE, CHALLENGE_IDEAS, ARC_WEAK_POINTS, the commission preamble) although
+the arc machine now authors the story; the SCENE field duplicated staging the Art Director re-does;
+the page plan optimized shot variety instead of simplicity; and the text stages treated the
+illustration brief as a ceiling on what the words may tell.
+
+**Decision (owner's principles: "the beats gets the story"; "simplify the picture, never the story").**
+1. `story-beats.txt` fully redesigned: one merged opening (divide {PAGE_COUNT} pages, plan in
+   English, reader line), the FINAL ARC as input ({FINAL_ARC}), premise reduced to a names/world
+   reference ("The arc above delivers the commission; keep its names and world as written").
+   Removed: the beats-authored ---ARC--- output block, SCENE, STORY_SHAPE, CHALLENGE_IDEAS,
+   ARC_WEAK_POINTS, the commission preamble, the reading-level rhythm block, "Resolve what the
+   commission conflates". The PAGE PLAN is rebuilt as a simplicity-first sequence (emotional
+   close-ups, no-people pages, one calm group picture, 3+ only where the story demands it), one
+   line per page: shot — who — instant — change; the change field is the anti-filler rule.
+   A one-camera rule (never inside a vehicle/structure and its exterior at once) joins the
+   drawability bullets and, plate-side, the emptyScenePrompt rules of both AD templates.
+2. Story-authoring requirements migrated (deduped) into `arc-create.txt` + `arc-retell.txt`
+   RULES OF THE TELLING (want/change, costs, children-resolve, youngest-in-reach, grounded
+   reasons, rival ending, safe ending, peril level, obstacle origin, naming, deadline-hour,
+   thread closure, fewest characters, group cohesion). Division craft stays in beats. The arc
+   goal line now names characters: "carried by figures a child likes, roots for, and can tell
+   apart" (owner ruling, same day).
+3. AD templates stage from BEAT + PLAN line and receive the FINAL ARC read-only ("for judgment —
+   the beats divide it"). Migrated out of the AD: instant re-selection (hand-over moment-before/
+   after), multi-action selection, cast-count policing (staging craft kept; never drop characters).
+4. Text writer: "The picture shows the named instant; the text tells the whole beat — above all
+   what the picture cannot show. It never merely describes the picture, and never contradicts it."
+   The dialogue floor (a third of pages + counting) is REMOVED, replaced by one recommendation
+   ("Use dialogue where it fits — speech carries feeling and decision..."). Text refine gains the
+   arc read-only and the cargo rule ("Events the beat carries and the picture doesn't show are the
+   text's cargo — never cut them for image fidelity"); its out-of-frame deletion rule is reworked
+   to non-contradiction only.
+5. Wiring: `parseBeats` drops SCENE (legacy SCENE lines bridge into `planLine`), keeps stored-
+   transcript arc extraction; `parsePagePlan`/`planInstant` added; every BEAT+SCENE assembly is
+   now BEAT+PLAN (review, audit, bible, clothing review, AD, text INSTANT); `getReadingLevel`
+   split (planning form without PACING; text stages keep the full block); finalArc threaded into
+   the beats prompt, the AD batch, text writer, beats reviewer and text refine; Test Lab stages,
+   `testlabWriterCompare.filled`, `resolveStoryBeats` and the client beats panels swept; the Lab
+   arc-panel stage now authors from `arc-create.txt` (the beats template authors nothing).
+
+**Rationale.** The beats stage kept re-authoring the story it was told to divide, and complicated
+pages were the default because nothing optimized for simple ones. Char counts (LF-normalized):
+story-beats 14567→6254; net across the eight touched templates −1736, and each beats call also
+drops the injected STORY_SHAPE/CHALLENGE_IDEAS/ARC_WEAK_POINTS/preamble blocks.
+
+**Touched files.** `prompts/story-beats.txt`, `prompts/story-beats-review.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`, `prompts/arc-create.txt`,
+`prompts/arc-retell.txt`, `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`server/lib/textRefine.js`, `server/lib/testlab.js`, `server/lib/testlabWriterCompare.js`,
+`server/lib/storyHelpers.js`, `storyJobPipeline.js`, `client/src/pages/TestLab.tsx`,
+`client/src/services/testlabService.ts`.

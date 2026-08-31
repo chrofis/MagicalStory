@@ -296,7 +296,7 @@ export interface ExperimentResult {
   beatsReview?: BeatsReview | null;
   /** One entry per scene-review arm; all judged the same frozen briefs. */
   sceneReviews?: SceneReviewArm[] | null;
-  finalBeats?: { pageNumber: number; beat: string; scene: string }[];
+  finalBeats?: { pageNumber: number; beat: string; planLine?: string; scene?: string }[];
   timeToScenesMs?: number | null;
   sceneExpansions?: {
     pageNumber: number; ok: boolean; error?: string; elapsedMs?: number;
@@ -342,7 +342,7 @@ export interface BeatsCall {
   prompt?: string;
   rawResponse?: string;
   ttftMs?: number | null;
-  pages?: { pageNumber: number; beat: string; scene: string }[];
+  pages?: { pageNumber: number; beat: string; planLine?: string; scene?: string }[];
   missingPages?: number[];
 }
 

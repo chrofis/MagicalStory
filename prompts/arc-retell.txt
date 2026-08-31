@@ -1,4 +1,4 @@
-You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). The goal of the arc is a story full of suspense that stays coherent. Work in ENGLISH.
+You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). The goal of the arc is a story full of suspense that stays coherent, carried by figures a child likes, roots for, and can tell apart. Work in ENGLISH.
 
 Reading level: {READING_LEVEL}
 
@@ -16,8 +16,21 @@ Reading level: {READING_LEVEL}
 - Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.
 - Every sentence follows from the one before — therefore, or but. Never "and then".
 - Each character's nature causes a problem or solves one.
-- Whoever or whatever stands in the way presses on the story to the end and stands in the scene at the turning point.
-- Names the commission gives stand as written.
+- The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves. Early on, a character says aloud what must happen and why.
+- Each challenge is met at a cost, each harder because the last was not clean; near the end the goal looks lost before it is won. No obstacle is removed in the moment that introduces it; passing one costs something named — time, a possession, a plan, help asked for.
+- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes an obstacle; adults may comfort, permit or watch.
+- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child's reach — noticing, holding, fetching, naming, offering, refusing.
+- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request.
+- Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.
+- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story's own world — weather, distance, a rival, a broken or missing or guarded thing, a character's own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.
+- A rival's thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.
+- Peril matches the youngest named child: frightening is the right level, and nothing can kill or injure a child — no drowning, no fall from a height; a refusal, a loss, a delay or a broken promise carries it instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.
+- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.
+- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.
+- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows. The group stays together unless it has a reason to separate and a reason to meet again.
+- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.
+- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.
+- When the deadline is a time of day, the story starts at an hour the book's length can cross to reach it.
 
 # THE COMMITTED ARC AND ITS CRITIQUE
 

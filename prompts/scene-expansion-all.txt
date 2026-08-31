@@ -10,18 +10,18 @@
 # Output is parsed by parseRefinedText(raw, expectedPages, 'SCENES') — the same
 # parser the scene review's response goes through.
 
-**ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader. You write ALL {PAGE_COUNT} pages in this one response.
+**ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader. You write ALL {PAGE_COUNT} pages in this one response. Each page arrives as its BEAT (what happens) and its PLAN line (shot — who is in frame — the instant the picture shows — what changes); stage that instant.
 
 ---
 
 ## Per-page rules
 
-1. **Simplify, don't elaborate.** The page's BEAT + SCENE is already good. Flesh it into prose; don't add complexity. If the beat says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent. The SCENE prose stays under 450 words.
+1. **Simplify, don't elaborate.** The page's BEAT + PLAN line is already good. Flesh it into prose; don't add complexity. If the beat says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent. The SCENE prose stays under 450 words.
 1b. **Distinctive settings carry their own detail.** When a beat's location is a fantastical or strongly-themed world (a magical realm, undersea, outer space, an enchanted forest, an ancient ruin, and the like), or a real place the story's premise has transformed into one, fill the SETTING with a lot of that world's characteristic environmental elements even when the beat names only the bare place — this describes the location, it is not added plot. Keep it to the environment and background; never add characters and never change the beat's action.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally — `hovers above` becomes a visible gap. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
-3. **Only characters from the page's beat.** The BEAT and SCENE lines define who is visible on that page. Do not import characters from other pages. If the beat describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
-4. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Up to {MAX_CHARACTERS_PER_SCENE} when the beat genuinely needs more. Preserve every character the beat lists — don't drop characters silently. When more than three characters are present, prefer the whole group together at one depth in a wider shot. Push a figure into the background only when the beat itself separates them (left behind, watching from afar, arriving in the distance) — never as a crowd-management default, and never thin by removing a character who is in the scene. When four or more characters must share the frame, compose it as a wide or distant shot, or show the group from behind as they move away — never five detailed close foreground faces, which the model renders poorly.
-5. **One moment, one focal point.** Single instant. One main action draws the eye. When the beat chains physical actions, depict the one with the most motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
+3. **Only characters from the page's beat.** The BEAT and PLAN lines define who is visible on that page. Do not import characters from other pages, and never drop one they list. If the beat describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
+4. **Staging a group.** When more than three characters share the frame, keep the whole group together at one depth in a wider shot, or show them from behind as they move away — never five detailed close foreground faces. Push a figure into the background only when the beat itself separates them (left behind, watching from afar, arriving in the distance) — never as a crowd-management default.
+5. **One moment, one focal point.** Stage the given instant as written, without hidden limbs. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
 5b. **One centre of action.** Never two vehicles or vessels in frame each with a crew doing its own thing — one carries the moment, and a second is distant, partly cut by the frame edge, or empty.
 5c. **One instant, no history.** The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no "again", "for the third time", "already", no object both mid-motion and in its ended state. Write the single visible instant.
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
@@ -73,7 +73,11 @@ C6. **Visual arc.** Framing builds with the plot: the widest establishing shot n
 
 ## INPUT
 
-**ALL LOCKED PAGE BEATS ({PAGE_COUNT} pages — write one brief per page, in order):**
+# THE STORY (for judgment — the beats divide it; stage only what this page's beat and plan line carry)
+
+{FINAL_ARC}
+
+**ALL LOCKED PAGE BEATS ({PAGE_COUNT} pages, each BEAT + PLAN line — write one brief per page, in order):**
 {ALL_BEATS}
 
 **CHARACTER DETAILS (exactly {CHARACTER_COUNT} characters — weave each one's appearance into the prose):**
@@ -184,7 +188,7 @@ Omit entirely (do not include with `false`): pure ground/floor/path contact, lea
 
 Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side" — the visible grip belongs in the prose (rule 7b). Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
-`hands`: `true` when the character's hands are on the object. One object takes one pair of hands: a second character in contact with the same object belongs on another page, and a hand-over is drawn as the moment before or after it — one holds the object out, the other reaches.
+`hands`: `true` when the character's hands are on the object. One object takes one pair of hands: when a second character reaches for the same object, one holds it out and the other reaches — their hands never share the grip.
 
 `action`: required on every row, in English whatever the story language. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
 
@@ -196,7 +200,7 @@ Field shape: `{character, object, where, action, hands, storyRelevant, priority}
 
 A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's beat and `low` otherwise.
 
-Cap: 1–6 entries, 0–2 with `storyRelevant: true`, and one `action` label per page beyond `"watching"` and `"standing"` — a second activity belongs on a different page.
+Cap: 1–6 entries, 0–2 with `storyRelevant: true`, and one `action` label per page beyond `"watching"` and `"standing"`.
 
 Every entry must also appear in the prose as the same physical contact.
 
@@ -212,6 +216,7 @@ Distance rule: when the verb implies action across a gap ('shoots', 'aims at', '
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.
 - Same camera framing as the scene itself: a close-up scene gets a close-up stage (the wall, the doorway, the table corner), a wide scene gets the wide setting. Never an establishing wide shot for a close-up scene.
+- The plate describes only what the camera sees from its vantage — never the exterior of the vehicle or structure the camera stands on.
 - The scene geography must give every standing character footing at their declared position — a bank, path, floor, deck, or walkway at that depth, never open water or air under a standing figure. A beat that puts a figure where nothing standable exists moves the figure or the camera.
 - When the page's beat is an obstacle, stage it blocking the route in frame and give one character an action against it — pushing, pointing, trying, being stopped. An obstacle nobody engages reads as scenery.
 - A crowd the action needs — pushing through it, hiding in it, lost in it — is a required scene element with mass and closeness, never background atmosphere.
