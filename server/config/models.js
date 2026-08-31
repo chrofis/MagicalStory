@@ -277,16 +277,19 @@ const MODEL_DEFAULTS = {
   arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
     .split(',').map(s => s.trim()).filter(Boolean),
   // Rounds of panel + re-tell. Round k>1 feeds the previous FINAL ARC + its
-  // critique back to the same panel. Default 2 (2026-08-31): both iteration
-  // studies concentrated the value in round 1 (the dragon study's judged
-  // winner was v1), and the 2026-08-31 pirate validation run showed every
-  // round's fresh critique minting a fresh MAJOR (R1 2M, R2 1M, R3 1M — each
-  // new), so the nothing-above-MINOR early stop never fired and max rounds
-  // always burned. The clamp stays 3 (owner cap 2026-08-30 — the study
+  // critique back to the same panel. Default 1 (owner verdict 2026-09-01 — a
+  // second round accretes texture that buries the story's spine; A/B
+  // arcflow-ab: the owner read both arcs and overruled the blind judges, who
+  // rewarded density where the owner rewards followability). Was 2
+  // (2026-08-31); the clamp stays 3 (owner cap 2026-08-30 — the study
   // regressed at round 4); the pipeline also stops early once the critique
   // holds nothing above MINOR, or once a re-telling's Fixing line addressed
   // only MINOR faults. ARC_ROUNDS for staging A/B.
-  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 2),
+  arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 1),
+  // The lean flow's hint pass (owner, 2026-09-01): after the final re-telling,
+  // one outside model names the top remaining issues as ISSUE → CHANGE hints.
+  // The hints ride into the beats and text-writer prompts; nothing re-tells.
+  arcHintsModel: process.env.ARC_HINTS_MODEL || 'grok-4.6',
   // The creator runs at the provider default (the Anthropic path sends no
   // temperature); these apply on OpenRouter/xAI paths only.
   arcPanelTemperature: 0.8,

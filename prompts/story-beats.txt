@@ -6,6 +6,8 @@ The story below is finished. Divide it into {PAGE_COUNT} pages: first the PAGE P
 
 {FINAL_ARC}
 
+{ARC_HINTS}
+
 # THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)
 
 The arc above delivers the commission; keep its names and world as written.

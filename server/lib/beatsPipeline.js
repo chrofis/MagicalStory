@@ -66,6 +66,8 @@ const {
   buildArcCreatePrompt,
   buildArcPanelPrompt,
   buildArcRetellPrompt,
+  buildArcHintsPrompt,
+  parseArcHints,
   parseArcCreate,
   parseArcRetell,
   critiqueMaxSeverity,
@@ -411,6 +413,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // The FINAL ARC's own critique — handed to the beats prompt as the known
   // weak points the page division must not amplify.
   let arcWeakPoints = '';
+  // The lean flow's hint pass (owner verdict 2026-09-01): the top remaining
+  // ISSUE → CHANGE lines on the final arc. They ride into the beats prompt
+  // (applied while dividing) and the text writer (the text supports them).
+  let arcHints = '';
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
@@ -588,6 +594,26 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       currentBlock = `FINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
     }
 
+    // GROK HINT PASS (owner verdict 2026-09-01, lean flow): one outside look
+    // at the final arc — the top remaining issues travel forward as hints,
+    // never as another re-telling round. Advisory: failure skips, never blocks.
+    try {
+      const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
+      const hintsPrompt = buildArcHintsPrompt(inputData, approvedArc);
+      if (!hintsPrompt) throw new Error('arc-hints template unavailable');
+      // null maxTokens = the model's own maximum; temp 0 on the non-Anthropic paths.
+      const hintsRes = await textModels.callTextModelStreaming(hintsPrompt, null, onChunk, hintsModel, { usageLabel: 'arc_hints', ...tempFor(hintsModel, 0) });
+      arcHints = parseArcHints(hintsRes?.text || '');
+      if (!arcHints) throw new Error('no ISSUE → CHANGE lines parsed');
+      gl.info('arc_hints', `Hint pass (${hintsRes.modelId || hintsModel}): ${arcHints.split('\n').length} hint(s) on the final arc`, null, {
+        model: hintsRes.modelId || hintsModel, hints: arcHints.split('\n'),
+      });
+    } catch (hintErr) {
+      arcHints = '';
+      log.warn(`⚠️ [ARC] hint pass failed (${hintErr.message}) — beats and text proceed without hints`);
+      gl.warn('arc_hints_failed', `Arc hint pass failed: ${hintErr.message} — beats and text proceed without hints`);
+    }
+
     meta.timings.arcMs = Date.now() - t;
     // Everything the machine produced, verbatim — storage is cheap,
     // debuggability is the point. Text only, no images.
@@ -608,6 +634,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       keeping: roundReports.length ? roundReports[roundReports.length - 1].keeping : '',
       maxSeverity: roundReports.length ? roundReports[roundReports.length - 1].maxSeverity : null,
       critique: roundReports.length ? roundReports[roundReports.length - 1].critique : arcWeakPoints,
+      arcHints,
     };
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s), final arc by ${arcCreatorModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, creatorModel: arcCreatorModel,
@@ -619,6 +646,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     gl.warn('beats_arc_failed', `Arc machine failed: ${err.message} — beats planned without an arc`);
     approvedArc = '';
     arcWeakPoints = '';
+    arcHints = '';
   }
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
@@ -627,7 +655,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // "the beats gets the story"). The final arc enters the template as
   // {FINAL_ARC}; the challenge draw and the arc critique no longer travel here
   // — the arc machine consumed the one and answered the other.
-  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc });
+  const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints });
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
@@ -1535,7 +1563,7 @@ PLAN: ${x.planLine || ''}`.trim(),
       gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
     }
     const textPrompt = withCarriedRulings(
-      buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc),
+      buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints }),
       // Rulings only (2026-08-26) — see the Art Director carry above.
       [beatsReviewAnalysis, beatsReviewReport?.analysis2 || ''],
       CARRY_ROUTES.beatsToStoryText

@@ -75,6 +75,8 @@ C6. **Visual arc.** Framing builds with the plot: the widest establishing shot n
 
 # THE STORY (for judgment — the beats divide it; stage only what this page's beat and plan line carry)
 
+Where the beats and the story differ, the beats are the story's final form.
+
 {FINAL_ARC}
 
 **ALL LOCKED PAGE BEATS ({PAGE_COUNT} pages, each BEAT + PLAN line — write one brief per page, in order):**

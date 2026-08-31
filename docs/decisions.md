@@ -22430,3 +22430,47 @@ distribution: about two close-ups and two ultra-wides, the rest medium or wide �
 close-ups when a moment earns one, but never just two shot types across the book." Check 6c
 in `story-beats-review.txt` extended to name a book whose shot column uses only two shot types
 across the whole plan.
+
+## 2026-09-01 — The arc machine adopts the LEAN FLOW: one round, missed-issues panel, grok hint pass riding into beats and text
+
+**Context.** The arcflow-ab A/B compared the two-round arc flow (Arm A) against a leaner
+one-round flow (Arm B). The blind judges preferred Arm A; the owner read both arcs and
+overruled them: *"Arm B's clear spine beats Arm A's dense texture; two retell rounds accrete
+detail that buries the main line."* The judges rewarded density, the owner rewards
+followability.
+
+**Decision (owner verdict, 2026-09-01).**
+1. `arcRounds` default 2 → 1 — a second round accretes texture that buries the story's
+   spine (clamp stays 3, `ARC_ROUNDS` still overrides for A/Bs).
+2. `arc-panel.txt` reframed to MISSED ISSUES: panelists receive the committed arc AND the
+   creator's own critique (already wired — `parseArcCreate().committed` carries arc +
+   CRITIQUE + commitment line, and round k>1 sends FINAL ARC + CRITIQUE); their job is to
+   find further issues the creator missed, not re-litigate the listed ones, judged on story
+   consistency and relatable characters. Still exactly ONE solution each in the existing
+   "SOLUTION (answers faults ...)" format; a missed issue is named in one line ahead of the
+   solution points. Budget (≤8 points), structure and suspense rules unchanged.
+3. NEW grok hint pass: after the final re-telling, one call to `grok-4.6`
+   (`arcHintsModel`, temp 0, model-max tokens, usageLabel `arc_hints`, template
+   `prompts/arc-hints.txt`) names the top 3 remaining "ISSUE: … → CHANGE: …" lines
+   (consistency + relatable-characters focus). Parsed tolerantly (`parseArcHints`),
+   persisted as `arcHints` in the arc trail (`arcReviewReport`); failure = genLog warn +
+   skip, never blocks. This is the #26 design — measured 8/9 hints useful.
+4. Hand-off: the hints enter the beats prompt as `{ARC_HINTS}` ("# FIX WHILE DIVIDING —
+   apply these while dividing the pages") and the text writer as `{ARC_HINTS}`
+   ("# APPLIED HINTS — the beats already apply these; the text supports them"). Wherever
+   the arc travels as read-only context (AD `scene-expansion-all.txt`, reviewer
+   `story-beats-review.txt`, writer `story-text-from-beats.txt`, refine `text-refine.txt`)
+   one precedence line now sits under the arc heading: "Where the beats and the story
+   differ, the beats are the story's final form."
+
+**Rationale.** Retell rounds are where the density came from; the hint pass keeps the one
+thing extra rounds actually delivered (a fresh outside reading) without letting anyone
+re-tell. Hints are applied at the division step, where the spine is cheapest to protect.
+Task-list alignment: this closes the lean-flow adoption item and the #26 hint-pass design.
+
+**Touched files.** `server/config/models.js` (`arcRounds`, `arcHintsModel`),
+`prompts/arc-panel.txt`, `prompts/arc-hints.txt` (new), `prompts/story-beats.txt`,
+`prompts/story-text-from-beats.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/story-beats-review.txt`, `prompts/text-refine.txt`, `server/services/prompts.js`,
+`server/lib/promptBuilders.js` (`buildArcHintsPrompt`/`parseArcHints`, `{ARC_HINTS}` fills),
+`server/lib/storyHelpers.js` (re-exports), `server/lib/beatsPipeline.js` (hint pass + hand-off).

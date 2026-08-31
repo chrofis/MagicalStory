@@ -22,7 +22,11 @@ Characters: {CHARACTER_NAMES}
 
 # THE STORY (the whole story, for judgment — the beats divide it; write only what this page's beat carries. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown.)
 
+Where the beats and the story differ, the beats are the story's final form.
+
 {STORY_ARC}
+
+{ARC_HINTS}
 
 # LOCKED BEATS AND ILLUSTRATIONS (given — the text matches them, page for page)
 

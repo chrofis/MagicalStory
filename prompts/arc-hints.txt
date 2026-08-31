@@ -1,0 +1,17 @@
+You review the finished story arc of a children's picture book.
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# THE FINAL ARC
+
+{FINAL_ARC}
+
+# YOUR TASK
+
+Name the top 3 remaining issues, judged on story consistency and how relatable the characters are. Output exactly 3 lines, nothing else, each:
+ISSUE: <one sentence> → CHANGE: <one sentence>
+Each change stays inside the existing structure and costs no suspense.

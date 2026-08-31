@@ -22,6 +22,8 @@ Characters: {CHARACTER_NAMES}
 
 # THE STORY (the whole story, for judgment — the beats divide it; a page's text carries only its own beat)
 
+Where the beats and the story differ, the beats are the story's final form.
+
 {STORY_ARC}
 
 # SCENE OUTLINES — read-only
