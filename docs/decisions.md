@@ -22054,3 +22054,46 @@ reader's home for landmark use only, not the story's setting, when the
 user's own premise names a world. See tasks/BACKLOG.md.
 **Status:** ✅ active (prompt/rounds fixes shipped; Setting/location
 precedence still open).
+
+## 2026-08-31 — Story-idea world split made explicit: labels, rerun steering, persisted `ideaWorld`
+
+**Context.** The wizard has always generated idea 1 from the user's real
+location (landmarks, `story-idea-requirements-adventure-1.txt`) and idea 2 in
+the fantasy/theme world (`-2.txt`), but nothing in the UI said so — the owner's
+report: "it is not obvious to the user that the location is different for idea
+1 and 2". The chosen idea's world also never reached the pipeline, so the
+"named location is binding" rule had nothing structured to hang on to.
+
+**Decision.** One server-side resolver, `resolveIdeaWorlds()` in
+`server/routes/storyIdeas.js`, is the single source of truth for which world
+each idea plays in. It returns two entries `{world: 'location'|'fantasy',
+theme, location}` — or `null` when there is no split (historical stories play
+at the event's real place; no known location = legacy behavior, no labels).
+Overrides: life-skills stories in a realistic environment
+(`REALISTIC_ENVIRONMENT_THEMES`: realistic, farm, forest, fireman, doctor,
+police, detective) always get BOTH ideas from the real location — no fantasy
+idea. A new `worldMode` request field ('auto'|'location'|'fantasy') lets a
+rerun steer both ideas to one side; the requirements file, variant
+instruction, and location/landmark prompt sections follow the resolved world
+per idea (fantasy prompts get `USER_LOCATION_INSTRUCTION` and
+`AVAILABLE_LANDMARKS` blanked so the city cannot leak in). The streaming
+endpoint emits `ideaWorlds` in its initial SSE event; the wizard shows a world
+badge above each idea card («Deine Stadt: Zürich» / «Fantasiewelt: <Thema>»)
+and a three-pill steering control (hidden when there is no split to steer).
+The selected idea's world ships as `ideaWorld` on the create-story payload and
+is persisted on `stories.data.ideaWorld` (null for custom/user-written ideas);
+the offered pair is kept as `ideaGeneration.worlds` alongside the existing
+provenance data. The trial wizard has its own ideas step
+(`TrialIdeasStep.tsx` + `/api/trial` endpoint) and is deliberately untouched.
+
+**Rationale.** The split existed; the fix is to surface and persist it, not to
+build a second mechanism. Server-resolved worlds (not client-guessed) because
+the effective city can differ from the user's home city (swiss-stories
+override it), and because the pipeline consumer needs the same truth the user
+saw.
+
+**Touched files.** `server/routes/storyIdeas.js` (resolver + both endpoints),
+`storyJobPipeline.js` (persist `ideaWorld`), `client/src/types/story.ts`
+(`IdeaWorld`, `IdeaWorldMode`), `client/src/services/storyService.ts`,
+`client/src/pages/StoryWizard.tsx`,
+`client/src/pages/wizard/WizardStep6Summary.tsx`.

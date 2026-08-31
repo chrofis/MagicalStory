@@ -325,12 +325,59 @@ ${adventureGuideContent}`
   };
 }
 
+/**
+ * Which world each of the two generated ideas plays in — the single source of
+ * truth for the wizard's per-idea world labels and for the `ideaWorld` field
+ * the selected idea carries into the create-story payload (persisted on
+ * stories.data so the pipeline can honor the chosen world).
+ *
+ * Default (auto): idea 1 = the user's real location, idea 2 = the fantasy /
+ * theme world. `worldMode` lets a rerun steer both ideas to one side.
+ * Overrides:
+ * - historical stories play at the event's real time and place — neither
+ *   "your city" nor a fantasy world applies → null (no labels, no steering).
+ * - life-skills stories in a realistic environment stay in the real world:
+ *   BOTH ideas from the real location, no fantasy idea.
+ * - without a known location there is nothing to anchor idea 1 to → null
+ *   (legacy prompt behavior, no labels).
+ *
+ * @returns {Array<{world: 'location'|'fantasy', theme: string|null, location: Object|null}>|null}
+ */
+const REALISTIC_ENVIRONMENT_THEMES = new Set(['realistic', 'farm', 'forest', 'fireman', 'doctor', 'police', 'detective']);
+
+function resolveIdeaWorlds({ storyCategory, storyTheme, location, worldMode = 'auto' }) {
+  const effectiveCategory = storyCategory || 'adventure';
+  if (effectiveCategory === 'historical') return null;
+
+  const hasLocation = !!(location && location.city);
+  if (!hasLocation) return null;
+
+  const locationWorld = () => ({
+    world: 'location',
+    theme: null,
+    location: { city: location.city, region: location.region || null, country: location.country || null }
+  });
+  const fantasyWorld = () => ({
+    world: 'fantasy',
+    theme: (storyTheme && storyTheme !== 'realistic') ? storyTheme : null,
+    location: null
+  });
+
+  const realisticLifeChallenge = effectiveCategory === 'life-challenge'
+    && (!storyTheme || REALISTIC_ENVIRONMENT_THEMES.has(storyTheme));
+  if (realisticLifeChallenge) return [locationWorld(), locationWorld()];
+
+  if (worldMode === 'location') return [locationWorld(), locationWorld()];
+  if (worldMode === 'fantasy') return [fantasyWorld(), fantasyWorld()];
+  return [locationWorld(), fantasyWorld()];
+}
+
 // Generate story ideas endpoint - FREE, no credits
 router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode } = req.body;
 
-    log.debug(`💡 Generating story ideas for user ${req.user.username}`);
+    log.debug(`💡 Generating story ideas for user ${req.user.username}${worldMode && worldMode !== 'auto' ? ` (worldMode: ${worldMode})` : ''}`);
 
     // For swiss-stories, use the story's city for landmarks (not user's home city)
     let effectiveLocation = userLocation;
@@ -412,8 +459,19 @@ ${landmarkEntries}`;
       userLocationInstruction, availableLandmarksSection
     });
 
+    // Resolve which world each idea plays in (null = legacy split, no labels)
+    const ideaWorlds = resolveIdeaWorlds({ storyCategory, storyTheme, location: locationForPrompt, worldMode });
+    const reqForWorld = (w) => w === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
+    const combinedRequirements = ideaWorlds
+      ? reqForWorld(ideaWorlds[0].world) + '\n\n' + reqForWorld(ideaWorlds[1].world)
+      : ctx.storyRequirements1 + '\n\n' + ctx.storyRequirements2;
+    // When both ideas play in the fantasy world, blank the real-location
+    // sections so the city cannot leak in
+    const bothFantasy = ideaWorlds && ideaWorlds[0].world === 'fantasy' && ideaWorlds[1].world === 'fantasy';
+
     const prompt = ctx.applyReplacements(ctx.promptTemplate, {
-      STORY_REQUIREMENTS: ctx.storyRequirements1 + '\n\n' + ctx.storyRequirements2
+      STORY_REQUIREMENTS: combinedRequirements,
+      ...(bothFantasy ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' } : {})
     });
 
     // Call the text model (using the imported function)
@@ -462,6 +520,7 @@ ${landmarkEntries}`;
     res.json({
       storyIdeas,
       storyIdea: storyIdeas[0], // backwards compatibility
+      ideaWorlds,
       prompt,
       model: modelToUse
     });
@@ -484,9 +543,9 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
   res.flushHeaders();
 
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode } = req.body;
 
-    log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
+    log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}${worldMode && worldMode !== 'auto' ? ` (worldMode: ${worldMode})` : ''}`);
 
     // For swiss-stories, use the story's city for landmarks (not user's home city)
     let effectiveLocation = userLocation;
@@ -596,21 +655,41 @@ ${landmarkEntries}`;
       return result;
     };
 
-    // Build prompts for both stories using shared context
-    const buildSinglePrompt = (storyNum, variantInstruction) => {
-      const requirements = storyNum === 1 ? ctx.storyRequirements1 : ctx.storyRequirements2;
+    // Resolve which world each idea plays in (null = legacy split, no labels)
+    const ideaWorlds = resolveIdeaWorlds({ storyCategory, storyTheme, location: locationForPrompt, worldMode });
+
+    // Build prompts for both stories using shared context.
+    // The world decides the requirements file: 'location' = real-world setting
+    // with landmarks (requirements-1), 'fantasy' = direct start in the theme
+    // world, no landmarks (requirements-2). Fantasy prompts get the location
+    // and landmarks sections blanked so the real city cannot leak in.
+    const buildSinglePrompt = (world, variantInstruction) => {
+      const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
+      const worldOverrides = world === 'fantasy'
+        ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
+        : {};
       return ctx.applyReplacements(ctx.singlePromptTemplate, {
         STORY_VARIANT_INSTRUCTION: variantInstruction,
-        STORY_REQUIREMENTS: requirements
+        STORY_REQUIREMENTS: requirements,
+        ...worldOverrides
       });
     };
 
-    // Build prompts for both stories (each with its own requirements)
-    const prompt1 = buildSinglePrompt(1, 'Use local landmarks if available. Create an engaging story that uses the setting naturally.');
-    const prompt2 = buildSinglePrompt(2, 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.');
+    const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
+    const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
+    const firstInstruction = world1 === 'fantasy'
+      ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
+      : 'Use local landmarks if available. Create an engaging story that uses the setting naturally.';
+    const secondInstruction = world2 === 'fantasy'
+      ? 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.'
+      : 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
 
-    // Send initial event with prompt info for dev mode
-    res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse })}\n\n`);
+    const prompt1 = buildSinglePrompt(world1, firstInstruction);
+    const prompt2 = buildSinglePrompt(world2, secondInstruction);
+
+    // Send initial event with prompt info for dev mode + per-idea worlds so the
+    // wizard can label each card before/while the ideas stream in
+    res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse, ideaWorlds })}\n\n`);
 
     // Track state for both stories
     let fullResponse1 = '';
@@ -697,3 +776,4 @@ ${landmarkEntries}`;
 
 module.exports = router;
 module.exports.buildIdeasPromptContext = buildIdeasPromptContext;
+module.exports.resolveIdeaWorlds = resolveIdeaWorlds;

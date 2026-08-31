@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Wand2, Sparkles, Loader2, Pencil, Check } from 'lucide-react';
+import { Wand2, Sparkles, Loader2, Pencil, Check, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useRotatingMessage } from '@/hooks/useRotatingMessage';
 import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
-import type { StoryLanguageCode } from '@/types/story';
+import type { StoryLanguageCode, IdeaWorld, IdeaWorldMode } from '@/types/story';
 import type { LayoutOverride } from '@/hooks/useDeveloperMode';
 
 // All story language options for display lookup (user-friendly names, no codes shown)
@@ -91,6 +91,11 @@ interface WizardStep6Props {
   ideaPrompt: { prompt: string; model: string } | null;
   ideaFullResponse?: string;
   generatedIdeas: string[];
+  // Per-idea worlds (location vs fantasy), server-resolved; null = no world split
+  ideaWorlds?: IdeaWorld[] | null;
+  // Steering for the next idea (re)generation
+  ideaWorldMode?: IdeaWorldMode;
+  onIdeaWorldModeChange?: (mode: IdeaWorldMode) => void;
   onSelectIdea: (idea: string, index?: number) => void;  // index: 0 or 1 for generated ideas, undefined for custom
   onUseDirectly?: () => void;  // Called when "Use my theme directly" is clicked to start generation
   // Navigation
@@ -133,6 +138,9 @@ export function WizardStep6Summary({
   ideaPrompt,
   ideaFullResponse,
   generatedIdeas,
+  ideaWorlds = null,
+  ideaWorldMode = 'auto',
+  onIdeaWorldModeChange,
   onSelectIdea,
   onUseDirectly,
   onEditStep,
@@ -159,6 +167,24 @@ export function WizardStep6Summary({
       setSelectedOption(null);
     }
   }, [generatedIdeas]);
+
+  // Can the user steer which world the ideas play in? Mirrors the server's
+  // resolveIdeaWorlds (server/routes/storyIdeas.js): no split for historical
+  // stories, without a known location, or for life-skills stories in a
+  // realistic environment (those always get BOTH ideas from the real location).
+  const REALISTIC_ENVIRONMENT_THEMES = ['realistic', 'farm', 'forest', 'fireman', 'doctor', 'police', 'detective'];
+  const worldSteerable = !!onIdeaWorldModeChange
+    && storyCategory !== 'historical'
+    && !!userLocation?.city
+    && !(storyCategory === 'life-challenge' && (!storyTheme || REALISTIC_ENVIRONMENT_THEMES.includes(storyTheme)));
+
+  // Label for an idea card's world badge
+  const getWorldLabel = (world: IdeaWorld) => {
+    if (world.world === 'location') {
+      return world.location?.city ? `${t.worldLocation}: ${world.location.city}` : t.worldLocation;
+    }
+    return world.theme ? `${t.worldFantasy}: ${getThemeName()}` : t.worldFantasy;
+  };
 
   // Handle option selection
   const handleSelectOption = (index: number) => {
@@ -274,6 +300,12 @@ export function WizardStep6Summary({
     option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : 'Option 1',
     option2: language === 'de' ? 'Option 2' : language === 'fr' ? 'Option 2' : 'Option 2',
     selected: language === 'de' ? 'Ausgewählt' : language === 'fr' ? 'Sélectionné' : 'Selected',
+    worldLocation: language === 'de' ? 'Deine Stadt' : language === 'fr' ? 'Ta ville' : 'Your city',
+    worldFantasy: language === 'de' ? 'Fantasiewelt' : language === 'fr' ? 'Monde fantastique' : 'Fantasy world',
+    worldModeLabel: language === 'de' ? 'Neue Vorschläge:' : language === 'fr' ? 'Nouvelles suggestions:' : 'New suggestions:',
+    worldModeAuto: language === 'de' ? '1× dein Ort, 1× Fantasie' : language === 'fr' ? '1× ton lieu, 1× fantaisie' : '1× your location, 1× fantasy',
+    worldModeLocation: language === 'de' ? 'Beide von deinem Ort' : language === 'fr' ? 'Les deux de ton lieu' : 'Both from your location',
+    worldModeFantasy: language === 'de' ? 'Beide Fantasiewelt' : language === 'fr' ? 'Les deux fantastiques' : 'Both fantasy',
     customTheme: language === 'de' ? 'Eigenes Thema' : language === 'fr' ? 'Thème personnalisé' : 'Custom Theme',
     customThemePlaceholder: language === 'de' ? 'Beschreibe dein Abenteuer-Thema...' : language === 'fr' ? 'Décris ton thème...' : 'Describe your adventure theme...',
     useMyTheme: language === 'de' ? 'Mein Thema direkt verwenden' : language === 'fr' ? 'Utiliser mon thème directement' : 'Use my theme directly',
@@ -441,6 +473,30 @@ export function WizardStep6Summary({
         {/* Two-idea selection UI - always show grid layout for consistency */}
         <div className="space-y-4">
           <p className="text-sm text-gray-600 mb-2">{t.chooseIdea}</p>
+          {/* Steer which world the next generated ideas play in */}
+          {worldSteerable && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500">{t.worldModeLabel}</span>
+              {([
+                { mode: 'auto' as IdeaWorldMode, label: t.worldModeAuto },
+                { mode: 'location' as IdeaWorldMode, label: t.worldModeLocation },
+                { mode: 'fantasy' as IdeaWorldMode, label: t.worldModeFantasy },
+              ]).map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  onClick={() => onIdeaWorldModeChange?.(mode)}
+                  disabled={isGeneratingIdeas}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    ideaWorldMode === mode
+                      ? 'bg-indigo-500 text-white border-indigo-500'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[0, 1].map((index) => {
               const idea = editableIdeas[index] || '';
@@ -449,6 +505,7 @@ export function WizardStep6Summary({
               const isLoading = (index === 0 ? isGeneratingIdea1 : isGeneratingIdea2) && !hasIdea;
               const isSelected = selectedOption === index;
               const optionTitle = index === 0 ? t.option1 : t.option2;
+              const world = ideaWorlds?.[index] ?? null;
 
               return (
                 <div
@@ -477,6 +534,18 @@ export function WizardStep6Summary({
                       </span>
                     )}
                   </div>
+
+                  {/* World badge — which world this idea plays in (shown above the idea text) */}
+                  {world && (
+                    <div className={`px-4 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
+                      world.world === 'location'
+                        ? 'bg-sky-50 text-sky-700'
+                        : 'bg-purple-50 text-purple-700'
+                    }`}>
+                      {world.world === 'location' ? <MapPin size={12} /> : <Sparkles size={12} />}
+                      <span>{getWorldLabel(world)}</span>
+                    </div>
+                  )}
 
                   {/* Content area */}
                   {isLoading ? (

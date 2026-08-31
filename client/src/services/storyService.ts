@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection, IdeaWorld, IdeaWorldMode } from '@/types/story';
 
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
@@ -1660,11 +1660,15 @@ export const storyService = {
       userLocation?: { city: string | null; region: string | null; country: string | null };
       // Season for story setting
       season?: string;
+      // Steer which world the two ideas play in (auto = 1 location + 1 fantasy)
+      worldMode?: IdeaWorldMode;
     },
     callbacks: {
       onStory1?: (story: string) => void;
       onStory2?: (story: string) => void;
       onStatus?: (status: string, prompt?: string, model?: string) => void;
+      // Per-idea worlds, sent with the initial event (null = no world split)
+      onWorlds?: (worlds: IdeaWorld[] | null) => void;
       onError?: (error: string) => void;
       onDone?: (fullResponse?: string) => void;
     }
@@ -1733,6 +1737,9 @@ export const storyService = {
                 const eventData = JSON.parse(line.slice(6));
                 if (eventData.status) {
                   callbacks.onStatus?.(eventData.status, eventData.prompt, eventData.model);
+                }
+                if ('ideaWorlds' in eventData) {
+                  callbacks.onWorlds?.(eventData.ideaWorlds ?? null);
                 }
                 if (eventData.story1) {
                   callbacks.onStory1?.(eventData.story1);
@@ -1850,7 +1857,11 @@ export const storyService = {
       prompt: string;
       model: string;
       selectedIndex: number | null;  // 0, 1, or null if custom/edited
+      worlds?: IdeaWorld[] | null;  // per-idea worlds as shown in the wizard
     };
+    // World of the SELECTED idea (persisted on stories.data.ideaWorld so the
+    // pipeline can honor it); null for custom/user-written ideas
+    ideaWorld?: IdeaWorld | null;
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1890,6 +1901,8 @@ export const storyService = {
       season: data.season,
       // Idea generation data (for analysis)
       ideaGeneration: data.ideaGeneration,
+      // World of the selected idea (location vs fantasy)
+      ideaWorld: data.ideaWorld,
     });
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },

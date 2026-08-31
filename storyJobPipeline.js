@@ -5820,6 +5820,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // has always sent this; nothing carried it this far before 2026-08-25.
       // See server/lib/ideaProvenance.js.
       ideaGeneration: inputData.ideaGeneration || null,
+      // Which world the chosen idea plays in: {world: 'location'|'fantasy',
+      // theme, location}. Server-resolved at idea time (resolveIdeaWorlds in
+      // server/routes/storyIdeas.js); null for custom/user-written ideas or
+      // categories without the split (historical). The pipeline uses this to
+      // honor the chosen world ("named location is binding").
+      ideaWorld: inputData.ideaWorld || null,
       trialMode: !!inputData.trialMode,
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',
@@ -5832,6 +5838,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       dedication: inputData.dedication || '',
       season: inputData.season || '', // Season when story takes place
       userLocation: inputData.userLocation || null, // User's location for personalization
+      // Whether the premise names its own binding world (server/lib/premiseWorld.js).
+      // Persisted so Test Lab replays rebuild the same commission block.
+      premiseNamedWorld: inputData.premiseNamedWorld === true,
       characters: inputData.characters || [],
       mainCharacters: inputData.mainCharacters || [],
       relationships: inputData.relationships || {},
@@ -6774,6 +6783,14 @@ async function _processStoryJobImpl(jobId) {
         log.debug(`[SWISS] Using story city ${storyCity} for landmark discovery (storyTopic: ${inputData.storyTopic})`);
       }
     }
+
+    // Owner ruling (2026-08-31): a location the premise names is binding.
+    // Stamp whether the premise names its own world BEFORE any prompt is
+    // built — buildSettingLine in promptBuilders.js relabels the commission's
+    // home-city line off this flag. After the swiss-stories override so the
+    // comparison uses the final userLocation.
+    const { stampPremiseWorld } = require('./server/lib/premiseWorld');
+    await stampPremiseWorld(inputData);
 
     // Inject pre-discovered landmarks if available for this user's location.
     // Shared resolver: landmark_index (proximity fallback) -> shared in-memory

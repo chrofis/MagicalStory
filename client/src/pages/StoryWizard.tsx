@@ -26,7 +26,7 @@ import { INITIAL_USER_CREDITS } from '@/constants/credits';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion, IdeaWorld, IdeaWorldMode } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -328,6 +328,10 @@ export default function StoryWizard() {
   const [lastIdeaFullResponse, setLastIdeaFullResponse] = useState<string>('');
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
   const [selectedIdeaIndex, setSelectedIdeaIndex] = useState<number | null>(null); // Track which idea was selected (0, 1, or null for custom)
+  // Per-idea worlds (location vs fantasy), server-resolved with each idea run; null = no split (no location / historical)
+  const [ideaWorlds, setIdeaWorlds] = useState<IdeaWorld[] | null>(null);
+  // User steering for the next idea (re)generation: auto = 1 location + 1 fantasy
+  const [ideaWorldMode, setIdeaWorldMode] = useState<IdeaWorldMode>('auto');
   // Store the input parameters used for idea generation (for later analysis)
   const [ideaGenerationInput, setIdeaGenerationInput] = useState<{
     storyType: string;
@@ -1838,6 +1842,7 @@ export default function StoryWizard() {
     if (prevExcludedRef.current !== excludedCharacters &&
         JSON.stringify(prevExcludedRef.current) !== JSON.stringify(excludedCharacters)) {
       setGeneratedIdeas([]);
+      setIdeaWorlds(null);
       setStoryDetails('');
       prevExcludedRef.current = excludedCharacters;
     }
@@ -1924,6 +1929,7 @@ export default function StoryWizard() {
       localStorage.removeItem('story_details');
       // Clear generated story ideas when topic/theme changes to avoid confusion
       setGeneratedIdeas([]);
+      setIdeaWorlds(null);
     }
 
     // Update refs
@@ -1987,6 +1993,7 @@ export default function StoryWizard() {
       setIsGeneratingIdea1(false);
       setIsGeneratingIdea2(false);
       setGeneratedIdeas([]);
+      setIdeaWorlds(null);
       setLastIdeaPrompt(null);
       setLastIdeaFullResponse('');
 
@@ -3757,6 +3764,7 @@ export default function StoryWizard() {
     setIsGeneratingIdea1(true);
     setIsGeneratingIdea2(true);
     setGeneratedIdeas([]);
+    setIdeaWorlds(null);
     setLastIdeaPrompt(null);
     setLastIdeaFullResponse('');
     setSelectedIdeaIndex(null);  // Reset selection when regenerating
@@ -3810,12 +3818,16 @@ export default function StoryWizard() {
         ideaModel: (user?.role === 'admin' || isImpersonating) ? modelSelections.ideaModel : undefined,
         userLocation: userLocation || undefined,
         season,
+        worldMode: ideaWorldMode,
       },
       {
         onStatus: (_status, prompt, model) => {
           if (prompt && model) {
             setLastIdeaPrompt({ prompt, model });
           }
+        },
+        onWorlds: (worlds) => {
+          setIdeaWorlds(worlds);
         },
         onStory1: (story1) => {
           setGeneratedIdeas(prev => {
@@ -4086,7 +4098,11 @@ export default function StoryWizard() {
           prompt: lastIdeaPrompt.prompt,
           model: lastIdeaPrompt.model,
           selectedIndex: selectedIdeaIndex,
+          worlds: ideaWorlds,
         } : undefined,
+        // World of the selected idea — persisted on stories.data.ideaWorld so
+        // the pipeline can honor the chosen world (location vs fantasy)
+        ideaWorld: (selectedIdeaIndex !== null && ideaWorlds) ? (ideaWorlds[selectedIdeaIndex] ?? null) : null,
       });
 
       setJobId(newJobId);
@@ -4613,6 +4629,9 @@ export default function StoryWizard() {
             ideaPrompt={lastIdeaPrompt}
             ideaFullResponse={lastIdeaFullResponse}
             generatedIdeas={generatedIdeas}
+            ideaWorlds={ideaWorlds}
+            ideaWorldMode={ideaWorldMode}
+            onIdeaWorldModeChange={setIdeaWorldMode}
             onSelectIdea={handleSelectIdea}
             onUseDirectly={() => generateStory()}
             onEditStep={safeSetStep}

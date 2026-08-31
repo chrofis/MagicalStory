@@ -30,6 +30,19 @@ export interface AdventureThemeGroup {
   name: LocalizedString;
 }
 
+// Which world a generated story idea plays in. Resolved server-side
+// (resolveIdeaWorlds in server/routes/storyIdeas.js) and shown as a label
+// above each idea card; the selected idea's world is sent as `ideaWorld` on
+// the create-story payload and persisted on stories.data.
+export interface IdeaWorld {
+  world: 'location' | 'fantasy';
+  theme: string | null;  // wizard theme id backing a fantasy world (null for realistic)
+  location: { city: string | null; region?: string | null; country: string | null } | null;
+}
+
+// Steering for idea (re)generation: auto = 1 location + 1 fantasy idea
+export type IdeaWorldMode = 'auto' | 'location' | 'fantasy';
+
 // Story category (Adventure, Life Challenge, Educational, Historical, Custom)
 export interface StoryCategory {
   id: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom';
