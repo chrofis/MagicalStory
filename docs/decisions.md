@@ -11268,6 +11268,26 @@ stay distinct (Germany/Austria/South-Tyrol users legitimately use ß). No mechan
 
 **Touched files:** server/lib/languages.js.
 
+### 2026-08-31 update — the English label for de-ch was still bare "Swiss German"
+
+**Context:** an arc-create call (arcflow A/B) titled an arc «Nebel uf em Zürisee» — Swiss German
+DIALECT, not the Swiss Standard German this decision mandates. `getLanguageNameEnglish('de-ch')`
+returned the bare label `'Swiss German'`, which a model reads as Schwyzerdütsch. A prior fix note
+at `server/lib/promptBuilders.js` (buildOutlineReviewPrompt) already named this exact trap after it
+rewrote a whole book into Mundart, and worked around it locally by always pairing the LANGUAGE
+placeholder with the full LANGUAGE_INSTRUCTION + LANGUAGE_NOTE — but the label itself, and other
+call sites that emit LANGUAGE alone, stayed unfixed at the root.
+
+**Decision:** Fixed at the root instead of patching each call site: `nameEnglish` for `de-ch` is now
+`'Swiss Standard German (ss, never ß — never dialect)'` — self-describing so no consumer needs to
+also carry the instruction/note to avoid the trap. The identical bare label in the (unused)
+`getAvailableLanguages()` UI list was fixed the same way. A duplicate hand-typed language-name map
+in `buildTextProofreadPrompt` (promptBuilders.js) was consolidated to call `getLanguageNameEnglish`
+instead of carrying its own narrower `'de-ch'` mapping — one source of truth.
+
+**Touched files:** server/lib/languages.js, server/lib/promptBuilders.js. Registry:
+tasks/bugs.json → `de-ch-nameEnglish-swiss-german-dialect-trap`.
+
 ---
 
 ## 2026-08-15 — Title paint-in shape gate: the promised wholesale rejection, actually wired

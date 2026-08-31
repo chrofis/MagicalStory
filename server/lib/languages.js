@@ -45,7 +45,11 @@ const LANGUAGES = {
   'de-ch': {
     code: 'de-ch',
     name: 'Deutsch (Schweiz)',
-    nameEnglish: 'Swiss German',
+    // NEVER 'Swiss German' bare — a model reads that label as Schwyzerdütsch
+    // (dialect) and rewrites the whole book into Mundart. de-ch is Swiss
+    // STANDARD German (Hochdeutsch, ss never ß), never dialect. See the
+    // 2026-08-31 fix note in promptBuilders.js near buildOutlineReviewPrompt.
+    nameEnglish: 'Swiss Standard German (ss, never ß — never dialect)',
     instruction: 'You MUST write your response in German. Use Swiss Standard German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) NEVER use "ß", always use "ss" instead. (3) Use Swiss vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "Rüebli" (not "Karotte"), "Velo" (not "Fahrrad"), "parkieren" (not "parken"), "grillieren" (not "grillen"), "Trottoir" (not "Bürgersteig"), "Lavabo" (not "Waschbecken"), "Natel" (not "Handy"), "Poulet" (not "Hähnchen"), "Glace" (not "Eis"), "Znüni/Zvieri" for snacks. (4) More formal register, no contractions. (5) DIALOGUE TYPOGRAPHY — Swiss style: use guillemets «...» for direct speech with NO internal spaces (Swiss tight style), NEVER em-dashes («—») for opening a dialogue. Examples: «Hallo!», not « Hallo ! » (that\'s French style with spaces). Use a single em-dash only for speaker turns inside an already-open quoted block. NO space before !?:; CORRECT: "grösser", "süss", "das Velo", "das Rüebli", "parkieren", "das Poulet", «Wie geht es dir?» | WRONG: "größer", "süß", "das Fahrrad", "die Karotte", "parken", "das Hähnchen", « Wie geht es dir ? » (spaces inside guillemets), — Wie geht es dir? (em-dash for dialogue open).',
     note: '(Swiss German: NEVER ß, always ss. Guillemets «text» tight, NO em-dash dialogue. CORRECT: "grösser", «Hallo!» | WRONG: "größer", « Hallo ! », — Hallo!)'
   },
@@ -357,7 +361,7 @@ function getAvailableLanguages() {
     { code: 'de-de-north', name: 'Norddeutsch', nameEnglish: 'German (North)' },
     { code: 'de-de-south', name: 'Süddeutsch', nameEnglish: 'German (South)' },
     { code: 'de-at', name: 'Deutsch (Österreich)', nameEnglish: 'Austrian German' },
-    { code: 'de-ch', name: 'Deutsch (Schweiz)', nameEnglish: 'Swiss German' },
+    { code: 'de-ch', name: 'Deutsch (Schweiz)', nameEnglish: 'Swiss Standard German (ss, never ß — never dialect)' },
     { code: 'de-it', name: 'Deutsch (Südtirol)', nameEnglish: 'South Tyrolean German' },
     // French variants
     { code: 'fr-fr', name: 'Français (France)', nameEnglish: 'French (France)' },

@@ -4900,8 +4900,12 @@ function buildTextProofreadPrompt(inputData, pages = []) {
     log.error('[PROMPT] storyTextProofread template not loaded — proofread unavailable');
     return null;
   }
-  const langNames = { 'de-ch': 'Swiss Standard German (ss, never ß)', de: 'German', fr: 'French', it: 'Italian', en: 'English' };
-  const lang = langNames[String(inputData?.language || '').toLowerCase()] || inputData?.language || 'the language of the pages';
+  // Single source of truth: languages.js (was a local hand-typed map here,
+  // duplicating de-ch's dialect-trap fix — see the 2026-08-31 fix note near
+  // buildOutlineReviewPrompt below).
+  const lang = inputData?.language
+    ? getLanguageNameEnglish(inputData.language)
+    : 'the language of the pages';
   const body = pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n');
   return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
 }
