@@ -22151,3 +22151,71 @@ reported honestly, no further validation attempt per the two-attempt rule.
 **Touched files.** `server/lib/premiseWorld.js` (new),
 `server/lib/promptBuilders.js` (`buildSettingLine` + both briefs),
 `storyJobPipeline.js` (stamp + persist), `docs/prompt-inventory.md`.
+
+## 2026-08-31 — Arc machine calibration: stakes are drama not law, lean arc-level STORY SHAPE, anonymous panelists, declarations-first re-telling, reader-question critique
+
+**Context.** The pirate-premise trail showed the arc machine treating an idea's
+announced consequence ("whoever arrives last goes home empty-handed") as a
+world-law needing literal enforcement machinery — ship's articles, legal
+bargaining, rule-cancellation scenes — and contorting arcs to satisfy its
+letter. Owner ruling (2026-08-31): "the story drama is that who gets there
+last does not get anything — this is more like an idea than an iron rule."
+The same trail surfaced six sibling faults: the arc prompts carried the
+beats-stage page-budget quota table ("Challenges: exactly 3", per-part page
+arithmetic, "split the cast ONCE" — owner: "here a full page budget, this
+belongs to the beats. the arc should just make the story, with this amount of
+challenges"); panel solutions were headed with raw model names ("## PANELIST:
+x-ai/grok-4.6"); the retell template claimed authorship the model doesn't
+have ("YOUR OWN COMMITTED ARC" — factually false in the cross-model reteller
+arm); the retell output declared its plan after the telling; the critique was
+a fault-type checklist with no reader in it; and severity was miscalibrated
+on live examples (no-enforcement-machinery tagged MAJOR — owner: not a fault
+at all; a principle reversed in two pages under trivial pressure tagged
+MINOR — owner: that is the real MAJOR). The `<user_input>` explanatory note
+was also missing from every commission-brief consumer.
+
+**Decision.**
+1. Commission preamble (`buildStoryContextFields`) gains two sentences: an
+   announced consequence sets the stakes — "a promise of drama, not a law of
+   the world" needing "no machinery to enforce its letter" — and the standard
+   `<user_input>` data-not-instructions note (chokepoint: covers all six
+   brief consumers — arc-create/panel/retell, story-beats, story-beats-review,
+   story-arc-review).
+2. Critique taxonomies (arc-create + arc-retell): "decided by something other
+   than the announced rule" → "never bites (announced but never felt)";
+   explicit exclusion "That nothing enforces an announced consequence is not
+   a fault; that the consequence is never felt is."; severity floor "a stated
+   trait that reverses under trivial pressure, at no cost, is MAJOR — never
+   MINOR."; and the critique is now driven by four reader questions (where
+   does the story lose an eight-year-old; is it logical; is it full of
+   suspense; are the figures likable and distinguishable) with the old fault
+   list demoted to vocabulary ("Faults usually look like: …").
+3. `buildStoryShapeSection` gains an `{ arc: true }` variant used ONLY by
+   arc-create/arc-retell: main-character line + "Build the story on
+   one or two / about three / three or four challenges" (same thresholds as
+   the challenge-catalogue draw) + the difficulty line. No page arithmetic,
+   threads/split rule, secondary-moment quota, entrance choreography, or
+   subject line (the commission binds the subject). The FULL block stays for
+   story-beats, story-beats-review, story-arc-review and the scorecard judge.
+4. Panelists are anonymous in prompts: `## PANELIST A/B/C` (beatsPipeline
+   assembly), letter persisted on each trail panel entry alongside the model;
+   the retell "Used:" line cites "Panelist A Solution 2". Panel solutions
+   must name the critique faults they answer ("SOLUTION <N> (answers faults
+   <numbers>):").
+5. Retell output contract is declarations-first: Fixing, Keeping, Challenges
+   taken, Used, then FINAL ARC, then CRITIQUE. `parseArcRetell` is
+   order-tolerant (old tellings still parse) and re-appends a head-positioned
+   "Challenges taken:" block to the arc text so cross-story challenge memory
+   (`extractChallengeLines`) keeps working.
+6. Retell authorship fiction removed: "# THE COMMITTED ARC AND ITS CRITIQUE",
+   "The arc stands above with its critique", "none of the flagged faults".
+
+**Rationale.** Owner rulings quoted above; each change keeps the machine's
+structure and recalibrates what it enforces. No parser reads model names or
+"SOLUTION N:" markers, and the Used line is stored as opaque text, so the
+letter forms are backward-compatible by construction.
+
+**Touched files.** `prompts/arc-create.txt`, `prompts/arc-retell.txt`,
+`prompts/arc-panel.txt`, `server/lib/promptBuilders.js`
+(`buildStoryContextFields`, `buildStoryShapeSection`, `parseArcRetell`, both
+arc builders), `server/lib/beatsPipeline.js` (panelist letters).

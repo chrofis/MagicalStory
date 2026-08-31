@@ -514,7 +514,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // again from the beginning. Never a patch. A parse miss (no FINAL ARC)
       // gets one more telling, then throws.
       await stage(2, 'Re-telling the story arc...', { next: 3, ms: 90000 });
-      const solutionsText = panel.map(p => `## PANELIST: ${p.model}\n${p.text}`).join('\n\n');
+      // No model names in prompts (owner, 2026-08-31): panelists appear as
+      // letters, stable in arcPanelModels order. The letter→model mapping
+      // stays in the trail via each panel entry's `letter` + `model`.
+      panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
+      const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
       const retellPrompt = buildArcRetellPrompt(inputData, pageCount, currentBlock, solutionsText);
       if (!retellPrompt) throw new Error('arc-retell template unavailable');
       let retellRes = null;
