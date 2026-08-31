@@ -575,4 +575,4 @@ Recorded so nobody re-proposes them as gaps.
 - No camera-coherence rule in beats/AD: p9 impossible frame (on deck + hull seen from outside) passed both beats audits, AD escalated it → phantom vessel; add "one camera position per SCENE" rule → same dir
 - AD receives neither arc nor page plan — inverted p1's characterization beat (Facundo mid-lift → idle watcher); pass the arc (or plan) into scene expansion → same dir
 - Beats review is the serial killer of story content (Q6/Q7/Q8/Q9 all trace to it): silently strips events, rivals, persuaders; per-page change-field + beats-level redundancy check + re-site-or-declare rule proposed; page budget sums to 15/16 (one page bought by nothing) → scratchpad piraterun/q8-p12/
-- VB bible schema invites skin-tone prose clichés ("warm olive skin"); swap the face field's skin-tone slot to skinToneHex like photo characters → scratchpad piraterun/q1-rossa-vb/
+- VB bible schema invites skin-tone prose clichés ("warm olive skin"); owner ruling 2026-08-31: do NOT request skin tone at all — drop it from the face field schema → scratchpad piraterun/q1-rossa-vb/
