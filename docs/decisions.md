@@ -22384,3 +22384,11 @@ drops the injected STORY_SHAPE/CHALLENGE_IDEAS/ARC_WEAK_POINTS/preamble blocks.
 `server/lib/textRefine.js`, `server/lib/testlab.js`, `server/lib/testlabWriterCompare.js`,
 `server/lib/storyHelpers.js`, `storyJobPipeline.js`, `client/src/pages/TestLab.tsx`,
 `client/src/services/testlabService.ts`.
+
+**Addendum (2026-08-31, same day).** The validation A/B on this redesign produced pages using
+only wide and close-up shots — the PAGE PLAN sequence asked where close-ups/ultra-wides land
+but never asked for a spread across shot types. Added one line after question 5: "Rough
+distribution: about two close-ups and two ultra-wides, the rest medium or wide — more
+close-ups when a moment earns one, but never just two shot types across the book." Check 6c
+in `story-beats-review.txt` extended to name a book whose shot column uses only two shot types
+across the whole plan.
