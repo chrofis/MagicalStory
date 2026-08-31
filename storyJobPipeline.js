@@ -3731,17 +3731,116 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 log.warn(`⚠️ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) produced no image`);
                 return;
               }
+
+              // Empty-scene QC on the vantage path (2026-08-31): the per-page
+              // path below has always run validateEmptyScene + one
+              // retry-with-feedback, but this block never did — on
+              // job_1788123310558 empty-scene QC ran 0 times and the p2 plate
+              // shipped with a blocked foreground and paper margins. Same
+              // validator, same single retry. textPosition is null (a shared
+              // plate serves pages with different text zones, so no calm-zone
+              // grading) and the character placements are the UNION across the
+              // plate's page group.
+              let plateImage = result.imageData;
+              let platePrompt = emptyPrompt;
+              let plateQcRecord = null;
+              try {
+                const { validateEmptyScene } = require('./server/lib/images');
+                const seenPlacement = new Set();
+                const placements = [];
+                for (const pn of group.pageNumbers) {
+                  const pd = pageDataArray.find(x => x.pageNumber === pn);
+                  for (const c of (pd?.sceneMetadata?.fullData?.characters || [])) {
+                    if (!c?.name || !c?.position) continue;
+                    const key = `${c.name}|${c.position}`;
+                    if (seenPlacement.has(key)) continue;
+                    seenPlacement.add(key);
+                    placements.push({ name: c.name, position: c.position, depth: c.depth });
+                  }
+                }
+                // Same era derivation as the per-page path below.
+                let storyEra = null;
+                const costumedTypes = Object.values(streamingClothingRequirements || {})
+                  .map(r => r?.costumed?.used && r?.costumed?.costume)
+                  .filter(Boolean);
+                if (costumedTypes.length > 0) {
+                  const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
+                  storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
+                }
+                const qc = await validateEmptyScene(plateImage, null, `vantage-${vantageId}`, {
+                  sceneDescription: emptySceneDesc,
+                  characterPlacements: placements.length > 0 ? placements : null,
+                  mainScenePrompt: repPageData.scene?.sceneDescription || null,
+                  storyEra,
+                });
+                if (!qc.pass) {
+                  genLog.warn('vantage_plate_qc_failed', `Vantage plate ${vantageId} (${v.locationName} – ${v.name}, pages ${group.pageNumbers.join(',')}) failed QC: ${qc.issues.join(', ')} — retrying with feedback`);
+                  const fixHint = qc.visionFeedback
+                    ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
+                    : '';
+                  log.info(`🔄 [VANTAGE] ${vantageId} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
+                  const retryPrompt = buildEmptyScenePrompt({
+                    style: artStyleDesc,
+                    description: emptySceneDesc + fixHint,
+                    characterSpace,
+                    eraGuard,
+                    landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
+                    referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
+                    visualBible,
+                    pageNumber: repPageData.pageNumber,
+                  });
+                  const retryResult = await generateImageOnly(retryPrompt, [], {
+                    aspectRatio: layoutAspect,
+                    ...emptyScenePlateRouting(),
+                    landmarkPhotos,
+                    visualBibleGrid: emptySceneVbGrid,
+                    pageNumber: repPageNum,
+                    skipCache: true,
+                    pageContext: `vantage-${vantageId}-retry`,
+                  });
+                  if (retryResult?.usage) {
+                    const isRunware = retryResult.modelId?.startsWith('runware:');
+                    const isGrok = retryResult.modelId?.startsWith('grok-imagine');
+                    const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+                    addUsage(provider, retryResult.usage, 'page_images', retryResult.modelId);
+                  }
+                  imageGenHeartbeat();
+                  if (retryResult?.imageData) {
+                    // Validate retry (pixel only — same as the per-page retry,
+                    // skips the second vision call).
+                    const retryQc = await validateEmptyScene(retryResult.imageData, null, `vantage-${vantageId}-retry`, { skipVision: true });
+                    if (retryQc.pass || retryQc.issues.length < qc.issues.length) {
+                      plateQcRecord = { v1ImageData: plateImage, v1Issues: qc.issues, visionFeedback: qc.visionFeedback || null, retryPrompt };
+                      plateImage = retryResult.imageData;
+                      platePrompt = retryPrompt;
+                      genLog.info('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry ${retryQc.pass ? 'passed QC' : `still has ${retryQc.issues.length} issue(s) — fewer than v1's ${qc.issues.length}, keeping retry`}`);
+                    } else {
+                      genLog.warn('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry did not improve (${retryQc.issues.join(', ')}) — keeping the first plate`);
+                    }
+                  } else {
+                    genLog.warn('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry produced no image — keeping the first plate`);
+                  }
+                } else {
+                  genLog.info('vantage_plate_qc', `Vantage plate ${vantageId} (pages ${group.pageNumbers.join(',')}) passed QC`);
+                }
+              } catch (qcErr) {
+                // QC must never cost us a plate — a validator error keeps v1.
+                log.warn(`⚠️ [VANTAGE] ${vantageId} QC errored (${qcErr.message}) — keeping the unvalidated plate`);
+              }
+
               // Fan out the same canvas to every page in the group.
               for (const pn of group.pageNumbers) {
                 if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
                 sceneBackgrounds[pn] = {
-                  imageData: result.imageData,
-                  prompt: emptyPrompt,
+                  imageData: plateImage,
+                  prompt: platePrompt,
                   textAreaMask: null,
                   emptySceneVbGrid: emptySceneVbGridDataUrl,
                   vantageId,
                   vantageName: v.name,
                   locationName: v.locationName,
+                  // Same QC-history shape the per-page path stores (dev panel).
+                  ...(plateQcRecord || {}),
                 };
               }
               log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);

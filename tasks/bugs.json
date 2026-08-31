@@ -348,6 +348,38 @@
       "status": "fixed",
       "fixedIn": "37646a21a",
       "note": "thinkingConfig { thinkingBudget: 0 } + cap 600 on both; verified after fix finishReason=STOP, thoughts=0, answer 75/105 tok, JSON parses. Same defect patched in 4 historical-image admin scripts. server/routes/avatars.js left alone: 4096 has headroom, works, only wastes thinking tokens. Parse failure raised from log.debug to log.warn carrying finishReason, because at debug a config fault was indistinguishable from ordinary photo rejection."
+    },
+    {
+      "id": "beats-batch-expansion-truncates-silently",
+      "reported": "2026-08-31",
+      "summary": "The batched Art Director call truncated after page 11 and pages 12-16 silently fell back to per-page expansion (no batch retry, fallback booked under the same usageLabel). job_1788123310558: beats_scene_expansion shows 6 calls / 42,260 output tokens under one label; generationLog beats_scene_expansion_incomplete says 11/16 briefs. Root cause CONFIRMED as an undersized config cap: the default sceneDescription model gemini-3.1-pro carried maxOutputTokens 16384 in TEXT_MODELS while OpenRouter's top_provider.max_completion_tokens for google/gemini-3.1-pro-preview is 65536 (checked 2026-08-31) — the call site already passes maxTokens=null (full cap), so the config cap WAS the effective truncation point.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "models.js: gemini-3.1-pro maxOutputTokens 16384 -> 65536 (real OpenRouter limit; the old judge-context caveat kept — the cap was never the judge fix). beatsPipeline.js: the all-pages call now retries the batch ONCE when it parses fewer briefs than beats (first attempt's pages win the merge, retry only fills gaps), with a loud log.error + genLog beats_scene_expansion_truncated naming the missing pages; the existing beats_scene_expansion_incomplete warn still names every page that ultimately fell back. Per-page fallback calls now book under usageLabel beats_scene_expansion_fallback so a truncated batch is visible in the usage summary."
+    },
+    {
+      "id": "vantage-plates-skip-empty-scene-qc",
+      "reported": "2026-08-31",
+      "summary": "The vantage-plate block (storyJobPipeline Phase 5a-pre-vantage) never called validateEmptyScene while the per-page path always has — on job_1788123310558 empty-scene QC ran 0 times (all pages were vantage-covered) and the p2 plate shipped with a blocked foreground and paper margins, exactly the defect classes the validator checks.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "Reused, not redesigned: the same validateEmptyScene + one retry-with-feedback loop as the per-page path, called per plate. textPosition passed as null (a shared plate serves pages with different text zones, so no calm-zone grading; the pixel white/black-box artifact checks and the vision people/foreground/signage checks all still run). characterPlacements = union of sceneMetadata.fullData.characters across the plate's page group; storyEra derived identically to the per-page path. Retry validated pixel-only (skipVision) and kept only when it passes or has fewer issues. Outcomes genLogged (vantage_plate_qc / vantage_plate_qc_failed / vantage_plate_qc_retry) and the v1/v2 QC history stored on sceneBackgrounds in the same shape the per-page path stores. A validator error keeps the unvalidated plate — QC can never cost a plate."
+    },
+    {
+      "id": "proofread-withdrawn-fault-lines-counted",
+      "reported": "2026-08-31",
+      "summary": "The proofread stream leaked reasoning prose ('Let me work through this carefully page by page.') and a finding that withdraws itself mid-line ('...as a compound image is fine — withdraw. Let me re-examine.') into the corrective round: the withdrawn line still matches FAULT_LINE_RE so it was counted and merged raw (job_1788123310558 stored proofread: countFaults=9 vs the model's own FAULTS: 8). NOTE — the second half of the reported premise did NOT reproduce: proofread findings were NOT dropped from the corrective round; the stored audit2 of the same job contains the proofread faults verbatim (gleichmässig, Leimnaht), wired since the b81c5010c-era merge at textRefine.js. The corrective round ran with them and changed zero pages — a model outcome, not missing wiring.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "textRefine.js: sanitizeProofreadFindings() keeps only lines matching ^FAULT[TAG]*: and discards any FAULT line carrying a withdrawal marker (withdraw / '— fine' / re-examine); the sanitized form feeds countFaults and the audit2 merge, the raw stream stays persisted for traceability, and discarded lines are logged. Unit-checked against the stored output (scratchpad piraterun/q7-ai-dialogue/tr-proofread.txt): 9 -> 8 faults, the withdrawn Möwensegel line and the reasoning leak both dropped, matching the model's own FAULTS: 8 tally. The main audit stream is deliberately untouched (different format, out of scope)."
+    },
+    {
+      "id": "semantic-eval-judges-against-beats-scene",
+      "reported": "2026-08-31",
+      "summary": "The semantic evaluator received the beats SCENE (scene.outlineExtract/sceneHint) as SCENE_HINT — labeled 'the authoritative source' in prompts/image-semantic.txt — while page images are generated from the Art Director brief. Images were penalized for obeying their own generation prompt: job_1788123310558 p6 CRITICAL 'missing Fiona' and p9 MAJOR 'chart not in her hand', both absent from the AD brief the render followed.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "Wiring only, prompt untouched. All SCENE_HINT producers greped and swapped to the content the image was MADE from: repairPipeline.js buildEvalInputs + baseline inputs (orig.scene.outlineExtract || entry.description || sceneDescription || scene.sceneHint — covers hit leg 1 unchanged because their outlineExtract IS the cover brief and pages never set outlineExtract; entry.description wins on an iterate rewrite), regeneration.js re-evaluate + eval-prompt routes (cover branch keeps the old expression), testlab.js ctx.outlineHint (Lab/prod parity). Shapes stable (string|null everywhere). Side benefit: evaluateThreeStage/interaction extraction now parse the METADATA block the AD brief carries."
     }
   ]
 }

@@ -151,10 +151,16 @@ const TEXT_MODELS = {
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
-  // Judge answers are ~1KB, far under this cap — raising it does NOT fix the
-  // empty/malformed responses this model returns (measured: fails and succeeds
-  // at both 16384 and 32768). The fix is the retry in scoreArtifactsWithJudge.
-  'gemini-3.1-pro': { provider: 'openrouter', modelId: 'google/gemini-3.1-pro-preview', maxOutputTokens: 16384, description: 'Gemini 3.1 Pro (Google) via OpenRouter (~$2.00/$12.00 per 1M) — neutral judge' },
+  // Judge answers are ~1KB — the cap was never the fix for the empty/malformed
+  // responses this model returns as a judge (measured: fails and succeeds at
+  // both 16384 and 32768; the fix is the retry in scoreArtifactsWithJudge).
+  // But as the DEFAULT sceneDescription model it writes ~16 Art Director
+  // briefs in ONE batched call, and the old 16384 cap truncated that batch
+  // after page 11 on job_1788123310558 (pages 12-16 silently fell back to
+  // per-page expansion). Raised to OpenRouter's confirmed
+  // top_provider.max_completion_tokens (65536, checked 2026-08-31 via
+  // https://openrouter.ai/api/v1/models) — no-caps rule.
+  'gemini-3.1-pro': { provider: 'openrouter', modelId: 'google/gemini-3.1-pro-preview', maxOutputTokens: 65536, description: 'Gemini 3.1 Pro (Google) via OpenRouter (~$2.00/$12.00 per 1M) — neutral judge' },
   // maxOutputTokens raised to OpenRouter's confirmed top_provider.max_completion_tokens
   // (131072, checked 2026-08-29 via https://openrouter.ai/api/v1/models) after the
   // 16384/32768 caps we'd been using turned out to be our own invention, not the

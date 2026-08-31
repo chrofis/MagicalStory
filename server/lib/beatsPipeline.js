@@ -1021,7 +1021,12 @@ SCENE: ${x.scene || ''}`.trim(),
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
+        // Own usage label (2026-08-31): fallback pages used to book under
+        // 'beats_scene_expansion' like the batch call, so a truncated batch
+        // plus silent per-page recovery was invisible in the usage summary
+        // (job_1788123310558: 6 calls under one label, no way to tell 1
+        // batch + 5 fallbacks from 6 batches).
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback' });
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
         return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
       } catch (err) {
@@ -1059,19 +1064,39 @@ SCENE: ${x.scene || ''}`.trim(),
   } else {
     // Output is `## Page N` + prose + METADATA per page — the same shape the
     // scene review returns, so the review's parser reads it unchanged.
-    let allRaw = '';
+    // Two attempts at the full batch (2026-08-31): the call already asks for
+    // the model's full maxOutputTokens (maxTokens=null), but an incomplete
+    // parse — the truncation signature — used to drop straight to the
+    // per-page fallback with no batch retry and no stored warning until the
+    // shortfall guard below. job_1788123310558 lost pages 12-16 that way
+    // (gemini-3.1-pro's configured cap was 16384; raised in models.js).
+    // First attempt's pages win the merge so a retry can only FILL gaps,
+    // never rewrite pages already parsed.
     let allModelId = sceneModel;
-    try {
-      await stage(30, 'Writing scene briefs...', { next: 42, ms: 176000 });
-      const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
-      allRaw = res?.text || '';
-      allModelId = res?.modelId || sceneModel;
-    } catch (err) {
-      log.error(`🚨 [BEATS] All-pages scene expansion failed (${err.message}) — falling back to per-page expansion`);
-      gl.warn('beats_scene_expansion_failed', `All-pages call failed: ${err.message} — falling back to per-page expansion`);
+    const byPage = new Map();
+    await stage(30, 'Writing scene briefs...', { next: 42, ms: 176000 });
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let allRaw = '';
+      try {
+        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
+        allRaw = res?.text || '';
+        allModelId = res?.modelId || sceneModel;
+      } catch (err) {
+        log.error(`🚨 [BEATS] All-pages scene expansion attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
+        gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
+        break;
+      }
+      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
+      for (const p of parsed.pages) {
+        if (p.text && p.text.trim() && !byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      }
+      if (byPage.size >= beats.length) break;
+      if (attempt === 1) {
+        const missingNow = beats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
+        log.error(`🚨 [BEATS] All-pages expansion truncated: ${byPage.size}/${beats.length} briefs parsed (missing page(s) ${missingNow.join(', ')}) — retrying the batch ONCE at full cap`);
+        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${beats.length} briefs (missing page(s) ${missingNow.join(', ')}) — retrying the batch once at full output cap`);
+      }
     }
-    const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
-    const byPage = new Map(parsed.pages.filter(p => p.text && p.text.trim()).map(p => [p.pageNumber, p.text]));
     expansions = beats
       .filter(b => byPage.has(b.pageNumber))
       .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));

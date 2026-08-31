@@ -400,7 +400,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneCharacters: entry.sceneCharacters || orig.sceneCharacters,
       sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
       pageText: orig.text,
-      sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
+      // SCENE_HINT = what the image was MADE from (2026-08-31). Pages were
+      // judged against the beats SCENE (scene.sceneHint) while the render
+      // obeyed the Art Director brief — job_1788123310558 p6 got a CRITICAL
+      // "missing character" and p9 a MAJOR "object not in hand" for content
+      // the AD brief never asked for. Covers are unchanged: their
+      // scene.outlineExtract IS the cover brief the image was generated
+      // from (pages never set outlineExtract, so they fall through to the
+      // AD brief; entry.description wins on an iterate rewrite).
+      sceneHint: orig.scene?.outlineExtract || entry.description || orig.sceneDescription || orig.scene?.sceneHint || null,
       evaluationType: orig.evaluationType,
       // Structured cover text contract (replaces the old prompt-string surgery):
       // 'appOverlay' → evaluator must never flag missing/present title text;
@@ -562,7 +570,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       pageText: img.text,
-      sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null,
+      // Same SCENE_HINT rule as buildEvalInputs above: the AD brief for
+      // pages, the cover brief (scene.outlineExtract) for covers.
+      sceneHint: img.scene?.outlineExtract || img.sceneDescription || img.scene?.sceneHint || null,
       evaluationType: img.evaluationType,
     });
   }

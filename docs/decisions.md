@@ -22253,3 +22253,49 @@ asked to describe one.
 
 **Touched files.** `prompts/story-bible-from-beats.txt`, `prompts/story-trial.txt`,
 `prompts/story-unified-imagefirst.txt`, `prompts/story-unified.txt`.
+
+## 2026-08-31 — Four mechanism repairs from job_1788123310558 (batch-expansion cap, vantage-plate QC, proofread fault hygiene, SCENE_HINT source)
+
+**Context:** The 16-page pirate run job_1788123310558 surfaced four clear mechanism bugs, all
+confirmed from stored evidence (generationLog, tokenUsage.byFunction, textRefineReport,
+per-page eval findings). Owner mandate: surgical fixes only, no design changes.
+
+**Decision:**
+1. **Batched Art Director truncation (beatsPipeline.js, models.js).** The all-pages scene
+   expansion truncated after page 11; pages 12-16 fell back per-page silently, under the same
+   usageLabel. The call already asks for the model's full cap (maxTokens=null) — the undersized
+   value was `gemini-3.1-pro`'s own TEXT_MODELS entry (16384). Raised to 65536, OpenRouter's
+   confirmed `top_provider.max_completion_tokens` for `google/gemini-3.1-pro-preview`
+   (checked 2026-08-31). The batch now retries ONCE on an incomplete parse (first attempt's
+   pages win; the retry only fills gaps), truncation is genLogged loudly naming the missing
+   pages, and per-page fallbacks book under `beats_scene_expansion_fallback`.
+2. **Vantage plates now run empty-scene QC (storyJobPipeline.js Phase 5a-pre-vantage).** The
+   block never called `validateEmptyScene` while the per-page path always did (0 QC runs on the
+   evidence job; p2 plate shipped blocked foreground + paper margins). Same validator + same
+   one-retry-with-feedback, adapted: textPosition=null (shared plate, no calm-zone grading),
+   characterPlacements = union across the plate's page group, outcomes genLogged, v1/v2 QC
+   history stored in the per-page shape. A validator error keeps the unvalidated plate.
+3. **Proofread fault hygiene (textRefine.js).** A FAULT line that withdraws itself mid-line
+   ("… — withdraw. Let me re-examine.") still matches FAULT_LINE_RE and was merged raw into
+   the corrective round, along with leaked reasoning prose. `sanitizeProofreadFindings()` keeps
+   only genuine FAULT lines and discards withdrawal-marked ones before count + merge; the raw
+   stream stays persisted. Unit-checked against the stored proofread output: 9 → 8 faults,
+   matching the model's own tally. Finding correction: proofread findings were NOT missing from
+   the corrective round — the stored audit2 contains them verbatim; the round ran and chose to
+   change nothing.
+4. **SCENE_HINT = what the image was made from (repairPipeline.js, regeneration.js,
+   testlab.js).** The semantic evaluator judged pages against the beats SCENE
+   (scene.outlineExtract/sceneHint) while renders follow the AD brief — p6 CRITICAL "missing
+   Fiona" / p9 MAJOR "chart not in her hand" penalized images that obeyed their own prompt.
+   Wiring-only swap at every producer: pages now pass the AD brief (entry.description /
+   sceneDescription), covers keep their cover brief (their outlineExtract already IS it),
+   prompts/image-semantic.txt untouched, shapes stable.
+
+**Rationale:** Each is a wiring/config defect, not a policy change: the no-caps rule
+(2026-08-09) already governed 1; the per-page QC contract already governed 2; FAULT-line
+parsing already had one yardstick that a self-withdrawing line gamed in 3; and 4 restores the
+evaluator contract that the reference is the generation source, which covers always had.
+
+**Touched files:** `server/config/models.js`, `server/lib/beatsPipeline.js`,
+`storyJobPipeline.js`, `server/lib/textRefine.js`, `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`, `server/lib/testlab.js`, `tasks/bugs.json`.

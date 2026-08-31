@@ -144,9 +144,10 @@ async function loadSceneContext(storyId, pageNumber) {
     // null when the story renders text below the image (layout square-below) —
     // stages must NOT invent a text zone then (production omits it too).
     textPosition: scene.textPosition || scene.sceneMetadata?.textPosition || null,
-    // Outline hint for evals — stored as outlineExtract/sceneHint on the
-    // scene (there is no sceneMetadata.hint field; production reads these).
-    outlineHint: scene.outlineExtract || scene.sceneHint || null,
+    // SCENE_HINT for evals — Lab/prod parity with repairPipeline (2026-08-31):
+    // the AD brief the image was actually generated from, not the beats-scene
+    // outlineExtract the render never saw.
+    outlineHint: scene.description || scene.sceneDescription || scene.outlineExtract || scene.sceneHint || null,
   };
 }
 

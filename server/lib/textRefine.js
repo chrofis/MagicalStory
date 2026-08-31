@@ -19,6 +19,24 @@
 
 const { log } = require('../utils/logger');
 
+// Proofread fault-line hygiene (2026-08-31, job_1788123310558). The proofread
+// model leaks reasoning prose between findings ("Let me work through this
+// carefully page by page.") and sometimes WITHDRAWS a finding mid-line
+// ("… but «weisses Möwensegel» as a compound image is fine — withdraw. Let me
+// re-examine.") while the line still starts with FAULT[...]: and so still
+// matches FAULT_LINE_RE. Both used to be merged raw into the corrective
+// round's findings block. Keep only genuine FAULT lines; a FAULT line that
+// withdraws itself is discarded.
+const PROOFREAD_FAULT_RE = /^FAULT(?:\[[A-Z]+\])*:/;
+const PROOFREAD_WITHDRAW_RE = /\bwithdraw\b|—\s*fine\b|\bre-?examine\b/i;
+function sanitizeProofreadFindings(text) {
+  return String(text || '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => PROOFREAD_FAULT_RE.test(l) && !PROOFREAD_WITHDRAW_RE.test(l))
+    .join('\n');
+}
+
 /**
  * @param {Object} storyData - story record fields (language, characters, brief, …)
  * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
@@ -223,9 +241,14 @@ async function refineStoryText(storyData, pages, opts = {}) {
           log.warn(`⚠️ [TEXT-AUDIT2] ${auditModel} returned empty output — retrying once`);
           a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
         }
-        const proofFindings = await proofPromise;
-        proofread = proofFindings;
+        const proofRaw = await proofPromise;
+        // Raw stream persisted for traceability; the CORRECTIVE round gets the
+        // sanitized form only (no leaked reasoning, no withdrawn findings).
+        proofread = proofRaw;
+        const proofFindings = sanitizeProofreadFindings(proofRaw);
         const proofFaults = countFaults(proofFindings);
+        const withdrawn = countFaults(proofRaw) - proofFaults;
+        if (withdrawn > 0) log.info(`🔎 [PROOFREAD] ${withdrawn} withdrawn/leaked FAULT line(s) discarded before the corrective round`);
         if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);
         audit2 = [String(a2.text || '').trim(), proofFaults > 0 ? proofFindings : ''].filter(Boolean).join('\n');
         const n1 = countFaults(auditFindings);
@@ -329,4 +352,4 @@ function startBackgroundRefine(storyData, pages, opts = {}) {
     });
 }
 
-module.exports = { refineStoryText, extractRefinablePages, startBackgroundRefine };
+module.exports = { refineStoryText, extractRefinablePages, startBackgroundRefine, sanitizeProofreadFindings };

@@ -3932,8 +3932,13 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Get page text for semantic fidelity check
         const pageText = isCoverPage(pageNumber) ? null : (getPageText(fullStoryText, pageNumber) || scene.text || null);
 
-        // Get scene hint (most direct statement of what image should show)
-        const sceneHint = scene.outlineExtract || scene.sceneHint || null;
+        // SCENE_HINT = what the image was MADE from (2026-08-31): for pages
+        // the AD brief (scene.description), not the beats-scene outlineExtract
+        // the render never saw. Covers keep the old expression — their brief
+        // lives in outlineExtract/description depending on age.
+        const sceneHint = evaluationType === 'cover'
+          ? (scene.outlineExtract || scene.sceneHint || null)
+          : (scene.description || scene.sceneDescription || scene.outlineExtract || scene.sceneHint || null);
 
         // For covers, include text requirements so the evaluator knows what text to expect
         // Without this, the evaluator marks required text (title, dedication, magicalstory.ch) as "UNWANTED"
@@ -4235,7 +4240,11 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     // Get page text and scene hint
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
     const pageText = isCoverPage(pageNumber) ? null : (getPageText(fullStoryText, pageNumber) || scene.text || null);
-    const sceneHint = scene.outlineExtract || scene.sceneHint || null;
+    // SCENE_HINT = what the image was MADE from (2026-08-31): AD brief for
+    // pages, cover brief for covers — same rule as repairPipeline.
+    const sceneHint = evaluationType === 'cover'
+      ? (scene.outlineExtract || scene.sceneHint || null)
+      : (scene.description || scene.sceneDescription || scene.outlineExtract || scene.sceneHint || null);
 
     // ─── QUALITY EVALUATION ────────────────────────────────────────────
     if (evalType === 'quality') {
