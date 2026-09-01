@@ -40,7 +40,10 @@
  * GB-scale table. It kills in-flight story generation. It is a scheduled
  * maintenance action for an idle window, printed here as a suggestion only.
  *
- *   node scripts/admin/db-housekeeping.js [--staging] [--apply]
+ *   node scripts/admin/db-housekeeping.js [--staging] [--apply] [--vacuum-full]
+ *
+ * --vacuum-full is the WEEKLY reclaim: it checks GET /api/health/busy first and
+ * refuses when a generation is running. Everything else is safe to run daily.
  */
 'use strict';
 
@@ -52,7 +55,27 @@ const { execFileSync } = require('child_process');
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
 const STAGING = args.includes('--staging');
+const VACUUM_FULL = args.includes('--vacuum-full');
 const TABLES = ['characters', 'stories'];
+
+/**
+ * VACUUM FULL takes an ACCESS EXCLUSIVE lock: no reads, no writes, for minutes
+ * on a GB-scale table. A story generating at that moment dies. So the weekly
+ * reclaim asks the environment whether it is idle and refuses otherwise.
+ *
+ * This narrows the window; it does not close it. A generation can still start
+ * in the seconds between this answer and the lock being taken — an accepted
+ * trade-off (owner, 2026-09-01) for automatic space reclamation. Run it when
+ * traffic is lowest, and prefer staging first.
+ */
+async function refuseIfBusy() {
+  const base = STAGING ? 'https://staging.magicalstory.ch' : 'https://magicalstory.ch';
+  const res = await fetch(`${base}/api/health/busy`, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`busy check failed (HTTP ${res.status}) — refusing to lock the tables`);
+  const j = await res.json();
+  if (j.busy) throw new Error(`${base} is busy (${(j.reasons || []).join('; ')}) — not vacuuming`);
+  return base;
+}
 
 (async () => {
   const cs = STAGING ? process.env.STAGING_DATABASE_URL : process.env.DATABASE_URL;
@@ -122,6 +145,17 @@ const TABLES = ['characters', 'stories'];
     console.log('  idle window — it takes an ACCESS EXCLUSIVE lock and will kill any running');
     console.log('  generation. Check GET /api/health/busy first:');
     console.log('      VACUUM (FULL, ANALYZE) stories;  VACUUM (FULL, ANALYZE) characters;');
+  }
+
+  // ── 4. Weekly reclaim (only with --vacuum-full, only when idle) ───────
+  if (VACUUM_FULL) {
+    const base = await refuseIfBusy();          // throws, so a busy env stops here
+    console.log(`\n  ${base} reports idle — reclaiming space (tables locked while this runs)`);
+    for (const t of TABLES) {
+      const t0 = Date.now();
+      await pool.query(`VACUUM (FULL, ANALYZE) ${t}`);
+      console.log(`    VACUUM FULL ${t}: ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    }
   }
 
   console.log(`\n  database ${await dbSize()}`);
