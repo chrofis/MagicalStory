@@ -22581,3 +22581,93 @@ nothing because I am looking in the wrong place".
 **Touched:** `scripts/admin/clean-blind-run-landmark-rows.js`.
 **Status:** ✅ kept — 397 rows deleted from staging; 6,472 → 6,075 Swiss rows,
 in line with production.
+
+## 2026-09-01 — Background mismatch is registration telemetry, never a repair rejection; figure registration restores the insert design (G7)
+
+**Context:** Edit-mode character repair (POST /repair-workflow/character-repair, body/
+fullScene) produced NOTHING for the owner on job_1788215224103_avu132n7je p16 — 12/12
+Grok draws rejected (11× "Model redrew the SCENE… background still differs by 27-71 grey
+levels", 1× mask IoU 54%), before AND after the template fix e7447ec81. Git archaeology:
+the design that demonstrably worked (fullScene inpaint d68bd8815 + the 2026-07-11 old∪new
+union feather composite) NEVER trusted the model's background — it composited only the
+figure union onto the ORIGINAL scene, so a whole-scene re-render was harmless by
+construction, and the path had no rejection at all (worst case: Grok verbatim). The
+Stage-3 spine merge (24842d2bd) routed fullScene through the crop-space gate battery
+(the merge design flagged "body repaints now face the IoU gate they never had —
+calibrate", which never happened), and 2026-08-06 added a hard bg-residual reject to box
+mode premised on "the model edits in place". Stored p16 frames prove that premise false:
+Grok Imagine ALWAYS re-renders the whole scene in box mode (figures preserved but
+reflowed, boat/coins moved, target ~1.3-1.6× oversized). Net: body repair structurally
+cannot pass on any page where Grok reflows — the regression the owner reported.
+
+**Decision (supersedes the 2026-08-06 box-mode background reject):**
+1. `samUnionBlend` background registration never throws. Residual ≤ 26 grey levels →
+   apply the background-derived shift (unchanged); above → record
+   `registration = {mode:'bg-rerendered', bgErr}` and apply NO shift. The composite only
+   ever ships the figure union; the shipped background is the original's by construction,
+   so a background mismatch is not a defect of the paste.
+2. NEW figure registration (body blends, `blendShape:'figure-exact'`): align the new
+   silhouette's bbox onto the old one — uniform scale from the HEIGHT ratio (width varies
+   with pose), dy anchors the bbox bottoms (feet on the ground), dx aligns centres;
+   clamped [0.6, 1.45], applied only when the silhouette-bbox IoU improves by >0.05.
+   Same affine on candidate and mask. Pure math in `computeFigureRegistration`,
+   unit-tested (tests/unit/figure-registration.test.ts).
+3. ALL quality gates unchanged and still judge the registered candidate: mask IoU 0.55,
+   style-match, white-card, coverage, sharpness, figure-integrity naturalness. A genuinely
+   re-posed figure still rejects. `BLEND_RULE_VERSION` bumped to `union-soft2-pad6-figreg`.
+
+**Dead paths removed (Stage-3/5 orphans):** `prompts/character-repair-grok-fullscene.txt`
+(blackout template; blackout deprecated in Stage 5, alias still maps to fullScene axes) and
+`prompts/character-repair-gemini.txt` (Gemini repair folded into the spine) — both loaded
+by `LOCAL_PROMPTS` with zero consumers; the `featherComposite` dev toggle
+(StoryDisplay checkbox → route → adapter — consumed by NOTHING since Stage-3 deleted the
+conditional-feather engine; the client service layer never even forwarded it); the
+RepairWorkflowPanel "Grok Blackout" option; stale "body → cutout" comments.
+
+**Rationale:** The gate was refusing a paste that is background-safe by construction.
+Restoring the insert principle (take only the figure from the model, put it where the old
+figure was, at the old scale, on the original background) fixes the draw-acceptance
+mismatch at its root instead of loosening any quality gate.
+
+**Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`, `server/lib/images.js`,
+`server/routes/regeneration.js`, `client/src/components/generation/StoryDisplay.tsx`,
+`client/src/components/generation/RepairWorkflowPanel.tsx`, `client/src/pages/StoryWizard.tsx`,
+`client/src/services/storyService.ts`, `client/src/hooks/useRepairWorkflow.ts`,
+`docs/codebase-guide.md`, `docs/image-generation-methods.html`, `docs/prompt-inventory.md`,
+`tests/unit/figure-registration.test.ts`, `tasks/bugs.json`, `tasks/BACKLOG.md`.
+**Status:** ✅ active
+
+## 2026-09-01 — Final post-repair book audit REMOVED; mid-loop audits unaffected
+
+**Context:** The 2026-08-26 final-book audit (see that entry above) ran a second time
+inside `storyJobPipeline.js`, after covers and after the repair loop's own mid-loop audits
+were already feeding `readerFindingsByPage` into live repair rounds
+(`repairPipeline.js` MID-LOOP BOOK AUDIT, 2026-08-27). This final call's IMG-route
+findings were only ever written to `sceneImages[].bookAuditFaults`, `data.bookAuditReport`,
+and `finalChecksReport.bookAudit` — none of which had a reader. Its own code comment
+claimed "the dev panel and the repair endpoints" as consumers; neither does (checked:
+zero matches for `bookAuditFaults`/`bookAuditReport` under `client/` or `server/routes/`).
+Measured on `job_1788215224103`: the call found 31 faults, including the run's only
+CRITICAL, and none of it went anywhere.
+
+**Decision (owner ruling):** the final book-audit round is removed from the pipeline.
+"Skip the last book audit round — that is something you can run if I ask to evaluate a
+story." The mid-loop audits stay exactly as they were: they feed the next repair round
+and remain the reason IMG faults get fixed at all. The on-demand capability is not lost —
+it already existed as the Test Lab "book_audit" stage (`server/lib/testlab.js`
+`runBookAuditStage`, registered in `server/routes/admin/testlab.js`
+`STAGE_RUNNERS.book_audit`, listed in `client/src/services/testlabService.ts`), which runs
+`auditStoryBook` on any stored story by id and reports the findings without writing them
+back — no new script was needed.
+
+**Cost saved:** the removed call's own token usage on `job_1788215224103`
+(`data.tokenUsage.byFunction.book_audit`): 1 call, 8,691 input / 1,229 output / 13,361
+thinking tokens on `gemini-2.5-flash` → **$0.039/story** at the project's own
+`calculateTextCost` pricing (that job's TEXT route was empty, so no corrective text-refine
+round rode on top; when TEXT faults exist, an extra `callTextModelStreaming` round adds to
+this).
+
+**Touched:** `storyJobPipeline.js` (removed the FINAL-BOOK AUDIT block, the `bookAuditReport`
+variable, and its `finalChecksReport.bookAudit` / result-object wiring), `server/lib/repairPipeline.js`
+(corrected the MID-LOOP comment that pointed at the now-removed final audit).
+**Status:** ✅ active — mid-loop audits + Test Lab `book_audit` stage are the only paths left.
