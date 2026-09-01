@@ -792,7 +792,26 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
             return sharp(base).composite([{ input: piece, left: dx2, top: dy2 }]).png().toBuffer();
           };
           const regCand = await applyAffine(candidateCropBuf, false);
-          const regMask = await applyAffine(newMask, true);
+          let regMask = null;
+          if (regCand) {
+            // RE-SEGMENT on the registered candidate, exactly like the
+            // background branch above. The round-2 mask was fetched on the
+            // UNREGISTERED output with seeds from the ORIGINAL geometry — when
+            // the model moved/rescaled the figure, a seed lands on background
+            // and SAM segments the sky (measured: the 2026-09-01 p16 verify
+            // run cut out the sunset behind Lorena's enlarged head, pixel IoU
+            // 13% under a bbox IoU of 0.90). On the registered candidate the
+            // old-geometry box and seeds are valid again. Affine-transforming
+            // the old round-2 mask is only the fallback when the refetch fails
+            // — it faithfully preserves whatever round 2 found, poisoned or not.
+            try {
+              regMask = maskFetcher ? await maskFetcher(regCand) : await fetchMaskWithRetry(regCand, boxInCrop, 5, maskPoints || {});
+            } catch { /* fall back below */ }
+            if (!regMask) {
+              log.warn('[TESTLAB] round-2 refetch on the registered candidate failed — using the affine-transformed mask');
+              regMask = await applyAffine(newMask, true);
+            }
+          }
           if (regCand && regMask) {
             candidateCropBuf = regCand;
             newMask = regMask;
