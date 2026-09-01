@@ -9,8 +9,16 @@
  * metadata still gets trusted — nothing reconciles them, so the contradiction
  * ships.
  *
- * Two contradictions, both computed by exact comparison, both free — no API
- * call, no image:
+ * Six checks, all computed from the brief itself, all free — no API call, no
+ * image. Four are contradictions between the two halves (A, B, E and the id
+ * variant), two are declared limits the brief exceeds (C, D). Only the types in
+ * REVIEWABLE reach a prompt.
+ *
+ * Comparison is deterministic but NOT string equality where names are
+ * concerned: `isSameFigureName` (sceneMetadata.js) treats a title prefix or a
+ * trailing epithet as the same figure, because the visual bible and a brief's
+ * `characters[]` routinely write one person two ways. See that helper for the
+ * measured failure that forced it.
  *
  *   cast_unlisted       a cast member the prose describes is absent from
  *                       `characters[]`. Staging `job_1786397108357_q1fjbdzbx`
@@ -33,7 +41,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { extractSceneMetadata, findCastMissingFromMetadata } = require('./sceneMetadata');
+const { extractSceneMetadata, findCastMissingFromMetadata, isSameFigureName } = require('./sceneMetadata');
 
 // A visual-bible id: three letters, three digits, optionally a landmark variant
 // suffix (`LOC003.1` is variant 1 of LOC003 and resolves to it). Anything not
@@ -156,18 +164,19 @@ function checkPage(page, castNames = [], visualBible = null) {
   // the picture — the prose still described them — it removed only the line
   // saying what they were doing. So the row is kept and the disagreement is
   // reported here instead, for the review that authored both halves to settle.
-  const castOnPage = new Set(
-    ((metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
-      .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
-      .filter(Boolean))
-  );
+  // Compared with isSameFigureName, not string equality, for the same reason
+  // check A is: an interactions row saying "Kapitänin Rossa" while
+  // characters[] lists "Rossa" is one figure, not an unresolvable actor.
+  const castOnPage = ((metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
+    .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
+    .filter(Boolean));
   const vbKnown = knownIds(visualBible);
   const unresolved = new Set();
   for (const row of interactions) {
     if (!row || !row.character) continue;
     for (const part of String(row.character).split(/\s*(?:\+|&|\band\b|,)\s*/i)) {
       const name = part.trim();
-      if (!name || castOnPage.has(name)) continue;
+      if (!name || castOnPage.some(entry => isSameFigureName(entry, name))) continue;
       const handle = /^([A-Z]{3})(\d{3})(?:\.\d+)?$/.exec(name.toUpperCase());
       if (handle && vbKnown.has(handle[1] + handle[2])) continue;  // a visual-bible actor
       unresolved.add(name);
@@ -240,6 +249,14 @@ function checkScenes(pages, castNames = [], visualBible = null) {
 //     the prose, three in characters[]) and 7f75jspcz p11 ("Daniel and Hans
 //     remain a few steps back, out of the tight frame, their presence felt") —
 //     which is a drawability defect in its own right. Rare and specific. SENT.
+//     RE-MEASURED 2026-09-01, because that count predates the 2026-08-16
+//     widening to visual-bible secondaries: across every story then held on
+//     staging the type fired on 6 pages, and all 6 were one false positive —
+//     the bible's "Kapitänin Rossa" against a characters[] entry "Rossa",
+//     compared as strings. With isSameFigureName the corpus is 0. The type
+//     stays SENT: the false positives are gone, and the true shape it was
+//     built for (a described figure genuinely absent from characters[]) is
+//     covered by tests/manual/sceneCastConsistency.test.js.
 //   cast_id_unresolved  11 pages of 42, every one a CHR id invented for a main
 //     character. One id short of a real reference, and the page that motivated
 //     this work is one of them. SENT.
@@ -271,7 +288,7 @@ function renderFindingsBlock(byPage) {
   return [
     '# BRIEF FAULTS',
     '',
-    "Each line states either a disagreement between a brief's prose and its own metadata, found by exact comparison against the cast and the visual bible, or a declared limit the brief exceeds. A name can be mentioned without the person being in the frame, so judge each one and rewrite the pages where the fault is real.",
+    "Each line states either a disagreement between a brief's prose and its own metadata, found by comparing it against the cast and the visual bible, or a declared limit the brief exceeds. A name can be mentioned without the person being in the frame, so judge each one and rewrite the pages where the fault is real.",
     '',
     ...lines,
   ].join('\n');

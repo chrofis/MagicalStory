@@ -107,6 +107,56 @@ console.log('\n── Possessives name places and props, not people ──');
   eq('typographic apostrophe behaves like the straight one', findCastMissingFromMetadata(s, CAST), []);
 }
 
+console.log('\n── A title in front of the name is the same person ──');
+{
+  // Staging job_1788215224103_avu132n7je. The visual bible declared the
+  // secondary as "Kapitänin Rossa"; every brief listed her in characters[] as
+  // "Rossa". Under string equality she was reported unlisted on all six of her
+  // pages, and a paid second review round returned the same six findings —
+  // no rewrite of the prose could make the two strings equal.
+  const s = scene('Fiona steps onto the deck where Kapitänin Rossa grips the wheel.', ['Fiona', 'Rossa']);
+  eq('a bible title in front of the name still counts as listed',
+    findCastMissingFromMetadata(s, ['Fiona', 'Kapitänin Rossa']), []);
+}
+{
+  const s = scene('Fiona steps onto the deck where Rossa grips the wheel.', ['Fiona', 'Kapitänin Rossa']);
+  eq('the same holds with the long form listed and the short one in the cast',
+    findCastMissingFromMetadata(s, ['Fiona', 'Rossa']), []);
+}
+{
+  const s = scene('Fiona hauls at the rope while Rossa steadies the boom.', ['Fiona', 'Rossa']);
+  eq('a possessive-headed figure is not collapsed into the name it borrows',
+    findCastMissingFromMetadata(s, ["Rossa's crew member (trapped)", 'Rossa']), []);
+}
+{
+  const s = scene("Fiona hauls at the rope while Rossa's crew member (trapped) kicks at the grate.", ['Fiona', 'Rossa']);
+  eq('and that figure is still reported when the prose puts them in the frame',
+    findCastMissingFromMetadata(s, ["Rossa's crew member (trapped)"]), ["Rossa's crew member (trapped)"]);
+}
+{
+  const s = scene('Hans Meier opens the gate while Anna Meier waits in the cart.', ['Hans Meier']);
+  eq('a shared surname alone is two different people',
+    findCastMissingFromMetadata(s, ['Hans Meier', 'Anna Meier']), ['Anna Meier']);
+}
+{
+  const s = scene('Bruno waits at the gate while Kapitänin Cato counts the coins.', ['Bruno']);
+  eq('a titled figure the list omits entirely is still reported',
+    findCastMissingFromMetadata(s, ['Bruno', 'Kapitänin Cato']), ['Kapitänin Cato']);
+}
+{
+  // ASYMMETRY, on purpose. The LISTED side is matched by figure identity; the
+  // PROSE side still needs the cast name written out in full. Prose that says
+  // only "Cato" for a bible figure called "Kapitänin Cato", with characters[]
+  // omitting her, is a miss. Widening the prose search to a derived short name
+  // would fire on any two-word bible name whose second word is a common noun
+  // ("Alter Mann" → "Mann"), and there is no measured case asking for it — a
+  // false positive here costs a paid review round. Reversing this needs
+  // evidence, not a hunch (docs/decisions.md 2026-09-01).
+  const s = scene('Bruno waits at the gate while Cato counts the coins.', ['Bruno']);
+  eq('prose using only the short form is a known miss, not a silent one',
+    findCastMissingFromMetadata(s, ['Bruno', 'Kapitänin Cato']), []);
+}
+
 console.log('\n── The metadata block itself is not searched ──');
 {
   // Cato appears only inside the JSON (as a CHR id label), never in the prose.

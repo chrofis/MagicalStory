@@ -16404,9 +16404,11 @@ both appear in the reviewer's `changedPages`.
 fact handed to the reviewer.
 - `interactions[]` gains a `contact` field: `"hands"` (hands on something not
   already held), `"carries"`, `"gaze"`, `"none"`.
-- `sceneBriefCheck` emits `interaction_hands_on_excess` when a page declares more
+- `sceneBriefCheck` emits `interaction_object_shared_hands` when a page declares more
   than one `contact: "hands"` row, and the type is in `REVIEWABLE`, so it reaches
   `scene-review.txt` through `{BRIEF_FINDINGS}`.
+  *(Type name corrected 2026-09-01: this entry said `interaction_hands_on_excess`,
+  which was never the shipped string — see sceneBriefCheck.js check D.)*
 - `sceneConsistencyCheck` emits the same finding on the unified path, which feeds
   the REVIEW HINTS block instead.
 - The template cap references the field rather than describing the condition.
@@ -22671,3 +22673,73 @@ this).
 variable, and its `finalChecksReport.bookAudit` / result-object wiring), `server/lib/repairPipeline.js`
 (corrected the MID-LOOP comment that pointed at the now-removed final audit).
 **Status:** ✅ active — mid-loop audits + Test Lab `book_audit` stage are the only paths left.
+
+---
+
+## 2026-09-01 — `cast_unlisted` compares figures, not strings (the "fixed 3×" bug)
+
+**Context:** On staging `job_1788215224103_avu132n7je` the brief check reported
+`cast_unlisted` on six pages (p3, p4, p10, p11, p12, p13), the scene review ran, the
+targeted second round ran — and the re-check returned the same six findings. Before = 6,
+after = 6, twice, at real token cost. The type had been "fixed" three times without the
+symptom moving:
+
+| Commit | Date (CH) | What it changed | Why the symptom survived |
+|---|---|---|---|
+| `50b0ebc0c` | 2026-08-11 | Created the check; advisory, reports-never-repairs | Birth, not a fix — no channel for "the finding is wrong" |
+| `68dcc717f` | 2026-08-16 | Widened `castNames` to visual-bible `secondaryCharacters` | The *cause*, not a fix: bible names carry titles ("Kapitänin Rossa") while briefs list the short form ("Rossa"), so the widening added exactly the names string equality cannot match |
+| `edd75f3c2` | 2026-08-25 | Post-review re-check, SURVIVED vs INTRODUCED | Pure observation — made the repeat firing visible, added no way to clear it |
+| `c92d56ff2` | 2026-08-25 | Sharpened the finding text, added a targeted second round | Re-asked an identical, false question of the same model; converted "fires once" into "fires, is re-sent, fires again, ships" |
+
+Every one of those addressed plumbing around the finding. **None ever touched the name
+comparison**, which is where the defect always was.
+
+**Root cause:** `findCastMissingFromMetadata` decided "is this cast member listed?" with
+`listed.has(name.toLowerCase())` — exact string equality. The visual bible declared the
+secondary as `Kapitänin Rossa`; every brief's `characters[]` listed her as `Rossa`. The
+two strings are never equal, the prose does contain the literal "Kapitänin Rossa", so she
+was reported missing from a list she was already on. The reviewer could not clear it: the
+prose and the metadata already agreed, so there was no defect to rewrite. The control case
+is in the same corpus — `job_1788123310558_1yx71oyo1wg`, same story, same cast, bible name
+plain `Rossa`: zero findings.
+
+**Decision:** name identity moves to one shared helper, `isSameFigureName`
+(`server/lib/sceneMetadata.js`). Two written names denote the same figure when their token
+lists are equal, or when the shorter is a leading or trailing RUN of the longer —
+parentheticals stripped, possessive-marked tokens dropped first. That admits
+`Kapitänin Rossa` ≡ `Rossa` and `Frau Müller` ≡ `Müller`, and refuses a merely shared
+token: `Hans Meier` ≢ `Anna Meier`, and `Rossa's crew member (trapped)` ≢ `Rossa` (the
+possessive is a modifier, never the head). Both emitters of this fault now use it —
+`sceneBriefCheck` (beats: checks A and E) and `sceneConsistencyCheck` (unified:
+`prose_char_absent_from_metadata`, `cast_char_missing_from_metadata`,
+`interaction_char_unknown`, `interaction_target_char_unknown`, `scene_intent_char_absent`),
+which had the identical `metaCharSet.has(lower)` flaw and is a large part of why fixing one
+site never moved the symptom.
+
+**Rationale:** the fault is in the matcher, so the matcher is where it is fixed — not in the
+prompt (the reviewer was declining a false finding correctly), and not by dropping visual-bible
+secondaries from the cast universe, which would revert the 2026-08-16 entry and re-open the
+real omissions it was built for.
+
+**Deliberately NOT changed — the mirror-image gap.** The LISTED side is now matched by figure
+identity; the PROSE side still requires the cast name written out in full. Prose that says only
+"Rossa" for a bible figure called "Kapitänin Rossa", with `characters[]` omitting her, is still a
+miss. Widening the prose search to a derived short name would fire on any two-word bible name
+whose second word is a common noun ("Alter Mann" → "Mann"), and no measured case asks for it —
+a false positive here costs a paid review round, which is the exact cost this entry is about.
+The boundary is asserted in `tests/manual/sceneCastConsistency.test.js` so it stays a known miss
+rather than a silent one. Reversing it needs evidence, not a hunch.
+
+**Verification:** replayed against the stored briefs of every completed story then on staging.
+`cast_unlisted` fired on 6 pages before and 0 after; each of the 6 suppressions was verified to
+be a title/short-name pair, and no other finding in the corpus changed. `sceneCastConsistency`
+32/32 (6 new cases covering the title prefix, the possessive non-collapse, the shared surname,
+and the documented true positives). `sceneBriefCheck` unchanged at 43 passed / 2 failed — both
+failures pre-date this work (stale assertions expecting a two-type `REVIEWABLE` set).
+
+**Touched:** `server/lib/sceneMetadata.js` (`nameTokens`, `isSameFigureName`, exported;
+`findCastMissingFromMetadata` uses it), `server/lib/sceneBriefCheck.js` (checks A and E; stale
+header and the stale pre-widening measurement note corrected), `server/lib/sceneConsistencyCheck.js`
+(five comparison sites; dead `metaCharSet` removed), `tests/manual/sceneCastConsistency.test.js`,
+`tasks/bugs.json`.
+**Status:** ✅ active

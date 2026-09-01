@@ -36,6 +36,12 @@ function nameMentioned(name, text) {
 }
 
 /** Strip a trailing parenthesised annotation from a character name. */
+// Name identity — a bible figure written "Kapitänin Rossa" and a characters[]
+// entry written "Rossa" are one person. Shared with sceneBriefCheck so both
+// emitters of this fault agree; string equality here produced six unclearable
+// cast_unlisted findings on job_1788215224103_avu132n7je (2026-09-01).
+const { isSameFigureName } = require('./sceneMetadata');
+
 function baseName(name) {
   return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 }
@@ -116,7 +122,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
 
     const metaChars = Array.isArray(meta.characters) ? meta.characters : [];
     const metaCharNames = metaChars.map(c => baseName(c && c.name)).filter(Boolean);
-    const metaCharSet = new Set(metaCharNames.map(n => n.toLowerCase()));
+    const listedAs = (who) => metaCharNames.some(entry => isSameFigureName(entry, who));
     const objects = Array.isArray(meta.objects) ? meta.objects : [];
     const objectStrings = objects.map(o => (typeof o === 'string' ? o : (o && (o.name || o.id)) || '')).filter(Boolean);
     const background = typeof meta.background === 'string' ? meta.background : '';
@@ -128,7 +134,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     if (castLine && knownNames.length > 0) {
       for (const name of knownNames) {
         const inCast = nameMentioned(name, castLine);
-        const inMeta = metaCharSet.has(name.toLowerCase());
+        const inMeta = listedAs(name);
         if (inCast && !inMeta) {
           issues.push({ type: 'cast_char_missing_from_metadata', detail: `locked Scene ${pageNumber} cast names '${name}' but METADATA characters[] does not` });
         } else if (!inCast && inMeta) {
@@ -146,7 +152,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
         }
       }
       for (const name of knownNames) {
-        if (nameMentioned(name, prose) && !metaCharSet.has(name.toLowerCase())) {
+        if (nameMentioned(name, prose) && !listedAs(name)) {
           issues.push({ type: 'prose_char_absent_from_metadata', detail: `SCENE prose mentions '${name}' but METADATA characters[] does not list them` });
         }
       }
@@ -157,14 +163,14 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     for (const inter of interactions) {
       if (!inter || typeof inter !== 'object') continue;
       const ch = baseName(inter.character);
-      if (ch && !metaCharSet.has(ch.toLowerCase())) {
+      if (ch && !listedAs(ch)) {
         issues.push({ type: 'interaction_char_unknown', detail: `interactions[] references character '${ch}' who is not in characters[]` });
       }
       const obj = String(inter.object || '').trim();
       if (obj) {
-        const objIsKnownChar = knownNames.some(n => n.toLowerCase() === baseName(obj).toLowerCase());
+        const objIsKnownChar = knownNames.some(n => isSameFigureName(n, baseName(obj)));
         if (objIsKnownChar) {
-          if (!metaCharSet.has(baseName(obj).toLowerCase())) {
+          if (!listedAs(baseName(obj))) {
             issues.push({ type: 'interaction_target_char_unknown', detail: `interactions[] targets character '${obj}' who is not in characters[]` });
           }
         } else if (!isEntityId(obj)) {
@@ -236,7 +242,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     const sceneIntent = typeof meta.sceneIntent === 'string' ? meta.sceneIntent : '';
     if (sceneIntent && knownNames.length > 0) {
       for (const name of knownNames) {
-        if (nameMentioned(name, sceneIntent) && !metaCharSet.has(name.toLowerCase())) {
+        if (nameMentioned(name, sceneIntent) && !listedAs(name)) {
           issues.push({ type: 'scene_intent_char_absent', detail: `sceneIntent names '${name}' but METADATA characters[] does not list them` });
         }
       }
