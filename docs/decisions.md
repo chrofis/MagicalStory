@@ -22743,3 +22743,51 @@ header and the stale pre-widening measurement note corrected), `server/lib/scene
 (five comparison sites; dead `metaCharSet` removed), `tests/manual/sceneCastConsistency.test.js`,
 `tasks/bugs.json`.
 **Status:** ✅ active
+
+## 2026-09-01 — Entity character faults route to character repair again — CRITICAL only, on Grok 1.x (G5)
+
+**Context:** On `job_1788215224103_avu132n7je` p16 the entity evaluator emitted a CRITICAL
+`age_shift` for Lorena, but `repairLogic.js` gated the entity→char-fix route with
+`issue.severity !== 'major' && issue.severity !== 'critical'` while the evaluator emits
+UPPERCASE severities (measured on this story: `MAJOR` ×96, `CRITICAL` ×16). The gate never
+matched — the route was dead code — so the fault fell through to inpaint. There, the
+consolidator's per-character entry carried no `fix_instruction`, and the
+`p.fix_instruction || (p.issues||[]).join('; ')` fallback pasted the raw defect prose
+("appears visibly older…") to Grok as the edit instruction. Lorena was painted into her
+60s, and that version shipped. `selectCharRepairTasks` (repair-workflow auto-select,
+regeneration.js:5197) had the identical lowercase-only compare and was equally dead.
+
+**Decision (owner ruling, G5 / option 2):** character faults route to character-repair
+again — "only for critical for now", one attempt, keep-only-if-improved, on cheap Grok 1.x.
+Concretely:
+- Both entity severity gates (`decideRepairMethod` step 2, `selectCharRepairTasks`) compare
+  case-insensitively AND select CRITICAL only. MAJOR entity character findings get NO
+  automatic repair: not char-fix, and not inpaint either — `NOT_INPAINTABLE_TYPES` keeps
+  character types out of inpaint instructions regardless of routing.
+- The two inpaint fail-opens are closed: a `per_character_fixes` entry with an empty
+  `fix_instruction` is DROPPED loudly (a diagnosis is not an edit instruction), and the
+  `(p.issues||[]).join('; ')` refill is deleted.
+- `REPAIR_DEFAULTS.charRepairModel = 'grok-imagine-image'` pins char repair to Imagine 1.x
+  ($0.02), consumed as `editWithGrok`'s default model (the char-repair paths —
+  faceRepair `callModel` and the fullScene `grokEditSceneExact` — are the only pipeline
+  callers omitting `model`). The anatomy study measured 1.x BETTER on anatomy: 0/82
+  structural defects vs 2.0's 2/29, so the cheap tier is also the correct one. The staging
+  2.0 rollout (`1a253d866`) deliberately kept the edit tier on Standard; the pin makes that
+  survivable.
+- "One attempt" is structural, not new code: the round loop picks ONE method per page per
+  round (repairPipeline.js:1829) and `executeCharFixAction` makes one repair call; staging
+  runs `maxPasses=1`. The spine's internal `REPAIR_ATTEMPTS=3` redraws fire only on
+  gate-REJECTED draws (nothing shipped) — owner design 2026-08-17, untouched.
+- "Keep-only-if-improved" is the pre-existing Step 3 pick-best: every char-fix output
+  becomes its own scored version (repairPipeline.js:2340-2392, `applyScore` at creation)
+  and ships only if `selectBestVersion` → `pickBestVersionIndex` (tieBreak 'earliest')
+  scores it above the input.
+
+**Evidence:** offline routing repro on the stored story data — BEFORE (HEAD):
+`P16 decision => inpaint ("4 quality, 2 targets")`; AFTER: `P16 decision => char-fix
+("entity critical on Lorena")`. Unit tests: tests/unit/repair-method.test.js entity block.
+
+**Touched files:** `server/lib/repairLogic.js`, `server/lib/images.js` (inpaint
+per-character instruction assembly), `server/config/models.js` (charRepairModel pin),
+`server/lib/grok.js` (editWithGrok default reads the pin),
+`tests/unit/repair-method.test.js`.
