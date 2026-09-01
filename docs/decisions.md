@@ -22366,6 +22366,19 @@ loop in `generateReferenceSheet`).
 
 **Status:** ✅ active.
 
+**2026-09-01 update:** Evidence job_1788215224103 — Fiona's avatar sheet read 40-45 vs
+stated 25, Lorena's 35-40 vs 22; both passed the identity/render checks because neither
+asked about age. Added a third question to `checkCharacterCellRender`'s prompt — "Apparent
+age: does the figure look about {age}? A visibly older or younger rendering fails." — filled
+from the VB entry's own `age` field (free-text, e.g. "adult, mid-thirties"), same gate/retry,
+no new machinery. The photo-backed avatar-sheet identity check
+(`prompts/sheet-row-identity-eval.txt`, `evaluateIdentity` in `server/lib/character2x4Sheet.js`)
+got the matching fix: a CHARACTER_AGE-filled apparent-age line feeding the existing
+per-cell/lowest-cell `identityScore`, wired from `character.age` through
+`reviewHeadRow`/`generateComposited2x4` (production) and `evaluateSheetSplit`/
+`evaluateAvatarSheet`/`testlab.js` (Test Lab pass 1), mirroring the CHARACTER_AGE pattern
+`sheet-2x4-style-eval.txt` already used for Pass 2.
+
 ## 2026-08-31 — Beats/AD/text redesign: the beats stage divides a finished story; SCENE replaced by the PAGE PLAN line
 
 **Context.** Live owner review of the pirate run (job_1788123310558; autopsies q3/q6/q7/q8 in the

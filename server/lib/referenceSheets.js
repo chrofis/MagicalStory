@@ -189,7 +189,7 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
 // cheapest vision-capable TEXT_MODELS entry, one re-render on NO, then accept
 // whatever came back. No scores, no thresholds, no loops; fail-open on any API
 // error — the gate may never block a story.
-async function checkCharacterCellRender(cellBase64, styleDescription = '') {
+async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
@@ -197,7 +197,8 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '') {
   // The style anchor is load-bearing: without it flash-lite judged the known-bad
   // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
   // job_1788123310558 cell — NO with the anchor, YES without).
-  const prompt = `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Is the figure's skin a plausible human skin color — not green-, gray- or blue-tinted? (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)? If either check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+  const ageClause = age ? ` (3) Apparent age: does the figure look about ${age}? A visibly older or younger rendering fails.` : '';
+  const prompt = `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Is the figure's skin a plausible human skin color — not green-, gray- or blue-tinted? (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
   const body = {
     contents: [{ parts: [
       { inlineData: { mimeType: 'image/png', data: cellBase64 } },
@@ -386,7 +387,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         if (element.type !== 'character' || !references[i]) continue;
         let verdict;
         try {
-          verdict = await checkCharacterCellRender(references[i], styleDescription);
+          verdict = await checkCharacterCellRender(references[i], styleDescription, element.age || null);
         } catch (err) {
           log.warn(`⚠️ [REF-SHEET] Cell render gate errored for "${element.name}" (${err.message}) — accepting cell unchecked`);
           continue;
@@ -402,7 +403,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
           if (!reCell) throw new Error('re-rendered cell extraction failed');
           references[i] = reCell;
           try {
-            const recheck = await checkCharacterCellRender(reCell, styleDescription);
+            const recheck = await checkCharacterCellRender(reCell, styleDescription, element.age || null);
             if (!recheck.natural) {
               log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
               genLog?.warn('vb_character_cell_still_bad', `Re-rendered cell still fails render gate (${recheck.reason}) — accepted anyway`, element.name);

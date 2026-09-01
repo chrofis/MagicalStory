@@ -6,6 +6,8 @@ IMAGES, in order:
 
 Compare each head in the LAST image against the reference face image(s): is it the SAME person — same face structure, hair colour and length, skin tone, apparent age? Pose and angle differ by design (front, three-quarter, profile, back) — judge identity only, never pose.
 
+The character's stated age is CHARACTER_AGE. Does each head look about that age? A visibly older or younger rendering counts as a mismatch on that cell, same as a face mismatch. Skip this check if CHARACTER_AGE is unknown.
+
 Per-cell 1-10:
   - 8-10: clearly the same person; only pose/angle differs.
   - 4-6: ambiguous — face similar but age, hair, or features visibly drifted.

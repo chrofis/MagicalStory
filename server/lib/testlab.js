@@ -6147,6 +6147,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     const { split } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
       pass: 1, facePhoto, standardAvatar,
       costumeDescription: costume.description || 'standard outfit',
+      declaredAge: params.declaredAge ?? null,
       model, promptOverride,
     });
     const { heads, bodies, identity } = split;

@@ -353,11 +353,11 @@ async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = nu
 }
 
 // Review the 1×4 head row: heads-structure eval + identity vs face photo/avatar.
-async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker }) {
+async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null }) {
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, identityR] = await Promise.all([
     evaluateSheetRow(headRowData, 'heads', { model, usageTracker }),
-    hasRefs ? evaluateIdentity(headRowData, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker }) : Promise.resolve(null),
+    hasRefs ? evaluateIdentity(headRowData, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge }) : Promise.resolve(null),
   ]);
   const heads = headsR.report;
   const identity = identityR?.report || null;
@@ -426,7 +426,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     let review = { valid: true, score: 10, heads: null, identity: null };
     if (!skipReview) {
       try {
-        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker });
+        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age });
       } catch (err) {
         log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
         review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
@@ -1067,9 +1067,14 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
 // Identity is a face question, so it runs on the head row; the body row's
 // identity is not relevant (user direction). Returns {perCell, identityScore}.
 async function evaluateIdentity(headsCrop, opts = {}) {
-  const { sourcePhoto = null, avatarFaces = null, model = 'gemini-2.5-flash', usageTracker = null } = opts;
-  const prompt = PROMPT_TEMPLATES.sheetRowIdentityEval;
+  const { sourcePhoto = null, avatarFaces = null, model = 'gemini-2.5-flash', usageTracker = null, declaredAge = null } = opts;
+  let prompt = PROMPT_TEMPLATES.sheetRowIdentityEval;
   if (!prompt) throw new Error('sheetRowIdentityEval template not loaded');
+  // Same pattern as the Pass-2 style eval's CHARACTER_AGE fill (job_1788215224103:
+  // Fiona/Lorena avatar sheets read 40-45 vs stated 25 and 35-40 vs 22 — this
+  // check passed both because nothing asked about age).
+  const ageNum = parseInt(declaredAge, 10);
+  prompt = prompt.replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
   const parts = [];
   if (sourcePhoto) parts.push(inlinePartOf(sourcePhoto));
   if (avatarFaces) parts.push(inlinePartOf(avatarFaces));
@@ -1093,7 +1098,7 @@ async function evaluateIdentity(headsCrop, opts = {}) {
 // them but only against the heads. Returns the sub-reports + a merged `verdict`
 // whose flat fields are a drop-in for the whole-sheet verdict the retry gate reads.
 async function evaluateSheetSplit(sheetImageData, opts = {}) {
-  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
+  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null, declaredAge = null } = opts;
   const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
   const hasRefs = !!(facePhoto || avatarFaces);
@@ -1104,7 +1109,7 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
     // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
     // (detectBodyRowHeads) and merged in below. ONE source of truth per concept.
     evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, costumeName, model, promptOverride, usageTracker }),
-    hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker }) : Promise.resolve(null),
+    hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge }) : Promise.resolve(null),
     detectBodyRowHeads(bottomBody),
   ]);
   const heads = headsR.report, bodies = bodiesR.report;
@@ -1168,7 +1173,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   } = opts;
   if (Number(pass) === 1) {
     const split = await evaluateSheetSplit(sheet, {
-      facePhoto, standardAvatar, costumeDescription, costumeName,
+      facePhoto, standardAvatar, costumeDescription, costumeName, declaredAge,
       model: model || MODEL_DEFAULTS.sheetEvalModel, promptOverride, usageTracker,
     });
     return { verdict: split.verdict, split };
