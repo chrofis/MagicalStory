@@ -1093,6 +1093,11 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
         Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
       ] : null,
       r2Prompt: opts.r2Prompt || 'face',
+      // DINO's re-detect of the repainted figure (crop coords). Body blends use
+      // it to prompt round-2 SAM where the figure actually LANDED and to derive
+      // the figure registration detector-to-detector — the old-geometry prompt
+      // on a moved figure seeds the background and SAM returns the sky.
+      newBoxInCrop: (!faceOnly && Array.isArray(r2BodyBox) && r2BodyBox.length === 4) ? r2BodyBox : null,
       protectedBoxesInCrop: (Array.isArray(opts.protectedBodies) ? opts.protectedBodies : [])
         .filter(b => Array.isArray(b) && b.length === 4)
         .map(b => [

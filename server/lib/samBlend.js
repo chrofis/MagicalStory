@@ -472,7 +472,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, newBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -574,20 +574,43 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         log.info();
       }
     }
+    // DETECTOR-ANCHORED round 2 (owner principle: evidence, not inference).
+    // When the caller supplies DINO's re-detected body box for the CANDIDATE
+    // (faceRepair's round-2 re-detect), prompt SAM where the figure actually
+    // IS: padded new box + one seed at its centre. The old-geometry prompt on
+    // a moved/rescaled figure puts the face seed on background and SAM returns
+    // the sky (measured: p16 verify run + exps #967/#968, pixel IoU 5-13%).
+    let fetchBox = padBox, fetchOpts = r2Opts;
+    if (Array.isArray(newBoxInCrop) && newBoxInCrop.length === 4) {
+      const nw = newBoxInCrop[2] - newBoxInCrop[0], nh = newBoxInCrop[3] - newBoxInCrop[1];
+      if (nw > 8 && nh > 8) {
+        fetchBox = [
+          Math.max(0, Math.round(newBoxInCrop[0] - nw * 0.04)),
+          Math.max(0, Math.round(newBoxInCrop[1] - nh * 0.04)),
+          Math.min(cropW, Math.round(newBoxInCrop[2] + nw * 0.04)),
+          Math.min(cropH, Math.round(newBoxInCrop[3] + nh * 0.04)),
+        ];
+        fetchOpts = { points: [[Math.round((newBoxInCrop[0] + newBoxInCrop[2]) / 2), Math.round((newBoxInCrop[1] + newBoxInCrop[3]) / 2)]] };
+        log.info(`[TESTLAB] round-2 prompt anchored on DINO's re-detected body box [${newBoxInCrop.join(',')}] (centre seed)`);
+      }
+    }
+    // OLD-geometry fetcher, for the post-registration refetch: after the
+    // affine the figure sits at the ORIGINAL geometry, so the original padded
+    // box + face-centre seed are the right prompt there.
     refetchRound2 = (buf) => fetchMaskWithRetry(buf, padBox, 5, r2Opts);
-    newMask = await refetchRound2(candidateCropBuf);
+    newMask = await fetchMaskWithRetry(candidateCropBuf, fetchBox, 5, fetchOpts);
     // WHAT ROUND 2 WAS PROMPTED WITH — box (yellow) + seed points (red). Round 1
     // has such a view; round 2 never did, so a bad box or a seed landing off the
     // figure was invisible (owner asked to see the box and points).
     try {
-      const dots = (r2Opts.points || []).map(([px, py]) =>
+      const dots = (fetchOpts.points || []).map(([px, py]) =>
         `<circle cx="${px}" cy="${py}" r="6" fill="#ff2d2d" stroke="#fff" stroke-width="2"/>`).join('');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cropW}" height="${cropH}">`
-        + `<rect x="${padBox[0]}" y="${padBox[1]}" width="${padBox[2] - padBox[0]}" height="${padBox[3] - padBox[1]}" fill="none" stroke="#ffcc00" stroke-width="3"/>`
+        + `<rect x="${fetchBox[0]}" y="${fetchBox[1]}" width="${fetchBox[2] - fetchBox[0]}" height="${fetchBox[3] - fetchBox[1]}" fill="none" stroke="#ffcc00" stroke-width="3"/>`
         + dots + `</svg>`;
       const viz = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' })
         .composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 92 }).toBuffer();
-      await addStep(`SAM round 2 PROMPT: box (yellow) + ${(r2Opts.points || []).length} seed point(s) (red)`, `data:image/jpeg;base64,${viz.toString('base64')}`);
+      await addStep(`SAM round 2 PROMPT: box (yellow) + ${(fetchOpts.points || []).length} seed point(s) (red)${fetchBox !== padBox ? ' — DINO re-detect anchored' : ''}`, `data:image/jpeg;base64,${viz.toString('base64')}`);
     } catch { /* viz only */ }
   }
   // ---- OCCLUDER SUBTRACT on ROUND 2 ---------------------------------------
@@ -774,7 +797,15 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         }
         return x1 < 0 ? null : [x0, y0, x1 + 1, y1 + 1];
       };
-      const ob = await alphaBox(oldMask), nb = await alphaBox(newMask);
+      // Transform source: DINO box → DINO box when the caller re-detected the
+      // candidate (same instrument on both sides; immune to a poisoned SAM
+      // mask — exp #968: the sky-blob bbox produced a plausible-looking but
+      // meaningless transform). SAM alpha bboxes are the fallback.
+      const haveDino = Array.isArray(newBoxInCrop) && newBoxInCrop.length === 4
+        && (newBoxInCrop[2] - newBoxInCrop[0]) > 8 && (newBoxInCrop[3] - newBoxInCrop[1]) > 8
+        && Array.isArray(boxInCrop) && boxInCrop.length === 4;
+      const ob = haveDino ? boxInCrop : await alphaBox(oldMask);
+      const nb = haveDino ? newBoxInCrop : await alphaBox(newMask);
       const reg = (ob && nb) ? computeFigureRegistration({ oldBox: ob, newBox: nb }) : null;
       const meaningful = reg && (Math.abs(reg.scale - 1) > 0.03 || Math.abs(reg.dx) > cropW * 0.02 || Math.abs(reg.dy) > cropH * 0.02);
       if (meaningful) {
