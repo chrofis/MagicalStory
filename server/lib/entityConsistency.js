@@ -1267,6 +1267,18 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             clothingCategory,
             pageNumbers,
             cellsToPages,
+            // ROUTING CONTRACT: repair readers (repairLogic.js selectCharRepairTasks
+            // + decideRepairMethod) route on `pagesToFix || pageNumber` — both of
+            // which came ONLY from the model's own optional pagesToFix field. A
+            // finding that named cells but no pagesToFix got `pageNumbers` stamped
+            // (manifest-resolved, above) yet left pagesToFix undefined and
+            // pageNumber null, so it could never reach char-fix. Backfill both
+            // from the manifest resolution; the model's own pagesToFix wins when
+            // present (it may legitimately span multiple pages — pageNumbers is
+            // deliberately first-cell-only for the consolidator).
+            ...(Array.isArray(issue.pagesToFix) && issue.pagesToFix.length
+              ? {}
+              : { pagesToFix: pageNumbers, pageNumber: pageNumbers[0] ?? null }),
             ...(unlocatedReason ? { unlocatedReason } : {}),
             description: annotateCells(issue.description, cellToPage),
             issue: annotateCells(issue.issue, cellToPage),
@@ -2629,7 +2641,11 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
         // `subType` stays populated for stored evaluations and older readers.
         type: issue.type || 'consistency',
         subType: issue.type,
-        severity: issue.severity || 'major',
+        // Normalised at the parse boundary (owner, 2026-09-01): the evaluator
+        // mostly emits UPPERCASE but not always — one stored report carried
+        // "MINOR" and "minor" side by side, and a lowercase value slips any
+        // case-sensitive filter downstream. One casing from here on.
+        severity: String(issue.severity || 'MAJOR').toUpperCase(),
         description: issue.description,
         fixInstruction: issue.fix || issue.fixInstruction,
         affectedCharacter: entityName,

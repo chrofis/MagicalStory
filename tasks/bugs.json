@@ -447,6 +447,30 @@
       "status": "fixed",
       "fixedIn": "fix(text-refine): auditRulings ledger no longer shadowed by the per-round trace field — 2026-09-01 (same commit)",
       "note": "Renamed the per-round trace field to roundTrace and added auditRulings: usable.roundsDetail to textRefineReport, so both survive. Confirmed no other code (grepped server/, client/src/) reads textRefineReport.roundsDetail by that name, so the rename is non-breaking."
+    },
+    {
+      "id": "entity-report-duplicated-on-every-scene-image",
+      "reported": "2026-09-01",
+      "summary": "repairPipeline.js stamps the SAME story-level entity consistency report object onto every results row (entityReport per page), and storyJobPipeline.js:5241 copied it into every stored sceneImage — a 16-page story persisted 16 identical copies of a report that already ships once as finalChecksReport.entity (built from pipelineResult[0].entityReport at storyJobPipeline.js:5657). Confirmed on the pirate capstone working set: every sceneImage row carried the identical report. Only consumer of the per-scene copies was the garment-colour route (server/routes/stories.js:2083), which took the FIRST sceneImage carrying one.",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
+      "note": "storyJobPipeline.js no longer stamps entityReport per sceneImage (comment left at the site); the report is stored once at finalChecksReport.entity, which the repair endpoints (regeneration.js:5279, testlab.js) already read. The garment-colour route now reads finalChecksReport.entity first and falls back to the legacy per-sceneImage copies, so old stories keep working. No migration — old rows keep their copies; new stories just stop duplicating. database.js already R2-offloads grids in BOTH locations."
+    },
+    {
+      "id": "entity-severity-casing-not-normalized-at-parse",
+      "reported": "2026-09-01",
+      "summary": "entityConsistency.js parse boundary stored issue.severity verbatim from the model. The evaluator mostly emits UPPERCASE but not always: the pirate capstone entityReport carries \"MINOR\" (Fiona) and \"minor\" (Sarah) side by side in one report. Any case-sensitive severity filter downstream silently drops the lowercase variant (the historical repairLogic gate bug fixed 2026-09-01 was the mirror image: a lowercase-only compare that never matched UPPERCASE).",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
+      "note": "Parse boundary now stamps severity: String(issue.severity || \"MAJOR\").toUpperCase() (entityConsistency.js, evaluateEntityConsistency issue mapping). One casing from the source; scoring.js/repairLogic.js already lowercase their side."
+    },
+    {
+      "id": "entity-pagestofix-routing-empty-for-cell-only-findings",
+      "reported": "2026-09-01",
+      "summary": "Field-contract mismatch traced end-to-end on the stored capstone data: entityConsistency.js stamps manifest-resolved pageNumbers on each annotated issue (read only by feedbackConsolidator), while the char-fix routers (repairLogic.js:106 selectCharRepairTasks and :321 decideRepairMethod) read issue.pagesToFix || issue.pageNumber — BOTH of which came only from the model-volunteered pagesToFix field. Verdict from the trace: a bridge DOES exist when the model emits pagesToFix (on the capstone run every in-pipeline issue had it, e.g. clothing_inconsistent pagesToFix [2,6,13,14] vs pageNumbers [2] — findings DID reach char-fix, via the model-claimed multi-page set), but a finding that names only cells leaves pagesToFix undefined AND pageNumber null, so it can never reach char-fix at any severity — the exact survivorship the 2026-08 gridCellToPage fix documented (\"only findings where the model volunteered an absolute pagesToFix survived\").",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
+      "note": "Contract fixed at the producer, one name both sides: the annotation site (entityConsistency.js) backfills pagesToFix (and pageNumber) from the manifest-resolved pageNumbers whenever the model omitted pagesToFix, so pagesToFix is now guaranteed populated for every locatable finding and stays the single routing field the repair readers consume. The model-emitted pagesToFix wins when present (legitimately multi-page); pageNumbers keeps its deliberate first-cell-only consolidator semantics untouched."
     }
   ]
 }

@@ -107,7 +107,12 @@ const { log } = require('../utils/logger');
 // =====================================================================
 // Types that are recorded and routed but never charged. Garment colour is
 // fixed mechanically, so charging it would trip the redo gate for a hue shift.
-const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
+// `cutout_artifact` (owner, 2026-09-01): a grid cell with missing regions,
+// hard white gaps or truncated limbs is an artifact of OUR crop extraction,
+// not of the page — charging it would buy paid repairs for a defect the
+// image does not have. The entity prompt names the type; this zeroes its cost
+// (same contract as garment_colour: reported in full, costs nothing).
+const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color', 'cutout_artifact']);
 
 // Types with a hard severity CEILING, applied to the SCORE regardless of what
 // the evaluator claimed. Same shape as ZERO_POINT_TYPES: the finding is still

@@ -5238,7 +5238,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           issuesSummary: img.issuesSummary || null,
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
-          entityReport: img.entityReport || null,
+          // entityReport is deliberately NOT stamped per page (owner, 2026-09-01):
+          // the pipeline put the SAME story-level report object on every row, so
+          // stories.data carried N copies of a report that already ships once as
+          // finalChecksReport.entity (built from pipelineEntityReport below).
+          // Readers tolerate both shapes for old stories (server/routes/stories.js
+          // garment-colour route reads finalChecksReport.entity first, then falls
+          // back to the first sceneImage carrying a copy).
           // Do the evaluator and the detector agree on WHO IS WHO. Computed in
           // evaluateImageBatch, carried on the page record — and dropped here
           // until this line existed: the whitelist above is the single gate on

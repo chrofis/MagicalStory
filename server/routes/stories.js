@@ -2080,7 +2080,11 @@ router.get('/:id/garment-colour/:pageNumber', authenticateToken, async (req, res
     if (rows.length === 0) return res.status(404).json({ error: 'Story not found' });
 
     const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-    const report = (data?.sceneImages || []).find(si => si?.entityReport)?.entityReport;
+    // Story-level location first (finalChecksReport.entity — the only place new
+    // stories carry it since the per-page duplication stopped, 2026-09-01);
+    // fall back to the legacy per-sceneImage copies for older stories.
+    const report = data?.finalChecksReport?.entity
+      || (data?.sceneImages || []).find(si => si?.entityReport)?.entityReport;
 
     // Every mismatch naming this page, with whatever outcome Step 1b recorded.
     const entries = [];

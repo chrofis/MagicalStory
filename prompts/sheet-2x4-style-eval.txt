@@ -29,6 +29,7 @@ TASK 3: STYLE MATCH
 TASK 4: COSTUME PRESERVED
 - The outfit in Image 3 cells 5-8 matches the outfit in Image 2 cells 5-8 — same garments, same colours, same accessories. Style of rendering can change (photographic → watercolour) but the outfit itself must not change (no different shirt, no added hat, no swapped colours).
 - Cross-cell consistency: all 4 body cells in Image 3 wear the same outfit.
+- The character's clothing description: CLOTHING_DESCRIPTION. Does the outfit match it? A missing or different garment lowers the score; small details (fastenings, panels, trim) do not. Skip this check when the description is "none".
 - Score 1-10. Different outfit between passes, or different outfits across cells, scores 1-3.
 - `outfitScore` is the score.
 

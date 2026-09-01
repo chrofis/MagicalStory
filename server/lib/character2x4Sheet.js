@@ -888,7 +888,7 @@ function loadStyleAnchor(artStyle) {
  */
 async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null, declaredAge = null, opts = {}) {
   // model / promptOverride: Test Lab A/B only; production passes neither.
-  const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
+  const { model = 'gemini-2.5-flash', promptOverride = null, costumeDescription = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
@@ -898,6 +898,12 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
   const ageNum = parseInt(declaredAge, 10);
   prompt = prompt.replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
+  // TASK 4 spec conformance (owner, 2026-09-01): the outfit is judged against
+  // the character's clothing description, not only against Image 2. Source is
+  // the canonical clothingRequirements prose the sheet was generated from;
+  // "none" disables the check (prompt-side skip).
+  const clothingDesc = (typeof costumeDescription === 'string' && costumeDescription.trim()) ? costumeDescription.trim() : 'none';
+  prompt = prompt.replace(/CLOTHING_DESCRIPTION/g, clothingDesc);
 
   const toInlinePart = (dataUri) => {
     const b64 = r2.stripDataUriPrefix(dataUri);
@@ -1180,7 +1186,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride, costumeDescription }
   );
   return { verdict: styled, split: null };
 }
@@ -1293,6 +1299,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
         artStyle,
         characterName: character?.name,
         characterAge: character?.age,
+        // Spec-conformance check in the Pass-2 eval judges the outfit against
+        // this prose (same canonical clothingRequirements text the sheet was
+        // generated from).
+        costumeDescription,
         usageTracker,
         skipQualityEval,
       });
@@ -1361,7 +1371,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * style match + costume preserved. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, costumeDescription = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
   // Optional per-style anchor image (Image 2). The prompt references it only
   // when present; styleTransferGenerate passes it as the 2nd reference.
   const styleAnchor = loadStyleAnchor(artStyle);
@@ -1446,7 +1456,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     let verdict = null;
     try {
       ({ verdict } = await evaluateAvatarSheet(result.imageData, {
-        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
+        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, costumeDescription, usageTracker,
       }));
       log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {

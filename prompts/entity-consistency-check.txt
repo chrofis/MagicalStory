@@ -36,6 +36,7 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 5. **Age Appearance**: Should look the same age in all panels
 6. **Body Build**: Proportions should be similar
 7. **Clothing**: Should match the listed category per page (ignore intentional costume changes)
+8. **Cross-Character Leakage**: Does any figure carry a marking, emblem or garment that belongs to a DIFFERENT character? Cross-character leakage is MAJOR at least.
 
 ### For OBJECT/PET entities, check:
 1. **Color**: Primary colors should be consistent
@@ -50,7 +51,7 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - When the Clothing Context provides an expected clothing description, judge outfits against that text — not against the reference photo's outfit
 - Example: If cell A has "winter" and cell B has "standard", different outfits are fine
 - Example: If both cells have "standard" but one shows a jacket and one shows a t-shirt, that's inconsistent
-- The expected clothing description is a checklist of garments and of the parts it names — a hood, a collar, straps, a fastening, a pocket. A named part missing from a cell, or present where none is named, is `clothing_inconsistent` MAJOR even when the category and colour read correctly.
+- The expected clothing description is a checklist of garments and of the parts it names — a hood, a collar, straps, a fastening, a pocket. A named part missing from a cell, or present where none is named, is `clothing_inconsistent` even when the category and colour read correctly; its severity follows the Severity Guide.
 - Fill `clothing_check` from the full-body cells, one row per cell, walking that checklist item by item before writing any other field; when a head-only image is also provided it shows no garments and is not used here. Every cell with a non-empty `missing` or `unexpected` also gets a `clothing_inconsistent` entry in `fixable_issues`.
 - Judge a part only from an angle that would show it.
 
@@ -60,6 +61,7 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - Pose and viewing-angle differences between cells are never inconsistencies.
 - Only flag an attribute as missing or wrong when the cell's angle would actually show it.
 - Each cell is a cutout of the figure alone, so whatever stood in front of it — furniture, a prop, another figure — was cut away with the background, taking the part it covered. A limb, hand, foot or garment area that is absent or stops at a clean edge is an artefact of that cut and never a defect; report identity, hair, skin, age, build and clothing only.
+- A cell with missing regions, hard white gaps or truncated limbs is a cropping artifact — report `type: "cutout_artifact"`; never describe it as a skin, clothing or anatomy difference.
 
 ## Output Format
 
@@ -128,9 +130,9 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 
 ## Severity Guide
 
-- **critical**: Entity is unrecognizable (completely different face, wrong species for pets)
-- **major**: Obvious difference readers will notice (wrong hair color, significantly different features)
-- **minor**: Subtle variation that might go unnoticed (slightly different proportions, minor color shift); `face_drift` and `hair_nuance` are always minor
+- **CRITICAL**: a viewer would read this as a different person (age, face, build).
+- **MAJOR**: a clearly visible difference — a garment, a colour, the hair.
+- **MINOR**: only findable comparing side by side — fastenings, buttons, panels, trim, freckle density, small hue shifts. `face_drift` and `hair_nuance` are always MINOR.
 
 ## Score Scale (1-10)
 
