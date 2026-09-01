@@ -485,7 +485,14 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   if (!oldMask) throw fail('SAM could not mask the original figure (mask service unavailable?) — retry.');
   const n0 = cropW * cropH;
   let newMask;
+  // The exact round-2 segmentation procedure, reusable on a REGISTERED
+  // candidate: figure registration must re-prompt SAM with the same padded box
+  // and seeds, or the refetch degrades to an unseeded box prompt (measured:
+  // exp #967 replay — box-only on the registered p16 candidate returned the
+  // sky again, pixel IoU 5%).
+  let refetchRound2 = null;
   if (maskFetcher) {
+    refetchRound2 = maskFetcher;
     newMask = await maskFetcher(candidateCropBuf);
   } else {
     // Round 2 runs on the SAME box — a valid repair keeps the figure in place
@@ -567,7 +574,8 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         log.info();
       }
     }
-    newMask = await fetchMaskWithRetry(candidateCropBuf, padBox, 5, r2Opts);
+    refetchRound2 = (buf) => fetchMaskWithRetry(buf, padBox, 5, r2Opts);
+    newMask = await refetchRound2(candidateCropBuf);
     // WHAT ROUND 2 WAS PROMPTED WITH — box (yellow) + seed points (red). Round 1
     // has such a view; round 2 never did, so a bad box or a seed landing off the
     // figure was invisible (owner asked to see the box and points).
@@ -805,7 +813,9 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
             // the old round-2 mask is only the fallback when the refetch fails
             // — it faithfully preserves whatever round 2 found, poisoned or not.
             try {
-              regMask = maskFetcher ? await maskFetcher(regCand) : await fetchMaskWithRetry(regCand, boxInCrop, 5, maskPoints || {});
+              // SAME padded box + seeds as the initial round-2 fetch — on the
+              // registered candidate the old-geometry prompt is valid again.
+              regMask = refetchRound2 ? await refetchRound2(regCand) : null;
             } catch { /* fall back below */ }
             if (!regMask) {
               log.warn('[TESTLAB] round-2 refetch on the registered candidate failed — using the affine-transformed mask');
