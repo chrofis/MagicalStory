@@ -23258,3 +23258,20 @@ prompt problem. Anatomy ships unguarded by explicit choice; mitigations are mode
 render on Imagine 2.0, whose ~7% figure rate the owner accepted for its other strengths).
 **Touched.** Nothing in production. Evidence: scratchpad anatomy-trial/report.html,
 results.json. Memory: project_anatomy_detection_verdicts.md.
+
+## 2026-09-01 — book-audit MAJOR weight: absence is not a fault, only contradiction is
+
+**Context.** `prompts/book-audit.txt`'s MAJOR weight read "a described action, object or
+feeling is missing or wrong" — the "missing" clause let the audit fault a page's IMAGE for
+simply not depicting something the text alone carries.
+**Decision.** MAJOR now reads: "a described action, object or feeling is contradicted or
+wrongly shown, and a listener notices. Words describing what the picture simply does not show
+are not a fault." Scanned Q3 (ONPAGE) and the MINOR/CRITICAL/CATASTROPHIC weight definitions
+for the same absence-faulting pattern — none found; ONPAGE already accepts the event
+happening in EITHER channel, and the other three weights are already contradiction/wrongness
+worded.
+**Rationale.** Division of labor between picture and text: the picture shows the simple
+instant, the text carries the rest of the beat. Absence in the picture is legal; only
+contradiction faults.
+**Touched.** `prompts/book-audit.txt`.
+**Status:** ✅ active
