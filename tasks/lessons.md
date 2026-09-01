@@ -625,3 +625,14 @@ overwritten, which is why `--mains=1` worked and `--mainAge=2` did not.
 (~520-631s for 10 pages) and expired at 64% while the job was healthy. A poll
 exiting non-zero is not a failed story — check `story_jobs` before concluding
 anything.
+
+## 2026-09-01 — Fixes without tripwires rot silently
+Three separately "already fixed" mechanisms were found dead this weekend, all killed by later
+refactors that nothing detected: the character-repair scene template (orphaned by the Stage-3
+refactor — loaded, zero consumers), the entity→char-fix severity gate (uppercase/lowercase,
+dead for weeks), the entrance rules (both redesign commits each assumed the other kept them).
+Rule: a fix is not done when the code changes — it is done when something breaks loudly if the
+fix stops working. Every mechanism fix ships with at least one of: a regression test, a
+startup/wiring assertion (template has ≥1 consumer; gate matches ≥1 stored real finding), or a
+bugs.json entry whose repro script can be re-run. "Verified today" is worth nothing in a repo
+where five agents refactor concurrently.
