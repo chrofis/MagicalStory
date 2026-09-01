@@ -7,7 +7,7 @@
   },
   "main": "server.js",
   "scripts": {
-    "start": "node --max-old-space-size=3072 server.js",
+    "start": "node --max-old-space-size=3072 --expose-gc server.js",
     "staging:up": "node scripts/admin/staging-power.js up",
     "staging:down": "node scripts/admin/staging-power.js down",
     "staging:status": "node scripts/admin/staging-power.js status",

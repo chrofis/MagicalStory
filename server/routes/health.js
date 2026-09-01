@@ -9,6 +9,7 @@ const router = express.Router();
 const { errorLoggingLimiter } = require('../middleware/rateLimit');
 const { validateBody, schemas } = require('../middleware/validation');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { log } = require('../utils/logger');
 
 // GET /api/health - Health check
 router.get('/health', (req, res) => {
@@ -82,10 +83,19 @@ router.post('/health/release-memory', authenticateToken, requireAdmin, async (re
   try {
     const r = await fetch(`${url}/release-memory${unload}`, { method: 'POST', signal: AbortSignal.timeout(30000) });
     const python = await r.json();
-    // Node's own heap too, when the runtime exposes it (--expose-gc).
-    if (typeof global.gc === 'function') global.gc();
+    // Node's own heap too. `--expose-gc` is in the start script for exactly
+    // this: without it `global.gc` is undefined, this line quietly does
+    // nothing, and the endpoint reports success having reclaimed only the
+    // Python half. Measured on production 2026-09-01 — Python freed 118 MB
+    // while Node sat at 588 MB RSS against 123 MB of live heap, i.e. ~460 MB
+    // the allocator was holding and nobody could reach.
+    const gcAvailable = typeof global.gc === 'function';
+    if (gcAvailable) global.gc();
     const nodeAfter = Math.round(process.memoryUsage().rss / 1024 / 1024 * 10) / 10;
-    res.json({ success: true, python, node: { rss_before_mb: nodeBefore, rss_after_mb: nodeAfter, gc_available: typeof global.gc === 'function' } });
+    if (!gcAvailable) {
+      log.warn('[HEALTH] release-memory: global.gc unavailable — node was started without --expose-gc, so only Python was reclaimed');
+    }
+    res.json({ success: true, python, node: { rss_before_mb: nodeBefore, rss_after_mb: nodeAfter, gc_available: gcAvailable } });
   } catch (err) {
     res.status(502).json({ success: false, error: err.message });
   }
