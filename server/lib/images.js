@@ -2806,11 +2806,21 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const perCharItems = perCharSource
       .map(p => {
         const visualId = p.visual_identifier || 'this character';
-        const fixRaw = p.fix_instruction || (p.issues || []).join('; ');
+        // NO INSTRUCTION → NO WORK (owner ruling 2026-09-01, G5). An entry
+        // whose fix_instruction is empty is DROPPED, never refilled from
+        // `issues`: those are diagnoses, not edit instructions, and the old
+        // `|| (p.issues||[]).join('; ')` fallback handed the defect prose to
+        // Grok verbatim — job_1788215224103 p16 sent "appears visibly older…"
+        // as the instruction and painted Lorena into her 60s (it shipped).
+        const fixRaw = typeof p.fix_instruction === 'string' ? p.fix_instruction.trim() : '';
+        if (!fixRaw) {
+          log.warn(`[INPAINT PAGE] P${pageNumber}: per-character fix for ${p.characterName || visualId} has no fix_instruction — dropped (a diagnosis is not an edit instruction)`);
+          return null;
+        }
         const fix = stripNames(fixRaw, visualId);
         return { severity: p.severity, text: `For ${visualId}: ${fix}` };
       })
-      .filter(x => x.text);
+      .filter(x => x && x.text);
 
     // Merge scene fix + per-char fixes, order by severity (highest first), and
     // emit as a numbered list. Grok prioritises top items; putting the most

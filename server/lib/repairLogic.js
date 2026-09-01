@@ -57,8 +57,10 @@ function findBadPages(evalPages, options = {}) {
 /**
  * Select character repair tasks from an entity consistency report.
  *
- * Collects major/critical issues, deduplicates by page+character (keeping highest
- * severity), sorts by severity then page score, and applies budget cap.
+ * Collects CRITICAL issues only (case-insensitive — the entity evaluator emits
+ * UPPERCASE severities; owner ruling 2026-09-01: character faults route to
+ * character repair "only for critical for now"), deduplicates by
+ * page+character, sorts by page score, and applies budget cap.
  *
  * @param {Object} entityReport - Entity consistency report with `.characters`
  * @param {Object} [options]
@@ -94,40 +96,34 @@ function selectCharRepairTasks(entityReport, options = {}) {
     }
 
     for (const issue of allIssues) {
-      if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
+      // CRITICAL only, case-insensitive — same gate as decideRepairMethod's
+      // entity block (owner ruling 2026-09-01). The old lowercase-only
+      // major/critical compare never matched the evaluator's UPPERCASE
+      // severities, so this selector was dead code too.
+      const sev = String(issue.severity || '').toLowerCase();
+      if (sev !== 'critical') continue;
 
       const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
       for (const pageNum of pagesToFix) {
         const key = `${pageNum}-${charName}`;
-        if (seenPairs.has(key)) {
-          // Deduplicate: upgrade severity if this one is higher
-          const existing = fixTasks.find(t => t.pageNumber === pageNum && t.charName === charName);
-          if (existing && issue.severity === 'critical' && existing.severity !== 'critical') {
-            existing.severity = 'critical';
-            existing.issueDescription = issue.description || issue.fixInstruction || '';
-          }
-          continue;
-        }
+        if (seenPairs.has(key)) continue; // one task per page+character
         seenPairs.add(key);
         fixTasks.push({
           pageNumber: pageNum,
           charName,
-          severity: issue.severity,
+          severity: sev,
           issueDescription: issue.description || issue.fixInstruction || '',
         });
       }
     }
   }
 
-  // Sort: critical first, then worst page score (ascending), then page number as tiebreaker
+  // Sort: worst page score (ascending) first, then page number as tiebreaker
+  // (every task is critical, so severity no longer orders anything).
   fixTasks.sort((a, b) => {
-    // Severity: critical before major
-    if (a.severity !== b.severity) return a.severity === 'critical' ? -1 : 1;
-    // Page score: lower (worse) first
     const scoreA = getPageScore(a.pageNumber);
     const scoreB = getPageScore(b.pageNumber);
     if (scoreA !== scoreB) return scoreA - scoreB;
-    // Page number tiebreaker
     return a.pageNumber - b.pageNumber;
   });
 
@@ -294,9 +290,22 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   }
 
   // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
+  //
+  // CRITICAL ONLY, CASE-INSENSITIVE (owner ruling 2026-09-01, G5/option 2:
+  // character faults route to character repair "only for critical for now").
+  // Two rules live in this one gate:
+  //   - The compare is case-insensitive because the entity evaluator emits
+  //     UPPERCASE severities ('MAJOR' x96 / 'CRITICAL' x16 on
+  //     job_1788215224103) while this gate matched lowercase only — the
+  //     entity→char-fix route was dead code, and every entity fault fell
+  //     through to inpaint, which took the raw defect prose as its edit
+  //     instruction (p16: "appears visibly older…" painted Lorena into her
+  //     60s, and that version shipped).
+  //   - MAJOR entity findings get NO automatic repair: not char-fix (this
+  //     gate), and not inpaint either — NOT_INPAINTABLE_TYPES keeps character
+  //     types out of inpaint instructions regardless of how this gate routes.
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
-    const sevRank = (s) => (s === 'critical' ? 4 : s === 'major' ? 3 : s === 'moderate' ? 2 : s === 'minor' ? 1 : 0);
     for (const [charName, charResult] of Object.entries(entityReport.characters)) {
       const allIssues = [...(charResult.issues || [])];
       if (charResult.byClothing) {
@@ -307,12 +316,11 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         }
       }
       for (const issue of allIssues) {
-        if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
+        const sev = String(issue.severity || '').toLowerCase();
+        if (sev !== 'critical') continue;
         const pages = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
         if (!pages.includes(pageNumber)) continue;
-        if (!worst || sevRank(issue.severity) > sevRank(worst.severity)) {
-          worst = { severity: issue.severity, charName, issue };
-        }
+        if (!worst) worst = { severity: sev, charName, issue };
       }
     }
     if (worst) {

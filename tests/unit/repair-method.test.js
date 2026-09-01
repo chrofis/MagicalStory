@@ -52,8 +52,13 @@ test('CRITICAL-only issues with ok subscores keep the default inpaint route', ()
   assert.strictEqual(decision.method, 'inpaint');
 });
 test('visual score below floor still iterates (score gate unchanged)', () => {
+  // Floor is REPAIR_DEFAULTS.qualityThresholdForIterate = 20 (wired
+  // 2026-08-09); this test previously used 40 against the old hardcoded 50
+  // and had been failing since the config was wired. finalScore below the
+  // salvage floor so worthSalvaging cannot mask the gate.
   const decision = decideRepairMethod(3, {
-    scoreBreakdown: { visual: { score: 40 }, semantic: { score: 80 } },
+    scoreBreakdown: { visual: { score: 15 }, semantic: { score: 80 } },
+    finalScore: -5,
     fixableIssues: [{ description: 'minor wobble', severity: 'MINOR' }],
   }, null);
   assert.strictEqual(decision.method, 'iterate');
@@ -91,6 +96,46 @@ test('reframe gate is strict === true — a truthy string does not force iterate
     consolidatedPlan: { scene_fix: { requires_regeneration: 'yes', instruction: 'Add glow.' } },
   }, null);
   assert.strictEqual(decision.method, 'inpaint');
+});
+
+console.log('\ndecideRepairMethod — entity severity routing (owner ruling 2026-09-01: CRITICAL only, case-insensitive)');
+const entityReportWith = (severity) => ({
+  characters: {
+    Lorena: {
+      issues: [{
+        id: 'i1', type: 'age_shift', severity,
+        description: 'appears visibly older than the reference across pages',
+        pagesToFix: [16],
+      }],
+    },
+  },
+});
+const okEval = () => ({
+  scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+  fixableIssues: [],
+});
+test('UPPERCASE CRITICAL entity issue routes to char-fix (job_1788215224103 p16 regression)', () => {
+  const decision = decideRepairMethod(16, okEval(), entityReportWith('CRITICAL'));
+  assert.strictEqual(decision.method, 'char-fix', `expected char-fix, got ${decision.method} (${decision.reason})`);
+  assert.strictEqual(decision.charName, 'Lorena');
+  assert.strictEqual(decision.severity, 'critical');
+});
+test('lowercase critical entity issue also routes to char-fix', () => {
+  const decision = decideRepairMethod(16, okEval(), entityReportWith('critical'));
+  assert.strictEqual(decision.method, 'char-fix');
+});
+test('MAJOR entity issue gets NO automatic repair — not char-fix (and nothing else actionable → skip)', () => {
+  const decision = decideRepairMethod(16, okEval(), entityReportWith('MAJOR'));
+  assert.notStrictEqual(decision.method, 'char-fix', `MAJOR must not route to char-fix (got ${decision.method})`);
+  assert.strictEqual(decision.method, 'skip');
+});
+test('lowercase major entity issue likewise does not route to char-fix', () => {
+  const decision = decideRepairMethod(16, okEval(), entityReportWith('major'));
+  assert.notStrictEqual(decision.method, 'char-fix');
+});
+test('CRITICAL entity issue on a different page does not claim this page', () => {
+  const decision = decideRepairMethod(3, okEval(), entityReportWith('CRITICAL'));
+  assert.strictEqual(decision.method, 'skip');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

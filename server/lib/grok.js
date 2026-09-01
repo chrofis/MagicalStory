@@ -271,7 +271,16 @@ async function fitGrokPromptWithPrefix(prefix, body, model) {
  */
 async function editWithGrok(prompt, referenceImages = [], options = {}) {
   const {
-    model = GROK_MODELS.STANDARD,
+    // Default edit tier = the char-repair pin (REPAIR_DEFAULTS.charRepairModel,
+    // Grok Imagine 1.x). Character repair — faceRepair.js callModel and the
+    // fullScene grokEditSceneExact path — is the only pipeline caller family
+    // that omits `model`; every other caller pins its own tier explicitly.
+    // Owner ruling 2026-09-01 (G5): char repair must NOT follow page-tier
+    // routing changes (e.g. the staging Imagine-2.0 rollout, 1a253d866) —
+    // 1.x measured better on anatomy (0/82 structural defects vs 2.0's 2/29).
+    // Lazy require: config/models has no dependency on this file, but images.js
+    // pulls both — resolving at call time keeps load order irrelevant.
+    model = require('../config/models').REPAIR_DEFAULTS.charRepairModel || GROK_MODELS.STANDARD,
     aspectRatio = '1:1',
     resolution = '1k',
     skipOutputPadding = true, // Don't letterbox-pad Grok's output — callers handle varying aspects

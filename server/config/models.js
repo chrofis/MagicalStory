@@ -916,6 +916,18 @@ const REPAIR_DEFAULTS = {
   issueThreshold: 5,        // Pages with this many fixable issues need redo
   maxPasses: REPAIR_MAX_PASSES,  // Global passes over all pages — 1 on staging, 3 on prod
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
+  // Char-repair Grok tier — PINNED to Imagine 1.x ('grok-imagine-image',
+  // $0.02), NOT 'grok-imagine-image-2.0'. Owner ruling 2026-09-01 (G5):
+  // character repair stays on the cheap 1.x model, and the anatomy study says
+  // the cheap tier is also the better one for this job — 1.x measured 0/82
+  // structural anatomy defects vs 2.0's 2/29. The staging 2.0 rollout
+  // (1a253d866) moved only pageRenderModel/coverRenderModel; the edit tier
+  // deliberately stayed Standard — this key makes that pin explicit and
+  // survivable across future routing changes. Consumed by grok.js
+  // editWithGrok as its default model: both char-repair Grok entry points
+  // (faceRepair.js callModel and the fullScene grokEditSceneExact path) omit
+  // `model` and ride this default; every other caller pins its own tier.
+  charRepairModel: 'grok-imagine-image',
   // WIRED 2026-08-09. These were dead config for a month while
   // decideRepairMethod hardcoded visualScore<50 / semanticScore<30, and the two
   // sources DISAGREED (config said 20, code did 50). Resolved toward the
