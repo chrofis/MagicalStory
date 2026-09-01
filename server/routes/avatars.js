@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2 } = require('../services/database');
+const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, extractCharacterInlineImagesToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS, resolveGrokImageModel } = require('../config/models');
@@ -1432,6 +1432,14 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
           return lightChar;
         });
         const metadataObj = Array.isArray(charData) ? lightCharacters : { ...charData, characters: lightCharacters };
+
+        // Image bytes never enter characters.data. This is the last point
+        // before the write, so anything the avatar pipeline left inline —
+        // styledAvatars, preGeneratedAvatarSlides, photos.bodyNoBg — goes to
+        // R2 here and the blob keeps only URLs. Throws if R2 is unavailable
+        // rather than silently storing base64, which is how 73 MB accumulated.
+        await extractCharacterInlineImagesToR2(rowId, req.user.id, charData);
+        await extractCharacterInlineImagesToR2(rowId, req.user.id, metadataObj);
 
         // Upsert the characters row
         await txClient.query(`

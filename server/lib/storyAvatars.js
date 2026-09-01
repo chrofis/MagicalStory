@@ -286,6 +286,36 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
  * @param {Object} costumeDescriptions - story.data.visualBible.costumes
  * @returns {Promise<number>} count of history entries actually appended
  */
+/**
+ * Put an avatar sheet in R2 and return its URL.
+ *
+ * A value that is already a URL passes straight through — this runs on every
+ * append and must be idempotent. Bytes are uploaded; there is no third option,
+ * because storing them in characters.data is the defect this exists to close.
+ * A failed upload returns null and the history entry is SKIPPED rather than
+ * written with base64 in a field named sheetUrl.
+ */
+async function sheetToR2(sheet, userId, charId, storyId, sheetKey) {
+  if (typeof sheet !== 'string' || !sheet) return null;
+  if (/^https?:\/\//.test(sheet)) return sheet;                    // already offloaded
+  const looksLikeBytes = sheet.startsWith('data:image/') || sheet.startsWith('/9j/')
+    || sheet.startsWith('iVBORw0') || sheet.startsWith('R0lGOD') || sheet.startsWith('UklGR');
+  if (!looksLikeBytes) return sheet;
+  const r2 = require('./r2');
+  if (!r2.isConfigured()) {
+    log.error('[STORY-AVATAR-HISTORY] R2 not configured — refusing to store sheet bytes in JSONB');
+    return null;
+  }
+  const safe = (v) => String(v).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  const key = `characters/${safe(userId)}/${safe(charId)}/story-sheets/${safe(storyId)}-${safe(sheetKey)}.jpg`;
+  try {
+    return await r2.uploadImage(sheet, key);
+  } catch (err) {
+    log.error(`[STORY-AVATAR-HISTORY] R2 upload failed for ${key}: ${err.message}`);
+    return null;
+  }
+}
+
 async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars, costumeDescriptions) {
   if (!userId || !Array.isArray(characters) || !ctx?.storyId) {
     console.warn(`[STORY-AVATAR-HISTORY] precondition fail userId=${!!userId} chars=${characters?.length} storyId=${ctx?.storyId}`);
@@ -334,7 +364,14 @@ async function appendStoryHistory(userId, characters, ctx, storyCharacterAvatars
       continue;
     }
     const costumeDesc = (costumeDescriptions && costumeDescriptions[char.name]) || null;
-    for (const [sheetKey, sheetUrl] of Object.entries(sheets)) {
+    for (const [sheetKey, rawSheet] of Object.entries(sheets)) {
+      if (!rawSheet) continue;
+      // `storyCharacterAvatars` hands us the sheet as BYTES, and this field is
+      // named sheetUrl — so the base64 went straight into characters.data and
+      // stayed there. Measured 2026-09-01: storyHistory[].sheetUrl was the
+      // single largest inline payload on prod (10.3 MB across 4 sampled rows).
+      // R2 is the only store for image bytes; a URL is what this field means.
+      const sheetUrl = await sheetToR2(rawSheet, userId, char.id, ctx.storyId, sheetKey);
       if (!sheetUrl) continue;
       const entry = {
         storyId: ctx.storyId,

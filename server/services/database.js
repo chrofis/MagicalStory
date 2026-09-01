@@ -890,6 +890,103 @@ function buildStoryMetadata(story) {
  * @param {string} storyId
  * @param {object} data    storyData blob (or response shape mirroring it)
  */
+/**
+ * Move every inline image byte in a CHARACTER row to R2, in place.
+ *
+ * `extractInlineImagesToR2` is story-scoped — every call site passes a storyId
+ * and every key it mints is `stories/…`. Characters have their own write paths
+ * (server/routes/avatars.js, server/lib/storyAvatars.js) that never went
+ * through it, so nothing ever offloaded them: measured on production
+ * 2026-09-01, 40 of 59 character rows still carried base64 (73 MB), the newest
+ * created that same day. `stories.data` had been clean since June, so the rule
+ * was enforced at one chokepoint and characters were left behind.
+ *
+ * Deliberately GENERIC rather than a list of known fields. The leaking shapes
+ * were `avatars.storyHistory[].sheetUrl`, `avatars.styledAvatars.<style>.
+ * standard`, `.costumed.default`, `preGeneratedAvatarSlides[]`,
+ * `photos.bodyNoBg` and `bodyNoBgUrl` — two of them NAMED `*Url` while holding
+ * data URIs. Any enumerated list would be one avatar feature away from leaking
+ * again; a sweep cannot be outrun by a new field.
+ *
+ * R2 is the only store. If it is not configured this THROWS rather than
+ * silently leaving bytes in the row — a quiet fallback is what let 73 MB
+ * accumulate unnoticed.
+ *
+ * @param {string} characterId  row id, used in the R2 key
+ * @param {string} userId       owner, used in the R2 key
+ * @param {Object} data         characters.data — mutated in place
+ * @returns {Promise<number>} how many payloads were moved
+ */
+async function extractCharacterInlineImagesToR2(characterId, userId, data) {
+  if (!data || typeof data !== 'object') return 0;
+  if (!r2.isConfigured()) {
+    throw new Error('R2 is not configured — refusing to store character image bytes in JSONB');
+  }
+
+  const looksLikeBytes = (s) =>
+    typeof s === 'string'
+    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0')
+        || s.startsWith('R0lGOD') || s.startsWith('UklGR'))
+    && s.length > 1024;
+
+  const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  const prefix = `characters/${sanitize(userId || 'unknown')}/${sanitize(characterId)}/inline`;
+
+  const tasks = [];
+  const usedKeys = new Set();
+  const seen = new WeakSet();
+
+  const sweep = (node, pathSegments) => {
+    if (!node || typeof node !== 'object') return;
+    if (seen.has(node)) return;          // cycles, and shared sub-objects
+    seen.add(node);
+    for (const k of Object.keys(node)) {
+      const child = node[k];
+      if (typeof child === 'string' && looksLikeBytes(child)) {
+        const base = `${prefix}/${[...pathSegments, sanitize(k)].join('-')}`;
+        let key = `${base}.jpg`;
+        let n = 1;
+        while (usedKeys.has(key)) key = `${base}__${n++}.jpg`;
+        usedKeys.add(key);
+        tasks.push({ input: child, key, apply: (url) => { node[k] = url; } });
+      } else if (child && typeof child === 'object') {
+        sweep(child, [...pathSegments, sanitize(k)]);
+      }
+    }
+  };
+  sweep(data, []);
+  if (!tasks.length) return 0;
+
+  // Same bounded pool as the story path — hundreds of small PUTs at 12 at a
+  // time is seconds, sequential is minutes.
+  const PARALLEL = 12;
+  let next = 0, moved = 0;
+  const failures = [];
+  await Promise.all(new Array(Math.min(PARALLEL, tasks.length)).fill(null).map(async () => {
+    while (true) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      const t = tasks[i];
+      try {
+        const url = await r2.uploadImage(t.input, t.key);
+        if (!url) throw new Error('upload returned no URL');
+        t.apply(url);
+        moved++;
+      } catch (err) {
+        failures.push(`${t.key}: ${err.message}`);
+      }
+    }
+  }));
+
+  // Fail loudly. Saving the row with some bytes still inline is precisely the
+  // silent half-success that produced the 73 MB.
+  if (failures.length) {
+    throw new Error(`R2 upload failed for ${failures.length}/${tasks.length} character image(s): ${failures[0]}`);
+  }
+  log.info(`[R2-extract] character ${characterId}: moved ${moved} inline image(s) to R2`);
+  return moved;
+}
+
 async function extractInlineImagesToR2(storyId, data) {
   if (!data || typeof data !== 'object') return;
   if (!r2.isConfigured()) return;  // graceful no-op; strip will still drop bytes
@@ -3531,6 +3628,7 @@ module.exports = {
   saveCoverData,
   stripInlineImagesFromStoryData,
   extractInlineImagesToR2,
+  extractCharacterInlineImagesToR2,
   upsertStory,
   ensureStoryRow,
   // Image functions
