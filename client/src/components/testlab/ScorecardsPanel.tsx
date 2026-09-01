@@ -12,8 +12,11 @@ const PART_LABEL: Record<string, string> = {
 const SCORER_NAMES: Record<string, string> = { '2.1': 'sonnet', '2.2': 'grok', '2.3': 'gemini', '3.1': 'sonnet', '3.2': 'grok', '3.3': 'gemini' };
 const scorerLabel = (v: string) => (SCORER_NAMES[v] ? `${v} ${SCORER_NAMES[v]}` : `v${v}`);
 
-const PART_STAGE: Record<string, string> = {
-  full: 'story_scorecard', beats: 'beats_review_replay', scene: 'scene_review_replay',
+// beats_review_replay retired 2026-09-01 (beats-review/audit machinery
+// deleted, docs/decisions.md) — "beats" keeps no rerun stage, but its scores
+// stay visible above; only the "＋ next round" control is suppressed for it.
+const PART_STAGE: Record<string, string | null> = {
+  full: 'story_scorecard', beats: null, scene: 'scene_review_replay',
   storyText: 'story_text_replay', visualBible: 'story_bible_replay',
 };
 
@@ -75,11 +78,13 @@ export default function ScorecardsPanel() {
   const doNextRound = async () => {
     if (!nr || !nrModel) return;
     const row = nr.row;
+    const stage = PART_STAGE[nr.part];
+    if (!stage) { setNrMsg('this part has no rerun stage'); return; }
     if (!row.artifact_text) { setNrMsg('this round has no stored text to continue from'); return; }
     setNrMsg('starting…');
     try {
       await testlabService.createExperiment({
-        stage: PART_STAGE[nr.part],
+        stage,
         params: {
           fromText: row.artifact_text, fromRound: row.round,
           model: nrModel, reviewModel: nrModel, textModel: nrModel, bibleModel: nrModel,
@@ -135,8 +140,10 @@ export default function ScorecardsPanel() {
                     <td className="pr-3 font-mono opacity-70">${fmt(ln.rounds.reduce((s, r) => s + (Number(r.gen_cost_usd) || 0) + (Number(r.judge_cost_usd) || 0), 0))} · {secs(ln.rounds.reduce((s, r) => s + (Number(r.gen_ms) || 0) + (Number(r.judge_ms) || 0), 0))}</td>
                     <td className="pr-3 font-mono opacity-70">{[...new Set(ln.rounds.map(r => r.judge_model).filter(Boolean))].join(', ') || '—'}</td>
                     <td className="pr-3"><button className="text-indigo-600 hover:underline font-mono" onClick={() => openPrompt(ln.version)}>{scorerLabel(ln.version)}</button></td>
-                    <td><button className="text-indigo-600 hover:underline whitespace-nowrap" title={`continue from round ${ln.maxRound} → round ${ln.maxRound + 1} with a model you pick`}
-                      onClick={() => { const fin = ln.rounds.find(r => r.round === ln.maxRound)!; setNr({ storyId: ln.storyId, part: sec.part, version: ln.version, row: fin }); setNrModel(''); setNrMsg(null); }}>＋ next round ▾</button></td>
+                    <td>{PART_STAGE[sec.part] && (
+                      <button className="text-indigo-600 hover:underline whitespace-nowrap" title={`continue from round ${ln.maxRound} → round ${ln.maxRound + 1} with a model you pick`}
+                        onClick={() => { const fin = ln.rounds.find(r => r.round === ln.maxRound)!; setNr({ storyId: ln.storyId, part: sec.part, version: ln.version, row: fin }); setNrModel(''); setNrMsg(null); }}>＋ next round ▾</button>
+                    )}</td>
                   </tr>
                 ))}
               </tbody>

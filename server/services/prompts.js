@@ -182,12 +182,6 @@ async function loadPromptTemplates() {
     // fast structural review — the cheapest point to fix an arc, and the gate
     // that locks scenes so image generation can start.
     ['storyBeats', 'story-beats.txt'],
-    // LAB ONLY since 2026-09-01: the production beats pipeline no longer runs a
-    // reviewer at all (owner ruling — see planCheck below). Two Lab stages still
-    // replay it on frozen beats (beats_review_replay, beats_scenes), so the
-    // template stays, exactly as arcAuditModel/childCriticModel did when the arc
-    // machine replaced that chain. Nothing in production loads it.
-    ['storyBeatsReview', 'story-beats-review.txt'],
     // The beats layer's only model check (owner, 2026-09-01). Counts and shot
     // arithmetic run in code (server/lib/planCounters.js); this call answers
     // only the three questions a counter cannot — emotional highlights,
@@ -213,7 +207,6 @@ async function loadPromptTemplates() {
     // audience would have, before the full-context reviewer runs. The audit
     // names faults; the reviewer's fix ledger must answer every one.
     ['storyArcAudit', 'story-arc-audit.txt'],
-    ['storyBeatsAudit', 'story-beats-audit.txt'],
     ['storyTextAudit', 'story-text-audit.txt'],
     ['storyTextProofread', 'story-text-proofread.txt'],
     // Final-book audit: the reader's-eye pass. A vision judge receives every

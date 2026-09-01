@@ -3085,7 +3085,10 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
  * auditor bake-off as a repeatable Lab stage. Report only — writes nothing
  * back to the story.
  *
- * params.level  : 'arc' | 'beats' | 'text' (required)
+ * params.level  : 'arc' | 'text' (required). 'beats' was retired 2026-09-01
+ *                 along with the rest of the beats-review/audit machinery —
+ *                 the production beats layer no longer runs a reviewer or
+ *                 auditor (see planCheck in promptBuilders.js).
  * params.models : comma list of TEXT_MODELS keys (default: the production
  *                 auditor for that level)
  */
@@ -3097,12 +3100,11 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const H = require('./storyHelpers');
 
   const level = String(params.level || '').toLowerCase();
-  if (!['arc', 'beats', 'text'].includes(level)) throw new Error(`params.level must be arc | beats | text, got "${params.level}"`);
+  if (level === 'beats') throw new Error('audit_replay level=beats retired 2026-09-01 — the beats review/audit machinery was deleted (docs/decisions.md)');
+  if (!['arc', 'text'].includes(level)) throw new Error(`params.level must be arc | text, got "${params.level}"`);
   const defaultModel = level === 'text'
     ? (MODEL_DEFAULTS.textAuditModel || MODEL_DEFAULTS.arcReviewModel)
-    : (level === 'arc'
-      ? (MODEL_DEFAULTS.arcAuditModel || MODEL_DEFAULTS.arcReviewModel)
-      : (MODEL_DEFAULTS.beatsAuditModel || MODEL_DEFAULTS.outlineReviewModel));
+    : (MODEL_DEFAULTS.arcAuditModel || MODEL_DEFAULTS.arcReviewModel);
   const models = String(params.models || params.model || defaultModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
@@ -3116,13 +3118,6 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
     if (!arc.trim()) throw new Error('story has no stored arc to audit');
     prompt = H.buildArcAuditPrompt(storyData, arc);
-  } else if (level === 'beats') {
-    templateKey = 'storyBeatsAudit';
-    const beatsSection = (outline.match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
-    const beats = H.parseBeats(beatsSection).pages;
-    if (!beats.length) throw new Error('story has no stored beats to audit');
-    const pagePlan = (outline.match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
-    prompt = H.buildBeatsAuditPrompt(beats, pagePlan);
   } else {
     templateKey = 'storyTextAudit';
     const pages = (storyData.sceneImages || [])
@@ -3520,123 +3515,22 @@ async function runOutlineReviewStage(target, { params = {} }) {
  * Nothing here writes prose. The full text and its refinement are the OTHER
  * branch, which already runs parallel with images in production.
  *
+ * Step 2 (the fast structural review) was retired 2026-09-01 along with the
+ * rest of the beats-review/audit machinery — this stage now only plans
+ * (Step 1) and expands scenes (Steps 3-4); `review`/`beatsReview` on the
+ * result is always null for new runs (historical rows that have one still
+ * display). `params.useStoredBeats` (the carry A/B harness) is retired too.
+ *
  * params.beatsModel  : planner (default MODEL_DEFAULTS.outline)
- * params.reviewModel : fast reviewer (default MODEL_DEFAULTS.outlineReviewModel)
  * params.pages       : page count (default: the story's own)
- * params.skipReview  : plan only, to isolate planner cost
  * params.storyDetails : replace the story's own idea text. The idea is an input
  *   to the plan, so a change to the idea GENERATOR can only be measured by
  *   planning the same cast and setting from a different idea.
  */
-/**
- * Stored beats → Art Director → (optionally) page text, run twice: once with
- * the beats-audit faults carried in, once without.
- *
- * Answers the question CARRY_ROUTES exists for — can a stage downstream of the
- * beats repair what the beats review left behind — on a story that already
- * shipped, with no images and no re-planning. Uses the SAME route text
- * production uses (server/lib/carryRoutes.js), or the arms would measure a
- * string production never sends.
- */
-async function runStoredBeatsScenes(storyData, storedBeats, { params = {}, costOf }) {
-  const { buildSceneExpansionAllPrompt, buildAvailableAvatarsForPrompt, parseRefinedText: parseAll,
-    buildStoryTextFromBeatsPrompt } = require('./storyHelpers');
-  const { callTextModelStreaming } = require('./textModels');
-  const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
-  const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
-  const { checkScenes, REVIEWABLE } = require('./sceneBriefCheck');
-
-  const beatsAudit = String(params.beatsAudit || storyData?.beatsReviewReport?.audit || '').trim();
-  if (!beatsAudit) throw new Error('no beats audit findings stored on this story — nothing to carry');
-
-  const limit = parseInt(params.expandPages, 10) || storedBeats.length;
-  const toExpand = storedBeats.slice(0, limit);
-  const model = params.expansionModel || MODEL_DEFAULTS.outline;
-  const imgCfg = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
-  const availableAvatars = buildAvailableAvatarsForPrompt
-    ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
-    : '';
-
-  const basePrompt = buildSceneExpansionAllPrompt(
-    { ...storyData, characters: storyData.characters || [], pageClothing: null },
-    toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, planLine: b.planLine })),
-    {
-      visualBible: storyData.visualBible || null,
-      availableAvatars,
-      maxCharactersPerScene: imgCfg?.maxCharactersPerScene || 3,
-      clothingRequirements: storyData.clothingRequirements || null,
-    }
-  );
-  if (!basePrompt) throw new Error('scene-expansion-all template unavailable');
-
-  const castNames = [
-    ...(storyData.characters || []).map(c => c && c.name),
-    ...(Array.isArray(storyData.visualBible?.secondaryCharacters)
-      ? storyData.visualBible.secondaryCharacters
-      : Object.values(storyData.visualBible?.secondaryCharacters || {})).map(c => c && c.name),
-  ].filter(Boolean);
-
-  const arms = [
-    { key: 'control', label: 'no carry', prompt: basePrompt },
-    { key: 'carry', label: 'beats audit carried', prompt: withCarriedRulings(basePrompt, beatsAudit, CARRY_ROUTES.beatsToArtDirector) },
-  ];
-
-  const results = [];
-  for (const arm of arms) {
-    const t0 = Date.now();
-    const res = await callTextModelStreaming(arm.prompt, null, null, model, { usageLabel: 'testlab_carry_ab' });
-    const parsed = parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES');
-    const briefs = parsed.pages.map(p => ({ pageNumber: p.pageNumber, brief: p.text }));
-    const checked = checkScenes(briefs, castNames, storyData.visualBible || null);
-    const faults = checked.findings.filter(f => REVIEWABLE.has(f.type));
-    results.push({
-      arm: arm.key,
-      label: arm.label,
-      promptChars: arm.prompt.length,
-      elapsedMs: Date.now() - t0,
-      modelId: res.modelId,
-      usage: res.usage,
-      cost: costOf ? costOf(res) : null,
-      pagesReturned: briefs.length,
-      faultCount: faults.length,
-      faults: faults.map(f => ({ page: f.pageNumber, type: f.type })),
-      briefs,
-    });
-  }
-
-  let storyText = null;
-  if (params.alsoText) {
-    const textBase = buildStoryTextFromBeatsPrompt(storyData, toExpand, [], storyData.outline || '');
-    if (textBase) {
-      const textArms = [
-        { key: 'control', prompt: textBase },
-        { key: 'carry', prompt: withCarriedRulings(textBase, beatsAudit, CARRY_ROUTES.beatsToStoryText) },
-      ];
-      storyText = [];
-      for (const a of textArms) {
-        const r = await callTextModelStreaming(a.prompt, null, null, params.textModel || MODEL_DEFAULTS.storyText || model, { usageLabel: 'testlab_carry_ab_text' });
-        storyText.push({ arm: a.key, promptChars: a.prompt.length, modelId: r.modelId, usage: r.usage, cost: costOf ? costOf(r) : null, text: String(r.text || '').slice(0, 30000) });
-      }
-    }
-  }
-
-  return {
-    stageKind: 'beats_scenes',
-    mode: 'stored_beats_carry_ab',
-    storyId: storyData.id || null,
-    beatsAuditFaults: (beatsAudit.match(/^FAULT(\[[A-Z]+\])?:/gm) || []).length,
-    beatsAudit,
-    pages: toExpand.length,
-    arms: results,
-    delta: results.length === 2 ? { control: results[0].faultCount, carry: results[1].faultCount } : null,
-    storyText,
-  };
-}
-
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildBeatsPrompt, buildBeatsReviewPrompt, parseBeats } = require('./storyHelpers');
+  const { buildBeatsPrompt, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
@@ -3650,10 +3544,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
 
   const beatsModel = params.beatsModel || MODEL_DEFAULTS.outline;
-  const reviewModel = params.reviewModel || MODEL_DEFAULTS.outlineReviewModel;
-  for (const m of [beatsModel, reviewModel]) {
-    if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-  }
+  if (!TEXT_MODELS[beatsModel]) throw new Error(`Unknown model "${beatsModel}"`);
 
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
   const lockStart = Date.now();
@@ -3677,10 +3568,13 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       .filter(Boolean);
     if (stored.length === 0) throw new Error('stored beats: no page carries an outlineExtract BEAT');
     // plainStoredBeats: hold the beats constant and fall through to the NORMAL
-    // step-3 expansion + scene review — the Art Director bake-off path. The
-    // carry harness (useStoredBeats) stays what it was.
+    // step-3 expansion + scene review — the Art Director bake-off path.
     if (params.useStoredBeats) {
-      return await runStoredBeatsScenes(storyData, stored, { params, experimentId: null, costOf, lockStart });
+      // stored_beats_carry_ab retired 2026-09-01 along with the beats-review/
+      // audit machinery it carried (docs/decisions.md) — past experiment rows
+      // with result.mode === 'stored_beats_carry_ab' still load and display;
+      // no new run can be launched.
+      throw new Error('stored_beats_carry_ab retired 2026-09-01 — the beats review/audit machinery was deleted (docs/decisions.md)');
     }
     plainStoredBeats = stored;
   }
@@ -3728,45 +3622,13 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     missingPages: planParsed.missing,
   };
 
-  // ── Step 2: fast structural review ──────────────────────────────────────
+  // Step 2 (fast structural review) retired 2026-09-01 along with the rest of
+  // the beats-review/audit machinery — buildBeatsReviewPrompt is deleted, so
+  // `review` is always null now. `finalBeats` is just the planned beats;
+  // BeatsScenesView (client) already renders `review` conditionally, so
+  // historical experiment rows with a populated review still display.
   let review = null;
   let finalBeats = plainStoredBeats || planParsed.pages;
-  if (!plainStoredBeats && !params.skipReview) {
-    const tlPagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
-    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages,
-      storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || parseBeats(String(storyData.outline || '')).arc || '', tlPagePlan);
-    if (!reviewPrompt) throw new Error('story-beats-review template unavailable');
-    const t1 = Date.now();
-    const revRes = await callTextModelStreaming(reviewPrompt, null, null, reviewModel, { usageLabel: 'testlab_beats_review' });
-    const revMs = Date.now() - t1;
-    const revParsed = parseBeats(revRes.text || '', []);
-
-    // Only rewritten pages come back; everything else keeps its planned beat.
-    const byPage = new Map(revParsed.pages.map(p => [p.pageNumber, p]));
-    finalBeats = planParsed.pages.map(p => {
-      const fix = byPage.get(p.pageNumber);
-      return fix ? { ...p, beat: fix.beat || p.beat } : p;
-    });
-    const changed = finalBeats
-      .filter((p, i) => p.beat !== planParsed.pages[i].beat)
-      .map(p => p.pageNumber);
-
-    review = {
-      modelKey: reviewModel,
-      modelId: revRes.modelId,
-      provider: revRes.provider || null,
-      elapsedMs: revMs,
-      ttftMs: revRes.ttft ?? null,
-      usage: revRes.usage,
-      cost: costOf(revRes),
-      promptChars: reviewPrompt.length,
-      prompt: reviewPrompt,
-      rawResponse: (revRes.text || '').slice(0, 40000),
-      analysis: (revParsed.analysis || '').slice(0, 40000),
-      changedPages: changed,
-      strayPages: revParsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n)),
-    };
-  }
 
   const timeToLockMs = Date.now() - lockStart;
 
@@ -6928,179 +6790,6 @@ async function runStoryScorecardStage(target, { params = {}, promptOverride = nu
 }
 
 /**
- * BEATS REVIEW REPLAY — re-run the beats review on a story's frozen beats, to
- * A/B the reviewer prompt (promptOverride) and models (params.reviewModel, CSV)
- * and measure how many PASSES it takes to converge (params.passes). Each pass
- * reviews the beats the previous pass rewrote. With params.scoreOutput, the ONE
- * evaluator scores the beats after each pass, so the coherence score is visible
- * pass-to-pass and comparable across models/prompts.
- */
-/**
- * AN EMPTY RESPONSE IS A FAILED CALL, NOT A CLEAN REVIEW — the same rule the
- * scene replay already enforces. Without it the beats replay reported "0 pages
- * rewritten, converged" for a provider that returned nothing, which is
- * indistinguishable from a reviewer that read everything and declined. Three
- * candidates (2026-08-15) published non-reviews as converged results that way,
- * one of them after burning 983s. Never publish that as a measurement.
- */
-function assertReviewerResponded(res, model) {
-  const outTok = res?.usage?.output_tokens ?? null;
-  if (!String(res?.text || '').trim() || outTok === 0) {
-    throw new Error(`reviewer ${model} returned an empty response (${outTok} output tokens, ${Math.round((res?.usage?.elapsed_ms || 0) / 1000)}s) — provider failure, not a review`);
-  }
-}
-
-async function runBeatsReviewReplayStage(target, { params = {}, promptOverride = null }) {
-  const { loadPromptTemplates, withTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
-  const { buildBeatsReviewPrompt, parseBeats } = require('./storyHelpers');
-
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  const beatsSection = (String(storyData.outline || '').match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
-  const beats0 = parseBeats(beatsSection).pages;
-  if (!beats0.length) throw new Error('story has no beats to replay');
-  // A replay reviews stored beats, so the arc comes from the run that produced
-  // them. Stories planned before the arc stage existed have none — the review
-  // prompt then says so rather than pretending one was committed.
-  const storedArc = parseBeats(String(storyData.outline || '')).arc || storyData.beatsReviewReport?.arc || '';
-
-  const models = String(params.reviewModel || params.model || MODEL_DEFAULTS.outlineReviewModel)
-    .split(',').map(x => x.trim()).filter(Boolean);
-  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-  const passCount = Math.min(Math.max(parseInt(params.passes, 10) || 1, 1), 3);
-  const scoreOutput = params.scoreOutput === true || params.scoreOutput === 'true';
-
-  // "## Page N" so a stored round's artifact_text round-trips back through parseBeats
-  // (needed to branch a new round off a selected round — params.fromText below).
-  const beatsToText = (bs) => bs.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`).join('\n\n');
-
-  // BRANCH MODE — continue a SPECIFIC round: review the selected round's stored
-  // beats text (params.fromText) once with the chosen model, scoring it as the
-  // next round. This is how "take DeepSeek round 2, rerun with Grok → round 3"
-  // works from the page.
-  if (params.fromText) {
-    const model = models[0];
-    const fromRound = parseInt(params.fromRound, 10) || 1;
-    const inBeats = parseBeats(String(params.fromText)).pages;
-    if (!inBeats.length) throw new Error('fromText has no parseable beats');
-    const t = Date.now();
-    // withTemplates, not a global swap: this window spans a model call, so a
-    // concurrently running experiment would otherwise read this override (or
-    // have its own dropped by the restore). The other override sites in this
-    // file are synchronous and safe by construction; these replay windows are
-    // the two that are not. See server/services/prompts.js.
-    const res = await withTemplates({ storyBeatsReview: promptOverride }, () =>
-      callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats, storedArc, ''), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }));
-    assertReviewerResponded(res, model);
-    const out = res.text || '';
-    const marker = out.match(/---\s*BEATS\s*---/i);
-    const branchAnalysis = (marker ? out.slice(0, marker.index) : out).trim();
-    const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
-    const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
-    const nextBeats = inBeats.map(b => { const r = byPage.get(b.pageNumber); return r ? { ...b, beat: r.beat || b.beat } : b; });
-    const genCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
-    const genMs = Date.now() - t;
-    const chain = {
-      reviewModel: model,
-      fromRound,
-      analysis: branchAnalysis.slice(0, 15000),
-      rewrites: inBeats.filter(b => byPage.has(b.pageNumber)).map(b => {
-        const r = byPage.get(b.pageNumber);
-        return { page: b.pageNumber, before: `BEAT: ${b.beat}`.slice(0, 2000), after: `BEAT: ${r.beat}`.slice(0, 2000) };
-      }),
-    };
-    let scorecard = null;
-    if (scoreOutput) {
-      scorecard = (await scoreArtifactsWithJudge({ beats: beatsToText(nextBeats) }, {
-        model: params.judgeModel, evalVersion: params.evalVersion,
-        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs, chain },
-      })).scorecard;
-    }
-    return { storyId: target.storyId, branch: { fromRound, toRound: fromRound + 1, model, rewrittenPages: [...byPage.keys()], score: scorecard?.artifacts?.beats?.score ?? null } };
-  }
-  const arms = [];
-  // round 1 = the RAW beats (as generated, before any review), scored once.
-  // Model-agnostic, so it's the shared baseline every reviewer arm builds on.
-  let rawScorecard = null;
-  if (scoreOutput) {
-    try {
-      rawScorecard = (await scoreArtifactsWithJudge({ beats: beatsToText(beats0) }, {
-        model: params.judgeModel, evalVersion: params.evalVersion,
-        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model: storyData.outlineModelId || 'writer', label: 'raw (as generated)', round: 1 },
-      })).scorecard;
-    } catch (e) { require('../utils/logger').log.warn(`[beats replay] round-1 raw score failed: ${e.message}`); }
-  }
-
-  for (const model of models) {
-    // Per-arm isolation, same reason as the scene fan-out: one provider's
-    // empty response must not discard the arms that already succeeded.
-    try {
-    let beats = beats0;
-    const passes = [];
-    let convergedAtPass = null;
-    for (let p = 1; p <= passCount; p++) {
-      // The override lives only around this synchronous build. It used to be
-      // set on the shared registry for the whole replay — many minutes and
-      // many awaits — which is one of the two windows that forced the Lab to
-      // run one experiment at a time.
-      const prompt = withTemplates({ storyBeatsReview: promptOverride }, () =>
-        buildBeatsReviewPrompt(storyData, beats, storedArc, ''));
-      const t = Date.now();
-      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
-      assertReviewerResponded(res, model);
-      const out = res.text || '';
-      const marker = out.match(/---\s*BEATS\s*---/i);
-      const analysis = (marker ? out.slice(0, marker.index) : out).trim();
-      const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
-      const rewrittenPages = rewritten.map(r => r.pageNumber);
-      const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
-      // Full chain for this pass: the reviewer's complete analysis (all
-      // checks) + exact before→after per rewritten page. This is what the
-      // score row persists — a round must explain what produced it.
-      const chain = {
-        reviewModel: model,
-        pass: p,
-        analysis: analysis.slice(0, 15000),
-        rewrites: beats.filter(b => byPage.has(b.pageNumber)).map(b => {
-          const r = byPage.get(b.pageNumber);
-          return { page: b.pageNumber, before: `BEAT: ${b.beat}`.slice(0, 2000), after: `BEAT: ${r.beat}`.slice(0, 2000) };
-        }),
-      };
-      const entry = {
-        pass: p,
-        rewrittenPages,
-        converged: rewrittenPages.length === 0,
-        analysis: analysis.slice(0, 15000),
-        check8: (analysis.match(/8\.\s*Loose threads[\s\S]*?(?=\n\d{1,2}\.\s|$)/i) || [''])[0].trim().slice(0, 800),
-        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
-        elapsedMs: Date.now() - t,
-      };
-      beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
-      if (scoreOutput) {
-        const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
-          model: params.judgeModel, evalVersion: params.evalVersion,
-          // round p+1: round 1 is the raw beats (scored below), so pass p → round p+1
-          persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `review pass ${p}`, round: p + 1, genCost: entry.cost, genMs: entry.elapsedMs, chain },
-        });
-        entry.scorecard = sr.scorecard;
-        entry.cost += sr.cost;
-      }
-      passes.push(entry);
-      if (entry.converged) { convergedAtPass = p; break; }
-    }
-    arms.push({ model, passes, convergedAtPass });
-    } catch (err) {
-      require('../utils/logger').log.warn(`⚠️ [beats replay] arm ${model} failed: ${err.message}`);
-      arms.push({ model, ok: false, error: err.message, passes: [] });
-    }
-  }
-  return { storyId: target.storyId, beatCount: beats0.length, passesRequested: passCount, rawScore: rawScorecard?.artifacts?.beats?.score ?? null, arms };
-}
-
-
-/**
  * STORY BIBLE REPLAY — re-derive the clothing contract for an EXISTING story.
  *
  * The costume descriptions are written once, in the story-bible stage, and every
@@ -7754,7 +7443,6 @@ const STORY_STAGES = {
   clothing_review: runClothingReviewStage,
   story_scorecard: runStoryScorecardStage,
   score_rejudge: runScoreRejudgeStage,
-  beats_review_replay: runBeatsReviewReplayStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.

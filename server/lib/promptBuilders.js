@@ -4849,35 +4849,6 @@ function critiqueMaxSeverity(critique) {
   return max;
 }
 
-/** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
-/**
- * LAB ONLY since 2026-09-01. The production beats pipeline no longer reviews
- * beats — see buildPlanCheckPrompt below for what replaced it. This builder
- * survives for the two Lab stages that replay the old reviewer against frozen
- * beats (beats_review_replay, beats_scenes); nothing in production calls it.
- */
-function buildBeatsReviewPrompt(inputData, beats, arc = '', pagePlan = '', auditFindings = '') {
-  const template = PROMPT_TEMPLATES.storyBeatsReview;
-  if (!template) {
-    log.error('[PROMPT] storyBeatsReview template not loaded — beats review replay unavailable');
-    return null;
-  }
-  const current = beats
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`)
-    .join('\n\n');
-  return fillTemplate(template, {
-    ...buildStoryContextFields(inputData),
-    PAGE_COUNT: beats.length,
-    STORY_SHAPE: buildStoryShapeSection(inputData, beats.length),
-    TODDLER_MODE: buildToddlerModeSection(inputData),
-    PAGE_PLAN: String(pagePlan || '').trim() || '(the planner emitted no page plan — check 6c falls back to the beats alone)',
-    CURRENT_BEATS: current,
-    CURRENT_ARC: String(arc || '').trim() || '(the planner authored no arc)',
-    AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
-  });
-}
-
 /**
  * THE PLAN CHECK (owner, 2026-09-01) — successor to the beats reviewer.
  *
@@ -5000,22 +4971,6 @@ function buildChildCriticPrompt(inputData, arc) {
     AGE: readerAge(inputData),
     STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
     ARC: String(arc || '').trim(),
-  });
-}
-
-/** Blind audit of the beats: the auditor sees ONLY the page plan and the beats. */
-function buildBeatsAuditPrompt(beats, pagePlan = '') {
-  const template = PROMPT_TEMPLATES.storyBeatsAudit;
-  if (!template) {
-    log.error('[PROMPT] storyBeatsAudit template not loaded — beats audit unavailable');
-    return null;
-  }
-  const current = beats
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`)
-    .join('\n\n');
-  return fillTemplate(template, {
-    PAGE_PLAN: String(pagePlan || '').trim() || '(none)',
-    BEATS: current,
   });
 }
 
@@ -6144,7 +6099,6 @@ module.exports = {
   parseArcCreate,
   parseArcRetell,
   critiqueMaxSeverity,
-  buildBeatsReviewPrompt,
   buildPlanCheckPrompt,
   parsePlanCheck,
   buildReplanSection,
@@ -6152,7 +6106,6 @@ module.exports = {
   buildArcAuditPrompt,
   buildChildCriticPrompt,
   youngestMainAge,
-  buildBeatsAuditPrompt,
   buildTextAuditPrompt,
   buildTextProofreadPrompt,
   countFaults,

@@ -1,9 +1,11 @@
 /**
  * story_scores persistence — the durable store behind the live /admin/scorecards
- * page. Every scoring path (story_scorecard stage, replay scoreOutput,
- * beats_review_replay, CLI, auto-score hook) calls persistScore so a rerun with
- * a different model/prompt lands next to the others, comparable within one
- * evaluator version. See migrations/016_story_scores.sql.
+ * page. Every scoring path (story_scorecard stage, replay scoreOutput, CLI,
+ * auto-score hook) calls persistScore so a rerun with a different
+ * model/prompt lands next to the others, comparable within one evaluator
+ * version. See migrations/016_story_scores.sql. (beats_review_replay was one
+ * such source before it was retired 2026-09-01 — its historical rows,
+ * source: 'beats_review_replay', are still read here unchanged.)
  */
 const { dbQuery } = require('../services/database');
 const { log } = require('../utils/logger');

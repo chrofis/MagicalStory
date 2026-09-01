@@ -476,13 +476,16 @@ export const TESTLAB_STAGES = [
   // Reader's-eye pass: each page's text next to the image that shipped on it.
   { id: 'book_audit', label: 'Book audit — page text + shipped image, in reading order', producesImage: false, overridable: true, storyLevel: true },
   // Auditor bake-off: the frozen artifact of one level vs a list of models.
-  { id: 'audit_replay', label: 'Audit replay — arc/beats/text audit on stored artifact, per model', producesImage: false, overridable: true, storyLevel: true },
+  // level=beats retired 2026-09-01 with the rest of the beats-review/audit machinery.
+  { id: 'audit_replay', label: 'Audit replay — arc/text audit on stored artifact, per model', producesImage: false, overridable: true, storyLevel: true },
   // The measurement for the hazard-reduction loop: how many render hazards do
   // this book's briefs (or beat SCENE lines) demand, by class.
   { id: 'scene_hazard_count', label: 'Scene hazard count — render hazards per page in the briefs, by class', producesImage: false, overridable: true, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
-  { id: 'beats_scenes', label: 'Beats + scenes → fast review (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
+  // Step 2 (fast structural review) retired 2026-09-01 — this stage now only
+  // plans + expands scenes; historical rows with a review still display.
+  { id: 'beats_scenes', label: 'Beats + scenes (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
   // Replays the scene review over a story's STORED briefs, so a reviewer-prompt
   // change is measurable: the clothing findings are deterministic, and the
   // briefs are frozen, so the only variable is the prompt (or the model).
@@ -506,10 +509,9 @@ export const TESTLAB_STAGES = [
   // visual bible) on a 4×5 dimension rubric — one scorecard per story, comparable
   // across generation models. params.model picks the judge (default reviewer model).
   { id: 'story_scorecard', label: 'Story scorecard (LLM judge → beats/scene/text/VB scores)', producesImage: false, overridable: true, storyLevel: true },
-  // Re-run the beats review on frozen beats: A/B the reviewer prompt (override) and
-  // models (params.reviewModel CSV), iterate params.passes times, and with
-  // params.scoreOutput the one evaluator scores the beats after each pass.
-  { id: 'beats_review_replay', label: 'Beats review replay (prompt/model A/B, multi-pass, scored)', producesImage: false, overridable: true, storyLevel: true },
+  // beats_review_replay retired 2026-09-01 (beats-review/audit machinery
+  // deleted, docs/decisions.md) — no longer launchable; stories scored under
+  // source: 'beats_review_replay' still render on the Scores page.
   // Arc only — cents per round instead of francs, so "how many review rounds
   // still pay" and "does rotating the reviewer beat repeating one" are
   // measurable. params.variants asks for N arcs in ONE call plus a merge pass,
