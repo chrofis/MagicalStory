@@ -72,7 +72,7 @@ List exactly 5 improvements. Never say "no issues" - always find ways to make it
 
 First check - language: Is the entire draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is an error that must be fixed.
 
-Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) All characters appear with a role? (5) Complexity matches scene count? (6) Back cover, not synopsis: no ending given away, nothing named that decides the outcome, no test stated, no character trait paired with the obstacle it will meet? (7) Peril: could the threat kill or injure a child — drowning, a fall from a height?
+Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) All characters appear with a role? (5) Complexity matches scene count? (6) Back cover, not synopsis: no ending given away, nothing named that decides the outcome, no test stated, no character trait paired with the obstacle it will meet? (7) Peril: is anything dangerous enough that it could lead to death, for anyone?
 
 5 improvements:
 1. [specific improvement]
@@ -118,7 +118,7 @@ Each story idea must be PLAIN TEXT PARAGRAPHS:
 - Plain flowing paragraphs only
 - All characters must appear
 - Never write how it ends, and never write the middle: no naming the object, gate, figure or trick that decides the outcome, no test the characters will have to pass, and no pairing of a character's trait with the obstacle it will meet. Say who they are, not what each of them will do about it.
-- Match danger to the youngest character: frightening is the right level, and nothing may be able to kill or injure them — no drowning, no fall from a height.
+- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level.
 
 **LENGTH:** three to five sentences, whatever the page count ({STORY_LENGTH_CATEGORY}). The page count sets how much story gets written later, never how much of it is given away here.
 

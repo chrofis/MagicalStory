@@ -290,6 +290,17 @@ const MODEL_DEFAULTS = {
   // one outside model names the top remaining issues as ISSUE → CHANGE hints.
   // The hints ride into the beats and text-writer prompts; nothing re-tells.
   arcHintsModel: process.env.ARC_HINTS_MODEL || 'grok-4.6',
+  // The beats plan check (owner, 2026-09-01). The beats reviewer is gone; what
+  // replaced it is code counters plus this ONE cheap call, which judges only
+  // emotional highlights, entrances, and 3+-cast justifications. Cheap on
+  // purpose — it reads a plan, it does not write a story.
+  // Picked by A/B on the frozen plan of job_1788215224103_avu132n7je against 13
+  // known division defects (2026-09-01): luna-pro found 4 of the 7 entrance
+  // defects — the class this call exists for — where gemini-2.5-flash and
+  // qwen3-max found 1 each, and it did so at $0.017 vs gemini's $0.024. qwen
+  // was cheapest but spent half its findings restating the counters it was told
+  // not to repeat. The cost is latency: 169s vs 39s (gemini) and 7s (qwen).
+  planCheckModel: process.env.PLAN_CHECK_MODEL || 'gpt-5.6-luna-pro',
   // The creator runs at the provider default (the Anthropic path sends no
   // temperature); these apply on OpenRouter/xAI paths only.
   arcPanelTemperature: 0.8,

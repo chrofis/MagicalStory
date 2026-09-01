@@ -1,0 +1,35 @@
+Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the three points below.
+
+Commissioned characters: {CHARACTER_NAMES}
+
+# THE STORY
+
+{FINAL_ARC}
+
+# THE PAGE PLAN
+
+{PAGE_PLAN}
+
+# THE BEATS
+
+{CURRENT_BEATS}
+
+# ALREADY COUNTED
+
+Counters have measured the division; these are their results, for reference. Do not repeat them.
+
+{COUNTER_FINDINGS}
+
+# YOUR TASK
+
+Answer only these three:
+
+1. Emotional highlights. Name every page the plan stages as one character showing a strong feeling, and say whether the beat there is truly one person's felt moment. A page holding a second actor, an event, or a feeling nobody shows is a finding.
+2. Entrances. Name the page each character first appears on. That page stages an arrival or a naming by someone present. A badge, a garment, a title or an epithet never counts as a naming, and a character already in frame before anyone says who they are is a finding.
+3. Cast of three or more. For each page with three or more named characters in frame, say whether its plan line justifies the third. A justification that repeats the action, names the place, or asserts the characters are needed does not hold.
+
+# OUTPUT FORMAT
+
+Numbered findings, one line each, nothing before or after. Each line names the page and what is wrong. Never propose a rewrite, never write a beat. When a check finds nothing, write no line for it.
+
+When nothing is wrong anywhere, output exactly: NONE

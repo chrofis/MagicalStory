@@ -1,11 +1,10 @@
 
 
-const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
+const { runPlanCounters } = require('./planCounters');
 
-// One yardstick everywhere: audits emit "FAULT[<QUESTION>]:" lines (bare
-// "FAULT:" accepted from older reports); counts compare only when the same
-// template and judge produced both sides. Parsers live in storyHelpers
-// (countFaults / faultsByCategory), imported below.
+// The beats layer no longer audits the STORY (owner, 2026-09-01). Its only
+// check is arithmetic over the page division (./planCounters) plus one cheap
+// model call; neither emits FAULT lines, and neither rewrites a beat.
 
 /**
  * Beats-first story generation (pipelineMode: 'beats').
@@ -19,7 +18,9 @@ const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
  *      re-tells the story whole. Replaces the old arc audit/review chain
  *      (owner, 2026-08-30 — see docs/decisions.md)
  *   1. beats_plan            Sonnet    PAGE PLAN + per-page BEAT, FROM the approved arc
- *   2. beats_review          Grok      structural review, rewrites faulted pages
+ *   2. plan_check            counters + one cheap call: arithmetic over the
+ *      DIVISION only, then at most ONE re-plan by the planner. No story
+ *      checking happens at this layer by design (owner, 2026-09-01)
  *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
  *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
  *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
@@ -27,7 +28,7 @@ const { CARRY_ROUTES, withCarriedRulings } = require('./carryRoutes');
  *
  * Scheduling is by data dependency, not by list order:
  *
- *   beats ─> beats review ─> bible ─┬─> styled avatars   (caller-owned, long pole)
+ *   beats ─> plan check ─> bible ─┬─> styled avatars    (caller-owned, long pole)
  *                                   └─> scene expansion ─> scene review ─> page text
  *
  * Step 6 runs AFTER the scene review and reads the FINAL briefs (owner decision
@@ -71,10 +72,9 @@ const {
   parseArcCreate,
   parseArcRetell,
   critiqueMaxSeverity,
-  buildBeatsReviewPrompt,
-  buildBeatsAuditPrompt,
-  countFaults,
-  faultsByCategory,
+  buildPlanCheckPrompt,
+  parsePlanCheck,
+  buildReplanSection,
   buildClothingReviewPrompt,
   parseClothingReview,
   parseBeats,
@@ -299,20 +299,6 @@ async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
   }
 }
 
-/** Merge a reviewer's partial rewrite onto a base list keyed by pageNumber. */
-function mergeByPage(base, fixes, apply) {
-  const byPage = new Map(fixes.map(f => [f.pageNumber, f]));
-  const changed = [];
-  const merged = base.map(item => {
-    const fix = byPage.get(item.pageNumber);
-    if (!fix) return item;
-    const next = apply(item, fix);
-    if (next !== item) changed.push(item.pageNumber);
-    return next;
-  });
-  return { merged, changed, stray: fixes.map(f => f.pageNumber).filter(n => !base.some(b => b.pageNumber === n)) };
-}
-
 /**
  * Run the beats-first pipeline.
  *
@@ -376,7 +362,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const arcRoundsRequested = parseInt(modelOverrides.arcRounds, 10) || MODEL_DEFAULTS.arcRounds || 1;
   const arcRounds = Math.max(1, Math.min(3, arcRoundsRequested));
   if (arcRoundsRequested > 3) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to 3 (owner cap 2026-08-30 — iteration study regressed at round 4)`);
-  const beatsAuditModel = modelOverrides.beatsAuditModel || MODEL_DEFAULTS.beatsAuditModel || reviewModel;
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
   const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
@@ -384,9 +369,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, arcCreatorModel, arcPanelModels, arcRounds, beatsAuditModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcCreatorModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreator=${arcCreatorModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} beatsAudit=${beatsAuditModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreator=${arcCreatorModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
 
   // ── Step 0: THE ARC MACHINE — create → panel → re-tell ────────────────────
   // Replaces the arc write → audit → child critic → review → re-audit chain
@@ -657,22 +642,36 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // — the arc machine consumed the one and answered the other.
   const planPrompt = buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints });
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
+
+  /**
+   * One planner response -> its PAGE PLAN text and its parsed beats.
+   *
+   * Used twice: the first division, and the single re-plan the plan check may
+   * request. Keeping it one function is what makes the re-plan a genuine
+   * re-division — the second response is read exactly like the first, with no
+   * merge path that could leave half a plan behind.
+   */
+  const readPlan = (raw) => {
+    const parsed = parseBeats(String(raw || ''), expected);
+    // The approved arc is the story; parseBeats no longer authors one.
+    parsed.arc = approvedArc || '';
+    // The page plan decides shot, cast and the picture's instant per page. It
+    // sits ahead of ---BEATS---, so beats parsers ignore it; each page's own
+    // line rides on the beat as planLine.
+    const planText = (String(raw || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
+    const byPage = parsePagePlan(planText);
+    for (const p of parsed.pages) p.planLine = byPage.get(p.pageNumber) || p.planLine || '';
+    return { parsed, pagePlan: planText };
+  };
+
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
   meta.timings.planMs = Date.now() - t;
-  const plan = parseBeats(planRes.text || '', expected);
-  // The approved arc is the contract the reviewer checks the pages against.
-  // parseBeats no longer authors one — the arc machine's finalArc is the only arc.
-  plan.arc = approvedArc || '';
-  // The page plan decides shot, cast and the picture's instant per page BEFORE
-  // any page is written. It sits ahead of ---BEATS---, so beats parsers ignore
-  // it; each page's own line rides on the beat as planLine (the SCENE field's
-  // replacement, 2026-08-31).
-  const pagePlan = (String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
+  const first = readPlan(planRes.text);
+  const plan = first.parsed;
+  let pagePlan = first.pagePlan;
   if (pagePlan) log.info(`📐 [BEATS] page plan: ${pagePlan.split('\n').filter(Boolean).length} line(s)`);
-  const planLines = parsePagePlan(pagePlan);
-  for (const p of plan.pages) p.planLine = planLines.get(p.pageNumber) || p.planLine || '';
   const unplanned = plan.pages.filter(p => !p.planLine).map(p => p.pageNumber);
   if (unplanned.length > 0) {
     log.warn(`⚠️ [BEATS] No page-plan line for page(s) ${unplanned.join(', ')} — those pages stage from the beat alone`);
@@ -687,149 +686,150 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     pages: plan.pages.length, model: planRes.modelId || planModel,
   });
 
-  // ── Step 2: beats review (rewrites only faulted pages) ────────────────────
+  // ── Step 2: THE PLAN CHECK — counters, one cheap call, ONE re-plan ────────
+  //
+  // What used to stand here: a blind beats audit, a full-context reviewer that
+  // rewrote every faulted beat, a re-audit of its output, and a second review
+  // round. All of it is deleted (owner ruling, 2026-09-01 — the reviewer
+  // "should not fix the story at all... count the images").
+  //
+  // The beats layer therefore performs NO story checking by design. The arc
+  // machine owns story correctness; the text audit downstream is the remaining
+  // prose guard. What is left at this layer is arithmetic over the DIVISION —
+  // shot distribution, cast per page, whether a character ever gets a page of
+  // their own — and arithmetic belongs in code, where it is free and cannot
+  // hallucinate (server/lib/planCounters.js). ONE cheap model call judges only
+  // the three things a counter cannot: whether an emotional-highlight page is
+  // really one person's felt moment, whether each character's first page stages
+  // an arrival or a naming, and whether a 3+-cast page's justification holds.
+  //
+  // Neither half ever edits a beat. Findings travel back to the PLANNER as a
+  // single re-plan request ("re-divide the named pages; everything else
+  // stands"), and that loop runs at most once — a checker that could rewrite is
+  // exactly the mechanism this replaced.
   await checkCancellation();
   let beats = plan.pages;
-  let beatsReviewAnalysis = '';
-  // Before/after for every page the reviewer rewrote, same shape as
-  // textRefineReport. Without it two of the three review stages are
-  // unmeasurable: the log says "3 pages rewritten" and nothing says WHAT.
-  // Stays null only when the review never ran (missing template or a throw).
   let beatsReviewReport = null;
-  // Blind audit: a reader with only the page plan and the beats names faults.
-  // The reviewer's fix ledger must answer every one. Never blocks.
-  let beatsAuditFindings = '';
-  try {
-    const beatsAuditPrompt = buildBeatsAuditPrompt(plan.pages, pagePlan);
-    if (beatsAuditPrompt) {
-      await stage(4, 'Auditing the story beats...', { next: 5, ms: 120000 });
-      const auditRes = await textModels.callTextModelStreaming(beatsAuditPrompt, null, onChunk, beatsAuditModel, { usageLabel: 'beats_audit' });
-      beatsAuditFindings = String(auditRes.text || '').trim();
-      gl.info('beats_audit', `Beats audit by ${auditRes.modelId || reviewModel}: ${countFaults(beatsAuditFindings)} fault(s)`, null, { byCategory: faultsByCategory(beatsAuditFindings) });
-    }
-  } catch (auditErr) {
-    log.warn(`⚠️ [BEATS] Beats audit failed (${auditErr.message}) — review runs without audit findings`);
-    gl.warn('beats_audit_failed', `Beats audit failed: ${auditErr.message}`);
-  }
-  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages, plan.arc, pagePlan, beatsAuditFindings);
-  if (!reviewPrompt) {
-    log.warn('⚠️ [BEATS] story-beats-review template unavailable — beats shipped unreviewed');
-    gl.warn('beats_review_failed', 'Review template unavailable — beats shipped unreviewed');
-  } else {
-    t = Date.now();
-    try {
-      await stage(5, 'Reviewing the story beats...', { next: 18, ms: 217000 });
-      const revRes = await textModels.callTextModelStreaming(reviewPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_review' });
-      const parsed = parseBeats(revRes.text || '', []);
-      beatsReviewAnalysis = parsed.analysis || '';
-      // The apply callback is the ONLY point where both the planned and the
-      // rewritten beat exist — capture the pair here or it is gone.
-      const rewrites = [];
-      const { merged, changed, stray } = mergeByPage(plan.pages, parsed.pages, (p, fix) => {
-        const next = { ...p, beat: fix.beat || p.beat };
-        rewrites.push({
-          pageNumber: p.pageNumber,
-          before: `BEAT: ${p.beat}`,
-          after: `BEAT: ${next.beat}`,
-        });
-        return next;
-      });
-      beats = merged;
-      meta.timings.beatsReviewMs = Date.now() - t;
-      // changedPages counts only pages whose text actually moved — a reviewer
-      // that echoes a page unchanged is not a rewrite.
-      const beatsDiffs = rewrites.filter(r => r.before !== r.after);
-      beatsReviewReport = {
-        model: revRes.modelId || reviewModel,
-        durationMs: meta.timings.beatsReviewMs,
-        changedPages: beatsDiffs.map(r => r.pageNumber),
-        analysis: beatsReviewAnalysis,
-        audit: beatsAuditFindings,
-        auditByCategory: faultsByCategory(beatsAuditFindings),
-        // The arc the planner committed to, and the contract this review judged
-        // the pages against. Stored so a plan can be read back against it.
-        arc: plan.arc || '',
-        pagePlan,
-        pages: beatsDiffs,
-        // Same dev-mode inspection as the scene review (owner request
-        // 2026-08-09): the exact prompt, and EVERY beat as sent — not only the
-        // ones that changed, which is all a diff can ever show.
-        prompt: reviewPrompt,
-        briefsIn: plan.pages.map(x => ({
-          pageNumber: x.pageNumber,
-          brief: `BEAT: ${x.beat || ''}
-PLAN: ${x.planLine || ''}`.trim(),
-        })),
-      };
-      if (stray.length > 0) log.warn(`⚠️ [BEATS] Review returned page(s) ${stray.join(', ')} that are not in the plan — ignored`);
-      // A reviewer may CUT a page and shift the later ones up (the prompt licenses
-      // it; the page total is fixed because the merge is keyed by pageNumber). The
-      // failure mode of a shift is a page it forgot to rewrite at the end, which
-      // leaves the pre-shift text behind and duplicates its neighbour. Report it —
-      // a duplicated beat is the one restructure error the merge cannot detect.
-      const seenBeat = new Map();
-      const dupes = [];
-      for (const b of merged) {
-        const key = String(b.beat || '').trim().toLowerCase();
-        if (!key) continue;
-        if (seenBeat.has(key)) dupes.push(`${seenBeat.get(key)}+${b.pageNumber}`);
-        else seenBeat.set(key, b.pageNumber);
-      }
-      if (dupes.length > 0) {
-        log.warn(`⚠️ [BEATS] Duplicate beat text after review on page pair(s) ${dupes.join(', ')} — a page shift left an un-rewritten page behind`);
-        gl.warn('beats_review_duplicate_beat', `Duplicate beat text on page pair(s) ${dupes.join(', ')} after the review`, null, { pairs: dupes });
-      }
-      gl.info('beats_review', `Beat review by ${revRes.modelId || reviewModel}: ${changed.length} page(s) rewritten (${(meta.timings.beatsReviewMs / 1000).toFixed(1)}s)`, null, {
-        changedPages: changed, model: revRes.modelId || reviewModel,
-      });
+  const commissionedNames = (inputData?.characters || []).map(c => c && c.name).filter(Boolean);
+  const maxCast = IMAGE_MODELS[inputData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
+  const planCheckModel = modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel;
 
-      // FRESH JUDGMENT (owner, 2026-08-26) — same design as the arc re-audit
-      // above: the identical blind audit re-reads the REVIEWED beats, so a fix
-      // that introduced a fault (the flying "fix" on job_1787689073034 was
-      // born exactly here) is caught before the Art Director and the text
-      // writer inherit it as settled law. One targeted re-review; no loop.
-      try {
-        const audit2Prompt = buildBeatsAuditPrompt(beats, pagePlan);
-        if (audit2Prompt && beatsAuditFindings) {
-          const a2 = await textModels.callTextModelStreaming(audit2Prompt, null, onChunk, beatsAuditModel, { usageLabel: 'beats_audit2' });
-          const findings2 = String(a2.text || '').trim();
-          const n1 = countFaults(beatsAuditFindings);
-          const n2 = countFaults(findings2);
-          beatsReviewReport.audit2 = findings2;
-          beatsReviewReport.audit2ByCategory = faultsByCategory(findings2);
-          gl.info('beats_audit2', `Beats re-audit after review: ${n1} → ${n2} fault(s)`, null, { before: n1, after: n2, byCategory: beatsReviewReport.audit2ByCategory });
-          if (n2 > 0) {
-            const withRulings = `${findings2}\n\nThe previous review answered an earlier audit; its ledger follows. A fault it ruled to stand, with a reason, stays as ruled — answer it by citing that ruling.\n\n${beatsReviewAnalysis || ''}`;
-            const fixPrompt = buildBeatsReviewPrompt(inputData, beats, plan.arc, pagePlan, withRulings);
-            const fixRes = await textModels.callTextModelStreaming(fixPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_review2' });
-            const fixParsed = parseBeats(fixRes.text || '', []);
-            const rewrites2 = [];
-            const merged2 = mergeByPage(beats, fixParsed.pages, (p, fix) => {
-              const next = { ...p, beat: fix.beat || p.beat };
-              rewrites2.push({
-                pageNumber: p.pageNumber,
-                before: `BEAT: ${p.beat}`,
-                after: `BEAT: ${next.beat}`,
-              });
-              return next;
-            });
-            beats = merged2.merged;
-            const diffs2 = rewrites2.filter(r => r.before !== r.after);
-            beatsReviewReport.analysis2 = fixParsed.analysis || '';
-            beatsReviewReport.changedPages2 = diffs2.map(r => r.pageNumber);
-            beatsReviewReport.pages2 = diffs2;
-            gl.info('beats_review2', `Beats re-review rewrote page(s) ${diffs2.map(r => r.pageNumber).join(', ') || 'none'} for the re-audit's ${n2} fault(s)`);
-          }
-        }
-      } catch (e2) {
-        log.warn(`⚠️ [BEATS] Beats re-audit failed (${e2.message}) — reviewed beats kept as-is`);
-        gl.warn('beats_audit2_failed', `Beats re-audit failed: ${e2.message}`);
+  /**
+   * Counters (free, deterministic) + the one model call. Never throws: the
+   * model half is advisory, and a lost call leaves the counters standing alone
+   * rather than skipping the check entirely.
+   */
+  const runCheck = async (label, pages, planText) => {
+    const counters = runPlanCounters({ pages, commissionedNames, maxCharactersPerScene: maxCast });
+    let modelFindings = [];
+    let checkModelId = null;
+    let prompt = null;
+    try {
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, counters.lines);
+      if (!prompt) throw new Error('plan-check template unavailable');
+      const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
+        usageLabel: label,
+        // Judges run at temperature 0 (settled); the Anthropic path sends none.
+        ...(TEXT_MODELS[planCheckModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
+      });
+      checkModelId = res.modelId || planCheckModel;
+      modelFindings = parsePlanCheck(res.text || '');
+    } catch (err) {
+      log.warn(`⚠️ [BEATS] Plan check (${label}) failed (${err.message}) — the counters' findings stand alone`);
+      gl.warn(`${label}_failed`, `Plan check failed: ${err.message} — the counters' findings stand alone`);
+    }
+    const all = [...counters.lines, ...modelFindings.map(f => `CHECK: ${f}`)];
+    gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
+      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
+    });
+    return { counters, modelFindings, lines: all, checkModelId, prompt };
+  };
+
+  t = Date.now();
+  await stage(4, 'Checking the page division...', { next: 5, ms: 45000 });
+  const check1 = await runCheck('plan_check', plan.pages, pagePlan);
+  let check2 = null;
+  let replannedPages = [];
+  if (check1.lines.length > 0) {
+    try {
+      await checkCancellation();
+      await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+      const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
+        finalArc: approvedArc,
+        arcHints,
+        replan: buildReplanSection(pagePlan, plan.pages, check1.lines),
+      });
+      if (!replanPrompt) throw new Error('story-beats template unavailable');
+      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
+      const second = readPlan(rpRes.text);
+      if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable beats');
+      if (second.parsed.missing.length > 0) {
+        log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — first division kept`);
+        gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — first division kept`);
+      } else {
+        const before = new Map(plan.pages.map(p => [p.pageNumber, p.beat || '']));
+        replannedPages = second.parsed.pages
+          .filter(p => (before.get(p.pageNumber) || '') !== (p.beat || ''))
+          .map(p => p.pageNumber);
+        beats = second.parsed.pages;
+        pagePlan = second.pagePlan || pagePlan;
+        gl.info('beats_replan', `Planner re-divided ${replannedPages.length} page(s) for ${check1.lines.length} finding(s)`, null, {
+          replannedPages, findings: check1.lines.length,
+        });
+        check2 = await runCheck('plan_recheck', beats, pagePlan);
       }
     } catch (err) {
-      // Same containment as the unified path's outline review: never block.
-      log.warn(`🚨 [BEATS] Beat review failed (${err.message}) — proceeding with the unreviewed plan`);
-      gl.warn('beats_review_failed', `Reviewer ${reviewModel} failed: ${err.message} — plan shipped unreviewed`);
+      // Never block a story on the check: the first division is a complete plan.
+      log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
+      gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
+      beats = plan.pages;
+      replannedPages = [];
     }
+  }
+  meta.timings.planCheckMs = Date.now() - t;
+
+  {
+    // Stored under the beatsReviewReport key on purpose: the persistence in
+    // storyJobPipeline, the dev-mode diff panels, and the cross-story challenge
+    // memory (which reads `data->'beatsReviewReport'->>'arc'`) all key off it.
+    // Renaming the key would silently empty a family's challenge history.
+    const beforeBeat = new Map(plan.pages.map(p => [p.pageNumber, p.beat || '']));
+    const summary = [
+      check1.lines.length ? `Findings on the first division:\n${check1.lines.join('\n')}` : 'The first division drew no findings.',
+      replannedPages.length ? `\nRe-divided page(s): ${replannedPages.join(', ')}` : '',
+      check2 ? `\nFindings after the re-plan:\n${check2.lines.join('\n') || '(none)'}` : '',
+    ].filter(Boolean).join('\n');
+    beatsReviewReport = {
+      check: 'counters+plan-check',
+      model: check1.checkModelId || planCheckModel,
+      durationMs: meta.timings.planCheckMs,
+      arc: plan.arc || '',
+      pagePlan,
+      analysis: summary,
+      counterFindings: check1.counters.lines,
+      counterStats: check1.counters.stats,
+      cast: check1.counters.cast,
+      modelFindings: check1.modelFindings,
+      changedPages: replannedPages,
+      pages: replannedPages.map(n => ({
+        pageNumber: n,
+        before: `BEAT: ${beforeBeat.get(n) || ''}`,
+        after: `BEAT: ${(beats.find(b => b.pageNumber === n) || {}).beat || ''}`,
+      })),
+      recheck: check2 ? {
+        counterFindings: check2.counters.lines,
+        counterStats: check2.counters.stats,
+        modelFindings: check2.modelFindings,
+      } : null,
+      prompt: check1.prompt || '',
+      briefsIn: plan.pages.map(x => ({
+        pageNumber: x.pageNumber,
+        brief: `BEAT: ${x.beat || ''}\nPLAN: ${x.planLine || ''}`.trim(),
+      })),
+    };
+    gl.info('beats_plan_checked', `Division checked: ${check1.lines.length} finding(s), ${replannedPages.length} page(s) re-divided${check2 ? `, ${check2.lines.length} remaining` : ''} (${(meta.timings.planCheckMs / 1000).toFixed(1)}s)`, null, {
+      findings: check1.lines.length, replanned: replannedPages.length, remaining: check2 ? check2.lines.length : null,
+    });
   }
 
   // ── Step 3: visual contract from the locked beats ─────────────────────────
@@ -1072,8 +1072,10 @@ PLAN: ${x.planLine || ''}`.trim(),
   t = Date.now();
   const beatPageNumbers = beats.map(b => b.pageNumber);
   let expansions = [];
-  const allPrompt = withCarriedRulings(
-    buildSceneExpansionAllPrompt(inputData, beats, {
+  // No rulings travel here any more (2026-09-01): the beats reviewer that
+  // produced them is gone, and the plan check never rules on anything — it
+  // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
+  const allPrompt = buildSceneExpansionAllPrompt(inputData, beats, {
       visualBible,
       availableAvatars,
       maxCharactersPerScene,
@@ -1084,15 +1086,7 @@ PLAN: ${x.planLine || ''}`.trim(),
       // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
       // only source, and it is resolved by the time scenes are expanded.
       clothingRequirements,
-    }),
-    // Rulings only (2026-08-26): the re-audit above already decided whether the
-    // review's fixes held; the ledger travels as precedent, not as work.
-    [beatsReviewAnalysis, beatsReviewReport?.analysis2 || ''],
-    CARRY_ROUTES.beatsToArtDirector
-  );
-  if (beatsReviewAnalysis) {
-    gl.info('beats_carry_artdirector', 'Beats review rulings carried into the Art Director');
-  }
+  });
   if (!allPrompt) {
     log.error('🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
     gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
@@ -1562,16 +1556,8 @@ PLAN: ${x.planLine || ''}`.trim(),
       log.warn('⚠️ [BEATS] Step 6 has NO scene briefs — text is being written blind to the illustrations');
       gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
     }
-    const textPrompt = withCarriedRulings(
-      buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints }),
-      // Rulings only (2026-08-26) — see the Art Director carry above.
-      [beatsReviewAnalysis, beatsReviewReport?.analysis2 || ''],
-      CARRY_ROUTES.beatsToStoryText
-    );
+    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints });
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
-    if (beatsReviewAnalysis) {
-      gl.info('beats_carry_storytext', 'Beats review rulings carried into the page text');
-    }
     const beatPages = beats.map(b => b.pageNumber);
     let raw = '';
     let modelId = textModel;
@@ -1667,15 +1653,16 @@ PLAN: ${x.planLine || ''}`.trim(),
     // with a lookahead to the next section, so a block ahead of it is invisible
     // to them and readable in the outline view.
     ...(plan.arc ? ['---ARC---', plan.arc, ''] : []),
-    // The plan was written before the review; when the review rewrote pages the
-    // stored plan describes a book that no longer exists page-for-page. Say so
-    // in the transcript rather than letting a reader trust a stale map.
-    ...(pagePlan ? ['---PAGE PLAN---', (beatsReviewReport?.changedPages?.length ? '(written before the beats review; rewritten pages may no longer match it)\n' : '') + pagePlan, ''] : []),
+    // The plan and the beats always come from the SAME planner response — a
+    // re-plan replaces both — so this map is never stale against the beats below.
+    ...(pagePlan ? ['---PAGE PLAN---', pagePlan, ''] : []),
     '---BEATS---',
     beats.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`).join('\n\n'),
     '',
+    // Marker unchanged on purpose: stored transcripts, storyMetrics and the
+    // analysis scripts all key on it. What it holds is now the plan check.
     '---BEATS REVIEW---',
-    beatsReviewAnalysis || '(no review)',
+    beatsReviewReport?.analysis || '(no plan check)',
     '',
     '---SCENE REVIEW---',
     sceneReviewAnalysis || '(no review)',

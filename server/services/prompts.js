@@ -182,7 +182,18 @@ async function loadPromptTemplates() {
     // fast structural review — the cheapest point to fix an arc, and the gate
     // that locks scenes so image generation can start.
     ['storyBeats', 'story-beats.txt'],
+    // LAB ONLY since 2026-09-01: the production beats pipeline no longer runs a
+    // reviewer at all (owner ruling — see planCheck below). Two Lab stages still
+    // replay it on frozen beats (beats_review_replay, beats_scenes), so the
+    // template stays, exactly as arcAuditModel/childCriticModel did when the arc
+    // machine replaced that chain. Nothing in production loads it.
     ['storyBeatsReview', 'story-beats-review.txt'],
+    // The beats layer's only model check (owner, 2026-09-01). Counts and shot
+    // arithmetic run in code (server/lib/planCounters.js); this call answers
+    // only the three questions a counter cannot — emotional highlights,
+    // entrances, and whether a 3+-cast page's justification holds. It never
+    // rewrites a beat; its findings go back to the PLANNER as one re-plan.
+    ['planCheck', 'plan-check.txt'],
     // Arc-only review and its judge. The arc is ~15 lines where the beats are a
     // whole book, so a review round costs cents — which is what makes "how many
     // rounds, and with which models" answerable at all.

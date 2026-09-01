@@ -22791,3 +22791,199 @@ Concretely:
 per-character instruction assembly), `server/config/models.js` (charRepairModel pin),
 `server/lib/grok.js` (editWithGrok default reads the pin),
 `tests/unit/repair-method.test.js`.
+
+---
+
+## The beats layer stops checking the STORY: the reviewer is replaced by code counters + one cheap plan check (2026-09-01)
+
+**Context.** The beats layer carried a full story-review apparatus: a blind
+`beats_audit`, a full-context reviewer (`story-beats-review.txt`) that rewrote
+every faulted beat, a `beats_audit2` re-audit of that output, and a
+`beats_review2` corrective round. It re-judged causality, stakes, loose threads
+and unearned turns — the arc machine's job — and then edited beat text to
+"fix" what it found. That is the same patch-step failure mode the arc machine
+was built to remove (2026-08-30): a fix deletes the cause a turn depended on.
+
+**Owner ruling (verbatim).** The reviewer *"should not fix the story at all...
+count the images"*. On cast entrances: entrance groups are *"max 3, ideally 1 or
+2"*. On the emotional layering: *"the arc should have them... the text should
+then create the feelings... mainly the text should create the suspense based on
+the arc"*. On the peril rule's phrasing, the owner replaced a longer draft with
+one sentence covering everyone, named or unnamed, child or adult.
+
+**Decision.**
+
+1. **Deleted from the production beats pipeline:** the `beats_audit` stage, the
+   `beats_audit2` re-audit, the `beats_review` call, the `beats_review2` round,
+   and the review-rulings carry into the Art Director and the page-text writer
+   (`CARRY_ROUTES.beatsToArtDirector` / `beatsToStoryText` no longer fire in
+   production). `mergeByPage` went with them — it existed only to merge a
+   reviewer's partial rewrite.
+
+2. **Code counters (free, deterministic)** — `server/lib/planCounters.js`, run
+   over the parsed PAGE PLAN lines: shot distribution (about two close-ups, two
+   ultra-wides, and never only two shot types), cast per page over three, cast
+   over the image model's ceiling, solo-page presence, peopleless-page presence,
+   main character in at least half the images, invented characters never
+   dominant on more than one page and never on consecutive pages, no peopled
+   page without a commissioned character, every commissioned character with at
+   least one focal page, and every plan line carrying all four of shot / who /
+   instant / change. Findings render as `PLAN[<CODE>] page N: <detail>`.
+
+3. **One cheap model call** — `prompts/plan-check.txt`, judging only the three
+   things arithmetic cannot: whether an emotional-highlight page is truly one
+   person's felt moment, whether each character's first page stages an arrival
+   or a naming by someone present (a badge or garment never counts), and whether
+   each 3+-cast page's justification holds. Numbered findings, never a rewrite.
+
+4. **One re-plan, by the PLANNER.** Counter + model findings go back to
+   `story-beats.txt` through a new `{REPLAN_SECTION}` ("re-divide the named
+   pages; everything else stands"). The loop runs at most once, and the checker
+   never edits a beat. genLog labels: `plan_check`, `plan_recheck`,
+   `beats_replan`.
+
+**Acknowledged consequence (owner chose this explicitly).** With the deletions
+above, **the beats layer performs NO story checking by design.** The arc machine
+owns story correctness; the remaining prose guard is the text audit. Nothing
+between them re-reads the story for causality or stakes.
+
+**Checker model — measured, not assumed.** A/B on the frozen plan of
+`job_1788215224103_avu132n7je` against 13 known division defects, temperature 0,
+identical prompt:
+
+| model | findings | entrance defects found (of 7) | cost | latency |
+|---|---|---|---|---|
+| gpt-5.6-luna-pro | 12 | **4** | $0.0171 | 169s |
+| gemini-2.5-flash | 2 | 1 | $0.0239 | 39s |
+| qwen3-max | 6 | 1 | $0.0049 | 7s |
+
+`planCheckModel` defaults to **gpt-5.6-luna-pro**: it found four of the seven
+entrance defects — the class this call exists for — where the other two found
+one each, and it is cheaper than gemini-2.5-flash. qwen was cheapest but spent
+three of its six findings restating counter results the prompt told it not to
+repeat. Its cost is latency (169s vs 39s / 7s); the chain it replaces was four
+model calls. luna's one false positive was flagging the main character's page-1
+appearance as an unstaged entrance.
+
+**Planner bake-off (reported, default UNCHANGED — owner decides).** Same story's
+stored FINAL ARC through the current beats prompt, one call each, model-max
+tokens, no caps. "Findings" = counter findings on that model's own output (fewer
+is better); all four parsed cleanly at 16/16 pages with 16 plan lines.
+
+| planner | findings | shots (cu/uw/w/m) | peopleless pages | cost | latency |
+|---|---|---|---|---|---|
+| claude-sonnet (control) | **5** | 2/2/4/8 | 2 | **$0.0428** | **54s** |
+| grok-4.6 | 6 | 2/2/4/8 | 0 | $0.1407 | 418s |
+| gemini-3.1-pro | 7 | 3/2/5/6 | 1 | $0.1682 | 111s |
+| gpt-5.6-sol | 10 | 5/2/4/5 | 0 | $0.0883 | 144s |
+
+The control wins on every axis measured: fewest counter findings, lowest cost,
+lowest latency, and it is one of only two models that produced a peopleless page
+at all. Spot-checking four pages each (1, 7, 11, 16) against the arc: grok is the
+most literally faithful but adds actions the arc does not have and put a
+character in a beat its own plan line excludes; sol's page-16 plan stages all
+five characters in one frame (three of its pages break the cast ceiling);
+gemini is clean but terse. **One finding worth acting on separately:** the
+control writes its BEATS in the book's language while all three challengers write
+them in English as `story-beats.txt` asks. That is why `planCounters` reads plan
+lines only — German capitalises every noun, and scanning beats turned ordinary
+nouns into cast members. **Recommendation: keep claude-sonnet**; the beats-language
+drift is a separate prompt question, not a reason to switch planner.
+
+**Total measured spend for both A/Bs: $0.486.**
+
+**Counter coverage, honestly.** The counters caught the share-class defects
+(zero-commissioned pages 11/12, consecutive invented-dominant pages 11/12) and
+missed the co-equal pages 3/10 and Lorena's focal-page gap (she has a solo plan
+line on page 9, so the counter is right by its own definition and the ground
+truth uses a stricter one). The entrance class is entirely the model's.
+
+**Also in this batch.**
+
+- **Arc templates gain three rules** (`arc-create.txt`, `arc-retell.txt`):
+  entrances in ones or twos with a line of their own; a distinctive voice per
+  named character; and *"Name what the main figures feel at each turn, as plain
+  fact — a feeling stated is part of the story."* The layering is: the arc has
+  the feelings, the beats say who does what, the text creates feeling and
+  suspense from the arc. `story-beats.txt` needed no change — nothing there
+  forbade feeling-words.
+- **The text stages explicitly own emotion** (`story-text-from-beats.txt`,
+  `text-refine.txt`): *"The text gives each page its feeling and its suspense,
+  drawn from the story — feelings and dialogue may go beyond what the beat
+  carries; everything else may not."* This amends the add-nothing clamp
+  precisely: feelings and dialogue exempt, everything else still bound.
+- **Hints header relabelled** (`promptBuilders.js`): `# APPLIED HINTS — the
+  beats already apply these; the text supports them` → `# HINTS — apply these in
+  the text where the beats have not`. The old label told the writer the work was
+  done, so it skipped the one hint only it could apply (evidence: G10).
+- **Peril rule unified and widened.** One sentence replaces the child-scoped
+  wording at every site: *"Nothing in the story or its pictures is dangerous
+  enough that it could lead to death — for anyone."* Existing useful tails
+  (frightening is the right level; a refusal/loss/delay carries it; nobody looks
+  monstrous; anyone separated is reunited) are kept, deduped. Added to the prose
+  stages that had none, plus the fix-guard *"A fault is never fixed by putting a
+  person in danger."* in `text-refine.txt` and as a proofread fault type.
+  Evidence: G9 — the beats-layer cut was reversed by `text-refine`, the one stage
+  never given the rule, and a trapped adult slipped through the "a child"
+  wording. A debris guard drafted alongside this was struck by the owner: under
+  the new architecture the beats layer makes no changes, so that class has no
+  producer.
+- **Text re-audit tracks fault IDENTITY, not counts.** On
+  `job_1788215224103` round 1 emitted 24 faults and round 2 emitted 11 — six of
+  the original 24 vanished with no ruling: never fixed, never withdrawn, still in
+  the shipped book, invisible because only totals were compared. The re-audit now
+  receives round 1's faults (`{PRIOR_FAULTS}` in `story-text-audit.txt`) and must
+  rule on each — `RULING: <fault> — fixed | stands | withdrawn (reason)` — before
+  naming a new one. `textRefine.js` parses and persists these as `roundsDetail`
+  and warns on any prior fault left unruled.
+- **Small amounts of real text are now allowed in images** (owner ruling):
+  staging renders on Grok Imagine 2.0, which handles lettering. The anti-lettering
+  rules in `scene-expansion-all.txt`, `scene-expansion.txt`, `image-generation.txt`
+  and the Visual Bible element cards (`story-bible-from-beats.txt`) are replaced
+  by: *"A document, sign or object may show a few real words when the beat names
+  them — real words in the book's language, never invented glyphs; surfaces the
+  beat does not name stay unlettered."* The two-sided-prop rule now lets the
+  face entry be named and its content written when the beat IS what the document
+  says — the blank-treasure-map class (evidence: G8's blank chart). Cover prompts
+  are untouched; they already bake real titles.
+
+**Consumer sweep before deleting.** Every consumer of the deleted machinery was
+grepped. Two Lab stages still exercise the old reviewer against frozen beats
+(`beats_review_replay`, `beats_scenes`) and one replays the beats audit
+(`audit_replay level=beats`, plus `stored_beats_carry_ab`, which reads
+`beatsReviewReport.audit` off stored stories). **`story-beats-review.txt`,
+`story-beats-audit.txt`, `buildBeatsReviewPrompt` and `buildBeatsAuditPrompt`
+therefore stay, marked Lab-only** — the same convention already used for
+`arcAuditModel` / `childCriticModel` / `arcReviewModel` after the arc machine
+replaced that chain. Nothing in production loads them.
+
+**Stored-shape compatibility.** The report keeps the key `beatsReviewReport`
+(now `{check: 'counters+plan-check', counterFindings, counterStats, cast,
+modelFindings, changedPages, recheck, …}`) because the persistence in
+`storyJobPipeline`, the dev-mode diff panels, and the cross-story challenge
+memory all key off it — the memory reads
+`data->'beatsReviewReport'->>'arc'`, and renaming the key would silently empty a
+family's challenge history. The outline transcript keeps its `---BEATS REVIEW---`
+marker for the same reason (`storyMetrics.js` and the analysis scripts read it);
+what it holds is now the plan check's summary.
+
+**Rationale.** Arithmetic over a page division is deterministic, so it belongs
+in code where it is free and cannot hallucinate. The judgements left over are
+three, and they fit in one cheap call. Nothing in the new shape can rewrite a
+beat, which is what made the old reviewer dangerous: the only thing that changes
+a page is the planner planning it again, once.
+
+**Touched files:** `server/lib/planCounters.js` (new), `prompts/plan-check.txt`
+(new), `tests/unit/plan-counters.test.ts` (new), `server/lib/beatsPipeline.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`,
+`server/lib/textRefine.js`, `server/services/prompts.js`,
+`server/config/models.js`, `prompts/story-beats.txt`, `prompts/arc-create.txt`,
+`prompts/arc-retell.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/text-refine.txt`, `prompts/story-text-audit.txt`,
+`prompts/story-text-proofread.txt`, `prompts/story-arc-review.txt`,
+`prompts/story-beats-review.txt`, `prompts/generate-story-ideas.txt`,
+`prompts/generate-story-idea-single.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/image-generation.txt`,
+`prompts/story-bible-from-beats.txt`, `docs/prompt-inventory.md`.
+
+**Status:** ✅ active

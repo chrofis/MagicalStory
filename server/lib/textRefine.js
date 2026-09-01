@@ -29,6 +29,58 @@ const { log } = require('../utils/logger');
 // withdraws itself is discarded.
 const PROOFREAD_FAULT_RE = /^FAULT(?:\[[A-Z]+\])*:/;
 const PROOFREAD_WITHDRAW_RE = /\bwithdraw\b|—\s*fine\b|\bre-?examine\b/i;
+/**
+ * Match the re-audit's "RULING: <fault> — fixed|stands|withdrawn (reason)" lines
+ * back onto the previous round's FAULT lines.
+ *
+ * Matching is by the fault's page tag plus a normalised prefix of its text, not
+ * by exact string equality — the auditor quotes a fault, it does not echo the
+ * line byte for byte. Deliberately tolerant: an unmatched ruling is reported
+ * rather than dropped, and `unruled` is the list this exists to surface.
+ *
+ * @returns {{rulings: Array<{ruling: string, verdict: string, reason: string}>,
+ *            unruled: string[], stands: number, fixed: number, withdrawn: number}}
+ */
+function parseAuditRulings(reauditText, priorFaults) {
+  const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const prior = String(priorFaults || '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => /^FAULT(\[[A-Z]+\])?:/.test(l));
+
+  const rulings = [];
+  const matched = new Set();
+  for (const raw of String(reauditText || '').split('\n')) {
+    const line = raw.trim();
+    const m = line.match(/^RULING:\s*([\s\S]*?)\s*[—–-]\s*(fixed|stands|withdrawn)\b\s*(?:\((.*)\))?\s*$/i);
+    if (!m) continue;
+    const quoted = norm(m[1]);
+    const verdict = m[2].toLowerCase();
+    // Best match = the prior fault sharing the longest normalised prefix.
+    let best = -1;
+    let bestLen = 0;
+    prior.forEach((f, i) => {
+      const nf = norm(f);
+      let k = 0;
+      while (k < Math.min(nf.length, quoted.length) && nf[k] === quoted[k]) k++;
+      // A page tag alone ("p7") is not a match; require real overlap.
+      if (k > bestLen && k >= 12) { bestLen = k; best = i; }
+    });
+    if (best >= 0) matched.add(best);
+    rulings.push({ ruling: m[1].trim(), verdict, reason: (m[3] || '').trim(), matchedFault: best >= 0 ? prior[best] : null });
+  }
+
+  const tally = v => rulings.filter(r => r.verdict === v).length;
+  return {
+    rulings,
+    unruled: prior.filter((_, i) => !matched.has(i)),
+    priorCount: prior.length,
+    fixed: tally('fixed'),
+    stands: tally('stands'),
+    withdrawn: tally('withdrawn'),
+  };
+}
+
 function sanitizeProofreadFindings(text) {
   return String(text || '')
     .split('\n')
@@ -81,6 +133,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // a `let` below its reader is the TDZ throw that killed the evaluator on
   // 2026-08-24. The re-audit at the bottom fills it.
   let audit2 = '';
+  // Per-fault rulings the re-audit gave on round 1's faults (addendum 2026-09-01).
+  let roundsDetail = null;
   // Proofread findings on their own — audit2 merges them for the corrective
   // round, but traceability needs the two streams separable, and an empty
   // string here still proves the proofread ran.
@@ -103,6 +157,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       .filter(n => n !== null),
     audit: auditFindings,
     audit2,
+    roundsDetail,
     proofread,
     partial: true,
   });
@@ -225,7 +280,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
   if (auditFindings) {
     try {
       const { buildTextAuditPrompt, buildTextProofreadPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
-      const audit2Prompt = buildTextAuditPrompt(storyData, current);
+      // The re-audit receives round 1's faults and must rule on each BY
+      // IDENTITY (fixed / stands / withdrawn) before naming a new one —
+      // comparing counts alone let faults disappear silently. See
+      // buildTextAuditPrompt's note for the run that exposed it.
+      const audit2Prompt = buildTextAuditPrompt(storyData, current, auditFindings);
       if (audit2Prompt && TEXT_MODELS[auditModel]) {
         const t0 = Date.now();
         // Proofread runs alongside the re-audit: a narrow sentence-level pass
@@ -254,6 +313,13 @@ async function refineStoryText(storyData, pages, opts = {}) {
         if (withdrawn > 0) log.info(`🔎 [PROOFREAD] ${withdrawn} withdrawn/leaked FAULT line(s) discarded before the corrective round`);
         if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);
         audit2 = [String(a2.text || '').trim(), proofFaults > 0 ? proofFindings : ''].filter(Boolean).join('\n');
+        // One entry per prior fault the re-audit ruled on. A prior round's
+        // fault that appears in NEITHER the rulings nor the new fault list
+        // is the disappearance this mechanism exists to make visible.
+        roundsDetail = parseAuditRulings(String(a2.text || ''), auditFindings);
+        if (roundsDetail.unruled.length > 0) {
+          log.warn(`\u26a0\ufe0f [TEXT-AUDIT2] ${roundsDetail.unruled.length} fault(s) from round 1 were never ruled on by the re-audit`);
+        }
         const n1 = countFaults(auditFindings);
         const n2 = countFaults(audit2);
         log.info(`🔎 [TEXT-AUDIT2] ${auditModel}: ${n1} → ${n2} fault(s) ${JSON.stringify(faultsByCategory(audit2))} after ${rounds.filter(r => r.ok).length} round(s), ${((Date.now() - t0) / 1000).toFixed(0)}s`);
@@ -295,7 +361,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
-  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, proofread, partial: false };
+  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, roundsDetail, proofread, partial: false };
 }
 
 /**
@@ -331,7 +397,25 @@ function extractRefinablePages(sceneLike = []) {
       // explicit that appearance and staging are not the prose's business.
       const briefRaw = String(s.sceneDescription || s.description || '');
       const sceneBrief = briefRaw.split(/---\s*METADATA/i)[0].trim();
-      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent, sceneBrief };
+      // The page's own LOCKED BEAT (beats pipeline only — 2026-09-01 fix).
+      // outlineExtract holds "BEAT: …/PLAN: …" in beats mode but the scene
+      // expansion's own JSON in unified mode (storyScorecard.js finalBeats()
+      // draws the same distinction); guard on the marker so a unified story
+      // never mistakes its own JSON for a beat. This is what the story's final
+      // form actually is — the arc is background judgment context, not what
+      // the beat locked. Feeding the refiner the arc alone (job_1788215224103
+      // p11) let it reinstate an arc detail ("a crewman on a rope... trapped")
+      // that the beat had deliberately cut for safety.
+      // PLAN is staging shorthand for the artist (shot, camera, who's where) —
+      // the same rendering detail SCENE_OUTLINES already excludes elsewhere in
+      // this prompt, and PLAN's staging notes can name a danger the BEAT text
+      // deliberately left out (job_1788215224103 p11: PLAN named a person the
+      // BEAT explicitly kept out of harm). Only BEAT ships.
+      const beatRaw = String(s.outlineExtract || '');
+      const beat = /(^|\n)\s*BEAT\s*:/i.test(beatRaw)
+        ? beatRaw.split(/\n\s*PLAN\s*:/i)[0].trim()
+        : '';
+      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent, sceneBrief, beat };
     })
     .sort((a, b) => a.pageNumber - b.pageNumber);
 }

@@ -24,6 +24,7 @@ Characters: {CHARACTER_NAMES}
 # RULES OF THE TELLING
 - Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.
 - Every sentence follows from the one before — therefore, or but. Never "and then".
+- Name what the main figures feel at each turn, as plain fact — a feeling stated is part of the story.
 - Each character's nature causes a problem or solves one.
 - The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves. Early on, a character says aloud what must happen and why.
 - Each challenge is met at a cost, each harder because the last was not clean; near the end the goal looks lost before it is won. No obstacle is removed in the moment that introduces it; passing one costs something named — time, a possession, a plan, help asked for.
@@ -33,10 +34,12 @@ Characters: {CHARACTER_NAMES}
 - Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.
 - An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story's own world — weather, distance, a rival, a broken or missing or guarded thing, a character's own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.
 - A rival's thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.
-- Peril matches the youngest named child: frightening is the right level, and nothing can kill or injure a child — no drowning, no fall from a height; a refusal, a loss, a delay or a broken promise carries it instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.
+- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.
 - The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.
 - Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.
 - Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows. The group stays together unless it has a reason to separate and a reason to meet again.
+- Characters enter in ones or twos — never more than three at once — and each gets one line of their own on first appearance, doing or saying something only they would.
+- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.
 - An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.
 - Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.
 - When the deadline is a time of day, the story starts at an hour the book's length can cross to reach it.

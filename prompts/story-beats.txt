@@ -64,6 +64,8 @@ Requirements:
 - Stage a beat with two people rather than three when two carry it.
 - No beat states what anyone learned, realised or now understands.
 
+{REPLAN_SECTION}
+
 # OUTPUT FORMAT
 
 Only the blocks below, in this order. No preamble, no commentary.

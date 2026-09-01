@@ -66,7 +66,7 @@ The page count sets how much story gets written later, never how much of it is g
 RULES:
 - No adjectives allowed. Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
 - Three to five sentences, whatever the page count. A longer text turns into a plot summary.
-- Match danger to the youngest character: frightening is the right level, and nothing may be able to kill or injure them — no drowning, no fall from a height.
+- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level.
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
@@ -108,7 +108,7 @@ Check and critique:
 4. **Characters**: Do all characters appear and have a role? Anyone missing or passive?
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
 6. **Back cover, not synopsis**: does it give away the ending, name what decides the outcome, state a test the characters must pass, or say which obstacle each character's trait will meet? Cut all of it and leave the situation and the stakes.
-7. **Peril**: could the threat kill or injure a child — drowning, a fall from a height? Replace it with something they can lose.
+7. **Peril**: is anything dangerous enough that it could lead to death, for anyone? Replace it with something they can lose.
 
 List your 5 improvements (be specific):
 1. [improvement]
