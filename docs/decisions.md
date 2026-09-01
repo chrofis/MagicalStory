@@ -22957,6 +22957,11 @@ therefore stay, marked Lab-only** — the same convention already used for
 `arcAuditModel` / `childCriticModel` / `arcReviewModel` after the arc machine
 replaced that chain. Nothing in production loads them.
 
+*Superseded same day* — see "Old beats review/audit machinery deleted; the
+four Lab replays that carried it were retired" below: the owner ratified
+deleting these templates and all four consumers outright, rather than keeping
+them Lab-only indefinitely.
+
 **Stored-shape compatibility.** The report keeps the key `beatsReviewReport`
 (now `{check: 'counters+plan-check', counterFindings, counterStats, cast,
 modelFindings, changedPages, recheck, …}`) because the persistence in
@@ -23040,4 +23045,123 @@ the full arc unchanged — no unfilled placeholders in the rendered prompt.
 **Touched files:** `server/lib/textRefine.js`, `server/lib/promptBuilders.js`,
 `prompts/text-refine.txt`, `storyJobPipeline.js`, `tasks/bugs.json`.
 
+## 2026-09-01 — Old beats review/audit machinery deleted; the four Lab replays that carried it were retired
+
+**Context.** Commit `b736f0ff7` (earlier the same day) replaced the beats
+reviewer with the code-counter + plan-check machine, but kept
+`story-beats-review.txt` / `story-beats-audit.txt` and their builders
+(`buildBeatsReviewPrompt`, `buildBeatsAuditPrompt`) alive as "Lab-only
+artifacts" because four Lab stages still replayed them against frozen beats:
+`audit_replay level=beats`, `stored_beats_carry_ab` (a `beats_scenes` mode),
+`beats_review_replay`, and `beats_scenes` Step 2 (the fast structural review).
+
+**Decision.** Owner-ratified: delete the templates, their builders, and all
+four Lab consumers. This supersedes the "**Consumer sweep before
+deleting**" paragraph above (2026-09-01, same day) — that paragraph is the
+sweep that named these exact four consumers as the reason the machinery was
+kept; the reason no longer holds because the consumers themselves are now
+gone rather than being fed a live generator.
+
+**What was deleted:**
+- `prompts/story-beats-review.txt`, `prompts/story-beats-audit.txt`.
+- Their registry entries (`storyBeatsReview`, `storyBeatsAudit`) in
+  `server/services/prompts.js`.
+- `buildBeatsReviewPrompt` and `buildBeatsAuditPrompt` in
+  `server/lib/promptBuilders.js` (and their re-exports in
+  `server/lib/storyHelpers.js`).
+- `runAuditReplayStage`'s `level === 'beats'` branch (`server/lib/testlab.js`)
+  — `audit_replay` now only accepts `arc | text`.
+- `runStoredBeatsScenes` (the `stored_beats_carry_ab` A/B harness) and the
+  `params.useStoredBeats` call site in `runBeatsScenesStage` — now throws a
+  named "retired" error instead of running.
+- `beats_scenes` Step 2 (the fast structural review call) — the stage now
+  only plans (Step 1) and expands scenes (Steps 3-4); `review`/`beatsReview`
+  on a fresh result is always `null`.
+- `runBeatsReviewReplayStage` and its `assertReviewerResponded` helper, and
+  the `beats_review_replay` entry in `STORY_STAGES`.
+- The matching `TESTLAB_STAGES` mirror entries and stale param mentions in
+  `client/src/services/testlabService.ts`; the "＋ next round" control in
+  `client/src/components/testlab/ScorecardsPanel.tsx` is suppressed for the
+  `beats` scorecard part (no rerun stage left to call).
+- `docs/prompt-inventory.md` rows for both templates.
+
+**What was preserved, and why.** Only the GENERATORS were deleted — every
+reader of already-stored data survives untouched:
+- The `beatsReviewReport` key itself, and the production writer of it
+  (`server/lib/beatsPipeline.js`'s plan-check, which deliberately reuses this
+  key per the "Stored-shape compatibility" paragraph above).
+- The cross-story challenge memory (`loadPriorChallenges` in
+  `beatsPipeline.js`), which queries `data->'beatsReviewReport'->>'arc'`.
+- Every other reader of stored `beatsReviewReport`/`beatsReview` data:
+  `storyScorecard.js`, `storyMetrics.js`, `server/routes/stories.js`'s JSONB
+  projection, the dev-mode before/after panels in `StoryWizard.tsx` /
+  `StoryDisplay.tsx`, and `BeatsScenesView` in `TestLab.tsx` (renders
+  `result.beatsReview` conditionally — `null` on new runs, populated on old
+  ones).
+- Historical experiment rows and scorecards recorded under
+  `source: 'beats_review_replay'` / `mode: 'stored_beats_carry_ab'` — `GET
+  /api/admin/testlab/experiments/:id` is a plain DB read with no dependency
+  on `STORY_STAGES`, and `ScorecardsPanel.tsx`'s `beats` scorecard section
+  still renders; only launching a NEW run of either is blocked.
+
+**Verified:** `node --check` on every touched server file, prompt templates
+load (`loadPromptTemplates`), `cd client && npx tsc --noEmit`, `npm run
+test:unit` (pre-existing failures only, per project convention).
+
+**Touched files:** `prompts/story-beats-review.txt` (deleted),
+`prompts/story-beats-audit.txt` (deleted), `server/services/prompts.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`,
+`server/lib/testlab.js`, `client/src/services/testlabService.ts`,
+`client/src/components/testlab/ScorecardsPanel.tsx`,
+`docs/prompt-inventory.md`.
+
 **Status:** ✅ active
+
+**Status:** ✅ active
+
+## 2026-09-01 — Database housekeeping is scheduled, and VACUUM FULL is guarded but not guaranteed
+
+**Context.** Production's database was 1,818 MB and essentially all TOAST
+(`stories` heap 376 kB / TOAST 1,280 MB). Two independent causes, neither of
+them "the rule was ignored":
+
+1. `extractInlineImagesToR2` is story-scoped; character writes were never
+   covered, so 694 MB of image bytes lived in JSONB.
+2. Dead TOAST that autovacuum never reclaimed — and it was not blocked (no
+   replication slots, no long transactions, healthy xid age). It was **blind**:
+   `pg_stat_user_tables` reported `stories` as live=2 with `last_analyze` NEVER
+   against ~174 real rows, so its trigger computed to 50 + 0.2×2 ≈ 50 and a
+   table of GB-scale blobs never looked busy enough to touch.
+
+This is a cost item, not hygiene: Railway bills container memory, `shared_buffers`
+is only 160 MB, and the rest of Postgres's memory is OS page cache holding the
+database files — so container RAM tracks database SIZE almost exactly
+(1,818 MB → 2.14 GB).
+
+**Decision.** Two scheduled routines, deliberately separate from the existing
+story-health doctor (`trig_013aywEJ…`), whose prompt is explicitly *read-only
+toward production*. Housekeeping mutates; sharing one job would have quietly
+dissolved that boundary.
+
+- **Daily 06:30 CH** — `trig_011PRocojAx13tPywZ8NFzAD`. Runs
+  `db-housekeeping.js --apply` on staging and prod: migrates stray inline bytes,
+  runs `VACUUM (ANALYZE)`, emails the bloat report. No exclusive locks. The
+  ANALYZE is load-bearing — it is what lets autovacuum see these tables at all.
+  It raises an alarm on any NEW inline rows, because that means a write path is
+  leaking again.
+- **Weekly Sunday 03:30 CH** — `trig_01WLWZdoQTK7h2vWC7rNSxZZ`. Runs
+  `--vacuum-full`, staging first, prod only if staging succeeded.
+
+**Rationale for the guard, and its honest limit.** `VACUUM FULL` is the only
+thing that returns space to the OS, but it takes an ACCESS EXCLUSIVE lock for
+minutes on a GB table and would kill a paying user's in-flight generation. The
+script calls `GET /api/health/busy` and refuses when busy. **That narrows the
+window; it does not close it** — a generation can begin between the answer and
+the lock. The owner accepted that trade-off for automatic reclamation; it runs
+Sunday 03:30 CH for that reason. The routine is told that a refusal is correct
+behaviour, not an error, and that it must never bypass the check with psql.
+
+**Touched:** `scripts/admin/db-housekeeping.js`,
+`scripts/admin/migrate-inline-images-to-r2.js`, two remote routines.
+**Status:** ✅ kept. First runs: daily 2026-09-02 06:35 CH, weekly 2026-09-06
+03:36 CH.
