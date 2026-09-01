@@ -1102,16 +1102,17 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
           Math.min(crop.h, Math.round(b[2] * H) - crop.y),
         ])
         .filter(b => b[2] > b[0] + 8 && b[3] > b[1] + 8),
-      // CUTOUT has no scene anchor, so the model redraws the figure a few
-      // percent off (exp #345: ~40px lower, IoU 53% -> gate reject). Register
-      // the candidate onto the original silhouette first; only kept if IoU
-      // improves, so a genuinely re-posed figure is still rejected.
-      // ALWAYS on. In cutout mode it also SHIFTS the candidate; in box mode the
-      // model edits in place, so a background that still mismatches after the
-      // best alignment means the model redrew the scene — reject it. Box-mode
-      // production repairs previously had no background check at all, which is
-      // why a misaligned paste shipped (story job_1786024729214_zrjgzqiey p5)
-      // while the same page was rejected in the Lab.
+      // ALWAYS on. Registration aligns the candidate before the gates judge
+      // it: on the BACKGROUND when the model preserved it (shift+scale, exp
+      // #345), and on the FIGURE silhouette when it did not — Grok Imagine
+      // re-renders the whole scene in box mode, so a background mismatch is
+      // expected, not a defect (the composite ships only the figure union;
+      // the background outside it is the original's by construction). The
+      // background residual used to hard-reject here, which refused 11/12
+      // owner repairs on job_1788215224103_avu132n7je p16; see
+      // docs/decisions.md 2026-09-01 (supersedes the 2026-08-06 box-mode
+      // background gate). The IoU gate still rejects a genuinely re-posed
+      // figure after the best alignment.
       registerCandidate: true,
       // garmentOnly / bgBorderMatch default to true inside samUnionBlend; thread
       // them only when a caller (Test Lab A/B) overrides, so prod keeps the defaults.
@@ -1203,6 +1204,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     promptSent: prompt,
     iou: blend.iou,
     colorInfo: blend.colorInfo || null,
+    registration: blend.registration || null,
     blendRule: blend.blendRule,
     // Same masks on the way OUT as on a rejection — a successful repair that
     // still looks wrong needs them just as much (the viewer's "Blend mask"

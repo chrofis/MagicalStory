@@ -11,8 +11,8 @@ Three loading mechanisms feed these templates:
    from a ~50-entry `FILES` list. Derived keys: `sceneDescriptions` (alias of
    `sceneIteration`), `frontCoverTextless`, `backCoverTextless`.
 2. **`server/lib/images.js` `LOCAL_PROMPTS{}`** — direct `fs.readFileSync` at module load
-   (bbox-refine-overlay, iterative-placement-pass1/2, character-repair-gemini,
-   character-repair-grok-fullscene, inpaint-grok-regions, style-transfer).
+   (bbox-refine-overlay, iterative-placement-pass1/2, inpaint-grok-regions,
+   style-transfer).
 3. **Direct reads in feature modules** — the `*-guides.txt`, `art-styles.txt`,
    `generate-story-idea*`, `story-idea-requirements-*`, `grid-repair.txt`.
 
@@ -145,9 +145,7 @@ Sizes measured 2026-08-09.
 | character-repair-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok blended repair |
 | `repair-naturalness.txt` | faceRepair.js checkRepairNaturalness | post-repair figure-integrity check: MATCH/EDGES observations -> enum; clearly off rejects the repaint |
 | character-repair-body-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok body-blended repair |
-| character-repair-inpaint.txt | images.js `repairCharacterMismatchWithGrok` | Char repair via inpaint |
-| character-repair-grok-fullscene.txt | images.js `repairCharacterMismatchWithGrok` (LOCAL_PROMPTS) | Full-scene Grok repair |
-| character-repair-gemini.txt | images.js `repairCharacterMismatch` (LOCAL_PROMPTS) | Gemini-backend char repair |
+| character-repair-inpaint.txt | faceRepair.js `buildPrompt` (crosshatch + box) | Full-scene (box-mode) char repair |
 | inpainting.txt | images.js `inpaintWithMask` | Mask inpainting (Runware) — **DEAD CHAIN**, no live caller |
 | inpaint-grok-regions.txt | images.js `inpaintWithGrokBackend` (LOCAL_PROMPTS) | Grok region inpainting — **DEAD CHAIN**. The LIVE `inpaint` repair method is `inpaintPage` → `editImageWithPrompt` (whole-image edit, no mask) |
 | grid-repair.txt | repairGrid.js | Grid-based repair (legacy) |

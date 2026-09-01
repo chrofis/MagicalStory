@@ -129,22 +129,26 @@ Note the two orchestrators intentionally differ: the client keeps character repa
 post-round step; the server pipeline runs it inside the rounds. Abortable at every step
 via AbortController.
 
-### Character repair — FOUR modes (`repairCharacterMismatchWithGrok`, images.js)
+### Character repair — THREE modes (`repairCharacterMismatchWithGrok` adapter → `repairCharacterFace` spine, faceRepair.js)
 
 Defaults (both the pipeline char-fix and the manual endpoint): **face repairs → blended,
 body repairs → fullScene**. In `regeneration.js`:
 `effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'fullScene')`.
-Cutout and blackout only run when explicitly requested via `grokRepairMode`.
+Cutout only runs when explicitly requested via `grokRepairMode`. (The legacy
+`blackout` mode — no-gate verbatim full-scene repaint — was deprecated in Stage 5;
+its alias still maps to fullScene axes server-side, its template and UI option are gone.)
 
-| Mode | method label | What it does | Prompt file |
-|------|--------------|--------------|-------------|
-| **blended** | `grok_blended` | Blur the face/figure region → Grok redraws → feathered blend back onto the original scene | `character-repair-blended.txt` (face) / `character-repair-body-blended.txt` (body whiteout) |
-| **fullScene** | `grok_inpaint` | Mirror-pad scene to a Grok preset → magenta crosshatch over body + solid block over face → Grok edits the FULL scene → unpad → conditional feather composite | `character-repair-inpaint.txt` |
-| **cutout** | `grok_cutout` | Preset-aligned extract of bbox + **40% min padding** (`PAD_FACTOR = 0.4`, `computePresetAlignedExtract`) → magenta hatch → Grok → feathered composite back | `character-repair-cutout.txt` |
-| **blackout** | `grok_blackout` | Legacy fallback: full scene + avatar ref to Grok, no mask, no composite | `character-repair-grok-fullscene.txt` |
+| Mode | method label | Axes | What it does | Prompt file |
+|------|--------------|------|--------------|-------------|
+| **blended** | `grok_blended` | cutout+blur (face) / box+blur (body) | Blur the face/figure region → Grok redraws → SAM-union blend back onto the original scene | `character-repair-blended.txt` (face) / `character-repair-body-blended.txt` (body) |
+| **fullScene** | `grok_inpaint` | box+crosshatch | Magenta crosshatch over the figure silhouette on the FULL scene → Grok edits it (exact-aspect round-trip) → crop extracted → registered (background shift when the model preserved it, FIGURE-silhouette scale/shift when it re-rendered — Grok always re-renders in box mode) → SAM-union blend into the original; the shipped background is always the original's | `character-repair-inpaint.txt` |
+| **cutout** | `grok_cutout` | cutout+crosshatch | Preset-aligned extract of bbox + **40% min padding** (`PAD_FACTOR = 0.4`, `computePresetAlignedExtract`) → magenta hatch → Grok → registered + SAM-union blend back | `character-repair-cutout.txt` |
 
-**Prompt-file naming trap:** `character-repair-grok-fullscene.txt` belongs to the
-BLACKOUT mode; the fullScene mode uses `character-repair-inpaint.txt`.
+**Gates (all modes, faceRepair spine):** style-match, mask IoU (0.55, judged AFTER
+registration), white-card, coverage, sharpness, figure-integrity (naturalness). A
+background mismatch is registration telemetry, NOT a gate — the composite only ever
+ships the figure union (decisions.md 2026-09-01, supersedes the 2026-08-06 box-mode
+background reject).
 
 Non-Grok paths on the character-repair endpoint: `useGeminiRepair` →
 `entityConsistency.repairSinglePage()` (also the fallback when bbox/avatar/bytes are

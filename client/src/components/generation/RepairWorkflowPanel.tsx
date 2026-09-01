@@ -437,7 +437,7 @@ export function RepairWorkflowPanel({
   const [gridLightbox, setGridLightbox] = useState<string | null>(null);
   const [overrideImageModel, setOverrideImageModel] = useState<string | null>(null);
   const [overrideQualityModel, setOverrideQualityModel] = useState<string | null>(null);
-  const [grokRepairMode, setGrokRepairMode] = useState<'blended' | 'cutout' | 'blackout' | null>(null);
+  const [grokRepairMode, setGrokRepairMode] = useState<'blended' | 'cutout' | null>(null);
   const [whiteoutTarget, setWhiteoutTarget] = useState<'auto' | 'face' | 'body'>('auto');
   const [retryingPages, setRetryingPages] = useState<Set<string>>(new Set()); // "char:pageNum" keys
   const effectiveImageModel = overrideImageModel || imageModel;
@@ -1274,7 +1274,6 @@ export function RepairWorkflowPanel({
                     <select
                       value={
                         grokRepairMode === 'cutout' ? 'grok-cutout' :
-                        grokRepairMode === 'blackout' ? 'grok-blackout' :
                         grokRepairMode === 'blended' ? 'grok-blended' :
                         useMagicApiRepair ? 'magicapi' :
                         overrideImageModel === 'gemini-repair' ? 'gemini-repair' :
@@ -1288,10 +1287,6 @@ export function RepairWorkflowPanel({
                           setOverrideImageModel(null);
                         } else if (val === 'grok-cutout') {
                           setGrokRepairMode('cutout');
-                          setUseMagicApiRepair?.(false);
-                          setOverrideImageModel(null);
-                        } else if (val === 'grok-blackout') {
-                          setGrokRepairMode('blackout');
                           setUseMagicApiRepair?.(false);
                           setOverrideImageModel(null);
                         } else if (val === 'gemini-repair') {
@@ -1320,10 +1315,9 @@ export function RepairWorkflowPanel({
                         <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
                       </optgroup>
                       <optgroup label="Character Repair">
-                        <option value="">Server Default — face→blended, body→cutout</option>
+                        <option value="">Server Default — face→blended, body→fullScene</option>
                         <option value="grok-blended">Grok Blended (face blur, feather blend)</option>
                         <option value="grok-cutout">Grok Cut-Out (extract figure, inpaint, composite)</option>
-                        <option value="grok-blackout">Grok Blackout (full scene + reference)</option>
                         <option value="gemini-repair">Gemini Repair (~$0.04/repair)</option>
                         <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
                       </optgroup>
@@ -1347,7 +1341,7 @@ export function RepairWorkflowPanel({
                           ))}
                         </div>
                         <p className="text-[11px] text-yellow-700">
-                          With "Server Default" selected: face target → Grok Blended, body target → Grok Cut-Out.
+                          With "Server Default" selected: face target → Grok Blended, body target → Grok fullScene (crosshatch).
                           An explicit Grok mode overrides this.
                         </p>
                       </div>
@@ -1365,11 +1359,6 @@ export function RepairWorkflowPanel({
                     {grokRepairMode === 'cutout' && (
                       <p className="text-xs text-yellow-600 mt-2">
                         Extracts the figure's bbox + 20% padding, Grok replaces the figure using the avatar, feathered composite back.
-                      </p>
-                    )}
-                    {grokRepairMode === 'blackout' && (
-                      <p className="text-xs text-yellow-600 mt-2">
-                        Sends full scene + reference to Grok for character face replacement
                       </p>
                     )}
                   </div>

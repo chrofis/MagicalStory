@@ -59,8 +59,6 @@ const readPrompt = (f) => applyRepairStyleGuard(fs.readFileSync(path.join(LOCAL_
 const LOCAL_PROMPTS = {
   iterativePlacementPass1: readPrompt('iterative-placement-pass1.txt'),
   iterativePlacementPass2: readPrompt('iterative-placement-pass2.txt'),
-  characterRepairGemini: readPrompt('character-repair-gemini.txt'),
-  characterRepairGrokFullscene: readPrompt('character-repair-grok-fullscene.txt'),
   inpaintGrokRegions: readPrompt('inpaint-grok-regions.txt'),
   styleTransfer: readPrompt('style-transfer.txt'),
 };

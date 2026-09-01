@@ -5143,7 +5143,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget, maxCharRepairPages: maxCharRepairPagesOverride, useGeminiRepair, featherComposite } = req.body;
+    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget, maxCharRepairPages: maxCharRepairPagesOverride, useGeminiRepair } = req.body;
 
     let repairs;
 
@@ -5770,9 +5770,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               useBlended: effectiveMode === 'blended',
               useCutout: effectiveMode === 'cutout',
               useFullScene: effectiveMode === 'fullScene',
-              // Dev toggle: when explicitly false, skip the silhouette mask
-              // composite and use Grok's bytes verbatim. Default = true.
-              ...(featherComposite === false ? { featherComposite: false } : {}),
             }
           );
 

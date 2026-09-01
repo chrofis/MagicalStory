@@ -2755,7 +2755,7 @@ export const storyService = {
   async repairCharacters(
     storyId: string,
     repairs: Array<{ character: string; pages: number[] }>,
-    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout' | 'fullScene'; whiteoutTarget?: 'face' | 'body'; maxCharRepairPages?: number; useGeminiRepair?: boolean; featherComposite?: boolean }
+    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'fullScene'; whiteoutTarget?: 'face' | 'body'; maxCharRepairPages?: number; useGeminiRepair?: boolean }
   ): Promise<{
     results: Array<{
       character: string;

@@ -9,7 +9,41 @@ const { log } = require('../utils/logger');
 // Stamped on every blended entry so the UI can show WHICH blend generation
 // produced an image — mixed-generation comparisons were repeatedly mistaken
 // for bugs. Bump on every blend-behavior change.
-const BLEND_RULE_VERSION = 'union-soft2-pad6';
+const BLEND_RULE_VERSION = 'union-soft2-pad6-figreg';
+
+// ---------------------------------------------------------------------------
+// Figure-registration math — pure, exposed for unit tests.
+// Boxes are pixel bboxes [x0, y0, x1, y1] of a silhouette's alpha.
+// The affine maps candidate pixel p → p * scale + (dx, dy).
+//   scale : old height / new height (HEIGHT ratio — width varies with pose),
+//           clamped so a wild SAM box cannot blow the paste up or shrink it away
+//   dy    : anchors the bbox BOTTOMS (feet stay on the ground)
+//   dx    : aligns the bbox horizontal centres
+// ---------------------------------------------------------------------------
+function computeFigureRegistration({ oldBox, newBox, minScale = 0.6, maxScale = 1.45 }) {
+  if (!Array.isArray(oldBox) || !Array.isArray(newBox)) return null;
+  const [ox0, oy0, ox1, oy1] = oldBox, [nx0, ny0, nx1, ny1] = newBox;
+  const oh = oy1 - oy0, nh = ny1 - ny0;
+  if (oh < 8 || nh < 8) return null;
+  const scale = Math.min(maxScale, Math.max(minScale, oh / nh));
+  const dx = Math.round((ox0 + ox1) / 2 - scale * (nx0 + nx1) / 2);
+  const dy = Math.round(oy1 - scale * ny1);
+  return { scale: +scale.toFixed(4), dx, dy };
+}
+
+function transformBox(box, { scale, dx, dy }) {
+  return [box[0] * scale + dx, box[1] * scale + dy, box[2] * scale + dx, box[3] * scale + dy];
+}
+
+function boxIou(a, b) {
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+  const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = ix * iy;
+  const areaA = Math.max(0, a[2] - a[0]) * Math.max(0, a[3] - a[1]);
+  const areaB = Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  const uni = areaA + areaB - inter;
+  return uni > 0 ? inter / uni : 0;
+}
 
 async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
   const { fetchFigureMaskPng } = require('./imageCompositing');
@@ -663,12 +697,21 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         }
         const k = cropW / SW;                                 // small grid → crop pixels
         const dxF = best.dx * k, dyF = best.dy * k;
-        // ACCEPT / REJECT on the background residual, not on the figure.
-        const REJECT_ERR = 26;   // mean |grey diff| over background — above this the scene itself was redrawn
-        if (best.err > REJECT_ERR) {
-          throw fail(`Model redrew the SCENE, not just the figure — background still differs by ${best.err.toFixed(1)} grey levels after the best alignment (dx ${Math.round(dxF)}, dy ${Math.round(dyF)}, scale ${best.sc}). Redo.`);
-        }
-        if (Math.abs(best.dx) > 0 || Math.abs(best.dy) > 0 || best.sc !== 1) {
+        // Above this residual the model re-rendered the scene and the
+        // background is not a usable alignment signal. That is NOT a rejection:
+        // the composite takes only the figure union from the candidate, so the
+        // shipped background is the original's by construction (the pre-spine
+        // fullScene design). This used to throw here — Grok Imagine ALWAYS
+        // re-renders the whole scene in box mode, so the throw refused 11/12
+        // owner repairs on job_1788215224103_avu132n7je p16 while the paste
+        // itself would have been background-safe. We only refuse to APPLY a
+        // background-derived shift; figure registration below aligns the
+        // silhouettes instead, and the IoU gate still judges the result.
+        const BG_TRUST_ERR = 26;   // mean |grey diff| over background
+        if (best.err > BG_TRUST_ERR) {
+          registration = { mode: 'bg-rerendered', bgErr: +best.err.toFixed(1) };
+          log.info(`[TESTLAB] background re-rendered by the model (err ${best.err.toFixed(1)} grey levels at best alignment) — no background shift applied; relying on figure registration + IoU gate`);
+        } else if (Math.abs(best.dx) > 0 || Math.abs(best.dy) > 0 || best.sc !== 1) {
           const sw = Math.max(1, Math.round(cropW * best.sc)), sh = Math.max(1, Math.round(cropH * best.sc));
           const scaled = await sharp(candidateCropBuf).resize(sw, sh, { fit: 'fill' }).png().toBuffer();
           const canvas = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
@@ -678,7 +721,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
           if (newMask2) {
             candidateCropBuf = registered;
             newMask = newMask2;
-            registration = { dx: Math.round(dxF), dy: Math.round(dyF), scale: best.sc, bgErrBefore: +base.toFixed(1), bgErrAfter: +best.err.toFixed(1) };
+            registration = { mode: 'background', dx: Math.round(dxF), dy: Math.round(dyF), scale: best.sc, bgErrBefore: +base.toFixed(1), bgErrAfter: +best.err.toFixed(1) };
             require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('repair_registration');
             log.info(`[TESTLAB] registered on BACKGROUND: dx=${registration.dx} dy=${registration.dy} scale=${registration.scale} — bg mismatch ${registration.bgErrBefore} → ${registration.bgErrAfter} grey levels`);
             await addStep(`registered on background (dx ${registration.dx}, dy ${registration.dy}, scale ${registration.scale}) — bg err ${registration.bgErrBefore}→${registration.bgErrAfter}`, `data:image/png;base64,${registered.toString('base64')}`);
@@ -690,8 +733,78 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         log.info('[TESTLAB] too little background visible to register on — blending unregistered');
       }
     } catch (err) {
-      if (err.partialResult) throw err;               // the reject above
+      if (err.partialResult) throw err;               // a gate throw passing through
       log.warn(`[TESTLAB] background registration failed (${err.message}) — blending unregistered`);
+    }
+  }
+
+  // ---- FIGURE REGISTRATION (body blends) -----------------------------------
+  // When the model re-renders in place, the repainted figure routinely comes
+  // back a little larger or shifted even though it is the RIGHT figure in the
+  // RIGHT spot — the pre-spine fullScene design absorbed that with its
+  // old∪new feather composite; the spine's IoU gate refused it instead
+  // (job_1788215224103 p16: draws ~1.3-1.6x oversized, every one rejected).
+  // Restore the absorption without losing the gate: align the new silhouette's
+  // bbox onto the old one (uniform scale from the HEIGHT ratio — width varies
+  // with pose; dy anchors the bbox BOTTOMS, feet stay on the ground; dx aligns
+  // the centres), apply the same affine to candidate and mask, and only keep
+  // it when the bbox IoU improves. A genuinely re-posed figure still fails the
+  // pixel-IoU gate afterwards — this normalises geometry, it does not excuse a
+  // different figure. Body blends only: the face path's masks nearly coincide
+  // by construction and its blend is separately calibrated.
+  if (registerCandidate && blendShape === 'figure-exact') {
+    try {
+      const alphaBox = async (maskPng) => {
+        const a = await sharp(maskPng).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+        const st = Math.max(1, Math.round(a.length / (cropW * cropH)));
+        let x0 = cropW, y0 = cropH, x1 = -1, y1 = -1;
+        for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+          if (a[(y * cropW + x) * st] > 128) {
+            if (x < x0) x0 = x; if (x > x1) x1 = x;
+            if (y < y0) y0 = y; if (y > y1) y1 = y;
+          }
+        }
+        return x1 < 0 ? null : [x0, y0, x1 + 1, y1 + 1];
+      };
+      const ob = await alphaBox(oldMask), nb = await alphaBox(newMask);
+      const reg = (ob && nb) ? computeFigureRegistration({ oldBox: ob, newBox: nb }) : null;
+      const meaningful = reg && (Math.abs(reg.scale - 1) > 0.03 || Math.abs(reg.dx) > cropW * 0.02 || Math.abs(reg.dy) > cropH * 0.02);
+      if (meaningful) {
+        const tb = transformBox(nb, reg);
+        const before = boxIou(ob, nb), after = boxIou(ob, tb);
+        if (after > before + 0.05) {
+          const applyAffine = async (buf, blank) => {
+            const sw = Math.max(1, Math.round(cropW * reg.scale));
+            const sh = Math.max(1, Math.round(cropH * reg.scale));
+            const scaled = await sharp(buf).ensureAlpha().resize(sw, sh, { fit: 'fill' }).png().toBuffer();
+            // Destination canvas: the (unscaled) candidate itself for the image
+            // (best available filler outside the moved frame), transparent for
+            // the mask. Composite handles negative offsets by pre-cropping.
+            const base = blank
+              ? await sharp({ create: { width: cropW, height: cropH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+              : await sharp(buf).ensureAlpha().resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
+            const L = Math.round(reg.dx), T = Math.round(reg.dy);
+            const sx = Math.max(0, -L), sy = Math.max(0, -T);
+            const dx2 = Math.max(0, L), dy2 = Math.max(0, T);
+            const w = Math.min(sw - sx, cropW - dx2), h = Math.min(sh - sy, cropH - dy2);
+            if (w <= 0 || h <= 0) return null;
+            const piece = await sharp(scaled).extract({ left: sx, top: sy, width: w, height: h }).png().toBuffer();
+            return sharp(base).composite([{ input: piece, left: dx2, top: dy2 }]).png().toBuffer();
+          };
+          const regCand = await applyAffine(candidateCropBuf, false);
+          const regMask = await applyAffine(newMask, true);
+          if (regCand && regMask) {
+            candidateCropBuf = regCand;
+            newMask = regMask;
+            registration = { ...(registration || {}), mode: registration?.mode === 'background' ? 'background+figure' : 'figure', figDx: reg.dx, figDy: reg.dy, figScale: reg.scale, bboxIouBefore: +before.toFixed(2), bboxIouAfter: +after.toFixed(2) };
+            require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('repair_figure_registration');
+            log.info(`[TESTLAB] registered on FIGURE: scale=${reg.scale} dx=${reg.dx} dy=${reg.dy} — silhouette bbox IoU ${before.toFixed(2)} → ${after.toFixed(2)}`);
+            await addStep(`registered on figure (scale ${reg.scale}, dx ${reg.dx}, dy ${reg.dy}) — bbox IoU ${before.toFixed(2)}→${after.toFixed(2)}`, `data:image/png;base64,${regCand.toString('base64')}`);
+          }
+        }
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] figure registration failed (${err.message}) — blending unregistered`);
     }
   }
 
@@ -1079,4 +1192,4 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   return { feathered, iou, redPx, colorInfo, registration, blendRule: blendShape === 'figure-exact' ? 'figure-exact-pad6' : BLEND_RULE_VERSION };
 }
 
-module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION };
+module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION, computeFigureRegistration, transformBox, boxIou };
