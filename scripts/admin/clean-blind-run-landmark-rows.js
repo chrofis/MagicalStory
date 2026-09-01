@@ -22,6 +22,13 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const { Pool } = require('pg');
 const APPLY = process.argv.includes('--apply');
+
+// The incident window, NOT a rolling interval. It was `NOW() - INTERVAL '5 days'`,
+// which quietly matched nothing once five days had passed — the script then
+// reported "0 rows" and looked like it had already done its job. An incident has
+// a fixed date; the query must say so. Times are UTC (created_at is stored UTC).
+const WINDOW_START = '2026-08-26T00:00:00Z';
+const WINDOW_END   = '2026-08-27T00:00:00Z';
 (async () => {
   const prod = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   const stg  = new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -36,7 +43,7 @@ const APPLY = process.argv.includes('--apply');
      WHERE wikidata_qid IS NOT NULL
        AND photo_url IS NULL AND photo_url_2 IS NULL AND photo_url_3 IS NULL
        AND photo_url_4 IS NULL AND photo_url_5 IS NULL AND photo_url_6 IS NULL
-       AND created_at > NOW() - INTERVAL '5 days'`)).rows;
+       AND created_at >= $1 AND created_at < $2`, [WINDOW_START, WINDOW_END])).rows;
 
   const targets = rows.filter(r => !pq.has(r.wikidata_qid));
   console.log(`${targets.length} photoless staging row(s) from the blind run, absent from prod`);

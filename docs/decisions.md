@@ -22499,3 +22499,72 @@ the draw instead of loosening the gate.
 **Touched:** `server/lib/faceRepair.js`, `prompts/character-repair-inpaint.txt`,
 `tasks/bugs.json` (entry `fullscene-crosshatch-repair-uses-cutout-template`)
 **Status:** ✅ active
+
+## 2026-08-29/09-01 — A landmark photo must be drawable and lawfully usable, or it is not stored
+
+**Context.** Three defects in the same area, all found by pulling on the same
+thread: what exactly is a stored `photo_url` worth?
+
+1. `HAS_PHOTO_SQL` only ever **sorted**. Nothing filtered photoless rows, so a
+   town whose single row had no picture "matched" by name, the proximity
+   fallback was suppressed, and the story was set somewhere nobody can draw —
+   Ehrikon was served `Ruine Alt-Wildberg`, a castle burned down c.1320 with
+   nothing standing above ground.
+2. `fetch-landmark-photos-free.js` wrote `photo_url` and nothing else. **2,843
+   rows** held a Commons picture with no author and no licence. Commons content
+   is overwhelmingly CC BY / CC BY-SA, where credit is a licence CONDITION.
+3. **16 rows held non-free images.** Their URLs were `/wikipedia/de|it/…`, not
+   `/wikipedia/commons/…` — local uploads on a language Wikipedia, which is
+   exactly where fair-use media lives because Commons rejects it. Six were
+   corporate logos; one was the IOC's 1972 Olympic mascot.
+
+**Decision.**
+- A name match containing **nothing servable** (no non-place, and has a photo)
+  counts as no match and falls through to proximity, extending the existing
+  `overviewOnly` rule. The weak rows remain the fallback of last resort.
+- Credit is resolved from Commons `extmetadata` (Artist + LicenseShortName,
+  falling back to the uploader) and written into the **same slot** as its photo.
+  `backfill-landmark-attribution.js` repairs the history; free and resumable.
+- `isFreelyLicensedImageUrl()` rejects any `upload.wikimedia.org/wikipedia/<lang>/`
+  file at both write paths — `saveLandmarkToIndex` for the pipeline, and the
+  free fetcher, which UPDATEs directly and bypasses it.
+
+**Rationale.** A photoless landmark is not a cheaper landmark, it is a different
+product: the story names a real place and the illustrator invents it. And an
+image we cannot credit is one we cannot lawfully print — we sell books, so this
+is commercial use. The attribution lookup doubles as the licence check: anything
+Commons cannot find is, by construction, not freely licensed. That is how the 16
+were caught.
+
+**Verified.** 42 towns affected by the proximity change: 41 now get a
+photographed landmark, **0 regressions** (Ehrikon → Schloss Kyburg; Baden
+unchanged). Attribution reached **19,462 of 19,477 photos (99.9%)**, 47 credited
+as "Unknown", the 15 residual failures being exactly the non-free files. All 16
+cleared on prod and staging (URL, description and credit together — a stale
+description pointing at a removed image is worse than none).
+
+**Touched:** `server/lib/landmarkPhotos.js`,
+`scripts/admin/fetch-landmark-photos-free.js`,
+`scripts/admin/backfill-landmark-attribution.js`, `docs/landmark-database.md` §7/§11.
+**Status:** ✅ kept.
+
+## 2026-09-01 — An incident cleanup names its dates; it does not use a rolling window
+
+**Context.** `clean-blind-run-landmark-rows.js` selected the damaged rows with
+`created_at > NOW() - INTERVAL '5 days'`. The blind run was 2026-08-26; by
+2026-09-01 the window had slid past it, so the script matched nothing and
+printed "0 photoless staging row(s)" — indistinguishable from "already done".
+The 397 rows were still there.
+
+**Decision.** The window is two explicit UTC constants (`WINDOW_START` /
+`WINDOW_END`) bracketing the incident. A cleanup targets a fixed past event, so
+its query must be fixed too.
+
+**Rationale.** A rolling interval silently changes what a script means depending
+on when it runs, and its failure mode is a clean-looking zero rather than an
+error. Nothing distinguishes "found nothing because it is done" from "found
+nothing because I am looking in the wrong place".
+
+**Touched:** `scripts/admin/clean-blind-run-landmark-rows.js`.
+**Status:** ✅ kept — 397 rows deleted from staging; 6,472 → 6,075 Swiss rows,
+in line with production.

@@ -25,6 +25,8 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const { Pool } = require('pg');
+// Same licence guard saveLandmarkToIndex applies — one definition, not two.
+const { isFreelyLicensedImageUrl } = require('../../server/lib/landmarkPhotos');
 const fs = require('fs');
 
 const args = process.argv.slice(2);
@@ -134,7 +136,17 @@ async function attributionFor(fileUrl) {
     try { lead = await leadImage(l.lang, l.wikipedia_page_id); } catch { /* try commons */ }
     try { extra = await commonsFiles(l.wikidata_qid, 3); } catch { /* lead may still exist */ }
 
-    const urls = [lead, ...extra].filter(Boolean).filter((u, i, a) => a.indexOf(u) === i);
+    // `pageimages` returns whatever the article displays — including files
+    // uploaded LOCALLY to that language Wikipedia, which is where non-free
+    // fair-use media lives (Commons would reject it). This script UPDATEs
+    // directly and so bypasses saveLandmarkToIndex's guard; apply the same one.
+    const urls = [lead, ...extra].filter(Boolean)
+      .filter(u => {
+        if (isFreelyLicensedImageUrl(u)) return true;
+        console.log(`  ${l.name}: skipping non-free local-wiki file ${String(u).split('/').pop().slice(0, 50)}`);
+        return false;
+      })
+      .filter((u, i, a) => a.indexOf(u) === i);
     if (!urls.length) { none++; await sleep(150); continue; }
 
     if (!DRY) {

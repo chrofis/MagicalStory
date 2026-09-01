@@ -2869,12 +2869,46 @@ function stripLandmarkAbbreviations(text) {
     .trim();
 }
 
+/**
+ * Only a file hosted on COMMONS may be stored.
+ *
+ * upload.wikimedia.org serves two different things: `/wikipedia/commons/…` is
+ * Wikimedia Commons, which accepts freely-licensed media only, while
+ * `/wikipedia/de/…`, `/wikipedia/it/…` etc. are LOCAL uploads on one language
+ * Wikipedia — precisely where non-free, fair-use files live, because Commons
+ * would reject them.
+ *
+ * Sixteen such files reached the index before this existed: six corporate logos
+ * (a bank, a university, an airfield, a tennis open) and the IOC's 1972 Olympic
+ * mascot. We sell printed books, so that is commercial use of unlicensed work —
+ * and a logo is not a place a scene can be set at either. Dropping the URL
+ * leaves the landmark photoless, which is the honest state.
+ */
+function isFreelyLicensedImageUrl(url) {
+  if (!url) return false;
+  const u = String(url);
+  if (/\/wikipedia\/commons\//.test(u)) return true;
+  if (/commons\.wikimedia\.org/.test(u)) return true;              // Special:FilePath
+  return !/upload\.wikimedia\.org\/wikipedia\//.test(u);           // non-Wikimedia sources unaffected
+}
+
 async function saveLandmarkToIndex(landmark) {
   const pool = getPool();
   if (!pool) return false;
 
   // Normalize values - ensure we don't save "undefined" strings
-  const normalize = (val) => (val === undefined || val === 'undefined' || val === '') ? null : val;
+  const normalizeRaw = (val) => (val === undefined || val === 'undefined' || val === '') ? null : val;
+  // Photo columns get the licence check on top: a non-free URL is dropped, not
+  // stored. Every photo_url in this function goes through `normalize`.
+  const normalize = (val) => {
+    const v = normalizeRaw(val);
+    if (typeof v === 'string' && /^https?:\/\//.test(v) && /\.(jpe?g|png|svg|gif|tiff?)/i.test(v)
+        && !isFreelyLicensedImageUrl(v)) {
+      log.warn(`[LANDMARK-INDEX] Dropping non-free image (local wiki upload): ${v.slice(0, 90)}`);
+      return null;
+    }
+    return v;
+  };
 
   try {
     await pool.query(`
@@ -3850,6 +3884,7 @@ async function resolveAvailableLandmarks(location, opts = {}) {
 
 module.exports = {
   stripLandmarkAbbreviations,
+  isFreelyLicensedImageUrl,
   fetchLandmarkPhoto,
   resolveAvailableLandmarks,
   availableLandmarkCache,
