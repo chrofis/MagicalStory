@@ -2399,15 +2399,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // text, in order) and hands its IMG faults to the next round's
     // consolidator via readerFindingsByPage.
     //
-    // Skipped on the LAST round: nothing would consume the findings, and the
-    // final audit at the end of generation already covers the shipped state.
+    // Skipped on the LAST round: nothing would consume the findings. (The
+    // post-repair final audit that used to cover the shipped state was
+    // removed — owner ruling, 2026-09-01, docs/decisions.md — it wrote
+    // findings to a field with zero consumers. Run it on demand instead via
+    // the Test Lab "book_audit" stage.)
     //
     // The text here may be PRE-REFINE. That is fine: refine rewrites wording,
     // never events — a fault about the picture disagreeing with what happens
     // on the page reads the same before and after.
     //
-    // Non-blocking, exactly like the final call: auditStoryBook never throws,
-    // and a null result contributes nothing.
+    // Non-blocking: auditStoryBook never throws, and a null result
+    // contributes nothing.
     //
     // Second spend guard: a round where every repair failed leaves the book
     // byte-identical, so re-auditing it buys the same findings twice. It still

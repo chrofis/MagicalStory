@@ -5696,120 +5696,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
     }
 
-    // ── FINAL-BOOK AUDIT — the reader's-eye pass ───────────────────────────
-    // Runs HERE, after covers are in and before the story is persisted, because
-    // it is the first moment the finished book exists: every page's picked
-    // image next to that page's final (already refined) prose, in order. Every
-    // earlier check reads ONE artefact — the evaluator an image against its
-    // brief, the text audit prose with a one-line note of what the picture
-    // depicts. None of them can see the two disagreeing.
-    //
-    // This FINAL audit's IMG faults are stored, not repainted — no repair round
-    // remains to consume them, so the finding lands on the page for the dev
-    // panel and the repair endpoints. Acting on IMG faults happens EARLIER:
-    // the repair loop runs its own audit after each round and feeds those IMG
-    // faults into the next round's consolidator (owner directive superseding
-    // the old measure-only rule — see repairPipeline.js MID-LOOP BOOK AUDIT and
-    // docs/decisions.md 2026-08-27). TEXT faults get ONE corrective round here —
-    // prose is cheap to rewrite and nothing downstream has consumed it yet.
-    let bookAuditReport = null;
-    try {
-      const { auditStoryBook } = require('./server/lib/bookAudit');
-      const audit = await auditStoryBook(
-        { id: jobId, sceneImages: allImages },
-        { usageTracker: addUsage }
-      );
-      if (audit) {
-        const { faultsByCategory } = require('./server/lib/storyHelpers');
-        bookAuditReport = {
-          checkedAt: new Date().toISOString(),
-          modelId: audit.modelId,
-          faults: audit.faults,
-          byRoute: audit.byRoute,
-          byCategory: faultsByCategory(audit.raw),
-          pagesRead: audit.pagesRead,
-          pagesSkipped: audit.pagesSkipped,
-          raw: audit.raw,
-        };
-        genLog.info(
-          'book_audit',
-          `Book audit: ${audit.faults} fault(s) — ${audit.byRoute.IMG.length} IMG, ${audit.byRoute.TEXT.length} TEXT`,
-          null,
-          { faults: audit.faults, img: audit.byRoute.IMG.length, text: audit.byRoute.TEXT.length }
-        );
-
-        // IMG route → onto the page itself, so a reader of the story blob sees
-        // the finding where the picture is.
-        for (const f of audit.byRoute.IMG) {
-          const page = allImages.find(im => im.pageNumber === f.page);
-          if (!page) continue;
-          (page.bookAuditFaults = page.bookAuditFaults || []).push(f.line);
-        }
-
-        // TEXT route → one corrective refine round. Same shape as the re-audit
-        // round at the bottom of textRefine.js: the FAULT lines go in as the
-        // findings block, the model returns only the pages it rewrote, and
-        // omitted pages keep their text.
-        if (audit.byRoute.TEXT.length > 0) {
-          try {
-            const { buildTextRefinePrompt, parseRefinedText } = require('./server/lib/storyHelpers');
-            const { extractRefinablePages } = require('./server/lib/textRefine');
-            const { callTextModelStreaming } = require('./server/lib/textModels');
-            const { TEXT_MODELS, MODEL_DEFAULTS: MD } = require('./server/config/models');
-            const refinePages = extractRefinablePages(allImages);
-            const modelKey = MD.textRefineModel || MD.outlineReviewModel;
-            const findings = `${audit.byRoute.TEXT.map(f => f.line).join('\n')}\nFAULTS: ${audit.byRoute.TEXT.length}`;
-            const prompt = buildTextRefinePrompt(inputData, refinePages, findings,
-              arcReviewReport?.finalArc || beatsReviewReport?.arc || '');
-            if (!prompt) throw new Error('text-refine template unavailable');
-            if (!TEXT_MODELS[modelKey]) throw new Error(`unknown model "${modelKey}"`);
-            const MAX_OUT = Math.min(64000, TEXT_MODELS[modelKey].maxOutputTokens || 64000);
-            const r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: 'book_audit_text' });
-            const parsed = parseRefinedText(r.text || '', refinePages.map(p => p.pageNumber));
-            const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
-            const changed = [];
-            // The SAME three stores the refine join writes (see the "THIRD
-            // store" comment above): the expanded scene, the image record that
-            // becomes sceneImages[], and the assembled story text the Lab's
-            // edit mode reads. Updating fewer than three ships two versions of
-            // the prose in one blob.
-            for (const scene of expandedScenes) {
-              const t = byPage.get(scene.pageNumber);
-              if (t && t !== scene.text) scene.text = t;
-            }
-            for (const img of allImages) {
-              const t = byPage.get(img.pageNumber);
-              if (t && t !== img.text) { img.text = t; changed.push(img.pageNumber); }
-            }
-            if (changed.length > 0) {
-              // Rebuilt from allImages, NOT from storyPages[].text: storyPages
-              // still holds the pre-refinement prose, so falling back to it
-              // would revert every page this round did not touch.
-              const finalText = new Map(allImages.map(im => [im.pageNumber, im.text]));
-              fullStoryText = storyPages.map(page =>
-                `--- Page ${page.pageNumber} ---\n${finalText.get(page.pageNumber) ?? page.text}`
-              ).join('\n\n');
-            }
-            bookAuditReport.textRound = {
-              modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
-              changedPages: changed,
-              analysis: (parsed.analysis || '').slice(0, 20000),
-            };
-            genLog.info('book_audit_text', `Book audit text round rewrote page(s) ${changed.join(', ') || 'none'}`, null, { changedPages: changed });
-          } catch (textErr) {
-            log.warn(`⚠️ [BOOK-AUDIT] corrective text round failed (${textErr.message}) — text kept as-is`);
-            genLog.warn('book_audit_text_failed', `Book audit text round failed (${textErr.message}) — text kept as-is`);
-          }
-        }
-      }
-    } catch (auditErr) {
-      // A missing measurement never costs a paid-for story.
-      log.warn(`⚠️ [BOOK-AUDIT] skipped: ${auditErr.message}`);
-    }
-    if (bookAuditReport) {
-      finalChecksReport = finalChecksReport || {};
-      finalChecksReport.bookAudit = { faults: bookAuditReport.faults, byRoute: bookAuditReport.byRoute, byCategory: bookAuditReport.byCategory };
-    }
+    // The final post-repair book audit was REMOVED (owner ruling, 2026-09-01):
+    // its findings wrote to sceneImages[].bookAuditFaults, a field with zero
+    // consumers (client, server/routes, and the dev panel never read it), and
+    // finalChecksReport.bookAudit / data.bookAuditReport had none either. The
+    // MID-LOOP audits (repairPipeline.js, MID-LOOP BOOK AUDIT) are unaffected —
+    // they feed live repair rounds via readerFindingsByPage and stay exactly as
+    // they were. The capability itself is not gone: run it on demand via the
+    // Test Lab "book_audit" stage (server/lib/testlab.js runBookAuditStage) on
+    // any completed story. See docs/decisions.md 2026-09-01.
 
     let originalStoryText = null;
 
@@ -6000,7 +5895,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       sceneReviewReport, // per-page before/after from the scene review (beats mode)
-      bookAuditReport,   // reader's-eye pass: page text + shipped image, routed IMG/TEXT
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {
         // Cost
