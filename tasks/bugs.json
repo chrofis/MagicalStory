@@ -2,6 +2,15 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "fullscene-crosshatch-repair-uses-cutout-template",
+      "title": "Edit-mode character repair in fullScene (box) mode always dies at the blend gate - the crosshatch prompt is the CUTOUT template, so the model repaints the figure oversized",
+      "reportedAt": "2026-09-01",
+      "source": "owner: 'character repair from edit mode did not work' on staging job_1788215224103_avu132n7je p16 (Lorena). Reproduced via POST /repair-workflow/character-repair: 3/3 Grok draws rejected by the blend gate ('background still differs by 60-71 grey levels' x5, 'mask IoU 54%' x1 across the owner's run + the repro). attemptFrames show the model repainting Lorena ~1.6x larger than the hatched silhouette, covering sand/boat background - the gate refuses correctly; the DRAW is bad every time. Root cause: faceRepair.js buildPrompt uses characterRepairCutout for every crosshatch treatment. In box mode the model receives the FULL scene, but that template calls IMAGE 2 'THE CUTOUT TO EDIT - a scene region' and has no silhouette-size rule. The pre-spine fullScene branch used characterRepairInpaint ('The crosshatch traces the exact silhouette - match its shape, size, and pose. Do not paint outside the crosshatch.'); the Stage-3 refactor (24842d2bd, 2026-07-26) collapsed both region sources onto the cutout template and left characterRepairInpaint orphaned (loaded by prompts.js, zero consumers).",
+      "status": "fixed",
+      "fixedIn": "da885047f",
+      "note": "faceRepair.js buildPrompt now threads regionSource and picks characterRepairInpaint for crosshatch+box (full scene), keeping characterRepairCutout for the cutout region path. character-repair-inpaint.txt gains the {appearanceContext} placeholder the cutout template already carried (exp #360 identity facts), passed from the same fill. Verified: template fills with no unfilled placeholders; repair re-run on the failing page after deploy."
+    },
+    {
       "id": "de-ch-nameEnglish-swiss-german-dialect-trap",
       "title": "getLanguageNameEnglish('de-ch') returns bare 'Swiss German', which a model reads as Schwyzerdütsch dialect instead of Swiss Standard German",
       "reportedAt": "2026-08-31",

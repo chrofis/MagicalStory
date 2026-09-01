@@ -8,7 +8,7 @@ Replace the figure under the magenta crosshatch in IMAGE 2 with {charName} from 
 
 Preserve the exact figure count. Do not add, remove, or duplicate any character. Only the figure under the magenta crosshatch is repainted; every other figure in IMAGE 2 is final.
 
-Face: match IMAGE 1 (face shape, eyes, hair, skin tone).
+Face: match IMAGE 1 (face shape, eyes, hair, skin tone).{appearanceContext}
 
 {REPAIR_STYLE_GUARD}
 

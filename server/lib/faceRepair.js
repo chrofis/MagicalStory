@@ -592,7 +592,7 @@ function buildTextPositionContext(textPosition, sceneDescription) {
   return `\n\nQuiet zone: keep the ${desc} as ${zoneDesc ? `the established ${zoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not place the character's face or any high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`;
 }
 
-async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
+async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
   // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
   // name the person we WANT (opts.promptName), while scene-state lookups stay keyed
@@ -669,7 +669,16 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
     if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext });
   }
   if (treatment === 'crosshatch') {
-    const tpl = PROMPT_TEMPLATES.characterRepairCutout;
+    // Box mode sends the FULL SCENE, so it needs the scene template: the cutout
+    // wording ("THE CUTOUT TO EDIT", no silhouette-size rule) let the model
+    // repaint the hatched figure oversized and every draw died at the blend
+    // gate (job_1788215224103 p16, 6/6 rejections). characterRepairInpaint is
+    // the template the pre-spine fullScene branch used (d68bd8815); the Stage-3
+    // refactor collapsed both region sources onto the cutout template and
+    // orphaned it.
+    const tpl = (regionSource === 'box' && PROMPT_TEMPLATES.characterRepairInpaint)
+      ? PROMPT_TEMPLATES.characterRepairInpaint
+      : PROMPT_TEMPLATES.characterRepairCutout;
     if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext });
   }
   return `This is a children's book illustration. Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
@@ -941,7 +950,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   const treatmentInfo = { treatment, regionSource, faceOnly, faceBlur: treated.faceBlur || null, hatchClipped: treated.hatchClipped !== false };
 
   // --- Prompt + model call ---------------------------------------------------
-  const prompt = opts.prompt || await buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
+  const prompt = opts.prompt || await buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
 
   let candidateCrop;      // model output resized to crop dims (the paste source)
   let usage;
