@@ -583,7 +583,11 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
     let fetchBox = padBox, fetchOpts = r2Opts;
     if (Array.isArray(newBoxInCrop) && newBoxInCrop.length === 4) {
       const nw = newBoxInCrop[2] - newBoxInCrop[0], nh = newBoxInCrop[3] - newBoxInCrop[1];
-      if (nw > 8 && nh > 8) {
+      // A near-whole-crop "person" box is not evidence of anything — on a busy
+      // page DINO returns the enclosing crowd (exp #969: [16,14,301,779] on a
+      // 301x779 crop) and its centre seed grabs figure+neighbours as one blob.
+      const degenerate = (nw * nh) > 0.85 * cropW * cropH;
+      if (nw > 8 && nh > 8 && !degenerate) {
         fetchBox = [
           Math.max(0, Math.round(newBoxInCrop[0] - nw * 0.04)),
           Math.max(0, Math.round(newBoxInCrop[1] - nh * 0.04)),
@@ -671,6 +675,11 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // background clearly mismatched, REJECT the candidate — the model redrew the
   // scene, not just the figure.
   let registration = null;
+  // What the background comparison concluded: 'aligned' (figure geometry
+  // trustworthy as-is), 'shifted' (aligned after a shift), 'rerendered' (the
+  // model repainted the scene — background unusable), null (no information:
+  // too little background visible, or the comparison failed).
+  let bgVerdict = null;
   if (registerCandidate) {
     try {
       const SW = 200, SH = Math.max(1, Math.round(cropH * (SW / cropW)));   // small grid: the search is O(candidates × pixels)
@@ -741,6 +750,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         const BG_TRUST_ERR = 26;   // mean |grey diff| over background
         if (best.err > BG_TRUST_ERR) {
           registration = { mode: 'bg-rerendered', bgErr: +best.err.toFixed(1) };
+          bgVerdict = 'rerendered';
           log.info(`[TESTLAB] background re-rendered by the model (err ${best.err.toFixed(1)} grey levels at best alignment) — no background shift applied; relying on figure registration + IoU gate`);
         } else if (Math.abs(best.dx) > 0 || Math.abs(best.dy) > 0 || best.sc !== 1) {
           const sw = Math.max(1, Math.round(cropW * best.sc)), sh = Math.max(1, Math.round(cropH * best.sc));
@@ -753,11 +763,13 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
             candidateCropBuf = registered;
             newMask = newMask2;
             registration = { mode: 'background', dx: Math.round(dxF), dy: Math.round(dyF), scale: best.sc, bgErrBefore: +base.toFixed(1), bgErrAfter: +best.err.toFixed(1) };
+            bgVerdict = 'shifted';
             require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('repair_registration');
             log.info(`[TESTLAB] registered on BACKGROUND: dx=${registration.dx} dy=${registration.dy} scale=${registration.scale} — bg mismatch ${registration.bgErrBefore} → ${registration.bgErrAfter} grey levels`);
             await addStep(`registered on background (dx ${registration.dx}, dy ${registration.dy}, scale ${registration.scale}) — bg err ${registration.bgErrBefore}→${registration.bgErrAfter}`, `data:image/png;base64,${registered.toString('base64')}`);
           }
         } else {
+          bgVerdict = 'aligned';
           log.info(`[TESTLAB] background already aligned (err ${base.toFixed(1)}) — no registration needed`);
         }
       } else {
@@ -783,7 +795,13 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // pixel-IoU gate afterwards — this normalises geometry, it does not excuse a
   // different figure. Body blends only: the face path's masks nearly coincide
   // by construction and its blend is separately calibrated.
-  if (registerCandidate && blendShape === 'figure-exact') {
+  // Only when the background says the scene was RE-RENDERED (or told us
+  // nothing). An aligned background is the strongest available evidence that
+  // the figure's geometry is trustworthy in box mode — exp #969: bg err 7.4
+  // (aligned) while DINO returned a degenerate whole-crop box, and the
+  // resulting 0.85 "correction" shrank an already-aligned candidate into a
+  // guaranteed IoU failure.
+  if (registerCandidate && blendShape === 'figure-exact' && bgVerdict !== 'aligned' && bgVerdict !== 'shifted') {
     try {
       const alphaBox = async (maskPng) => {
         const a = await sharp(maskPng).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
