@@ -431,6 +431,22 @@
       "status": "fixed",
       "fixedIn": "504a5faf2",
       "note": "Fix per owner ruling G5/option 2: gates case-insensitive AND restricted to CRITICAL only (MAJOR entity findings get no automatic repair; NOT_INPAINTABLE_TYPES keeps character types out of inpaint). Empty fix_instruction entries dropped loudly; issues-join refill deleted. Char repair pinned to grok-imagine-image 1.x via REPAIR_DEFAULTS.charRepairModel. See docs/decisions.md 2026-09-01 G5 entry."
+    },
+    {
+      "id": "text-refine-prompt-fed-arc-not-beats",
+      "reported": "2026-09-01",
+      "summary": "prompts/text-refine.txt tells the refiner 'where the beats and the story differ, the beats are the story's final form', but the only story block it ever received ({STORY_ARC}, filled at storyJobPipeline.js:3315 from arcReviewReport.finalArc, with beatsReviewReport.arc as fallback — also the arc, since beatsPipeline.js stamps plan.arc = approvedArc) was the ARC, never the locked beats. On job_1788215224103 p11 the beat text explicitly reads 'Dark water seeps toward the chest-space in the cistern, not toward any person' (a deliberate safety cut — no person is endangered), but the arc's page 11 entry has Rossa 'sending a crewman down on a rope' who gets trapped as the water rises. Believing its own 'beats win' instruction while blind to what the beats actually said, the refiner reinstated the arc's trapped crewman into the shipped text — the run's only CRITICAL finding. Confirmed by rendering the fixed prompt offline against the stored job's data: the new # THE BEATS section for p11 now carries the exact 'not toward any person' beat text.",
+      "status": "fixed",
+      "fixedIn": "b736f0ff7",
+      "note": "extractRefinablePages (textRefine.js) now reads each page's locked BEAT out of scene.outlineExtract (guarded on the 'BEAT:' marker so a unified-mode page, where outlineExtract holds the scene expansion's own JSON, never gets mistaken for one — same guard storyScorecard.js's finalBeats() already uses) and drops the PLAN line: PLAN is staging shorthand for the artist and on this exact page it names a person the BEAT text deliberately did not. buildTextRefinePrompt (promptBuilders.js) fills a new {STORY_BEATS} block from it. prompts/text-refine.txt now has two separate sections — '# THE ARC' ({STORY_ARC}, background judgment context) and '# THE BEATS' ({STORY_BEATS}, the story's final form, beats win on conflict) — mirroring the writer's own story-text-from-beats.txt, which already kept ARC and BEATS apart and was not affected. Empty on a unified-mode story (falls back to arc + scene outlines only, same as before). No plumbing changes needed in storyJobPipeline.js/testlab.js's three refineStoryText call sites — all three already run pages through extractRefinablePages, which now carries the beat automatically."
+    },
+    {
+      "id": "text-refine-audit-rulings-dropped-key-collision",
+      "reported": "2026-09-01",
+      "summary": "storyJobPipeline.js:5389 builds textRefineReport.roundsDetail as a per-round trace array (round/ok/modelKey/changedPages/...), overwriting the field of the SAME name that refineStoryText (textRefine.js) already returns holding something else entirely: parseAuditRulings' per-fault ledger (rulings each fixed/stands/withdrawn, plus which prior faults the re-audit never ruled on). usable.roundsDetail (the ledger) was never read anywhere in storyJobPipeline.js — the local object literal's own roundsDetail key silently shadowed it before persistence, so no story has ever shipped a per-fault ruling in its textRefineReport despite the mechanism (textRefine.js:319, parseAuditRulings) computing one every run with a re-audit.",
+      "status": "fixed",
+      "fixedIn": "fix(text-refine): auditRulings ledger no longer shadowed by the per-round trace field — 2026-09-01 (same commit)",
+      "note": "Renamed the per-round trace field to roundTrace and added auditRulings: usable.roundsDetail to textRefineReport, so both survive. Confirmed no other code (grepped server/, client/src/) reads textRefineReport.roundsDetail by that name, so the rename is non-breaking."
     }
   ]
 }

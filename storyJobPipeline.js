@@ -5386,7 +5386,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           rounds: usable.rounds.length,
           // Per-round trace (owner, 2026-08-27): the count alone made "what did
           // round 2 change" unanswerable twice. Analyses capped — text only.
-          roundsDetail: usable.rounds.map(r => ({
+          // Named roundTrace, NOT roundsDetail: refineStoryText's own
+          // `roundsDetail` (parseAuditRulings' per-fault fixed/stands/withdrawn
+          // ledger, see textRefine.js) used to be dropped on the floor here —
+          // this object's key of the same name silently shadowed it before it
+          // ever reached textRefineReport, so no ruling was ever persisted.
+          roundTrace: usable.rounds.map(r => ({
             round: r.round,
             ok: r.ok,
             reAudit: !!r.reAudit,
@@ -5399,6 +5404,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             error: r.error || null,
             analysis: (r.analysis || '').slice(0, 15000),
           })),
+          // The re-audit's per-fault ruling on round 1's faults (fixed / stands /
+          // withdrawn) plus any it never ruled on — see parseAuditRulings.
+          auditRulings: usable.roundsDetail || null,
           changedPages: usable.changed,
           audit: usable.audit || '',
           proofread: usable.proofread || '',

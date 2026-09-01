@@ -22987,3 +22987,57 @@ a page is the planner planning it again, once.
 `prompts/story-bible-from-beats.txt`, `docs/prompt-inventory.md`.
 
 **Status:** ✅ active
+
+## 2026-09-01 — Text refiner was judging pages against the ARC only; the locked BEATS never reached it
+
+**Context.** `text-refine.txt` tells the refiner "where the beats and the story
+differ, the beats are the story's final form", but the only story-level block the
+prompt ever received (`{STORY_ARC}`, filled at `storyJobPipeline.js:3315` from
+`arcReviewReport.finalArc`, with `beatsReviewReport.arc` as fallback — also the
+arc, since `beatsPipeline.js` stamps `plan.arc = approvedArc`) was the arc, never
+the beats. On `job_1788215224103` p11 the locked beat reads "Dark water seeps
+toward the chest-space in the cistern, not toward any person" — a deliberate
+safety cut — while the arc has Rossa "sending a crewman down on a rope" who then
+gets trapped as the water rises. The refiner, obeying its own instruction while
+blind to what the beats actually said, reinstated the arc's trapped crewman —
+the run's only CRITICAL audit finding.
+
+**Decision.** `extractRefinablePages` (`textRefine.js`) now reads each page's
+locked BEAT straight out of `scene.outlineExtract`, the same field
+`storyScorecard.js`'s `finalBeats()` already treats as the beats artifact,
+guarded on the `BEAT:` marker so a unified-mode page (where `outlineExtract`
+holds the scene expansion's own JSON) is never mistaken for one. The `PLAN:`
+line is stripped before use: it is staging shorthand for the artist, and on this
+exact page it names a person the BEAT text deliberately did not.
+`buildTextRefinePrompt` fills a new `{STORY_BEATS}` placeholder from it, and
+`text-refine.txt` now has two separate sections — `# THE ARC` (background
+judgment context) and `# THE BEATS` ("where the beats and the arc above differ,
+the beats win") — mirroring `story-text-from-beats.txt`, which already kept
+`{STORY_ARC}` and `{BEATS}` apart and was never affected by this bug. No caller
+needed new plumbing: all three `refineStoryText` call sites (the production
+pipeline, and Test Lab's `runTextRefineStage` + branch-continue) already build
+their `pages` array through `extractRefinablePages`, which now carries the beat
+automatically.
+
+**Same commit — a second, unrelated defect in the same stage.**
+`storyJobPipeline.js:5389` built `textRefineReport.roundsDetail` as a per-round
+trace array (round/ok/modelKey/changedPages/…), silently shadowing the field of
+the same name `refineStoryText` already returns holding something else: the
+per-fault `fixed`/`stands`/`withdrawn` ledger from `parseAuditRulings` that the
+2026-08-31 "text re-audit tracks fault IDENTITY" entry above describes
+persisting as `roundsDetail`. Because the local object literal used the same key
+name, `usable.roundsDetail` (the ledger) was read nowhere and never reached a
+shipped story despite being computed every run with a re-audit. Renamed the
+per-round trace to `roundTrace`; added `auditRulings: usable.roundsDetail` so
+both survive. Grepped `server/` and `client/src/` for `roundsDetail` — no other
+reader depended on the old name.
+
+**Verified** by rendering the fixed prompt offline against
+`job_1788215224103`'s stored data: the new `# THE BEATS` section for p11 now
+carries the exact "not toward any person" text, and `# THE ARC` still carries
+the full arc unchanged — no unfilled placeholders in the rendered prompt.
+
+**Touched files:** `server/lib/textRefine.js`, `server/lib/promptBuilders.js`,
+`prompts/text-refine.txt`, `storyJobPipeline.js`, `tasks/bugs.json`.
+
+**Status:** ✅ active
