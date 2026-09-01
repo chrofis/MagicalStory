@@ -6171,6 +6171,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   } else {
     ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
       pass: 2, facePhoto, realisticSheet: realistic, artStyle,
+      costumeDescription: costume.description || 'standard outfit',
       declaredAge: params.declaredAge ?? null, model, promptOverride,
     }));
   }

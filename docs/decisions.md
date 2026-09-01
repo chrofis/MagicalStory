@@ -23165,3 +23165,79 @@ behaviour, not an error, and that it must never bypass the check with psql.
 `scripts/admin/migrate-inline-images-to-r2.js`, two remote routines.
 **Status:** ✅ kept. First runs: daily 2026-09-02 06:35 CH, weekly 2026-09-06
 03:36 CH.
+
+## Ending craft: emotion/image over bookkeeping, both arc and page-text layers (2026-08-12)
+**Context:** `job_1788215224103` p16 spent 53% of its words closing prop-loops
+(container opened, rival dealt with, promise kept) and left only a ten-word
+emotional payoff at the very end. Owner: "the ending should be an emotion or a
+memorable moment... same focus as the first sentences." Existing arc rule
+("The story ends with the children safe and together...") governs the ending's
+*content* (safety, reunion, thread closure) but says nothing about *where in
+the page* the payoff lands or that mechanics must be cleared before it.
+**Decision:** Added one bullet each to `prompts/arc-create.txt` and
+`prompts/arc-retell.txt` (RULES OF THE TELLING, placed directly after the
+existing "ends with the children safe and together" bullet): the ending is
+the page the child remembers — one emotion or image, never bookkeeping or a
+stated moral — and debts/props settle before the final page so the last page
+belongs to the feeling. Added a matching bullet to
+`prompts/story-text-from-beats.txt` (YOUR TASK list, after the
+feeling/suspense bullet): the final page gets the same care as the first
+sentence — land one feeling plainly and warmly; a string of short solemn
+sentences is not an ending.
+**Rationale:** Two separate owners write "the end" — the arc layer decides
+what closes and in what order, the beats→text layer decides how the last
+page reads sentence-by-sentence. Both needed the same correction (payoff over
+housekeeping) stated in their own vocabulary; the existing safe-and-together
+bullet stays because it is a content requirement, not a craft one.
+**Touched:** `prompts/arc-create.txt`, `prompts/arc-retell.txt`,
+`prompts/story-text-from-beats.txt`.
+**Status:** ✅ active.
+
+## 2026-09-01 — Entity-eval reshape: visibility severity anchors, cross-character leakage question, cutout_artifact escape, avatar spec conformance
+**Context:** The gentity audit of the pirate capstone run (stored working set:
+entity report + history + per-version issues) measured 77% of the entity
+evaluator's MAJOR findings as false — near all of them spec-vs-reference
+confusion on one character's costume parts (bib panel, side buttons, shoulder
+straps billed as MAJOR each), while the one finding the eval exists for — a
+gull emblem belonging to a DIFFERENT character on his shirt (p2/13/14) — was
+missed entirely. Owner rulings, quoted: "we pass the text and the image" (the
+eval keeps receiving both the expected-clothing prose and the grid images —
+document inputs unchanged); "be more relaxed — a bib panel cannot be that
+important, why is this not minor"; and cross-character leakage is the eval's
+core purpose, so missing it is the real failure, not the part-checklist noise.
+**Decision:**
+1. `prompts/entity-consistency-check.txt` severity anchors are VISIBILITY
+   anchors now — CRITICAL: a viewer would read this as a different person
+   (age, face, build); MAJOR: a clearly visible difference — a garment, a
+   colour, the hair; MINOR: only findable comparing side by side —
+   fastenings, buttons, panels, trim, freckle density, small hue shifts. The
+   clothing-checklist rule no longer hard-codes MAJOR for a missing named
+   part; severity follows the anchors (this is what the old wording defeated).
+2. New named question in the same template: does any figure carry a marking,
+   emblem or garment that belongs to a DIFFERENT character? Cross-character
+   leakage is MAJOR at least.
+3. Cutout-artifact escape: a cell with missing regions, hard white gaps or
+   truncated limbs is reported as `type: "cutout_artifact"`, never as a skin,
+   clothing or anatomy difference — and `cutout_artifact` joins
+   `ZERO_POINT_TYPES` in `server/lib/scoring.js` (same contract as
+   garment_colour: reported in full, costs nothing, buys no paid repair).
+4. The avatar Pass-2 styled-sheet eval (`prompts/sheet-2x4-style-eval.txt`
+   TASK 4) now judges the outfit against the character's clothing description
+   (canonical clothingRequirements prose, threaded
+   generateCharacter2x4Sheet → runStyleTransferPass → evaluateAvatarSheet →
+   evaluateStyledSheetWithGemini; Test Lab call site passes the same value) —
+   a missing or different garment lowers the score, small details do not.
+**Rationale:** Classification stays in the prompt, code only bounds cost —
+the sanctioned shape (SETTLED). The visibility anchors encode the owner's
+severity philosophy directly; the leakage question restores the eval's
+purpose; the zero-point cap keeps crop artifacts from tripping redo gates;
+checking the avatar sheet against its spec at generation time catches wrong
+garments before sixteen pages inherit them.
+**Touched:** `prompts/entity-consistency-check.txt`,
+`prompts/sheet-2x4-style-eval.txt`, `server/lib/scoring.js`,
+`server/lib/character2x4Sheet.js`, `server/lib/testlab.js` (avatar-eval
+stage), plus the three bug fixes logged in `tasks/bugs.json`
+(entity-report duplication, severity casing, pagesToFix routing backfill —
+`storyJobPipeline.js`, `server/routes/stories.js`,
+`server/lib/entityConsistency.js`).
+**Status:** ✅ active
