@@ -240,8 +240,6 @@ const BASE = {
       onImageReady: null,
       outputAspect: '3:4',
       evaluationType: null,
-      grokPrimaryModel: 'grok-standard',
-      grokPrimaryModelKey: 'grok-imagine',
       usePadExtension: true,
       avatarMode: false,
       pageLabel: '',
@@ -269,7 +267,6 @@ const BASE = {
       landmarkPhotos: [], visualBibleGrid: null,
       sceneBackground: 'data:image/png;base64,BG', textAreaMask: null, onImageReady: null,
       outputAspect: '3:4', evaluationType: null,
-      grokPrimaryModel: 'grok-standard', grokPrimaryModelKey: 'grok-imagine',
       usePadExtension: true, avatarMode: false, pageLabel: '',
       defaultModel: 'gemini-2.5-flash-image', includeSceneBackgroundPart: true,
     });

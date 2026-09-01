@@ -319,6 +319,8 @@ measurement, is lost).
 - [ ] REV-7 (P3) deferred minors: second poller lacks `knownPages`; `imgRowToBytes` is a
       hand-copied fork of `imgBytesAsync`; `dropInlineBase64` mutates shared refs
       → `docs/review-2026-07-04.html:124`
+- [ ] `callGrokEdit` in coverComposite has no prompt-length guard before the Grok API call
+      (other Grok paths shrink to the model's cap first) → `server/lib/coverComposite.js:416`
 
 ---
 

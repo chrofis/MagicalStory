@@ -3046,8 +3046,13 @@ These corrections OVERRIDE what is visible in the reference photo.
             try {
               // Same registry-derived tier resolution as the page/cover
               // dispatcher — the two-way ternary this replaces collapsed
-              // grok-imagine-2 to Standard.
-              const grokModel = resolveGrokImageModel(selectedModel).modelId;
+              // grok-imagine-2 to Standard. Announce a non-tier key before
+              // downgrading, exactly like the images.js dispatch sites.
+              const grokTier = resolveGrokImageModel(selectedModel);
+              if (selectedModel && !grokTier.isExplicit) {
+                log.warn(`⚠️ [CLOTHING AVATARS] Model override "${selectedModel}" is not a Grok tier — using ${grokTier.modelId}`);
+              }
+              const grokModel = grokTier.modelId;
               // Use the body-clothed reference photo as input — Grok edits it.
               const refImages = [referencePhoto];
               const result = await editWithGrok(avatarPrompt, refImages, {

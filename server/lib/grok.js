@@ -303,10 +303,6 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
                               // behavior — only slot 0 gets the magenta treatment.
   } = options;
 
-  require('./promptCapture').recordPrompt('grok_edit', model, prompt, {
-    kind: 'image', aspectRatio, referenceImages: referenceImages.length,
-  });
-
   if (!XAI_API_KEY) {
     throw new Error('XAI_API_KEY not configured');
   }
@@ -422,6 +418,12 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     prompt = await fitGrokPromptWithPrefix(buildMagentaExtensionPrefix(slot0Pad), prompt, model);
     log.info(`🎨 [GROK] Magenta-extension active on slot 0: pad top=${slot0Pad.top} bottom=${slot0Pad.bottom} left=${slot0Pad.left} right=${slot0Pad.right}`);
   }
+
+  // Capture AFTER the prompt is final (magenta-extension prefix + budget fit
+  // above) so promptCapture records what is actually sent, not the raw input.
+  require('./promptCapture').recordPrompt('grok_edit', model, prompt, {
+    kind: 'image', aspectRatio, referenceImages: referenceImages.length,
+  });
 
   log.info(`🎨 [GROK] Starting edit (model: ${model}, refs: ${images.length}, aspect: ${aspectRatio})`);
   // Per-slot identification — bytes + role hint when caller annotated images

@@ -1026,7 +1026,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // below — never as the primary path.
   await checkCancellation();
   const lang = inputData.language || 'en';
-  const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
+  const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
   const maxCharactersPerScene = imgModelConfig?.maxCharactersPerScene || 3;
 

@@ -597,7 +597,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyleForEmptyScene } = require('./storyHelpers');
   const { generateImageOnly } = require('./images');
   const { getTextAreaMask } = require('./textMasks');
-  const { MODEL_DEFAULTS } = require('../config/models');
+  const { MODEL_DEFAULTS, emptyScenePlateRouting } = require('../config/models');
 
   const meta = ctx.scene.sceneMetadata || {};
   // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
@@ -625,6 +625,9 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
 
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, [], {
+    // Plates stay on the plate tier regardless of the page tier — same pinned
+    // routing as every production plate call site (docs/image-routing.md).
+    ...emptyScenePlateRouting(),
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     landmarkPhotos: ctx.landmarkPhotos,
     textAreaMask: wantsTextZone ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null,
@@ -3651,7 +3654,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
     const toExpand = finalBeats.slice(0, expandLimit);
     const lang = storyData.language || 'en';
-    const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
+    const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
     const availableAvatars = buildAvailableAvatarsForPrompt
       ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
       : '';
