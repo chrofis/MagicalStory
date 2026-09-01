@@ -23241,3 +23241,20 @@ stage), plus the three bug fixes logged in `tasks/bugs.json`
 `storyJobPipeline.js`, `server/routes/stories.js`,
 `server/lib/entityConsistency.js`).
 **Status:** ✅ active
+
+## 2026-09-01 — Per-figure VLM anatomy check: tested, NOT viable (trial, $0.22)
+
+**Context.** After the two-hands-one-forearm defect shipped unflagged (job_1788123310558 p5),
+the owner approved a trial: per-figure anatomy check — bbox rectangle crop (cannot amputate
+limbs) as primary evidence + SAM cutout as secondary, one cheap vision call per figure,
+across the 5 most recent staging stories (155 figures).
+**Decision.** NOT wired to production. Precision 0/4 (all flags were neighbors' limbs inside
+the bbox or watercolor softness); recall 0/2 — both known structural defects passed as OK on
+gemini-2.5-flash, flash-lite AND 2.5-pro. VLM judges normalize duplicated hands — the defect
+class is trained into both generator and judge. SAM secondary was ignored in both directions.
+**Rationale.** A check with zero precision and zero recall at three model tiers is not a
+prompt problem. Anatomy ships unguarded by explicit choice; mitigations are model-side
+(char-repair pinned to grok-imagine 1.x — 0/82 structural defects measured — while pages
+render on Imagine 2.0, whose ~7% figure rate the owner accepted for its other strengths).
+**Touched.** Nothing in production. Evidence: scratchpad anatomy-trial/report.html,
+results.json. Memory: project_anatomy_detection_verdicts.md.
