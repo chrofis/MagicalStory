@@ -22474,3 +22474,28 @@ Task-list alignment: this closes the lean-flow adoption item and the #26 hint-pa
 `prompts/story-beats-review.txt`, `prompts/text-refine.txt`, `server/services/prompts.js`,
 `server/lib/promptBuilders.js` (`buildArcHintsPrompt`/`parseArcHints`, `{ARC_HINTS}` fills),
 `server/lib/storyHelpers.js` (re-exports), `server/lib/beatsPipeline.js` (hint pass + hand-off).
+
+## 2026-09-01 — FullScene crosshatch repair uses the scene template (characterRepairInpaint), not the cutout one
+**Context:** Edit-mode character repair in fullScene (box) mode sends the FULL
+scene to the model, but every crosshatch treatment used the
+`characterRepairCutout` template, which describes IMAGE 2 as "THE CUTOUT TO
+EDIT — a scene region" and has no silhouette-size rule. The model repainted the
+hatched figure oversized (~1.6x on the reproduced page), covering background,
+and the blend gate correctly rejected every draw — 6/6 rejections on staging
+job_1788215224103_avu132n7je p16 ("background differs by 60-71 grey levels",
+"mask IoU 54%"). The `characterRepairInpaint` template — built for exactly this
+mode (d68bd8815) with "The crosshatch traces the exact silhouette — match its
+shape, size, and pose. Do not paint outside the crosshatch." — was orphaned by
+the Stage-3 spine refactor (24842d2bd): loaded by prompts.js, zero consumers.
+**Decision:** `buildPrompt` in `server/lib/faceRepair.js` threads
+`regionSource`; crosshatch+box picks `characterRepairInpaint`, crosshatch+cutout
+keeps `characterRepairCutout`. `character-repair-inpaint.txt` gains the
+`{appearanceContext}` placeholder the cutout template already carried (exp #360
+identity facts), filled from the same call.
+**Rationale:** The gate was refusing correctly; the draw was wrong every time
+because the prompt neither described the input truthfully nor bounded the
+figure's scale. Restoring the deliberate pre-refactor template pairing fixes
+the draw instead of loosening the gate.
+**Touched:** `server/lib/faceRepair.js`, `prompts/character-repair-inpaint.txt`,
+`tasks/bugs.json` (entry `fullscene-crosshatch-repair-uses-cutout-template`)
+**Status:** ✅ active
