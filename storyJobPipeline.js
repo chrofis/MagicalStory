@@ -100,8 +100,11 @@ const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
 function coverTypesFor(inputData = {}) {
   if (Array.isArray(inputData.coverTypes) && inputData.coverTypes.length > 0) {
     // Legacy compat: jobs queued before the 2026-08-23 naming unification
-    // carry 'frontCover' in coverTypes — normalize at this one boundary.
-    return inputData.coverTypes.map(ct => ct === 'frontCover' ? 'frontCover' : ct);
+    // carry 'titlePage' in coverTypes — normalize at this one boundary.
+    // (Was written as `ct === 'frontCover' ? 'frontCover' : ct` — a no-op that
+    // mapped the NEW name to itself and let the legacy token through, so a
+    // pre-rename queued job's front cover would silently never start.)
+    return inputData.coverTypes.map(ct => ct === 'titlePage' ? 'frontCover' : ct);
   }
   return inputData.titlePageOnly
     ? ['frontCover']

@@ -125,6 +125,15 @@ const TYPE_TO_BUCKET = {
   // hair is NOT clothing: typing it so put ponytail/parting complaints in the
   // clothing bucket, where the repair repaints a garment and cannot fix hair.
   hair: 'character_identity',
+  // MINOR-capped nuance types (scoring.js MAX_SEVERITY_TYPES), registered
+  // explicitly: without these entries they only resolved via the
+  // compound-splitter's first token by accident, and a spelling variant
+  // would fall silently to `other`. cutout_artifact is deliberately NOT
+  // mapped here — it is zero-point and describes OUR crop extraction, not
+  // the page; wherever the splitter files it, it never charges and must not
+  // inherit a bucket whose repair route would repaint a healthy page.
+  hair_nuance: 'character_identity',
+  face_drift: 'character_identity',
   anatomy: 'anatomy', proportion: 'anatomy',
   incomplete_figure: 'figure_completeness', figure_completeness: 'figure_completeness',
   // Facing vocabulary → action_interaction (merge 2026-08-09). Kept as ALIASES,

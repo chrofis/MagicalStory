@@ -2454,6 +2454,32 @@ async function evaluateImageBatch(images, options = {}) {
             seen,
             { pageLabel: `PAGE ${img.pageNumber}: ` }
           );
+          // RESCORE after a drop (review 2026-09-01). score/qualityScore were
+          // derived from the issue lists INSIDE evaluateImageQuality — before
+          // this filter can run, because the filter needs the detector, which
+          // needs the eval. Dropping the claim without recomputing left its
+          // −20/−30 baked into the number while the finding vanished from the
+          // list: the page was silently under-scored and the repair-method
+          // gates acted on a charge with no finding behind it. Same rubric,
+          // same clamp as evalPipeline (visual = (10 − Σ SEVERITY_PENALTY) ×
+          // 10; final = visual − 30/20/10 semantic), recomputed from the
+          // now-filtered lists so the invariant "score derives from the
+          // current issues" holds again.
+          if (presenceDrops.length) {
+            const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
+            const visual = Math.max(0, Math.min(10, 10 - (qualityResult.fixableIssues || []).reduce(
+              (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1), 0))) * 10;
+            let semanticPenalty = 0;
+            for (const issue of (qualityResult.semanticResult?.semanticIssues || [])) {
+              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
+              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
+              else semanticPenalty += 10;
+            }
+            const before = qualityResult.score;
+            qualityResult.qualityScore = visual;
+            qualityResult.score = visual - semanticPenalty;
+            log.info(`👥 [PRESENCE] PAGE ${img.pageNumber}: rescored after ${presenceDrops.length} dropped absence claim(s): ${before} → ${qualityResult.score}`);
+          }
         }
       }
 
@@ -4596,7 +4622,9 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
           issues.push({
             description: issue.fixInstruction || issue.description,
             severity: issue.severity,
-            type: 'consistency',
+            // Real entity class first (face_drift, hair_nuance, ...) — the
+            // report keeps it in subType with type flattened to 'consistency'.
+            type: issue.subType || issue.type || 'consistency',
             fix: issue.canonicalVersion || issue.fixInstruction || '',
             character: charName,
             source: 'entity check',
@@ -4622,7 +4650,9 @@ function collectAllIssuesForPage(scene, storyData, pageNumber) {
           issues.push({
             description: issue.fixInstruction || issue.description,
             severity: issue.severity,
-            type: 'consistency',
+            // Real entity class first (face_drift, hair_nuance, ...) — the
+            // report keeps it in subType with type flattened to 'consistency'.
+            type: issue.subType || issue.type || 'consistency',
             fix: issue.canonicalVersion || issue.fixInstruction || '',
             character: objName,
             source: 'entity check',

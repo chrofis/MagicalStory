@@ -25,7 +25,9 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 6. For scene fixes, write a single consolidated instruction. Reference characters by visual identifier only.
 
-7. **Inpaint cannot do face/head replacement.** If an evaluator finding effectively asks for a face swap, head replacement, or whole-figure swap (verbs like "replace the face", "swap the head", "redraw the figure"), drop it from the plan. Record it in `dropped_issues` with reason `"requires_char_fix_not_inpaint"`. The character-fix pass handles identity; inpaint only does bounded edits.
+7. **Inpaint changes what a figure DOES, never who it is or what it wears.** It may turn, move, re-pose, re-aim a gaze or hand, alter an expression, and add, remove or reposition objects. It may not change a face, its shape or apparent age, hair, skin, or any garment — whatever verb the finding uses, including "repaint … to appear 22 years old". Drop those from the plan into `dropped_issues` with reason `"requires_char_fix_not_inpaint"`; the character-fix pass handles them.
+
+7a. **Every `per_character_fixes[]` entry carries `types`** — the declared types of the findings it consolidates, copied from `deduped_issues`. An entry whose types are all identity, age, hair, skin or clothing belongs in `dropped_issues` under rule 7, never in the plan.
 
 7b. **Inpaint cannot move the camera.** Set `scene_fix.requires_regeneration: true` only for a change to the camera angle, viewpoint, or shot distance (overhead vs eye-level, close-up vs wide) — the whole frame is re-shot. Moving or restaging a figure, changing a pose, gesture, or body orientation, and adding, removing, or repositioning an object are not camera changes; leave it `false` so inpaint handles them. When `true`, write the target framing in `instruction`.
 
@@ -69,7 +71,9 @@ Fill `spec_conflicts[]` before writing any fixes. This is the one exception to r
 
 11. Also return `deduped_issues[]`: the full deduplicated issue list, NOT capped at 3. The pipeline computes the page score from this list, one deduction per entry by severity — it is the scoring source, not just display. One entry per unique physical problem regardless of how many evaluators flagged it, and regardless of how differently they worded it. Group by CAUSE, not by wording: one repaint fixes one entry. A single atmosphere or lighting treatment described from several angles is ONE entry, not one per phrase; several figures sharing one staging fault (all turned the same wrong way) is ONE entry naming them together; a setting described as wrong in one entry is not also charged as wrong lighting, wrong palette, and wrong props. Each entry has:
    - `type`: the category, from this closed list. Carry it over from the findings you merged — when they disagree, pick the one that names the DEFECT rather than its symptom (a figure wearing the wrong garment is `clothing`, not `character_identity`). This value routes the repair, so an unlisted value is discarded as unroutable and the defect is reported but never fixed:
-     `image_coherence` · `character_identity` · `duplicate_character` · `missing_character` · `clothing` · `clothing_detail` · `accessory` · `accessory_missing` · `hair` · `nudity` · `anatomy` · `figure_completeness` · `action_interaction` · `object_presence` · `missing_element` · `object_count` · `scale` · `setting` · `style_consistency` · `rendered_text` · `character_marking` · `anachronism` · `garment_colour` · `naturalness`
+     `image_coherence` · `character_identity` · `duplicate_character` · `missing_character` · `clothing` · `clothing_detail` · `accessory` · `accessory_missing` · `hair` · `hair_nuance` · `face_drift` · `cutout_artifact` · `nudity` · `anatomy` · `figure_completeness` · `action_interaction` · `object_presence` · `missing_element` · `object_count` · `scale` · `setting` · `style_consistency` · `rendered_text` · `character_marking` · `anachronism` · `garment_colour` · `naturalness`
+
+     `hair_nuance` (hair differing only in shade within one colour family, or wavy vs curly), `face_drift` (same person, face reads rounder/fuller/narrower) and `cutout_artifact` (missing regions or hard white gaps from crop extraction) keep their own type when merging — they carry their own score ceilings, so relabelling one as `hair` or `character_identity` silently raises what it costs.
 
      `clothing` is the MAIN garment. A small worn item — eyewear, hat, bandana, belt, sash, badge, footwear, jewellery — is `accessory` when the wrong version was drawn and `accessory_missing` when a contract-named item is entirely absent. Keep that distinction when merging: they carry different score ceilings, so relabelling an accessory finding as `clothing` silently raises what it costs.
      `nudity` only when a figure has no torso garment AND no lower-body garment. Bare feet, a missing shoe, hat, or any single absent item is `clothing` or `accessory_missing`, never `nudity`.
@@ -130,6 +134,7 @@ Final: `"Open the eyes wide."`
       "visual_identifier": "the slim boy with brown hair in the center foreground",
       "bbox": [ymin, xmin, ymax, xmax],
       "severity": "MAJOR",
+      "types": ["action_interaction"],
       "issues": ["head facing camera instead of the stone"],
       "fix_draft": "Rotate the head and torso downward, eyes looking at the stone in the hands.",
       "fix_critique": "Two actions (rotate head/torso, redirect eyes) plus an -ing clause. Head rotation is highest-impact — eyes will follow.",
@@ -140,6 +145,7 @@ Final: `"Open the eyes wide."`
       "visual_identifier": "the tall brown-haired man on the right",
       "bbox": [ymin, xmin, ymax, xmax],
       "severity": "MAJOR",
+      "types": ["action_interaction"],
       "issues": ["face turned toward camera"],
       "fix_draft": "Angle the head over the boy's shoulder, tilting face down toward the stone.",
       "fix_critique": "Two actions (angle head, tilt face). Both describe head orientation — the first one already implies the second. Drop the tilt.",

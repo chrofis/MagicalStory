@@ -14132,6 +14132,61 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-09-01 — Deep-review fixes: the nuance caps reach the consolidated path, and a dropped absence refunds its charge
+
+**Context.** A five-agent adversarial review of the last week's changes returned
+seven findings. The four real ones are fixed here; the review's full text is in
+the session log, the two structural ones below are the ones that mattered.
+
+**1. The MINOR caps were dead on the DEFAULT scoring path (CRITICAL).**
+`prompts/feedback-consolidator.txt` carries a CLOSED type vocabulary and
+instructs the model to treat unlisted values as unroutable. `face_drift`,
+`hair_nuance` and `cutout_artifact` were never added when they were created, so
+the consolidator remapped them onto `character_identity` / `hair` — names with
+no entry in MAX_SEVERITY_TYPES / ZERO_POINT_TYPES — and `applyScore` prefers the
+consolidated issues over the raw math. Net: the caps held only when
+consolidation failed; on a normal story the 75-point hair-nuance overcharge came
+straight back. The three types are now in the vocabulary with a keep-your-type
+merge rule (same shape as the clothing/accessory note). Lesson recorded: a new
+scored TYPE is a four-file change — entity prompt, scoring.js,
+evalBuckets.js, AND feedback-consolidator.txt.
+
+**2. The two-witness filter dropped the claim but not the charge (MEDIUM-HIGH).**
+`score`/`qualityScore` are derived from the issue lists INSIDE
+`evaluateImageQuality`, and the witness filter cannot run until after it (the
+filter needs the detector, which needs the eval). So a suppressed
+`missing_character` vanished from the list while its −20/−30 stayed in the
+number — under-scored pages, repair gates acting on a charge with no finding.
+The wiring in `images.js` now RESCORES after a drop with the identical rubric
+(visual = (10 − Σ SEVERITY_PENALTY) × 10; final = visual − 30/20/10 semantic),
+restoring the invariant that the score derives from the current issues.
+version.finalScore was never affected (applyScore reads the filtered lists).
+
+**3. `coverTypesFor`'s legacy normalizer was a no-op** — written as
+`ct === 'frontCover' ? 'frontCover' : ct`, mapping the new name to itself.
+Now maps the actual legacy token: `'titlePage' → 'frontCover'`.
+
+**4. `face_drift`/`hair_nuance` registered in TYPE_TO_BUCKET** (→
+character_identity) instead of resolving by compound-splitter accident.
+`cutout_artifact` deliberately NOT mapped: zero-point, describes our crop
+extraction, must not inherit a repair route that repaints a healthy page.
+
+**5. Dev-panel display** (`collectAllIssuesForPage`) carries the real entity
+class (`issue.subType || issue.type`) instead of hardcoded 'consistency'.
+
+**Verified.** `deductionPoints` on consolidated-shaped issues: hair_nuance/
+face_drift MAJOR → 2 pts, cutout_artifact CRITICAL → 0 pts; taxonomy gate and
+check-no-undef full sweep clean.
+
+**Also confirmed by the review, for the record:** the coverless story
+(job_1787867402809) was a const-reassignment TypeError introduced by the
+2026-08-26 cover refactor and already fixed (f1a92b312) plus the allSettled
+hardening (320c93a00) — the earlier claim that the refactor was exonerated was
+wrong.
+
+**Touched files.** `prompts/feedback-consolidator.txt`, `server/lib/images.js`,
+`server/lib/evalBuckets.js`, `storyJobPipeline.js`.
+
 ## 2026-08-28 — One failing cover no longer destroys the other two
 
 **Context.** A 16-page staging story (`job_1787867402809_z9bwoo3yp`) shipped with
