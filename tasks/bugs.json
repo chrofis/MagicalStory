@@ -398,6 +398,12 @@
       "status": "fixed",
       "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
       "note": "Wiring only, prompt untouched. All SCENE_HINT producers greped and swapped to the content the image was MADE from: repairPipeline.js buildEvalInputs + baseline inputs (orig.scene.outlineExtract || entry.description || sceneDescription || scene.sceneHint — covers hit leg 1 unchanged because their outlineExtract IS the cover brief and pages never set outlineExtract; entry.description wins on an iterate rewrite), regeneration.js re-evaluate + eval-prompt routes (cover branch keeps the old expression), testlab.js ctx.outlineHint (Lab/prod parity). Shapes stable (string|null everywhere). Side benefit: evaluateThreeStage/interaction extraction now parse the METADATA block the AD brief carries."
+    },
+    {
+      "id": "character-avatars-store-base64-in-jsonb",
+      "reported": "2026-09-01",
+      "summary": "characters.data still stores base64 image bytes, violating the no-images-in-JSONB rule. extractInlineImagesToR2 is STORY-ONLY (every call site passes a storyId); the character write paths in server/routes/avatars.js and server/lib/storyAvatars.js never call it, so nothing offloads them. Measured on prod 2026-09-01: 40 of 59 character rows carry data:image, 73 MB; still happening today (newest row 2026-09-01, 4.2 MB inline). Worst fields, sampled over 4 rows: avatars.storyHistory[].sheetUrl 10.31 MB, avatars.styledAvatars.<style>.standard/.costumed.default 9.02 MB, preGeneratedAvatarSlides[] 1.13 MB, photos.bodyNoBg 1.13 MB, bodyNoBgUrl 0.65 MB — note sheetUrl and bodyNoBgUrl are NAMED url and hold data URIs. stories.data is clean since 2026-06 (0 inline in Jun/Jul/Aug/Sep), so the story path was fixed and characters were left behind. Cost impact: Postgres RAM tracks database size (shared_buffers is only 160 MB, the rest is OS page cache of the DB files), prod DB 1818 MB -> 2.14 GB container RAM.",
+      "status": "open"
     }
   ]
 }
