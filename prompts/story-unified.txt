@@ -103,6 +103,7 @@ Visual Bible entry with full description (build, hair, face, signature look, clo
 - Dialogues flow inline with the narrative text
 - Scene changes or location changes = start a NEW PAGE, not a new paragraph
 - Create a readable, engaging style appropriate for the target age
+- No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
 
 **Example of correct paragraph formatting:**
 ```
@@ -414,7 +415,7 @@ For EACH **primary character** ({PRIMARY_CHARACTER_NAMES}):
 
 **Inciting Incident**: [Event that sets the story in motion]
 **Rising Action**: [Building tension, obstacles, challenges]
-**Climax**: [Peak tension, main conflict reaches highest point]
+**Climax**: [Peak tension, main conflict reaches highest point — the low point or loss gets a page of its own; loss and resolution never share a page]
 **Falling Action**: [Events that begin resolving conflict]
 **Resolution**: [How story concludes, character growth shown]
 

@@ -57,6 +57,7 @@ Requirements:
 - When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.
+- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.
 - A beat may put the subject alone in frame — the creature, the artifact, the place — when the moment is the subject's: hatching, breaking, glowing, arriving, with the children just outside the frame.
 - A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.
 - The stake the arc has a character say aloud lands on an early page, spoken.

@@ -23330,3 +23330,26 @@ instant, the text carries the rest of the beat. Absence in the picture is legal;
 contradiction faults.
 **Touched.** `prompts/book-audit.txt`.
 **Status:** ✅ active
+
+## 2026-09-02 — writer register follows reading level; low point gets its own page; head-row coverage eval
+
+**Context.** Prod trial job_1788285785501_sbpfd0i8s (main character age 3, languageLevel
+"standard" — the trial hard-codes it, server/routes/trial.js:2551): the text was full of
+onomatopoeia/baby-talk, the outline compressed loss+regain into one beat, one scene asked
+the image for a facial transition ("changing from X to Y"), and the costumed 2×4 sheet's
+head-row front cells were bare-chested despite the head-row prompt requiring costume — the
+head-row eval (sheet-row-heads-eval.txt) had no clothing criterion, so it shipped at 9.
+**Decision.** (1) Writer prompts (story-trial.txt, story-text-from-beats.txt,
+story-unified.txt): no onomatopoeia/sound-effect words, no baby-talk — register follows the
+reading level, never a character's age. (2) Page planning (story-trial.txt, story-beats.txt,
+story-unified.txt plot structure): the emotional low point gets a page of its own; loss and
+resolution never share a page. (3) Expression guidance (story-trial.txt scene-hint schema,
+scene-expansion.txt): an expression is one instant, never a transition. (4)
+sheet-row-heads-eval.txt gains TASK 3 COVERAGE (bare skin below the neck scores 1-3);
+finalScore = min(angles, clean, coverage). Note: the trial skips sheet reviews
+(skipQualityEval, owner 2026-08-15), so the coverage gate protects full stories only.
+**Rationale.** The generation prompt for the head row was already correct ("no bare skin
+below the neck") — Grok violated it and nothing rejected the row. Register rules existed
+nowhere; the model inferred toddler speech from the character's age.
+**Touched.** prompts/story-trial.txt, story-text-from-beats.txt, story-unified.txt,
+story-beats.txt, scene-expansion.txt, sheet-row-heads-eval.txt, docs/decisions.md.

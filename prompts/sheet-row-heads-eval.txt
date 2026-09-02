@@ -8,12 +8,16 @@ The 4 cells read front, three-quarter, profile, back-of-head, left to right. Sco
 TASK 2: CLEAN RENDER (no arrows or stray marks)
 Check every head for arrows, lines, pointers, symbols, letters, or graphics coming out of or drawn on the head, face, hair, or skin. Coloured axis arrows (red / green / blue) sticking out of a head are a leaked pose-marker and score 1. Any clear stray mark on a head scores 1-3; none = 9-10. cleanScore 1-10.
 
-finalScore = lowest of anglesScore, cleanScore. valid = finalScore ≥ 6.
+TASK 3: COVERAGE (no bare skin below the neck)
+Where a cell shows any shoulder or upper torso, it is clothed — collar, fabric, or costume visible. A cell showing a bare chest, bare shoulders, or an unclothed torso scores 1-3; all cells clothed (or cropped above the shoulders) = 9-10. coverageScore 1-10.
+
+finalScore = lowest of anglesScore, cleanScore, coverageScore. valid = finalScore ≥ 6.
 
 Return EXACTLY this JSON:
 {
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "cleanRender": {"cleanScore": 9, "reason": "No arrows or stray marks on any head"},
+  "coverage": {"coverageScore": 9, "reason": "Visible shoulders are clothed in every cell"},
   "finalScore": 9,
   "valid": true,
   "failureReasons": []
