@@ -23620,6 +23620,20 @@ is copied into REQUIRED OBJECTS, so 'turned away from the viewer' arrives … in
 orientation now rides the lead's name qualifier instead of the description. The pair-of-entries
 design is unchanged.
 
+**Validation:** Test Lab exp **974** (Art Director replay of p2/4/5/9/15 with the new templates,
+text-only) and exp **975** (re-render of the same five pages from the SAME stored brief, so the
+prompt builder is the only variable). Measured, one sample per page: painted hull/stern lettering
+gone on 4/5 (p4 "two-masted wooden sailing ship, topsail schooner-style" across the hull, p5 the
+same across the hull, p9 and p15 the stern names — all clean); scale fixed on both pages where it
+was broken (p5's 3x-height beached hull, p15's toy boat with the masthead at eye level); the
+invented foreground vessel gone on p5 and p4. Not fixed: p2 is unchanged (still a second complete
+ship WITH its name painted) and p9/p15 still place a separate complete vessel beside the surface
+the camera stands on. Two channels remain and are logged in `tasks/BACKLOG.md`: the stored brief
+itself names the ship as a described object while the camera is aboard it (what rule 11d fixes —
+not exercised by a run that reuses the old briefs), and the Visual-Bible **grid reference image**,
+which shows the ship's exterior with its name and is a picture no text rule can outvote.
+Comparison page: `scratchpad/piraterun3/fixcheck/compare.html`.
+
 **Touched:** `server/lib/promptBuilders.js` (`buildImagePrompt` REQUIRED OBJECTS emission + header),
 `server/lib/bboxDetection.js` (`parseVisualBibleObjects` accepts a colonless entry),
 `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`, `prompts/image-generation.txt`,
