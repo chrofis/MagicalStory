@@ -6815,6 +6815,9 @@ async function _processStoryJobImpl(jobId) {
       const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
       const landmarks = await resolveAvailableLandmarks(inputData.userLocation, {
         limit: 30, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        // A landmark the family names in their idea is pinned first (after the
+        // shuffle), so the writer's top-3 opens on it.
+        premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),
       });
       if (landmarks.length > 0) {
         inputData.availableLandmarks = landmarks;

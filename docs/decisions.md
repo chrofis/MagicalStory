@@ -23353,3 +23353,28 @@ below the neck") — Grok violated it and nothing rejected the row. Register rul
 nowhere; the model inferred toddler speech from the character's age.
 **Touched.** prompts/story-trial.txt, story-text-from-beats.txt, story-unified.txt,
 story-beats.txt, scene-expansion.txt, sheet-row-heads-eval.txt, docs/decisions.md.
+
+## 2026-09-02 — Premise-named landmark is pinned first in the offered list
+
+**Context.** `resolveAvailableLandmarks` served the town's ranked list, shuffled, and the
+writer / trial prompt took its top 3 (`buildTrialStoryPrompt` slices exactly 3). A family
+whose story idea names a specific place ("a visit to the castle at X") got whatever the
+shuffle put first; the named landmark, if indexed at all, sat anywhere in 30 rows or was in
+a neighbouring town's list and not offered at all.
+**Decision.** New option `premiseText` (storyDetails + title, passed from
+`storyJobPipeline.js`). After the shuffle, index rows whose name the premise mentions are
+moved/added to the FRONT (dedupe by id, cap 3, `story_score DESC`), built through the same
+`servedLandmark` row builder so they carry photoVariants. Matching is purely lexical and
+lives in one pure function, `premiseMentionsLandmark` (accent-folded, case-insensitive,
+"(Town)" suffix stripped, generic type words and articles dropped, every remaining token a
+whole word of the premise, 5+ chars total); SQL is only a folded whole-word prefilter with
+the existing `JUDGED_USABLE_SQL` / `NEVER_A_SETTING_SQL` filters and class > 0 (no town
+overview aerials). `storyIdeas.js` callers are untouched — ideas are generated before a
+premise exists.
+**Rationale.** No model call, no fuzzy matching: a whole-word token rule cannot pin "Aare"
+from "Aarburg", and the 5-char floor stops "Zug"-length fragments. Pinning after the shuffle
+is what guarantees the trial's slice(0,3) sees it.
+**Touched.** `server/lib/landmarkPhotos.js` (`premiseMentionsLandmark`, `servedLandmark`,
+`premiseNamedLandmarks`, `resolveAvailableLandmarks`), `storyJobPipeline.js`,
+`tests/unit/premise-landmark-match.test.ts`, `docs/landmark-database.md`.
+**Status:** ✅ active

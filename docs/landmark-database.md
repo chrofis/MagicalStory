@@ -150,6 +150,15 @@ by a vision API. See `docs/landmark-judging-instructions.md`,
 
 ---
 
+**Premise pin.** `resolveAvailableLandmarks({ premiseText })` puts any index row
+whose name the family's story idea mentions FIRST (after the shuffle), so the
+writer's top-3 opens on it. Lexical only: `premiseMentionsLandmark` (pure,
+unit-tested in `tests/unit/premise-landmark-match.test.ts`) — strip "(Town)",
+fold accents, drop generic type words and articles, every remaining token must
+be a whole word of the premise and they must total 5+ chars. SQL prefilters on
+folded whole-word overlap; same usable/never-a-setting filters, class > 0,
+`story_score DESC`, cap 3.
+
 ## 7. Serving — the fallback ladder
 
 `resolveAvailableLandmarks(location, opts)` is the **single entry point** for both
@@ -263,7 +272,11 @@ a private one, so landmarks it discovered were invisible to the pipeline.
 **Photos**
 `backfill-landmark-photos.js` (uses `findBestLandmarkImage`; aborts on
 `analysisUnavailable`) · `fetch-landmark-photos-free.js` (no model calls at all) ·
-`classify-landmark-photos.js` (camera angle, Gemini)
+`classify-landmark-photos.js` (camera angle, Gemini) ·
+`prep-landmark-descriptions.js` → agents → `merge-landmark-descriptions.js`
+($0 — fills the `photo_description[_N]` slots that `fetch-landmark-photos-free.js`
+left NULL, ~10,000 on prod; agents Read the thumbnails and write
+`descs_<batch>.json` in the `analyzeLandmarkPhoto` brief; `--brief` prints it)
 
 **Judging**
 `prep-landmark-judging.js` → agents → `merge-landmark-judgments.js` ·

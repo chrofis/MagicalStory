@@ -2518,6 +2518,39 @@ const NORM_SQL = t => `LOWER(translate(${t}, 'üùäàâöôéèêëîïçñß',
 const TOWN_MATCHES_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
   OR ${NORM_SQL('coalesce(municipality, nearest_city)')} = $1)`;
 
+// A landmark the premise NAMES is pinned to the front of the offered list
+// (resolveAvailableLandmarks `premiseText`). The rule is lexical only: strip a
+// trailing "(Town)" disambiguator, fold accents and case, drop the generic
+// type word ("Festung", "château", "Kirche"…) and articles, and require every
+// remaining name token to occur as a whole word in the premise. The kept
+// tokens must add up to 5+ characters, so a name whose distinctive part is a
+// short word ("Aare") cannot ride in on a coincidental fragment.
+const PREMISE_GENERIC_WORDS = new Set([
+  'festung', 'schloss', 'burg', 'ruine', 'chateau', 'castello', 'castle',
+  'kirche', 'eglise', 'chiesa', 'church', 'kloster', 'abbaye', 'abbazia', 'abbey', 'kapelle', 'chapelle',
+  'museum', 'musee', 'museo', 'turm', 'tour', 'torre', 'tower', 'see', 'lac', 'lago', 'lake',
+  'brucke', 'pont', 'ponte', 'bridge',
+  // articles / prepositions inside French, German and Italian names
+  'de', 'du', 'des', 'la', 'le', 'les', 'der', 'die', 'das', 'den', 'dem', 'von', 'vom',
+  'zu', 'zum', 'zur', 'am', 'im', 'an', 'in', 'di', 'del', 'della', 'il', 'of', 'the',
+]);
+const PREMISE_MIN_TOKEN_CHARS = 5;
+
+const premiseWords = text => normalizeForCompare(String(text || '')).split(/[^a-z0-9]+/).filter(Boolean);
+
+function premiseNameTokens(name) {
+  const core = String(name || '').replace(/\s*\([^)]*\)\s*$/, '');
+  return premiseWords(core).filter(t => t.length > 1 && !PREMISE_GENERIC_WORDS.has(t));
+}
+
+function premiseMentionsLandmark(name, premiseText) {
+  const tokens = premiseNameTokens(name);
+  if (!tokens.length) return false;
+  if (tokens.reduce((n, t) => n + t.length, 0) < PREMISE_MIN_TOKEN_CHARS) return false;
+  const words = new Set(premiseWords(premiseText));
+  return tokens.every(t => words.has(t));
+}
+
 // Own-village landmarks rank ahead of ones inherited from the municipality —
 // but BELOW having a photo at all, so this sorts after HAS_PHOTO_SQL. Ranked
 // above it, Langnau opened on photoless Burg Spitzenberg instead of its own
@@ -3745,71 +3778,75 @@ function availableLandmarkCacheKey(location) {
  *   score, wikipediaExtract, photoDescription, photoUrl, attribution, lat, lon,
  *   photoVariants, isIndexed/landmarkIndexId + legacy isSwissPreIndexed/swissLandmarkId)
  */
+// One served landmark from an index row plus its judged best-slot entry
+// (bestPhotoSlots). Shared by the town lookup and the premise pin so both
+// hand the story the same shape, photoVariants included.
+function servedLandmark(l, judged) {
+  // Serve the BEST-judged photo, not always slot 1. A landmark's score is
+  // derived from its best slot, so returning the lead image regardless would
+  // hand the story a picture the score never described: Ruine Stein rates 85
+  // on slot 3, while its lead photo is the distant one that scored 55.
+  // Every field below describes ONE image, so they all take the same slot.
+  // No cross-slot fallback: attribution is a CC licence condition, and
+  // pairing slot 3's photo with slot 1's credit names the wrong
+  // photographer. A missing description beats a wrong one.
+  const served = judged?.primary || 1;
+  const at = key => l[served === 1 ? key : `${key}_${served}`] ?? null;
+  const col = (s, v) => l[v === 1 ? s : `${s}_${v}`] ?? null;
+
+  // One variant per framing, so a scene set INSIDE the castle can reach the
+  // interior shot even though a medium exterior is the primary. Falls back
+  // to every described slot when the landmark has not been judged yet.
+  const photoVariants = judged
+    ? judged.byFraming.map(f => ({
+      variantNumber: f.slot,
+      vantage: f.framing,
+      photoScore: f.photoScore,
+      url: col('photo_url', f.slot),
+      description: col('photo_description', f.slot),
+      attribution: col('photo_attribution', f.slot),
+    }))
+    : Array.from({ length: 6 }, (_, i) => i + 1)
+      .filter(v => col('photo_url', v) && col('photo_description', v))
+      .map(v => ({
+        variantNumber: v,
+        // photo_type is recorded per slot; the old v>=4 rule was a guess
+        // about how the indexer filled the columns, not the stored fact.
+        vantage: col('photo_type', v) || (v >= 4 ? 'interior' : 'exterior'),
+        url: col('photo_url', v),
+        description: col('photo_description', v),
+        attribution: col('photo_attribution', v),
+      }));
+  return {
+    name: l.name,
+    query: l.name,
+    type: l.type,
+    score: l.score,
+    lat: parseFloat(l.latitude),
+    lon: parseFloat(l.longitude),
+    photoUrl: at('photo_url') || l.photo_url,
+    photoDescription: at('photo_description'),
+    attribution: at('photo_attribution'),
+    photoType: at('photo_type'),
+    photoSlot: served,
+    wikipediaExtract: l.wikipedia_extract,
+    photoVariants,
+    isIndexed: true,
+    landmarkIndexId: l.id,
+    isSwissPreIndexed: true, // legacy field names, still read downstream
+    swissLandmarkId: l.id,
+  };
+}
+
 async function resolveAvailableLandmarks(location, opts = {}) {
-  const { limit = 30, discoverOnMiss = false, language = null, shuffle = false, onStatus = null } = opts;
+  const { limit = 30, discoverOnMiss = false, language = null, shuffle = false, onStatus = null, premiseText = '' } = opts;
   if (!location?.city) return [];
   let landmarks = [];
 
   try {
     const indexed = await getIndexedLandmarks(location, limit);
     const bestSlot = await bestPhotoSlots(indexed.map(l => l.id));
-    landmarks = indexed.map(l => {
-      // Serve the BEST-judged photo, not always slot 1. A landmark's score is
-      // derived from its best slot, so returning the lead image regardless would
-      // hand the story a picture the score never described: Ruine Stein rates 85
-      // on slot 3, while its lead photo is the distant one that scored 55.
-      // Every field below describes ONE image, so they all take the same slot.
-      // No cross-slot fallback: attribution is a CC licence condition, and
-      // pairing slot 3's photo with slot 1's credit names the wrong
-      // photographer. A missing description beats a wrong one.
-      const judged = bestSlot.get(l.id);
-      const served = judged?.primary || 1;
-      const at = key => l[served === 1 ? key : `${key}_${served}`] ?? null;
-      const col = (s, v) => l[v === 1 ? s : `${s}_${v}`] ?? null;
-
-      // One variant per framing, so a scene set INSIDE the castle can reach the
-      // interior shot even though a medium exterior is the primary. Falls back
-      // to every described slot when the landmark has not been judged yet.
-      const photoVariants = judged
-        ? judged.byFraming.map(f => ({
-          variantNumber: f.slot,
-          vantage: f.framing,
-          photoScore: f.photoScore,
-          url: col('photo_url', f.slot),
-          description: col('photo_description', f.slot),
-          attribution: col('photo_attribution', f.slot),
-        }))
-        : Array.from({ length: 6 }, (_, i) => i + 1)
-          .filter(v => col('photo_url', v) && col('photo_description', v))
-          .map(v => ({
-            variantNumber: v,
-            // photo_type is recorded per slot; the old v>=4 rule was a guess
-            // about how the indexer filled the columns, not the stored fact.
-            vantage: col('photo_type', v) || (v >= 4 ? 'interior' : 'exterior'),
-            url: col('photo_url', v),
-            description: col('photo_description', v),
-            attribution: col('photo_attribution', v),
-          }));
-      return {
-        name: l.name,
-        query: l.name,
-        type: l.type,
-        score: l.score,
-        lat: parseFloat(l.latitude),
-        lon: parseFloat(l.longitude),
-        photoUrl: at('photo_url') || l.photo_url,
-        photoDescription: at('photo_description'),
-        attribution: at('photo_attribution'),
-        photoType: at('photo_type'),
-        photoSlot: served,
-        wikipediaExtract: l.wikipedia_extract,
-        photoVariants,
-        isIndexed: true,
-        landmarkIndexId: l.id,
-        isSwissPreIndexed: true, // legacy field names, still read downstream
-        swissLandmarkId: l.id,
-      };
-    });
+    landmarks = indexed.map(l => servedLandmark(l, bestSlot.get(l.id)));
     if (landmarks.length > 0) log.info(`[LANDMARK] 📍 ${landmarks.length} indexed landmarks for ${location.city}`);
   } catch (err) {
     log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${err.message}`);
@@ -3879,7 +3916,43 @@ async function resolveAvailableLandmarks(location, opts = {}) {
       [landmarks[i], landmarks[j]] = [landmarks[j], landmarks[i]];
     }
   }
+
+  // A landmark the premise names goes FIRST — after the shuffle, so the
+  // writer's top-3 (the trial prompt slices exactly that) opens on the place
+  // the family asked for instead of a random neighbour. Matches already in
+  // the list move to the front; new ones are added ahead of it.
+  if (premiseText && premiseWords(premiseText).length) {
+    const pinned = await premiseNamedLandmarks(premiseText);
+    if (pinned.length) {
+      const ids = new Set(pinned.map(p => p.landmarkIndexId));
+      landmarks = [...pinned, ...landmarks.filter(l => !ids.has(l.landmarkIndexId))];
+      log.info(`[LANDMARK] premise names ${pinned.map(p => `"${p.name}"`).join(', ')} → pinned first`);
+    }
+  }
   return landmarks;
+}
+
+// Index rows whose name the premise mentions (premiseMentionsLandmark), best
+// story_score first, at most 3. The SQL is a cheap accent-folded, word-bounded
+// prefilter — any premise word occurring in the name — and the pure helper
+// applies the full rule on what comes back, so the rule lives in one place.
+async function premiseNamedLandmarks(premiseText) {
+  const pool = getPool();
+  if (!pool) return [];
+  const words = [...new Set(premiseWords(premiseText).filter(w => w.length > 1))];
+  if (!words.length) return [];
+  const { rows } = await pool.query(`
+    SELECT * FROM landmark_index
+     WHERE photo_url IS NOT NULL
+       AND ${NEVER_A_SETTING_SQL}
+       AND ${JUDGED_USABLE_SQL}
+       AND ${LANDMARK_CLASS_SQL} > 0
+       AND ${NORM_SQL('name')} ~ ('\\m(' || $1 || ')\\M')
+     ORDER BY story_score DESC NULLS LAST, name ASC
+     LIMIT 50`, [words.join('|')]);
+  const matched = rows.filter(r => premiseMentionsLandmark(r.name, premiseText)).slice(0, 3);
+  const bestSlot = await bestPhotoSlots(matched.map(l => l.id));
+  return matched.map(l => servedLandmark(l, bestSlot.get(l.id)));
 }
 
 module.exports = {
@@ -3887,6 +3960,7 @@ module.exports = {
   isFreelyLicensedImageUrl,
   fetchLandmarkPhoto,
   resolveAvailableLandmarks,
+  premiseMentionsLandmark,
   availableLandmarkCache,
   AVAILABLE_LANDMARK_CACHE_TTL,
   prefetchLandmarkPhotos,
