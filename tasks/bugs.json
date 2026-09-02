@@ -7,7 +7,7 @@
    "reportedAt": "2026-09-02",
    "source": "fault-hunt agent A (silent-default class), verified against images.js batch wrapper + scoring.js applyScore + repairPipeline null tripwire; same disease as the 2026-08-24 dead evaluator, one seam higher",
    "status": "fixed",
-   "fixedIn": "466310732",
+   "fixedIn": "a02726f19",
    "note": "evaluateImageQuality returns null on ~8 failure paths; batch wrapper stamped evaluated:true with empty lists; applyScore read empty deductions as 100; the 100 outranked genuine repairs. Fixed both seams: wrapper stamps evaluated:false + evalError; applyScore refuses evidence-free evals (finalScore null, scoreSource 'unevaluated'), discriminating real clean evals by numeric score + reasoning."
   },
   {
