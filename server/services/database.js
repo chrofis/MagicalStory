@@ -2685,7 +2685,16 @@ async function persistFigureMasks(storyId, img, pageNumberOverride) {
   const masks = img?.bboxDetection?._gdinoMasks;
   if (!Array.isArray(masks) || !masks.some(Boolean)) return 0;
   const pageNumber = pageNumberOverride != null ? pageNumberOverride : img.pageNumber;
+  // The mask is only valid for the bytes it was segmented on — same contract
+  // as the boxes it travels with (bboxDetection.sourceImageFp / bboxPairsWith).
+  // Stamped here, verified in loadFigureMaskPng: without the stamp, a page
+  // regeneration left the OLD render's silhouettes answering lookups for the
+  // NEW bytes, and a stale mask decides whose head a repair whites out.
+  // Written even when null (detection unexpectedly unstamped) so a re-save can
+  // never leave an older fp validating fresher mask bytes.
+  const sourceFp = img?.bboxDetection?.sourceImageFp || null;
   let saved = 0;
+  let fpColumnMissing = false;
   for (let i = 0; i < masks.length; i++) {
     const m = masks[i];
     if (!m) continue;
@@ -2695,7 +2704,37 @@ async function persistFigureMasks(storyId, img, pageNumberOverride) {
       saved++;
     } catch (e) {
       log.warn(`[FIGURE-MASK] p${pageNumber} figure ${i}: save failed — ${e.message}`);
+      continue;
     }
+    // Separate UPDATE (not part of the generic saveStoryImage upsert) so the
+    // code keeps working before migration 034 lands: 42703 = undefined_column
+    // → the row stays fp-less, which the load path treats as "refuse mask".
+    if (!fpColumnMissing) {
+      try {
+        await dbQuery(
+          `UPDATE story_images SET source_image_fp = $1
+           WHERE story_id = $2 AND image_type = 'figure_mask' AND page_number IS NOT DISTINCT FROM $3 AND version_index = $4`,
+          [sourceFp, storyId, pageNumber, i]
+        );
+      } catch (e) {
+        fpColumnMissing = e.code === '42703';
+        log.warn(`[FIGURE-MASK] p${pageNumber} figure ${i}: fp stamp failed — ${e.message}${fpColumnMissing ? ' (run migration 034_story_images_source_fp.sql; unstamped masks are refused at load)' : ''}`);
+      }
+    }
+  }
+  // Stale-higher-index leak: a re-detection with FEWER figures used to leave
+  // the old detection's extra rows in place — figure #3's silhouette from a
+  // render that no longer has a figure #3, served to any later lookup that
+  // asked for that index. The current detection owns the full index range now.
+  try {
+    const gone = await dbQuery(
+      `DELETE FROM story_images
+       WHERE story_id = $1 AND image_type = 'figure_mask' AND page_number IS NOT DISTINCT FROM $2 AND version_index >= $3 AND NOT is_test`,
+      [storyId, pageNumber, masks.length]
+    );
+    if (gone.rowCount > 0) log.info(`🎭 [FIGURE-MASK] p${pageNumber}: removed ${gone.rowCount} stale silhouette row(s) beyond figure count ${masks.length}`);
+  } catch (e) {
+    log.warn(`[FIGURE-MASK] p${pageNumber}: stale-mask cleanup failed — ${e.message}`);
   }
   if (saved > 0) log.debug(`🎭 [FIGURE-MASK] p${pageNumber}: stored ${saved} silhouette(s) for repair reuse`);
   return saved;
@@ -2886,13 +2925,42 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
  * figure_mask persistence — in which case the caller re-runs SAM and says so
  * loudly (faceRepair stamps `samRecomputed`).
  *
+ * FINGERPRINT-GUARDED like the boxes it travels with (bboxPairsWith): the row
+ * is only served when its source_image_fp matches `expectedFp` — the fp of the
+ * detection whose figures[] gave the caller `figureIndex`. Lookup by
+ * (storyId, pageNumber, figureIndex) alone paired a silhouette segmented on
+ * OLD bytes with a repair running on NEW bytes, and the mask decides whose
+ * head gets whited out. Missing fp (legacy row, or pre-migration-034 column)
+ * refuses too: masks are regenerable, a stale one is worse than none.
+ *
  * @param {number} figureIndex - position in bboxDetection.figures[]
+ * @param {string|null} expectedFp - imageFingerprint of the detection's source
+ *   bytes (detection.sourceImageFp); null → cannot verify → refuse.
  */
-async function loadFigureMaskPng(storyId, pageNumber, figureIndex) {
+async function loadFigureMaskPng(storyId, pageNumber, figureIndex, expectedFp = null) {
   if (!isDatabaseMode() || !Number.isInteger(figureIndex) || figureIndex < 0) return null;
   try {
-    const row = await getStoryImage(storyId, 'figure_mask', pageNumber, figureIndex);
-    const bytes = row && await imgBytesAsync(row.imageData ? { image_data: row.imageData } : { image_url: row.imageUrl });
+    let rows;
+    try {
+      rows = await dbQuery(
+        `SELECT image_data, image_url, source_image_fp FROM story_images
+         WHERE story_id = $1 AND image_type = 'figure_mask' AND page_number IS NOT DISTINCT FROM $2 AND version_index = $3 AND NOT is_test`,
+        [storyId, pageNumber, figureIndex]
+      );
+    } catch (e) {
+      // 42703 = source_image_fp column doesn't exist yet (migration 034 not
+      // applied). An unverifiable mask is treated exactly like a missing fp.
+      if (e.code !== '42703') throw e;
+      log.warn(`[FIGURE-MASK] p${pageNumber} #${figureIndex}: source_image_fp column missing (run migration 034) — refusing stored mask, caller re-runs SAM`);
+      return null;
+    }
+    const row = rows[0];
+    if (!row) return null;
+    if (!expectedFp || !row.source_image_fp || row.source_image_fp !== expectedFp) {
+      log.warn(`[FIGURE-MASK] p${pageNumber} #${figureIndex}: stored mask refused — fp ${row.source_image_fp || 'MISSING'} vs expected ${expectedFp || 'UNKNOWN'}; silhouette is from different bytes, caller re-runs SAM`);
+      return null;
+    }
+    const bytes = await imgBytesAsync(row);
     if (!bytes) return null;
     const m = String(bytes).match(/^data:image\/\w+;base64,(.+)$/);
     return Buffer.from(m ? m[1] : bytes, 'base64');

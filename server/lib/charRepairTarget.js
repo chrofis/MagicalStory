@@ -193,6 +193,10 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
             clothing: app.clothing || null,
             figures: figs,
             bodyMask: (selfIdx >= 0 && paired?._gdinoMasks?.[selfIdx]) || null,
+            // The fp of the detection these figures came from, carried so
+            // resolveFigureMask can verify a STORED mask row against it — the
+            // boxes were fp-guarded (bboxPairsWith) but the mask never was.
+            sourceImageFp: paired?.sourceImageFp || null,
           };
         }
       }
@@ -220,6 +224,9 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
       source: 'bbox',
       bodyMask,
       figures,
+      // Non-empty figures ⇒ pairs() accepted this detection; its fp is what a
+      // stored mask row must match (see resolveFigureMask).
+      sourceImageFp: bestEval?.bboxDetection?.sourceImageFp || null,
     };
   }
 
@@ -237,7 +244,12 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
     };
   }
 
-  return { faceBbox: null, bodyBbox: null, source: null, figures };
+  return {
+    faceBbox: null, bodyBbox: null, source: null, figures,
+    // Same rule as tier 2: `figures` is empty unless pairs() accepted the
+    // detection, so this fp always describes the figure list it ships with.
+    sourceImageFp: figures.length ? (bestEval?.bboxDetection?.sourceImageFp || null) : null,
+  };
 }
 
 /**
@@ -270,8 +282,12 @@ async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {
   }
   try {
     const { loadFigureMaskPng } = require('../services/database');
-    const png = await loadFigureMaskPng(storyId, pageNumber, idx);
-    if (!png) log.warn(`[FIGURE-MASK] ${charName}: figure #${idx} has no stored mask for p${pageNumber}`);
+    // The stored row must match the DETECTION that named figure #idx — the
+    // load verifies its source_image_fp against this fp and refuses on
+    // mismatch/missing (a silhouette from old bytes clips repairs on new
+    // bytes; masks are regenerable, so refusal just costs one SAM call).
+    const png = await loadFigureMaskPng(storyId, pageNumber, idx, resolved?.sourceImageFp || null);
+    if (!png) log.warn(`[FIGURE-MASK] ${charName}: figure #${idx} has no usable stored mask for p${pageNumber} (missing, unstamped, or from different bytes)`);
     else log.info(`♻️ [FIGURE-MASK] ${charName}: reusing stored silhouette #${idx} (${(png.length / 1024).toFixed(1)}KB)`);
     return png;
   } catch (e) {

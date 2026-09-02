@@ -92,7 +92,7 @@ const { log } = require('../utils/logger');
 // Severity points calibrated for tolerance — minor wobbles shouldn't
 // trip the redo gate.
 //
-// THREE severity→number tables exist ON PURPOSE — do not "unify" one
+// FOUR severity→number tables exist ON PURPOSE — do not "unify" one
 // against the others:
 //   SEVERITY_POINTS (here)          — the SCORE: what finalScore charges.
 //   RANK_SEVERITY_WEIGHT (below)    — the RANKING tiebreak: deliberately
@@ -102,6 +102,9 @@ const { log } = require('../utils/logger');
 //                                     repair-method gates; feeds
 //                                     qualityScore/rawScore, never
 //                                     finalScore.
+//   SEMANTIC_ISSUE_PENALTY (below)  — the in-eval semantic surcharge that
+//                                     evaluateImageQuality subtracts from its
+//                                     own merged score (semanticPenaltyPoints).
 // Entity display/rank derives from SEVERITY_POINTS (see images.js
 // ENTITY_PENALTIES).
 // =====================================================================
@@ -237,6 +240,30 @@ function capEntityPenalty(rawPenalty, { allNonActionable = false } = {}) {
   return allNonActionable ? capped / 2 : capped;
 }
 
+// Semantic-issue surcharge that evaluateImageQuality subtracts from its own
+// merged score (evalPipeline: finalScore = visual − Σ this). ONE table for
+// what were four hand-copied `CRITICAL→30 / MAJOR→20 / else→10` chains
+// (evalPipeline ×3, images.js presence-rescore ×1): none of the copies
+// learned CATASTROPHIC when it joined the severity ladder, so a CATASTROPHIC
+// semantic issue fell through to the `else` arm and was billed 10 — half of
+// MAJOR. It now charges 40, keeping the ladder monotonic above CRITICAL's 30.
+// MODERATE/MINOR/unknown keep the historic else→10 on purpose.
+const SEMANTIC_ISSUE_PENALTY = { CATASTROPHIC: 40, CRITICAL: 30, MAJOR: 20 };
+
+/**
+ * Total semantic penalty for a semanticIssues list (see table above).
+ *
+ * @param {Array|null} semanticIssues  semanticResult.semanticIssues
+ * @returns {number} points to subtract from the visual score
+ */
+function semanticPenaltyPoints(semanticIssues) {
+  let total = 0;
+  for (const issue of (Array.isArray(semanticIssues) ? semanticIssues : [])) {
+    total += SEMANTIC_ISSUE_PENALTY[String(issue?.severity || '').toUpperCase()] ?? 10;
+  }
+  return total;
+}
+
 /**
  * Normalize a list of raw evaluator issues into the deductions shape.
  * Filters out anything without a severity.
@@ -252,6 +279,15 @@ function normalizeIssues(rawIssues, source) {
       severity: sev,
       description: it.description || it.problem || it.issue || '',
       type: it.type || it.category || null,
+      // Entity findings flatten type to 'consistency' and keep the real
+      // classification in subType (entityConsistency.js). deductionPoints
+      // reads subType FIRST for exactly that reason — dropping it here made
+      // every type ceiling inert on the raw (unconsolidated) path: a MAJOR
+      // hair_nuance billed 15 instead of its minor-capped 2, while the
+      // consolidated path (feedbackConsolidator maps subType back into type)
+      // billed 2 for the same finding. Quality/semantic/compliance issues
+      // carry no subType, so this is entity-only in practice.
+      ...(it.subType ? { subType: it.subType } : {}),
       name: it.character || it.name || it.element || null,
       source,
       // Consolidator deduped issues carry the evaluator names that flagged
@@ -529,6 +565,41 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
     ? consolidatedPlan.deduped_issues
     : null;
   const deductions = composeDeductions({ evalResult, entityResult, consolidated: dedupedIssues });
+
+  // A FAILED eval must not become a perfect page. evaluateImageQuality returns
+  // null on ~8 failure paths (blocked response, MAX_TOKENS exhaustion,
+  // unparseable output, generic catch); the batch wrapper's record then
+  // carries score:null with empty issue lists, and this function read those
+  // empty lists as zero deductions → finalScore 100 — a hollow eval outranked
+  // every genuinely-evaluated repair in pickBestVersionIndex, and
+  // repairPipeline's finalScore==null tripwire (written for exactly this
+  // case) never fired. Discriminator: a real clean eval carries a numeric
+  // score/qualityScore and reasoning text; an eval with none of those and
+  // zero issues in every bucket judged nothing. Leave finalScore null so the
+  // existing null-score guards (pickBestVersionIndex refusal, repairPipeline
+  // tripwire, findBadPages' evaluated===false redo) do their job.
+  const bucketCount = deductions.quality.length + deductions.semantic.length
+    + deductions.compliance.length + deductions.consolidated.length + deductions.entity.length;
+  const hollowEval = evalResult != null && (
+    evalResult.evaluated === false ||
+    (typeof evalResult.score !== 'number'
+      && typeof evalResult.qualityScore !== 'number'
+      && !evalResult.reasoning
+      && bucketCount === 0)
+  );
+  if (hollowEval) {
+    version.deductions = deductions;
+    version.finalScore = null;
+    version.evalScore = null;
+    version.entityPenaltyRaw = 0;
+    version.entityPenalty = 0;
+    version.scoreSource = 'unevaluated';
+    version.scoreBreakdown = _buildBreakdownFromEvalResult(evalResult, entityResult);
+    const pnHollow = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
+    log.warn(`[SCORE] ${pnHollow}: eval carries no evidence of judgment (evaluated=${evalResult.evaluated ?? 'n/a'}, no score, no reasoning, no issues) — finalScore left null, NOT defaulted to 100`);
+    return version;
+  }
+
   if (!dedupedIssues) {
     const rawCount = deductions.quality.length + deductions.semantic.length
       + deductions.compliance.length + deductions.entity.length;
@@ -563,7 +634,16 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
   // The previous evalScore math (MIN of visual/semantic/threeStage subscores
   // was the legacy behavior; new model derives
   // evalScore from deductions ÷ entity-penalty split.
-  const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[String(d.severity || '').toLowerCase()] || 0), 0);
+  //
+  // deductionPoints per issue, NOT raw SEVERITY_POINTS: finalScore's entity
+  // charge (sumDeductionPoints) goes through deductionPoints, which applies
+  // the ZERO_POINT/MAX_SEVERITY/MIN_SEVERITY type ceilings. Billing this
+  // display field at raw severity made the two disagree — a MAJOR hair_nuance
+  // charged 2 in finalScore was displayed as entityPenalty 15, and
+  // evalScore = finalScore + entityPenalty overstated by the 13-point gap.
+  // Same per-issue arithmetic on both sides; capEntityPenalty stays applied
+  // identically in both paths, so the 40-point cap cannot diverge either.
+  const entityRaw = (deductions.entity || []).reduce((s, d) => s + deductionPoints(d), 0);
   const entityPoints = capEntityPenalty(entityRaw);
   version.entityPenaltyRaw = entityRaw;
   version.entityPenalty = entityPoints;
@@ -973,6 +1053,7 @@ module.exports = {
   computeMathFinalScore,
   applyScore,
   capEntityPenalty,
+  semanticPenaltyPoints,
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   versionDeductionTotal,

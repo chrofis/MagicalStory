@@ -3180,7 +3180,13 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         textPosition: pageTextPosition,
         detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
           charName,
-          { figures: (storyData.sceneImages || []).find(x => x.pageNumber === pageNumber)?.bboxDetection?.figures || [] },
+          // Carry the detection's own fingerprint: stored figure_mask rows are
+          // fp-guarded (migration 034), and an ad-hoc {figures} without it is
+          // refused — fresh SAM instead of verified reuse.
+          (() => {
+            const det = (storyData.sceneImages || []).find(x => x.pageNumber === pageNumber)?.bboxDetection;
+            return { figures: det?.figures || [], sourceImageFp: det?.sourceImageFp || null };
+          })(),
           { storyId: storyData.id, pageNumber },
         ),
       })

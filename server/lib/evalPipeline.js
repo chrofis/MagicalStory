@@ -1752,14 +1752,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           semanticResult = await semanticPromise;
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
-            // Apply semantic penalties to score
-            // CRITICAL (-30), MAJOR (-20) severity
-            let semanticPenalty = 0;
-            for (const issue of semanticResult.semanticIssues) {
-              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
-              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
-              else semanticPenalty += 10;
-            }
+            // Semantic surcharge via the ONE shared table (scoring.js
+            // SEMANTIC_ISSUE_PENALTY): the hand-copied chain here billed
+            // CATASTROPHIC 10 (the `else` arm) — half of MAJOR. Lazy require
+            // per the cycle law in this file's header.
+            const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult.semanticIssues);
             finalScore = score - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`🔍 [SEMANTIC] Semantic score: ${semanticResult.score}/100, penalty: ${semanticPenalty} points (quality ${score} → final ${finalScore})`);
             // Append semantic issues to summary
@@ -1800,14 +1797,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             visualScore = mergedRawScore * 10;
             // Re-derive semantic penalty so finalScore = visualScore − semantic.
             // (Was applied to `score` above; recomputed here against visualScore.)
-            let semanticPenalty = 0;
-            if (semanticResult?.semanticIssues?.length) {
-              for (const issue of semanticResult.semanticIssues) {
-                if (issue.severity === 'CRITICAL') semanticPenalty += 30;
-                else if (issue.severity === 'MAJOR') semanticPenalty += 20;
-                else semanticPenalty += 10;
-              }
-            }
+            // Shared table (scoring.js semanticPenaltyPoints) — same reason as
+            // the first chain: the hand-copy billed CATASTROPHIC 10.
+            const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult?.semanticIssues);
             finalScore = visualScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Merged ${threeStageResult.fixableIssues.length} issue(s); recomputed visual ${score}→${visualScore}, final ${finalScore} (semantic −${semanticPenalty})`);
           }
@@ -1893,13 +1885,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           semanticResult = await semanticPromise;
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
-            // Apply semantic penalties to score
-            let semanticPenalty = 0;
-            for (const issue of semanticResult.semanticIssues) {
-              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
-              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
-              else semanticPenalty += 10;
-            }
+            // Shared table (scoring.js semanticPenaltyPoints) — same reason as
+            // the parsed-JSON chain: the hand-copy billed CATASTROPHIC 10.
+            const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult.semanticIssues);
             finalScore = qualityScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`🔍 [SEMANTIC] Applied ${semanticPenalty} point penalty for semantic issues (${qualityScore} → ${finalScore})`);
             issuesSummary = `SEMANTIC: ${semanticResult.semanticIssues.map(i => i.problem).join('; ')}`;

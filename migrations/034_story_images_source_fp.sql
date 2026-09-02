@@ -1,0 +1,17 @@
+-- Which image bytes a stored row was computed FROM — starting with figure_mask.
+--
+-- A figure_mask row is a SAM silhouette of one figure, index-aligned with the
+-- page detection's figures[]. Repairs load it by (story_id, page_number,
+-- version_index=figureIndex) to decide whose head gets whited out. The bboxes
+-- the mask travels with are already guarded by bboxDetection.sourceImageFp
+-- (bboxPairsWith), but the mask row itself carried no such stamp: regenerate
+-- the page, and a silhouette segmented on the OLD bytes would clip a repair on
+-- the NEW bytes — the exact stale-geometry failure the bbox guard exists to
+-- prevent, on the one artifact that is MORE destructive when stale.
+--
+-- Value is imageFingerprint() output: sha1 of the image data, first 16 hex
+-- chars — same helper, same format as bboxDetection.sourceImageFp, so save and
+-- load compare like with like. Loads REFUSE a mask whose fp is missing or
+-- mismatched (masks are regenerable; a stale one is worse than none), so rows
+-- predating this column simply fall back to a fresh SAM call.
+ALTER TABLE story_images ADD COLUMN IF NOT EXISTS source_image_fp VARCHAR(16);

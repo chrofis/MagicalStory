@@ -1116,7 +1116,19 @@ async function iterateCover(coverKey, storyData, options = {}) {
     } else if (bakeAlreadyRan || forceRestampWhenUnbaked) {
       try {
         const { restampCover } = require('./coverTypography');
-        const figures = existingCover.bboxDetection?.figures || [];
+        // Typography must dodge the figures on the bytes it is stamping. This
+        // read existingCover.bboxDetection — boxes measured on the PREVIOUS
+        // render's pixels — so when the repaint changed the composition, the
+        // title could land straight across a face that moved. The fresh
+        // detection of THIS render already exists (coverBboxDetection above,
+        // carried as imageResult.bboxDetection); use it. On the skipEval path
+        // no detection ran: pass NO figures and let composeCover use its
+        // figure-less placement, loudly — stale boxes are worse than none.
+        // (Owner intends to retire restampCover eventually; correct until then.)
+        const figures = imageResult.bboxDetection?.figures || [];
+        if (!imageResult.bboxDetection) {
+          log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: no fresh detection for this render (skipEval path) — restamping WITHOUT figure avoidance`);
+        }
         const stamped = await restampCover(storyData, coverKey, imageResult.imageData, { seed: storyData.title, figures });
         servedImageData = stamped.titledData;
         artImageData = stamped.textlessData;

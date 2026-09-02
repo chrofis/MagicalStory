@@ -2462,19 +2462,16 @@ async function evaluateImageBatch(images, options = {}) {
           // list: the page was silently under-scored and the repair-method
           // gates acted on a charge with no finding behind it. Same rubric,
           // same clamp as evalPipeline (visual = (10 − Σ SEVERITY_PENALTY) ×
-          // 10; final = visual − 30/20/10 semantic), recomputed from the
+          // 10; final = visual − semanticPenaltyPoints), recomputed from the
           // now-filtered lists so the invariant "score derives from the
           // current issues" holds again.
           if (presenceDrops.length) {
             const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
             const visual = Math.max(0, Math.min(10, 10 - (qualityResult.fixableIssues || []).reduce(
               (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1), 0))) * 10;
-            let semanticPenalty = 0;
-            for (const issue of (qualityResult.semanticResult?.semanticIssues || [])) {
-              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
-              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
-              else semanticPenalty += 10;
-            }
+            // Shared table (scoring.js semanticPenaltyPoints) — the hand-copied
+            // chain here billed a CATASTROPHIC semantic issue 10, half of MAJOR.
+            const semanticPenalty = require('./scoring').semanticPenaltyPoints(qualityResult.semanticResult?.semanticIssues);
             const before = qualityResult.score;
             qualityResult.qualityScore = visual;
             qualityResult.score = visual - semanticPenalty;
@@ -2491,7 +2488,16 @@ async function evaluateImageBatch(images, options = {}) {
 
       const evalResult = {
         pageNumber: img.pageNumber,
-        evaluated: true,
+        // A null qualityResult is a FAILED eval — evaluateImageQuality returns
+        // null on its failure paths (blocked response, MAX_TOKENS exhaustion,
+        // unparseable output, catch). Stamping such a record evaluated:true
+        // handed downstream score:null with empty issue lists, which applyScore
+        // read as zero deductions → finalScore 100: the failed eval outranked
+        // every genuinely-evaluated repair in pickBestVersionIndex and dodged
+        // findBadPages' evaluated===false redo branch (repairLogic.js), the
+        // branch written for exactly this case. evaluated:false routes it there.
+        evaluated: !!qualityResult,
+        evalError: qualityResult ? null : 'evaluator returned no result',
         // Fingerprint of the EXACT bytes this eval scored. applyScore copies it
         // onto the version; pickBestVersionIndex refuses a score whose version
         // bytes no longer hash to it. Guards the eval↔bytes pairing the same way
@@ -2851,7 +2857,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Merge scene fix + per-char fixes, order by severity (highest first), and
     // emit as a numbered list. Grok prioritises top items; putting the most
     // critical change first makes the instruction harder to ignore.
-    const SEV_RANK = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
+    // CATASTROPHIC included: without it the `?? 2` fallback ranked a
+    // CATASTROPHIC fix as MODERATE, so the worst defect could sort below
+    // real MAJORs instead of leading the numbered list.
+    const SEV_RANK = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
     const sevRank = (s) => SEV_RANK[String(s || 'MODERATE').toUpperCase()] ?? 2;
     const items = [];
     if (sceneInstr) items.push({ severity: consolidatedPlan.scene_fix?.severity, text: sceneInstr });
@@ -2898,7 +2907,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // sent Grok a 4-issue blob it cannot execute atomically (observed on
     // job_1783845868262 P4). Rank by severity, keep the top few, and emit a
     // numbered atomic list — same shape and ≤3 cap as the plan path.
-    const SEV = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
+    // CATASTROPHIC included: the `?? 2` fallback ranked it as MODERATE, so
+    // with >3 issues the .slice(0, 3) below could drop the CATASTROPHIC one
+    // from the repair instruction while keeping lesser fixes.
+    const SEV = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
     const ranked = inpaintableIssues
       .filter(i => i.description)
       .sort((a, b) => (SEV[String(b.severity || 'MODERATE').toUpperCase()] ?? 2) - (SEV[String(a.severity || 'MODERATE').toUpperCase()] ?? 2))

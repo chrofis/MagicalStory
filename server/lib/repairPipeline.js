@@ -252,7 +252,11 @@ function mergeEntityIssues(base, fresh, repairedPages) {
     total += issues.length;
   }
   merged.totalIssues = total;
-  merged.overallConsistent = total === 0;
+  // evalFailed sticky across merges (same rule as entityConsistency.js's
+  // per-character aggregation): a round re-check of a few repaired pages must
+  // not launder a base report whose check FAILED to run into a clean pass.
+  merged.evalFailed = !!base.evalFailed || !!fresh.evalFailed;
+  merged.overallConsistent = total === 0 && !merged.evalFailed;
   merged.summary = `${names.size} entities checked: ${total} consistency issue(s) (merged after round update)`;
   return merged;
 }
@@ -523,7 +527,27 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       onHeartbeat: pingHeartbeat
     }).catch(err => {
       log.error(`❌ [UNIFIED PIPELINE] Entity consistency check failed: ${err.message}`);
-      return { characters: {}, totalIssues: 0, overallConsistent: true, summary: 'Entity check failed', grids: [] };
+      // Fail CLOSED, same idiom as the module's own per-entity catches
+      // (entityConsistency.js: consistent:false + evalFailed:true). This used
+      // to return overallConsistent:true — a crash of the WHOLE check shipped
+      // the book with a report claiming every entity matched, while the
+      // module's internal failures were carefully marked evalFailed. The
+      // returned object flows verbatim into finalChecksReport.entity, so the
+      // dev panel now shows "not checked", not a clean pass. characters/objects
+      // stay empty ON PURPOSE: no issues → getEntityPenaltyAndIssues charges
+      // nothing and no phantom repairs fire — we didn't FIND problems, we
+      // couldn't look.
+      return {
+        timestamp: new Date().toISOString(),
+        characters: {},
+        objects: {},
+        grids: [],
+        totalIssues: 0,
+        overallConsistent: false,
+        evalFailed: true,
+        error: err.message,
+        summary: `Entity consistency check FAILED to run: ${err.message} — story shipped WITHOUT entity checking`
+      };
     })
   ]);
 

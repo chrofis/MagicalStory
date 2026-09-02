@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import storyService from '@/services/storyService';
+// Severity points, per-type ceilings and the 40-point entity cap — single client
+// mirror of server/lib/scoring.js (SEVERITY_POINTS / deductionPoints /
+// capEntityPenalty). Keep useRepairWorkflow's tables in sync with scoring.js.
+import { entityIssuePoints, capEntityPenalty } from '@/hooks/useRepairWorkflow';
 import type { EntityConsistencyReport, StoryLanguageCode } from '@/types/story';
 
 interface EntityHistoryEntry {
@@ -329,7 +333,6 @@ export function EntityConsistencyView({
                     : 'bg-amber-200 text-amber-800'
                 }`}>
                   {(() => {
-                    const pts: Record<string, number> = { catastrophic: 50, critical: 25, major: 15, moderate: 5, minor: 2 };
                     const all: any[] = [
                       ...(charResult.issues || []),
                       ...Object.values(charResult.byClothing || {}).flatMap((c: any) => c.issues || []),
@@ -339,12 +342,14 @@ export function EntityConsistencyView({
                       const pages = iss.pageNumbers || iss.pagesToFix || (iss.pageNumber != null ? [iss.pageNumber] : []);
                       for (const pg of pages) {
                         if (pg < 0) continue; // reference-cell finding, not a story page
-                        perPage[pg] = (perPage[pg] || 0) + (pts[String(iss.severity || '').toLowerCase()] || 0);
+                        perPage[pg] = (perPage[pg] || 0) + entityIssuePoints(iss);
                       }
                     }
                     const entries = Object.entries(perPage).sort((a, b) => Number(a[0]) - Number(b[0]));
                     if (entries.length === 0) return all.length > 0 ? `${all.length} issue(s)` : 'OK';
-                    return entries.map(([pg, pen]) => `P${pg}: −${pen}`).join('  ');
+                    // capEntityPenalty: the server charges at most 40 entity points
+                    // per page (scoring.js) — show the capped figure, not the raw sum.
+                    return entries.map(([pg, pen]) => `P${pg}: −${capEntityPenalty(pen)}`).join('  ');
                   })()}
                 </span>
               </div>

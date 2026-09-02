@@ -14155,6 +14155,107 @@ ONE commission; the 3-story corpus check is still not run.
 server/lib/testlab.js (`params.storyDetails` on beats_scenes).
 **Status:** ✅ active on staging.
 
+## 2026-09-02 — Fault-hunt batch: nine fixes across the silent-default, registry-drift and derived-truth classes
+
+**Context.** After the deep review, three parallel hunters swept the whole
+server for the five fault classes that produced last week's bugs. ~30 verified
+findings came back; the owner approved fixing the mechanical tier. Nine fixes,
+implemented by three agents with disjoint file ownership, reviewed and committed
+together. The design-tier findings (canonical-cell feedback loop, `scale` type
+double meaning, self-graded repairs, no-photo avatar bootstrap, `spec_conflict`)
+remain open questions for the owner and are NOT addressed here.
+
+**1. A failed eval can no longer become a perfect page.** `evaluateImageQuality`
+returns null on ~8 failure paths; the batch wrapper stamped `evaluated: true`
+with empty issue lists, `applyScore` read that as zero deductions = 100, and the
+fake 100 beat every genuinely-evaluated repair in pick-best (nothing real
+exceeds 100). Both seams closed: the wrapper stamps `evaluated: false` +
+`evalError` when the evaluator returned nothing, and `applyScore` refuses to
+fabricate a score from an evidence-free eval (`finalScore: null`,
+`scoreSource: 'unevaluated'`) - a genuine clean eval always carries a numeric
+score and reasoning text, which is the discriminator. The nulls flow into the
+existing `evaluated === false` redo branch and the pick-best null refusal.
+Registered in tasks/bugs.json (hollow-eval-scores-100).
+
+**2. CATASTROPHIC severity now exists everywhere severities are ranked.** The
+four hand-copied semantic chains (CRITICAL 30 / MAJOR 20 / else 10) charged a
+CATASTROPHIC semantic issue 10 - half of MAJOR; replaced by ONE exported
+`semanticPenaltyPoints()` (CATASTROPHIC 40) in scoring.js, consumed by all four
+sites. The two images.js ranking tables lacked CATASTROPHIC entirely, so via
+the `?? 2` fallback the worst defect ranked MODERATE and could be the one
+dropped from the top-3 repair instructions; both tables now carry
+CATASTROPHIC: 5.
+
+**3. Entity billing agrees with itself - and the subType fix now actually
+works on the raw path.** `version.entityPenalty` summed raw SEVERITY_POINTS
+while finalScore went through `deductionPoints` ceilings; both now use
+`deductionPoints`. The deeper find: `normalizeIssues` STRIPPED `subType`, so on
+the raw (unconsolidated) path the 2026-09-01 subType-first fix was inert - a
+MAJOR hair_nuance still billed 15. The 2-vs-15 split was raw-vs-consolidated
+divergence. `subType` now survives normalization; both paths bill 2. That is
+the FIFTH place the type registration had to land (entity prompt, scoring
+tables, evalBuckets, consolidator vocabulary, normalizeIssues).
+
+**4. The consolidator vocabulary knows all registered types.** Six more types
+added to feedback-consolidator.txt's closed list - `unverified_absence`
+(capped MINOR; relabelled it billed up to 25), `composite_seam` (floor 60;
+relabelled billed 25), `emotion`, `viewer_address` (own buckets, deliberately),
+`physics`, `clothing_sex` - with a terse keep-your-type sentence for the two
+carrying ceilings/floors. `spec_conflict` deliberately not added (open design
+question: the semantic prompt mandates a type its own closed list excludes).
+
+**5. Client severity mirrors true and ceilinged.** catastrophic 50 -> 60 in
+both client tables; EntityConsistencyView no longer keeps a third hand-copy
+(imports the hook's), and both apply a mirrored `entityIssuePoints()` with the
+server's per-type ceilings plus the 40-point entity cap - the panel now shows
+-2 where the server charges 2, instead of -15/-50. Stale comment pointing at
+the deleted images.js ENTITY_PENALTIES table fixed to name scoring.js.
+
+**6. Entity-check crash is honest.** The outer catch returned
+`overallConsistent: true` with empty characters - a crashed check shipped as a
+clean report. Now fail-closed (`overallConsistent: false, evalFailed: true`,
+error surfaced into finalChecksReport.entity for the dev panel), with
+`evalFailed` made STICKY across round merges - a repaired-page re-check used to
+recompute `overallConsistent = total === 0` and launder the failed base back to
+a pass. Characters stay empty so nothing phantom fires.
+
+**7. Text-region wash: per-page isolation.** One page's failure rejected the
+batch while sibling closures kept mutating `img.imageData` AFTER the pipeline
+moved on - evals could score bytes that never ship. Per-page try/catch (failed
+page keeps original bytes, logged with reason), the aggregate never rejects
+early, and the outer message no longer claims "using original images" when some
+pages were already washed.
+
+**8. Cover restamp lays text on the CURRENT render.** restampCover received
+`existingCover.bboxDetection.figures` - measured on the previous pixels - to
+decide where the title lands on the new art. Now uses the fresh detection from
+the scored path; skipEval passes `[]` (figure-less placement) with a warn.
+Owner intends to retire restampCover eventually; fixed anyway, and the comment
+says so.
+
+**9. figure_mask rows are fingerprint-guarded.** Masks were loaded by
+(storyId, pageNumber, figureIndex) with no bytes pairing, while the boxes they
+travel with ARE guarded - a silhouette from old bytes could clip a repair on
+new bytes (the mask decides whose head gets whited out). Migration
+`034_story_images_source_fp.sql` adds `source_image_fp`; save stamps it, load
+refuses missing/mismatched fp (warn - masks are regenerable, a stale one is
+worse than none), stale higher-index rows are deleted on save, and the
+column-absent case (42703) degrades with a warn naming the migration. All four
+mask consumers now pass the fp (repairPipeline and regeneration via
+resolveCharBbox; entityConsistency and testlab ad-hoc call sites patched).
+Existing fp-less rows are refused post-migration and regenerate on demand.
+
+**Verified.** node --check on all 14 files; check-no-undef full sweep; per-bug
+node -e proofs (hollow shapes -> null vs clean -> 100; CATASTROPHIC 10->40 and
+kept-first in ranking; hair_nuance 2 pts on BOTH paths; entity-catch shape;
+mask 42703 tolerance probed against staging). Client tsc --noEmit clean. The 6
+failing scoring unit tests fail identically on unmodified HEAD (stale tests).
+
+**Touched files.** scoring.js, evalPipeline.js, images.js, repairPipeline.js,
+storyJobPipeline.js, coverIterate.js, charRepairTarget.js, database.js,
+entityConsistency.js, testlab.js, feedback-consolidator.txt,
+useRepairWorkflow.ts, EntityConsistencyView.tsx, migrations/034.
+
 ## 2026-09-01 — Deep-review fixes: the nuance caps reach the consolidated path, and a dropped absence refunds its charge
 
 **Context.** A five-agent adversarial review of the last week's changes returned

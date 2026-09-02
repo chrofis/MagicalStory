@@ -20,18 +20,46 @@ const COVER_PAGES: Record<string, number> = { frontCover: -1, initialPage: -2, b
 const IMAGE_CONCURRENCY = 50;
 
 // Entity penalty values by severity — mirrors the backend's single scale:
-// SEVERITY_POINTS in server/lib/scoring.js, which is what computeMathFinalScore
-// actually charges. Keep in sync with server/lib/images.js ENTITY_PENALTIES.
-// `catastrophic` and `moderate` were missing here: both fell through the
-// `?? ENTITY_PENALTIES.minor` default and were charged 2 instead of 50 / 5,
-// so the panel's penalty disagreed with the server's for those severities.
-const ENTITY_PENALTIES = { catastrophic: 50, critical: 25, major: 15, moderate: 5, minor: 2 } as const;
+// SEVERITY_POINTS in server/lib/scoring.js (taken wholesale by
+// server/lib/repairPipeline.js). Keep in sync with scoring.js —
+// catastrophic was raised 50 → 60 there on 2026-08-21.
+export const ENTITY_PENALTIES = { catastrophic: 60, critical: 25, major: 15, moderate: 5, minor: 2 } as const;
+
+// Per-type cost adjustments — mirrors scoring.js ZERO_POINT_TYPES /
+// MAX_SEVERITY_TYPES / MIN_SEVERITY_TYPES (see deductionPoints there).
+// Keep in sync with server/lib/scoring.js.
+const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color', 'cutout_artifact']);
+const MAX_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
+  accessory: 'moderate',
+  accessory_missing: 'moderate',
+  clothing_detail: 'moderate',
+  unverified_absence: 'minor',
+  face_drift: 'minor',
+  hair_nuance: 'minor',
+};
+const MIN_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
+  composite_seam: 'catastrophic',
+};
+
+/** Points one issue costs — severity points bounded by per-type ceiling/floor,
+ *  mirroring scoring.js deductionPoints. Unknown severity defaults to minor
+ *  (existing client convention; the server drops it). */
+export function entityIssuePoints(issue: { type?: string; severity?: string } | null | undefined): number {
+  const type = String(issue?.type || '').toLowerCase();
+  if (ZERO_POINT_TYPES.has(type)) return 0;
+  const raw = ENTITY_PENALTIES[String(issue?.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+  const ceiling = MAX_SEVERITY_TYPES[type];
+  let pts = ceiling ? Math.min(raw, ENTITY_PENALTIES[ceiling]) : raw;
+  const floor = MIN_SEVERITY_TYPES[type];
+  if (floor) pts = Math.max(pts, ENTITY_PENALTIES[floor]);
+  return pts;
+}
 
 // Mirror of capEntityPenalty (server/lib/scoring.js): at most 40 points of
 // entity penalty apply to a score. Without it the client showed uncapped
 // −70/−90 deductions the server never charged.
 const ENTITY_PENALTY_CAP = 40;
-const capEntityPenalty = (raw: number) => Math.min(Math.max(0, raw || 0), ENTITY_PENALTY_CAP);
+export const capEntityPenalty = (raw: number) => Math.min(Math.max(0, raw || 0), ENTITY_PENALTY_CAP);
 
 /** Simple concurrency limiter (like p-limit) */
 function pLimit(concurrency: number) {
@@ -505,13 +533,13 @@ export function useRepairWorkflow({
         // Compute entity penalty (same model as backend re-evaluate)
         let entityPenalty = 0;
         for (const ei of feedback.entityIssues) {
-          entityPenalty += ENTITY_PENALTIES[String(ei.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+          entityPenalty += entityIssuePoints(ei);
         }
         for (const oi of feedback.objectIssues) {
-          entityPenalty += ENTITY_PENALTIES[String(oi.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+          entityPenalty += entityIssuePoints(oi);
         }
         for (const si of feedback.semanticIssues) {
-          entityPenalty += ENTITY_PENALTIES[String(si.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+          entityPenalty += entityIssuePoints(si);
         }
         feedback.entityPenalty = capEntityPenalty(entityPenalty);
         // Score convention: qualityScore = raw visual (Gemini), score = final after penalties.
@@ -592,7 +620,7 @@ export function useRepairWorkflow({
           // Compute entity penalty (covers typically have no entity issues, but handle uniformly)
           let entityPenalty = 0;
           for (const ei of feedback.entityIssues) {
-            entityPenalty += ENTITY_PENALTIES[String(ei.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+            entityPenalty += entityIssuePoints(ei);
           }
           feedback.entityPenalty = capEntityPenalty(entityPenalty);
           const baseScore = feedback.qualityScore ?? 100;

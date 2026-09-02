@@ -4822,74 +4822,98 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.info(`📝 [TEXT-REGION] Skipped (layout.textInImage=false — text rendered below image)`);
         }
         const scenePages = !skipTextRegionPhase ? rawImages.filter(img => img.pageNumber > 0 && img.imageData) : [];
+        // Per-page try/catch is load-bearing, not politeness: these closures
+        // mutate img.imageData IN PLACE. Without it, one page's rejection made
+        // Promise.all reject while the sibling closures kept running and kept
+        // writing bytes AFTER the pipeline had moved on — the eval phase could
+        // score bytes that never shipped, and the outer catch claimed "using
+        // original images" for pages that were already washed. A failed page
+        // keeps its original bytes (logged with the reason); the aggregate
+        // never rejects early, so every in-flight page finishes before the
+        // pipeline continues.
         await Promise.all(scenePages.map(async (img) => {
-          const preferred = enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber);
+          try {
+            const preferred = enforceSpreadTextPosition(img.sceneMetadata?.textPosition || null, img.pageNumber);
 
-          // Caller-supplied retry image generator. Wraps generateImageOnly so
-          // ensureCalmZone doesn't import images.js (would be circular).
-          const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
-            imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-            imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
-            landmarkPhotos: img.landmarkPhotos || [],
-            visualBibleGrid: img.visualBibleGrid || null,
-            previousImage: opts.previousImage,
-            textAreaMask: opts.textAreaMask,
-            pageNumber: img.pageNumber,
-            skipCache: true,
-            aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-          });
+            // Caller-supplied retry image generator. Wraps generateImageOnly so
+            // ensureCalmZone doesn't import images.js (would be circular).
+            const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
+              imageModelOverride: img.sceneMetadata?.pageImageModel || null,
+              imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+              landmarkPhotos: img.landmarkPhotos || [],
+              visualBibleGrid: img.visualBibleGrid || null,
+              previousImage: opts.previousImage,
+              textAreaMask: opts.textAreaMask,
+              pageNumber: img.pageNumber,
+              skipCache: true,
+              aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+            });
 
-          const onUsage = (result) => {
-            if (!result.usage) return;
-            const isRunware = result.modelId?.startsWith('runware:');
-            const isGrok = result.modelId?.startsWith('grok-imagine');
-            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-            addUsage(provider, result.usage, 'page_images', result.modelId);
-          };
+            const onUsage = (result) => {
+              if (!result.usage) return;
+              const isRunware = result.modelId?.startsWith('runware:');
+              const isGrok = result.modelId?.startsWith('grok-imagine');
+              const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+              addUsage(provider, result.usage, 'page_images', result.modelId);
+            };
 
-          const result = await ensureCalmZone({
-            imageData: img.imageData,
-            text: img.text,
-            textPosition: preferred,
-            pageNumber: img.pageNumber,
-            languageLevel: inputData?.languageLevel || 'standard',
-            textAreaMask: img.textAreaMask,
-            sceneDescription: img.sceneDescription || '',
-            generateImage,
-            onUsage,
-            label: 'TEXT-SPACE',
-          });
+            const result = await ensureCalmZone({
+              imageData: img.imageData,
+              text: img.text,
+              textPosition: preferred,
+              pageNumber: img.pageNumber,
+              languageLevel: inputData?.languageLevel || 'standard',
+              textAreaMask: img.textAreaMask,
+              sceneDescription: img.sceneDescription || '',
+              generateImage,
+              onUsage,
+              label: 'TEXT-SPACE',
+            });
 
-          img.imageData = result.winnerImageData;
-          // Persist all candidates so the dev viewer can show each attempt.
-          // Candidate 0 inherits the original's Grok refs; repair candidates
-          // carry their own captured by ensureCalmZone.
-          img.textSpaceCandidates = result.candidates.length > 1
-            ? result.candidates.map((c, i) => ({
-                imageData: c.imageData,
-                position: c.position,
-                rect: c.rect,
-                calmFoundPx: c.calmFoundPx,
-                areaPx: c.areaPx,
-                source: c.source,
-                prompt: c.prompt,
-                modelId: c.modelId || img.modelId || null,
-                grokRefImages: i === 0 ? (img.grokRefImages || null) : c.grokRefImages,
-                isWinner: i === result.winnerIndex,
-              }))
-            : null;
-          img.textCoverageReport = result.report;
-          textRegionResults[img.pageNumber] = {
-            position: result.winnerCandidate.position,
-            rect: result.winnerCandidate.rect,
-            report: result.report,
-          };
+            img.imageData = result.winnerImageData;
+            // Persist all candidates so the dev viewer can show each attempt.
+            // Candidate 0 inherits the original's Grok refs; repair candidates
+            // carry their own captured by ensureCalmZone.
+            img.textSpaceCandidates = result.candidates.length > 1
+              ? result.candidates.map((c, i) => ({
+                  imageData: c.imageData,
+                  position: c.position,
+                  rect: c.rect,
+                  calmFoundPx: c.calmFoundPx,
+                  areaPx: c.areaPx,
+                  source: c.source,
+                  prompt: c.prompt,
+                  modelId: c.modelId || img.modelId || null,
+                  grokRefImages: i === 0 ? (img.grokRefImages || null) : c.grokRefImages,
+                  isWinner: i === result.winnerIndex,
+                }))
+              : null;
+            img.textCoverageReport = result.report;
+            textRegionResults[img.pageNumber] = {
+              position: result.winnerCandidate.position,
+              rect: result.winnerCandidate.rect,
+              report: result.report,
+            };
+          } catch (pageErr) {
+            // This page keeps its ORIGINAL bytes — img.imageData is only
+            // reassigned after ensureCalmZone succeeds, so a mid-flight throw
+            // leaves it untouched. No textRegionResults entry → downstream
+            // falls back to the scene metadata's textPosition.
+            log.warn(`⚠️ [TEXT-REGION] Page ${img.pageNumber}: text-space check failed (${pageErr.message}) — keeping original image`);
+          }
         }));
         const passed = Object.entries(textRegionResults).filter(([, r]) => r.report.passed).length;
         const repaired = Object.entries(textRegionResults).filter(([, r]) => r.report.retriesUsed > 0).length;
-        log.info(`📝 [TEXT-REGION] Processed ${scenePages.length} pages, ${passed} passed, ${repaired} repaired for text space`);
+        const failedPages = scenePages.length - Object.keys(textRegionResults).length;
+        log.info(`📝 [TEXT-REGION] Processed ${scenePages.length} pages, ${passed} passed, ${repaired} repaired for text space${failedPages > 0 ? `, ${failedPages} FAILED (original bytes kept)` : ''}`);
       } catch (trErr) {
-        log.warn(`⚠️ [TEXT-REGION] Detection failed: ${trErr.message} — using original images`);
+        // Per-page failures are caught above; reaching here means the phase
+        // broke BEFORE/AROUND the page loop (require, filter, setup). The old
+        // message said "using original images", which was false for pages a
+        // rejected Promise.all had already washed — with per-page catches the
+        // aggregate no longer rejects, so any page listed in textRegionResults
+        // genuinely shipped its washed bytes.
+        log.warn(`⚠️ [TEXT-REGION] Phase setup failed: ${trErr.message} — pages not yet processed keep their original images`);
       }
 
       if (skipQualityEval) {

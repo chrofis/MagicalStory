@@ -1598,7 +1598,10 @@ async function runCharRepairStage(ctx, opts) {
     // Resolves to null for a story with no stored mask, which is the old
     // behaviour and is reported as a miss.
     detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
-      charName, { figures: ctx.scene.bboxDetection?.figures || [] },
+      // sourceImageFp along for the ride: fp-guarded mask rows refuse an
+      // unstamped lookup (migration 034), and the Lab must reuse exactly what
+      // production reuses or its result is not evidence about production.
+      charName, { figures: ctx.scene.bboxDetection?.figures || [], sourceImageFp: ctx.scene.bboxDetection?.sourceImageFp || null },
       { storyId: ctx.storyId, pageNumber: ctx.pageNumber },
     ),
     protectedFaces,
