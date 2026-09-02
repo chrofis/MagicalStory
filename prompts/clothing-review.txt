@@ -16,9 +16,9 @@ Characters: {CHARACTER_NAMES}
 
 {CURRENT_CLOTHING}
 
-# LOCKED BEATS
+# LOCKED PAGE PLAN
 
-{BEATS}
+{PLAN_LINES}
 
 # CHECKS
 
@@ -30,7 +30,7 @@ Characters: {CHARACTER_NAMES}
 6. Completeness — name any character whose outfit is missing a top, a bottom or footwear. An outfit that replaces the legs (a tail, a fin, a fused lower body) needs no bottom or footwear: it must say the legs are replaced, and naming footwear for it is the fault.
 7. Style world — only when a world is named below. Name any character wearing nothing from that world, and any character whose whole outfit has been replaced by it rather than accented.
 8. Sex — name any character wearing a garment made for the other sex. A costume with a male and a female form uses the form matching that character; replace the garment with that character's form of it, never by removing the slot.
-9. Coverage — name any character a beat costumes or transforms (a tail, wings, an animal form, a disguise) whose wardrobe has no category covering that appearance. Add the missing entry under the heading `## <CharacterName> / costumed:<costume>` with the full outfit describing the transformed or costumed appearance.
+9. Coverage — name any character a page costumes or transforms (a tail, wings, an animal form, a disguise) whose wardrobe has no category covering that appearance. Add the missing entry under the heading `## <CharacterName> / costumed:<costume>` with the full outfit describing the transformed or costumed appearance.
 10. Child coverage — name any child wearing a `bikini`, a bare chest, or a bare midriff; replace with a modest full-coverage form of the same garment (`swim shirt`, `swim top`, a one-piece).
 11. Garment variety — name any two characters whose outfits share the same set of garments and differ only in colour. Rewrite one with different garment types and silhouette; the story world decides the wardrobe.
 

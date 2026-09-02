@@ -10,23 +10,23 @@
 # Output is parsed by parseRefinedText(raw, expectedPages, 'SCENES') — the same
 # parser the scene review's response goes through.
 
-**ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader. You write ALL {PAGE_COUNT} pages in this one response. Each page arrives as its BEAT (what happens) and its PLAN line (shot — who is in frame — the instant the picture shows — what changes); stage that instant.
+**ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader. You write ALL {PAGE_COUNT} pages in this one response. Each page arrives as its PLAN line (shot — who is in frame — the instant the picture shows — what is true after); stage that instant.
 
 ---
 
 ## Per-page rules
 
-1. **Simplify, don't elaborate.** The page's BEAT + PLAN line is already good. Flesh it into prose; don't add complexity. If the beat says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent. The SCENE prose stays under 450 words.
-1b. **Distinctive settings carry their own detail.** When a beat's location is a fantastical or strongly-themed world (a magical realm, undersea, outer space, an enchanted forest, an ancient ruin, and the like), or a real place the story's premise has transformed into one, fill the SETTING with a lot of that world's characteristic environmental elements even when the beat names only the bare place — this describes the location, it is not added plot. Keep it to the environment and background; never add characters and never change the beat's action.
+1. **Simplify, don't elaborate.** The page's PLAN line is already good. Flesh it into prose; don't add complexity. If the plan line says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent. The SCENE prose stays under 450 words.
+1b. **Distinctive settings carry their own detail.** When a plan line's location is a fantastical or strongly-themed world (a magical realm, undersea, outer space, an enchanted forest, an ancient ruin, and the like), or a real place the story's premise has transformed into one, fill the SETTING with a lot of that world's characteristic environmental elements even when the plan line names only the bare place — this describes the location, it is not added plot. Keep it to the environment and background; never add characters and never change the plan line's action.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally — `hovers above` becomes a visible gap. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
-3. **Only characters from the page's beat.** The BEAT and PLAN lines define who is visible on that page. Do not import characters from other pages, and never drop one they list. If the beat describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
-4. **Staging a group.** When more than three characters share the frame, keep the whole group together at one depth in a wider shot, or show them from behind as they move away — never five detailed close foreground faces. Push a figure into the background only when the beat itself separates them (left behind, watching from afar, arriving in the distance) — never as a crowd-management default.
+3. **Only characters from the page's plan line.** The plan line defines who is visible on that page. Do not import characters from other pages, and never drop one they list. If the plan line describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
+4. **Staging a group.** When more than three characters share the frame, keep the whole group together at one depth in a wider shot, or show them from behind as they move away — never five detailed close foreground faces. Push a figure into the background only when the plan line itself separates them (left behind, watching from afar, arriving in the distance) — never as a crowd-management default.
 5. **One moment, one focal point.** Stage the given instant as written, without hidden limbs. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
 5b. **One centre of action.** Never two vehicles or vessels in frame each with a crew doing its own thing — one carries the moment, and a second is distant, partly cut by the frame edge, or empty.
 5c. **One instant, no history.** The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no "again", "for the third time", "already", no object both mid-motion and in its ended state. Write the single visible instant.
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
-6b. **A group acts together.** When several characters share the frame, show them mid-action on one shared task, turned toward it and each other — never lined up abreast facing the viewer, unless the beat itself is a portrait or an arrival.
-6c. **One gaze target per page.** Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer unless the beat is a portrait.
+6b. **A group acts together.** When several characters share the frame, show them mid-action on one shared task, turned toward it and each other — never lined up abreast facing the viewer, unless the plan line itself is a portrait or an arrival.
+6c. **One gaze target per page.** Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer unless the plan line is a portrait.
 7. **Physically possible.** Two hands = max two items. If a character holds a book and a flashlight and waves — that's three hands. Fix it. One hand-duty per figure: a second grip written onto the same figure grows a third hand or fuses the fingers of the first.
 7b. **Contact is written as the pose, in the prose.** `hand on the hasp`, `grips the rung`, `touches the spoke` render as a hand hovering near the object. In the prose name what the fingers wrap, which way the weight leans, what the body presses against: "fingers curled right around the rung, arms taking her weight, chest against the ladder". The `interactions[]` `where` field stays terse — the visible grip lives in the prose.
 7c. **Force is a shape.** `taut`, `strained`, `braced`, `pulling hard` all render at rest. Name the shape the force makes instead: "the rope is a straight line from the post to her hands", "the sail curves out toward the bow".
@@ -39,8 +39,8 @@
 8f. **True relative size.** A vessel, building or vehicle holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. When such an element shares the frame with a figure, name the ratio in the prose ("the mast rises five times her height").
 9. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
 10. **Prose construction.** Each page is one continuous paragraph followed by its metadata block — no headers, labels, bullet points, or section breaks inside a page. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. A character wears the outfit CHARACTER DETAILS gives them; never move a garment onto a character of the other sex, and never give a male character a garment made for girls or women, or the reverse. Name the TOP, the BOTTOM and the FOOTWEAR for every character on every page (a character whose outfit replaces the legs has no footwear — name the tail or fin instead, and never give them feet or shoes) — the image model draws only what the prose names, so a character given a hat and a shirt is drawn in a hat and a shirt and nothing else. Every page repeats the full physical description: each brief is read on its own by the image model. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
-10b. **Subject page.** When a beat stages the subject alone — a creature, an artifact, a place — describe it at full physical detail and name its size against a familiar object, since no character is there to give scale. Leave `characters[]` empty and name no character in the prose.
-11. **Framing pattern.** When a page's beat calls for one of these shots, compose the prose as:
+10b. **Subject page.** When a plan line stages the subject alone — a creature, an artifact, a place — describe it at full physical detail and name its size against a familiar object, since no character is there to give scale. Leave `characters[]` empty and name no character in the prose.
+11. **Framing pattern.** When a page's plan line calls for one of these shots, compose the prose as:
     - `solo-before`: close-up on the acting character, weapon drawn and aimed forward if applicable, gaze following the weapon's direction. No opponent or target in the frame.
     - `solo-after`: close-up on the character after the moment, no opponent, strong emotion.
     - `over-the-shoulder`: the acting character's back in one front corner (front-left or front-right), target small and soft in the opposite back corner (diagonal composition), 5–10% image height, weapon aim line runs diagonally from foreground to target.
@@ -57,34 +57,32 @@
 
 12g. **Build descriptions are visual, not nominal.** Describe an object by its shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style") — style words are lettering bait the sanitizer can't catch.
 
-12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's beat is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
+12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's plan line is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
  A prop being carried rather than read stays folded, rolled or pocketed.
 
-**A two-sided prop.** A map, letter, note, chart, book, page, sign, board or plaque has two visual bible entries, one turned away and one face to camera. Name exactly one of the pair in `objects[]`: the turned-away entry unless the page's beat is what the document itself says, and never both on one page. When the beat is what the document says, name the face entry and write what it shows, including only the exact words its Visual Bible entry specifies. Otherwise the brief names the document as an object (material, size, edge wear, how it folds or rolls), leaves its face unlettered, and never stages it lying face-up or spread open across a surface.
+**A two-sided prop.** A map, letter, note, chart, book, page, sign, board or plaque has two visual bible entries, one turned away and one face to camera. Name exactly one of the pair in `objects[]`: the turned-away entry unless the page's plan line is what the document itself says, and never both on one page. When the plan line is what the document says, name the face entry and write what it shows, including only the exact words its Visual Bible entry specifies. Otherwise the brief names the document as an object (material, size, edge wear, how it folds or rolls), leaves its face unlettered, and never stages it lying face-up or spread open across a surface.
 
 ---
 
 ## Cross-page rules (why this is one call)
 
-C1. **Location continuity.** Consecutive pages stay in the same place unless a beat states the move. Never jump from an exterior to an interior — or between two unrelated locations — on a page whose beat says nothing about travelling or entering. If a beat implies a move, the arriving page's prose must name the transition ("steps in through the farmhouse door"). Reuse the same Visual Bible location id on every page set there.
-C2. **Monotonic time of day.** Time moves forward across the book, never backwards. Pick the lighting of page 1, then hold or advance it: morning → midday → afternoon → dusk → night. Two consecutive pages in the same scene share the same light. Only a beat that states a jump (next morning, days later) resets it.
-C3. **Clothing consistency.** A character wears the same clothing category on every page unless a beat changes it (weather, costume, sleep). The category must come from AVAILABLE_AVATARS. Once a character changes, later pages keep the new one.
+C1. **Location continuity.** Consecutive pages stay in the same place unless a plan line states the move. Never jump from an exterior to an interior — or between two unrelated locations — on a page whose plan line says nothing about travelling or entering. If a plan line implies a move, the arriving page's prose must name the transition ("steps in through the farmhouse door"). Reuse the same Visual Bible location id on every page set there.
+C2. **Monotonic time of day.** Time moves forward across the book, never backwards. Pick the lighting of page 1, then hold or advance it: morning → midday → afternoon → dusk → night. Two consecutive pages in the same scene share the same light. Only a plan line that states a jump (next morning, days later) resets it.
+C3. **Clothing consistency.** A character wears the same clothing category on every page unless a plan line changes it (weather, costume, sleep). The category must come from AVAILABLE_AVATARS. Once a character changes, later pages keep the new one.
 C4. **No two consecutive pages with near-identical composition.** Neighbouring pages must differ in at least one of: camera distance (close-up / medium / wide / aerial), character grouping, or camera angle. Same location on two pages is fine; the same shot twice is not.
 C5. **Recurring elements stay identical.** A location, animal, vehicle or artifact keeps its description across pages — same colours, same shape, same markings. Take them from RECURRING VISUAL ELEMENTS and do not re-invent details per page.
-C6. **Visual arc.** Framing builds with the plot: the widest establishing shot near the start, the tightest and most intense framing on the page whose beat carries the climax.
+C6. **Visual arc.** Framing builds with the plot: the widest establishing shot near the start, the tightest and most intense framing on the page whose plan line carries the climax.
 
 ---
 
 ## INPUT
 
-# THE STORY (for judgment — the beats divide it; stage only what this page's beat and plan line carry)
-
-Where the beats and the story differ, the beats are the story's final form.
+# THE STORY (for judgment — the plan lines divide it into pictures; stage only what this page's plan line carries)
 
 {FINAL_ARC}
 
-**ALL LOCKED PAGE BEATS ({PAGE_COUNT} pages, each BEAT + PLAN line — write one brief per page, in order):**
-{ALL_BEATS}
+**ALL LOCKED PLAN LINES ({PAGE_COUNT} pages — write one brief per page, in order):**
+{ALL_PLAN_LINES}
 
 **CHARACTER DETAILS (exactly {CHARACTER_COUNT} characters — weave each one's appearance into the prose):**
 {CHARACTER_DESCRIPTIONS}
@@ -173,7 +171,7 @@ Then a single-line JSON object:
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.
 - `shot` is the page's camera framing: `close-up`, `medium`, or `wide`. Decide it once — the scene prose, the emptyScenePrompt, and the metadata all use this same framing. Omitting it makes the empty scene default to a wide shot.
 - `landmarkView` is how the page sees a real landmark, when one is cited: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
-- A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping, or feet-on-ground contact, and nothing placed behind the character. The outfit list still names all garments including footwear. A beat that needs below-waist action is a `medium` shot, not a close-up.
+- A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping, or feet-on-ground contact, and nothing placed behind the character. The outfit list still names all garments including footwear. A plan line that needs below-waist action is a `medium` shot, not a close-up.
 - Only add `depth` when the character is in the background (default is foreground/midground).
 
 **`objects[]`**
@@ -189,7 +187,7 @@ Then a single-line JSON object:
 
 **`interactions[]`** — visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`.
 
-Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`.
+Mark `storyRelevant: true` only when the contact is the page's plot moment, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`.
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
@@ -205,7 +203,7 @@ Field shape: `{character, object, where, action, hands, storyRelevant, priority}
 
 **Coverage:** every foreground/midground character should appear in `interactions[]` exactly once. If a character has no real action, give them a `priority: "low"` entry (e.g. `{character, object: "the campfire", where: "watches the campfire", storyRelevant: false, priority: "low"}`) — without it the image model defaults to a camera-facing portrait. Background characters exempt.
 
-A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's beat and `low` otherwise.
+A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's plan line and `low` otherwise.
 
 Cap: 1–6 entries, 0–2 with `storyRelevant: true`, and one `action` label per page beyond `"watching"` and `"standing"`.
 
@@ -228,8 +226,8 @@ Distance rule: when the verb implies action across a gap ('shoots', 'aims at', '
 - 2-3 sentences describing only the background.
 - Same camera framing as the scene itself: a close-up scene gets a close-up stage (the wall, the doorway, the table corner), a wide scene gets the wide setting. Never an establishing wide shot for a close-up scene.
 - The plate describes only what the camera sees from its vantage — never the exterior of the vehicle or structure the camera stands on.
-- The scene geography must give every standing character footing at their declared position — a bank, path, floor, deck, or walkway at that depth, never open water or air under a standing figure. A beat that puts a figure where nothing standable exists moves the figure or the camera.
-- When the page's beat is an obstacle, stage it blocking the route in frame and give one character an action against it — pushing, pointing, trying, being stopped. An obstacle nobody engages reads as scenery.
+- The scene geography must give every standing character footing at their declared position — a bank, path, floor, deck, or walkway at that depth, never open water or air under a standing figure. A plan line that puts a figure where nothing standable exists moves the figure or the camera.
+- When the page's plan line is an obstacle, stage it blocking the route in frame and give one character an action against it — pushing, pointing, trying, being stopped. An obstacle nobody engages reads as scenery.
 - A crowd the action needs — pushing through it, hiding in it, lost in it — is a required scene element with mass and closeness, never background atmosphere.
 - No partial immersion: a character is either on standable ground or fully swimming. Wading, ankle-deep, and knee-deep poses render as standing on the water surface — restage them at the water's edge or as swimming.
 - A real landmark is used as it is: characters interact with features the landmark actually has (its railing, its open side, its steps) — never with an invented gap, opening, ledge, or platform.

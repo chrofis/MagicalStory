@@ -20,15 +20,15 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE ARC (the whole story, for judgment — the beats divide it; a page's text carries only its own beat)
+# THE STORY (final — this arc IS the story; every fact, cause and spoken line it states belongs on some page, in its specific form)
 
 {STORY_ARC}
 
-# THE BEATS (the story's final form)
+# THE PAGE PLAN (how the story was divided into pictures)
 
-Where the beats and the arc above differ, the beats win.
+One line per page: shot — who is in frame — the instant the picture shows — what is true after that page that was not before. A page's text carries the stretch of the story that leads to its instant, and never a stretch a later page carries.
 
-{STORY_BEATS}
+{PLAN_LINES}
 
 # SCENE OUTLINES — read-only
 
@@ -36,8 +36,8 @@ What each page's illustration shows. The picture is already drawn from this and 
 
 You may rewrite how a page READS; you may never change what HAPPENS on it. Do not add, remove, reorder or reverse an event, an action or an outcome. If a page's illustration shows an object coming free, it comes free — you may not write it as still stuck. If a character is doing something in the outline, the prose may name it, describe it differently, or leave it unsaid, but it must never state the opposite. A reader sees the words and the picture together on one page.
 
-These outlines describe rendering as well as events — appearance, clothing, position in frame, expression, camera. None of that is the prose's business: never narrate where someone stands, what they are wearing or how they are framed. The picture shows one instant; the text tells the whole beat. Events the beat carries and the picture doesn't show are the text's cargo — never cut them for image fidelity. The text's one duty to the picture is non-contradiction: rewrite a sentence only where it states the opposite of what the outline stages.
-The text gives each page its feeling and its suspense, drawn from the story — feelings and dialogue may go beyond what the beat carries; everything else may not.
+These outlines describe rendering as well as events — appearance, clothing, position in frame, expression, camera. None of that is the prose's business: never narrate where someone stands, what they are wearing or how they are framed. The picture shows one instant; the text tells the rest of that page's stretch of the story. Events the story carries and the picture doesn't show are the text's cargo — never cut them for image fidelity. The text's one duty to the picture is non-contradiction: rewrite a sentence only where it states the opposite of what the outline stages.
+The text gives each page its feeling and its suspense, drawn from the story — feelings and dialogue may go beyond what the story states; everything else may not.
 Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. A fault is never fixed by putting a person in danger.
 
 {SCENE_OUTLINES}

@@ -23782,3 +23782,82 @@ against the real staging VB: the stern clause and the guillemets both survive,
 `sanitizeVbIdsInPrompt`'s name loop, export),
 `tests/unit/vb-lettering-exception.test.ts`.
 **Status:** ✅ active
+
+## 2026-09-02 — Beat prose deleted: the beats stage emits PLAN LINES only, and the text writer works from the ARC + the plan lines
+
+**Context:** The beats stage did two jobs at once — it paginated the finished
+arc (a plan line per page: shot, cast, the instant, what changes) AND it
+rewrote each page's story content as a BEAT paragraph. Everything downstream
+then read the beat prose, not the arc: the text writer, the refiner, the Art
+Director, the bible and the wardrobe review. A full arc → beats → text diff on
+the proof story (staging `job_1788295892348_l028ggiq7a`) measured where the
+arc's clauses died: **20 of 25 losses happened in the beat rewrite** — causes,
+rememberings, quantities, and admissions the arc had a character say aloud.
+The stage that was supposed to divide the story was silently re-writing it,
+and the writer never saw what it dropped.
+
+**Decision:** The beats stage keeps pagination and global composition planning
+— its irreplaceable jobs — and emits **only** the plan line per page. The
+planner's response is now a single `---PAGE PLAN---` block; there is no
+`---BEATS---` block in it and no `BEAT:` line anywhere. Every downstream
+consumer receives the FINAL ARC as the story plus the plan lines as the
+division:
+
+- **Text writer** (`story-text-from-beats.txt`): arc + plan lines + the locked
+  scene brief per page. Framing: the arc IS the story, every fact, cause,
+  feeling and spoken line it states must find its home on some page; each
+  page's picture shows its plan line's instant, and the text tells what the
+  picture cannot.
+- **Text refine** (`text-refine.txt`): `{STORY_BEATS}` → `{PLAN_LINES}`, arc
+  promoted from "judgment context" to the story.
+- **Text audit** (`story-text-audit.txt`): receives the arc and the plan lines
+  for the first time. Its LOADBEARING question 12 asked what "the story and
+  the beat" treat as load-bearing while the audit was shown neither — the
+  question could not fire. It now points at the arc, and a fact of the story
+  that no page carries at all is a fault.
+- **Art Director** (`scene-expansion-all.txt`, and the per-page fallback):
+  plan line + the final arc as story context (it already received the arc).
+- **Bible / wardrobe review / plan check / scene review**: plan lines.
+
+The plan checker is unchanged in substance — the code counters already read
+plan lines only, and `plan-check.txt` lost its now-duplicate `{CURRENT_BEATS}`
+section.
+
+**Rationale:** Test Lab experiment **#973** ran the production text writer with
+ONLY the final arc + the 16 plan lines, no beat prose. It recovered **4 of the
+5 worst measured losses**, produced zero hard picture contradictions, and a
+blind child-listener judge preferred it on all three axes (7/7/6 vs 6/6/5) — as
+a single raw pass beating the shipped writer + refine chain. Deleting a stage
+that only loses information is strictly better than adding a guard to it.
+Owner ruling: "Flip production now."
+
+This supersedes the 2026-09-01 fix that fed the refiner the BEAT and
+deliberately withheld the PLAN line (a plan line's staging can name a danger a
+beat excluded, job_1788215224103 p11). With the beat gone, the plan line plus
+the arc are what exists; the safety rule that motivated the exclusion still
+stands in the refine template ("Nothing … dangerous enough that it could lead
+to death — for anyone. A fault is never fixed by putting a person in danger.").
+
+**Compatibility:** stored stories keep loading everywhere. `parseBeats` now
+accepts a page carrying EITHER field, so all three transcript generations read
+back: `BEAT + SCENE`, `BEAT + PLAN`, and `PLAN` alone. The per-page
+`outlineExtract` marker changed from `BEAT: …\nPLAN: …` to `PLAN: …`, and the
+three places that sniff that field for beats-vs-unified mode
+(`storyScorecard.finalBeats`, `textRefine.extractRefinablePages`, the Lab's
+stored-beats recovery) accept both prefixes. The stored transcript still
+carries a `---BEATS---` section, now holding `## Page N` + `PLAN:` blocks, so
+`storyMetrics`, the analysis scripts and the Lab replays key on the same marker.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/text-refine.txt`, `prompts/story-text-audit.txt`,
+`prompts/plan-check.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-review.txt`, `prompts/clothing-review.txt`,
+`prompts/story-bible-from-beats.txt`, `server/lib/promptBuilders.js`
+(`parsePlanResponse`, `planBlocks`, `parseBeats` bridge, every per-page block
+renderer, `buildTextAuditPrompt` arc), `server/lib/storyHelpers.js`,
+`server/lib/beatsPipeline.js`, `server/lib/textRefine.js`,
+`server/lib/storyScorecard.js`, `server/lib/testlab.js`,
+`server/lib/testlabWriterCompare.js`, `client/src/pages/TestLab.tsx`,
+`tests/unit/plan-response-parse.test.ts`, `tests/unit/text-refine-beats.test.ts`.
+
+**Status:** ✅ active

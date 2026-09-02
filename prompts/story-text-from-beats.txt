@@ -1,4 +1,4 @@
-You are writing the narrative text of an illustrated children's book. The page beats and the illustrations are already locked and cannot change.
+You are writing the narrative text of an illustrated children's book. The illustrations are already locked and cannot change.
 
 # LANGUAGE
 
@@ -20,52 +20,48 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE STORY (the whole story, for judgment — the beats divide it; write only what this page's beat carries. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown.)
-
-Where the beats and the story differ, the beats are the story's final form.
+# THE STORY (final — this arc IS the story. Every fact, cause, feeling and spoken line it states finds its home on some page, in its specific form. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown.)
 
 {STORY_ARC}
 
 {ARC_HINTS}
 
-# LOCKED BEATS AND ILLUSTRATIONS (given — the text matches them, page for page)
+# LOCKED ILLUSTRATIONS (given — one PLAN line per page, the text matches them, page for page)
 
-The commission above was already delivered by these beats. Its licence to replace mechanics was spent upstream: take nothing from it that the beats do not carry.
+The pictures are already done. Each page's PLAN line names the shot, who is in frame, the single instant the picture shows, and what is true after that page that was not before. ILLUSTRATION is the finished brief the artist drew from.
 
-One block per page. BEAT is what happens on that page. INSTANT is the single moment the picture shows. ILLUSTRATION is the finished brief the artist is drawing from — it is already locked and the picture will match it.
-
-The picture shows the named instant; the text tells the whole beat — above all what the picture cannot show. It never merely describes the picture, and never contradicts it: if the picture shows an object coming free, it comes free on that page; if it shows one still stuck, it stays stuck. Where BEAT and ILLUSTRATION disagree, the ILLUSTRATION wins.
+The plan lines divide the story into pages: a page tells the stretch of the story that leads to its picture's instant and that instant's consequence — everything the pages before have not told. The picture shows the named instant; the text tells everything else the page needs — above all what the picture cannot show. It never merely describes the picture, and never contradicts it: what a plan line says is true after a page is true from that page on and not before; what the picture shows still happening has not yet finished on that page.
 
 Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's.
 
-{BEATS}
+{PLAN_LINES}
 
 # YOUR TASK
 
 Write the text for all {PAGE_COUNT} pages, in page order, plus a title.
 
-Each page covers its own beat and nothing from the next one.
-The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the rest of the beat.
-Never contradict a page's illustration, and never mention pages, beats or illustrations.
+Each page covers its own stretch of the story and nothing that belongs to a later page.
+The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the causes, the rest of that stretch of the story.
+Never contradict a page's illustration, and never mention pages, plans or illustrations.
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
 Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene. Rhetorical set-pieces are rationed to one use in the whole book: a paired negation (kein X, kein Y), a coined saying or incantation, a one-sentence paragraph for drama — the second occurrence is written as plain narration.
 Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
-The arc's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
-Everything else works the other way: information neither the beats nor the pictures carry is cut, never added.
+The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
+Everything else works the other way: information neither the story nor the pictures carry is cut, never added.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
-The text gives each page its feeling and its suspense, drawn from the story — feelings and dialogue may go beyond what the beat carries; everything else may not.
+The text gives each page its feeling and its suspense, drawn from the story — feelings and dialogue may go beyond what the story states; everything else may not.
 The final page gets the same care as the first sentence: land one feeling, plainly and warmly. A string of short solemn sentences is not an ending.
 Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone.
 No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
 Every word must be one a child at the reading level above already uses. Name a thing plainly instead of reaching for a rare compound or an unusual colour or material word, and keep a sentence to one idea when the word count is tight.
-No abbreviation or acronym reaches the page, even when a beat uses one: write the thing the way a child says it — the little train up the mountain, not its initials.
+No abbreviation or acronym reaches the page, even when the story uses one: write the thing the way a child says it — the little train up the mountain, not its initials.
 Use dialogue where it fits — speech carries feeling and decision, not only what the pictures already show.
 {TITLE_RULE}
 Then name the candidate to ship, judged in this order: it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud.
 
 Work in two steps.
 
-Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it.
+Step 1 — write the analysis: one line per page naming which stretch of the story the page tells and what changed for the main character, then name any page whose text risks repeating the page before it, and name any fact, cause or spoken line of the story that has not yet found its page.
 
 Step 2 — write the pages, fixing what the analysis found. A problem the analysis names must change the page it names.
 

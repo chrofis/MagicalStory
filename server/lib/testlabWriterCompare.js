@@ -133,13 +133,15 @@ function scoreText(pages, expectedPages, language) {
 /** Beat plan: structure only — one beat and one page-plan line per page. */
 function scorePlan(beats, expectedPages) {
   const n = beats.length;
-  if (n === 0) return { score: 0, note: 'no beats' };
-  const withBoth = beats.filter(b => String(b.beat || '').trim() && String(b.planLine || b.scene || '').trim()).length;
+  if (n === 0) return { score: 0, note: 'no plan lines' };
+  // A page is filled when it carries its plan line — the only per-page field the
+  // planner emits since 2026-09-02 (`scene` is the legacy name for the same one).
+  const filled = beats.filter(b => String(b.planLine || b.scene || '').trim()).length;
   const criteria = {
     completeness: rate(Math.min(n, expectedPages), Math.max(expectedPages, 1)),
-    filled: rate(withBoth, n),
+    filled: rate(filled, n),
   };
-  return { ...criteria, score: avg(Object.values(criteria)), raw: `${n}/${expectedPages} pages, ${withBoth} with beat+plan` };
+  return { ...criteria, score: avg(Object.values(criteria)), raw: `${n}/${expectedPages} pages, ${filled} with a plan line` };
 }
 
 module.exports = { ALL_STAGES, scoreScenes, scoreBible, scoreText, scorePlan, rate, avg };

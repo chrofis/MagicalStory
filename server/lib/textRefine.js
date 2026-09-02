@@ -175,7 +175,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
   const auditModel = opts.auditModel || MODEL_DEFAULTS.textAuditModel || MODEL_DEFAULTS.arcReviewModel || defaultModel;
   try {
     const { buildTextAuditPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
-    const auditPrompt = buildTextAuditPrompt(storyData, current);
+    // The arc travels into the audit (2026-09-02): its LOADBEARING question
+    // asks what the story treats as load-bearing, and the audit was never shown
+    // the story — the question could not fire.
+    const auditPrompt = buildTextAuditPrompt(storyData, current, '', arc);
     if (auditPrompt && TEXT_MODELS[auditModel]) {
       const t0 = Date.now();
       // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
@@ -284,7 +287,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       // IDENTITY (fixed / stands / withdrawn) before naming a new one —
       // comparing counts alone let faults disappear silently. See
       // buildTextAuditPrompt's note for the run that exposed it.
-      const audit2Prompt = buildTextAuditPrompt(storyData, current, auditFindings);
+      const audit2Prompt = buildTextAuditPrompt(storyData, current, auditFindings, arc);
       if (audit2Prompt && TEXT_MODELS[auditModel]) {
         const t0 = Date.now();
         // Proofread runs alongside the re-audit: a narrow sentence-level pass
@@ -397,25 +400,19 @@ function extractRefinablePages(sceneLike = []) {
       // explicit that appearance and staging are not the prose's business.
       const briefRaw = String(s.sceneDescription || s.description || '');
       const sceneBrief = briefRaw.split(/---\s*METADATA/i)[0].trim();
-      // The page's own LOCKED BEAT (beats pipeline only — 2026-09-01 fix).
-      // outlineExtract holds "BEAT: …/PLAN: …" in beats mode but the scene
-      // expansion's own JSON in unified mode (storyScorecard.js finalBeats()
-      // draws the same distinction); guard on the marker so a unified story
-      // never mistakes its own JSON for a beat. This is what the story's final
-      // form actually is — the arc is background judgment context, not what
-      // the beat locked. Feeding the refiner the arc alone (job_1788215224103
-      // p11) let it reinstate an arc detail ("a crewman on a rope... trapped")
-      // that the beat had deliberately cut for safety.
-      // PLAN is staging shorthand for the artist (shot, camera, who's where) —
-      // the same rendering detail SCENE_OUTLINES already excludes elsewhere in
-      // this prompt, and PLAN's staging notes can name a danger the BEAT text
-      // deliberately left out (job_1788215224103 p11: PLAN named a person the
-      // BEAT explicitly kept out of harm). Only BEAT ships.
-      const beatRaw = String(s.outlineExtract || '');
-      const beat = /(^|\n)\s*BEAT\s*:/i.test(beatRaw)
-        ? beatRaw.split(/\n\s*PLAN\s*:/i)[0].trim()
+      // The page's own LOCKED PLAN LINE (beats pipeline only). outlineExtract
+      // holds "PLAN: …" in beats mode — older stored stories carry
+      // "BEAT: …/PLAN: …" — but the scene expansion's own JSON in unified mode
+      // (storyScorecard.js finalBeats() draws the same distinction); guard on
+      // the marker so a unified story never mistakes its own JSON for a plan
+      // line. The arc is the story (owner ruling 2026-09-02, Lab #973); the
+      // plan line says which picture this page carries, and the refiner may
+      // not write text that contradicts it.
+      const extractRaw = String(s.outlineExtract || '');
+      const planLine = /(^|\n)\s*(?:PLAN|BEAT)\s*:/i.test(extractRaw)
+        ? ((extractRaw.match(/(?:^|\n)\s*PLAN\s*:\s*([\s\S]*)$/i) || [, ''])[1] || '').trim()
         : '';
-      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent, sceneBrief, beat };
+      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent, sceneBrief, planLine };
     })
     .sort((a, b) => a.pageNumber - b.pageNumber);
 }

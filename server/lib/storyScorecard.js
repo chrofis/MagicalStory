@@ -165,7 +165,9 @@ const mean = (nums) => (nums.length ? Math.round((nums.reduce((a, b) => a + b, 0
 // they were not. Return null instead: a missing artifact is omitted by
 // scoreFromDims({partial}), which reports honestly that this story has no beats.
 function finalBeats(d) {
-  const looksLikeBeats = (t) => /(^|\n)\s*BEAT\s*:/i.test(String(t || ''));
+  // PLAN alone since 2026-09-02 (the beat prose is gone); BEAT for stored
+  // stories written before that. Unified mode holds JSON here and matches neither.
+  const looksLikeBeats = (t) => /(^|\n)\s*(?:BEAT|PLAN)\s*:/i.test(String(t || ''));
   const scenes = (d.sceneDescriptions || []).filter(s => s && s.outlineExtract);
   if (scenes.length) {
     const text = scenes

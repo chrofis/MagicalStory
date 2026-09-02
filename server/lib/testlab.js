@@ -3550,7 +3550,7 @@ async function runOutlineReviewStage(target, { params = {} }) {
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildBeatsPrompt, parseBeats } = require('./storyHelpers');
+  const { buildBeatsPrompt, parseBeats, parsePlanResponse } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
@@ -3583,10 +3583,12 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         const raw = String(s.outlineExtract || '');
         const beat = (raw.match(/BEAT:\s*([\s\S]*?)(?=\n(?:PLAN|SCENE):|$)/i) || [, ''])[1].trim();
         const planLine = (raw.match(/(?:PLAN|SCENE):\s*([\s\S]*)$/i) || [, ''])[1].trim();
-        return beat ? { pageNumber: s.pageNumber, beat, planLine } : null;
+        // Either field carries the page: production emits PLAN only since
+        // 2026-09-02, stored stories from before that carry BEAT as well.
+        return (beat || planLine) ? { pageNumber: s.pageNumber, beat, planLine } : null;
       })
       .filter(Boolean);
-    if (stored.length === 0) throw new Error('stored beats: no page carries an outlineExtract BEAT');
+    if (stored.length === 0) throw new Error('stored beats: no page carries an outlineExtract PLAN or BEAT line');
     // plainStoredBeats: hold the beats constant and fall through to the NORMAL
     // step-3 expansion + scene review — the Art Director bake-off path.
     if (params.useStoredBeats) {
@@ -3618,13 +3620,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const t0 = Date.now();
     planRes = await callTextModelStreaming(plannerPrompt, null, null, beatsModel, { usageLabel: 'testlab_beats' });
     planMs = Date.now() - t0;
-    planParsed = parseBeats(planRes.text || '', expected);
-    {
-      const { parsePagePlan } = require('./storyHelpers');
-      const tlPlanLines = parsePagePlan((String(planRes.text || '').match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1]);
-      for (const pg of planParsed.pages) pg.planLine = tlPlanLines.get(pg.pageNumber) || pg.planLine || '';
-    }
-    if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable beats');
+    planParsed = parsePlanResponse(planRes.text || '', expected);
+    if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable plan lines');
   }
 
   const plan = plainStoredBeats ? { source: 'stored-beats', pages: plainStoredBeats } : {
@@ -3733,7 +3730,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       // BEAT + PLAN line stands in for page.text. No rawOutlineContext: in a
       // beats-first run there is no outline block yet, so this measures the
       // Art Director working from the plan alone.
-      const pageContent = `BEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`;
+      const pageContent = `PLAN: ${b.planLine || ''}`;
       const prompt = buildSceneExpansionPrompt(
         b.pageNumber, pageContent, storyData.characters || [], lang,
         storyData.visualBible || null, availableAvatars, null,
@@ -7185,7 +7182,7 @@ async function runWriterCompareStage(target, { params = {} }) {
       try {
         if (stage === 'plan') {
           const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: SH.parseBeats(String(storyData.outline || '')).arc || '' }), model, 'plan');
-          const parsed = SH.parseBeats(r.text, []);
+          const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
           const r = await call(SH.buildStoryBibleFromBeatsPrompt(storyData, beats), model, 'bible');

@@ -2274,14 +2274,10 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     log.error(`👕 [PROMPT] all-pages scene expansion resolved an outfit for only ${resolvedOutfits}/${characters.length} character(s) — the rest have no outfit text and the Art Director will invent one`);
   }
 
-  const allBeats = beats
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`)
-    .join('\n\n');
-
   return fillTemplate(template, {
     PAGE_COUNT: beats.length,
-    ALL_BEATS: allBeats,
-    // The whole story, read-only: the Art Director stages each page's beat
+    ALL_PLAN_LINES: planBlocks(beats),
+    // The whole story, read-only: the Art Director stages each page's plan line
     // with the arc in view for judgment, never as extra material to stage.
     FINAL_ARC: String(options.finalArc || '').trim() || '(no arc was recorded for this story)',
     CHARACTER_DESCRIPTIONS: characterDescriptions,
@@ -3318,6 +3314,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const promptObjects = requiredObjects.filter(o => o.type !== 'location');
       requiredObjectsSection = `\n${header}\n`;
       const GENERIC_NOUN_BY_TYPE = { object: 'object', vehicle: 'vehicle', clothing: 'outfit' };
+      // VB ids whose reference render travels with this generation call
+      // (grid cell or, for a plate-covered vehicle, the background plate).
+      // Callers that know the attachment set pass it; without it no image
+      // reference is claimed.
+      const vbRefIds = new Set(
+        (Array.isArray(options.vbRefElementIds) ? options.vbRefElementIds : [])
+          .map(id => String(id || '').toUpperCase()).filter(Boolean)
+      );
+      const gridRefNames = [];
       for (const obj of promptObjects) {
         // Note: obj.id exists for Visual Bible tracking but is not included in image prompts
         // as image models don't use these identifiers.
@@ -3339,20 +3344,34 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // built from the STATE-AWARE description so a stripped attachment
         // clause can't sneak back in via the lead.
         const refEntry = placedElsewhere ? { description } : obj.entry;
-        // The lead is a LABEL — the full description follows on the same line,
-        // so the 12-word englishEntityRef default just duplicates the
-        // description's own opening (~60 wasted chars per object on prompts
-        // that fight an 8k model cap). First comma clause, max 6 words.
-        const shortRef = (r) => r.split(',')[0].split(/\s+/).slice(0, 6).join(' ');
+        // The lead is a checklist NAME — one clean short noun phrase. The raw
+        // englishEntityRef clause often runs into measurement prose without a
+        // comma ("…sailing ship roughly 25 m long"), so a bare word-count chop
+        // cut mid-phrase ("…sailing ship roughly 25"). Cap the words, then
+        // trim trailing dangling tokens (approximators, numbers, units,
+        // dimension words, function words) until the ref ends on a content
+        // word.
+        const DANGLING_TAIL = /^(?:roughly|about|approximately|around|nearly|almost|over|under|x|×|by|per|of|with|and|or|the|a|an|in|on|at|for|to|its|his|her|their|cm|mm|m|km|meters?|metres?|ft|feet|inch(?:es)?|long|wide|tall|high|deep|thick|across|diameter)$|^[\d(]/i;
+        const shortRef = (r) => {
+          let words = r.split(',')[0].trim().split(/\s+/).slice(0, 6);
+          while (words.length > 1 && DANGLING_TAIL.test(words[words.length - 1])) words.pop();
+          return words.join(' ');
+        };
         // A two-sided prop is TWO bible entries whose orientation lives in the
         // NAME's parenthetical ("… (turned away)", "… (face to camera)").
         // decisions.md 2026-08-26 made that orientation reach the prompt via
         // the copied description; with the description gone it rides the lead
         // instead, so the pair mechanism keeps its text channel.
         const qualifier = (obj.name && obj.name.match(/\(([^)]+)\)\s*$/)) ? ` (${obj.name.match(/\(([^)]+)\)\s*$/)[1]})` : '';
+        const refName = (obj.type === 'animal' && obj.name)
+          ? obj.name
+          : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object'));
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
-          : `**${shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object'))}${qualifier}** (${obj.type})`;
+          : `**${refName}${qualifier}** (${obj.type})`;
+        if (obj.id && vbRefIds.has(String(obj.id).toUpperCase())) {
+          gridRefNames.push(refName);
+        }
         // NAME ONLY — no Visual Bible description. The block is a presence
         // checklist; the element's look is written into the Art Director's
         // prose (scene-expansion*.txt: "weave the detail this shot actually
@@ -3362,6 +3381,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // stands ON was painted as a complete vessel in the background, at
         // whatever size the model chose, with its stern lettering.
         requiredObjectsSection += `* ${lead}${wornSuffix}\n`;
+      }
+      if (gridRefNames.length > 0) {
+        // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry
+        // regex never reads it as an object.
+        requiredObjectsSection += gridRefNames.length === 1
+          ? `The attached reference images include a rough image of ${gridRefNames[0]} — match its look at the size and placement the scene description gives it.\n`
+          : `The attached reference images include rough images of: ${gridRefNames.join('; ')} — match each one's look at the size and placement the scene description gives it.\n`;
       }
       if (promptObjects.length === 0) {
         // All entries were locations — nothing left to list.
@@ -4094,13 +4120,13 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   const sceneOutlines = pages
     .map(p => `## Page ${p.pageNumber}\n${p.sceneBrief || p.sceneIntent || '(no scene outline recorded)'}`)
     .join('\n\n');
-  // The locked beats, page by page — the story's final form (beats pipeline
-  // only; extractRefinablePages leaves `beat` empty on a unified-mode page).
-  // Kept separate from STORY_ARC below: the arc is read-only judgment
-  // context, the beats are what a page's text may not contradict.
-  const storyBeats = pages
-    .filter(p => p.beat)
-    .map(p => `## Page ${p.pageNumber}\n${p.beat}`)
+  // The locked plan lines, page by page — which picture each page carries
+  // (beats pipeline only; extractRefinablePages leaves `planLine` empty on a
+  // unified-mode page). Kept separate from STORY_ARC below: the arc is the
+  // story, the plan lines are what a page's text may not contradict.
+  const planLines = pages
+    .filter(p => p.planLine)
+    .map(p => `## Page ${p.pageNumber}\n${p.planLine}`)
     .join('\n\n');
   const currentText = pages
     .map(p => `## Page ${p.pageNumber}\n${p.text || '(empty)'}`)
@@ -4178,11 +4204,12 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
     STORY_BRIEF: brief,
     CHARACTER_DETAILS: characterDetails,
-    // The whole story, read-only, for judgment — never a licence to add events.
+    // The whole story — every fact it states belongs on some page. Read-only:
+    // never a licence to add events the story does not carry.
     STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
-    // The story's FINAL form (beats mode only) — where it and the arc differ,
-    // this wins. Empty on a unified-mode story, which has no beats.
-    STORY_BEATS: storyBeats || '(no beats were recorded for this story — judge against the arc and scene outlines only)',
+    // How the story was divided into pictures (beats mode only). Empty on a
+    // unified-mode story, which has no page plan.
+    PLAN_LINES: planLines || '(no page plan was recorded for this story — judge against the story and scene outlines only)',
     SCENE_OUTLINES: sceneOutlines,
     CURRENT_TEXT: currentText,
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
@@ -4653,23 +4680,17 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  * a beat, so the only thing that can change a page is the planner planning it
  * again. Empty string when there is nothing to re-plan, which is the normal case.
  */
-function buildReplanSection(pagePlan, beats, findingLines) {
+function buildReplanSection(pagePlan, findingLines) {
   const findings = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(l => String(l || '').trim()).filter(Boolean);
   if (findings.length === 0) return '';
-  const current = (beats || [])
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}`)
-    .join('\n\n');
   return [
     '# RE-DIVIDE',
     '',
-    'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Output the full plan and beats again.',
+    'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Output the full plan again.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
-    '',
-    '## YOUR BEATS',
-    current || '(none)',
     '',
     '## FINDINGS',
     findings.join('\n'),
@@ -4719,6 +4740,45 @@ function parsePagePlan(pagePlan) {
     if (m && !byPage.has(parseInt(m[1], 10))) byPage.set(parseInt(m[1], 10), m[2].replace(/\*\*/g, '').trim());
   }
   return byPage;
+}
+
+/**
+ * A planner response -> the page list. The planner emits ONE block, the page
+ * plan, and each page IS its plan line (owner ruling, 2026-09-02: the beat
+ * prose is gone — see docs/decisions.md). `beat` stays on the shape, empty, so
+ * every downstream consumer that reads it keeps working on stored stories.
+ *
+ * Tolerant in one place only: a response that omitted the marker is scanned
+ * whole, because a lost page list is a dead story.
+ *
+ * @returns {{pages: Array<{pageNumber:number, planLine:string, beat:string}>, pagePlan: string, missing: number[]}}
+ */
+function parsePlanResponse(raw, expectedPages = []) {
+  const full = String(raw || '');
+  const block = (full.match(/---\s*PAGE PLAN\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i) || [, ''])[1].trim();
+  const byPage = parsePagePlan(block || full);
+  const pages = [...byPage.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([pageNumber, planLine]) => ({ pageNumber, planLine, beat: '' }));
+  const got = new Set(pages.map(p => p.pageNumber));
+  return {
+    pages,
+    // Never the raw response: what is stored and re-shown is the page list.
+    pagePlan: block || pages.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n'),
+    missing: expectedPages.filter(n => !got.has(n)),
+  };
+}
+
+/**
+ * The per-page block every downstream prompt receives: one plan line per page.
+ * One renderer so the planner, the checker, the bible, the wardrobe review, the
+ * Art Director and the writer can never be shown different divisions.
+ */
+function planBlocks(pages = []) {
+  return (pages || [])
+    .filter(p => p && p.pageNumber != null)
+    .map(p => `## Page ${p.pageNumber}\nPLAN: ${String(p.planLine || '').trim()}`)
+    .join('\n\n');
 }
 
 /**
@@ -4942,15 +5002,14 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
     return null;
   }
-  const current = beats
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`)
-    .join('\n\n');
   const counted = (Array.isArray(counterFindings) ? counterFindings.join('\n') : String(counterFindings || '')).trim();
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
-    PAGE_PLAN: String(pagePlan || '').trim() || '(the planner emitted no page plan — read the beats alone)',
-    CURRENT_BEATS: current,
+    // The plan line per page IS the division (2026-09-02); the block the
+    // planner emitted is preferred, and the parsed pages stand in when a
+    // re-plan left only the page list.
+    PAGE_PLAN: String(pagePlan || '').trim() || planBlocks(beats) || '(the planner emitted no page plan)',
     FINAL_ARC: String(arc || '').trim() || '(no arc was recorded)',
     COUNTER_FINDINGS: counted || '(the counters found nothing)',
   });
@@ -5083,7 +5142,7 @@ function buildTextProofreadPrompt(inputData, pages = []) {
  *   no ruling — never fixed, never withdrawn, still in the shipped book, and
  *   invisible because only the totals were compared.
  */
-function buildTextAuditPrompt(inputData, pages = [], priorFaults = '') {
+function buildTextAuditPrompt(inputData, pages = [], priorFaults = '', arc = '') {
   const template = PROMPT_TEMPLATES.storyTextAudit;
   if (!template) {
     log.error('[PROMPT] storyTextAudit template not loaded — text audit unavailable');
@@ -5100,8 +5159,19 @@ function buildTextAuditPrompt(inputData, pages = [], priorFaults = '') {
     `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${String(p.sceneIntent || '').trim() || depictsOf(p.sceneBrief) || '(no picture description)'}`
   ).join('\n\n');
   const prior = String(priorFaults || '').trim();
+  // The story and its division (2026-09-02). The LOADBEARING question asked
+  // what "the story and the beat" treat as load-bearing while the audit was
+  // shown neither — the question could not fire. It is answered against the
+  // arc, which is the master, with the plan lines saying which page carries
+  // which picture. Empty on a unified-mode story, which has no page plan.
+  const planLines = pages
+    .filter(p => String(p.planLine || '').trim())
+    .map(p => `## Page ${p.pageNumber}\n${String(p.planLine).trim()}`)
+    .join('\n\n');
   return fillTemplate(template, {
     STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
+    STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
+    PLAN_LINES: planLines || '(no page plan was recorded)',
     PAGES: body,
     PRIOR_FAULTS: prior
       ? [
@@ -5168,17 +5238,14 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
     }
   }
   if (blocks.length === 0) return null;
-  // The beats are what check 9 (coverage) reads: a transformation or costume a
-  // beat gives a character is invisible from the wardrobe text alone — the
-  // bible writer missed one from the same inputs, so the review must see them.
-  const beatBlocks = (beats || [])
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`)
-    .join('\n\n') || '(beats not available)';
+  // The plan lines are what check 9 (coverage) reads: a transformation or
+  // costume a page gives a character is invisible from the wardrobe text alone
+  // — the bible writer missed one from the same inputs, so the review sees them.
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
     CURRENT_CLOTHING: blocks.join('\n\n'),
-    BEATS: beatBlocks,
+    PLAN_LINES: planBlocks(beats) || '(page plan not available)',
   });
 }
 
@@ -5276,8 +5343,11 @@ function parseBeats(raw, expectedPages = []) {
     // stored outlines) fills planLine the same way — both name the picture.
     const beat = (chunk.match(/BEAT\s*:\s*([\s\S]*?)(?=\n\s*(?:SCENE|PLAN)\s*:|$)/i) || [])[1];
     const planLine = (chunk.match(/(?:PLAN|SCENE)\s*:\s*([\s\S]*?)(?=\n\s*(?:SCENE|BEAT|PLAN)\s*:|$)/i) || [])[1];
-    if (beat && beat.trim()) {
-      pages.push({ pageNumber: marks[i].page, beat: beat.trim(), planLine: (planLine || '').trim() });
+    // A page counts when it carries EITHER field. Since 2026-09-02 the planner
+    // emits plan lines only, so new transcripts have PLAN and no BEAT; stored
+    // transcripts from before that carry both, or BEAT alone, and still parse.
+    if ((beat && beat.trim()) || (planLine && planLine.trim())) {
+      pages.push({ pageNumber: marks[i].page, beat: (beat || '').trim(), planLine: (planLine || '').trim() });
     }
   }
 
@@ -5303,19 +5373,19 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     return null;
   }
   const all = scenes.map(s => ['## Page ' + s.pageNumber, s.brief].join(String.fromCharCode(10))).join(String.fromCharCode(10, 10));
-  // Per-page beat lines so check 5 (character in the beat but absent from the
-  // brief) has beats to compare against — without them the check was dead
-  // (ALL_SCENES + STORY_BRIEF never carried per-page beats). One line per page,
-  // truncated; "(no beat data)" tells the reviewer to skip the comparison
-  // instead of hallucinating one (non-beats callers pass no beats).
-  const beatLines = (Array.isArray(options.beats) ? options.beats : [])
-    .filter(b => b && b.pageNumber != null && String(b.beat || '').trim())
-    .map(b => `Page ${b.pageNumber}: ${String(b.beat).replace(/\s+/g, ' ').trim().slice(0, 200)}`);
+  // Per-page plan lines so check 5 (character on the page but absent from the
+  // brief) has the division to compare against — without them the check was
+  // dead (ALL_SCENES + STORY_BRIEF never carried it). One line per page,
+  // truncated; "(no plan data)" tells the reviewer to skip the comparison
+  // instead of hallucinating one (non-beats callers pass none).
+  const planLines = (Array.isArray(options.beats) ? options.beats : [])
+    .filter(b => b && b.pageNumber != null && String(b.planLine || '').trim())
+    .map(b => `Page ${b.pageNumber}: ${String(b.planLine).replace(/\s+/g, ' ').trim().slice(0, 300)}`);
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: scenes.length,
     ALL_SCENES: all,
-    PAGE_BEATS: beatLines.length ? beatLines.join('\n') : '(no beat data)',
+    PAGE_PLAN_LINES: planLines.length ? planLines.join('\n') : '(no plan data)',
     // Mechanical clothing faults (server/lib/clothingCheck.js) — free to
     // compute, and the review is the ONE place they get fixed (owner decision
     // 2026-08-08). Empty string when nothing was found, so fillTemplate drops
@@ -5351,14 +5421,17 @@ function buildDoNotWriteSection(inputData = {}) {
 }
 
 /**
- * Page text written FROM the locked beats (beats-first pipeline, step 5).
+ * Page text written from the FINAL ARC and the locked PLAN LINES (beats-first
+ * pipeline, step 5). The arc is the story; the plan lines divide it into
+ * pictures. Beat prose used to stand between the two and was measured as the
+ * lossiest stage in the chain (Lab #973, 2026-09-02 — see docs/decisions.md).
  * Emits the same ---ANALYSIS--- / ---STORY TEXT--- shape the refiner emits, so
  * parseRefinedText() reads it with no new parser. A ---TITLE--- block precedes
  * both: in a beats run no other call produces a title.
  */
 /**
  * @param {Object} inputData
- * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
+ * @param {Array<{pageNumber:number, planLine:string}>} beats
  * @param {Array<{pageNumber:number, brief:string}>} [expansions] - the FINAL
  *   scene briefs, post scene-review. Text is written to match the picture that
  *   will actually be drawn; see the ordering note in beatsPipeline.
@@ -5380,7 +5453,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
   const blocks = beats
     .map(b => {
       const brief = briefByPage.get(b.pageNumber);
-      return `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nINSTANT: ${planInstant(b.planLine)}`
+      return `## Page ${b.pageNumber}\nPLAN: ${String(b.planLine || '').trim()}`
         + (brief ? `\nILLUSTRATION (already locked — what the reader will SEE on this page):\n${brief}` : '');
     })
     .join('\n\n');
@@ -5393,7 +5466,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PAGE_COUNT: beats.length,
-    BEATS: blocks,
+    PLAN_LINES: blocks,
     TITLE_RULE: buildTitleRule(inputData),
     // The writer that produced the candidates also picks the shipped title
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
@@ -5472,10 +5545,6 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
   const chars = inputData.characters || [];
   const named = (predicate) => chars.filter(predicate).map(c => c.name).join(', ') || 'None';
 
-  const beatBlocks = beats
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nPLAN: ${b.planLine || ''}`)
-    .join('\n\n');
-
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
@@ -5491,7 +5560,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
       .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
       .join('\n\n') || '(no character appearance available)',
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
-    BEATS: beatBlocks,
+    PLAN_LINES: planBlocks(beats),
   });
 }
 
@@ -6196,6 +6265,8 @@ module.exports = {
   parseClothingReview,
   parseBeats,
   parsePagePlan,
+  parsePlanResponse,
+  planBlocks,
   planInstant,
   buildSceneReviewPrompt,
   buildDoNotWriteSection,

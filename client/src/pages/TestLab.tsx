@@ -1654,19 +1654,19 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
                 <div className="mt-1 grid gap-2 md:grid-cols-2">
                   <div className="rounded border border-gray-200 bg-white p-2">
                     <div className="text-[10px] font-semibold text-gray-500 mb-0.5">BEFORE — {plan?.modelKey}</div>
-                    <div><span className="text-gray-400">BEAT</span> {before.beat}</div>
+                    {before.beat ? <div><span className="text-gray-400">BEAT</span> {before.beat}</div> : null}
                     <div><span className="text-gray-400">PLAN</span> {before.planLine ?? before.scene}</div>
                   </div>
                   <div className="rounded border border-indigo-200 bg-white p-2">
                     <div className="text-[10px] font-semibold text-indigo-600 mb-0.5">AFTER — {review?.modelKey}</div>
-                    <div><span className="text-gray-400">BEAT</span> {b.beat}</div>
+                    {b.beat ? <div><span className="text-gray-400">BEAT</span> {b.beat}</div> : null}
                     <div><span className="text-gray-400">PLAN</span> {b.planLine ?? b.scene}</div>
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="mt-0.5"><span className="text-gray-500">BEAT</span> {b.beat}</div>
-                  <div><span className="text-gray-500">PLAN</span> {b.planLine ?? b.scene}</div>
+                  {b.beat ? <div className="mt-0.5"><span className="text-gray-500">BEAT</span> {b.beat}</div> : null}
+                  <div className="mt-0.5"><span className="text-gray-500">PLAN</span> {b.planLine ?? b.scene}</div>
                 </>
               )}
             </div>

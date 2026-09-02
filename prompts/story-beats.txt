@@ -1,6 +1,6 @@
 # YOUR TASK
 
-The story below is finished. Divide it into {PAGE_COUNT} pages: first the PAGE PLAN — the pictures, simple pages first — then the BEATS, one per page. Plan in ENGLISH; the book will be written in {LANGUAGE} — names, places and cultural details as they will appear there. Reader: {READER_LINE}.
+The story below is finished. Divide it into {PAGE_COUNT} pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in {LANGUAGE} — names, places and cultural details as they will appear there. Reader: {READER_LINE}.
 
 # THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)
 
@@ -34,12 +34,10 @@ Rough distribution: about two close-ups and two ultra-wides, the rest medium or 
 Then one line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.
 A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page.
 
-BEAT is what happens on that page: the event, and what changes because of it. One or two sentences. One change per beat — never a sequence of actions inside one page; move the next step to the next page.
-
 The plan line's instant is a single drawable moment:
 - One moment — no montage, no before-and-after, no "then", no passage of time inside one picture.
 - One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
-- At most three named characters in frame, and two carry a beat better than three. The whole cast together is the portrait or arrival page, the book has at most one, and it holds up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
+- At most three named characters in frame, and two carry a page better than three. The whole cast together is the portrait or arrival page, the book has at most one, and it holds up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
 - Everyone stands on the ground. A figure up high only when the event IS that height — then one figure up there and no one else off the ground.
@@ -50,35 +48,26 @@ The plan line's instant is a single drawable moment:
 
 Requirements:
 - Each page follows causally from the one before it.
-- A character present on a page is present on the next one unless a beat says where they went. What a beat establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a beat changes it.
-- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the beat itself requires the separation, and keep such pages few.
-- Every beat is visible: something happens that a picture can show. Any character who forces or blocks something is present where it happens.
+- A character in frame on a page is in frame on the next one unless a plan line says where they went. What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.
+- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.
+- Every page is visible: something happens that a picture can show. Any character who forces or blocks something is in frame where it happens.
 - The main character appears on most pages; the others come and go in different combinations, not the whole group on every page. A close-up page is a waist-up moment (holding, reading, reacting), never a kneeling or floor action.
 - When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.
 - The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.
-- A beat may put the subject alone in frame — the creature, the artifact, the place — when the moment is the subject's: hatching, breaking, glowing, arriving, with the children just outside the frame.
+- A page may put the subject alone in frame — the creature, the artifact, the place — when the moment is the subject's: hatching, breaking, glowing, arriving, with the children just outside the frame.
 - A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.
 - The stake the arc has a character say aloud lands on an early page, spoken.
-- A prop, pet or skill that solves a problem appears in an earlier beat with its owner before it does the work.
-- Stage a beat with two people rather than three when two carry it.
-- No beat states what anyone learned, realised or now understands.
+- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work.
+- Stage a page with two people rather than three when two carry it.
+- No plan line states what anyone learned, realised or now understands.
 
 {REPLAN_SECTION}
 
 # OUTPUT FORMAT
 
-Only the blocks below, in this order. No preamble, no commentary.
+Only the block below. No preamble, no commentary. One line per page, through page {PAGE_COUNT}.
 
 ---PAGE PLAN---
 Page <N>: <shot> — <who is in frame> — <the instant the picture shows> — <what is true after this page that was not before>
-
----BEATS---
-## Page 1
-BEAT: <what happens>
-
-## Page 2
-BEAT: <what happens>
-
-(continue through page {PAGE_COUNT})
