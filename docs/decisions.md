@@ -23539,3 +23539,26 @@ gate then refuses that draw (verified post-deploy: 3/3 attempts rejected at IoU 
 `server/lib/repairPipeline.js`, `server/routes/regeneration.js`, `server/lib/samBlend.js`,
 `tests/unit/repair-axes-types.test.ts`, `tests/unit/white-hole-guard.test.ts`.
 **Status:** ✅ active
+
+## 2026-09-02 — Blanket no-lettering guard restored; the Visual Bible is the only gate for text
+**Context:** A recent batch relaxed the no-lettering rule at ~7 sites (`scene-expansion.txt`,
+`scene-expansion-all.txt`, `story-bible-from-beats.txt`, `image-generation.txt`) to "a document,
+sign or object may show a few real words when the beat names them." Story job_1788295892348
+painted the spec prose itself ("brigantine-style" / "topsail schooner-style") in gold lettering
+on ship hulls across 5 images — the relaxed rule let any beat-level mention of an object's build
+license lettering, and a vehicle build description is exactly such a mention. Owner ruling:
+"put the no lettering guard back. If the visual bible explicitly asks for text it is allowed,
+otherwise forbidden."
+**Decision:** Canonical rule at all sites: "No lettering on any surface — no words, names or
+letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies
+for an element is painted exactly as specified." The VB (declared at story-bible generation time)
+is the single gate; scene/beat prose can no longer license lettering on its own. Also added: AD
+object-build descriptions are written visually ("two-masted with square topsails"), never by a
+style name ("brigantine-style") — style words are lettering bait and the ID-sanitizer only
+strips VB ids, not prose adjectives. Cover title-baking is untouched (separate path).
+**Rationale:** A per-vehicle-type carve-out was rejected — the owner noted the failure is
+generic ("next time it is a train or a bus"), so the fix must close the general hole, not add a
+special case per object category.
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/story-bible-from-beats.txt`, `prompts/image-generation.txt`.
+**Status:** ✅ active
