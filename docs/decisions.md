@@ -23861,3 +23861,48 @@ renderer, `buildTextAuditPrompt` arc), `server/lib/storyHelpers.js`,
 `tests/unit/plan-response-parse.test.ts`, `tests/unit/text-refine-beats.test.ts`.
 
 **Status:** ✅ active
+
+## 2026-09-02 — REQUIRED OBJECTS lines are clean noun phrases; a trailer points at the attached reference renders
+
+**Context:** Commit `05eaa27fd` made REQUIRED OBJECTS a name-only checklist,
+deriving each line by chopping `englishEntityRef`'s first clause at 6 words.
+VB descriptions often run into measurement prose with no comma, so the chop
+cut mid-phrase: "two-masted wooden sailing ship roughly 25", "short wooden
+pencil about 14 cm", "single sheet of aged parchment roughly (face to
+camera)" — noise to the image model (owner report, staging story
+`job_1788295892348_l028ggiq7a`). The VB entry names themselves are clean
+short names; the damage was purely builder-side. Separately, the checklist
+never told the model that most listed elements have a rough render attached
+(VB grid cell or, for a plate-covered vehicle, the plate) — the model had a
+name with no look to match.
+
+**Decision:** (1) The lead ref trims trailing dangling tokens after the word
+cap — approximators (roughly/about), bare numbers, units (cm/m), dimension
+words (long/wide/tall), and function words — until the line ends on a content
+word. (2) `buildImagePrompt` takes `options.vbRefElementIds`; entries whose id
+is in the set are collected and the block ends with one plain line: "The
+attached reference images include rough images of: X; Y — match each one's
+look at the size and placement the scene description gives it." Call sites
+pass what they can verify: iterate and trial read the built grid's
+`rawElements` (which now carry the VB id); Phase 5a passes its candidate
+element list, built before the grid exists — sound because locations are
+never listed in the block and a vehicle the 5a-pre-grid plate filter drops is
+painted into the attached plate. Callers with no grid knowledge
+(regeneration, testlab) pass nothing and the block claims nothing.
+
+**Rationale:** Truncated prefixes are worse than either a full clause or a
+clean short name. The trailer implements the owner's direction ("tell the
+model it gets a rough image of the object in the attached reference image")
+without ever claiming a reference that is not attached. The trailer line has
+no `* **` prefix, so `parseVisualBibleObjects`' entry regex (dormant) never
+reads it as an object, and the `(face to camera)`/`(turned away)` name
+parenthetical keeps riding the lead (2026-08-26 face-prop channel).
+
+**Touched:** `server/lib/promptBuilders.js` (buildImagePrompt REQUIRED
+OBJECTS block), `server/lib/referenceSheets.js` (grid `rawElements` carry
+`id`), `storyJobPipeline.js` (Phase 5a + trial call sites; trial prompt now
+built after the grid), `server/lib/images.js` (iterate call site),
+`tests/manual/test-page-prompt-builder.js` (stale
+`filterWornClothingAgainstScene` import removed — broken since `5f174cba5`).
+
+**Status:** ✅ active
