@@ -873,6 +873,9 @@ function extractSceneMetadata(sceneDescription) {
       landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
       setting: null, // Setting details are in the prose, not structured
       sceneComplexity,
+      // VB id of the vehicle/structure the camera stands on or inside — makes
+      // the plate render the surfaces around the camera, not the element's exterior.
+      aboard: metadata.aboard || null,
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
@@ -1026,6 +1029,9 @@ function extractSceneMetadata(sceneDescription) {
       // Scene complexity for model routing ('simple' | 'complex' | null)
       sceneComplexity,
       // Empty scene prompt from scene expansion (for style-anchor background generation)
+      // VB id of the vehicle/structure the camera stands on or inside — makes
+      // the plate render the surfaces around the camera, not the element's exterior.
+      aboard: parsedData.aboard || null,
       emptyScenePrompt: parsedData.emptyScenePrompt || null,
       // Whether the existing empty scene background can be reused (iteration only)
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
@@ -1114,6 +1120,7 @@ function extractSceneMetadata(sceneDescription) {
         reuseEmptyScene: null,
         textPosition: null,
         textZoneDescription: null,
+        aboard: null,
         era: null,
         framingPattern: null,
         isJsonFormat: true,

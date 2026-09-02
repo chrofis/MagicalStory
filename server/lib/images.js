@@ -3763,6 +3763,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     ...newSceneMetadata,
     era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,
     textZoneDescription: newSceneMetadata?.textZoneDescription || savedMeta.textZoneDescription || null,
+    aboard: newSceneMetadata?.aboard || savedMeta.aboard || savedMeta.fullData?.aboard || null,
   };
 
   // Route by scene complexity when no explicit model override
@@ -3812,6 +3813,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         // photo (pageLandmarkPhotos below) — '' otherwise. Shared builder
         // in storyHelpers; used to be built only on the TRIAL empty-scene
         // path while every other caller shipped the generic unnamed block.
+        const iterateAboardId = iterateSceneMetadata?.aboard || null;
         const { buildEmptyScenePrompt } = require('../services/prompts');
         const { buildLandmarkFidelityBlock } = getStoryHelpers();
         const emptyPrompt = buildEmptyScenePrompt({
@@ -3822,8 +3824,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0]),
           visualBible,
           pageNumber,
+          aboardId: iterateAboardId,
         });
-        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId);
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           // Plates stay on the Standard tier regardless of the page tier.

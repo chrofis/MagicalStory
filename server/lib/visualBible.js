@@ -1987,15 +1987,23 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
  * @param {number} maxRefs
  * @returns {Array} Vehicle + non-landmark location references for this page
  */
-function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
+function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null) {
   if (!visualBible) return [];
 
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+
+  // The element the camera stands on or inside never rides as a reference on
+  // its own plate. Its render is an exterior three-quarter view, and an
+  // exterior IMAGE outweighs any amount of deck-level prose on the same call —
+  // the plate then paints the element from outside, the page inherits that
+  // camera from the plate, and the placement pass adds a second copy.
+  const skip = (entry) => aboardId && entry.id === aboardId;
 
   const refs = [];
 
   // Vehicles (ships, cars, carriages, spacecraft) — part of the setting
   for (const entry of visualBible.vehicles || []) {
+    if (skip(entry)) continue;
     if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
     refs.push({
@@ -2011,6 +2019,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9) {
 
   // Non-landmark locations (real landmarks use real photos via getLandmarkPhotosForScene)
   for (const entry of visualBible.locations || []) {
+    if (skip(entry)) continue;
     if (entry.isRealLandmark) continue;
     if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;

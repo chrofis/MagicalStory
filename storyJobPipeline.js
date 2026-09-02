@@ -3699,7 +3699,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // decides the REFERENCE line. Exactly one family per plate —
               // buildEmptySceneVbGrid returns null when a landmark photo is
               // present (owner, 2026-08-29).
-              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos);
+              const repAboardId = repPageData.sceneMetadata?.aboard || null;
+              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos, repAboardId);
               const emptySceneVbGridDataUrl = emptySceneVbGrid
                 ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
                 : null;
@@ -3715,6 +3716,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
                 visualBible,
                 pageNumber: repPageData.pageNumber,
+                aboardId: repAboardId,
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -3794,6 +3796,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
                     visualBible,
                     pageNumber: repPageData.pageNumber,
+                    aboardId: repAboardId,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -3999,7 +4002,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // doubling (e.g. an artifact rendered both in the empty scene and in the
             // character's hand on the page). Returns null when a landmark photo is
             // attached — one reference family per plate (owner, 2026-08-29).
-            const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || []);
+            const pageAboardId = sceneMetadata?.aboard || null;
+            const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || [], pageAboardId);
             // Persist the filtered grid as a data URL so the dev UI can show what
             // was actually attached to the empty-scene call (main-scene VB grid is
             // different; before this, the UI was displaying the wrong one).
@@ -4020,6 +4024,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               referenceKind: emptySceneRefKind,
               visualBible,
               pageNumber: pageData.pageNumber,
+              aboardId: pageAboardId,
             });
 
             try {
@@ -4100,6 +4105,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     referenceKind: emptySceneRefKind,
                     visualBible,
                     pageNumber: pageData.pageNumber,
+                    aboardId: pageAboardId,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,

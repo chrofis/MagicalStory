@@ -609,6 +609,9 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // Text zone only when this story overlays text on the image AND the scene
   // has a position — production omits it for text-below layouts.
   const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
+  // aboardOverride: test the aboard fix on a story whose stored AD metadata
+  // predates the `aboard` field.
+  const aboardId = params.aboardOverride ?? meta.aboard ?? null;
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
     style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
@@ -621,7 +624,17 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null),
     visualBible: ctx.visualBible,
     pageNumber: ctx.pageNumber ?? null,
+    aboardId,
   });
+
+  // Production attaches the VB element grid to every plate call
+  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
+  // saw only the text channel and a prompt change that fixes the image channel
+  // was invisible to the Lab. Same helper, same aboard filter.
+  const { buildEmptySceneVbGrid } = require('./referenceSheets');
+  const emptySceneVbGrid = await buildEmptySceneVbGrid(
+    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId
+  );
 
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, [], {
@@ -630,6 +643,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     ...emptyScenePlateRouting(),
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     landmarkPhotos: ctx.landmarkPhotos,
+    visualBibleGrid: emptySceneVbGrid,
     textAreaMask: wantsTextZone ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null,
     pageNumber: ctx.pageNumber,
     skipCache: true,

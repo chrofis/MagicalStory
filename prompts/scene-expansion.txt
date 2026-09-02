@@ -45,7 +45,7 @@
     - `side`: profile view, character's body axis perpendicular to the camera; the action's target/destination visible on one side of the frame.
 11b. **Camera-action consistency.** When the hint shows a character moving INTO, descending INTO, climbing INTO, or stepping THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), expand the prose so the camera sits OUTSIDE that space and the character is seen from `back view` or in profile — never facing the camera with the interior behind them. Name the camera POV in the prose ("camera positioned outside the cellar door looking past the threshold; steep stairs descend into the dark beyond").
 11c. **A close-up carries no environment.** A `close-up` brief describes only what that frame holds — the character, what their hands touch, the surface behind them. A long setting paragraph overrides the close-up tag and the wide shot is drawn instead; move the setting into `emptyScenePrompt`, or make the page a `medium` shot.
-11d. **Aboard is not alongside.** When the camera is aboard a vessel or inside a structure, that vessel or structure is the ground the shot stands on — deck, railing, mast base, planking, walls, floor — and only those near surfaces are described. Its exterior (hull, figurehead, name, complete silhouette) never appears as an object in the frame, and no second copy of it stands in the background.
+11d. **Aboard is not alongside.** When the camera is aboard a vessel or inside a structure, that vessel or structure is the ground the shot stands on — deck, railing, mast base, planking, walls, floor — and only those near surfaces are described. Its exterior (hull, figurehead, name, complete silhouette) never appears as an object in the frame, and no second copy of it stands in the background. The `emptyScenePrompt` for such a page is the view FROM that position — the planking, rail, mast base and the water or sky beyond, or the interior walls and floor — never the vessel or structure seen from outside. Set `aboard` to that element's id.
 12b. **Never name what must be absent.** "no glow", "bare rail", "no other figures in the room", "does not wave" each paint the named thing into the picture. Leave it unwritten and describe what does occupy that space instead ("the rail runs smooth grey iron", "the far wall is plain plaster"). This covers props, people and the medium alike — you are not shown the art style, and a ban on glow, colour, text, reflections or weather can contradict the style the picture is drawn in.
 12e. **A named prop is held, or it is the subject.** Props in a character's hands survive; props merely placed in the scene vanish. A plot-critical object goes into a named character's hands, or becomes the page's subject filling the foreground at full detail — never set dressing. At most two named props stand unheld on a page.
 12f. **A real place in another era is described, not named.** Naming a real location pulls in how it looks today — modern seating, signage, fittings — into a historical or fantastical story. When the page's `era` or genre differs from the place as it stands, write the landmark's shape, materials and surroundings into the prose and leave its name out; its LOC id still goes in `objects[]`.
@@ -121,6 +121,7 @@ Then a single-line JSON object:
     {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view", "depth": "background", "expression": "calm, faint smile"}
   ],
   "shot": "medium",
+  "aboard": "VEH001",
   "landmarkView": "exterior",
   "era": "present day",
   "objects": ["LOC001", "ART002"],
@@ -195,6 +196,10 @@ Distance rule: when the verb implies action across a gap ('shoots', 'aims at', '
 **`textPosition` / `textZoneDescription`** (story pages only — when a TEXT ZONE POSITION FIXES block appears above, `textPosition` matches the position it names)
 - `textPosition`: the corner reserved for the white story-text overlay. Even pages use a right corner (`top-right` / `bottom-right`), odd pages a left corner.
 - `textZoneDescription`: 5–15 words naming the saturated, high-contrast surface in that corner (e.g. "deep evening sky in rich indigo", "dark green pine foliage"). Describe what's there, not what it's for — never "rectangle", "blank area", "for text".
+
+**`aboard`**
+- The Visual Bible id of the vehicle or structure the camera stands on or inside for this page (`VEH001`, `LOC004`). Omit it when the camera is outside the element looking at it, or when no such element is in the shot.
+- It tells the plate builder to render the surfaces around the camera instead of the element's full exterior, so a page set on board does not gain a second copy of the vessel in its background.
 
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.

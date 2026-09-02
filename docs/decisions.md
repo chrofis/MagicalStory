@@ -16400,6 +16400,76 @@ easier.
 **Status:** 🟡 conditional — the unified prompt is a Lab candidate, not in the
 pipeline. Nothing merges until `inventory_ab` says it is safe.
 
+## 2026-09-02 — The plate is the view FROM aboard: `aboard` gates the VB vehicle injection (supersedes the 2026-08-23 raw append)
+
+**Context:** Owner diagnosis of the persisting "camera not aboard / phantom
+second vessel" defect on staging story `job_1788295892348_l028ggiq7a` (pages 2
+and 9), which survived commit `05eaa27fd`. The evidence says the Art Director
+was never at fault: the stored `emptyScenePrompt` for both pages is correctly
+deck-level ("A low weathered wooden deck table sits on a ship's deck ...
+rigging casting soft shadows across the wooden planks behind it"). Two
+downstream channels re-injected the exterior the AD had excluded:
+
+1. **Text** — the 2026-08-23 `buildEmptyScenePrompt` VEHICLES append pasted the
+   vessel's full VB description (hull from the waterline, gold pinstripe, name
+   on the stern transom, carved figurehead, two masts, bowsprit, rigging) into
+   a plate whose own prose stands on that vessel's deck. The mitigating
+   sentence added 2026-08-29 ("when the camera stands on board, show the deck
+   ... never the vessel seen from outside") sits *after* ~150 words of exterior
+   prose and loses.
+2. **Image** — `buildEmptySceneVbGrid` attached the `VEH001` element render as
+   the plate's single reference. That render is an exterior three-quarter view
+   of the ship under full sail. An exterior *image* outweighs any amount of
+   deck-level *prose* on the same call.
+
+The plate is the style/layout anchor the populated page is rendered from, so a
+plate painted from outside hands the whole page the wrong camera, and the
+placement pass then adds the deck as a second vessel. Test Lab exp 975 could
+not have caught this: the `image` stage loads the *stored* plate
+(`loadEmptyScene`) and composites onto it — it re-rendered pages 2/4/5/9/15
+onto the same exterior-view plates exp 974 had not touched.
+
+**Decision:** the Art Director emits a new metadata field **`aboard`** — the VB
+id of the vehicle or structure the camera stands on or inside, omitted when the
+camera is outside it. When set, that one element:
+- gets a **name-only** VEHICLES entry plus a from-the-deck instruction, instead
+  of its exterior description (every *other* vehicle on the page keeps its full
+  description);
+- is **dropped from the empty-scene VB grid**, so no exterior render is
+  attached to its own plate.
+
+This supersedes the *scope* of the 2026-08-23 entry, not its verdict: the raw
+append still fires for genuine exterior shots, which is the case that entry was
+written for (plates lost VB detail without it and invented a generic
+substitute). Only the aboard case is carved out.
+
+**Also:** the Lab's `empty_scene` stage did not attach the VB element grid that
+every production plate call attaches, so a plate rendered in the Lab saw only
+the text channel — a prompt change fixing the image channel was invisible to
+the Lab. It now calls the same `buildEmptySceneVbGrid` with the same aboard
+filter, and takes an `aboardOverride` param for stories whose stored metadata
+predates the field.
+
+**Rationale:** the signal has to be structural. Recognising "aboard" by
+pattern-matching the plate prose does not generalise past the story it was
+tuned on (the standing rule against reading meaning out of description text),
+and only the Art Director actually knows where it put the camera. One field,
+parsed in the two `sceneMetadata` parsers, threaded to the call sites that have
+scene metadata. The trial path (`vb.backgrounds`, no AD) and cover plates
+(`pageNumber` null, no VEHICLES block) are unaffected.
+
+**Touched files:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`
+(rule 11d + `aboard` field), `prompts/empty-scene.txt` (aboard framing line),
+`server/lib/sceneMetadata.js` (parse `aboard`, both parsers + the recovery
+fallback), `server/services/prompts.js` (`buildEmptyScenePrompt` `aboardId`),
+`server/lib/visualBible.js` (`getEmptySceneElementReferences` aboard filter),
+`server/lib/referenceSheets.js` (`buildEmptySceneVbGrid` aboardId),
+`storyJobPipeline.js` + `server/lib/images.js` (thread from scene metadata;
+iterate carries the saved value forward), `server/lib/testlab.js` (grid
+alignment + `aboardOverride`).
+
+---
+
 ## 2026-08-23: Empty-scene plates get the VB vehicle description injected
 
 **Context:** Story `job_1787423677246_r9llf5yi9` ("Kapitänin Fiona und die Goldene Möwe"): the VB spec'd the crew's vessel as a 10m single-mast sailing boat with a crossed-bones square sail, and the VEH001 reference image rendered it correctly — but page 1 shipped a mastless one-man rowboat. The Art Director's `emptyScenePrompt` described the quay with only "a boat sits tied" (the scene-expansion vessel-anchor rule exists but was not followed), the plate model invented a rowboat, and the iterative-placement pass painted the characters into the plate's boat — the correct VEH001 reference and full text description were both in the page prompt and lost to the pixels already on the canvas. Entity consistency tracks only characters (objects channel empty on all 9 boat pages), so nothing caught it.

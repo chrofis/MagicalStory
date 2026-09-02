@@ -351,6 +351,9 @@ function fillTemplate(template, replacements) {
  * @param {Object} [opts.visualBible]      - Visual Bible, used to resolve VB ids
  *   (ART008 → "carved stone trail marker") before the prompt reaches the model.
  *   ALWAYS pass it — see the sanitizer note in the body.
+ * @param {string} [opts.aboardId]      - VB id of the vehicle the camera stands on;
+ *   that vehicle's VEHICLES entry becomes a name-only from-the-deck instruction
+ *   instead of its full exterior description.
  * @param {number} [opts.pageNumber]       - Page number, for sanitizer logging
  * @param {'landmark'|'element'} [opts.referenceKind] - Which single reference family
  *   is attached to this plate call (landmark photo XOR Visual Bible element render).
@@ -384,7 +387,19 @@ function buildEmptyScenePrompt(opts = {}) {
       return Array.isArray(pages) && pages.includes(opts.pageNumber) && v.description;
     });
     if (pageVehicles.length > 0) {
-      const lines = pageVehicles.map(v => `- ${v.name || v.type || 'vehicle'}: ${v.description}`);
+      // The vehicle the camera stands ON gets a name-only mention, never its
+      // full exterior description. The plate prose for such a page is already
+      // the view from the deck, and appending 150 words of hull, figurehead,
+      // masts and bowsprit re-injects the exterior the Art Director excluded —
+      // the plate then paints the vessel from outside, and because the plate is
+      // the style/layout anchor the whole page inherits that camera and the
+      // placement pass adds a second copy of the vessel. The rest of the page's
+      // vehicles keep their full description (2026-08-23: plates lost VB detail
+      // without it, and a genuine exterior shot still needs the construction).
+      const aboardId = opts.aboardId || null;
+      const lines = pageVehicles.map(v => (aboardId && v.id === aboardId)
+        ? `- ${v.name || v.type || 'vehicle'}: the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.`
+        : `- ${v.name || v.type || 'vehicle'}: ${v.description}`);
       // Render only the visible PART, not the whole vessel. The old wording
       // ("render it exactly to its description") demanded the full vehicle even
       // when the camera stands on its deck, which shipped duplicate ships, a
