@@ -331,13 +331,17 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       // axes a char-fix uses. faceOnly here is the INTENT (assumes a face box is
       // available); executeCharFixAction finalises it against the actual bbox.
       const { resolveRepairAxes } = require('./faceRepair');
-      const repairParams = resolveRepairAxes(issueDescription, { hasFaceBbox: true });
+      // The finding's TYPE decides face vs full-figure (owner, 2026-09-01):
+      // an age_shift is a face patch, never a full-figure repaint.
+      const issueTypes = [worst.issue.subType || worst.issue.type].filter(Boolean);
+      const repairParams = resolveRepairAxes(issueDescription, { hasFaceBbox: true, issueTypes });
       return {
         method: 'char-fix',
         reason: `entity ${worst.severity} on ${worst.charName}`,
         charName: worst.charName,
         severity: worst.severity,
         issueDescription,
+        issueTypes,
         repairParams,
       };
     }

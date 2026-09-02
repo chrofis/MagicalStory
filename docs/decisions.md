@@ -23401,3 +23401,40 @@ is what guarantees the trial's slice(0,3) sees it.
 `premiseNamedLandmarks`, `resolveAvailableLandmarks`), `storyJobPipeline.js`,
 `tests/unit/premise-landmark-match.test.ts`, `docs/landmark-database.md`.
 **Status:** ✅ active
+
+## 2026-09-02 — Char-repair mode by finding TYPE (face = identity cues, full-figure = structure/position) + white-hole coverage guard
+
+**Context.** Which repair mode a character finding gets was decided by keyword-sniffing the
+issue prose (`resolveRepairAxes`: "face/hair/skin/eye/age" vs "cloth/outfit/color"). A pure
+age cue phrased "appears older" contains no keyword and routed to a FULL-FIGURE repaint —
+exactly the mode that structurally fails on busy multi-figure pages (G7 p16: 12/12 draws
+refused). Separately, when a full-figure draw lands misaligned, the union blend pastes
+candidate content across the OLD silhouette; where the model reproduced the treatment's
+white instead of painting content, a white rectangle shipped (G7 evidence v2-f1-s5) — the
+white-card gate averages over the whole union, so a partial hole slips under its 22%.
+**Decision.** Owner doctrine: "The char is needed if figure is distorted or limbs missing
+or position wrong. But age cue is the face."
+1. `resolveRepairAxes` accepts `issueTypes` (the entity findings' `subType`/`type`), and a
+   structured type BEATS the keyword heuristic: FACE_DEFECT_TYPES (`age_shift`,
+   `face_drift`, `face_mismatch`, `facial_hair`, `skin_tone`) → FACE repair (insert-blend);
+   BODY_DEFECT_TYPES (`clothing_inconsistent`, `color_change`, `shape_change`, `missing`,
+   `unexpected`, `garment`) → FULL-FIGURE. Mixed face+body types → full-figure (garment and
+   build own the body scale). Face type without a face bbox degrades to full-figure;
+   `forceTarget` still beats everything. Threaded from `decideRepairMethod`
+   (auto pipeline) and the manual `/repair-workflow/character-repair` route.
+2. NEW white-hole coverage guard in `samUnionBlend` (default ON, `gateWhiteHole` /
+   `whiteHoleMaxFrac` 0.02): before compositing, every old-silhouette pixel not covered by
+   the redrawn figure's cut (+3px ring) must be non-near-white in the candidate; >2% of the
+   silhouette near-white (and >150px) rejects the attempt. Geometric-only coverage was
+   deliberately NOT used: a legitimate shrink repair (extra limb removed, slimmer build)
+   leaves old-only pixels filled with the model's painted background — that is what the
+   red-zone colour match is for. Only near-white uncovered content is a hole.
+3. Busy-page full-figure failures are ACCEPTED (owner): when every draw is refused by the
+   gates, the repair fails visibly — no fallbacks, no degraded ship.
+The double-exposure case (v2-f1-s2) needs no new assertion: figure registration
+(e94fa715b) is kept only when it improves silhouette bbox IoU, and the unchanged 0.55 IoU
+gate then refuses that draw (verified post-deploy: 3/3 attempts rejected at IoU 13-14%).
+**Touched.** `server/lib/faceRepair.js`, `server/lib/repairLogic.js`,
+`server/lib/repairPipeline.js`, `server/routes/regeneration.js`, `server/lib/samBlend.js`,
+`tests/unit/repair-axes-types.test.ts`, `tests/unit/white-hole-guard.test.ts`.
+**Status:** ✅ active

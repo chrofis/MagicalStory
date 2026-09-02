@@ -866,7 +866,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   const model = guarded.model, faceOnly = guarded.faceOnly, treatment = guarded.treatment, regionSource = guarded.regionSource;
   const requireMobilesam = opts.requireMobilesam !== undefined ? !!opts.requireMobilesam : true;
   const gates = {
-    styleMatch: true, iou: true, whiteCard: true, coverage: true, requireMobilesam: true, sharpness: true,
+    styleMatch: true, iou: true, whiteCard: true, whiteHole: true, coverage: true, requireMobilesam: true, sharpness: true,
     ...(opts.gates || {}),
   };
   const charName = opts.charName || opts.characterName || 'the character';
@@ -1139,8 +1139,10 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       // Uniform gates — tunable for the Test Lab A/B, default ON in production.
       gateIou: gates.iou,
       gateWhiteCard: gates.whiteCard,
+      gateWhiteHole: gates.whiteHole,
       ...(opts.iouThreshold != null ? { iouThreshold: opts.iouThreshold } : {}),
       ...(opts.whiteCardMaxFrac != null ? { whiteCardMaxFrac: opts.whiteCardMaxFrac } : {}),
+      ...(opts.whiteHoleMaxFrac != null ? { whiteHoleMaxFrac: opts.whiteHoleMaxFrac } : {}),
     });
   } catch (blendErr) {
     log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED by blend gate: ${blendErr.message}`);
@@ -1268,15 +1270,32 @@ function applyGeometryGuards(axes, { faceBbox, bodyBbox } = {}) {
 // crosshatch + body. Keyword lists match the legacy derivations verbatim.
 // FAITHFULNESS-CHECK: images.js:8174-8177 / regeneration.js:5443-5450.
 // ---------------------------------------------------------------------------
-function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'grok', forceTarget = null } = {}) {
+// DEFECT-TYPE → REPAIR-MODE mapping (owner ruling, 2026-09-01): "The char is
+// needed if figure is distorted or limbs missing or position wrong. But age
+// cue is the face." FACE repair fixes IDENTITY CUES — a small, composable
+// patch that works even on busy multi-figure pages where every full-figure
+// draw is gate-refused (p16, 12/12). FULL-FIGURE repair is for STRUCTURAL /
+// POSITIONAL defects and clothing (garment = body scale).
+const FACE_DEFECT_TYPES = new Set(['age_shift', 'face_drift', 'face_mismatch', 'facial_hair', 'skin_tone']);
+const BODY_DEFECT_TYPES = new Set(['clothing_inconsistent', 'color_change', 'shape_change', 'missing', 'unexpected', 'garment']);
+
+function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'grok', forceTarget = null, issueTypes = null } = {}) {
   const issueText = (issueDescription || '').toLowerCase();
   const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
   const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
+  // Structured finding types beat keyword sniffing: "appears older" contains
+  // no keyword and routed a pure age cue to a full-figure repaint (the G7
+  // failure mode). Types come from the entity findings' subType field.
+  const types = (Array.isArray(issueTypes) ? issueTypes : [])
+    .map(t => String(t || '').toLowerCase().trim()).filter(Boolean);
+  const typeFace = types.some(t => FACE_DEFECT_TYPES.has(t));
+  const typeBody = types.some(t => BODY_DEFECT_TYPES.has(t));
   // forceTarget: explicit 'face' | 'body' override (user/dev toggle) beats the
   // keyword heuristic, mirroring regeneration.js's whiteoutTarget override.
   let faceOnly;
   if (forceTarget === 'face') faceOnly = hasFaceBbox;
   else if (forceTarget === 'body') faceOnly = false;
+  else if (typeFace || typeBody) faceOnly = typeFace && !typeBody && hasFaceBbox;
   else faceOnly = hasFaceIssue && !hasClothingIssue && hasFaceBbox;
   // FACE = BLUR (owner, 2026-08-26). A blur destroys the features while keeping
   // head size and tilt, so the pose survives and identity has to come from the

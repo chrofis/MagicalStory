@@ -1201,7 +1201,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // derivation. Prefer the intent the decision already emitted (repairParams),
     // but finalise faceOnly here since only now do we know a face box exists.
     const { resolveRepairAxes } = require('./faceRepair');
-    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox });
+    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null });
     const useFaceOnly = repairAxes.faceOnly;
     const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 

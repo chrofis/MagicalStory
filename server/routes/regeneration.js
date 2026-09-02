@@ -5647,6 +5647,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const manualAxes = resolveRepairAxes(issueDesc, {
             hasFaceBbox: !!storedAppearance.faceBox,
             forceTarget: (whiteoutTarget === 'face' || whiteoutTarget === 'body') ? whiteoutTarget : null,
+            // Finding TYPES decide face vs full-figure (owner, 2026-09-01) —
+            // "appears older" has no routing keyword but its subType is age_shift.
+            issueTypes: charIssues.map(i => i.subType || i.type).filter(Boolean),
           });
           const useFaceOnly = manualAxes.faceOnly;
           const repairBox = useFaceOnly ? storedAppearance.faceBox : (storedAppearance.bodyBox || storedAppearance.faceBox);

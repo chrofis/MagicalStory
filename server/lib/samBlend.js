@@ -458,6 +458,27 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
 }
 
 /**
+ * White-hole measurement (pure — unit-tested). Counts old-silhouette pixels
+ * that the redrawn figure's cut (+~3px edge ring, `newDil`) does NOT cover and
+ * whose candidate content is near-white (>=243 on all channels — same
+ * threshold as the white-card gate). Those pixels are treatment residue the
+ * union would paste onto the page as a white hole.
+ *   oldA    : old SAM mask alpha (possibly strided — pass sOld)
+ *   newDil  : dilated new-figure binary mask (stride 1, length n)
+ *   candRaw : candidate crop, raw RGB (3 bytes/px)
+ */
+function measureWhiteHole({ oldA, sOld, newDil, candRaw, n }) {
+  let oldCnt = 0, uncoveredWhite = 0;
+  for (let i = 0; i < n; i++) {
+    if ((oldA[i * sOld] || 0) <= 128) continue;
+    oldCnt++;
+    if (newDil[i] > 128) continue; // covered by the new figure's cut
+    if (candRaw[i * 3] >= 243 && candRaw[i * 3 + 1] >= 243 && candRaw[i * 3 + 2] >= 243) uncoveredWhite++;
+  }
+  return { oldCnt, uncoveredWhite, frac: oldCnt ? uncoveredWhite / oldCnt : 0 };
+}
+
+/**
  * THE shared repair blend — engine-agnostic. Given the original crop and a
  * candidate crop (any model's output for the same region), put ONLY the
  * repainted figure back:
@@ -472,7 +493,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, newBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, newBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true, gateWhiteHole = true, whiteHoleMaxFrac = 0.02 }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -1113,8 +1134,8 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // aligns) and the style gate (a colorless panel has no "style") — v92's
   // Roger shipped exactly that. Mechanical check: the pixels TAKEN from the
   // new image must not be substantially near-white.
+  const candRaw0 = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   {
-    const candRaw0 = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
     let unionCnt = 0, whiteCnt = 0;
     for (let i = 0; i < n; i++) {
       if (!alpha1[i]) continue;
@@ -1124,6 +1145,26 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
     const whiteFrac = unionCnt ? whiteCnt / unionCnt : 0;
     if (gateWhiteCard && whiteFrac > whiteCardMaxFrac) {
       throw fail(`Blended region is ${(whiteFrac * 100).toFixed(0)}% near-white — the model painted the face on a white card. Redo.`);
+    }
+  }
+
+  // WHITE-HOLE coverage guard (owner, 2026-09-02): every treated pixel — the
+  // old silhouette that was whited out / crosshatched in the input — must come
+  // back covered, either by the redrawn figure's cut or by real painted
+  // background. Where the model instead reproduced the treatment's white, the
+  // union pastes it onto the page as a white rectangle (G7 p16 evidence:
+  // v2-f1-s5). Colour-matching cannot rescue a pure-white region, and the
+  // white-card gate averages over the WHOLE union so a partial hole slips
+  // under its 22%. Reject BEFORE compositing. Geometric-only coverage would
+  // be wrong — a legitimate shrink repair (extra limb removed, slimmer build)
+  // leaves old-only pixels filled with the model's painted background, which
+  // is exactly what the red-zone colour match is for. Only NEAR-WHITE
+  // uncovered content is a hole.
+  {
+    const hole = measureWhiteHole({ oldA, sOld: Math.max(1, Math.round(oldA.length / n)), newDil, candRaw: candRaw0, n });
+    if (hole.uncoveredWhite > 0) log.info(`[TESTLAB] white-hole check: ${hole.uncoveredWhite}px near-white in the uncovered old silhouette (${(hole.frac * 100).toFixed(1)}% of ${hole.oldCnt}px)`);
+    if (gateWhiteHole && hole.frac > whiteHoleMaxFrac && hole.uncoveredWhite > 150) {
+      throw fail(`Treated region not covered — ${(hole.frac * 100).toFixed(0)}% of the old silhouette (${hole.uncoveredWhite}px) is near-white in the model output where the redrawn figure does not cover it. That ships as a white hole. Redo.`);
     }
   }
 
@@ -1270,4 +1311,4 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   return { feathered, iou, redPx, colorInfo, registration, blendRule: blendShape === 'figure-exact' ? 'figure-exact-pad6' : BLEND_RULE_VERSION };
 }
 
-module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION, computeFigureRegistration, transformBox, boxIou };
+module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION, computeFigureRegistration, transformBox, boxIou, measureWhiteHole };

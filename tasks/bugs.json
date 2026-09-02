@@ -471,6 +471,24 @@
       "status": "fixed",
       "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
       "note": "Contract fixed at the producer, one name both sides: the annotation site (entityConsistency.js) backfills pagesToFix (and pageNumber) from the manifest-resolved pageNumbers whenever the model omitted pagesToFix, so pagesToFix is now guaranteed populated for every locatable finding and stays the single routing field the repair readers consume. The model-emitted pagesToFix wins when present (legitimately multi-page); pageNumbers keeps its deliberate first-cell-only consolidator semantics untouched."
+    },
+    {
+      "id": "age-shift-findings-routed-to-full-figure-repaint",
+      "title": "Identity-cue entity findings (age_shift etc.) routed to FULL-FIGURE repaint because repair-mode routing keyword-sniffed the prose — 'appears older' has no keyword",
+      "reportedAt": "2026-09-01",
+      "source": "owner doctrine (G7 follow-up): 'The char is needed if figure is distorted or limbs missing or position wrong. But age cue is the face.' Evidence: G7 job age_shift finding phrased 'appears older' matched no face keyword in resolveRepairAxes and fell through to the full-figure crosshatch path — the mode that was refused 12/12 on the busy p16 while a face insert-blend patch would have addressed the age cue.",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-02 (repair-mode type mapping commit — same commit as this entry)",
+      "note": "resolveRepairAxes accepts issueTypes (finding subType/type); structured types beat keyword sniffing: FACE_DEFECT_TYPES (age_shift, face_drift, face_mismatch, facial_hair, skin_tone) -> face insert-blend, BODY_DEFECT_TYPES (clothing_inconsistent, color_change, shape_change, missing, unexpected, garment) -> full-figure. Mixed -> full-figure; no face bbox degrades to full-figure; forceTarget still wins. Threaded from decideRepairMethod (repairLogic.js), runUnifiedRepairPipeline (repairPipeline.js) and the manual character-repair route (regeneration.js). Unit-tested in tests/unit/repair-axes-types.test.ts."
+    },
+    {
+      "id": "whiteout-region-uncovered-ships-white-hole",
+      "title": "Full-figure repair composite can ship a white rectangle: treated (whited-out/crosshatched) silhouette pixels the redrawn figure does not cover paste the model's residual white onto the page",
+      "reportedAt": "2026-09-02",
+      "source": "stored evidence scratchpad piraterun2/g7-deep/v2-f1-s5.png: Grok redrew the p16 figure at a different position/scale; union-blend steps show near-white candidate content across the uncovered old silhouette. The white-card gate averages over the WHOLE union (22% threshold), so a partial hole passes it; colour matching cannot rescue pure white.",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-02 (same commit as this entry)",
+      "note": "NEW coverage guard in samUnionBlend, default ON, runs BEFORE compositing: measureWhiteHole counts old-silhouette pixels not covered by the dilated new-figure cut whose candidate content is near-white (>=243 all channels, same threshold as white-card); >2% of the silhouette AND >150px rejects the attempt (gateWhiteHole/whiteHoleMaxFrac, threaded through faceRepair gates for Lab A/B). Deliberately whiteness-scoped, not geometric: legit shrink repairs (extra limb removed) leave uncovered old pixels filled with painted background and must pass. Busy-page full-figure rejections are accepted by owner ruling — no fallback. Pure helper unit-tested in tests/unit/white-hole-guard.test.ts."
     }
   ]
 }
