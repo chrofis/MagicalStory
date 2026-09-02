@@ -157,7 +157,7 @@ const mean = (nums) => (nums.length ? Math.round((nums.reduce((a, b) => a + b, 0
 // complete, post-review set). beatsReviewReport stores only CHANGED pages, so
 // it is not the full artifact. Falls back to the ---BEATS--- outline section.
 // `outlineExtract` means different things per pipeline: in beats mode it holds
-// "BEAT: …/SCENE: …" (a narrative plan), in unified mode it holds the scene
+// "PLAN: …" (the page's plan line), in unified mode it holds the scene
 // expansion's own JSON ({"sceneIntent": …}). The old fallback chain never checked,
 // so a unified story was scored on scene-intent JSON under the header "# BEATS
 // (narrative skeleton)" and rated for arc, pacing and loose threads — grading the
@@ -165,9 +165,9 @@ const mean = (nums) => (nums.length ? Math.round((nums.reduce((a, b) => a + b, 0
 // they were not. Return null instead: a missing artifact is omitted by
 // scoreFromDims({partial}), which reports honestly that this story has no beats.
 function finalBeats(d) {
-  // PLAN alone since 2026-09-02 (the beat prose is gone); BEAT for stored
-  // stories written before that. Unified mode holds JSON here and matches neither.
-  const looksLikeBeats = (t) => /(^|\n)\s*(?:BEAT|PLAN)\s*:/i.test(String(t || ''));
+  // PLAN is the one shape (owner ruling 2026-09-02, no legacy bridge). Unified
+  // mode holds the scene expansion JSON here and matches nothing.
+  const looksLikeBeats = (t) => /(^|\n)\s*PLAN\s*:/i.test(String(t || ''));
   const scenes = (d.sceneDescriptions || []).filter(s => s && s.outlineExtract);
   if (scenes.length) {
     const text = scenes

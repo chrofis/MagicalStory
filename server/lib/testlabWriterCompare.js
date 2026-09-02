@@ -130,13 +130,13 @@ function scoreText(pages, expectedPages, language) {
   };
 }
 
-/** Beat plan: structure only — one beat and one page-plan line per page. */
+/** Page plan: structure only — one plan line per page. */
 function scorePlan(beats, expectedPages) {
   const n = beats.length;
   if (n === 0) return { score: 0, note: 'no plan lines' };
   // A page is filled when it carries its plan line — the only per-page field the
-  // planner emits since 2026-09-02 (`scene` is the legacy name for the same one).
-  const filled = beats.filter(b => String(b.planLine || b.scene || '').trim()).length;
+  // planner emits (2026-09-02).
+  const filled = beats.filter(b => String(b.planLine || '').trim()).length;
   const criteria = {
     completeness: rate(Math.min(n, expectedPages), Math.max(expectedPages, 1)),
     filled: rate(filled, n),

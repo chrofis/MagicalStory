@@ -4677,8 +4677,8 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  *
  * The SAME planner prompt, plus its own committed plan and the findings against
  * it. It re-divides the named pages and nothing else — the checker never edits
- * a beat, so the only thing that can change a page is the planner planning it
- * again. Empty string when there is nothing to re-plan, which is the normal case.
+ * a plan line, so the only thing that can change a page is the planner planning
+ * it again. Empty string when there is nothing to re-plan, which is the normal case.
  */
 function buildReplanSection(pagePlan, findingLines) {
   const findings = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
@@ -4745,13 +4745,12 @@ function parsePagePlan(pagePlan) {
 /**
  * A planner response -> the page list. The planner emits ONE block, the page
  * plan, and each page IS its plan line (owner ruling, 2026-09-02: the beat
- * prose is gone — see docs/decisions.md). `beat` stays on the shape, empty, so
- * every downstream consumer that reads it keeps working on stored stories.
+ * prose is gone, and there is no legacy bridge — see docs/decisions.md).
  *
  * Tolerant in one place only: a response that omitted the marker is scanned
  * whole, because a lost page list is a dead story.
  *
- * @returns {{pages: Array<{pageNumber:number, planLine:string, beat:string}>, pagePlan: string, missing: number[]}}
+ * @returns {{pages: Array<{pageNumber:number, planLine:string}>, pagePlan: string, missing: number[]}}
  */
 function parsePlanResponse(raw, expectedPages = []) {
   const full = String(raw || '');
@@ -4759,7 +4758,7 @@ function parsePlanResponse(raw, expectedPages = []) {
   const byPage = parsePagePlan(block || full);
   const pages = [...byPage.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([pageNumber, planLine]) => ({ pageNumber, planLine, beat: '' }));
+    .map(([pageNumber, planLine]) => ({ pageNumber, planLine }));
   const got = new Set(pages.map(p => p.pageNumber));
   return {
     pages,
@@ -5309,9 +5308,13 @@ function parseClothingReview(raw) {
 }
 
 /**
- * Parse a ---BEATS--- block into {pageNumber, beat, scene}. Same shape as
- * parseRefinedText: analysis before the marker, pages after, omission allowed
- * (the review returns only rewritten pages).
+ * Parse a stored transcript's ---BEATS--- block into {pageNumber, planLine}.
+ * Same shape as parseRefinedText: analysis before the marker, pages after,
+ * omission reported through `missing`.
+ *
+ * ONE shape only (owner ruling, 2026-09-02): a page is its `PLAN:` line. A
+ * transcript stored before that date carries `BEAT:` prose, which this parser
+ * does not read — those pages come back in `missing` and the caller fails.
  */
 function parseBeats(raw, expectedPages = []) {
   const full = String(raw || '');
@@ -5337,17 +5340,13 @@ function parseBeats(raw, expectedPages = []) {
   for (let i = 0; i < marks.length; i++) {
     const end = i + 1 < marks.length ? marks[i + 1].headStart : bodyEnd;
     const chunk = body.slice(marks[i].bodyStart, end);
-    // BEAT runs until PLAN; PLAN runs to the end of the chunk. PLAN is the
-    // page's page-plan line (the SCENE field's replacement, 2026-08-31) and
-    // round-trips through stored transcripts. A legacy SCENE line (older
-    // stored outlines) fills planLine the same way — both name the picture.
-    const beat = (chunk.match(/BEAT\s*:\s*([\s\S]*?)(?=\n\s*(?:SCENE|PLAN)\s*:|$)/i) || [])[1];
-    const planLine = (chunk.match(/(?:PLAN|SCENE)\s*:\s*([\s\S]*?)(?=\n\s*(?:SCENE|BEAT|PLAN)\s*:|$)/i) || [])[1];
-    // A page counts when it carries EITHER field. Since 2026-09-02 the planner
-    // emits plan lines only, so new transcripts have PLAN and no BEAT; stored
-    // transcripts from before that carry both, or BEAT alone, and still parse.
-    if ((beat && beat.trim()) || (planLine && planLine.trim())) {
-      pages.push({ pageNumber: marks[i].page, beat: (beat || '').trim(), planLine: (planLine || '').trim() });
+    // PLAN is the page — the ONE field a page carries (owner ruling,
+    // 2026-09-02: no legacy bridge). A transcript stored before that carries
+    // BEAT prose that this parser deliberately does not read; such a page is
+    // reported through `missing` and the caller fails loudly.
+    const planLine = (chunk.match(/PLAN\s*:\s*([\s\S]*?)(?=\n\s*PLAN\s*:|$)/i) || [])[1];
+    if (planLine && planLine.trim()) {
+      pages.push({ pageNumber: marks[i].page, planLine: planLine.trim() });
     }
   }
 

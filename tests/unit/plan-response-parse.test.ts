@@ -6,8 +6,9 @@ import { parsePlanResponse, parseBeats } from '../../server/lib/promptBuilders.j
 /**
  * The planner emits ONE block, the page plan, and each page IS its plan line
  * (owner ruling 2026-09-02, Lab #973 — the beat prose was the lossiest stage).
- * parseBeats stays as the reader for STORED transcripts, which come in three
- * generations: BEAT + SCENE, BEAT + PLAN, and PLAN alone.
+ * There is no legacy bridge: a transcript carrying beat prose is not a shape
+ * these parsers read, and its pages come back as missing so the caller fails
+ * loudly rather than replaying half a story.
  */
 describe('parsePlanResponse — the planner response', () => {
   const raw = [
@@ -20,7 +21,7 @@ describe('parsePlanResponse — the planner response', () => {
 
   it('reads one page per plan line', () => {
     const out = parsePlanResponse(raw, [1, 2]);
-    expect(out.pages.map(p => p.pageNumber)).toEqual([1, 2]);
+    expect(out.pages.map((p: any) => p.pageNumber)).toEqual([1, 2]);
     expect(out.pages[0].planLine).toContain('the box is open');
     expect(out.pages[1].planLine).toContain('the way out is shut');
     expect(out.missing).toEqual([]);
@@ -30,8 +31,8 @@ describe('parsePlanResponse — the planner response', () => {
     expect(parsePlanResponse(raw, [1, 2, 3]).missing).toEqual([3]);
   });
 
-  it('leaves beat empty — the planner no longer writes prose', () => {
-    expect(parsePlanResponse(raw, [1, 2]).pages.every(p => p.beat === '')).toBe(true);
+  it('carries no beat field — the planner writes no prose', () => {
+    expect(parsePlanResponse(raw, [1, 2]).pages.every((p: any) => !('beat' in p))).toBe(true);
   });
 
   it('stores the page plan block, never the whole response', () => {
@@ -48,29 +49,34 @@ describe('parsePlanResponse — the planner response', () => {
   });
 });
 
-describe('parseBeats — stored transcripts of every generation', () => {
+describe('parseBeats — a stored transcript is read in ONE shape', () => {
   const beatsBlock = (body: string) => `---BEATS---\n${body}`;
 
-  it('reads a new PLAN-only transcript', () => {
+  it('reads a page from its PLAN line', () => {
     const out = parseBeats(beatsBlock('## Page 1\nPLAN: close-up — the main character — she lifts the lid — the box is open'), [1]);
     expect(out.pages).toHaveLength(1);
     expect(out.pages[0].planLine).toContain('the box is open');
-    expect(out.pages[0].beat).toBe('');
+    expect(out.pages[0].beat).toBeUndefined();
   });
 
-  it('still reads a legacy BEAT + PLAN transcript', () => {
-    const out = parseBeats(beatsBlock('## Page 1\nBEAT: She opens the box.\nPLAN: close-up — the main character — she lifts the lid — the box is open'), [1]);
-    expect(out.pages[0].beat).toBe('She opens the box.');
-    expect(out.pages[0].planLine).toContain('the box is open');
-  });
-
-  it('still reads a legacy BEAT + SCENE transcript', () => {
+  it('does NOT read beat prose — a pre-2026-09-02 page is reported missing', () => {
     const out = parseBeats(beatsBlock('## Page 1\nBEAT: She opens the box.\nSCENE: a close-up of the open box'), [1]);
-    expect(out.pages[0].beat).toBe('She opens the box.');
-    expect(out.pages[0].planLine).toBe('a close-up of the open box');
+    expect(out.pages).toHaveLength(0);
+    expect(out.missing).toEqual([1]);
+  });
+
+  it('reads only the PLAN line when a legacy page carries both', () => {
+    const out = parseBeats(beatsBlock('## Page 1\nBEAT: She opens the box.\nPLAN: close-up — the main character — the box is open'), [1]);
+    expect(out.pages[0].planLine).toContain('the box is open');
+    expect(out.pages[0].planLine).not.toContain('She opens the box');
   });
 
   it('reports pages the transcript is missing', () => {
     expect(parseBeats(beatsBlock('## Page 1\nPLAN: a plan line'), [1, 2]).missing).toEqual([2]);
+  });
+
+  it('still extracts the ---ARC--- block', () => {
+    const raw = `---ARC---\n1. The story happens.\n\n---BEATS---\n## Page 1\nPLAN: a plan line`;
+    expect(parseBeats(raw, [1]).arc).toContain('The story happens');
   });
 });

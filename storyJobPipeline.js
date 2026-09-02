@@ -3627,6 +3627,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         : MODEL_DEFAULTS.singlePassScene === true;
       log.info(`🎛️ [UNIFIED] referenceMode=${runReferenceMode} singlePassScene=${runSinglePassScene}`);
 
+      // Per-page route decided ONCE for the run and reused by every phase that
+      // needs it (plate generation, the VB-grid filter, the page render). The
+      // router is a pure function of pageData + inputData, but a single map
+      // guarantees the grid filter and the render agree about what gets sent.
+      const { decidePageRoute } = require('./server/lib/imageRouter');
+      const pageRoutes = new Map(
+        pageDataArray.map(pd => [pd.pageNumber, decidePageRoute(pd, inputData, MODEL_DEFAULTS)])
+      );
+      // A page with no named cast gets no empty-scene plate: the plate exists
+      // to anchor character placement, and with nobody to place, the page
+      // render IS the scene (owner ruling, 2026-09-02). A plate may still
+      // exist for such a page when it shares a vantage with a cast>0 page —
+      // that is fine, it just isn't generated FOR it.
+      const platelessByRoute = (pageNumber) =>
+        pageRoutes.get(pageNumber)?.emptyScene === 'skip';
+
       // Heartbeat the empty-scene phase: each plate generation bumps
       // story_jobs.updated_at (throttled to 30s) so the phase never looks
       // "stuck" to the status endpoint's heartbeat check, no matter how many
@@ -3644,7 +3660,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene && visualBible?.locations?.length > 0) {
         const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
         const groups = groupPagesByVantage(pageDataArray, visualBible);
-        const realGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
+        const allRealGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
+        // A vantage whose pages ALL have zero cast needs no canvas — nobody
+        // will be placed on it, so the page render is the scene (owner ruling,
+        // 2026-09-02). A mixed group still renders its canvas: the cast>0
+        // pages need it, and the cast-0 page in the group simply rides along
+        // on the shared plate.
+        const realGroups = allRealGroups.filter(([, group]) =>
+          group.pageNumbers.some(pn => !platelessByRoute(pn)));
+        const castlessGroups = allRealGroups.length - realGroups.length;
+        if (castlessGroups > 0) {
+          const skipped = allRealGroups
+            .filter(([, group]) => group.pageNumbers.every(pn => platelessByRoute(pn)))
+            .map(([vid, group]) => `${vid} (p${group.pageNumbers.join(',')})`);
+          log.info(`🏛️ [VANTAGE] Skipping ${castlessGroups} canvas(es) — every page on them has cast=0: ${skipped.join('; ')}`);
+        }
         // One canvas per VB vantage, reused across every page that uses it.
         // Sonnet assigns a distinct vantage (LOC###.N) whenever the same
         // location is shown from a fundamentally different viewpoint (a cellar
@@ -3884,8 +3914,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const emptyScenes = await Promise.all(
           pageDataArray.map(pageData => bgLimit(async () => {
             await checkCancellation();
-            // Skip if already generated (e.g., trial mode early generation from visual bible)
+            // Skip if already generated (e.g., trial mode early generation from
+            // visual bible, or a shared vantage canvas fanned out above).
             if (sceneBackgrounds[pageData.pageNumber]) return null;
+            // Cast-0 page: no plate. The plate anchors character placement, and
+            // with no characters the page render IS the scene (owner ruling,
+            // 2026-09-02). Skipping it also lets the page keep its location /
+            // vehicle VB grid cells (Phase 5a-pre-grid), which the plate would
+            // otherwise displace.
+            if (platelessByRoute(pageData.pageNumber)) {
+              log.info(`🎨 [EMPTY SCENE] Page ${pageData.pageNumber}: cast=0 → no plate generated (the render is the scene)`);
+              return null;
+            }
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
             // emptyScenePrompt lives on pageData (from scene expansion), not on sceneMetadata
@@ -4159,8 +4199,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         // Which pages ended up without a plate, and why, recorded once.
+        // Cast-0 pages are excluded — they have no plate BY DESIGN (see the
+        // skip above), and warning about a deliberate omission sends the next
+        // reader hunting a bug that doesn't exist.
         const platelessPages = pageDataArray
           .map(pd => pd.pageNumber)
+          .filter(pn => !platelessByRoute(pn))
           .filter(pn => !sceneBackgrounds[pn] && !emptyScenes.some(bg => bg?.pageNumber === pn && bg?.imageData));
         if (platelessPages.length > 0) {
           log.warn(`⚠️ [EMPTY SCENE] No background plate for page(s) ${platelessPages.join(', ')} — rendering without one`);
@@ -4203,16 +4247,44 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // documented single source of truth for these filters: a plate already
       // paints the setting AND the vehicle, so both drop out of the grid; the
       // grid is for props, animals and secondary characters the plate omits.
+      //
+      // "Got a plate" means the plate that is actually SENT to the render, not
+      // one that merely exists in `sceneBackgrounds`. The page render runs the
+      // plate through applyReferenceMode with the page's route refMode, so this
+      // filter asks the same function the same question — otherwise a page
+      // whose mode drops the plate loses its location/vehicle cells to a plate
+      // nobody sees, and renders with no visual reference at all (page 1 of
+      // staging job_1788295892348_l028ggiq7a: a cast-0 ship exterior that
+      // attached zero references while a finished plate of the ship was built
+      // and discarded).
       {
+        const { applyReferenceMode } = require('./server/lib/storyHelpers');
         let filteredPages = 0;
         let droppedCells = 0;
         for (const pageData of pageDataArray) {
           const refs = pageData.vbElementRefs || [];
-          const hasPlate = !!sceneBackgrounds[pageData.pageNumber]?.imageData;
-          const kept = hasPlate
+          const effectiveRefMode = pageRoutes.get(pageData.pageNumber)?.refMode || runReferenceMode;
+          const hasPlate = !!applyReferenceMode({
+            mode: effectiveRefMode,
+            characterPhotos: [],
+            visualBibleGrid: null,
+            landmarkPhotos: [],
+            sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
+            sceneMetadata: pageData.sceneMetadata,
+          }).sceneBackground;
+          // The element the camera stands on/inside never enters the page grid:
+          // its render is an exterior three-quarter view, and an exterior image
+          // on a deck-level page is exactly the channel that produced the
+          // phantom second vessel (decisions.md 2026-09-02, `aboard`). The page
+          // prompt still names it; only the image is withheld. When a plate is
+          // sent this is already covered by the location/vehicle drop below —
+          // it matters on the plateless cast-0 pages this phase now feeds.
+          const aboardId = pageData.sceneMetadata?.aboard || null;
+          const kept = (hasPlate
             ? refs.filter(e => e.type !== 'location' && e.type !== 'vehicle')
-            : refs;
-          if (hasPlate && kept.length < refs.length) {
+            : refs
+          ).filter(e => !aboardId || e.id !== aboardId);
+          if (kept.length < refs.length) {
             filteredPages++;
             droppedCells += refs.length - kept.length;
           }
@@ -4224,10 +4296,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageData.visualBibleGrid = kept.length > 0
             ? await buildVisualBibleGrid(kept, [])
             : null;
-          log.debug(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length} cell(s)${hasPlate ? ` (plate set — dropped ${refs.length - kept.length} location/vehicle)` : ' (no plate — nothing filtered)'}`);
+          log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped location/vehicle` : `no plate sent, location/vehicle kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
         }
         if (filteredPages > 0) {
-          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} plate-covered location/vehicle cell(s) across ${filteredPages} page(s)`);
+          log.info(`🔲 [UNIFIED] Phase 5a-pre-grid: dropped ${droppedCells} cell(s) across ${filteredPages} page(s) (plate-covered location/vehicle + aboard elements)`);
         }
       }
 
@@ -4315,8 +4387,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // and refMode) based on cast size, sceneIntent, and per-story
             // overrides. See docs/image-generation-methods.html §7 and
             // server/lib/imageRouter.js for the decision table.
-            const { decidePageRoute } = require('./server/lib/imageRouter');
-            const route = decidePageRoute(pageData, inputData, MODEL_DEFAULTS);
+            // Same descriptor the plate and VB-grid phases used (pageRoutes,
+            // decided once above) — the phases must not disagree about what
+            // this page sends.
+            const route = pageRoutes.get(pageData.pageNumber)
+              || decidePageRoute(pageData, inputData, MODEL_DEFAULTS);
             log.info(`🧭 [ROUTE] P${pageData.pageNumber}: ${route.path} (cast=${route.cast}, refMode=${route.refMode}) — ${route.reason}`);
             // Apply reference-mode flag — strips refs/grid per the chosen mode.
             // Per-page route decision (from decidePageRoute) wins over the

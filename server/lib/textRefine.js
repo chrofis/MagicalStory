@@ -401,17 +401,14 @@ function extractRefinablePages(sceneLike = []) {
       const briefRaw = String(s.sceneDescription || s.description || '');
       const sceneBrief = briefRaw.split(/---\s*METADATA/i)[0].trim();
       // The page's own LOCKED PLAN LINE (beats pipeline only). outlineExtract
-      // holds "PLAN: …" in beats mode — older stored stories carry
-      // "BEAT: …/PLAN: …" — but the scene expansion's own JSON in unified mode
-      // (storyScorecard.js finalBeats() draws the same distinction); guard on
-      // the marker so a unified story never mistakes its own JSON for a plan
-      // line. The arc is the story (owner ruling 2026-09-02, Lab #973); the
-      // plan line says which picture this page carries, and the refiner may
-      // not write text that contradicts it.
+      // holds "PLAN: …" in beats mode and the scene expansion's own JSON in
+      // unified mode (storyScorecard.js finalBeats() draws the same
+      // distinction); matching the marker is what keeps a unified story from
+      // mistaking its own JSON for a plan line. The arc is the story (owner
+      // ruling 2026-09-02, Lab #973); the plan line says which picture this
+      // page carries, and the refiner may not write text that contradicts it.
       const extractRaw = String(s.outlineExtract || '');
-      const planLine = /(^|\n)\s*(?:PLAN|BEAT)\s*:/i.test(extractRaw)
-        ? ((extractRaw.match(/(?:^|\n)\s*PLAN\s*:\s*([\s\S]*)$/i) || [, ''])[1] || '').trim()
-        : '';
+      const planLine = ((extractRaw.match(/(?:^|\n)\s*PLAN\s*:\s*([\s\S]*)$/i) || [, ''])[1] || '').trim();
       return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent, sceneBrief, planLine };
     })
     .sort((a, b) => a.pageNumber - b.pageNumber);

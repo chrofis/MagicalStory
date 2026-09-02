@@ -3868,6 +3868,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         // prompt is built from the scene's objects[], so a prop named there
         // must bring its reference even if the VB filed it under other pages.
         sceneObjectIds: iterateSceneMetadata?.objects || null,
+        // Same aboard rule as the plate and the pipeline page grid: the vessel
+        // the camera stands on never rides in as an exterior render.
+        aboardId: iterateSceneMetadata?.aboard || null,
       })
     : { visualBibleGrid: null, landmarkPhotos: pageLandmarkPhotos };
   const visualBibleGrid = pageRefs.visualBibleGrid;

@@ -16,7 +16,10 @@
  *   }
  *
  * Rule (per the routing doc in docs/image-generation-methods.html §7):
- *   cast 0       → direct, refMode 'off'           (no identity, fastest)
+ *   cast 0       → direct, refMode 'off', emptyScene 'skip'
+ *                  (no identity to preserve, and no plate: the plate exists to
+ *                   anchor character placement, so with nobody to place the
+ *                   final render IS the scene — owner, 2026-09-02)
  *   cast 1       → direct, refMode 'loose'         (one subject, one ref)
  *   cast 2-3     → direct, refMode 'loose'         (Grok handles 2-3 named cast cleanly)
  *   cast 4-5     → composite, no phantom-pose
@@ -34,18 +37,31 @@
 'use strict';
 
 /**
+ * Named cast on a page — the count every routing decision keys off.
+ * Anonymous background extras (crowds, soldiers, villagers) do not count.
+ * Exported so the pipeline can ask the same question outside the router
+ * (e.g. "does this page need an empty-scene plate at all?").
+ *
+ * @param {Object} pageData
+ * @returns {number}
+ */
+function pageCastSize(pageData) {
+  const namedCharacters =
+       pageData?.sceneMetadata?.fullData?.characters
+    || pageData?.sceneMetadata?.characters
+    || pageData?.sceneCharacters
+    || [];
+  return Array.isArray(namedCharacters) ? namedCharacters.length : 0;
+}
+
+/**
  * @param {Object} pageData
  * @param {Object} inputData - story-job inputData (per-story overrides)
  * @param {Object} modelDefaults - MODEL_DEFAULTS from server/config/models.js
  * @returns {{path: 'direct'|'composite', refMode: string, phantomPoseRender: boolean, emptyScene: string, cast: number, reason: string}}
  */
 function decidePageRoute(pageData, inputData = {}, modelDefaults = {}) {
-  const namedCharacters =
-       pageData?.sceneMetadata?.fullData?.characters
-    || pageData?.sceneMetadata?.characters
-    || pageData?.sceneCharacters
-    || [];
-  const cast = Array.isArray(namedCharacters) ? namedCharacters.length : 0;
+  const cast = pageCastSize(pageData);
 
   // Hard overrides
   const compositeForced = inputData?.composite === true;
@@ -60,7 +76,7 @@ function decidePageRoute(pageData, inputData = {}, modelDefaults = {}) {
   // Compute the route the table picks for this cast size.
   let route;
   if (cast === 0) {
-    route = { path: 'direct', refMode: 'off', phantomPoseRender: false, emptyScene: 'reuse', reason: `cast=0 → direct text-only` };
+    route = { path: 'direct', refMode: 'off', phantomPoseRender: false, emptyScene: 'skip', reason: `cast=0 → direct text-only, no plate (nothing to place)` };
   } else if (cast <= 3) {
     route = { path: 'direct', refMode: 'loose', phantomPoseRender: false, emptyScene: 'reuse', reason: `cast=${cast} ≤ 3 → direct (Grok handles 2-3 named cast cleanly)` };
   } else if (cast <= 5) {
@@ -101,4 +117,4 @@ function decidePageRoute(pageData, inputData = {}, modelDefaults = {}) {
   return { ...route, cast };
 }
 
-module.exports = { decidePageRoute };
+module.exports = { decidePageRoute, pageCastSize };

@@ -6,8 +6,8 @@ import { extractRefinablePages } from '../../server/lib/textRefine.js';
 /**
  * The beats stage stopped writing beat prose (owner ruling 2026-09-02, Lab
  * #973): a page's stored `outlineExtract` is its PLAN line and nothing else,
- * and the arc is what the refiner judges the text against. Stored stories
- * written before that carry "BEAT: …/PLAN: …" and must keep loading.
+ * and the arc is what the refiner judges the text against. There is no legacy
+ * bridge — beat prose is never read, only the PLAN line.
  *
  * The unified-mode guard is the one that must not regress: that field holds the
  * scene expansion's own JSON there, and mistaking it for a plan line feeds the
@@ -26,7 +26,7 @@ describe('extractRefinablePages — plan line extraction', () => {
     expect(page.planLine).not.toContain('PLAN:');
   });
 
-  it('extracts the PLAN line from a legacy BEAT + PLAN outlineExtract', () => {
+  it('reads only the PLAN line when a pre-2026-09-02 page carries beat prose too', () => {
     const scenes = [{
       pageNumber: 11,
       text: 'shipped page text',

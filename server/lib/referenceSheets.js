@@ -597,10 +597,14 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
  *     into the plate; drop them all.
  *   - other refs present (original image, landmark photos) → drop locations
  *     only (the location anchor is covered), keep the rest.
+ *   - `aboardId` set → the element the camera stands on/inside never enters the
+ *     grid, plate or no plate. Its render is an exterior three-quarter view and
+ *     an exterior image on a deck-level page paints a second copy of the vessel
+ *     (decisions.md 2026-09-02). The prompt still names it.
  * Returns { visualBibleGrid, landmarkPhotos } — landmarkPhotos is what the
  * caller should pass to image generation (emptied when the plate covers it).
  */
-async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null } = {}) {
+async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null, aboardId = null } = {}) {
   const { getElementReferenceImagesForPage } = require('./visualBible');
   // Cap 4, not 6 (owner, 2026-08-29). The whole grid shares ONE of Grok's three
   // reference slots, so cell size scales as 1/n — a 6-cell grid renders each
@@ -622,6 +626,13 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
     log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
   } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {
     elementReferences = elementReferences.filter(e => e.type !== 'location');
+  }
+  if (aboardId) {
+    const before = elementReferences.length;
+    elementReferences = elementReferences.filter(e => e.id !== aboardId);
+    if (elementReferences.length < before) {
+      log.debug(`🔲 [${logTag}] Page ${pageNumber}: aboard ${aboardId} withheld from the grid (exterior render, deck-level page)`);
+    }
   }
   let visualBibleGrid = null;
   if (elementReferences.length > 0) {

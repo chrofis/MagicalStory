@@ -55,7 +55,9 @@ function formatClothingObject(clothingObj) {
  *                   shots, so it's dropped there. Older avatars without
  *                   thumbnail URLs fall back to the full 2×2 grid.
  *   'styled-only' — keep the full 2×2 grid (already styled) on every shot
- *   'off'         — drop character photos, landmarks, and empty-scene plate
+ *   'off'         — drop character photos and landmark photos. The VB grid and
+ *                   the empty-scene plate stay (identity + scene anchor, not
+ *                   character references).
  *
  * @param {Object} args
  * @param {string} args.mode               — one of strict|loose|styled-only|off
@@ -78,8 +80,13 @@ function applyReferenceMode({
     return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };
   }
   if (m === 'off') {
-    // VB grid stays — it's identity, not style noise.
-    return { characterPhotos: [], visualBibleGrid, landmarkPhotos: [], sceneBackground: null };
+    // VB grid stays — it's identity, not style noise. The plate stays too: it
+    // is the scene's own style/layout anchor, not a character reference, and
+    // dropping it made cast-0 pages pure text-to-image while a finished plate
+    // of the same setting sat unused (owner, 2026-09-02 — page 1 of staging
+    // job_1788295892348_l028ggiq7a). 'off' means "no identity refs", not
+    // "no refs".
+    return { characterPhotos: [], visualBibleGrid, landmarkPhotos: [], sceneBackground };
   }
   if (m === 'styled-only') {
     return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };

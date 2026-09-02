@@ -534,6 +534,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       const refs = await buildPageCompositeRefs(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, {
         hasBackground: !!emptyScene,
         logTag: 'TESTLAB',
+        // aboardOverride is the empty_scene stage's knob for stories whose
+        // stored metadata predates the field; honour it here too so a Lab page
+        // render matches production's grid exactly.
+        aboardId: params.aboardOverride ?? ctx.scene?.sceneMetadata?.aboard ?? null,
       });
       visualBibleGrid = refs.visualBibleGrid;
       genLandmarkPhotos = refs.landmarkPhotos;
@@ -3577,22 +3581,20 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // START FROM THE STORED BEATS (owner, 2026-08-25). The stage normally plans
   // and reviews beats from scratch, which measures the planner. To ask the
   // different question — can the Art Director and the text writer repair what
-  // the beats left behind — the beats have to be the ones that actually
-  // shipped, not a fresh draft. Every page keeps its own beat in
-  // `outlineExtract` ("BEAT: … PLAN: …"; legacy "SCENE:"), so the shipped set is recoverable
-  // without re-running anything.
+  // the plan left behind — the plan lines have to be the ones that actually
+  // shipped, not a fresh draft. Every page keeps its own plan line in
+  // `outlineExtract` ("PLAN: …"), so the shipped set is recoverable without
+  // re-running anything. A story stored before 2026-09-02 keeps beat prose
+  // there instead; that shape is not read (owner ruling: no legacy bridge) and
+  // this stage refuses the story by name rather than replaying half of it.
   if (params.useStoredBeats || params.plainStoredBeats) {
     const stored = (storyData.sceneImages || [])
       .map((s) => {
-        const raw = String(s.outlineExtract || '');
-        const beat = (raw.match(/BEAT:\s*([\s\S]*?)(?=\n(?:PLAN|SCENE):|$)/i) || [, ''])[1].trim();
-        const planLine = (raw.match(/(?:PLAN|SCENE):\s*([\s\S]*)$/i) || [, ''])[1].trim();
-        // Either field carries the page: production emits PLAN only since
-        // 2026-09-02, stored stories from before that carry BEAT as well.
-        return (beat || planLine) ? { pageNumber: s.pageNumber, beat, planLine } : null;
+        const planLine = (String(s.outlineExtract || '').match(/(?:^|\n)\s*PLAN:\s*([\s\S]*)$/i) || [, ''])[1].trim();
+        return planLine ? { pageNumber: s.pageNumber, planLine } : null;
       })
       .filter(Boolean);
-    if (stored.length === 0) throw new Error('stored beats: no page carries an outlineExtract PLAN or BEAT line');
+    if (stored.length === 0) throw new Error(`stored beats: no page of story ${target?.storyId || '(unknown)'} carries an outlineExtract PLAN line — a pre-2026-09-02 story cannot be replayed`);
     // plainStoredBeats: hold the beats constant and fall through to the NORMAL
     // step-3 expansion + scene review — the Art Director bake-off path.
     if (params.useStoredBeats) {
@@ -3696,7 +3698,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll } = require('./storyHelpers');
       const allPrompt = buildSceneExpansionAllPrompt(
         { ...storyData, characters: storyData.characters || [], pageClothing: null },
-        toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, planLine: b.planLine })),
+        toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
         {
           visualBible: storyData.visualBible || null,
           availableAvatars,
@@ -6836,23 +6838,19 @@ async function runStoryScorecardStage(target, { params = {}, promptOverride = nu
  * is flagged so a caller can tell a real comparison from a contaminated one.
  */
 function resolveStoryBeats(storyData, helpers) {
-  const { getPageText, extractSceneMetadata } = helpers;
+  const { extractSceneMetadata } = helpers;
   const briefs = storyData?.beatsReviewReport?.briefsIn;
   if (Array.isArray(briefs) && briefs.length > 0) {
-    const parsed = briefs.map((b) => {
-      const t = String(b.brief || '');
-      const beat = (t.match(/BEAT:\s*([\s\S]*?)(?=\n(?:PLAN|SCENE):|$)/i) || [])[1] || '';
-      const planLine = (t.match(/(?:PLAN|SCENE):\s*([\s\S]*)$/i) || [])[1] || '';
-      return { pageNumber: b.pageNumber, beat: beat.trim(), planLine: planLine.trim() };
-    }).filter(b => b.beat || b.planLine);
+    const parsed = briefs.map((b) => ({
+      pageNumber: b.pageNumber,
+      planLine: ((String(b.brief || '').match(/(?:^|\n)\s*PLAN:\s*([\s\S]*)$/i) || [])[1] || '').trim(),
+    })).filter(b => b.planLine);
     if (parsed.length > 0) return { beats: parsed, source: 'briefsIn' };
   }
-  const fullText = storyData.storyText || storyData.story || '';
   const beats = (storyData.sceneImages || []).map((sc) => {
     const meta = sc.sceneMetadata || extractSceneMetadata(sc.sceneDescription || '') || {};
     return {
       pageNumber: sc.pageNumber,
-      beat: (getPageText(fullText, sc.pageNumber) || '').slice(0, 600),
       planLine: (meta.sceneIntent || String(sc.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
     };
   });
