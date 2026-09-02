@@ -1127,11 +1127,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
           const isGrokImage = pageImageBackend === 'grok';
 
-          const imagePrompt = buildImagePrompt(
-            sceneDescription, inputData, sceneCharacters, streamingVisualBible,
-            page.pageNumber, pagePhotos, { skipVisualBible: isGrokImage }
-          );
-
           // Resolve landmarks and VB grid for Grok reference slots
           // (sceneMetadata is parsed above, before the cell crop that needs it)
           const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
@@ -1169,6 +1164,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
             trialVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
           }
+
+          // Built AFTER the grid so the REQUIRED OBJECTS checklist can point
+          // at the reference images that actually ride with this call.
+          const imagePrompt = buildImagePrompt(
+            sceneDescription, inputData, sceneCharacters, streamingVisualBible,
+            page.pageNumber, pagePhotos, {
+              skipVisualBible: isGrokImage,
+              vbRefElementIds: (trialVbGrid?.rawElements || []).map(e => e.id).filter(Boolean),
+            }
+          );
 
           log.info(`⚡ [TRIAL-STREAM] Page ${page.pageNumber} image generation starting (parallel with streaming)${pageLandmarkPhotos.length ? ` [${pageLandmarkPhotos.length} landmark(s)]` : ''}${trialVbGrid ? ' [VB grid]' : ''}`);
           const startTime = Date.now();
@@ -3567,7 +3572,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const imageModelConfig = IMAGE_MODELS[pageImageModel];
         const isGrokImage = imageModelConfig?.backend === 'grok';
         const imagePrompt = buildImagePrompt(
-          scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, { skipVisualBible: isGrokImage }
+          scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, {
+            skipVisualBible: isGrokImage,
+            // Elements whose reference render rides with this call: grid cells,
+            // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
+            vbRefElementIds: elementReferences.map(r => r.id).filter(Boolean),
+          }
         );
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata

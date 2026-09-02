@@ -18,7 +18,6 @@ const {
   textDeclaresNonWornPlacement,
   sceneDeclaresNonWornState,
   stripWornStateFromDescription,
-  filterWornClothingAgainstScene,
   sanitizeVbIdsInPrompt,
 } = require('../../server/lib/storyHelpers');
 const { buildVisualBiblePrompt } = require('../../server/lib/visualBible');
@@ -116,13 +115,9 @@ console.log(`  "${stripped}"`);
 check(!/tied|neck/i.test(stripped), 'attachment clause removed');
 check(/red superhero cape with golden trim/i.test(stripped), 'physical features preserved');
 
-console.log('\n--- filterWornClothingAgainstScene ---');
-const guarded = filterWornClothingAgainstScene(
-  referencePhotos[0].clothingDescription, prose, meta.interactions, visualBible, ['Hero']);
-console.log(`  "${guarded}"`);
-check(!/Umhang|cape|tied|neck/i.test(guarded), 'held cape segment dropped from wears-line');
-check(/blue t-shirt/.test(guarded) && /dark trousers/.test(guarded), 'unrelated garments preserved');
-check(!/\(Hero\)/.test(guarded), 'no wearer parenthetical');
+// (filterWornClothingAgainstScene was deleted 2026-08-09, commit 5f174cba5 —
+// worn-vs-held faults route to the scene review now. Its section is gone;
+// the test file had kept importing it and was broken from that commit on.)
 
 // ---- sanitizeVbIdsInPrompt: English-only substitutions ----
 console.log('\n--- sanitizeVbIdsInPrompt ---');

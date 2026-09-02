@@ -3869,7 +3869,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // The iterate output is prose + ---METADATA--- + JSON (same shape as initial
   // expansion). buildImagePrompt's prose branch strips the metadata block and
   // uses only the prose for the image prompt — no JSON-scene extraction needed.
-  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, visualBible, pageNumber, referencePhotos, { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition });
+  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, visualBible, pageNumber, referencePhotos, {
+    imageBackend: iterateImageBackend,
+    textPositionOverride: lockedTextPosition,
+    // Grid is already built above — pass exactly the elements it contains so
+    // the REQUIRED OBJECTS checklist can point at the attached references.
+    vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
+  });
 
   // Eval feedback was already routed to Claude via previewFeedback.fixIssues
   // (see Step 2 above). The image API gets a prose-only prompt — it cannot
