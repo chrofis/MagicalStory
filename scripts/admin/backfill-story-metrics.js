@@ -31,7 +31,13 @@ const limit = Math.max(1, parseInt(getArg('limit', '10'), 10) || 10);
 
 let connectionString;
 if (env === 'staging') {
-  connectionString = process.env.STAGING_DATABASE_URL || process.env.DATABASE_URL;
+  // No fallback to DATABASE_URL: that would silently write environment='staging'
+  // rows into the production database.
+  connectionString = process.env.STAGING_DATABASE_URL;
+  if (!connectionString) {
+    console.error('--env=staging requires STAGING_DATABASE_URL to be set (no fallback to DATABASE_URL)');
+    process.exit(1);
+  }
 } else if (env === 'production' || env === 'prod') {
   connectionString = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 } else {

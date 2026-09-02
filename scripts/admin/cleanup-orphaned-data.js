@@ -1,9 +1,13 @@
 /**
  * Check and clean up orphaned characters and stories (not linked to any user)
+ *
+ * SAFETY: --dry-run by default. Pass --apply to actually delete.
  */
 
 const { Pool } = require('pg');
 require('dotenv').config();
+
+const DRY_RUN = !process.argv.includes('--apply');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -32,6 +36,11 @@ async function cleanupOrphanedData() {
 
     if (orphanedCharsCount === 0 && orphanedStoriesCount === 0) {
       console.log('\n✅ No orphaned data found. Database is clean!');
+      return;
+    }
+
+    if (DRY_RUN) {
+      console.log('\n[DRY RUN] Would delete the rows above. Pass --apply to actually delete.');
       return;
     }
 

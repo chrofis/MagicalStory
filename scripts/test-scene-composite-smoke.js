@@ -44,7 +44,7 @@ function arg(name, dflt = null) {
   return m ? m.split('=')[1] : dflt;
 }
 
-const BASE_URL = (process.env.TEST_BASE_URL || 'https://magicalstory.ch').replace(/\/$/, '');
+const BASE_URL = (process.env.TEST_BASE_URL || 'https://staging.magicalstory.ch').replace(/\/$/, '');
 const BASIC_USER = process.env.STAGING_AUTH_USER;
 const BASIC_PASS = process.env.STAGING_AUTH_PASSWORD;
 const EMAIL = arg('email', 'demo-b-hnecf@magicalstory.ch');

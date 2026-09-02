@@ -6,14 +6,20 @@
  * This script resets all scene activeVersions to 0 for stories where the repair
  * pipeline ran (wasRegenerated pages exist).
  *
- * Usage: node scripts/admin/fix-active-versions.js [--dry-run]
+ * SAFETY: --dry-run by default. Pass --apply to write.
+ *
+ * Usage: node scripts/admin/fix-active-versions.js [--apply]
  */
 
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const dryRun = process.argv.includes('--dry-run');
+const url = process.env.DATABASE_URL;
+const pool = new Pool({
+  connectionString: url,
+  ssl: url && (url.includes('railway') || url.includes('proxy')) ? { rejectUnauthorized: false } : false,
+});
+const dryRun = !process.argv.includes('--apply');
 
 async function fix() {
   console.log(dryRun ? '=== DRY RUN ===' : '=== FIXING ===');
