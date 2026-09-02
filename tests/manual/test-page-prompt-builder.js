@@ -202,7 +202,11 @@ check(/Flocke/.test(vbSection), 'animal keeps its given name in fallback section
   });
   const wornPrompt = buildImagePrompt(`${wornProse}\n\n---METADATA---\n${wornMeta}`, inputData, sceneCharacters, visualBible, 8, referencePhotos, {});
   const wornReq = (wornPrompt.match(/\*\*REQUIRED OBJECTS[\s\S]*?(?=\n\n)/) || [''])[0];
-  check(/tied at the neck/i.test(wornReq), 'worn page keeps the attachment clause');
+  // REQUIRED OBJECTS is a name-only checklist since 2026-09-02 — no VB
+  // description reaches the image prompt, so there is no attachment clause
+  // to keep. The (worn by …) suffix survives: it binds the garment to a
+  // wearer, which the checklist still has to say.
+  check(!/tied at the neck/i.test(wornReq), 'worn page carries no VB description in the checklist');
   check(/worn by Hero/.test(wornReq), 'worn page keeps the (worn by …) suffix');
   check(!/Roter Superhelden-Umhang/.test(wornPrompt), 'worn page still uses English entity ref');
   const wornWears = (wornPrompt.match(/- Hero wears: .*/i) || [''])[0];

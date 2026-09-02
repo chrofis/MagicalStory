@@ -3309,7 +3309,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // de/fr variants. (The localized headers also broke the downstream
       // parseVisualBibleObjects, which matches /REQUIRED OBJECTS/ to build
       // the expected-objects list for eval/bbox.)
-      const header = '**REQUIRED OBJECTS IN THIS SCENE (MUST appear in the image):**';
+      const header = '**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**';
 
       // Skip location entries — the location is either visually attached
       // as the empty-scene / vantage backdrop reference image OR named in
@@ -3344,10 +3344,24 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // description's own opening (~60 wasted chars per object on prompts
         // that fight an 8k model cap). First comma clause, max 6 words.
         const shortRef = (r) => r.split(',')[0].split(/\s+/).slice(0, 6).join(' ');
+        // A two-sided prop is TWO bible entries whose orientation lives in the
+        // NAME's parenthetical ("… (turned away)", "… (face to camera)").
+        // decisions.md 2026-08-26 made that orientation reach the prompt via
+        // the copied description; with the description gone it rides the lead
+        // instead, so the pair mechanism keeps its text channel.
+        const qualifier = (obj.name && obj.name.match(/\(([^)]+)\)\s*$/)) ? ` (${obj.name.match(/\(([^)]+)\)\s*$/)[1]})` : '';
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
-          : `**${shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object'))}** (${obj.type})`;
-        requiredObjectsSection += `* ${lead}: ${description}${wornSuffix}\n`;
+          : `**${shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object'))}${qualifier}** (${obj.type})`;
+        // NAME ONLY — no Visual Bible description. The block is a presence
+        // checklist; the element's look is written into the Art Director's
+        // prose (scene-expansion*.txt: "weave the detail this shot actually
+        // shows into the prose"), exactly like character appearance. Emitting
+        // the VB description here handed the image model a full exterior spec
+        // for an element the shot only shows part of — a vessel the camera
+        // stands ON was painted as a complete vessel in the background, at
+        // whatever size the model chose, with its stern lettering.
+        requiredObjectsSection += `* ${lead}${wornSuffix}\n`;
       }
       if (promptObjects.length === 0) {
         // All entries were locations — nothing left to list.

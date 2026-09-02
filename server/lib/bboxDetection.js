@@ -78,7 +78,8 @@ const FIGURE_COLORS = [
 /**
  * Parse Visual Bible objects from the image prompt
  * Looks for REQUIRED OBJECTS section with format:
- * * **ObjectName** (type): Description
+ * * **ObjectName** (type)          — current, name-only checklist
+ * * **ObjectName** (type): Description  — pre-2026-09-02 stored prompts
  *
  * @param {string} prompt - The full image generation prompt
  * @returns {string[]} Array of object names found
@@ -92,7 +93,10 @@ function parseVisualBibleObjects(prompt) {
   const requiredSection = prompt.match(/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i);
   if (requiredSection) {
     // Match entries like: * **ObjectName** (type): Description
-    const entryPattern = /\*\s*\*\*([^*]+)\*\*\s*\((\w+)\):/g;
+    // Trailing colon optional: the block is a NAME-ONLY checklist since
+    // 2026-09-02 (descriptions moved into the Art Director prose). Stored
+    // prompts from before that still carry "(type): description".
+    const entryPattern = /\*\s*\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/g;
     let match;
     while ((match = entryPattern.exec(requiredSection[1])) !== null) {
       const name = match[1].trim();

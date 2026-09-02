@@ -23562,3 +23562,66 @@ special case per object category.
 **Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
 `prompts/story-bible-from-beats.txt`, `prompts/image-generation.txt`.
 **Status:** ✅ active
+
+## 2026-09-02 — Visual Bible element detail is Art-Director-mediated: REQUIRED OBJECTS is a name-only checklist
+
+**Context:** The proof pirate story (staging `job_1788295892348_l028ggiq7a`, 16 pages, DE) shipped
+two defect classes the owner reviewed on the images. (1) *Fake second vessel*: pages 2, 4, 5 and 9
+put the cast on an invented foreground deck or dinghy while the story's own ship floated in the
+background as a separate complete vessel, stern lettering included — even though the Art Director
+prose said "medium shot on the worn deck of the ship". Page 7 rendered correctly (camera aboard,
+ship = the floor and rail of the shot), proving the model can do it. (2) *Scale absurdities*:
+p15 a captain nearly as tall as her boat's mast, p5 a two-masted vessel beached at ~3× a person,
+p10 a model boat, p2 an oversized pencil.
+
+Root cause, read out of the stored prompts: `buildImagePrompt` emitted every `metadata.objects`
+entry's **full Visual Bible description verbatim** under `**REQUIRED OBJECTS IN THIS SCENE (MUST
+appear in the image)**`. On every one of those pages the block carried the ship's complete
+exterior spec — "two-masted … roughly 25 metres long, hull painted deep forest green …, the ship's
+name painted in faded gold letters on the stern transom, a carved gull figurehead at the bow, two
+tall masts, a bowsprit, tarred hemp rigging" (~1.2k chars) — under a MUST-appear header. The model
+obeyed: it painted the described object as an object in view, which forces the characters onto some
+other surface and leaves the ship free-floating at whatever size fits. The stern-lettering leak
+fixed in `e4ca42a25` arrived through this same injection.
+
+**Decision:**
+1. `REQUIRED OBJECTS` becomes a **name-only presence checklist** — `* **<english short ref>** (type)`,
+   no VB description. Locations were already skipped; now every type is name-only. The clothing
+   `(worn by X)` suffix and a two-sided prop's orientation qualifier (`(turned away)` /
+   `(face to camera)`, taken from the entry NAME) are the only qualifiers that survive.
+2. The **Art Director owns element appearance**, exactly as it already owns character appearance:
+   `scene-expansion.txt` / `scene-expansion-all.txt` now say the image model reads only the AD's
+   prose and never the RECURRING VISUAL ELEMENTS list, and the OUTPUT contract asks for each
+   in-frame element "at the size and visibility the shot gives it".
+3. Two new generic AD rules: **11d "Aboard is not alongside"** — when the camera is aboard a vessel
+   or inside a structure, that vessel/structure is the ground the shot stands on (deck, railing,
+   mast base, planking, walls, floor); its exterior never appears as an object in frame and no
+   second copy stands in the background. **8f "True relative size"** — a vessel, building or
+   vehicle holds its real size against nearby figures; name the ratio in the prose. One matching
+   composition bullet in `image-generation.txt` as the render-side chokepoint.
+
+**Rationale:** The prose is the one place that knows what the shot actually shows; a bible entry
+does not. Handing the renderer a complete exterior spec for an element the camera is standing ON is
+a contradiction the model can only resolve by inventing a second surface. This is the same call
+already made for characters (`decisions.md` 2026-06-09: the SECONDARY CHARACTERS block was removed
+because the prose carries them) and for CHR ids (which are still filtered out of REQUIRED OBJECTS
+for exactly this reason). Owner ruling, verbatim: "Do we inject visual bible elements directly to
+the prompt? That is not good, like the figure description we should let the prompt handle it."
+
+Deliberately NOT changed: the `{VISUAL_BIBLE}` fallback slot and `visualBibleOverride` — that is
+the covers' only VB channel (`coverIterate.js` → `buildFullVisualBiblePrompt`, hint-filtered) and
+covers never populate REQUIRED OBJECTS. `buildEmptyScenePrompt`'s vehicle-description injection
+(2026-08-23) also stays: plates have no character prose to carry the detail. The
+`buildRecurringElementsText` block still goes to the Art Director as INPUT — it is the consistency
+source (`C5. Recurring elements stay identical`), it just no longer reaches the image model raw.
+
+**Supersedes in part:** the 2026-08-26 face-prop pair entry's claim that "an entry's `description`
+is copied into REQUIRED OBJECTS, so 'turned away from the viewer' arrives … in the prompt" — the
+orientation now rides the lead's name qualifier instead of the description. The pair-of-entries
+design is unchanged.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildImagePrompt` REQUIRED OBJECTS emission + header),
+`server/lib/bboxDetection.js` (`parseVisualBibleObjects` accepts a colonless entry),
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`, `prompts/image-generation.txt`,
+`tests/manual/test-page-prompt-builder.js`.
+**Status:** ✅ active
