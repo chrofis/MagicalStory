@@ -23709,3 +23709,76 @@ Comparison page: `scratchpad/piraterun3/fixcheck/compare.html`.
 `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`, `prompts/image-generation.txt`,
 `tests/manual/test-page-prompt-builder.js`.
 **Status:** ✅ active
+
+
+## 2026-09-02 — The VB-lettering exception: a prop name the bible DRAWS on the prop survives substitution (refines 2026-08-24 "A prop's NAME is the thing that gets painted on it")
+
+**Context:** staging `job_1788295892348_l028ggiq7a` p1 rendered garbled gibberish
+lettering across the ship's stern. VEH001's Visual Bible description reads
+*"…the ship's name 'Goldene Möwe' painted in faded gold letters on the stern
+transom…"*. `sanitizeVbIdsInPrompt` substitutes every artifact/vehicle/clothing
+NAME with the entry's `type` — blindly, everywhere in the prompt — so it rewrote
+the name INSIDE that clause. The prompt that reached the model ordered it to
+paint *"two-masted wooden sailing ship, brigantine-style"* in faded gold letters
+on the transom. It also rewrote the name inside guillemets in the Art Director's
+prose (`«Goldene Möwe»` → the type string). The model did what it was told, badly.
+
+**Decision (owner's explicit ruling, 2026-09-02 — "VB-lettering exception"):**
+a prop NAME survives substitution **only** where the Visual Bible entry itself
+declares that name as text drawn on the element. New helper
+`vbDeclaredLetteringNames(visualBible)` returns the exempt names; the name-
+substitution loop in `sanitizeVbIdsInPrompt` skips them. Qualification is
+derived from the VB ENTRY, never from the outgoing prompt's prose: an entry
+qualifies when its OWN `description` contains its OWN `name` inside a
+comma/semicolon/period-delimited clause that also matches
+`LETTERING_DECLARATION` (painted / lettered / letters / carved / engraved /
+inscribed / embroidered / stitched / stencilled / written / script / printed /
+etched / branded / emblazoned / monogrammed / spelled / reads). The exemption
+then holds for the whole prompt on any page where the entry appears — if the
+element is not on the page, its name is not in the prompt.
+
+**Rationale:** the 2026-08-24 protection exists because the Art Director writes
+the entity's NAME, not `VEH001`, and the model letters that name onto the prop.
+That is right for a name that is only a label and wrong for a name the bible has
+explicitly drawn onto the object — there the name is the one string the model is
+*supposed* to render, and substituting it can only produce nonsense. This also
+matches the restored blanket no-lettering rule (`e4ca42a25`): *"No lettering on
+any surface… only exception: text the Visual Bible explicitly specifies for an
+element."* The sanitizer is now consistent with the prompt rule it serves.
+
+Deriving the exemption from the VB entry rather than from context in the
+assembled prompt is deliberate: recognising "this looks like a lettering clause"
+in outgoing prose is the fragile pattern-matching approach that gets tuned on one
+story and fails on the next. The VB entry is declared data.
+
+**The 2026-08-24 motivating cases still hold.** Replayed against the real VB of
+`job_1788295892348_l028ggiq7a`: exactly ONE name is exempt (`goldene möwe`).
+- `ART012 "Goldene Kompassrose"` → still `gold compass rose`. Its description
+  never quotes its own name.
+- `VEH002 "Schwarze Nadel"` → still `two-masted wooden sailing ship, topsail
+  schooner-style`. Its description *has* a lettering clause — *"the ship's name
+  in small weathered dark red letters on the stern transom"* — but never names
+  the vessel, so nothing was declared and nothing is exempt.
+- A cross-reference in a sibling entry (`VEH002`'s *"narrower than the Goldene
+  Möwe"*) does not qualify the sibling; only self-name-in-self-description does.
+- The `Schatzkarte` half of the 2026-08-24 failure is untouched.
+
+**SETTLED check:** the 2026-08-24 verdict is not a `docs/SETTLED.md` line and is
+not string-enforced by `scripts/admin/check-settled.js`, so the reversal protocol
+does not apply. It would not have blocked this anyway — the owner sign-off
+condition is met (explicit ruling today, quoted above), and this entry is the
+superseding record with `job_1788295892348_l028ggiq7a` p1 as the evidence.
+
+**Verified:** `tests/unit/vb-lettering-exception.test.ts` (6 tests, all green) —
+declared-lettering name survives; undeclared name still substituted; the p1 stern
+clause round-trips byte-identical while `VEH001` is still resolved away; the
+2026-08-24 shape still protected when no entry declares lettering. Replayed
+against the real staging VB: the stern clause and the guillemets both survive,
+`Schwarze Nadel` and `Goldene Kompassrose` are still substituted, and `Rossa` /
+`Fiona` are untouched.
+
+**Touched files:** `server/lib/promptBuilders.js`
+(`LETTERING_DECLARATION`, `vbDeclaredLetteringNames`, the skip in
+`sanitizeVbIdsInPrompt`'s name loop, export),
+`tests/unit/vb-lettering-exception.test.ts`.
+**Status:** ✅ active

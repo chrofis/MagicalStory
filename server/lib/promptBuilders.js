@@ -3471,6 +3471,62 @@ Important:
   return finalize(appendExactPoses(fallback));
 }
 
+// Verbs and nouns that declare a mark as SURFACE TEXT rather than as prose.
+// Deliberately narrow: a clause must claim the thing is written/cut/sewn onto
+// the object, not merely that the object exists.
+const LETTERING_DECLARATION = /\b(?:painted|paint|lettered|letters|lettering|carved|engraved|inscribed|inscription|embroidered|stitched|stencil(?:l?ed)?|written|writing|script|printed|etched|branded|burnt|burned|emblazoned|monogram(?:med)?|spell(?:ed|s|t)?|reads|reading)\b/i;
+
+/**
+ * Names the Visual Bible itself declares as lettering ON the element.
+ *
+ * `sanitizeVbIdsInPrompt` substitutes every artifact/vehicle/clothing NAME with
+ * the entry's `type`, so the model cannot letter a story-language prop name
+ * onto the prop (decisions.md 2026-08-24). That protection is right for a name
+ * that is only a label — and wrong for a name the bible has explicitly drawn
+ * onto the object. Staging `job_1788295892348_l028ggiq7a` p1: VEH001's own
+ * description says the ship's name is *painted in faded gold letters on the
+ * stern transom*, and the blanket substitution rewrote the name INSIDE that
+ * clause, so the prompt ordered the model to paint
+ * "two-masted wooden sailing ship, brigantine-style" across the transom in
+ * gold. The render came back with garbled gibberish lettering.
+ *
+ * The exemption is derived from the VB ENTRY, never from the outgoing prompt's
+ * prose — reading context out of the assembled prompt is the fragile approach
+ * that gets tuned on one story. An entry qualifies only when its OWN
+ * description contains its OWN name inside a clause that also declares surface
+ * text ("the ship's name 'X' painted in faded gold letters on the stern
+ * transom"). A cross-reference in a sibling entry's description
+ * ("narrower than the X") does not qualify that sibling, and an entry whose
+ * lettering clause does not quote the name ("the ship's name in small
+ * weathered dark red letters") stays substituted — its name was never the
+ * thing being drawn.
+ *
+ * @param {Object} visualBible
+ * @returns {Set<string>} lower-cased names exempt from name substitution.
+ */
+function vbDeclaredLetteringNames(visualBible) {
+  const exempt = new Set();
+  if (!visualBible || typeof visualBible !== 'object') return exempt;
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const pool of ['artifacts', 'vehicles', 'clothing']) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      const name = String((entry && entry.name) || '').trim();
+      const description = String((entry && entry.description) || '');
+      if (name.length < 4 || !description) continue;
+      const nameRe = new RegExp(`(^|[^\\p{L}\\p{N}])${esc(name)}(?![\\p{L}\\p{N}])`, 'iu');
+      // Clause-scoped: the lettering word has to sit with the name, not merely
+      // somewhere in a 200-word description that happens to mention ink.
+      for (const clause of description.split(/[,;.]/)) {
+        if (!nameRe.test(clause)) continue;
+        if (!LETTERING_DECLARATION.test(clause)) continue;
+        exempt.add(name.toLowerCase());
+        break;
+      }
+    }
+  }
+  return exempt;
+}
+
 /**
  * Final-pass sanitiser for image prompts. Walks the assembled prompt for
  * Visual Bible IDs (CHR### / ANI### / ART### / LOC### / VEH### / CLO###),
@@ -3556,11 +3612,17 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     }
   }
   const seenAlias = new Map();
+  // VB-lettering exception: a name the bible itself draws onto the element is
+  // the one string the model is SUPPOSED to render there (see
+  // vbDeclaredLetteringNames). Substituting it produced gibberish gold letters
+  // on a stern transom. Every other prop name keeps being substituted.
+  const letteringNames = vbDeclaredLetteringNames(visualBible);
   for (const [pool, genericNoun] of Object.entries(REF_POOLS)) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       const name = String((entry && entry.name) || '').trim();
       if (name.length < 4) continue;
       if (protectedNames.has(name.toLowerCase())) continue;   // also a person or animal
+      if (letteringNames.has(name.toLowerCase())) continue;   // VB declares it as lettering on the thing
       const ref = String(entry.type || '').trim() || englishEntityRef(entry, genericNoun);
       if (!ref) continue;
       const aliases = [name];
@@ -6095,6 +6157,7 @@ module.exports = {
   stripWornStateFromDescription,
   buildImagePrompt,
   sanitizeVbIdsInPrompt,
+  vbDeclaredLetteringNames,
   buildExactPosesBlock,
   SPLIT_REVIEW_ANALYSIS_STUB,
   sliceAnalysisAspect,
