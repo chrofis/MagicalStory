@@ -24015,11 +24015,18 @@ only needed if there are characters"):**
    returned `sceneBackground`, i.e. the same function the render calls. Route
    descriptors are computed once per run (`pageRoutes`) and reused by the plate
    phases, the grid filter and the render, so no two phases can disagree.
-3. **`'off'` keeps the plate and the VB grid.** `'off'` means "no identity
-   references" — character photos and landmark photos — not "no references".
-   The comment there already promised the grid stays because it is identity and
-   not style noise; the plate is the scene's own style/layout anchor and is kept
-   on the same reasoning.
+3. **`'off'` drops the CHARACTER photos and nothing else.** The VB grid, the
+   empty-scene plate and the landmark photos all stay. `'off'` turns off
+   PERSONAL identity references; the grid is entity identity, the plate is the
+   scene's own style/layout anchor, and a landmark photo is a place's identity.
+   The comment there already promised the grid stays "because it is identity,
+   not style noise" — the plate and the landmark are kept on the same reasoning.
+   The landmark half was the owner's follow-up ruling the same day ("of course
+   they must get a landmark"): a cast-0 establishing shot of a real landmark is
+   precisely the page that most needs the curated photo, and under the old
+   `'off'` it was the one page that never got it — the landmark reached only the
+   plate, and the plate was then discarded, so the page rendered a real place
+   from prose alone.
 
 **Interaction with `aboard` (same-day entry above):** an aboard page with no
 cast now reaches the render through the no-plate branch, where locations and
@@ -24046,15 +24053,27 @@ plates, same grids); p1's vantage `LOC001.1` has no other page, so one plate
 generation is also saved. No page in that story carries `aboard` (its metadata
 predates the field).
 
-**Grok slot budget:** a cast-0 page goes from 0 packed slots to 1 (the VB grid
-own slot; `packReferences` gives VB its own slot when there are no characters).
-With a shared plate it is 2. Neither approaches the 3-slot cap, and
-`slot0IsScenePlate` stays false without a plate, so the grid is never
+**Grok slot budget (measured by running `packReferences` locally — it packs with
+sharp and calls no API):** a cast-0 page goes from 0 packed slots to **2** in
+the worst reachable case, against a cap of 3.
+
+| cast-0 case | slots |
+|---|---|
+| no plate, VB grid only | 1 (VB own slot) |
+| no plate, landmark only | 1 (landmark as scene anchor) |
+| **no plate, landmark + VB grid (worst case)** | **2** |
+| shared plate + landmark + VB grid | 2 — the landmark is skipped, `packReferences` treats it as baked into the plate |
+
+The text-zone mask cannot add a third: it is attached only when there is no
+plate, and on the page render it is read off `sceneBackgrounds[n].textAreaMask`,
+which does not exist when no plate was generated. (Forced artificially it lands
+exactly on the cap at 3, still no overflow.) `slot0IsScenePlate` stays false
+without a plate, so the grid or the landmark in slot 0 is never
 magenta-extension padded.
 
 **Touched:**
 - `server/lib/imageRouter.js` (`pageCastSize` export; cast-0 route → `emptyScene: 'skip'`)
-- `server/lib/clothingResolve.js` (`applyReferenceMode` `'off'` keeps `sceneBackground`)
+- `server/lib/clothingResolve.js` (`applyReferenceMode` `'off'` keeps `sceneBackground` and `landmarkPhotos`)
 - `storyJobPipeline.js` (`pageRoutes` map + `platelessByRoute`; vantage-group skip; Phase 5a-pre skip; plateless-warning exclusion; Phase 5a-pre-grid keyed on the sent plate + aboard withholding)
 - `server/lib/referenceSheets.js` (`buildPageCompositeRefs` accepts `aboardId`)
 - `server/lib/images.js` (iterate passes `aboardId`), `server/lib/testlab.js` (image stage passes `aboardId`)

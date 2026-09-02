@@ -6,10 +6,12 @@ import { describe, it, expect } from 'vitest';
 //   1. A page with no named cast gets NO empty-scene plate. The plate exists to
 //      anchor character placement; with nobody to place, the render IS the
 //      scene. Expressed as `emptyScene: 'skip'` on the route descriptor.
-//   2. applyReferenceMode('off') keeps the plate and the VB grid. 'off' means
-//      "no identity references" (character photos, landmark photos), not "no
-//      references" — it used to null the plate, so the one page type that could
-//      have used a shared plate never received it.
+//   2. applyReferenceMode('off') drops the CHARACTER photos and nothing else.
+//      The VB grid, the empty-scene plate and the landmark photos all stay:
+//      'off' turns off PERSONAL identity references, and neither a plate nor a
+//      landmark photo is one. It used to null both the plate and the landmark,
+//      so the cast-0 page — the one page type that has no character refs at
+//      all — went to the model with prose only.
 //   3. The element the camera stands on/inside (`aboard`) never enters the page
 //      VB grid. Its render is an exterior three-quarter view, and rule 1 now
 //      routes deck-level cast-0 pages down the no-plate branch where the grid
@@ -78,16 +80,22 @@ describe("applyReferenceMode 'off'", () => {
     sceneMetadata: null,
   };
 
-  it('drops identity references', () => {
+  it('drops the character photos — and only those', () => {
     const out = applyReferenceMode(args);
     expect(out.characterPhotos).toEqual([]);
-    expect(out.landmarkPhotos).toEqual([]);
   });
 
   it('keeps the VB grid and the scene plate', () => {
     const out = applyReferenceMode(args);
     expect(out.visualBibleGrid).toBe(args.visualBibleGrid);
     expect(out.sceneBackground).toBe(args.sceneBackground);
+  });
+
+  it('keeps the landmark photos — a place\'s identity is not a person\'s', () => {
+    // Owner, 2026-09-02: "of course they must get a landmark". A cast-0
+    // establishing shot of a landmark is the page that most needs the curated
+    // photo, and it was the one page that never received it.
+    expect(applyReferenceMode(args).landmarkPhotos).toBe(args.landmarkPhotos);
   });
 
   it('passes a missing plate through as null (nothing invented)', () => {
