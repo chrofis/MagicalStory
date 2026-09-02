@@ -925,6 +925,9 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     pageLabel = '',                      // Grok packReferences pageLabel
     defaultModel,                        // eval path cover-aware; gen-only pageImage
     includeSceneBackgroundPart = false,  // gen-only adds a [Background] Gemini part
+    maxRefSlots = null,                  // Test Lab only: raise packReferences/editWithGrok's
+                                          // slot budget above the production default of 3
+                                          // (xAI's edit cap is 5). null = production default.
   } = opts;
 
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
@@ -989,12 +992,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
-        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
+        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}) }
       );
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate });
+        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}) });
       } else {
         result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -1713,7 +1716,10 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // Post-gen crop of a stray uniform frame the model paints despite the D-01
     // prompt ban (a blue/black keyline framing the art). Page scenes want it;
     // covers (title paint) and avatars opt out by passing stripBorder: false.
-    stripBorder = true
+    stripBorder = true,
+    // Test Lab only: raise the Grok reference-slot budget above the production
+    // default of 3 (xAI's edit cap is 5, re-verified 2026-09-02).
+    maxRefSlots = null,
   } = options;
 
   if (captureLabel) {
@@ -1761,6 +1767,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     pageLabel: pageNumber != null ? String(pageNumber) : '',
     defaultModel: MODEL_DEFAULTS.pageImage,
     includeSceneBackgroundPart: true,
+    maxRefSlots,
   });
 
   // Strip a stray uniform frame the model painted despite the D-01 prompt ban

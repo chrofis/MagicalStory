@@ -555,6 +555,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     textAreaMask,
     pageNumber: ctx.pageNumber,
     skipCache: true,
+    // maxRefSlots: raise Grok's reference-slot budget above the production
+    // default of 3 (xAI's documented edit cap is 5, re-verified 2026-09-02) —
+    // e.g. give each of 4 characters their own slot instead of pairing 2-per-slot.
+    maxRefSlots: params.maxRefSlots || null,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Image generation returned no image');

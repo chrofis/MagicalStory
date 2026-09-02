@@ -301,15 +301,19 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
                               // portrait manga B&W with sky + river extended cleanly.
                               // Slots 1+ (avatars, VB grids) keep their existing padInput
                               // behavior — only slot 0 gets the magenta treatment.
+    maxRefs = 3,              // xAI docs (re-verified 2026-09-02) now say up to 5 source
+                              // images per edit — up from the 3 verified 2026-08-30. Default
+                              // stays 3 (production/packReferences budget); Test Lab passes
+                              // a higher value to probe whether 4-5 raw refs actually help.
   } = options;
 
   if (!XAI_API_KEY) {
     throw new Error('XAI_API_KEY not configured');
   }
 
-  // grok-imagine-image: max 3 input images
+  // grok-imagine-image: up to `maxRefs` input images (xAI cap is 5; default 3)
   // grok-imagine-image-pro: max 1 input image — stitch multiple refs into one composite
-  let images = referenceImages.slice(0, 3);
+  let images = referenceImages.slice(0, maxRefs);
 
   if (model === GROK_MODELS.PRO && images.length > 1) {
     log.info(`🎨 [GROK] Pro model supports 1 image — stitching ${images.length} refs into composite`);
@@ -1112,7 +1116,14 @@ async function packReferences(refs = {}, options = {}) {
     sceneBackground = null,
     textAreaMask = null, // Pre-built black/white mask for empty scene text area
   } = refs;
-  const { aspectRatio = '1:1', pageLabel = '', padInputWithExtension = false } = options;
+  const {
+    aspectRatio = '1:1', pageLabel = '', padInputWithExtension = false,
+    // maxSlots: xAI's edit cap is 5 (re-verified 2026-09-02, up from 3). Default
+    // stays 3 (the production budget this layout logic was tuned for); Test Lab
+    // passes 4-5 to test whether an extra raw slot (e.g. one more character, or
+    // a dedicated VB slot instead of a bundled row) beats the current packing.
+    maxSlots = 3,
+  } = options;
   const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
 
   // Extract character photo buffers as raw data — the layout function decides
@@ -1216,7 +1227,7 @@ async function packReferences(refs = {}, options = {}) {
   // When a scene background already exists, the landmark is assumed to be
   // baked into it (the empty-scene gen path uses the landmark as input) and
   // we skip — see the scene-bg slot above and the duplicate-skip log below.
-  if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < 3) {
+  if (landmarkBuffers.length > 0 && !hasSceneBackground && slots.length < maxSlots) {
     const resized = await sharp(landmarkBuffers[0])
       .resize({ height: 1024, withoutEnlargement: true })
       .jpeg({ quality: 92 })
@@ -1256,7 +1267,7 @@ async function packReferences(refs = {}, options = {}) {
   // when we'd exceed the 3-slot limit. The LAST char slot also absorbs any
   // VB elements as a cell row below the character.
   const pushCharSlot = async (group, includeVb) => {
-    if (slots.length >= 3 || group.length === 0) return;
+    if (slots.length >= maxSlots || group.length === 0) return;
     const willAddVb = includeVb && rawVbElements.length > 0;
     const composed = await buildCharacterGroupSlot(
       group.map(c => c.rawBuffer),
@@ -1330,7 +1341,7 @@ async function packReferences(refs = {}, options = {}) {
   const vbSlotElements = (visualBibleGrid && Array.isArray(visualBibleGrid.rawElements))
     ? visualBibleGrid.rawElements
     : [];
-  const availableCharSlots = 3 - slots.length;
+  const availableCharSlots = maxSlots - slots.length;
   const vbAvailable = vbSlotElements.length > 0;
   let charGroups = [];
   let vbOwnSlot = false;
@@ -1387,7 +1398,7 @@ async function packReferences(refs = {}, options = {}) {
   // Mask convention: ~20% BLACK = reserved text zone, ~80% WHITE = rest of scene.
   // The full explanation rides in the text prompt — DO NOT composite a label
   // strip onto the mask, Grok bakes that strip's text verbatim into the output.
-  if (textAreaMask && !hasSceneBackground && slots.length < 3) {
+  if (textAreaMask && !hasSceneBackground && slots.length < maxSlots) {
     try {
       const base64 = r2.stripDataUriPrefix(textAreaMask);
       const maskBuf = Buffer.from(base64, 'base64');
@@ -1550,7 +1561,7 @@ async function packReferences(refs = {}, options = {}) {
     }
   }
 
-  log.info(`🎨 [GROK] Packed ${paddedSlots.length}/3 reference slots at ${aspectRatio} (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
+  log.info(`🎨 [GROK] Packed ${paddedSlots.length}/${maxSlots} reference slots at ${aspectRatio} (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
   return paddedSlots;
 }
 
