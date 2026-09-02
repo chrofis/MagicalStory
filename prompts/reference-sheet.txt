@@ -2,7 +2,7 @@ You are creating reference images for a children's storybook.
 
 **ART STYLE:** {STYLE_DESCRIPTION}
 
-Generate one image laid out as a {GRID_SHAPE_PHRASE}. Cells are separated by thick, perfectly straight black gridlines so each cell can be cropped out cleanly. Each cell shows ONE element in isolation against a simple neutral background.
+Generate one image laid out as a {GRID_SHAPE_PHRASE}.{GRID_SEPARATION} Each cell shows ONE element in isolation against a simple neutral background.
 
 **LAYOUT:**
 {GRID_LAYOUT}
@@ -11,7 +11,7 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}. Cells are separated by thi
 - Each cell must show ONLY that single element, clearly visible and centered
 - Consistent art style across ALL cells matching the style description above
 - Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
-- Equal-sized cells separated by thick straight black gridlines
+{CELL_LAYOUT_REQ}
 - Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.
 - All content must be safe, family-friendly, and age-appropriate{BATCH_GUARD}
 
@@ -34,4 +34,4 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}. Cells are separated by thi
 - Show distinctive coloring and features
 - Facing the viewer or in 3/4 view
 
-Generate as a single image with equal-sized cells arranged exactly as described in the LAYOUT above. Thick black gridlines separate every cell so each cell can be extracted cleanly.
+{CLOSING}

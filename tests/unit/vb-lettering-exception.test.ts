@@ -204,6 +204,33 @@ describe('buildReferenceSheetPrompt — cross-cell backstop', () => {
       visualBible
     );
     expect(prompt).not.toContain(guard);
-    expect(prompt).not.toContain('{BATCH_GUARD}');
+    expect(prompt).not.toMatch(/\{[A-Z_]+\}/);
+  });
+
+  // A one-element call inherits a sheet template. Asked for "cells separated by
+  // thick black gridlines", a solo render painted a black grid across the ship
+  // — which would ride onto every page using that reference.
+  it('strips every gridline instruction from a solo prompt', () => {
+    const prompt = build(
+      [{ ...visualBible.vehicles[0], type: 'vehicle' }],
+      'soft watercolor',
+      visualBible
+    );
+    // Only the NEGATIVE mention survives ("no gridlines"); nothing asks for one.
+    expect(prompt).not.toMatch(/separated by[^.]*gridlines/i);
+    expect(prompt).not.toMatch(/gridlines separate/i);
+    expect(prompt).not.toMatch(/^Row 1:/m);
+    expect(prompt).toContain('no gridlines, borders or dividing lines');
+  });
+
+  it('keeps the gridline instructions on a multi-cell prompt', () => {
+    const prompt = build(
+      [{ ...visualBible.artifacts[0], type: 'artifact' }, { ...visualBible.vehicles[1], type: 'vehicle' }],
+      'soft watercolor',
+      visualBible
+    );
+    expect(prompt).toMatch(/thick,? perfectly straight black gridlines/);
+    expect(prompt).toContain('- Equal-sized cells separated by thick straight black gridlines');
+    expect(prompt).not.toMatch(/\{[A-Z_]+\}/);
   });
 });

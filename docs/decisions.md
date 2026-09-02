@@ -23958,6 +23958,17 @@ the cross-cell bleed is independent of what the string says.)
    `prompts/reference-sheet.txt`. Solo calls omit it, so an element whose bible
    entry declares lettering can still render its own.
 
+3. A ONE-element prompt no longer asks for gridlines. The template is written
+   for a sheet ("cells separated by thick, perfectly straight black gridlines",
+   in three places), and a solo render obeyed it: the first solo VEH001 render
+   came back with a black grid painted across the ship, which would then ride
+   onto every page holding that reference. `{GRID_SEPARATION}`,
+   `{CELL_LAYOUT_REQ}` and `{CLOSING}` are filled with grid wording only when
+   `count > 1`; the solo shape phrase is "single full-frame illustration with no
+   grid and no dividing lines", and its LAYOUT line drops the "Row 1:" prefix.
+   This also repairs the pre-existing single-element re-render inside the
+   character cell gate, which had the same defect since 2026-08-31.
+
 **Rationale:** The bleed is a property of prompt sharing, so the fix is to stop
 sharing the prompt — not to strip the clause (the entry legitimately declares
 that lettering) and not to pattern-match text out of the outgoing prompt. The
@@ -23971,8 +23982,14 @@ undeclared clause still describes writing.
 VEH001 "Goldene Möwe" goes solo. One paid re-render ($0.02, owner-authorised) of
 the NEW batch 1 (`CHR001 | ART001 | ART002 | ANI001`, no vehicle): ART002's cell
 came back with illegible squiggle-script and no readable words anywhere on the
-sheet. The stored staging cell was NOT replaced — local R2 credentials reach the
-production bucket only.
+sheet. Two solo VEH001 renders followed: the first exposed the gridline defect
+above, the second (post-fix) is clean — no gridlines, and the stern reads
+"Goldene Möwe" in gold letters, correctly spelled, which is the 8d694ee7f
+lettering exception working end to end. The stored staging cells were NOT
+replaced: no server-side path re-runs element reference sheets for an existing
+story (`generateReferenceSheet` is called only from `storyJobPipeline.js`; the
+Test Lab has no reference-sheet stage and `server.js` imports the function
+without calling it), and local R2 credentials reach the production bucket only.
 
 **Touched:**
 - `server/lib/referenceSheets.js` (`buildReferenceSheetBatches`, batch guard in `buildReferenceSheetPrompt`, solo-cell log line)

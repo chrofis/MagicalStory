@@ -150,7 +150,9 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     // already says which side it is. This replaced a `referenceView` field that
     // appended the closed state to a single entry; two entries do the same job
     // and also put the orientation into the page prompt.
-    return `${pos}: ${desc}`;
+    // A solo call has no position to name — a bare "Row 1:" prefix is a stringy
+    // label on an image with nothing to index.
+    return count === 1 ? desc : `${pos}: ${desc}`;
   });
 
   // Describe the grid in natural language. Passing literal digit-strings like
@@ -158,11 +160,30 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   // a label). Use words for the count and an explicit row/column phrase so the
   // model never sees a stringy template token to copy.
   const numWord = (n) => ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] || String(n);
-  const gridShapePhrase = (cols === 2 && rows === 2)
-    ? 'square grid with two rows and two columns (four cells total)'
-    : (cols === 1)
-      ? `single vertical column with ${numWord(rows)} cell${rows === 1 ? '' : 's'} stacked top-to-bottom`
-      : `${numWord(rows)}-row by ${numWord(cols)}-column grid`;
+  const gridShapePhrase = count === 1
+    ? 'single full-frame illustration with no grid and no dividing lines'
+    : (cols === 2 && rows === 2)
+      ? 'square grid with two rows and two columns (four cells total)'
+      : (cols === 1)
+        ? `single vertical column with ${numWord(rows)} cell${rows === 1 ? '' : 's'} stacked top-to-bottom`
+        : `${numWord(rows)}-row by ${numWord(cols)}-column grid`;
+
+  // A ONE-element call must not ask for gridlines. The template is written for
+  // a sheet — "cells separated by thick black gridlines", three times over —
+  // and a single-cell render obeys it: a solo VEH001 render came back with a
+  // black grid painted across the ship, which would then ride onto every page
+  // using that reference. The separator language is therefore parametrised and
+  // dropped when there is nothing to separate. This also fixes the pre-existing
+  // single-element re-render in the character cell gate below.
+  const gridSeparation = count > 1
+    ? ' Cells are separated by thick, perfectly straight black gridlines so each cell can be cropped out cleanly.'
+    : '';
+  const cellLayoutReq = count > 1
+    ? '- Equal-sized cells separated by thick straight black gridlines'
+    : '- The element fills the frame; no gridlines, borders or dividing lines anywhere in the image';
+  const closing = count > 1
+    ? 'Generate as a single image with equal-sized cells arranged exactly as described in the LAYOUT above. Thick black gridlines separate every cell so each cell can be extracted cleanly.'
+    : 'Generate as a single image showing that one element edge to edge, with no gridlines, borders or dividing lines.';
 
   // Cross-cell bleed backstop. A cell description that declares lettering on
   // its own element ("the name painted on the hull") made the model render
@@ -183,6 +204,9 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     GRID_SHAPE_PHRASE: gridShapePhrase,
     GRID_LAYOUT: gridLayoutLines.join('\n'),
     BATCH_GUARD: batchGuard,
+    GRID_SEPARATION: gridSeparation,
+    CELL_LAYOUT_REQ: cellLayoutReq,
+    CLOSING: closing,
   });
 
   // VB descriptions cross-reference each other by id ("shimmer matching
