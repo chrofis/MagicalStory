@@ -314,6 +314,29 @@ ungated on cast size.
 `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`.
 **Status:** ✅ active.
 
+### The arc is the master — a load-bearing fact must survive into the text (2026-09-02)
+**Context:** Owner ruling: "the arc is the master: what it describes must be in the text."
+`job_1788295892348` showed the beats correctly carrying two facts the arc treated as
+load-bearing — a uniqueness (a torn map edge cuts off the shallow water, making one
+character's pencil line the only record of it) and a cause (the tide falls faster than
+that line promised) — and the text layer then dropping or genericizing both: page 2 wrote
+only "alt und braun an den Rändern" (old and brown at the edges) instead of naming the cut,
+and page 5 said only "die Karte" (the map) instead of naming the line as the cause. Neither
+the text audit nor the writer's own contract had a question that would catch a specific,
+load-bearing fact quietly turning generic between beats and text.
+**Decision:** `story-text-audit.txt` gained a twelfth audit question, LOADBEARING: does the
+page keep every fact the story and the beat treat as load-bearing — a cause, a uniqueness, a
+limitation — or has it been dropped or made generic. `story-text-from-beats.txt` gained a
+matching line in the writer's contract: what the story establishes as load-bearing appears in
+the text in its specific form, never genericized.
+**Rationale:** The beats stage already does the work of carrying these facts correctly; the
+gap was entirely in the text stage having no rule against loosening them and no audit
+question that would catch it after the fact. This closes the "prose-level logic drift has no
+checker" backlog watch-item with the checker it was waiting on.
+**Touched:** `prompts/story-text-audit.txt`, `prompts/story-text-from-beats.txt`,
+`tasks/BACKLOG.md`.
+**Status:** ✅ active.
+
 ---
 
 ## Email
