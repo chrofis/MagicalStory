@@ -13,7 +13,7 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}. Cells are separated by thi
 - Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
 - Equal-sized cells separated by thick straight black gridlines
 - Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.
-- All content must be safe, family-friendly, and age-appropriate
+- All content must be safe, family-friendly, and age-appropriate{BATCH_GUARD}
 
 **FOR CHARACTERS:**
 - 3/4 view showing face and upper body clearly

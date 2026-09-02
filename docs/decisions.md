@@ -23838,15 +23838,27 @@ the arc are what exists; the safety rule that motivated the exclusion still
 stands in the refine template ("Nothing … dangerous enough that it could lead
 to death — for anyone. A fault is never fixed by putting a person in danger.").
 
-**Compatibility:** stored stories keep loading everywhere. `parseBeats` now
-accepts a page carrying EITHER field, so all three transcript generations read
-back: `BEAT + SCENE`, `BEAT + PLAN`, and `PLAN` alone. The per-page
-`outlineExtract` marker changed from `BEAT: …\nPLAN: …` to `PLAN: …`, and the
-three places that sniff that field for beats-vs-unified mode
-(`storyScorecard.finalBeats`, `textRefine.extractRefinablePages`, the Lab's
-stored-beats recovery) accept both prefixes. The stored transcript still
-carries a `---BEATS---` section, now holding `## Page N` + `PLAN:` blocks, so
-`storyMetrics`, the analysis scripts and the Lab replays key on the same marker.
+**No legacy bridge** (owner, explicit, same day: *"No, I do not want a legacy
+bridge"* — the standing clean-code rule: no parallel paths, one source of truth
+per concept). A first pass built one; it was ripped out. Every parser and every
+consumer reads ONE shape, the plan line:
+
+- `parseBeats` reads `PLAN:` and nothing else. A page carrying only `BEAT:`
+  prose is not parsed; it comes back in `missing` and the caller throws.
+- `textRefine.extractRefinablePages`, `storyScorecard.finalBeats`, the Lab's
+  stored-beats recovery and `resolveStoryBeats` match `PLAN:` only. The Lab
+  stage names the story it refuses ("a pre-2026-09-02 story cannot be
+  replayed") instead of silently replaying a fraction of it.
+- The page object no longer carries a `beat` field at all — not even empty.
+
+What this costs: a story stored before this change cannot be RE-RUN through the
+beats-shaped Lab replays. Its finished artifacts are untouched — pages, text and
+images live in `stories.data` and render exactly as before.
+
+The per-page `outlineExtract` marker changed from `BEAT: …\nPLAN: …` to
+`PLAN: …`. The stored transcript still carries a `---BEATS---` section, now
+holding `## Page N` + `PLAN:` blocks, so `storyMetrics`, the analysis scripts
+and the Lab replays key on the same marker.
 
 **Touched:** `prompts/story-beats.txt`, `prompts/story-text-from-beats.txt`,
 `prompts/text-refine.txt`, `prompts/story-text-audit.txt`,
@@ -23858,6 +23870,7 @@ renderer, `buildTextAuditPrompt` arc), `server/lib/storyHelpers.js`,
 `server/lib/beatsPipeline.js`, `server/lib/textRefine.js`,
 `server/lib/storyScorecard.js`, `server/lib/testlab.js`,
 `server/lib/testlabWriterCompare.js`, `client/src/pages/TestLab.tsx`,
+`client/src/services/testlabService.ts`,
 `tests/unit/plan-response-parse.test.ts`, `tests/unit/text-refine-beats.test.ts`.
 
 **Status:** ✅ active
@@ -23904,5 +23917,59 @@ OBJECTS block), `server/lib/referenceSheets.js` (grid `rawElements` carry
 built after the grid), `server/lib/images.js` (iterate call site),
 `tests/manual/test-page-prompt-builder.js` (stale
 `filterWornClothingAgainstScene` import removed — broken since `5f174cba5`).
+
+**Status:** ✅ active
+
+## 2026-09-02 — Declared-lettering VB entries are rendered in SOLO reference calls (a lettering clause bleeds across cells of one sheet)
+
+**Context:** VB element reference renders are produced in batches — up to four
+elements composed as stacked cells in ONE generation call, from ONE prompt that
+concatenates every cell's description (`generateReferenceSheet`). A description
+that declares lettering on its own element therefore sits in the same prompt as
+its neighbours' descriptions, and the model does not keep it inside its cell.
+Measured on staging `job_1788295892348_l028ggiq7a`: batch 1 was
+`VEH001 | CHR001 | ART001 | ART002`. VEH001's description declares the ship's
+name painted in gold letters on the stern transom; ART002 is a treasure map
+whose own description ends "all writing is illegible weathered script". The
+stored ART002 reference (`…/vb/ART002.jpg`) came back carrying LEGIBLE
+handwriting — "two-masted – wooded … sailing ship, brigantine-style", the
+sibling's own words — and that poisoned cell rode onto pages 2, 3, 4, 10, 12.
+(The garbled string itself was the separate sanitiser bug fixed in `8d694ee7f`;
+the cross-cell bleed is independent of what the string says.)
+
+**Decision:** Two layers, both at sheet-generation time.
+1. `buildReferenceSheetBatches()` partitions the elements before batching:
+   entries whose OWN description declares their name as lettering on the element
+   (`vbDeclaredLetteringNames`, shipped with `8d694ee7f`) are pulled out and each
+   gets its own single-cell generation call. Everything else batches exactly as
+   before, with the unchanged balancing that avoids lone-element batches.
+   Typically 0-2 solo calls per story — the pirate story's real VB (27 qualifying
+   elements) partitions to `4,4,4,4,4,3 + 1`, the 1 being VEH001.
+2. A multi-cell prompt carries one backstop line ("Each cell shows only its own
+   element, never anything described for another cell, and no lettering or
+   readable words anywhere"), filled through `{BATCH_GUARD}` in
+   `prompts/reference-sheet.txt`. Solo calls omit it, so an element whose bible
+   entry declares lettering can still render its own.
+
+**Rationale:** The bleed is a property of prompt sharing, so the fix is to stop
+sharing the prompt — not to strip the clause (the entry legitimately declares
+that lettering) and not to pattern-match text out of the outgoing prompt. The
+quarantine is derived from the bible entry itself, reusing the helper that
+already decides the same question for the sanitiser, so there is one definition
+of "declared lettering" in the codebase. Cost is one extra image call for the
+0-2 elements that qualify. The backstop line covers the case where an
+undeclared clause still describes writing.
+
+**Validation:** $0 partition dry-run against that story's real VB — exactly
+VEH001 "Goldene Möwe" goes solo. One paid re-render ($0.02, owner-authorised) of
+the NEW batch 1 (`CHR001 | ART001 | ART002 | ANI001`, no vehicle): ART002's cell
+came back with illegible squiggle-script and no readable words anywhere on the
+sheet. The stored staging cell was NOT replaced — local R2 credentials reach the
+production bucket only.
+
+**Touched:**
+- `server/lib/referenceSheets.js` (`buildReferenceSheetBatches`, batch guard in `buildReferenceSheetPrompt`, solo-cell log line)
+- `prompts/reference-sheet.txt` (`{BATCH_GUARD}` placeholder)
+- `tests/unit/vb-lettering-exception.test.ts` (partition + guard-line coverage)
 
 **Status:** ✅ active

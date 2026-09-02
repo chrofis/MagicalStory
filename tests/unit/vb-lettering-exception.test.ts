@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 // The bug this file locks down: `sanitizeVbIdsInPrompt` substitutes every
 // artifact/vehicle/clothing NAME with the entry's `type`, so a story-language
@@ -13,8 +13,18 @@ import { describe, it, expect } from 'vitest';
 // The exception is derived from the VB entry (its own name inside its own
 // lettering clause), never pattern-matched out of the outgoing prompt.
 
+// The second bug locked down here: reference-sheet cells are described in ONE
+// prompt to ONE generation call, so the same lettering clause bled ACROSS cells
+// — the map cell of that story came back with legible handwriting copied from
+// the ship's stern clause, although its own description says its script is
+// illegible. Declared-lettering entries are therefore quarantined into solo
+// calls, and a multi-cell prompt carries a no-lettering backstop line.
+
 // @ts-expect-error - JS module without types
 import { sanitizeVbIdsInPrompt, vbDeclaredLetteringNames } from '../../server/lib/promptBuilders.js';
+// @ts-expect-error - JS module without types
+import { buildReferenceSheetBatches } from '../../server/lib/referenceSheets.js';
+import { createRequire } from 'node:module';
 
 // Neutral fixture. VEH001 declares its name as painted lettering; VEH002 has a
 // lettering clause that does NOT name the vessel; ART001 is a plain prop whose
@@ -118,5 +128,82 @@ describe('sanitizeVbIdsInPrompt — VB-lettering exception', () => {
     );
     expect(out).not.toContain('Alte Seekarte');
     expect(out).not.toContain('Sturmklinge');
+  });
+});
+
+describe('buildReferenceSheetBatches — lettering quarantine', () => {
+  // What generateReferenceSheet works on: VB entries flattened with a type.
+  const el = (entry: any, type: string) => ({ ...entry, type, pageCount: 3 });
+  const plainProps = Array.from({ length: 4 }, (_, i) => ({
+    id: `ART10${i}`,
+    name: `Requisite ${i}`,
+    type: 'artifact',
+    description: 'a plain wooden object with no markings of any kind',
+    pageCount: 2,
+  }));
+
+  it('puts a declared-lettering entry in its own batch and leaves the rest batched', () => {
+    const needsReference = [
+      el(visualBible.artifacts[0], 'artifact'),   // illegible script — batchable
+      ...plainProps,
+      el(visualBible.vehicles[0], 'vehicle'),     // declares its name as stern lettering
+      el(visualBible.vehicles[1], 'vehicle'),     // lettering clause, but unnamed — batchable
+    ];
+    const batches = buildReferenceSheetBatches(needsReference, visualBible, 4);
+    const names = batches.map((b: any[]) => b.map(e => e.name));
+
+    // Six batchable elements → two balanced batches of three; the lettering
+    // vehicle rides alone, last.
+    expect(names.map(n => n.length)).toEqual([3, 3, 1]);
+    expect(names[2]).toEqual(['Nordwind']);
+    expect(names.flat()).toHaveLength(needsReference.length);
+    expect(new Set(names.flat()).size).toBe(needsReference.length);
+    // The poisoned pairing must not recur: the map never shares with the ship.
+    const mapBatch = batches.find((b: any[]) => b.some(e => e.name === 'Alte Seekarte'));
+    expect(mapBatch.some((e: any) => e.name === 'Nordwind')).toBe(false);
+  });
+
+  it('keeps the balanced distribution unchanged when nothing declares lettering', () => {
+    const needsReference = [...plainProps, el(visualBible.artifacts[0], 'artifact')];
+    const batches = buildReferenceSheetBatches(needsReference, visualBible, 4);
+    expect(batches.map((b: any[]) => b.length)).toEqual([3, 2]);
+  });
+
+  it('tolerates a missing visual bible and an unnamed element', () => {
+    const batches = buildReferenceSheetBatches([{ id: 'ART900' }, ...plainProps], null, 4);
+    expect(batches.map((b: any[]) => b.length)).toEqual([3, 2]);
+  });
+});
+
+describe('buildReferenceSheetPrompt — cross-cell backstop', () => {
+  const guard = 'Each cell shows only its own element';
+  // Templates are read from prompts/ at boot, not at import — and the loader
+  // has to run in the SAME CommonJS registry the builder resolves through, so
+  // both come from one createRequire.
+  const cjs = createRequire(import.meta.url);
+  let build: any;
+  beforeAll(async () => {
+    await cjs('../../server/services/prompts.js').loadPromptTemplates();
+    build = cjs('../../server/lib/referenceSheets.js').buildReferenceSheetPrompt;
+  });
+
+  it('carries the no-lettering line on a multi-cell prompt', () => {
+    const prompt = build(
+      [{ ...visualBible.artifacts[0], type: 'artifact' }, { ...visualBible.vehicles[1], type: 'vehicle' }],
+      'soft watercolor',
+      visualBible
+    );
+    expect(prompt).toContain(guard);
+    expect(prompt).toContain('no lettering or readable words anywhere');
+  });
+
+  it('omits it on a solo cell, so a declared-lettering element can render its own', () => {
+    const prompt = build(
+      [{ ...visualBible.vehicles[0], type: 'vehicle' }],
+      'soft watercolor',
+      visualBible
+    );
+    expect(prompt).not.toContain(guard);
+    expect(prompt).not.toContain('{BATCH_GUARD}');
   });
 });

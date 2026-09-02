@@ -164,10 +164,25 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
       ? `single vertical column with ${numWord(rows)} cell${rows === 1 ? '' : 's'} stacked top-to-bottom`
       : `${numWord(rows)}-row by ${numWord(cols)}-column grid`;
 
+  // Cross-cell bleed backstop. A cell description that declares lettering on
+  // its own element ("the name painted on the hull") made the model render
+  // legible words in a NEIGHBOURING cell too — a map cell whose own description
+  // says its script is illegible came back carrying readable handwriting copied
+  // from the sibling's clause. Lettering elements are quarantined into solo
+  // calls upstream (buildReferenceSheetBatches), so a multi-cell prompt should
+  // no longer contain such a clause; this line is the backstop for the case
+  // where one slips through. Solo calls omit it so an element whose own bible
+  // entry declares lettering can still render it.
+  // The value carries its own leading newline so the empty case leaves no gap.
+  const batchGuard = count > 1
+    ? '\n- Each cell shows only its own element, never anything described for another cell, and no lettering or readable words anywhere'
+    : '';
+
   const prompt = fillTemplate(PROMPT_TEMPLATES.referenceSheet, {
     STYLE_DESCRIPTION: styleDescription,
     GRID_SHAPE_PHRASE: gridShapePhrase,
     GRID_LAYOUT: gridLayoutLines.join('\n'),
+    BATCH_GUARD: batchGuard,
   });
 
   // VB descriptions cross-reference each other by id ("shimmer matching
@@ -226,6 +241,59 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
     parsed = JSON.parse(m ? m[0] : raw);
   }
   return { natural: parsed.natural !== false, reason: String(parsed.reason || '') };
+}
+
+/**
+ * Group elements into generation batches.
+ *
+ * Every cell of a batch is described in ONE prompt to ONE generation call, so a
+ * clause belonging to one cell can bleed into another. Measured on staging
+ * job_1788295892348_l028ggiq7a: a vehicle entry declaring its name as painted
+ * stern lettering shared a sheet with a map entry whose own description says its
+ * script is illegible — and the stored map reference came back carrying legible
+ * handwriting lifted from the vehicle's clause. Every page using that map
+ * inherited the text.
+ *
+ * So entries whose OWN description declares their name as lettering on the
+ * element (vbDeclaredLetteringNames — typically 0-2 per story) are quarantined:
+ * each gets its own single-cell call, where its lettering can only land on
+ * itself. Everything else batches exactly as before, balanced so no batch is
+ * left with a lone element:
+ *   N=5, M=4 → 3,2   N=6, M=4 → 3,3   N=9, M=4 → 3,3,3
+ *
+ * @param {Array} needsReference - Elements from getElementsNeedingReferenceImages
+ * @param {Object|null} visualBible - Story visual bible (source of the lettering declarations)
+ * @param {number} maxPerBatch - Maximum elements per grid
+ * @returns {Array<Array>} Batches, in generation order (batched groups, then solo cells)
+ */
+function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4) {
+  const { vbDeclaredLetteringNames } = require('./promptBuilders');
+  const letteringNames = vbDeclaredLetteringNames(visualBible);
+
+  const solo = [];
+  const batchable = [];
+  for (const el of needsReference) {
+    const name = String((el && el.name) || '').trim().toLowerCase();
+    if (name && letteringNames.has(name)) solo.push(el);
+    else batchable.push(el);
+  }
+
+  const batches = [];
+  const N = batchable.length;
+  if (N > 0) {
+    const batchCount = Math.max(1, Math.ceil(N / maxPerBatch));
+    const basePer = Math.floor(N / batchCount);
+    const remainder = N - basePer * batchCount; // first `remainder` batches get +1
+    let cursor = 0;
+    for (let b = 0; b < batchCount; b++) {
+      const size = basePer + (b < remainder ? 1 : 0);
+      batches.push(batchable.slice(cursor, cursor + size));
+      cursor += size;
+    }
+  }
+  for (const el of solo) batches.push([el]);
+
+  return batches;
 }
 
 /**
@@ -318,25 +386,15 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   let failed = 0;
   const processedElements = [];
 
-  // Batch elements into grids, balancing across batches so we never end up
-  // with a lone-element batch (which costs a full generation for 1 output
-  // and leaves no "neighbours" for the splitter to calibrate against).
-  // With N total and max per batch M: batchCount = ceil(N/M), perBatch =
-  // ceil(N/batchCount). Then distribute N elements across batchCount slots
-  // as evenly as possible.
-  //   N=5, M=4 → 2 batches of 3,2   (was 4,1)
-  //   N=6, M=4 → 2 batches of 3,3   (was 4,2)
-  //   N=9, M=4 → 3 batches of 3,3,3 (was 4,4,1)
-  const batches = [];
-  const N = needsReference.length;
-  const batchCount = Math.max(1, Math.ceil(N / maxPerBatch));
-  const basePer = Math.floor(N / batchCount);
-  const remainder = N - basePer * batchCount; // first `remainder` batches get +1
-  let cursor = 0;
-  for (let b = 0; b < batchCount; b++) {
-    const size = basePer + (b < remainder ? 1 : 0);
-    batches.push(needsReference.slice(cursor, cursor + size));
-    cursor += size;
+  // Batch elements into grids — balanced, with declared-lettering elements
+  // quarantined into solo calls (see buildReferenceSheetBatches).
+  const batches = buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch);
+  const letteringNames = require('./promptBuilders').vbDeclaredLetteringNames(visualBible);
+  const soloNames = needsReference
+    .map(e => e.name)
+    .filter(n => letteringNames.has(String(n || '').trim().toLowerCase()));
+  if (soloNames.length > 0) {
+    log.info(`[REF-SHEET] ✍️ Solo cell(s) — the bible declares lettering on these, so they never share a prompt: ${soloNames.join(', ')}`);
   }
 
   log.info(`[REF-SHEET] Processing ${batches.length} batch(es) — sizes: ${batches.map(b => b.length).join(', ')}`);
@@ -770,6 +828,7 @@ module.exports = {
   checkCharacterCellRender,
   splitGridIntoReferences,
   buildReferenceSheetPrompt,
+  buildReferenceSheetBatches,
   generateReferenceSheet,
   buildEmptySceneVbGrid,
   buildPageCompositeRefs,
