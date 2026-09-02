@@ -21545,6 +21545,13 @@ from scratch.
    both `location` **and** `vehicle` cells drop. Pages whose plate failed keep
    everything — there is no plate depicting it.
 
+> **Refined 2026-09-02** (see "A cast-0 page gets no plate…" at the end of this
+> file): "has a plate" now means the plate the render actually RECEIVES, not one
+> that merely exists in `sceneBackgrounds`. A cast-0 page's plate was dropped by
+> `refMode: 'off'` after this filter had already evicted its location and
+> vehicle cells, leaving the page with no references at all. Cast-0 pages no
+> longer get a plate generated in the first place.
+
 **Rationale:** the entire grid occupies ONE of Grok's three reference slots, so
 per-cell size scales as 1/n. Six cells is four elements' worth of unreadable,
 and spending two of them on scenery the plate already paints is the worst
@@ -23971,5 +23978,86 @@ production bucket only.
 - `server/lib/referenceSheets.js` (`buildReferenceSheetBatches`, batch guard in `buildReferenceSheetPrompt`, solo-cell log line)
 - `prompts/reference-sheet.txt` (`{BATCH_GUARD}` placeholder)
 - `tests/unit/vb-lettering-exception.test.ts` (partition + guard-line coverage)
+
+**Status:** ✅ active
+
+## 2026-09-02 — A cast-0 page gets no plate, and the VB grid is filtered on the plate SENT, not the plate built (supersedes the 2026-08-29 Phase 5a-pre-grid rule for cast-0 pages)
+
+**Context:** Owner diagnosis of pages with no named cast rendering as pure
+text-to-image. Page 1 of staging story `job_1788295892348_l028ggiq7a` — a wide
+harbour shot of the ship, cast 0 — attached **zero** reference images, while a
+finished empty-scene plate of that exact harbour had been generated for it and
+thrown away. Three independent rules combined:
+
+1. `imageRouter.decidePageRoute` routes cast 0 → `refMode: 'off'`.
+2. `applyReferenceMode`'s `'off'` branch nulled `sceneBackground`, so the plate
+   built for that page never reached the render.
+3. The Phase 5a-pre-grid filter (2026-08-29) keyed `hasPlate` on
+   `sceneBackgrounds[n]` merely EXISTING, so the page's `VEH001` (the ship) and
+   `LOC001` (the harbour) cells were dropped from its VB grid — "the plate
+   already paints them" — for a plate that was never sent.
+
+Net: the one page whose whole subject is the ship went to the model with prose
+only, while a correct render of the ship sat in memory unused.
+
+**Decision (owner ruling — "Fix both, but also skip the empty scene, that is
+only needed if there are characters"):**
+
+1. **No plate for a cast-0 page.** The plate exists to anchor iterative
+   character placement; with nobody to place, the final render IS the scene.
+   The router says so (`emptyScene: 'skip'` on the cast-0 route) and both plate
+   phases obey: Phase 5a-pre skips the page, and Phase 5a-pre-vantage skips a
+   whole vantage canvas only when EVERY page on it is cast-0. A mixed vantage
+   still renders its canvas — the cast>0 pages need it — and the cast-0 page in
+   that group simply rides along on the shared plate.
+2. **The grid filter asks what is SENT.** Phase 5a-pre-grid now runs the page's
+   route refMode through `applyReferenceMode` and keys `hasPlate` on the
+   returned `sceneBackground`, i.e. the same function the render calls. Route
+   descriptors are computed once per run (`pageRoutes`) and reused by the plate
+   phases, the grid filter and the render, so no two phases can disagree.
+3. **`'off'` keeps the plate and the VB grid.** `'off'` means "no identity
+   references" — character photos and landmark photos — not "no references".
+   The comment there already promised the grid stays because it is identity and
+   not style noise; the plate is the scene's own style/layout anchor and is kept
+   on the same reasoning.
+
+**Interaction with `aboard` (same-day entry above):** an aboard page with no
+cast now reaches the render through the no-plate branch, where locations and
+vehicles are NOT filtered — so the vessel's exterior three-quarter render would
+have ridden in as a page reference on a deck-level page, re-opening the phantom
+second vessel through the page channel instead of the plate channel. The
+`aboard` element is therefore withheld from the PAGE grid too, plate or no
+plate, in all three builders (the pipeline's inline builder,
+`buildPageCompositeRefs` for iterate, and the Lab's image stage, which also
+honours `params.aboardOverride`). The prompt still names it; only the image is
+withheld.
+
+**Rationale:** A plate is a means, not an output — it anchors placement and gets
+discarded. Generating one for a page with nobody on it buys nothing and costs a
+generation, and (worse) its mere existence disarmed the page's own references.
+Keying the filter on the sent value makes "the plate covers the setting" true by
+construction rather than by assumption.
+
+**Evidence (static replay of the stored story, $0):** page 1 —
+before: plate built, plate NOT sent (`off`), grid `—` (VEH001 + LOC001 dropped)
+→ zero references. After: no plate generated, grid `VEH001 + LOC001` sent as the
+VB own slot. The 15 cast>0 pages are byte-identical before and after (same
+plates, same grids); p1's vantage `LOC001.1` has no other page, so one plate
+generation is also saved. No page in that story carries `aboard` (its metadata
+predates the field).
+
+**Grok slot budget:** a cast-0 page goes from 0 packed slots to 1 (the VB grid
+own slot; `packReferences` gives VB its own slot when there are no characters).
+With a shared plate it is 2. Neither approaches the 3-slot cap, and
+`slot0IsScenePlate` stays false without a plate, so the grid is never
+magenta-extension padded.
+
+**Touched:**
+- `server/lib/imageRouter.js` (`pageCastSize` export; cast-0 route → `emptyScene: 'skip'`)
+- `server/lib/clothingResolve.js` (`applyReferenceMode` `'off'` keeps `sceneBackground`)
+- `storyJobPipeline.js` (`pageRoutes` map + `platelessByRoute`; vantage-group skip; Phase 5a-pre skip; plateless-warning exclusion; Phase 5a-pre-grid keyed on the sent plate + aboard withholding)
+- `server/lib/referenceSheets.js` (`buildPageCompositeRefs` accepts `aboardId`)
+- `server/lib/images.js` (iterate passes `aboardId`), `server/lib/testlab.js` (image stage passes `aboardId`)
+- `tests/unit/cast0-plate-routing.test.ts`
 
 **Status:** ✅ active
