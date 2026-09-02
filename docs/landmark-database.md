@@ -281,9 +281,16 @@ photos together; per photo they write `{description (1-2 sentences, visible
 features only), scope, season, timeOfDay, subjectMatch, discard}` to
 `descs_<batch>.json` — `--brief` prints the brief. Merge validates the enums
 and 40-400 chars, stores kept entries as `[scope, season, timeOfDay] description`
-in the slot column, and never writes discards (wrong subject, unrecognisable,
-map/print/archival, duplicate of a lower slot) — those go to a DISCARD table and
-`discards.json` for a later slot-clearing pass)
+in the slot column. Discards (wrong subject, unrecognisable, map/print/archival,
+duplicate of a lower slot) go to a DISCARD table and `discards.json` and are
+inert unless `--apply-discards` is passed: then the photo is REMOVED — all four
+per-slot columns (`photo_url`, `photo_attribution`, `photo_description`,
+`photo_type`) are dropped and the later slots shift down so slots stay
+contiguous, `landmark_photo_scores` rows are deleted/re-numbered with their
+photo, and that landmark's kept descriptions land at their post-compaction slot
+— one transaction per landmark, live slots read under `FOR UPDATE`. `--dry-run`
+prints the resulting per-slot layout per landmark. Run on prod 2026-09-02: 82
+descriptions, 19 slots cleared across 13 landmarks)
 
 **Judging**
 `prep-landmark-judging.js` → agents → `merge-landmark-judgments.js` ·
