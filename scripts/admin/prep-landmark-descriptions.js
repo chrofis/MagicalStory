@@ -14,12 +14,18 @@
  * already is. Files are <out>/<landmarkId>_<slot>.jpg — never a loop index, so
  * a restart with a shrunken set cannot mislabel an image.
  *
- * The agent writes descs_<batch>.json — `{ "<landmarkId>_<slot>": "text" }` —
- * in the SAME shape analyzeLandmarkPhoto produces (3-5 sentences: appearance
- * + layout in frame, which zones are empty sky / ground / open square). The
- * exact brief is printed by --brief. merge-landmark-descriptions.js applies it.
+ * BATCHES ARE CUT BY LANDMARK: every selected slot of one landmark lands in the
+ * same batch (~25 photos, never split), so the agent sees a landmark's photos
+ * side by side and can spot duplicates and "this is not the castle at all".
  *
- *   node scripts/admin/prep-landmark-descriptions.js [--limit=N] [--staging] [--dry-run]
+ * The agent writes descs_<batch>.json —
+ *   { "<landmarkId>_<slot>": { description, scope, season, timeOfDay, subjectMatch, discard } }
+ * (pilot feedback 2026-09-01: 3-5-sentence layout prose was too long and the
+ * empty-zone talk unwanted; what matters is WHAT the photo shows, when, whether
+ * it is really the named subject, and duplicates across slots). The exact brief
+ * is printed by --brief. merge-landmark-descriptions.js applies it.
+ *
+ *   node scripts/admin/prep-landmark-descriptions.js [--limit=N landmarks] [--staging] [--dry-run]
  *        [--ids=a,b,c] [--out=DIR] [--delay=MS] [--brief]
  */
 'use strict';
@@ -40,17 +46,41 @@ const OUT = flag('out') || path.join(process.env.TEMP || '/tmp', 'lm_describe');
 const DELAY = flag('delay') ? parseInt(flag('delay'), 10) : 700;
 const BATCH = 25;
 
-const BRIEF = `For each image in the batch, write a description of the landmark photo for use in
-children's book illustration, 3-5 sentences, covering BOTH of:
-1. APPEARANCE - main architectural/natural features, colours, materials, textures, distinctive recognizable elements.
-2. LAYOUT IN FRAME - where the landmark sits and where the open space is, in rough zones
-   ("tower fills the right 60% of the frame", "open sky fills the upper third"). Name which
-   thirds/halves/corners are EMPTY GROUND, EMPTY SKY or OPEN SQUARE - downstream prompts use
-   this to place props without mounting them on the landmark.
-Be specific and visual. Do NOT mention the photo itself ("the image shows").
-Write descs_<batch>.json: { "<landmarkId>_<slot>": "description" } with every key of the batch.`;
+const BRIEF = `For each landmark, view all its photos together. For each photo output an object:
+  description: 1-2 sentences, the visible features only (materials, colours, shape, distinctive
+    elements). No layout-in-frame, no empty-sky/ground zones, never "the image shows".
+  scope: one of whole | tower | entrance | interior | detail | distant | other - what part of
+    the landmark is in the photo.
+  season: snow | green | autumn | bare | unclear.   timeOfDay: day | dusk | night.
+  subjectMatch: yes | uncertain | no - does the photo show the landmark the name promises.
+  discard: null, or a short reason. Discard when: subjectMatch is no; the landmark is
+    tiny/unrecognisable (distant blur); the image is a map, drawing, print, sign, archival B&W;
+    or it duplicates/near-duplicates an earlier slot of the same landmark (keep the lowest slot,
+    discard the later one, reason "duplicate of <id>_<slot>").
+Write descs_<batch>.json: { "<id>_<slot>": {description, scope, season, timeOfDay, subjectMatch, discard} }
+with every key of the batch.`;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Group consecutive entries by landmark id, then fill batches of ~BATCH photos
+// without ever splitting a landmark: the agent must see all of a landmark's
+// slots together to detect duplicates. Input is already ordered by id, slot
+// within the score ordering, so one landmark's rows are adjacent.
+function cutBatches(entries) {
+  const groups = [];
+  for (const e of entries) {
+    const g = groups[groups.length - 1];
+    if (g && g[0].id === e.id) g.push(e); else groups.push([e]);
+  }
+  const batches = [];
+  let cur = [];
+  for (const g of groups) {
+    if (cur.length && cur.length + g.length > BATCH) { batches.push(cur); cur = []; }
+    cur.push(...g);
+  }
+  if (cur.length) batches.push(cur);
+  return batches;
+}
 
 // Width-limited Commons rendering — photo_url can be a 100 MB master (see
 // prep-landmark-judging.js thumbUrl).
@@ -67,25 +97,41 @@ function thumbUrl(url, width = 900) {
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
 
   // One row per (landmark, slot) that has a picture and no words for it.
-  // Slot 1's columns carry no suffix.
+  // Slot 1's columns carry no suffix. --limit counts LANDMARKS, not slots, so a
+  // landmark's slots are never cut in half by the limit (batches must hold all
+  // of a landmark's photos for duplicate detection).
   const rows = (await pool.query(`
-    SELECT id, name, type, coalesce(locality, municipality, nearest_city) town, s.slot, s.url
-      FROM landmark_index
-      CROSS JOIN LATERAL unnest(
-        ARRAY[1,2,3,4,5,6],
-        ARRAY[photo_url, photo_url_2, photo_url_3, photo_url_4, photo_url_5, photo_url_6],
-        ARRAY[photo_description, photo_description_2, photo_description_3,
-              photo_description_4, photo_description_5, photo_description_6]
-      ) AS s(slot, url, description)
-     WHERE s.url IS NOT NULL AND s.description IS NULL
-       ${IDS ? 'AND id = ANY($1)' : ''}
-     -- Best-judged places first: agents work batch by batch, and a run that
-     -- stops early should have covered the landmarks stories actually use.
-     ORDER BY story_score DESC NULLS LAST, id, s.slot${LIMIT ? ` LIMIT ${LIMIT}` : ''}`, IDS ? [IDS] : [])).rows;
+    WITH slots AS (
+      SELECT id, name, type, coalesce(locality, municipality, nearest_city) town, story_score, s.slot, s.url
+        FROM landmark_index
+        CROSS JOIN LATERAL unnest(
+          ARRAY[1,2,3,4,5,6],
+          ARRAY[photo_url, photo_url_2, photo_url_3, photo_url_4, photo_url_5, photo_url_6],
+          ARRAY[photo_description, photo_description_2, photo_description_3,
+                photo_description_4, photo_description_5, photo_description_6]
+        ) AS s(slot, url, description)
+       WHERE s.url IS NOT NULL AND s.description IS NULL
+         ${IDS ? 'AND id = ANY($1)' : ''}
+    ),
+    -- Best-judged places first: agents work batch by batch, and a run that
+    -- stops early should have covered the landmarks stories actually use.
+    picked AS (
+      SELECT id, max(story_score) story_score FROM slots GROUP BY id
+       ORDER BY max(story_score) DESC NULLS LAST, id${LIMIT ? ` LIMIT ${LIMIT}` : ''}
+    )
+    SELECT s.id, s.name, s.type, s.town, s.slot, s.url
+      FROM slots s JOIN picked p USING (id)
+     ORDER BY p.story_score DESC NULLS LAST, s.id, s.slot`, IDS ? [IDS] : [])).rows;
 
-  console.log(`${ch(new Date())}  ${STAGING ? 'STAGING' : 'PROD'}: ${rows.length} photo slot(s) with a picture and no description${LIMIT ? ` (limit ${LIMIT})` : ''}`);
+  console.log(`${ch(new Date())}  ${STAGING ? 'STAGING' : 'PROD'}: ${rows.length} photo slot(s) with a picture and no description${LIMIT ? ` (limit ${LIMIT} landmarks)` : ''}`);
   if (DRY) {
-    rows.slice(0, 20).forEach(r => console.log(`   #${r.id}_${r.slot}  ${r.name} [${r.type}] ${r.town || ''}  ${r.url}`));
+    const batches = cutBatches(rows);
+    console.log(`   -> ${batches.length} batch(es), cut by landmark:`);
+    batches.forEach(b => {
+      const ids = [...new Set(b.map(x => x.id))];
+      console.log(`   batch ${b[0].id * 10 + b[0].slot}: ${b.length} photo(s), ${ids.length} landmark(s)`);
+      b.forEach(r => console.log(`      #${r.id}_${r.slot}  ${r.name} [${r.type}] ${r.town || ''}`));
+    });
     await pool.end();
     return;
   }
@@ -126,8 +172,7 @@ function thumbUrl(url, width = 900) {
 
   function writeManifest() {
     fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1));
-    const batches = [];
-    for (let i = 0; i < manifest.length; i += BATCH) batches.push(manifest.slice(i, i + BATCH));
+    const batches = cutBatches(manifest);
     // Batch id keyed on content (first image's id+slot), never the loop index.
     fs.writeFileSync(path.join(OUT, 'batches.json'), JSON.stringify(batches.map(b => ({
       batch: b[0].id * 10 + b[0].slot, dir: OUT, brief: BRIEF,

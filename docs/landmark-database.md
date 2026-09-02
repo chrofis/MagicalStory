@@ -275,8 +275,15 @@ a private one, so landmarks it discovered were invisible to the pipeline.
 `classify-landmark-photos.js` (camera angle, Gemini) ·
 `prep-landmark-descriptions.js` → agents → `merge-landmark-descriptions.js`
 ($0 — fills the `photo_description[_N]` slots that `fetch-landmark-photos-free.js`
-left NULL, ~10,000 on prod; agents Read the thumbnails and write
-`descs_<batch>.json` in the `analyzeLandmarkPhoto` brief; `--brief` prints it)
+left NULL, ~10,000 on prod. Batches are cut BY LANDMARK (all of a landmark's slots
+in one ~25-photo batch, `--limit` counts landmarks) so agents see a landmark's
+photos together; per photo they write `{description (1-2 sentences, visible
+features only), scope, season, timeOfDay, subjectMatch, discard}` to
+`descs_<batch>.json` — `--brief` prints the brief. Merge validates the enums
+and 40-400 chars, stores kept entries as `[scope, season, timeOfDay] description`
+in the slot column, and never writes discards (wrong subject, unrecognisable,
+map/print/archival, duplicate of a lower slot) — those go to a DISCARD table and
+`discards.json` for a later slot-clearing pass)
 
 **Judging**
 `prep-landmark-judging.js` → agents → `merge-landmark-judgments.js` ·
