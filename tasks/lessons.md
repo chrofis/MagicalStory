@@ -636,3 +636,10 @@ fix stops working. Every mechanism fix ships with at least one of: a regression 
 startup/wiring assertion (template has ≥1 consumer; gate matches ≥1 stored real finding), or a
 bugs.json entry whose repro script can be re-run. "Verified today" is worth nothing in a repo
 where five agents refactor concurrently.
+
+## 2026-09-02 — Never repo-wide `git checkout`/`restore` in a shared tree
+An agent left `git checkout HEAD -- .` in a helper loop while filtering its own hunks; it reverted EVERY
+uncommitted tracked file from all concurrent sessions (recovered except possibly start.sh +
+tests/unit/inpaint-routing.test.ts edits). Rule: to stage only your own hunks, build a filtered patch and
+`git apply --cached` it — never a checkout/restore with a repo-wide pathspec. Same day, two agents also had
+their staged index swept into a foreign commit: commit promptly after staging, and name what you commit.
