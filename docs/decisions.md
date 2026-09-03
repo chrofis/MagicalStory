@@ -24631,3 +24631,54 @@ name appears nowhere as a call-site option (where it would be silently ignored
 
 **Status:** ✅ active — supersedes the `skipOutputPadding` default in
 `683cb9bf1`, whose padding-era rationale was voided by `e050e62c9`.
+
+---
+
+## 2026-09-03 — Test-data retention: 1-in-4 progression sample, Lab-referenced stories protected
+
+**Context:** Railway bills container memory, and Postgres container RAM tracks
+database SIZE (`shared_buffers` is only 160 MB; the rest is OS page cache
+holding the files). Against a target of **under $5/week**, the databases stood at
+production 391 MB and staging 655 MB — the bulk of it the owner's own test
+stories, demo showcase runs, and debug tables. Measured spend on the day:
+$1.79 (21.9 h) ⇒ $13.74/week.
+
+**Decision:** `scripts/admin/purge-test-data.js` deletes old TEST data under a
+retention rule that is deliberately NOT "delete everything old":
+
+- **production** — admin + `demo-*` stories older than **90 days**, keeping
+  **every 4th one chronologically**. The sample is the point: the owner wants to
+  see how the pipeline's output progressed over time, so a uniform time cut
+  would destroy the earliest evidence while a blanket delete destroys all of it.
+  Plus `consolidator_calls` older than 14 days.
+- **staging** — everything older than **30 days** (staging is test data by
+  definition), plus `consolidator_calls` older than 30 days and demo characters
+  whose owner has no surviving story.
+
+**Never deleted, in either environment:** stories with an order against them;
+shared stories (someone may hold the link); **stories referenced by a
+`testlab_experiments` target**; production stories of real users; the `files`
+table (order PDFs). `testlab_experiments` rows themselves are not touched at all.
+
+**Rationale:** The Lab protection is the non-obvious one. `stories.id` *is* the
+job id, and Lab targets store it as `{storyId, pageNumber}` — so a plain age cut
+would silently delete the story a `docs/decisions.md` entry cites as its
+evidence, leaving the finding unreproducible. 70 of 108 staging stories older
+than 30 days were Lab-referenced; without the guard the purge would have gutted
+the registry. Four tables cascade from `stories` (`story_images`,
+`story_retry_images`, `benchmark_scenes`, `style_lab_images`) but four more carry
+`story_id` with **no FK** (`consolidator_calls`, `story_scores`, `story_metrics`,
+`failure_log`) — those are purged explicitly or they become orphans.
+
+Deleting rows does not return space to the OS; `--vacuum-full` does, and it
+refuses to run unless `GET /api/health/busy` reports idle. Even then the OS page
+cache holds the old pages until the **service is restarted** — that restart, not
+the delete, is what moves the memory bill.
+
+**Result (measured):** production 391 MB → **278 MB**, staging 655 MB → **374 MB**.
+Most of staging's win was bloat, not rows: `characters` was 206 MB on disk for
+47 MB of live data (77% dead TOAST).
+
+**Touched files:** `scripts/admin/purge-test-data.js` (new)
+
+**Status:** ✅ active
