@@ -30,7 +30,7 @@ Characters: {CHARACTER_NAMES}
 
 The pictures are already done. Each page's PLAN line names the shot, who is in frame, the single instant the picture shows, and what is true after that page that was not before. ILLUSTRATION is the finished brief the artist drew from.
 
-The plan lines divide the story into pages: a page tells the stretch of the story that leads to its picture's instant and that instant's consequence — everything the pages before have not told. The picture shows the named instant; the text tells everything else the page needs — above all what the picture cannot show. It never merely describes the picture, and never contradicts it: what a plan line says is true after a page is true from that page on and not before; what the picture shows still happening has not yet finished on that page.
+The plan lines divide the story into pages: a page tells the stretch of the story that leads to its picture's instant, the move that gets them there included, and that instant's consequence — everything the pages before have not told. The picture shows the named instant; the text tells everything else the page needs — above all what the picture cannot show. It never merely describes the picture, and never contradicts it: what a plan line says is true after a page is true from that page on and not before; what the picture shows still happening has not yet finished on that page.
 
 Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's.
 
@@ -41,16 +41,16 @@ Do not narrate staging. Zones, depths, camera angles, who stands where and what 
 Write the text for all {PAGE_COUNT} pages, in page order, plus a title.
 
 Each page covers its own stretch of the story and nothing that belongs to a later page.
-The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the causes, the rest of that stretch of the story.
+The illustration already shows the instant, so write what it cannot show: the interior, the dialogue, the turn, the causes, the move that got them there.
 Never contradict a page's illustration, and never mention pages, plans or illustrations.
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
 Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene.
 No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Plain narration carries the story.
 Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
 The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
-Everything else works the other way: information neither the story nor the pictures carry is cut, never added.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
-The text gives each page its feeling and its suspense, drawn from the story — feelings and dialogue may go beyond what the story states; everything else may not.
+The text gives each page its feeling and its suspense, drawn from the story: feelings and dialogue may go beyond what it states.
+The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens. Nothing else is added: no fact, object, character or event the story and pictures do not carry.
 The final page gets the same care as the first sentence: land one feeling, plainly and warmly. A string of short solemn sentences is not an ending.
 Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone.
 No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.

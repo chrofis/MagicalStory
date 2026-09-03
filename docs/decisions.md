@@ -24727,3 +24727,56 @@ Most of staging's win was bloat, not rows: `characters` was 206 MB on disk for
 **Touched files:** `scripts/admin/purge-test-data.js` (new)
 
 **Status:** ✅ active
+
+## 2026-09-03 — The arc is a SUMMARY: the page text tells the MOVES the arc skips (owner ruling)
+
+**Context:** `prompts/story-text-from-beats.txt` carried an absolute add-nothing
+clamp: "Everything else works the other way: information neither the story nor
+the pictures carry is cut, never added", with only feelings and dialogue
+exempted. The arc, however, is a summary — it states states, not the travel
+between them. So the writer had no legal way to narrate a move the arc did not
+spell out, and compressed it away instead. Measured on the capstone job
+`job_1788380714660_4p9mr11xszu`: page 10 opened with the climb from the beach
+folded into a subordinate clause ("on the ledge, after the ascent…"); a blind
+page-only judge read p9→p10 as teleportation and filed it CRITICAL. The arc even
+carried a mid-climb moment (a companion landing partway up the rock) that the
+writer discarded, because writing the move itself was forbidden. The clamp was
+mirrored verbatim in `prompts/text-refine.txt`, so the refiner would delete such
+a transition as an "addition". The only transition license in the whole chain was
+reactive: `text-refine.txt`'s rule that a *fault* about a missing path is closed
+by showing the move on a page — it needed an audit finding to fire.
+
+**Decision:** Owner ruling — the arc is a summary; the text adds the transitions
+the arc skips. The clamp now licenses connective narration and nothing else:
+the moves between the story's states (a climb, a crossing, a getting there) are
+told plainly as they happen, never already finished when a page opens; feelings
+and dialogue may still go beyond what the arc states; everything else — any
+fact, object, character or event the story and pictures do not carry — is still
+cut, never added. In the writer prompt the license replaces the old clamp line
+(merged into the feelings/dialogue exemption rather than added as a new rule
+block), the page contract now says the stretch a page tells *includes* the move
+that gets them there, and the "write what the picture cannot show" list names the
+move. `text-refine.txt` mirrors the same clamp and adds that a plainly told move
+is never cut as an addition; its existing fault-closing rule (line ~77) stands
+unchanged. `prompts/story-text-audit.txt` was reviewed and left untouched: all
+twelve of its questions find faults of omission or contradiction, none penalises
+information a page carries, so a plainly told transition cannot be flagged as an
+addition there — and TRANSITION (Q4) is exactly the question the change satisfies.
+
+**Rationale:** The clamp's origin is `12310353e` (2026-08-22, "the main stake is
+SAID in the text"), where "everything else works the other way" was written as
+the counterweight to the stake-must-be-said rule — an anti-invention guard, never
+intended to outlaw connective narration. It is not on `docs/SETTLED.md` (no line
+covers the add-nothing clamp), so no reversal protocol applies. Alternatives
+rejected: leaving it to the audit→refine loop (reactive, costs a fault round-trip
+and only fires when a judge notices), and adding a separate transition rule block
+(a prompt-length tax on a rule that belongs inside the exemption it contradicts).
+Length: the writer prompt grew 139 chars (+2.4%) and the refiner 131 (+1.7%),
+with one duplicated clamp line merged away; the redundant "the rest of that
+stretch of the story" tail paid part of it.
+
+**Touched files:** `prompts/story-text-from-beats.txt` (page contract line,
+write-what-the-picture-cannot-show list, clamp/exemption lines),
+`prompts/text-refine.txt` (clamp mirror)
+
+**Status:** ✅ active
