@@ -24980,3 +24980,79 @@ grammar pass runs LAST, and the rhetorical-device menu is deleted (owner,
 lector's scope, its model, the rhetorical-set-piece ban) stand. Also supersedes
 what was left of "Text refine: one audit-fed round, no self-checklist loop
 (2026-08-27)" — there is no round count left to configure.
+
+---
+
+## 2026-09-03 — Addendum to the two-audit chain: per-audit deadline, model-max audit caps, and the first live measurement (Lab #984)
+
+**Context:** the first live run of the restructured chain — Lab experiment #984,
+`text_refine` on the stored 4-page story `job_1788378719225_8hpr0mzzh` (de) —
+produced three findings that changed the code, and one that is a question for
+the owner.
+
+**Measured, end to end:**
+
+| step | model | wall | cost | result |
+|---|---|---|---|---|
+| audit (arc-informed) | gemini-3.1-pro | 101s | $0.149 | 10 faults (CAUSE 3, LANGUAGE 2, DEVICE, ASSUMED, ENTRANCE, INFERRED, LOADBEARING) |
+| audit (blind) | grok-4.6 | 386s | $0.121 | 1 fault (CONFUSION) |
+| merge | code | — | — | 11 findings, 0 duplicates folded |
+| repair | deepseek-v4-pro | 35s | $0.030 | rewrote p1, p3, p4 |
+| lector | gemini-3.1-pro | 201s | $0.300 | returned p3, diff ratio 0.003 → accepted; 0 rejected, 0 stray |
+
+Chain wall clock ≈ 622s of model time (the two audits cost the slower one, 386s,
+not their sum). **Total $0.60** — double the $0.30 the run was authorised at, and
+the overrun is almost entirely the lector.
+
+**Code changes this produced:**
+
+1. **PER-AUDIT DEADLINE** (`AUDIT_DEADLINE_MS`, 900s, `opts.auditTimeoutMs` for
+   tests). A plain `Promise.all` over the two audits makes the chain hostage to
+   the slower one: during this run the blind auditor streamed for a long stretch
+   while the arc-informed audit had been done at 101s, and because the first
+   `publish()` happens after the MERGE, a stalled auditor would have cost not
+   just its own findings but the repair, the lector and the pipeline's whole
+   salvage. `textModels`' streaming ceiling is 25 minutes and its 120s
+   inactivity abort never fires while reasoning tokens keep arriving, so the
+   stage needed its own bound. A timed-out audit is absent from the merge,
+   exactly like a failed one; the abandoned call's tokens are spent either way.
+   900s and not 360s **because of this run**: grok's 386s is the slow-but-working
+   case, and a 360s cap would have discarded an audit that answered. This is a
+   hostage guard, not a latency policy.
+2. **The audits use the model's OWN output limit**, not a hand-picked 12000
+   (owner rule: no output caps). On a reasoning model an undersized cap does not
+   truncate the fault list, it returns ZERO visible text — the measured failure
+   of deepseek-v4-pro and qwen3.8-max as auditors at 16384 (models.js,
+   2026-08-27), and the trap a fixed 12000 would have set for grok-4.6 here.
+
+**The dedupe was conservative, as designed, and it shows.** p4 carried both
+`FAULT[CAUSE]` (arc-informed: "the red cloth slips from Noah's hand … nothing
+establishes a physical connection") and `FAULT[CONFUSION]` (blind: "the red cloth
+slips from Noah's hand into the water after he has already thrown it and Hans has
+knocked it away") — the same incoherence, filed under different questions, with
+content-word overlap below 0.4. Both went to the repair pass, which rewrote p4
+once and answered both. That is the intended failure direction: two lines about
+one defect cost a few tokens, one line covering two defects costs a fix.
+
+**Open question for the owner (not decided here): the lector's price.** $0.300 and
+201s for FOUR pages, against $0.030 for the repair pass over the same text. The
+cause is structural: now that the lector returns corrected pages instead of
+quoted spans, it gets the repair pass's output room (`min(64000, model max)`
+instead of 16000), and gemini-3.1-pro spends the larger budget on reasoning.
+Options, none applied: cap the lector's output at what its job needs (pages in ≈
+pages out, so ~2× the input tokens); route it to a cheaper model now that the
+task is mechanical; or accept it. Logged rather than tuned, because the model
+choice was an owner ruling this morning and the A/B behind it measured accuracy,
+not price.
+
+**Verified:** experiment #984 completed with `refineAudits` (both sources, one
+per auditor), `refineMerged` (11 findings, each carrying its `sources` tag),
+`roundTrace` `['repair','lector']`, and the lector's per-page accept ratio
+(0.003) — the whole ledger renders in the Lab. Unit suite: `text-lector.test.ts`
+20 tests, including a stalled-auditor test that stubs a blind audit which never
+answers and asserts the merge, the repair and the lector all still run.
+
+**Touched:** `server/lib/textRefine.js` (`AUDIT_DEADLINE_MS`, `withDeadline`,
+audit `MAX_OUT`), `tests/unit/text-lector.test.ts`.
+
+**Status:** ✅ active — the chain has run live once, on staging.

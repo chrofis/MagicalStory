@@ -259,3 +259,48 @@ describe('refineStoryText — chain order', () => {
     expect(byLabel.text_lector).toBe(MODEL_DEFAULTS.textProofreadModel);
   });
 });
+
+/**
+ * A stalled auditor must not hold the chain hostage. Measured on Lab #984:
+ * the arc-informed audit answered in 101s while the blind grok auditor streamed
+ * reasoning past 20 minutes, and with a plain Promise.all that blocks the merge,
+ * the repair and the lector — and the pipeline's join then salvages nothing,
+ * because the first publish() happens after the merge.
+ */
+describe('refineStoryText - a stalled audit is abandoned, the chain continues', () => {
+  const textModels = require('../../server/lib/textModels');
+  const original = textModels.callTextModelStreaming;
+  const labels: string[] = [];
+
+  const PAGES = [
+    { pageNumber: 1, text: 'Die Karte ist alt und der Rand ist eingerissen.', sceneIntent: 'a map', sceneBrief: 'a map', planLine: '' },
+  ];
+  const STORY = { language: 'de', languageLevel: '1st-grade', pages: 1, characters: [{ id: 'c1', name: 'Alba', age: 8, isMainCharacter: true }], mainCharacters: ['c1'] };
+
+  beforeAll(() => {
+    textModels.callTextModelStreaming = async (_p: string, _m: number, _i: unknown, model: string, opts: any = {}) => {
+      const label = String(opts.usageLabel || '');
+      labels.push(label);
+      // The blind auditor never answers.
+      if (label === 'text_audit_blind') return new Promise(() => {});
+      let text = '';
+      if (label === 'text_audit') text = ['FAULT[CAUSE]: p1 — nothing says how the map tore.', 'FAULTS: 1'].join('\n');
+      else if (label === 'text_refine') text = ['---ANALYSIS---', 'fixed', '---STORY TEXT---', '## Page 1', 'Die Karte ist alt, und der Rand riss beim Auspacken ein.'].join('\n');
+      else if (label === 'text_lector') text = ['---STORY TEXT---', 'NONE'].join('\n');
+      return { text, modelId: `stub-${model}`, usage: { input_tokens: 10, output_tokens: 20, direct_cost: 0 } };
+    };
+  });
+  afterAll(() => { textModels.callTextModelStreaming = original; });
+
+  it('merges the audit that answered and runs repair + lector anyway', async () => {
+    const res = await refineStoryText(STORY, PAGES, { auditTimeoutMs: 300 });
+    const blind = res.audits.find((a: any) => a.source === 'blind');
+    expect(blind.ok).toBe(false);
+    expect(blind.error).toMatch(/no answer within/);
+    expect(res.audits.find((a: any) => a.source === 'arc-informed').ok).toBe(true);
+    expect(res.mergedFindings).toHaveLength(1);
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'lector']);
+    expect(res.changed).toEqual([1]);
+    expect(labels).toContain('text_lector');
+  });
+});

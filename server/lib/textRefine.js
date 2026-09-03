@@ -339,13 +339,20 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (!prompt) return { source, modelKey, ok: false, error: 'template unavailable' };
     if (!TEXT_MODELS[modelKey]) return { source, modelKey, ok: false, error: `unknown model "${modelKey}"` };
     const t0 = Date.now();
+    // The model's OWN limit, never a hand-picked number (owner rule: no output
+    // caps). A reasoning model spends the budget on reasoning tokens first, so
+    // an undersized cap does not truncate the fault list, it returns ZERO
+    // visible text — the measured failure of deepseek-v4-pro and qwen3.8-max as
+    // auditors at 16384 (models.js, 2026-08-27), and the trap a fixed 12000
+    // would have set for the blind grok auditor.
+    const MAX_OUT = TEXT_MODELS[modelKey].maxOutputTokens || 32000;
     try {
       // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
       // retry, same call; a second empty is reported as a failed audit.
-      let r = await callTextModelStreaming(prompt, 12000, null, modelKey, { usageLabel: label });
+      let r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: label });
       if (!String(r.text || '').trim()) {
         log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey} returned empty output — retrying once`);
-        r = await callTextModelStreaming(prompt, 12000, null, modelKey, { usageLabel: label });
+        r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: label });
       }
       const raw = String(r.text || '').trim();
       const elapsedMs = Date.now() - t0;
@@ -367,10 +374,50 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // one sees the arc and the page plan and judges what the book dropped, the
   // other sees only the pages and judges what a listener cannot follow. Running
   // them together costs the slower of the two, not their sum.
+  //
+  // PER-AUDIT DEADLINE. "The slower of the two" is only true if one auditor
+  // cannot hold the chain hostage: a `Promise.all` with no deadline means a
+  // stalled auditor blocks the merge, the repair and the lector, and the
+  // pipeline's join then salvages NOTHING because the first publish() happens
+  // after the merge. Measured on Lab #984, a 4-page story: the arc-informed
+  // audit answered in 101s while grok-4.6 streamed reasoning past 20 minutes —
+  // textModels' own ceiling for a streaming call is 25 min and its inactivity
+  // abort never fires while reasoning tokens keep arriving.
+  //
+  // 900s, and it is a HOSTAGE guard, not a latency policy. The measured healthy
+  // numbers on that 4-page run are gemini 101s and grok-4.6 386s — a 360s cap
+  // would have thrown away a blind audit that answered, so the ceiling has to
+  // sit well above the slow-but-working case and only catch the pathological
+  // one (textModels' own streaming ceiling is 25 min, and its 120s inactivity
+  // abort never fires while reasoning tokens keep arriving). The audits run in
+  // parallel with image generation, so this wall clock is normally hidden
+  // behind the image phase; the pipeline's join deadline decides how long a
+  // user waits, and its salvage keeps every step that finished. A timed-out
+  // audit is simply absent from the merge, exactly like a failed one. The
+  // abandoned call keeps streaming until the provider ends it — its tokens are
+  // spent either way, and waiting for them costs the whole stage instead.
+  const AUDIT_DEADLINE_MS = Number(opts.auditTimeoutMs) || 900000;
+  const withDeadline = (p, source) => {
+    let timer = null;
+    const deadline = new Promise((resolve) => {
+      timer = setTimeout(() => resolve({
+        source,
+        ok: false,
+        error: `no answer within ${Math.round(AUDIT_DEADLINE_MS / 1000)}s — abandoned`,
+      }), AUDIT_DEADLINE_MS);
+    });
+    // NOT unref'd, for the same reason as the pipeline's join timer: an unref'd
+    // timer does not keep the loop alive, so the race could never settle.
+    // clearTimeout below is what stops it leaking, and it runs on both branches.
+    return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
+  };
   audits = await Promise.all([
-    runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc), 'text_audit'),
-    runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'),
+    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc), 'text_audit'), 'arc-informed'),
+    withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
   ]);
+  for (const a of audits) {
+    if (!a.ok && a.error) log.warn(`⚠️ [TEXT-AUDIT/${a.source}] ${a.error}`);
+  }
   const merged = mergeAuditFindings(audits.filter(a => a.ok).map(a => ({ source: a.source, raw: a.raw })));
   mergedFindings = merged.findings;
   mergeStats = { bySource: merged.bySource, duplicates: merged.duplicates.length };
