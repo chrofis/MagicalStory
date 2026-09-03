@@ -686,6 +686,120 @@ function extractCharacterNamesFromScene(sceneDescription) {
 }
 
 // ============================================================================
+// VISUAL BIBLE AUTHORING-CONTRACT AUDIT (tripwire, WARN only)
+// ============================================================================
+
+// Two authoring gaps that reached the illustrator on staging
+// job_1788380714660_4p9mr11xszu and cost 6 of 8 serious page failures:
+//
+//   1. CHR001's prose never stated her sex ("tall, broad-shouldered, sturdy,
+//      square jaw, no facial hair") — the image model rendered a man on three
+//      pages. The prompt now requires sex + apparent age in the first sentence.
+//   2. VEH001 declared appearsInPages 1-16 although the story moves inland at
+//      mid-book, so the vantage-plate builder baked the vessel into two inland
+//      hillside scenes. The prompt now requires an earned range.
+//
+// This audit only REPORTS. It never fails a story, never triggers a
+// regeneration, and never edits an entry: the fix belongs in the authoring
+// prompt, and a warning is how we find out the prompt slipped again.
+
+const VB_SEX_INDICATOR = /\b(?:sex|female|male|wom[ae]n|girl|lady|ladies|mother|mum|mom|grandmother|grandma|aunt|sister|daughter|wife|widow|she|her|hers|herself|m[ae]n|boy|lad|guy|gentleman|father|dad|grandfather|grandpa|uncle|brother|son|husband|widower|he|him|his|himself)\b/i;
+
+const VB_AGE_INDICATOR = /\b(?:\d{1,3}\s*(?:-|\s)?(?:year|yr)s?(?:\s*-?\s*old)?|aged\s+\d{1,3}|baby|infant|toddler|child|kid|boy|girl|youngster|teen|teenager|teenaged|adolescent|youth|young|adult|grown|middle-aged|mature|elderly|old|older|aging|ageing|senior|elder|twenties|thirties|forties|fifties|sixties|seventies|eighties|nineties)\b/i;
+
+// Fields that carry authored prose. `name` is deliberately excluded: a name is
+// not a statement of sex, and "Rossa"/"Mrs Baker" must not satisfy the rule.
+const VB_PROSE_FIELDS = ['description', 'age', 'build', 'face', 'hair', 'signatureLook', 'clothing', 'features', 'type', 'setting'];
+
+const VB_CATEGORIES = ['secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing'];
+
+/** Prose an entry actually authored, joined for indicator matching. */
+function vbEntryProse(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  return VB_PROSE_FIELDS
+    .map(f => (typeof entry[f] === 'string' ? entry[f] : ''))
+    .filter(Boolean)
+    .join('. ');
+}
+
+/**
+ * Audit a parsed Visual Bible against the authoring contract.
+ *
+ * @param {Object|null} visualBible - parsed VB, entries already normalized to `appearsInPages`
+ * @param {Object} [options]
+ * @param {number} [options.pageCount] - story page count; derived from the
+ *   highest page any entry references when the caller does not know it.
+ * @param {number} [options.blanketRatio=0.9] - a range covering more than this
+ *   share of the story's pages is reported as unearned.
+ * @returns {Array<{code: string, id: string, category: string, message: string}>}
+ */
+function auditVisualBibleContract(visualBible, options = {}) {
+  const findings = [];
+  if (!visualBible || typeof visualBible !== 'object') return findings;
+
+  const blanketRatio = typeof options.blanketRatio === 'number' ? options.blanketRatio : 0.9;
+  const entriesOf = (cat) =>
+    (Array.isArray(visualBible[cat]) ? visualBible[cat] : []).filter(e => e && typeof e === 'object');
+  const pagesOf = (entry) => (Array.isArray(entry?.appearsInPages) ? entry.appearsInPages : []);
+
+  // Page count: the caller's if known, else the highest page the VB references
+  // (vantage `pages` included — a location's span lives there).
+  let pageCount = Number(options.pageCount) || 0;
+  if (!pageCount) {
+    for (const cat of VB_CATEGORIES) {
+      for (const entry of entriesOf(cat)) {
+        for (const p of pagesOf(entry)) {
+          if (Number.isFinite(p) && p > pageCount) pageCount = p;
+        }
+        for (const v of Array.isArray(entry?.vantages) ? entry.vantages : []) {
+          for (const p of Array.isArray(v?.pages) ? v.pages : []) {
+            if (Number.isFinite(p) && p > pageCount) pageCount = p;
+          }
+        }
+      }
+    }
+  }
+
+  // (1) Every secondary-character entry states sex and apparent age.
+  for (const entry of entriesOf('secondaryCharacters')) {
+    const prose = vbEntryProse(entry);
+    const missing = [];
+    if (!VB_SEX_INDICATOR.test(prose)) missing.push('sex');
+    if (!VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
+    if (missing.length) {
+      findings.push({
+        code: 'character-missing-sex-or-age',
+        id: entry?.id || entry?.name || '(unnamed)',
+        category: 'secondaryCharacters',
+        message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" states no ${missing.join(' and no ')} — the image model will guess`,
+      });
+    }
+  }
+
+  // (2) A range covering nearly the whole book was almost certainly not earned.
+  // A genuinely single-setting story can trip this on its one location; the
+  // warning is a prompt for a human look, not a defect claim.
+  if (pageCount >= 4) {
+    for (const cat of VB_CATEGORIES) {
+      for (const entry of entriesOf(cat)) {
+        const pages = pagesOf(entry);
+        const covered = new Set(pages.filter(p => Number.isFinite(p))).size;
+        if (covered > pageCount * blanketRatio) {
+          findings.push({
+            code: 'blanket-appears-in-pages',
+            id: entry?.id || entry?.name || '(unnamed)',
+            category: cat,
+            message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
+          });
+        }
+      }
+    }
+  }
+
+  return findings;
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -693,6 +807,8 @@ module.exports = {
   log,
   KEYWORDS,
   CLOTHING_CATEGORIES,
+  auditVisualBibleContract,
+  vbEntryProse,
   parseCharacterClothingBlock,
   cleanPageText,
   parsePatchSections,

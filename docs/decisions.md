@@ -24097,3 +24097,93 @@ magenta-extension padded.
 - `tests/unit/cast0-plate-routing.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-03 — The Visual Bible authoring contract states sex, earns its page ranges, and gives every named vessel its own entry
+
+**Context:** The capstone rerun `job_1788380714660_4p9mr11xszu` (staging, 16
+pages) produced 8 serious image failures. Six of them trace to the Visual
+Bible's *authoring* contract rather than to any render or eval stage — the
+illustrator faithfully drew a contract that was underspecified:
+
+1. `CHR001` "Rossa", the story's antagonist, was authored as
+   `age: "adult, mid-thirties"`, `build: "tall, broad-shouldered, sturdy"`,
+   `face: "green eyes, square jaw, prominent cheekbones, no facial hair"`.
+   The concatenated `description` the image prompt receives never states her
+   sex, and every physical cue in it reads male. She rendered as a man on
+   three pages. The prompt asked for "age category", so the model gave one.
+2. `VEH001` declared `pages: [1..16]` — the whole book — although the story
+   moves inland at mid-book. `appearsInPages` is what the vantage-plate
+   builder consults, so the vessel was baked into two inland hillside scenes.
+3. The rival vessel *was* authored, but as `LOC008` in `locations` — a
+   "location" whose `setting` is "rival pirate ship on sea". `vehicles` held
+   exactly one entry, so nothing in the pipeline could tell the two ships
+   apart, and p11 freely substituted one for the other.
+
+The gaps are not one-offs. Replaying the audit below over the 25 most recent
+staging stories with a stored VB produced 19 findings across 15 stories: the
+missing-sex defect recurs on every run that invented that antagonist, and the
+blanket vehicle range recurs on 4 separate stories.
+
+**Decision (owner ruling, "so do a"):** Fix the contract at the authoring
+prompt, and add a WARN-only tripwire so a future slip is visible.
+
+Three rules, added to **every** emitter of a VB entry, phrased archetypally:
+
+- Every secondary-character entry states the character's **sex and apparent
+  age in its first sentence** ("a woman in her thirties", "a boy of about
+  eight"). Build, jaw and facial-hair notes carry neither. The `age` field is
+  the first clause of the concatenated `description`, so the scaffold hint
+  itself became `"[sex and apparent age, e.g. …]"` — that is what actually
+  moves the model, not a rule further up the prompt.
+- **`pages` is earned** — only the pages whose plan line (or draft scene)
+  actually contains the element, never a blanket `1-N` range. An element the
+  story leaves behind ends its range there.
+- **Every named or story-significant vehicle, vessel or structure gets its own
+  `vehicles` entry** — the antagonist's and the rival's included, never folded
+  into `locations`. When two of them can share one frame, both need entries.
+
+The tripwire is `auditVisualBibleContract()` in the parser's `shared.js`,
+called from `extractVisualBible()` — the single live parse chokepoint for
+every pipeline (beats, unified, image-first, trial, streaming). It logs
+`[UNIFIED-PARSER] VB CONTRACT (<code>): …` per finding and returns. It does
+**not** fail the story, edit an entry, trigger a regeneration, or make a model
+call.
+
+**Rationale:** Per `CLAUDE.md`, classification belongs to the prompt and code
+may only observe — so the fix is a rule in the template, and the code side is
+a warning with no authority. A validating loop was rejected for the usual
+reason: it would spend a paid call to re-derive what the prompt should have
+produced. Sex is placed in `age` rather than in a new field because the
+concatenation order (`age → build → hair → face → Signature → Clothing`) makes
+`age` the description's opening clause, and adding a field would change the VB
+JSON shape that ~20 consumers read. The shape is unchanged: entries only get
+better prose and honest ranges.
+
+The >90% blanket threshold can legitimately trip on a genuinely single-setting
+story's one location, and on a costume worn on every page. That is accepted —
+the finding is a prompt to look, not a defect claim, which is why it warns
+instead of failing.
+
+**Evidence ($0, no paid calls):**
+- Replaying the story's stored raw bible response through the real
+  `UnifiedStoryParser.extractVisualBible()` emits exactly the two expected
+  warnings and parses an identical VB (1 secondary, 1 animal, 12 artifacts,
+  8 locations, 1 vehicle):
+  - `[WARN] [UNIFIED-PARSER] VB CONTRACT (character-missing-sex-or-age): CHR001 "Rossa" states no sex — the image model will guess`
+  - `[WARN] [UNIFIED-PARSER] VB CONTRACT (blanket-appears-in-pages): VEH001 "the Goldene Möwe" claims 16 of 16 pages — a blanket range bakes the element into scenes that never contain it`
+- All 83 prompt templates load; the beats and unified prompts render with zero
+  unfilled placeholders and the `1-N` range interpolated ("never a blanket
+  1-16 range").
+
+**Touched:**
+- `prompts/story-bible-from-beats.txt` — beats path (live); all three rules + scaffold hint
+- `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt` — all three rules + scaffold hint
+- `prompts/story-trial.txt` — scaffold hint (its VB has no `vehicles` array, and 5 pages make the range rule moot)
+- `server/lib/phantomCharacters.js` — the JS-built phantom-patch prompt mints CHR entries outside `prompts/`; its `age` hint and instruction carry the same rule
+- `server/lib/outlineParser/shared.js` — `auditVisualBibleContract()` + `vbEntryProse()`
+- `server/lib/outlineParser/unified.js` — calls the audit at the end of `extractVisualBible()`
+- `tests/unit/vb-authoring-contract.test.ts` — 26 tests: audit behaviour on neutral fixtures, plus a guard that every emitter carries the rules
+
+**Status:** ✅ active

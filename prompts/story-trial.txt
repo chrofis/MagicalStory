@@ -91,7 +91,7 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
 ```json
 {
   "secondaryCharacters": [
-    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[age category]", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, distinctive features; for adults state facial hair]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
+    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, distinctive features; for adults state facial hair]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
   ],
   "animals": [
     { "id": "ANI001", "name": "[Name]", "pages": [1, 2], "species": "[type and breed]", "coloring": "[exact colours and full pattern]", "size": "[relative size]", "features": "[collar, markings, accessories]" }

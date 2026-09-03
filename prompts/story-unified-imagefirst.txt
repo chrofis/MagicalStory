@@ -671,6 +671,9 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 - **ENGLISH `name` and `description` for artifacts, locations, vehicles, and clothing — even when the story is written in another language.** These fields are copied verbatim into ENGLISH image prompts; a story-language name leaks into the prompt and can even be painted as lettering. Characters and animals keep their given names.
 - **Every physical item appears in exactly ONE category.** An item WORN by a character (cape, hat, mask, uniform, boots) belongs in `clothing` (and the wearer's `clothingRequirements`) ONLY — never also as an `artifacts` entry. `artifacts` is for props and objects that are not worn garments. Duplicating a worn item as an artifact produces two competing canonical descriptions and a stray standalone reference render of a garment that already appears on the character's avatar.
 - **Exception — a prop the story turns into costume.** When the plot physically moves a garment before anyone wears it (a hat found in a chest, a cloak handed over, a badge pinned on), it is one object with two roles. Write it ONCE as an `artifacts` entry and add `wornAs`: `"<CharacterName>.<slot>"` naming the costume slot it becomes (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`). The wearer's `clothingRequirements` describes the same item in that slot, in the same words. Without `wornAs` the two descriptions drift apart and the item is rendered twice — worn AND lying where the prop was left.
+- **Every secondary-character entry states the character's sex and apparent age in its first sentence** ("a woman in her thirties", "a boy of about eight"). Build, jaw and facial-hair notes carry neither.
+- **Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry** — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
+- **`pages` is earned** — only the pages whose draft scene actually contains the element, never a blanket 1-{PAGES} range. An element the story leaves behind ends its range there.
 - Add at least {PAGES} entries. Even if an element appears only once, add it for visual consistency
 - Use empty arrays `[]` for categories with no elements
 
@@ -715,7 +718,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "CHR001",
       "name": "[Name]",
       "pages": [X, Y, Z],
-      "age": "[age category]",
+      "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']",
       "build": "[height, body type]",
       "hair": "[color, style, length]",
       "face": "[eye color, distinctive features; for adults state facial hair]",

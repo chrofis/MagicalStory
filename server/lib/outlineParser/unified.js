@@ -15,6 +15,7 @@ const {
   extractDraftPagesFromText,
   extractCharacterNamesFromScene,
   getExtractJsonFromText,
+  auditVisualBibleContract,
 } = require('./shared');
 
 class UnifiedStoryParser {
@@ -272,6 +273,13 @@ class UnifiedStoryParser {
           locations: this._cache.visualBible.locations?.length || 0
         };
         log.debug(`[UNIFIED-PARSER] Visual Bible: ${counts.secondary} secondary chars, ${counts.animals} animals, ${counts.artifacts} artifacts, ${counts.locations} locations`);
+
+        // Authoring-contract tripwire. WARN only — the fix belongs in the
+        // authoring prompt, and this is how we learn the prompt slipped.
+        for (const f of auditVisualBibleContract(this._cache.visualBible)) {
+          log.warn(`[UNIFIED-PARSER] VB CONTRACT (${f.code}): ${f.message}`);
+        }
+
         return this._cache.visualBible;
       } catch (e) {
         log.error(`[UNIFIED-PARSER] Failed to parse Visual Bible: ${e.message}`);

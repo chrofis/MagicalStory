@@ -140,7 +140,7 @@ ${contextBlocks}
 Already-known characters (do NOT regenerate, do NOT make new ones look like these):
 ${knownNames.length > 0 ? knownNames.map(n => `- ${n}`).join('\n') : '(none)'}
 
-For EACH missing character above, write a Visual Bible entry. Infer age, gender, build, hair, and clothing from the passages. If the passages give no clue for some field, pick reasonable defaults consistent with the story tone. Make every character VISUALLY DISTINCT from each other and from the already-known characters above (different hair color, different build, different signature element).
+For EACH missing character above, write a Visual Bible entry. Infer age, sex, build, hair, and clothing from the passages. The "age" field states sex and apparent age together; build, jaw and facial-hair notes carry neither. If the passages give no clue for some field, pick reasonable defaults consistent with the story tone. Make every character VISUALLY DISTINCT from each other and from the already-known characters above (different hair color, different build, different signature element).
 
 For a "placeholder ID" phantom (e.g. CHR001), the "name" field must be a descriptive human name or role invented from the passages (e.g. "Wanderer", "Oma", "Baker"). Do NOT echo the placeholder ID back as the name.
 
@@ -150,7 +150,7 @@ Output ONLY a JSON array — no markdown fence, no commentary:
   {
     "phantom": "<exact phantom string from the list above>",
     "name": "<descriptive name — invented for placeholder IDs, echoed verbatim for regular names>",
-    "age": "<age category, e.g. 'child ~8', 'teen ~15', 'adult ~30', 'elderly ~70'>",
+    "age": "<sex and apparent age, e.g. 'a boy of about eight', 'a woman in her thirties', 'an elderly man of about seventy'>",
     "build": "<height + body type>",
     "hair": "<color, length, style>",
     "face": "<eye color, skin tone, distinctive features>",

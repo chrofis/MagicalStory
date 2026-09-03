@@ -54,10 +54,13 @@ Scan the page plan and list every element that must stay consistent across illus
 
 - All locations, all objects, all vehicles, all animals, all worn costumes and garments.
 - Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
+- Every secondary-character entry states the character's sex and apparent age in its first sentence ("a woman in her thirties", "a boy of about eight"). Build, jaw and facial-hair notes carry neither.
+- Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`); the wearer's clothing requirement describes the same item in that slot, in the same words.
 - An object's `description` is drawn literally. Material, colour, size and shape in plain terms; a size comparison is fine ("about as wide as a coin"), but never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
 - At least {PAGE_COUNT} entries. Include an element even if it appears once.
+- `pages` is earned: only the pages whose plan line actually contains the element, never a blanket 1-{PAGE_COUNT} range. An element the story leaves behind ends its range there.
 - Empty categories are `[]`.
 - One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id.
 
@@ -128,7 +131,7 @@ Only the three blocks below. No preamble, no commentary.
       "id": "CHR001",
       "name": "[Name]",
       "pages": [1],
-      "age": "[age category]",
+      "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']",
       "build": "[height, body type]",
       "hair": "[colour, style, length]",
       "face": "[eye colour, distinctive features; for adults state facial hair]",
