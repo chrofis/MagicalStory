@@ -24187,3 +24187,92 @@ instead of failing.
 - `tests/unit/vb-authoring-contract.test.ts` — 26 tests: audit behaviour on neutral fixtures, plus a guard that every emitter carries the rules
 
 **Status:** ✅ active
+
+## 2026-09-03 — Pointing gestures are banned in the beats plan line and the Art Director
+
+**Context.** On the capstone rerun (`job_1788380714660_4p9mr11xszu`, staging) p9's plan line
+staged a point as the picture's instant — "Sarah points up at the rock shelf and the overhang
+high on the cliff above them" — and the Art Director expanded it faithfully:
+`{ action: "pointing", where: "points high up at the rock shelf while shouting", hands: true,
+priority: "essential" }`, prose "her right arm is raised high, index finger pointing up toward
+the cliff face", with `perspective: "back view, head turned in sharp profile"`.
+
+The render failed on three counts at once. (1) **Hand:** the index finger is hooked at the middle
+joint so its base and its tip disagree on the direction, no thumb is resolvable, and the forearm is
+an elbow-less tapering tube roughly 1.5× its correct length. (2) **Target:** the fingertip lands on
+blank cliff beside the ladder — the shelf and overhang it names are not at the end of the vector,
+so the gesture indicates nothing. (3) **Coherence:** the gaze runs up-right while the arm runs
+up-left, ~90° apart, and the demanded back-view-plus-sharp-profile plus a raised arm produced a
+cumulative ~180° spine twist (hips away, shoulders near-frontal, head in full profile). The second
+character looks at the pointer's face rather than along the pointed line, so the page's instant
+reads as two people looking in three directions. The previous run's pointing page
+(`piraterun3` p10) failed identically and worse in the hand: a coneless-knuckle index finger with a
+duplicate fingertip behind it and the thumb sitting in the middle finger's place, the arm
+terminating in empty sky just short of the companion's hair rather than at the ship in the bay, and
+neither figure looking along the vector — a posed double portrait with an arm bolted on.
+
+**Decision.** Pointing is not staged anywhere in the live beats pipeline. `story-beats.txt` gains
+one line forbidding a pointing gesture as a plan line's instant, with the workable substitutes
+named (a look toward the thing, a turned head, a step toward it, the thing held up).
+`scene-expansion.txt` and `scene-expansion-all.txt` each gain one "Pointing rule" line: no
+character points; attention is shown by gaze, body orientation, or an object held up, never an
+extended arm or index finger — and never as an `action` label, which is how `"pointing"` entered
+the brief above.
+
+**Rationale.** This is not a new verdict, it is a **gap**: `NO POINTING` was already banned in the
+legacy templates (`story-unified-imagefirst.txt` "NO POINTING - BANNED: 'points at', 'points to'";
+`scene-iteration-free.txt` "NO POINTING - Overused stereotype") and was simply never carried into
+the beats plan line or the Art Director, which is why beats runs still emit it. Nothing on
+`docs/SETTLED.md` covers gestures, so no reversal protocol applies.
+
+The research says the technique the owner asked about does not exist for our stack (text prompts +
+reference images, no ControlNet/pose conditioning on Grok Imagine or Gemini):
+
+- Pointing is named specifically as one of the least reliable hand poses. Simple poses (open palm,
+  hands at sides, clasped) "converge faster than 'pointing' or 'holding a small object'"; an
+  occupied hand is easier than a free-floating one "because the object provides geometric
+  constraints that anchor finger positions" — which is exactly why the substitute is a held object.
+  Reported accuracy by complexity: simple 85-95%, gesturing 70-80%, complex/unusual angles 50-65%,
+  against a 2026 baseline of ~one bad region per generation across GPT-Image-2, Nano Banana Pro
+  (Gemini 3 Pro Image), Midjourney v8.1 and Flux 2 Pro.
+  (zsky.ai/blog/how-to-fix-ai-hands, zsky.ai/blog/ai-hands-fix-guide,
+  lifehackedai.com/articles/ai-image-failure-modes)
+- Guides converge on *avoiding or occupying* the hand rather than describing its geometry — "if
+  hands are not essential to your image, reduce their visibility"; "fists are easier than open
+  hands. Hands holding objects are easier than floating gestures". No source offers a phrasing
+  ("arm extended toward X at shoulder height", index-finger descriptions, avoiding the word
+  "pointing") measured to improve pointing; the searches for one return generic pose-prompt
+  listicles.
+- The only paper that produces usable deictic (pointing) gestures from prompts does it with
+  **image conditioning, not text**: Ali et al., "Prompt-to-Gesture" (arXiv 2604.14953, Apr 2026)
+  supplies Vidu Q3 with start *and* end reference keyframes sampled from real recordings, and even
+  then observes "filler motions where the participant raised the arm unexpectedly in the air
+  despite being prompted otherwise". They note current models "lack video-based in-context learning
+  for few-shot prompting". We cannot supply an end-state pose frame, so the one demonstrated method
+  is unavailable to us.
+- The failure is **both** the hand and the direction, and the direction half is not fixable by
+  rendering the hand better: pointing is intrinsically imprecise as target indication even when
+  performed perfectly by a human. Human-robot studies put pointing target selection at 100% for a
+  20cm target but 56.67%/72.92% (left/right hand) at 10cm and 7.97%/20.94% at 5cm
+  (arXiv 2506.22116), and target identification rises from 65% to 83% only once **head
+  orientation** is used rather than the finger alone (Akkil & Isokoski, dl.acm.org/10.1145/2971648.2971687;
+  cf. NeurIPS 2025 "Toward Human Deictic Gesture Target Estimation", which gains 6% mask IoU / 10%
+  existence accuracy from gaze-aware fusion). Gaze carries the direction; the finger does not. That
+  is the evidence for the substitute being gaze and body orientation rather than a better-rendered
+  arm.
+
+**Left alone deliberately.** `scene-repair.txt` still teaches how to compose a point (sideways
+profile, point down-and-forward) and `scene-iteration-free.txt` contradicts its own line-19 ban with
+pointing examples in its output samples — both are repair/legacy paths acting on already-rendered
+images, not generation, so changing them is a separate call. The evaluator side is untouched: the
+`points at` observable verb in `image-visual-inventory.txt` / `image-inventory-unified.txt` and the
+MAJOR aim/point-at-empty-space check in `image-semantic.txt` still correctly grade a pointing render
+if one slips through, and eval classification changes need their own sign-off.
+
+**NOT verified** — needs a beats run to confirm plan lines stop staging points and no brief emits an
+`action: "pointing"` label.
+
+**Touched files:** `prompts/story-beats.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`
+
+**Status:** ✅ active

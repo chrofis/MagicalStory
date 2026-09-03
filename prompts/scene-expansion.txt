@@ -191,6 +191,8 @@ Every entry must also appear in the prose as the same physical contact.
 
 Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side.
 
+Pointing rule: no character points. Show which thing has their attention with gaze, body orientation, or an object held up — never an extended arm or index finger, in the prose or in an `action` label.
+
 Distance rule: when the verb implies action across a gap ('shoots', 'aims at', 'throws at', 'calls to', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly, and the prose must place each figure at the correct end of the frame.
 
 **`textPosition` / `textZoneDescription`** (story pages only — when a TEXT ZONE POSITION FIXES block appears above, `textPosition` matches the position it names)
