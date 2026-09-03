@@ -124,6 +124,23 @@ RUN npm install --omit=dev
 # and without a preinstalled CPU build pip resolves the default Linux wheels,
 # which drag in ~2.5GB of CUDA libraries this CPU-only container can't use.
 #
+# THE VERSION MUST BE PINNED, AND PINNED WITH ITS `+cpu` LOCAL VERSION (bug
+# torch-double-install-breaks-groundingdino, 2026-09-03). This line used to say
+# a bare `torch torchvision`, which takes whatever is NEWEST on the CPU index —
+# 2.14.0+cpu by September. The `-r requirements.txt` layer below then resolved
+# torch a SECOND time against PyPI, where the numpy==1.24.3 co-pin forces 2.1.2,
+# and installed that CUDA wheel straight over the first one. Production ended up
+# with both torch-2.1.2.dist-info and torch-2.14.0+cpu.dist-info, a 2.1.2 version
+# stamp on a 2.14 file layout, and `from transformers import AutoProcessor`
+# raising `cannot import name 'ExportOptions'` — which is the exact import
+# get_groundingdino() makes, so /detect-figures-text 503'd and figure detection
+# silently fell back to Gemini from late August onward. It also left 2.9 GB of
+# unusable nvidia CUDA libraries in a CPU-only container.
+#
+# 2.1.2 is not a new choice — it is the version the numpy==1.24.3 co-pin already
+# forced. Pinning makes that explicit so the second resolution is a no-op instead
+# of an overwrite. torchvision 0.16.2 is torch 2.1.2's matching release.
+#
 # numpy MUST be co-pinned here to the same version requirements.txt pins.
 # Without it, torch pulls numpy 2.x, and the later `-r requirements.txt`
 # DOWNGRADE to numpy==1.24.3 leaves a mixed 2.x/1.x tree in dist-packages
@@ -136,7 +153,7 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     --timeout 120 --retries 5 \
     --index-url https://download.pytorch.org/whl/cpu \
     --extra-index-url https://pypi.org/simple \
-    torch torchvision "numpy==1.24.3"
+    "torch==2.1.2+cpu" "torchvision==0.16.2+cpu" "numpy==1.24.3"
 
 # Install Python dependencies. mediapipe / opencv are large (>30 MB each) and
 # files.pythonhosted.org occasionally stalls mid-download — give pip more
@@ -174,6 +191,26 @@ ENV GROUNDINGDINO_MODEL=IDEA-Research/grounding-dino-base
 # requirements file. TF runs fine against the newer one — install it separately,
 # after requirements.txt, exactly as the torch CPU build is sequenced above.
 RUN pip3 install --no-cache-dir --break-system-packages "typing_extensions>=4.12"
+
+# FATAL BY DESIGN — everything above this line is now installed, so this is the
+# last moment the build can tell the truth about the Python environment.
+#
+# The GroundingDINO and ArcFace pre-fetches below are deliberately non-fatal, and
+# that is exactly how bug torch-double-install-breaks-groundingdino shipped: a
+# second torch overwrote the CPU build, `from transformers import ...` started
+# raising, the pre-fetch's `|| echo WARN` swallowed it, and production ran for a
+# week silently falling back to Gemini while /api/health/config still reported
+# grounding-dino. A broken transformers import is NOT an optional degradation
+# when the figure-detection backend defaults to grounding-dino everywhere.
+#
+# Two assertions, both cheap: torch must be the +cpu build (a bare 2.x.y means
+# the PyPI CUDA wheel won again and 2.9 GB of nvidia libraries came with it), and
+# the transformers import must actually work. Either failure fails the build.
+RUN python3 -c "import torch, transformers; \
+    assert torch.__version__.endswith('+cpu'), \
+        f'torch is not the CPU build: {torch.__version__} — a second torch was installed over it'; \
+    from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
+    print(f'✓ torch {torch.__version__} / transformers {transformers.__version__} / DINO classes import')"
 
 RUN python3 -c "from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
     AutoProcessor.from_pretrained('IDEA-Research/grounding-dino-base'); \

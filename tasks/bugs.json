@@ -1,503 +1,511 @@
 {
- "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
- "bugs": [
-  {
-   "id": "hollow-eval-scores-100",
-   "title": "Failed eval becomes evaluated:true / finalScore 100 and beats every real repair in pick-best",
-   "reportedAt": "2026-09-02",
-   "source": "fault-hunt agent A (silent-default class), verified against images.js batch wrapper + scoring.js applyScore + repairPipeline null tripwire; same disease as the 2026-08-24 dead evaluator, one seam higher",
-   "status": "fixed",
-   "fixedIn": "a02726f19",
-   "note": "evaluateImageQuality returns null on ~8 failure paths; batch wrapper stamped evaluated:true with empty lists; applyScore read empty deductions as 100; the 100 outranked genuine repairs. Fixed both seams: wrapper stamps evaluated:false + evalError; applyScore refuses evidence-free evals (finalScore null, scoreSource 'unevaluated'), discriminating real clean evals by numeric score + reasoning."
-  },
-  {
-   "id": "edit-mode-char-repair-gate-battery-regression",
-   "title": "Edit-mode body character repair produces nothing: the spine gate battery rejects every draw because Grok always re-renders the scene in box mode",
-   "reportedAt": "2026-09-01",
-   "source": "owner: 'we already fixed this before and it was working' — G7, job_1788215224103_avu132n7je p16 (Lorena). Stored retryHistory: 12/12 draws rejected across 4 endpoint calls (11x 'Model redrew the SCENE... background still differs by 27-71 grey levels' at samBlend.js bg-residual reject, 1x mask IoU 54%), before AND after the template fix e7447ec81. Stored attemptFrames prove Grok re-renders the whole 1024x1024 scene on every box-mode draw (figures preserved but reflowed, target ~1.3-1.6x oversized) — inherent model behaviour the WORKING design (d68bd8815 fullScene + 2026-07-11 old-union-new feather composite) absorbed by compositing only the figure union onto the ORIGINAL scene, with no rejection path at all. The Stage-3 spine merge (24842d2bd) routed fullScene through the uncalibrated crop-space gate battery and the 2026-08-06 box-mode bg-residual hard reject (premised on the model editing in place) finished it: body repair structurally cannot pass wherever Grok reflows.",
-   "status": "fixed",
-   "fixedIn": "e94fa715b",
-   "note": "samUnionBlend: background residual above 26 grey levels is registration telemetry (mode bg-rerendered, no shift applied), never a throw — the composite ships only the figure union, so the shipped background is the original by construction. New figure registration for body blends aligns the new silhouette bbox onto the old (height-ratio scale clamped [0.6,1.45], feet-anchored dy, centre-aligned dx; same affine on candidate + mask; kept only when bbox IoU improves >0.05; pure math unit-tested in tests/unit/figure-registration.test.ts). Every quality gate is UNCHANGED and judges the registered candidate: mask IoU 0.55, style-match, white-card, coverage, sharpness, figure-integrity naturalness — a genuinely re-posed figure still rejects. Dead Stage-3/5 orphans removed in the same commit: character-repair-grok-fullscene.txt + character-repair-gemini.txt loaders, featherComposite plumbing (UI toggle consumed by nothing; the service layer never forwarded it), RepairWorkflowPanel blackout option. Supersedes the 2026-08-06 box-mode background-reject decision (docs/decisions.md 2026-09-01). Verified on p16 via the same API route the UI uses after staging deploy."
-  },
-  {
-   "id": "fullscene-crosshatch-repair-uses-cutout-template",
-   "title": "Edit-mode character repair in fullScene (box) mode always dies at the blend gate - the crosshatch prompt is the CUTOUT template, so the model repaints the figure oversized",
-   "reportedAt": "2026-09-01",
-   "source": "owner: 'character repair from edit mode did not work' on staging job_1788215224103_avu132n7je p16 (Lorena). Reproduced via POST /repair-workflow/character-repair: 3/3 Grok draws rejected by the blend gate ('background still differs by 60-71 grey levels' x5, 'mask IoU 54%' x1 across the owner's run + the repro). attemptFrames show the model repainting Lorena ~1.6x larger than the hatched silhouette, covering sand/boat background - the gate refuses correctly; the DRAW is bad every time. Root cause: faceRepair.js buildPrompt uses characterRepairCutout for every crosshatch treatment. In box mode the model receives the FULL scene, but that template calls IMAGE 2 'THE CUTOUT TO EDIT - a scene region' and has no silhouette-size rule. The pre-spine fullScene branch used characterRepairInpaint ('The crosshatch traces the exact silhouette - match its shape, size, and pose. Do not paint outside the crosshatch.'); the Stage-3 refactor (24842d2bd, 2026-07-26) collapsed both region sources onto the cutout template and left characterRepairInpaint orphaned (loaded by prompts.js, zero consumers).",
-   "status": "fixed",
-   "fixedIn": "e7447ec81",
-   "note": "faceRepair.js buildPrompt now threads regionSource and picks characterRepairInpaint for crosshatch+box (full scene), keeping characterRepairCutout for the cutout region path. character-repair-inpaint.txt gains the {appearanceContext} placeholder the cutout template already carried (exp #360 identity facts), passed from the same fill. Verified deployed: staging /api/health at 7426a1d2, re-run confirmed the new template in use (prompt 4166 -> 3669 chars, scene wording + size rule). The template regression is fixed; p16 itself STILL fails - Grok redraws the entire scene in every mode on that busy 6-figure page (12/12 draws rejected across fullScene and cutout) and the blend gate correctly refuses. That residual is model behaviour, tracked as an open BACKLOG item (body repair on busy pages), not this bug."
-  },
-  {
-   "id": "de-ch-nameEnglish-swiss-german-dialect-trap",
-   "title": "getLanguageNameEnglish('de-ch') returns bare 'Swiss German', which a model reads as Schwyzerdütsch dialect instead of Swiss Standard German",
-   "reportedAt": "2026-08-31",
-   "source": "arc-create call (arcflow A/B) titled an arc «Nebel uf em Zürisee» - Swiss German DIALECT, not the Swiss Standard German (Hochdeutsch, ss never ß) that de-ch books must be written in. Root cause confirmed in server/lib/languages.js:344's getLanguageNameEnglish, whose de-ch entry (line 48, pre-fix) was nameEnglish: 'Swiss German'. A prior fix note already existed at server/lib/promptBuilders.js:4077-4082 (buildOutlineReviewPrompt) citing this exact trap causing a full-book dialect rewrite ('S'Fescht', 'blybt stoh') and working around it there by always pairing LANGUAGE with the full LANGUAGE_INSTRUCTION + LANGUAGE_NOTE - but getLanguageNameEnglish itself, and every OTHER call site that emits bare LANGUAGE without instruction/note (buildOutlineReviewPrompt's own review-only injection at line 3948, plus two dead fallback string builders), stayed unfixed at the root.",
-   "status": "fixed",
-   "fixedIn": "9b48deb51",
-   "note": "server/lib/languages.js: de-ch nameEnglish -> 'Swiss Standard German (ss, never ß - never dialect)' (also fixed the identical bare label in the unused getAvailableLanguages() UI list at the same file, same trap). This is the single source of truth consumed by all ~13 call sites across promptBuilders.js and storyJobPipeline.js, so every consumer is fixed by the one change - none did a string equality check against 'Swiss German' (grepped, none found), so no consumer needed adjusting. Consolidated the duplicate hand-typed map at promptBuilders.js:4903 (buildTextProofreadPrompt) into a call to getLanguageNameEnglish instead of a second, narrower hard-coded 'de-ch' -> string mapping, per the sibling-paths rule (one source of truth for a value that exists in more than one place). Grepped prompts/*.txt for bare 'Swiss German' emissions: only the story-scorecard-judge*.txt family says 'Swiss German uses ss' - left untouched, that describes the orthography RULE for judging existing text, not an instruction to WRITE in dialect, matching the existing LANGUAGE_NOTE convention. Did not touch prompts/feedback-consolidator.txt or tests/unit/inpaint-routing.test.ts (out of scope, pre-existing unrelated working-tree changes)."
-  },
-  {
-   "id": "vantage-plates-discard-the-art-directors-framing",
-   "title": "Shared vantage plates are built from Visual Bible prose only - the Art Director's per-page emptyScenePrompt is discarded, and three selection bugs pick the wrong ground, vantage and shot",
-   "reportedAt": "2026-08-29",
-   "source": "audit of 32 pages across 2 stories (incl. staging job_1787959478282_bz19gm36h): 25/30 plates were PROMPT-WRONG. p5 is the worked example - objects[] is [LOC003 reef passage, VEH001, ART003], the AD's emptyScenePrompt says the ship's deck planks fill the centre with the boom across frame, page shot is 'medium'; the shipped plate prompt contained none of that and carried SHOT: wide.",
-   "status": "fixed",
-   "fixedIn": "18a15c6e1",
-   "note": "Four mechanisms, all in the vantage-canvas path (storyJobPipeline.js Phase 5a-pre-vantage), which the per-page path at the same phase never had. (1) The plate prompt was assembled from the vantage/LOC prose and DROPPED pageData.emptyScenePrompt - fixed by the hybrid plate: the AD prose is appended as a FRAMING block that outranks the setting lines, taken from the first page a shared plate serves, and the SHOT line now comes from the page's own shot. (2) getPrimaryVantageForPage took the FIRST LOC in objects[] as the camera's ground - fixed with an ordered selection: a LOC whose vantage's pages[] names this page, then the LOC the AD's emptyScenePrompt names, then an explicit dotted reference, then first-listed. (3) The vantages[0] fallback ignored each vantage's own pages[] - now matched before falling back. (4) Locations without vantages got a synthetic plate hard-coded to shot 'wide', overriding the page's framing - now inherits the page's shot. Plus the VEHICLES block demanded the whole vessel rendered even when the camera stands on it (duplicate ships, ships inside caves, wheels on land) - it now asks for the visible part only with an explicit camera-aboard clause, and the plate call carries one reference family (landmark photo XOR VB element render) named by a REFERENCE line. Template contradiction resolved: scene-expansion(-all).txt forbade dotted vantage ids for invented LOCs while story-bible-from-beats.txt asks the bible to create vantages for them. Verified by rendering p5's merged plate prompt from stored data: FRAMING carries the deck-filling prose, SHOT is medium, REFERENCE line present. Empty-scene QC is still not wired on the vantage path (open, see docs/decisions.md)."
-  },
-  {
-   "id": "vb-grid-plate-filter-is-unreachable-code",
-   "title": "The 'drop locations when an empty-scene plate exists' filter has never fired on any non-trial story - it reads sceneBackgrounds before Phase 5a-pre fills it",
-   "reportedAt": "2026-08-29",
-   "source": "reproduced on staging job_1787959478282_bz19gm36h: 14/14 pages with a grid shipped their locations AND the ship as grid cards despite every one of those pages having a plate. Census replayed getElementReferenceImagesForPage against the stored visualBible and matched the stored grid images cell-for-cell (stable ~639px cell pitch: 1920=3 cells, 2560=4, 3191=5, 3831=6) - every page's stored grid equals the UNFILTERED selection.",
-   "status": "fixed",
-   "fixedIn": "da5cf2b59",
-   "note": "storyJobPipeline.js had `if (sceneBackgrounds[pageNum]) elementReferences = filter(type !== 'location')` inside the pageData map that PRODUCES pageDataArray. sceneBackgrounds is populated by Phase 5a-pre-vantage and Phase 5a-pre, which both CONSUME that array - so the map is {} at that point on every non-trial story and the branch is unreachable. Fix separates selection from construction: the map now stores vbElementRefs/vbSecondaryLandmarks only, and a new Phase 5a-pre-grid pass (placed after the plates exist, before every pageData.visualBibleGrid reader) applies the filter and builds the buffer. Filter now matches buildPageCompositeRefs: a plate drops BOTH location and vehicle cells; plateless pages keep everything. Same commit caps selection at 4 (was 6) at both page-grid call sites. Verified statically on the real story: 3-6 cells with a location on every page -> 1-4 cells, zero locations, no vehicle on any plated page. Related: buildPageCompositeRefs calls itself the 'single source of truth' for these filters but production page generation never calls it (only iteratePageCore + Test Lab do) - the pipeline keeps an inline copy. Also NOT fixed here: that inline copy passes secondaryLandmarks into buildVisualBibleGrid, contradicting the 2026-08-18 'a landmark photo NEVER enters the grid' decision."
-  },
-  {
-   "id": "vb-grid-shrinks-to-a-sliver-in-its-grok-slot",
-   "title": "VB reference grid arrives at Grok as a tiny thumbnail row (50x83px cells) instead of owning slot 3 at full size",
-   "reportedAt": "2026-08-29",
-   "source": "owner (staging job_1787959478282_bz19gm36h p5) + measured from the stored grokRefImages: slot 3 is 683x683 and the two VB cells in it measure 50x83px each (0.9% of the slot area), while 2 of the grid's 4 elements were dropped entirely",
-   "status": "fixed",
-   "fixedIn": "ee575cbe6",
-   "note": "Two defects in packReferences (server/lib/grok.js). (1) The own-slot gate `rawVbElements.length === visualBibleGrid.rawElements.length` abandoned the own slot whenever the grid still held a location, so the whole VB set fell back to composeCharWithVbRow's bundled thumbnail row and slot 3 went unused - inverting the owner's 2026-08-15 slot table on every such page. (2) Even when the own slot did fire it shipped buildVisualBibleGrid's 512px-wide SINGLE COLUMN through resize({height:1024}), so an N-element grid became a ~1024/N px sliver that the aspect-pad loop then pillarboxed inside a 1024-wide slot (4 elements -> 20% of the slot, 80% white bars). New composeVbSlot() re-flows the cells into the rows x columns closest to square for the target aspect and fills the slot edge to edge. Verified statically on the real stored p5 grid: per-element 50x83 -> 512x512, slot coverage 1.8% -> 100%."
-  },
-  {
-   "id": "entity-cell-to-page-map-always-empty",
-   "title": "Entity-consistency cell->page map is always empty (reads cell.metadata.pageNumber; createLabeledGrid flattens it), so every letter-only finding is dropped unscored",
-   "reportedAt": "2026-08-24",
-   "source": "owner (Lorena's face on p16, staging job_1787514666616_yw9qsv1vf) + local probe: createLabeledGrid returns cells {letter,pageNumber,...} with NO metadata object, so the shipped mapping loop yields {}",
-   "status": "fixed",
-   "task": 39,
-   "fixedIn": "b445eb256",
-   "note": "Two sites in entityConsistency.js (gridCellToPage ~958, primaryCellToPage ~1092) read the nested cell.metadata.pageNumber. Because {} is truthy, the primaryCellToPage fallback never engaged either: any issue naming only cell letters resolved to no page, got pageNumbers:[], was never stamped on a version, never scored, never repaired, and never displayed. Only findings where the model volunteered an absolute pagesToFix survived (that is how Sarah's p2 MINOR got through on this story). Also why stored descriptions lack the '(page N)' annotation. Fix reads the flat field with the nested one as fallback; verified with a probe -> {A:3,B:16}."
-  },
-  {
-   "id": "dog-triggers-gemini-fallback",
-   "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
-   "reportedAt": "2026-08-19",
-   "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
-   "status": "fixed",
-   "task": 19,
-   "fixedIn": "4268015a8",
-   "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
-  },
-  {
-   "id": "fallback-replaces-instead-of-merging",
-   "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
-   "reportedAt": "2026-08-19",
-   "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
-   "status": "fixed",
-   "task": 21,
-   "fixedIn": "4268015a8",
-   "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
-  },
-  {
-   "id": "lab-unpinned-loads-v0",
-   "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
-   "reportedAt": "2026-08-19",
-   "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
-   "status": "fixed",
-   "task": 23,
-   "fixedIn": "4268015a8",
-   "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
-  },
-  {
-   "id": "experiments-route-strips-target-params",
-   "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
-   "reportedAt": "2026-08-19",
-   "source": "exp #9 stored target {storyId,pageNumber} only",
-   "status": "fixed",
-   "task": 23,
-   "fixedIn": "4268015a8",
-   "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
-  },
-  {
-   "id": "garment-seeds-missing-empty-description",
-   "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
-   "reportedAt": "2026-08-19",
-   "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
-   "status": "fixed",
-   "task": 24,
-   "fixedIn": "4268015a8",
-   "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
-  },
-  {
-   "id": "recolour-version-not-redetected",
-   "title": "Recolour version carried a stale, fp-nulled detection with no marker",
-   "reportedAt": "2026-08-19",
-   "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
-   "status": "fixed",
-   "fixedIn": "1dcdb3c09",
-   "task": 23,
-   "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
-  },
-  {
-   "id": "bbox-cache-keys-on-url-text",
-   "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
-   "reportedAt": "2026-08-19",
-   "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
-   "status": "fixed",
-   "fixedIn": "329170a3e",
-   "task": null,
-   "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
-  },
-  {
-   "id": "loadedfrom-null-on-new-code",
-   "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
-   "reportedAt": "2026-08-19",
-   "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
-   "status": "fixed",
-   "fixedIn": "329170a3e",
-   "task": null,
-   "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
-  },
-  {
-   "id": "version-detection-null-after-eval-refactor",
-   "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
-   "reportedAt": "2026-08-20",
-   "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
-   "status": "fixed",
-   "fixedIn": "1770eb63a",
-   "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
-  },
-  {
-   "id": "covers-undressed-call-site-4",
-   "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
-   "reportedAt": "2026-08-20",
-   "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
-   "status": "fixed",
-   "fixedIn": "756b8e692",
-   "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
-  },
-  {
-   "id": "refresh-bbox-strips-dino",
-   "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
-   "reportedAt": "2026-08-21",
-   "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
-   "status": "fixed",
-   "fixedIn": "4b6492a8e",
-   "note": "refine skipped for /dino/ backends; cover saves awaited before response."
-  },
-  {
-   "id": "silent-detection-failures-no-alert",
-   "title": "21 DINO detection failures shipped a degraded story with zero alerting",
-   "reportedAt": "2026-08-21",
-   "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
-   "status": "fixed",
-   "fixedIn": "4b6492a8e",
-   "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
-  },
-  {
-   "id": "garment-seed-off-colour-centroid",
-   "title": "Garment seed dot = blob centroid, lands off-colour on non-convex blobs (neighbour hand) and mis-seeds SAM",
-   "reportedAt": "2026-08-21",
-   "source": "owner + job_1787262655143_s9zb960muni p7 (top-red dot on Kiaan hand crossing Levin shirt; also p1 Kiaan, backCover Levin)",
-   "status": "fixed",
-   "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
-   "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
-  },
-  {
-   "id": "lab-unpinned-loads-v0",
-   "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
-   "reportedAt": "2026-08-21",
-   "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
-   "status": "fixed",
-   "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
-   "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
-  },
-  {
-   "id": "cover-save-clobbers-scene-page",
-   "title": "refresh-bbox cover branch saved the WHOLE story doc, clobbering the preceding scene page in-flight save",
-   "reportedAt": "2026-08-21",
-   "source": "trial-3 batch on job_1787262655143_s9zb960muni: p18 refreshed then covers; p18 detection erased (sam=0/4), single-page rerun clean",
-   "status": "fixed",
-   "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
-   "note": "new saveCoverData(storyId, coverType, coverData): jsonb_set on {coverImages,<type>} only, imageVersions bytes to story_images, R2 offload + strip; refresh-bbox cover branch uses it with full-save fallback."
-  },
-  {
-   "id": "repair-reference-full-sheet",
-   "title": "Char-repair reference = FULL 2x4 avatar sheet: extractFaceAndBody only matches the legacy tall format (aspect 1.5-2.0), square sheets (1.0) silently skip the crop",
-   "reportedAt": "2026-08-21",
-   "source": "owner question + exp #53: Max deterministically rejected on 2 pages (bg diff 95/79, 3 internal retries ~1% apart = sheet copied); local repro: cropToFrontColumn(1024x1024 sheet) returns input bytes unchanged for ALL characters",
-   "status": "fixed",
-   "note": "char-fix (and the Lab stage) now crop the pose-matched cell via the shared resolveCellPose/cropAvatarCell chain — cropSheetCell divides by grid geometry, so SQUARE 1024x1024 sheets crop correctly (verified: front/profile/back all yield ~256x607 cells from the failing sheet). Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793).",
-   "fixedIn": "30099b228"
-  },
-  {
-   "id": "active-image-no-admin-bypass",
-   "title": "PUT active-image 404s for admins on non-owned stories -> version selection silently does not save",
-   "reportedAt": "2026-08-22",
-   "source": "owner report: story opened from the Test Lab (demo-account story, admin logged in as own account); both PUT /:id/pages/:n/active-image and /:id/covers/:type/active-image checked user_id strictly while every other story route allows admin (any story) or impersonating admin",
-   "status": "fixed",
-   "fixedIn": "84e575ae8",
-   "note": "both routes now use the shared access rule (owner | admin | impersonating admin). Client swallow noted: StoryDisplay.handleSelectVersion catches and only console.errors, so the 404 was invisible."
-  },
-  {
-   "id": "som-identity-lines-undressed",
-   "title": "Gen-time SoM identity lines had NO clothing (and no hair): builder strips Wearing from description, rebuilds from c.clothing which generation never set",
-   "reportedAt": "2026-08-22",
-   "source": "owner (hpv76p0rokg mixups) + stored evidence: p3 v0 expectedCharacters = {name, description} only; gen-time answers consistently red->Julian 4/4 calls; Lab (builder sets clothing) 6/6 correct incl exp57 5x on the same v0 bytes",
-   "status": "fixed",
-   "fixedIn": "fix(identity) 2026-08-22 (same commit)",
-   "note": "storyJobPipeline gen call site now passes clothing: clothingText alongside the description; _somIdentifyFigures additionally falls back to the description own Wearing tail when c.clothing is absent, so no caller can send characters out undressed. Explains BOTH stories mixups incl. the s9zb960muni 30/30-replays-correct ghost. Remaining smaller gap: sceneCharacters carry no physical.hair, so gen lines still lack the Hair section the Lab lines have."
-  },
-  {
-   "id": "staging-analyzer-dino-crashloop",
-   "title": "Staging analyzer cannot load GroundingDINO since the ArcFace/TensorFlow image rebuild — every detection 503s",
-   "reportedAt": "2026-08-22",
-   "source": "staging runtime log: 6x \"[GDINO] Loading GroundingDINO...\" each followed by \"GroundingDINO unavailable:\" with EMPTY error (OOM-kill signature); Lab exps #799/#800 blocked/failed on /detect-figures-text HTTP 503 ~40min after deploy of f1448757b",
-   "status": "fixed",
-   "note": "Likely memory: TensorFlow(+deepface) now resident in the analyzer alongside DINO ~1.9GB + MobileSAM. The ArcFace commits (b123a2088 opt-in warmup, 36129ad73 idle reaper) hint at known pressure. Owner: the other agent (ArcFace author) is running a smoke test and owns this. Blocks verification of the identity fixes (task #29 exp on p1 waiting). UPDATE bbd41215: new build deployed, SAME crash loop (exp #801 failed identically, 503s). The empty error comes from get_groundingdino() (photo_analyzer.py:1975) — from_pretrained throws an exception whose str() is empty; the handler at :2089 prints only {load_err}. IMMEDIATE DIAGNOSTIC: log repr(load_err) + traceback there. Suspects: (a) transformers import path now touching the TF-2.13/protobuf-3.20.3 corridor (transformers auto-detects installed TF), (b) OOM during weight load with TF resident, (c) missing pre-downloaded weights in the rebuilt image (Dockerfile pre-download step vs new layer). ROOT CAUSE FOUND: Dockerfile layer order — requirements.txt (TF 2.13) downgrades typing_extensions below torch/transformers floor; the DINO pre-fetch layer ran BEFORE the typing_extensions>=4.12 repair layer, failed, was swallowed by || WARN, and the image shipped WITHOUT DINO weights; every runtime load re-downloaded ~900MB and died with an empty-str exception. FIX: typing_extensions upgrade moved BEFORE the pre-fetch layer; loader 503 path now logs repr+traceback+cache-presence so an empty str can never blind us again. CORRECTED ROOT CAUSE (diagnostics from 538d2f540): transformers>=4.44 re-resolved to 5.x in the ArcFace rebuild; transformers 5 requires torch>=2.5 and DISABLES our torch 2.1.2 (held there by the numpy==1.24.3 co-pin TF 2.13 needs) — every model class raised PyTorch-not-found. Fixed by pinning transformers<5 (a057d8017). The layer-order fix (typing_extensions before pre-fetch) stays as hardening.",
-   "fixedAt": "2026-08-22",
-   "fix": "ArcFace gate is now OFF by default (ARCFACE_GATE_ENABLED, server/lib/faceIdentity.js). Confirmed the cause rather than assumed it: POST /api/health/release-memory on staging reported 2336MB RSS and unload=true listed 'arcface-weights' as resident, dropping it to 1862MB. TensorFlow's ~350MB on top of GroundingDINO's ~1.9GB exceeded the container, so DINO died on load with an empty error and crash-looped. Disabled, no TF is imported at all and the analyzer returns to its pre-change footprint. The idle reaper could not have saved it: it requires the whole SERVICE to be idle, which never happens during a Lab run or a story. Re-enabling needs ArcFace out of the shared analyzer process.",
-   "fixedIn": "fix(analyzer) 2026-08-22 (same commit)"
-  },
-  {
-   "id": "text-refine-truncation-silent-converge",
-   "title": "Refiner output hit the 16k token cap; truncated reply parsed as zero rewrites and shipped as 'nothing to rewrite'",
-   "reportedAt": "2026-08-23",
-   "source": "job_1787423677246_r9llf5yi9 — text_refine usage row exactly 16000 output tokens, textRefineReport null, em-dashes shipped on p1/p12 despite the dash ban being an auto-flag",
-   "status": "fixed",
-   "fixedIn": "49ea80011",
-   "note": "server/lib/textRefine.js: cap raised 16000->32000 (deepseek-v4-pro allows 64k) and output_tokens >= cap now throws, recording a failed round instead of a silent convergence. storyJobPipeline.js join logs text_refine_failed (warn) when a round failed, distinct from a real nothing-to-rewrite."
-  },
-  {
-   "id": "closeup-face-eaten-by-leak-filter",
-   "title": "Close-up faces lost: leak filter + 0.15-crop cap rejected real full-frame faces (figure ships faceless)",
-   "reportedAt": "2026-08-23",
-   "source": "owner spotted Fiona r9llf5yi9 p2 (score 0.274, faceBox null) in the filter audit; crop-recovery cap 0.15*crop rejects any face >15% of its person crop",
-   "status": "fixed",
-   "fixedIn": "fix(detection) 2026-08-23 (same commit)",
-   "note": "crop-recovery cap 0.15->0.5; page-level leak-filter drops now logged in diag.faceLeaksDropped. Bundled: pre-identity crowd prune (faceless+<0.8%+score<0.45, face-contact untouchable, expected-count floor)."
-  },
-  {
-   "id": "cover-identity-undressed",
-   "title": "Cover refresh identity lines had empty clothing — coverHints deliver category labels/empties, the category filter blanks them, SoM matches on hair alone",
-   "reportedAt": "2026-08-23",
-   "source": "owner spotted wrong clothing on mfedxinwqd covers; frontCover detection swapped Levin/Julian (both blond curly); persisted expectedCharacters show clothing:\"\" and no Wearing in the prose; entity eval then reported a phantom Levin-wrong-shorts MAJOR",
-   "status": "fixed",
-   "fixedIn": "fix(refresh-bbox) 2026-08-23 (same commit)",
-   "note": "refresh-bbox cover branch now resolves each character through the shared buildIdentityClothingText chain (hint category -> clothingRequirements -> standard -> wardrobe). Separate finding kept open in #33: the entity eval MISSED Julian wearing only briefs (no trousers) on the backCover."
-  },
-  {
-   "id": "cancelled-job-persists-and-emails",
-   "title": "Cancel during repair/covers still persisted the story and emailed the customer; rerun-full emails the SOURCE story owner",
-   "reportedAt": "2026-08-23",
-   "source": "job_1787469664089_9e27p42el7l — admin rerun of a customer story cancelled at 81%; no checkCancellation after image phase, email block outside the completion guard; container restart was needed to stop the mail",
-   "status": "fixed",
-   "fixedIn": "same commit",
-   "note": "storyJobPipeline.js: checkCancellation() before avatar-persist/upsertStory; completion email now requires completionRes.rowCount>0 AND !inputData.adminRerun. server/routes/admin/jobs.js: rerun-full stamps adminRerun=true."
-  },
-  {
-   "id": "checkpoint-reaper-destroys-forensics",
-   "title": "Checkpoint purge policy: 1h retention for failed/cancelled, no salvage path for cancelled jobs",
-   "reportedAt": "2026-08-23",
-   "source": "job_1787469664089_9e27p42el7l post-mortem. NOTE: this job in fact had ZERO checkpoints (never written — separate investigation running); the purge policy and missing salvage were real defects found during that investigation and would have destroyed the evidence had it existed.",
-   "status": "fixed",
-   "fixedIn": "same commit",
-   "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-cleanup (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story); failed/cancelled checkpoints+rows NEVER auto-deleted (owner: keep the failed 1% forever); completed stays 1h."
-  },
-  {
-   "id": "cover-naming-two-names",
-   "title": "coverHints keyed by outline vocabulary (titlePage) while everything else says frontCover — third scheme (pipeline coverType titlePage) too",
-   "reportedAt": "2026-08-23",
-   "source": "owner: \"why do we have 2 names for the same thing\" — the mismatch left the frontCover identity lines undressed through two fix rounds while other covers healed",
-   "status": "fixed",
-   "fixedIn": "fix(covers) 2026-08-23 (same commit)",
-   "note": "Unified: outline parser translates the Title Page section at its boundary and writes coverHints.frontCover (unified+legacy+shared keyword map); migration 026 renamed titlePage in all stored stories (prod 106, staging 122, 0 remaining); COVER_HINT_KEY/coverKeyToHintKey retired from coverKeys.js and all 6 consumers read coverHints[coverKey] directly; pipeline coverType token titlePage renamed frontCover (storyJobPipeline + trial coverTypes) with a one-boundary legacy normalizer for queued jobs. Trial UX fields (titlePageImage etc.) are a different concept and untouched."
-  },
-  {
-   "id": "eval-tdz-expectedagesblock",
-   "title": "evaluateImageQuality threw ReferenceError on EVERY call — expectedAgesBlock read in its temporal dead zone; two whole books shipped with no quality/semantic score and no auto-repair",
-   "reportedAt": "2026-08-24",
-   "source": "staging job_1787514666616_yw9qsv1vf (16pp) + prod job_1787514321173_gvs2ojo4o0n (18pp): analytics.models.quality=[], zero page_quality/semantic_compliance calls in generationLog, every page finalScore=100 semanticScore=null, scoreBreakdown.visual.score=0. Only two stories in either DB with 0/N semantic coverage; every prior story is N/N.",
-   "status": "fixed",
-   "fixedIn": "935a46b8b",
-   "note": "0c9fa78e3 added `expectedAges: expectedAgesBlock` at evalPipeline.js:929 inside the evaluateThreeStage launch, while `let expectedAgesBlock` stayed at :1046 — a TDZ read, so the function threw on entry and the outer catch returned null for every page and every cover. Declaration moved above the launch. Verified: page 15 of the prod story now evaluates to score 90 in 1.5s instead of returning null. Same failure class the function header already documents for the hoisted promise handles. NOTE: the repair endpoints in regeneration.js call the same function, so the repair workflow was dead in prod for the same window."
-  },
-  {
-   "id": "text-refine-join-discards-paid-work",
-   "title": "Text refine + blind audit completed and were discarded at the bounded join — $0.236 of grok audit and deepseek rewriting thrown away, original text shipped",
-   "reportedAt": "2026-08-24",
-   "source": "staging job_1787514666616_yw9qsv1vf (16pp, languageLevel standard): generationLog text_refine_start 20:38:36 -> text_refine_join_timeout 20:57:29, textRefineReport null, yet api_usage records text_audit 1 call grok-4.6 18,396 out $0.1169 and text_refine 1 call deepseek-v4-pro 29,931 out $0.1188. Same evening prod job_1787514321173_gvs2ojo4o0n (1st-grade) finished audit + 2 rounds in 584s and joined fine.",
-   "status": "fixed",
-   "fixedIn": "a6d92d25a",
-   "note": "refineStoryText returned all-or-nothing, so a finished audit and a finished round 1 were worth nothing when the join deadline landed during round 2. Two causes compounded: the 300s budget was measured 2026-08-17, before 77d0fae0a put the blind audit in front of the rounds and roughly doubled the stage; and standard/advanced reading levels produce far larger payloads (this audit emitted 2.3x the 1st-grade run tokens). Fix: onProgress publishes the audit and each completed round, the join salvages the last snapshot, and the cap is 600s for long-text levels + 10s/page past ten. Precedent the cap-raise alone did not fix: job_1786998860057_o6deqtv5s lost $0.16 the same way on 2026-08-17. Regression test tests/manual/test-text-refine-salvage.js."
-  },
-  {
-   "id": "trial-vb-has-no-animals-pool-species-word-deleted",
-   "title": "Every animal in a TRIAL story loses its species word before the image model sees it — the trial Visual Bible has no animals pool, so animals are filed as artifacts and the sanitizer replaces the name with the type",
-   "reportedAt": "2026-08-25",
-   "source": "staging job_1787683120734_qkgfbd86o (6pp trial, de-ch). VB stored ART002 \"Brauner Hund\", type \"Tier\", description \"Ein kleiner, flauschiger brauner Hund mit weichen Schlappohren...\". Every page cites ART002. The stored page prompts read \"Ein kleiner, flauschiger Tier mit weichen Schlappohren\" — the word Hund is gone from all six prompts, and the German agreement break (flauschiger Tier) shows it is a blind string replacement. With no species anchor the render is a free choice per page: shaggy ginger on p1/p2/p3/p6, golden retriever puppy on p5.",
-   "status": "fixed",
-   "note": "prompts/story-trial.txt VB schema offers only secondaryCharacters / artifacts / locations / backgrounds — no animals array. story-bible-from-beats.txt:138 and story-unified.txt:671 both have one, so this is trial-only. sanitizeVbIdsInPrompt (promptBuilders.js:3332) protects NAME_POOLS = mainCharacters/secondaryCharacters/animals and rewrites REF_POOLS = artifacts/vehicles/clothing to their type, which is correct for a prop (stops the name being lettered onto it, 2026-08-24 fix) and wrong for a living thing. Second defect visible in the same evidence: the substitution also fires INSIDE the entry own description, so the description that teaches the model what the thing looks like is the very text being degraded, and the bullet label becomes the first two words of the description (\"**Ein kleiner** (object)\", \"**Eine runde** (object)\").",
-   "fixedIn": "5e8a0d1e3"
-  },
-  {
-   "id": "char-repair-target-bad-logger-require-broke-staging-deploys",
-   "title": "Staging deploys failed for 34 minutes — charRepairTarget.js required ./logger, which does not exist, so server.js could not boot",
-   "reportedAt": "2026-08-25",
-   "source": "Railway staging deployment 0b5acc98-90c2-426a-b982-ba41d1a69191 (commit 1140e8176) status FAILED. Deploy log: \"Error: Cannot find module ./logger\" at /app/server/lib/charRepairTarget.js:22, require stack charRepairTarget -> repairPipeline -> storyJobPipeline -> server.js. Introduced by 3565fced9 (20:38 CH); every push after it failed to deploy, and the /api/health commit SHA kept reporting the last GOOD build (0fb99344), so the breakage was invisible from the outside.",
-   "status": "fixed",
-   "fixedIn": "bb933ca08",
-   "note": "charRepairTarget.js sits in server/lib/ and the logger lives at server/utils/logger.js, exported as { log }. Every sibling uses const { log } = require(\"../utils/logger\"); this file had const log = require(\"./logger\"). Two lessons: (1) /api/health reports RAILWAY_GIT_COMMIT_SHA, which is the last SUCCESSFUL build — it cannot detect a failed deploy, so gating a validation run on it is unsound; check a boot-time side effect (a migration column) or the Railway deployment status instead. (2) check-no-undef in the pre-push hook does not resolve require() paths, so a bad module path passes every gate and only fails at container start."
-  },
-  {
-   "id": "text-audit-empty-depicts",
-   "reported": "2026-08-28",
-   "summary": "buildTextAuditPrompt reads the picture side via a THIS IMAGE DEPICTS regex that only ever matches image prompts, never briefs; extractRefinablePages sceneIntent JSON.parse on outlineExtract (BEAT prose) also always fails. Every page reached the text audit as THE PICTURE SHOWS: (no picture description) — verified on 9 pages across 3 staging stories (job_1787867402809, job_1787812110559, job_1787777447720). The MISMATCH question could never fire.",
-   "status": "fixed",
-   "fixedIn": "f5e62bf34",
-   "note": "sceneMetadata.sceneIntent is the canonical one-line picture summary; extractRefinablePages now reads it first, buildTextAuditPrompt prefers p.sceneIntent over the depictsOf regex."
-  },
-  {
-   "id": "testlab-stale-withCarriedFindings",
-   "reported": "2026-08-28",
-   "summary": "runStoredBeatsScenes (testlab.js) required withCarriedFindings from carryRoutes, which exports withCarriedRulings since the carry-routes reduction — every useStoredBeats beats_scenes experiment crashed with \"withCarriedFindings is not a function\" (reproduced: Lab experiments 893-896).",
-   "status": "fixed",
-   "fixedIn": "3d1497d4a",
-   "note": "renamed to withCarriedRulings at all three call sites."
-  },
-  {
-   "id": "covers-const-coverPrompt-reassignment",
-   "reported": "2026-08-29",
-   "summary": "Every story since 2026-08-26 shipped with coverImages {} — zero covers on 7 consecutive staging runs (job_1787959478282_bz19gm36h, job_1787867402809_z9bwoo3yp, job_1787812110559_n311ykfmin and four more). The cover-template retirement (c0d594a75) declared 'const coverPrompt = buildCoverPrompt(...)' in the streaming cover path while the VB-id sanitizer ten lines below still reassigns it, so every cover threw TypeError: Assignment to constant variable BEFORE any image call — no usage, no genLog entry, no stored error. coverIterate.js:651 had the identical const (reassigned at 676/692/704), so manual cover regeneration was broken the same way. Last story with covers: 2026-08-25T20:23Z; first without: 2026-08-26T18:50Z, straddling the commit.",
-   "status": "fixed",
-   "fixedIn": "f1a92b312",
-   "note": "const -> let at storyJobPipeline.js:1626 and coverIterate.js:651. Per-cover failures now also written to the stored genLog (cover_failed / covers_all_failed) instead of console-only."
-  },
-  {
-   "id": "page-image-missing-ships-silently",
-   "reported": "2026-08-29",
-   "summary": "job_1787959478282_bz19gm36h shipped pages 1 and 3 with imageVersions[0].imageData = \"\" (no story_images scene row, no eval, no score). generateImageOnly THROWS when a provider returns no image (Grok primary fails -> Gemini fallback -> 3 sanitization levels -> throw); the per-page catch in the generation loop returns {imageData:null} and the story continued to persistence. Only trace was a console log.error and the \"14/16\" count in generation_complete — no genLog error, no retry, no flag, and the book audit silently skipped both pages.",
-   "status": "fixed",
-   "fixedIn": "f1a92b312",
-   "note": "Phase 5a now sweeps rawImages for missing bytes: genLog.error(page_image_missing) with the error text, ONE retry through generateImageOnly (skipCache), then genLog.error at save time plus data.missingImages / data.missingCovers on the stored story. Retry is fully guarded — it can never crash the job."
-  },
-  {
-   "id": "gemini-thinking-budget-truncates-image-analysis",
-   "reported": "2026-08-29",
-   "summary": "gemini-2.5-flash spends maxOutputTokens on THINKING before the answer. landmarkPhotos.js analyzeImageQuality (cap 300) measured finishReason=MAX_TOKENS, thoughts=284, answer=12 — the JSON died at {\"photoQuality\": 8, the /{[sS]*}/ match failed, and EVERY image returned null. The caller reads null as unusable and logs \"No good images found from any source\", so landmarks were indexed with no picture and no error; with forceReanalyze it can overwrite a stored photo with nothing. Likely origin of the 210 photoless Swiss rows. Sibling call analyzeLandmarkPhoto (cap 400) does not fail — it stores a 60-character truncated description that feeds the illustration prompt.",
-   "status": "fixed",
-   "fixedIn": "37646a21a",
-   "note": "thinkingConfig { thinkingBudget: 0 } + cap 600 on both; verified after fix finishReason=STOP, thoughts=0, answer 75/105 tok, JSON parses. Same defect patched in 4 historical-image admin scripts. server/routes/avatars.js left alone: 4096 has headroom, works, only wastes thinking tokens. Parse failure raised from log.debug to log.warn carrying finishReason, because at debug a config fault was indistinguishable from ordinary photo rejection."
-  },
-  {
-   "id": "beats-batch-expansion-truncates-silently",
-   "reported": "2026-08-31",
-   "summary": "The batched Art Director call truncated after page 11 and pages 12-16 silently fell back to per-page expansion (no batch retry, fallback booked under the same usageLabel). job_1788123310558: beats_scene_expansion shows 6 calls / 42,260 output tokens under one label; generationLog beats_scene_expansion_incomplete says 11/16 briefs. Root cause CONFIRMED as an undersized config cap: the default sceneDescription model gemini-3.1-pro carried maxOutputTokens 16384 in TEXT_MODELS while OpenRouter's top_provider.max_completion_tokens for google/gemini-3.1-pro-preview is 65536 (checked 2026-08-31) — the call site already passes maxTokens=null (full cap), so the config cap WAS the effective truncation point.",
-   "status": "fixed",
-   "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
-   "note": "models.js: gemini-3.1-pro maxOutputTokens 16384 -> 65536 (real OpenRouter limit; the old judge-context caveat kept — the cap was never the judge fix). beatsPipeline.js: the all-pages call now retries the batch ONCE when it parses fewer briefs than beats (first attempt's pages win the merge, retry only fills gaps), with a loud log.error + genLog beats_scene_expansion_truncated naming the missing pages; the existing beats_scene_expansion_incomplete warn still names every page that ultimately fell back. Per-page fallback calls now book under usageLabel beats_scene_expansion_fallback so a truncated batch is visible in the usage summary."
-  },
-  {
-   "id": "vantage-plates-skip-empty-scene-qc",
-   "reported": "2026-08-31",
-   "summary": "The vantage-plate block (storyJobPipeline Phase 5a-pre-vantage) never called validateEmptyScene while the per-page path always has — on job_1788123310558 empty-scene QC ran 0 times (all pages were vantage-covered) and the p2 plate shipped with a blocked foreground and paper margins, exactly the defect classes the validator checks.",
-   "status": "fixed",
-   "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
-   "note": "Reused, not redesigned: the same validateEmptyScene + one retry-with-feedback loop as the per-page path, called per plate. textPosition passed as null (a shared plate serves pages with different text zones, so no calm-zone grading; the pixel white/black-box artifact checks and the vision people/foreground/signage checks all still run). characterPlacements = union of sceneMetadata.fullData.characters across the plate's page group; storyEra derived identically to the per-page path. Retry validated pixel-only (skipVision) and kept only when it passes or has fewer issues. Outcomes genLogged (vantage_plate_qc / vantage_plate_qc_failed / vantage_plate_qc_retry) and the v1/v2 QC history stored on sceneBackgrounds in the same shape the per-page path stores. A validator error keeps the unvalidated plate — QC can never cost a plate."
-  },
-  {
-   "id": "proofread-withdrawn-fault-lines-counted",
-   "reported": "2026-08-31",
-   "summary": "The proofread stream leaked reasoning prose ('Let me work through this carefully page by page.') and a finding that withdraws itself mid-line ('...as a compound image is fine — withdraw. Let me re-examine.') into the corrective round: the withdrawn line still matches FAULT_LINE_RE so it was counted and merged raw (job_1788123310558 stored proofread: countFaults=9 vs the model's own FAULTS: 8). NOTE — the second half of the reported premise did NOT reproduce: proofread findings were NOT dropped from the corrective round; the stored audit2 of the same job contains the proofread faults verbatim (gleichmässig, Leimnaht), wired since the b81c5010c-era merge at textRefine.js. The corrective round ran with them and changed zero pages — a model outcome, not missing wiring.",
-   "status": "fixed",
-   "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
-   "note": "textRefine.js: sanitizeProofreadFindings() keeps only lines matching ^FAULT[TAG]*: and discards any FAULT line carrying a withdrawal marker (withdraw / '— fine' / re-examine); the sanitized form feeds countFaults and the audit2 merge, the raw stream stays persisted for traceability, and discarded lines are logged. Unit-checked against the stored output (scratchpad piraterun/q7-ai-dialogue/tr-proofread.txt): 9 -> 8 faults, the withdrawn Möwensegel line and the reasoning leak both dropped, matching the model's own FAULTS: 8 tally. The main audit stream is deliberately untouched (different format, out of scope)."
-  },
-  {
-   "id": "semantic-eval-judges-against-beats-scene",
-   "reported": "2026-08-31",
-   "summary": "The semantic evaluator received the beats SCENE (scene.outlineExtract/sceneHint) as SCENE_HINT — labeled 'the authoritative source' in prompts/image-semantic.txt — while page images are generated from the Art Director brief. Images were penalized for obeying their own generation prompt: job_1788123310558 p6 CRITICAL 'missing Fiona' and p9 MAJOR 'chart not in her hand', both absent from the AD brief the render followed.",
-   "status": "fixed",
-   "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
-   "note": "Wiring only, prompt untouched. All SCENE_HINT producers greped and swapped to the content the image was MADE from: repairPipeline.js buildEvalInputs + baseline inputs (orig.scene.outlineExtract || entry.description || sceneDescription || scene.sceneHint — covers hit leg 1 unchanged because their outlineExtract IS the cover brief and pages never set outlineExtract; entry.description wins on an iterate rewrite), regeneration.js re-evaluate + eval-prompt routes (cover branch keeps the old expression), testlab.js ctx.outlineHint (Lab/prod parity). Shapes stable (string|null everywhere). Side benefit: evaluateThreeStage/interaction extraction now parse the METADATA block the AD brief carries."
-  },
-  {
-   "id": "character-avatars-store-base64-in-jsonb",
-   "reported": "2026-09-01",
-   "summary": "characters.data still stores base64 image bytes, violating the no-images-in-JSONB rule. extractInlineImagesToR2 is STORY-ONLY (every call site passes a storyId); the character write paths in server/routes/avatars.js and server/lib/storyAvatars.js never call it, so nothing offloads them. Measured on prod 2026-09-01: 40 of 59 character rows carry data:image, 73 MB; still happening today (newest row 2026-09-01, 4.2 MB inline). Worst fields, sampled over 4 rows: avatars.storyHistory[].sheetUrl 10.31 MB, avatars.styledAvatars.<style>.standard/.costumed.default 9.02 MB, preGeneratedAvatarSlides[] 1.13 MB, photos.bodyNoBg 1.13 MB, bodyNoBgUrl 0.65 MB — note sheetUrl and bodyNoBgUrl are NAMED url and hold data URIs. stories.data is clean since 2026-06 (0 inline in Jun/Jul/Aug/Sep), so the story path was fixed and characters were left behind. Cost impact: Postgres RAM tracks database size (shared_buffers is only 160 MB, the rest is OS page cache of the DB files), prod DB 1818 MB -> 2.14 GB container RAM.",
-   "status": "fixed",
-   "fixedIn": "fix(characters) 2026-09-01 (same commit)",
-   "note": "Leak closed at both write paths: storyAvatars.js uploads the 2x4 sheet to R2 before writing storyHistory[].sheetUrl (it was assigning raw bytes to a field named *Url), and the avatars.js character upsert runs extractCharacterInlineImagesToR2 over data AND metadata. That function is a GENERIC deep sweep, not a field list, so a new avatar field cannot reopen the hole. Both throw when R2 is unavailable instead of silently storing base64. Existing rows migrate via scripts/admin/migrate-inline-images-to-r2.js."
-  },
-  {
-   "id": "cast-unlisted-fires-forever-on-titled-bible-names",
-   "reported": "2026-09-01",
-   "summary": "sceneBriefCheck's cast_unlisted decided 'is this cast member listed?' with exact string equality (listed.has(name.toLowerCase())). The visual bible declared a secondary as 'Kapitänin Rossa'; every brief's characters[] listed her as 'Rossa'. The strings never match and the prose does contain the literal bible name, so she was reported missing from a list she was already on — on all six of her pages in job_1788215224103_avu132n7je. Unclearable by construction: prose and metadata already agreed, so no rewrite could resolve it. The scene review ran, the targeted second round ran, re-check returned before=6 after=6 at real token cost. Control in the same corpus: job_1788123310558_1yx71oyo1wg, same story and cast, bible name plain 'Rossa' — zero findings. Identical exact-equality flaw in the unified-path emitter sceneConsistencyCheck.js (prose_char_absent_from_metadata and four sibling types).",
-   "status": "fixed",
-   "fixedIn": "fix(brief-check): cast_unlisted compares figures, not strings — 2026-09-01 (same commit)",
-   "note": "THREE PRIOR FIXES MISSED THE MATCHER. 50b0ebc0c (2026-08-11) created the check. 68dcc717f (2026-08-16) widened castNames to visualBible.secondaryCharacters — the CAUSE, since bible names carry titles while briefs use the short form. edd75f3c2 (2026-08-25) added the post-review re-check: pure observation, made the repeat firing visible without a way to clear it. c92d56ff2 (2026-08-25) sharpened the finding text and added a targeted second round — re-asked an identical false question of the same model. All four touched plumbing around the finding; none touched the name comparison. Fix: one shared helper isSameFigureName (sceneMetadata.js) — same figure iff token lists are equal or the shorter is a leading/trailing RUN of the longer, parentheticals stripped and possessive tokens dropped. Admits 'Kapitänin Rossa'≡'Rossa', refuses 'Hans Meier'≢'Anna Meier' and \"Rossa's crew member (trapped)\"≢'Rossa'. Both emitters use it. Verified by replaying every stored staging story: 6 pages firing before, 0 after, each suppression a verified title/short-name pair, no other finding changed. Known remaining asymmetry (deliberate, asserted in tests, see docs/decisions.md 2026-09-01): the PROSE side still needs the full cast name, so prose saying only 'Rossa' with characters[] omitting her is a miss — widening it would false-positive on any two-word bible name ending in a common noun."
-  },
-  {
-   "id": "entity-charfix-gate-severity-casing-dead-plus-inpaint-instruction-refill",
-   "reported": "2026-09-01",
-   "summary": "repairLogic.js entity->char-fix gate (decideRepairMethod step 2) and selectCharRepairTasks both compared severity with lowercase-only string equality (issue.severity !== 'major' && !== 'critical') while the entity evaluator emits UPPERCASE severities (job_1788215224103_avu132n7je: MAJOR x96, CRITICAL x16) — the entity->char-fix route was dead code. On p16 the CRITICAL age_shift for Lorena fell through to inpaint, where the per_character_fixes entry had no fix_instruction and the fallback (p.fix_instruction || (p.issues||[]).join('; ')) pasted the defect diagnosis ('appears visibly older...') to Grok as the edit instruction: Lorena was painted into her 60s and that version shipped. Reproduced offline against stored story data: BEFORE p16 -> inpaint (4 quality, 2 targets); AFTER p16 -> char-fix (entity critical on Lorena).",
-   "status": "fixed",
-   "fixedIn": "504a5faf2",
-   "note": "Fix per owner ruling G5/option 2: gates case-insensitive AND restricted to CRITICAL only (MAJOR entity findings get no automatic repair; NOT_INPAINTABLE_TYPES keeps character types out of inpaint). Empty fix_instruction entries dropped loudly; issues-join refill deleted. Char repair pinned to grok-imagine-image 1.x via REPAIR_DEFAULTS.charRepairModel. See docs/decisions.md 2026-09-01 G5 entry."
-  },
-  {
-   "id": "text-refine-prompt-fed-arc-not-beats",
-   "reported": "2026-09-01",
-   "summary": "prompts/text-refine.txt tells the refiner 'where the beats and the story differ, the beats are the story's final form', but the only story block it ever received ({STORY_ARC}, filled at storyJobPipeline.js:3315 from arcReviewReport.finalArc, with beatsReviewReport.arc as fallback — also the arc, since beatsPipeline.js stamps plan.arc = approvedArc) was the ARC, never the locked beats. On job_1788215224103 p11 the beat text explicitly reads 'Dark water seeps toward the chest-space in the cistern, not toward any person' (a deliberate safety cut — no person is endangered), but the arc's page 11 entry has Rossa 'sending a crewman down on a rope' who gets trapped as the water rises. Believing its own 'beats win' instruction while blind to what the beats actually said, the refiner reinstated the arc's trapped crewman into the shipped text — the run's only CRITICAL finding. Confirmed by rendering the fixed prompt offline against the stored job's data: the new # THE BEATS section for p11 now carries the exact 'not toward any person' beat text.",
-   "status": "fixed",
-   "fixedIn": "b736f0ff7",
-   "note": "extractRefinablePages (textRefine.js) now reads each page's locked BEAT out of scene.outlineExtract (guarded on the 'BEAT:' marker so a unified-mode page, where outlineExtract holds the scene expansion's own JSON, never gets mistaken for one — same guard storyScorecard.js's finalBeats() already uses) and drops the PLAN line: PLAN is staging shorthand for the artist and on this exact page it names a person the BEAT text deliberately did not. buildTextRefinePrompt (promptBuilders.js) fills a new {STORY_BEATS} block from it. prompts/text-refine.txt now has two separate sections — '# THE ARC' ({STORY_ARC}, background judgment context) and '# THE BEATS' ({STORY_BEATS}, the story's final form, beats win on conflict) — mirroring the writer's own story-text-from-beats.txt, which already kept ARC and BEATS apart and was not affected. Empty on a unified-mode story (falls back to arc + scene outlines only, same as before). No plumbing changes needed in storyJobPipeline.js/testlab.js's three refineStoryText call sites — all three already run pages through extractRefinablePages, which now carries the beat automatically."
-  },
-  {
-   "id": "text-refine-audit-rulings-dropped-key-collision",
-   "reported": "2026-09-01",
-   "summary": "storyJobPipeline.js:5389 builds textRefineReport.roundsDetail as a per-round trace array (round/ok/modelKey/changedPages/...), overwriting the field of the SAME name that refineStoryText (textRefine.js) already returns holding something else entirely: parseAuditRulings' per-fault ledger (rulings each fixed/stands/withdrawn, plus which prior faults the re-audit never ruled on). usable.roundsDetail (the ledger) was never read anywhere in storyJobPipeline.js — the local object literal's own roundsDetail key silently shadowed it before persistence, so no story has ever shipped a per-fault ruling in its textRefineReport despite the mechanism (textRefine.js:319, parseAuditRulings) computing one every run with a re-audit.",
-   "status": "fixed",
-   "fixedIn": "fix(text-refine): auditRulings ledger no longer shadowed by the per-round trace field — 2026-09-01 (same commit)",
-   "note": "Renamed the per-round trace field to roundTrace and added auditRulings: usable.roundsDetail to textRefineReport, so both survive. Confirmed no other code (grepped server/, client/src/) reads textRefineReport.roundsDetail by that name, so the rename is non-breaking."
-  },
-  {
-   "id": "entity-report-duplicated-on-every-scene-image",
-   "reported": "2026-09-01",
-   "summary": "repairPipeline.js stamps the SAME story-level entity consistency report object onto every results row (entityReport per page), and storyJobPipeline.js:5241 copied it into every stored sceneImage — a 16-page story persisted 16 identical copies of a report that already ships once as finalChecksReport.entity (built from pipelineResult[0].entityReport at storyJobPipeline.js:5657). Confirmed on the pirate capstone working set: every sceneImage row carried the identical report. Only consumer of the per-scene copies was the garment-colour route (server/routes/stories.js:2083), which took the FIRST sceneImage carrying one.",
-   "status": "fixed",
-   "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
-   "note": "storyJobPipeline.js no longer stamps entityReport per sceneImage (comment left at the site); the report is stored once at finalChecksReport.entity, which the repair endpoints (regeneration.js:5279, testlab.js) already read. The garment-colour route now reads finalChecksReport.entity first and falls back to the legacy per-sceneImage copies, so old stories keep working. No migration — old rows keep their copies; new stories just stop duplicating. database.js already R2-offloads grids in BOTH locations."
-  },
-  {
-   "id": "entity-severity-casing-not-normalized-at-parse",
-   "reported": "2026-09-01",
-   "summary": "entityConsistency.js parse boundary stored issue.severity verbatim from the model. The evaluator mostly emits UPPERCASE but not always: the pirate capstone entityReport carries \"MINOR\" (Fiona) and \"minor\" (Sarah) side by side in one report. Any case-sensitive severity filter downstream silently drops the lowercase variant (the historical repairLogic gate bug fixed 2026-09-01 was the mirror image: a lowercase-only compare that never matched UPPERCASE).",
-   "status": "fixed",
-   "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
-   "note": "Parse boundary now stamps severity: String(issue.severity || \"MAJOR\").toUpperCase() (entityConsistency.js, evaluateEntityConsistency issue mapping). One casing from the source; scoring.js/repairLogic.js already lowercase their side."
-  },
-  {
-   "id": "entity-pagestofix-routing-empty-for-cell-only-findings",
-   "reported": "2026-09-01",
-   "summary": "Field-contract mismatch traced end-to-end on the stored capstone data: entityConsistency.js stamps manifest-resolved pageNumbers on each annotated issue (read only by feedbackConsolidator), while the char-fix routers (repairLogic.js:106 selectCharRepairTasks and :321 decideRepairMethod) read issue.pagesToFix || issue.pageNumber — BOTH of which came only from the model-volunteered pagesToFix field. Verdict from the trace: a bridge DOES exist when the model emits pagesToFix (on the capstone run every in-pipeline issue had it, e.g. clothing_inconsistent pagesToFix [2,6,13,14] vs pageNumbers [2] — findings DID reach char-fix, via the model-claimed multi-page set), but a finding that names only cells leaves pagesToFix undefined AND pageNumber null, so it can never reach char-fix at any severity — the exact survivorship the 2026-08 gridCellToPage fix documented (\"only findings where the model volunteered an absolute pagesToFix survived\").",
-   "status": "fixed",
-   "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
-   "note": "Contract fixed at the producer, one name both sides: the annotation site (entityConsistency.js) backfills pagesToFix (and pageNumber) from the manifest-resolved pageNumbers whenever the model omitted pagesToFix, so pagesToFix is now guaranteed populated for every locatable finding and stays the single routing field the repair readers consume. The model-emitted pagesToFix wins when present (legitimately multi-page); pageNumbers keeps its deliberate first-cell-only consolidator semantics untouched."
-  },
-  {
-   "id": "age-shift-findings-routed-to-full-figure-repaint",
-   "title": "Identity-cue entity findings (age_shift etc.) routed to FULL-FIGURE repaint because repair-mode routing keyword-sniffed the prose — 'appears older' has no keyword",
-   "reportedAt": "2026-09-01",
-   "source": "owner doctrine (G7 follow-up): 'The char is needed if figure is distorted or limbs missing or position wrong. But age cue is the face.' Evidence: G7 job age_shift finding phrased 'appears older' matched no face keyword in resolveRepairAxes and fell through to the full-figure crosshatch path — the mode that was refused 12/12 on the busy p16 while a face insert-blend patch would have addressed the age cue.",
-   "status": "fixed",
-   "fixedIn": "staging 2026-09-02 (repair-mode type mapping commit — same commit as this entry)",
-   "note": "resolveRepairAxes accepts issueTypes (finding subType/type); structured types beat keyword sniffing: FACE_DEFECT_TYPES (age_shift, face_drift, face_mismatch, facial_hair, skin_tone) -> face insert-blend, BODY_DEFECT_TYPES (clothing_inconsistent, color_change, shape_change, missing, unexpected, garment) -> full-figure. Mixed -> full-figure; no face bbox degrades to full-figure; forceTarget still wins. Threaded from decideRepairMethod (repairLogic.js), runUnifiedRepairPipeline (repairPipeline.js) and the manual character-repair route (regeneration.js). Unit-tested in tests/unit/repair-axes-types.test.ts."
-  },
-  {
-   "id": "whiteout-region-uncovered-ships-white-hole",
-   "title": "Full-figure repair composite can ship a white rectangle: treated (whited-out/crosshatched) silhouette pixels the redrawn figure does not cover paste the model's residual white onto the page",
-   "reportedAt": "2026-09-02",
-   "source": "stored evidence scratchpad piraterun2/g7-deep/v2-f1-s5.png: Grok redrew the p16 figure at a different position/scale; union-blend steps show near-white candidate content across the uncovered old silhouette. The white-card gate averages over the WHOLE union (22% threshold), so a partial hole passes it; colour matching cannot rescue pure white.",
-   "status": "fixed",
-   "fixedIn": "staging 2026-09-02 (same commit as this entry)",
-   "note": "NEW coverage guard in samUnionBlend, default ON, runs BEFORE compositing: measureWhiteHole counts old-silhouette pixels not covered by the dilated new-figure cut whose candidate content is near-white (>=243 all channels, same threshold as white-card); >2% of the silhouette AND >150px rejects the attempt (gateWhiteHole/whiteHoleMaxFrac, threaded through faceRepair gates for Lab A/B). Deliberately whiteness-scoped, not geometric: legit shrink repairs (extra limb removed) leave uncovered old pixels filled with painted background and must pass. Busy-page full-figure rejections are accepted by owner ruling — no fallback. Pure helper unit-tested in tests/unit/white-hole-guard.test.ts."
-  }
- ]
+  "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
+  "bugs": [
+    {
+      "id": "hollow-eval-scores-100",
+      "title": "Failed eval becomes evaluated:true / finalScore 100 and beats every real repair in pick-best",
+      "reportedAt": "2026-09-02",
+      "source": "fault-hunt agent A (silent-default class), verified against images.js batch wrapper + scoring.js applyScore + repairPipeline null tripwire; same disease as the 2026-08-24 dead evaluator, one seam higher",
+      "status": "fixed",
+      "fixedIn": "a02726f19",
+      "note": "evaluateImageQuality returns null on ~8 failure paths; batch wrapper stamped evaluated:true with empty lists; applyScore read empty deductions as 100; the 100 outranked genuine repairs. Fixed both seams: wrapper stamps evaluated:false + evalError; applyScore refuses evidence-free evals (finalScore null, scoreSource 'unevaluated'), discriminating real clean evals by numeric score + reasoning."
+    },
+    {
+      "id": "edit-mode-char-repair-gate-battery-regression",
+      "title": "Edit-mode body character repair produces nothing: the spine gate battery rejects every draw because Grok always re-renders the scene in box mode",
+      "reportedAt": "2026-09-01",
+      "source": "owner: 'we already fixed this before and it was working' — G7, job_1788215224103_avu132n7je p16 (Lorena). Stored retryHistory: 12/12 draws rejected across 4 endpoint calls (11x 'Model redrew the SCENE... background still differs by 27-71 grey levels' at samBlend.js bg-residual reject, 1x mask IoU 54%), before AND after the template fix e7447ec81. Stored attemptFrames prove Grok re-renders the whole 1024x1024 scene on every box-mode draw (figures preserved but reflowed, target ~1.3-1.6x oversized) — inherent model behaviour the WORKING design (d68bd8815 fullScene + 2026-07-11 old-union-new feather composite) absorbed by compositing only the figure union onto the ORIGINAL scene, with no rejection path at all. The Stage-3 spine merge (24842d2bd) routed fullScene through the uncalibrated crop-space gate battery and the 2026-08-06 box-mode bg-residual hard reject (premised on the model editing in place) finished it: body repair structurally cannot pass wherever Grok reflows.",
+      "status": "fixed",
+      "fixedIn": "e94fa715b",
+      "note": "samUnionBlend: background residual above 26 grey levels is registration telemetry (mode bg-rerendered, no shift applied), never a throw — the composite ships only the figure union, so the shipped background is the original by construction. New figure registration for body blends aligns the new silhouette bbox onto the old (height-ratio scale clamped [0.6,1.45], feet-anchored dy, centre-aligned dx; same affine on candidate + mask; kept only when bbox IoU improves >0.05; pure math unit-tested in tests/unit/figure-registration.test.ts). Every quality gate is UNCHANGED and judges the registered candidate: mask IoU 0.55, style-match, white-card, coverage, sharpness, figure-integrity naturalness — a genuinely re-posed figure still rejects. Dead Stage-3/5 orphans removed in the same commit: character-repair-grok-fullscene.txt + character-repair-gemini.txt loaders, featherComposite plumbing (UI toggle consumed by nothing; the service layer never forwarded it), RepairWorkflowPanel blackout option. Supersedes the 2026-08-06 box-mode background-reject decision (docs/decisions.md 2026-09-01). Verified on p16 via the same API route the UI uses after staging deploy."
+    },
+    {
+      "id": "fullscene-crosshatch-repair-uses-cutout-template",
+      "title": "Edit-mode character repair in fullScene (box) mode always dies at the blend gate - the crosshatch prompt is the CUTOUT template, so the model repaints the figure oversized",
+      "reportedAt": "2026-09-01",
+      "source": "owner: 'character repair from edit mode did not work' on staging job_1788215224103_avu132n7je p16 (Lorena). Reproduced via POST /repair-workflow/character-repair: 3/3 Grok draws rejected by the blend gate ('background still differs by 60-71 grey levels' x5, 'mask IoU 54%' x1 across the owner's run + the repro). attemptFrames show the model repainting Lorena ~1.6x larger than the hatched silhouette, covering sand/boat background - the gate refuses correctly; the DRAW is bad every time. Root cause: faceRepair.js buildPrompt uses characterRepairCutout for every crosshatch treatment. In box mode the model receives the FULL scene, but that template calls IMAGE 2 'THE CUTOUT TO EDIT - a scene region' and has no silhouette-size rule. The pre-spine fullScene branch used characterRepairInpaint ('The crosshatch traces the exact silhouette - match its shape, size, and pose. Do not paint outside the crosshatch.'); the Stage-3 refactor (24842d2bd, 2026-07-26) collapsed both region sources onto the cutout template and left characterRepairInpaint orphaned (loaded by prompts.js, zero consumers).",
+      "status": "fixed",
+      "fixedIn": "e7447ec81",
+      "note": "faceRepair.js buildPrompt now threads regionSource and picks characterRepairInpaint for crosshatch+box (full scene), keeping characterRepairCutout for the cutout region path. character-repair-inpaint.txt gains the {appearanceContext} placeholder the cutout template already carried (exp #360 identity facts), passed from the same fill. Verified deployed: staging /api/health at 7426a1d2, re-run confirmed the new template in use (prompt 4166 -> 3669 chars, scene wording + size rule). The template regression is fixed; p16 itself STILL fails - Grok redraws the entire scene in every mode on that busy 6-figure page (12/12 draws rejected across fullScene and cutout) and the blend gate correctly refuses. That residual is model behaviour, tracked as an open BACKLOG item (body repair on busy pages), not this bug."
+    },
+    {
+      "id": "de-ch-nameEnglish-swiss-german-dialect-trap",
+      "title": "getLanguageNameEnglish('de-ch') returns bare 'Swiss German', which a model reads as Schwyzerdütsch dialect instead of Swiss Standard German",
+      "reportedAt": "2026-08-31",
+      "source": "arc-create call (arcflow A/B) titled an arc «Nebel uf em Zürisee» - Swiss German DIALECT, not the Swiss Standard German (Hochdeutsch, ss never ß) that de-ch books must be written in. Root cause confirmed in server/lib/languages.js:344's getLanguageNameEnglish, whose de-ch entry (line 48, pre-fix) was nameEnglish: 'Swiss German'. A prior fix note already existed at server/lib/promptBuilders.js:4077-4082 (buildOutlineReviewPrompt) citing this exact trap causing a full-book dialect rewrite ('S'Fescht', 'blybt stoh') and working around it there by always pairing LANGUAGE with the full LANGUAGE_INSTRUCTION + LANGUAGE_NOTE - but getLanguageNameEnglish itself, and every OTHER call site that emits bare LANGUAGE without instruction/note (buildOutlineReviewPrompt's own review-only injection at line 3948, plus two dead fallback string builders), stayed unfixed at the root.",
+      "status": "fixed",
+      "fixedIn": "9b48deb51",
+      "note": "server/lib/languages.js: de-ch nameEnglish -> 'Swiss Standard German (ss, never ß - never dialect)' (also fixed the identical bare label in the unused getAvailableLanguages() UI list at the same file, same trap). This is the single source of truth consumed by all ~13 call sites across promptBuilders.js and storyJobPipeline.js, so every consumer is fixed by the one change - none did a string equality check against 'Swiss German' (grepped, none found), so no consumer needed adjusting. Consolidated the duplicate hand-typed map at promptBuilders.js:4903 (buildTextProofreadPrompt) into a call to getLanguageNameEnglish instead of a second, narrower hard-coded 'de-ch' -> string mapping, per the sibling-paths rule (one source of truth for a value that exists in more than one place). Grepped prompts/*.txt for bare 'Swiss German' emissions: only the story-scorecard-judge*.txt family says 'Swiss German uses ss' - left untouched, that describes the orthography RULE for judging existing text, not an instruction to WRITE in dialect, matching the existing LANGUAGE_NOTE convention. Did not touch prompts/feedback-consolidator.txt or tests/unit/inpaint-routing.test.ts (out of scope, pre-existing unrelated working-tree changes)."
+    },
+    {
+      "id": "vantage-plates-discard-the-art-directors-framing",
+      "title": "Shared vantage plates are built from Visual Bible prose only - the Art Director's per-page emptyScenePrompt is discarded, and three selection bugs pick the wrong ground, vantage and shot",
+      "reportedAt": "2026-08-29",
+      "source": "audit of 32 pages across 2 stories (incl. staging job_1787959478282_bz19gm36h): 25/30 plates were PROMPT-WRONG. p5 is the worked example - objects[] is [LOC003 reef passage, VEH001, ART003], the AD's emptyScenePrompt says the ship's deck planks fill the centre with the boom across frame, page shot is 'medium'; the shipped plate prompt contained none of that and carried SHOT: wide.",
+      "status": "fixed",
+      "fixedIn": "18a15c6e1",
+      "note": "Four mechanisms, all in the vantage-canvas path (storyJobPipeline.js Phase 5a-pre-vantage), which the per-page path at the same phase never had. (1) The plate prompt was assembled from the vantage/LOC prose and DROPPED pageData.emptyScenePrompt - fixed by the hybrid plate: the AD prose is appended as a FRAMING block that outranks the setting lines, taken from the first page a shared plate serves, and the SHOT line now comes from the page's own shot. (2) getPrimaryVantageForPage took the FIRST LOC in objects[] as the camera's ground - fixed with an ordered selection: a LOC whose vantage's pages[] names this page, then the LOC the AD's emptyScenePrompt names, then an explicit dotted reference, then first-listed. (3) The vantages[0] fallback ignored each vantage's own pages[] - now matched before falling back. (4) Locations without vantages got a synthetic plate hard-coded to shot 'wide', overriding the page's framing - now inherits the page's shot. Plus the VEHICLES block demanded the whole vessel rendered even when the camera stands on it (duplicate ships, ships inside caves, wheels on land) - it now asks for the visible part only with an explicit camera-aboard clause, and the plate call carries one reference family (landmark photo XOR VB element render) named by a REFERENCE line. Template contradiction resolved: scene-expansion(-all).txt forbade dotted vantage ids for invented LOCs while story-bible-from-beats.txt asks the bible to create vantages for them. Verified by rendering p5's merged plate prompt from stored data: FRAMING carries the deck-filling prose, SHOT is medium, REFERENCE line present. Empty-scene QC is still not wired on the vantage path (open, see docs/decisions.md)."
+    },
+    {
+      "id": "vb-grid-plate-filter-is-unreachable-code",
+      "title": "The 'drop locations when an empty-scene plate exists' filter has never fired on any non-trial story - it reads sceneBackgrounds before Phase 5a-pre fills it",
+      "reportedAt": "2026-08-29",
+      "source": "reproduced on staging job_1787959478282_bz19gm36h: 14/14 pages with a grid shipped their locations AND the ship as grid cards despite every one of those pages having a plate. Census replayed getElementReferenceImagesForPage against the stored visualBible and matched the stored grid images cell-for-cell (stable ~639px cell pitch: 1920=3 cells, 2560=4, 3191=5, 3831=6) - every page's stored grid equals the UNFILTERED selection.",
+      "status": "fixed",
+      "fixedIn": "da5cf2b59",
+      "note": "storyJobPipeline.js had `if (sceneBackgrounds[pageNum]) elementReferences = filter(type !== 'location')` inside the pageData map that PRODUCES pageDataArray. sceneBackgrounds is populated by Phase 5a-pre-vantage and Phase 5a-pre, which both CONSUME that array - so the map is {} at that point on every non-trial story and the branch is unreachable. Fix separates selection from construction: the map now stores vbElementRefs/vbSecondaryLandmarks only, and a new Phase 5a-pre-grid pass (placed after the plates exist, before every pageData.visualBibleGrid reader) applies the filter and builds the buffer. Filter now matches buildPageCompositeRefs: a plate drops BOTH location and vehicle cells; plateless pages keep everything. Same commit caps selection at 4 (was 6) at both page-grid call sites. Verified statically on the real story: 3-6 cells with a location on every page -> 1-4 cells, zero locations, no vehicle on any plated page. Related: buildPageCompositeRefs calls itself the 'single source of truth' for these filters but production page generation never calls it (only iteratePageCore + Test Lab do) - the pipeline keeps an inline copy. Also NOT fixed here: that inline copy passes secondaryLandmarks into buildVisualBibleGrid, contradicting the 2026-08-18 'a landmark photo NEVER enters the grid' decision."
+    },
+    {
+      "id": "vb-grid-shrinks-to-a-sliver-in-its-grok-slot",
+      "title": "VB reference grid arrives at Grok as a tiny thumbnail row (50x83px cells) instead of owning slot 3 at full size",
+      "reportedAt": "2026-08-29",
+      "source": "owner (staging job_1787959478282_bz19gm36h p5) + measured from the stored grokRefImages: slot 3 is 683x683 and the two VB cells in it measure 50x83px each (0.9% of the slot area), while 2 of the grid's 4 elements were dropped entirely",
+      "status": "fixed",
+      "fixedIn": "ee575cbe6",
+      "note": "Two defects in packReferences (server/lib/grok.js). (1) The own-slot gate `rawVbElements.length === visualBibleGrid.rawElements.length` abandoned the own slot whenever the grid still held a location, so the whole VB set fell back to composeCharWithVbRow's bundled thumbnail row and slot 3 went unused - inverting the owner's 2026-08-15 slot table on every such page. (2) Even when the own slot did fire it shipped buildVisualBibleGrid's 512px-wide SINGLE COLUMN through resize({height:1024}), so an N-element grid became a ~1024/N px sliver that the aspect-pad loop then pillarboxed inside a 1024-wide slot (4 elements -> 20% of the slot, 80% white bars). New composeVbSlot() re-flows the cells into the rows x columns closest to square for the target aspect and fills the slot edge to edge. Verified statically on the real stored p5 grid: per-element 50x83 -> 512x512, slot coverage 1.8% -> 100%."
+    },
+    {
+      "id": "entity-cell-to-page-map-always-empty",
+      "title": "Entity-consistency cell->page map is always empty (reads cell.metadata.pageNumber; createLabeledGrid flattens it), so every letter-only finding is dropped unscored",
+      "reportedAt": "2026-08-24",
+      "source": "owner (Lorena's face on p16, staging job_1787514666616_yw9qsv1vf) + local probe: createLabeledGrid returns cells {letter,pageNumber,...} with NO metadata object, so the shipped mapping loop yields {}",
+      "status": "fixed",
+      "task": 39,
+      "fixedIn": "b445eb256",
+      "note": "Two sites in entityConsistency.js (gridCellToPage ~958, primaryCellToPage ~1092) read the nested cell.metadata.pageNumber. Because {} is truthy, the primaryCellToPage fallback never engaged either: any issue naming only cell letters resolved to no page, got pageNumbers:[], was never stamped on a version, never scored, never repaired, and never displayed. Only findings where the model volunteered an absolute pagesToFix survived (that is how Sarah's p2 MINOR got through on this story). Also why stored descriptions lack the '(page N)' annotation. Fix reads the flat field with the nested one as fallback; verified with a probe -> {A:3,B:16}."
+    },
+    {
+      "id": "dog-triggers-gemini-fallback",
+      "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
+      "reportedAt": "2026-08-19",
+      "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
+      "status": "fixed",
+      "task": 19,
+      "fixedIn": "4268015a8",
+      "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
+    },
+    {
+      "id": "fallback-replaces-instead-of-merging",
+      "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
+      "reportedAt": "2026-08-19",
+      "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
+      "status": "fixed",
+      "task": 21,
+      "fixedIn": "4268015a8",
+      "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
+    },
+    {
+      "id": "lab-unpinned-loads-v0",
+      "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
+      "reportedAt": "2026-08-19",
+      "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
+      "status": "fixed",
+      "task": 23,
+      "fixedIn": "4268015a8",
+      "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
+    },
+    {
+      "id": "experiments-route-strips-target-params",
+      "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
+      "reportedAt": "2026-08-19",
+      "source": "exp #9 stored target {storyId,pageNumber} only",
+      "status": "fixed",
+      "task": 23,
+      "fixedIn": "4268015a8",
+      "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
+    },
+    {
+      "id": "garment-seeds-missing-empty-description",
+      "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
+      "reportedAt": "2026-08-19",
+      "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
+      "status": "fixed",
+      "task": 24,
+      "fixedIn": "4268015a8",
+      "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
+    },
+    {
+      "id": "recolour-version-not-redetected",
+      "title": "Recolour version carried a stale, fp-nulled detection with no marker",
+      "reportedAt": "2026-08-19",
+      "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
+      "status": "fixed",
+      "fixedIn": "1dcdb3c09",
+      "task": 23,
+      "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
+    },
+    {
+      "id": "bbox-cache-keys-on-url-text",
+      "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
+      "reportedAt": "2026-08-19",
+      "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
+      "status": "fixed",
+      "fixedIn": "329170a3e",
+      "task": null,
+      "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
+    },
+    {
+      "id": "loadedfrom-null-on-new-code",
+      "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
+      "reportedAt": "2026-08-19",
+      "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
+      "status": "fixed",
+      "fixedIn": "329170a3e",
+      "task": null,
+      "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
+    },
+    {
+      "id": "version-detection-null-after-eval-refactor",
+      "title": "Every stored version/page had bboxDetection NULL — eval refactor orphaned detectionForVersion leg 2",
+      "reportedAt": "2026-08-20",
+      "source": "smoke job_1787250416967_9owpz1j3b: runMetrics 18 DINO + 24 SAM calls, yet all versions+pages NULL; no code sets ev.bboxDetection anywhere any more",
+      "status": "fixed",
+      "fixedIn": "1770eb63a",
+      "note": "base original version now stamped directly with the Phase 5b-pre shared detection (its own bytes); scale-repair v0 deliberately unstamped (detection ran on post-repair bytes). som_identity_fallback=4 in the same run is still unexplained — the nulled detections destroyed the diag; now that detections persist, the next run carries identity.somFailure."
+    },
+    {
+      "id": "covers-undressed-call-site-4",
+      "title": "Gen-time page/cover identity builder (storyJobPipeline 4530) still used the old if(category) gate — all cover figures reached the detector undressed",
+      "reportedAt": "2026-08-20",
+      "source": "smoke #2 job_1787252581387_6sn8z0nh2: every cover seedTrace = 'no garment colour in the identity line', seeds=0; pages seeded fine",
+      "status": "fixed",
+      "fixedIn": "756b8e692",
+      "note": "converted to the shared buildIdentityClothingText/buildIdentityLine chain — the fourth and last unconverted identity-line builder."
+    },
+    {
+      "id": "refresh-bbox-strips-dino",
+      "title": "refresh-bbox auto-refine stripped DINO figures bare; sequential cover saves clobbered each other",
+      "reportedAt": "2026-08-21",
+      "source": "trial 1 on job_1787262655143_s9zb960muni: 21/21 detected, all persisted stripped; frontCover detection vanished",
+      "status": "fixed",
+      "fixedIn": "4b6492a8e",
+      "note": "refine skipped for /dino/ backends; cover saves awaited before response."
+    },
+    {
+      "id": "silent-detection-failures-no-alert",
+      "title": "21 DINO detection failures shipped a degraded story with zero alerting",
+      "reportedAt": "2026-08-21",
+      "source": "story s9zb960muni runMetrics dino_detect_fail=21; nothing in failure_log/daily email",
+      "status": "fixed",
+      "fixedIn": "4b6492a8e",
+      "note": "persistStoryToDatabase records customer-severity story_degraded_detection when dino_detect_fail>=3."
+    },
+    {
+      "id": "garment-seed-off-colour-centroid",
+      "title": "Garment seed dot = blob centroid, lands off-colour on non-convex blobs (neighbour hand) and mis-seeds SAM",
+      "reportedAt": "2026-08-21",
+      "source": "owner + job_1787262655143_s9zb960muni p7 (top-red dot on Kiaan hand crossing Levin shirt; also p1 Kiaan, backCover Levin)",
+      "status": "fixed",
+      "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
+      "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
+    },
+    {
+      "id": "lab-unpinned-loads-v0",
+      "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
+      "reportedAt": "2026-08-21",
+      "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
+      "status": "fixed",
+      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+      "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
+    },
+    {
+      "id": "cover-save-clobbers-scene-page",
+      "title": "refresh-bbox cover branch saved the WHOLE story doc, clobbering the preceding scene page in-flight save",
+      "reportedAt": "2026-08-21",
+      "source": "trial-3 batch on job_1787262655143_s9zb960muni: p18 refreshed then covers; p18 detection erased (sam=0/4), single-page rerun clean",
+      "status": "fixed",
+      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+      "note": "new saveCoverData(storyId, coverType, coverData): jsonb_set on {coverImages,<type>} only, imageVersions bytes to story_images, R2 offload + strip; refresh-bbox cover branch uses it with full-save fallback."
+    },
+    {
+      "id": "repair-reference-full-sheet",
+      "title": "Char-repair reference = FULL 2x4 avatar sheet: extractFaceAndBody only matches the legacy tall format (aspect 1.5-2.0), square sheets (1.0) silently skip the crop",
+      "reportedAt": "2026-08-21",
+      "source": "owner question + exp #53: Max deterministically rejected on 2 pages (bg diff 95/79, 3 internal retries ~1% apart = sheet copied); local repro: cropToFrontColumn(1024x1024 sheet) returns input bytes unchanged for ALL characters",
+      "status": "fixed",
+      "note": "char-fix (and the Lab stage) now crop the pose-matched cell via the shared resolveCellPose/cropAvatarCell chain — cropSheetCell divides by grid geometry, so SQUARE 1024x1024 sheets crop correctly (verified: front/profile/back all yield ~256x607 cells from the failing sheet). Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793).",
+      "fixedIn": "30099b228"
+    },
+    {
+      "id": "active-image-no-admin-bypass",
+      "title": "PUT active-image 404s for admins on non-owned stories -> version selection silently does not save",
+      "reportedAt": "2026-08-22",
+      "source": "owner report: story opened from the Test Lab (demo-account story, admin logged in as own account); both PUT /:id/pages/:n/active-image and /:id/covers/:type/active-image checked user_id strictly while every other story route allows admin (any story) or impersonating admin",
+      "status": "fixed",
+      "fixedIn": "84e575ae8",
+      "note": "both routes now use the shared access rule (owner | admin | impersonating admin). Client swallow noted: StoryDisplay.handleSelectVersion catches and only console.errors, so the 404 was invisible."
+    },
+    {
+      "id": "som-identity-lines-undressed",
+      "title": "Gen-time SoM identity lines had NO clothing (and no hair): builder strips Wearing from description, rebuilds from c.clothing which generation never set",
+      "reportedAt": "2026-08-22",
+      "source": "owner (hpv76p0rokg mixups) + stored evidence: p3 v0 expectedCharacters = {name, description} only; gen-time answers consistently red->Julian 4/4 calls; Lab (builder sets clothing) 6/6 correct incl exp57 5x on the same v0 bytes",
+      "status": "fixed",
+      "fixedIn": "fix(identity) 2026-08-22 (same commit)",
+      "note": "storyJobPipeline gen call site now passes clothing: clothingText alongside the description; _somIdentifyFigures additionally falls back to the description own Wearing tail when c.clothing is absent, so no caller can send characters out undressed. Explains BOTH stories mixups incl. the s9zb960muni 30/30-replays-correct ghost. Remaining smaller gap: sceneCharacters carry no physical.hair, so gen lines still lack the Hair section the Lab lines have."
+    },
+    {
+      "id": "staging-analyzer-dino-crashloop",
+      "title": "Staging analyzer cannot load GroundingDINO since the ArcFace/TensorFlow image rebuild — every detection 503s",
+      "reportedAt": "2026-08-22",
+      "source": "staging runtime log: 6x \"[GDINO] Loading GroundingDINO...\" each followed by \"GroundingDINO unavailable:\" with EMPTY error (OOM-kill signature); Lab exps #799/#800 blocked/failed on /detect-figures-text HTTP 503 ~40min after deploy of f1448757b",
+      "status": "fixed",
+      "note": "Likely memory: TensorFlow(+deepface) now resident in the analyzer alongside DINO ~1.9GB + MobileSAM. The ArcFace commits (b123a2088 opt-in warmup, 36129ad73 idle reaper) hint at known pressure. Owner: the other agent (ArcFace author) is running a smoke test and owns this. Blocks verification of the identity fixes (task #29 exp on p1 waiting). UPDATE bbd41215: new build deployed, SAME crash loop (exp #801 failed identically, 503s). The empty error comes from get_groundingdino() (photo_analyzer.py:1975) — from_pretrained throws an exception whose str() is empty; the handler at :2089 prints only {load_err}. IMMEDIATE DIAGNOSTIC: log repr(load_err) + traceback there. Suspects: (a) transformers import path now touching the TF-2.13/protobuf-3.20.3 corridor (transformers auto-detects installed TF), (b) OOM during weight load with TF resident, (c) missing pre-downloaded weights in the rebuilt image (Dockerfile pre-download step vs new layer). ROOT CAUSE FOUND: Dockerfile layer order — requirements.txt (TF 2.13) downgrades typing_extensions below torch/transformers floor; the DINO pre-fetch layer ran BEFORE the typing_extensions>=4.12 repair layer, failed, was swallowed by || WARN, and the image shipped WITHOUT DINO weights; every runtime load re-downloaded ~900MB and died with an empty-str exception. FIX: typing_extensions upgrade moved BEFORE the pre-fetch layer; loader 503 path now logs repr+traceback+cache-presence so an empty str can never blind us again. CORRECTED ROOT CAUSE (diagnostics from 538d2f540): transformers>=4.44 re-resolved to 5.x in the ArcFace rebuild; transformers 5 requires torch>=2.5 and DISABLES our torch 2.1.2 (held there by the numpy==1.24.3 co-pin TF 2.13 needs) — every model class raised PyTorch-not-found. Fixed by pinning transformers<5 (a057d8017). The layer-order fix (typing_extensions before pre-fetch) stays as hardening.",
+      "fixedAt": "2026-08-22",
+      "fix": "ArcFace gate is now OFF by default (ARCFACE_GATE_ENABLED, server/lib/faceIdentity.js). Confirmed the cause rather than assumed it: POST /api/health/release-memory on staging reported 2336MB RSS and unload=true listed 'arcface-weights' as resident, dropping it to 1862MB. TensorFlow's ~350MB on top of GroundingDINO's ~1.9GB exceeded the container, so DINO died on load with an empty error and crash-looped. Disabled, no TF is imported at all and the analyzer returns to its pre-change footprint. The idle reaper could not have saved it: it requires the whole SERVICE to be idle, which never happens during a Lab run or a story. Re-enabling needs ArcFace out of the shared analyzer process.",
+      "fixedIn": "fix(analyzer) 2026-08-22 (same commit)"
+    },
+    {
+      "id": "text-refine-truncation-silent-converge",
+      "title": "Refiner output hit the 16k token cap; truncated reply parsed as zero rewrites and shipped as 'nothing to rewrite'",
+      "reportedAt": "2026-08-23",
+      "source": "job_1787423677246_r9llf5yi9 — text_refine usage row exactly 16000 output tokens, textRefineReport null, em-dashes shipped on p1/p12 despite the dash ban being an auto-flag",
+      "status": "fixed",
+      "fixedIn": "49ea80011",
+      "note": "server/lib/textRefine.js: cap raised 16000->32000 (deepseek-v4-pro allows 64k) and output_tokens >= cap now throws, recording a failed round instead of a silent convergence. storyJobPipeline.js join logs text_refine_failed (warn) when a round failed, distinct from a real nothing-to-rewrite."
+    },
+    {
+      "id": "closeup-face-eaten-by-leak-filter",
+      "title": "Close-up faces lost: leak filter + 0.15-crop cap rejected real full-frame faces (figure ships faceless)",
+      "reportedAt": "2026-08-23",
+      "source": "owner spotted Fiona r9llf5yi9 p2 (score 0.274, faceBox null) in the filter audit; crop-recovery cap 0.15*crop rejects any face >15% of its person crop",
+      "status": "fixed",
+      "fixedIn": "fix(detection) 2026-08-23 (same commit)",
+      "note": "crop-recovery cap 0.15->0.5; page-level leak-filter drops now logged in diag.faceLeaksDropped. Bundled: pre-identity crowd prune (faceless+<0.8%+score<0.45, face-contact untouchable, expected-count floor)."
+    },
+    {
+      "id": "cover-identity-undressed",
+      "title": "Cover refresh identity lines had empty clothing — coverHints deliver category labels/empties, the category filter blanks them, SoM matches on hair alone",
+      "reportedAt": "2026-08-23",
+      "source": "owner spotted wrong clothing on mfedxinwqd covers; frontCover detection swapped Levin/Julian (both blond curly); persisted expectedCharacters show clothing:\"\" and no Wearing in the prose; entity eval then reported a phantom Levin-wrong-shorts MAJOR",
+      "status": "fixed",
+      "fixedIn": "fix(refresh-bbox) 2026-08-23 (same commit)",
+      "note": "refresh-bbox cover branch now resolves each character through the shared buildIdentityClothingText chain (hint category -> clothingRequirements -> standard -> wardrobe). Separate finding kept open in #33: the entity eval MISSED Julian wearing only briefs (no trousers) on the backCover."
+    },
+    {
+      "id": "cancelled-job-persists-and-emails",
+      "title": "Cancel during repair/covers still persisted the story and emailed the customer; rerun-full emails the SOURCE story owner",
+      "reportedAt": "2026-08-23",
+      "source": "job_1787469664089_9e27p42el7l — admin rerun of a customer story cancelled at 81%; no checkCancellation after image phase, email block outside the completion guard; container restart was needed to stop the mail",
+      "status": "fixed",
+      "fixedIn": "same commit",
+      "note": "storyJobPipeline.js: checkCancellation() before avatar-persist/upsertStory; completion email now requires completionRes.rowCount>0 AND !inputData.adminRerun. server/routes/admin/jobs.js: rerun-full stamps adminRerun=true."
+    },
+    {
+      "id": "checkpoint-reaper-destroys-forensics",
+      "title": "Checkpoint purge policy: 1h retention for failed/cancelled, no salvage path for cancelled jobs",
+      "reportedAt": "2026-08-23",
+      "source": "job_1787469664089_9e27p42el7l post-mortem. NOTE: this job in fact had ZERO checkpoints (never written — separate investigation running); the purge policy and missing salvage were real defects found during that investigation and would have destroyed the evidence had it existed.",
+      "status": "fixed",
+      "fixedIn": "same commit",
+      "note": "server/routes/jobs.js cleanupOldCompletedJobs: salvage-before-cleanup (savePartialStoryFromCheckpoints for failed/cancelled jobs with checkpoints and no titled story); failed/cancelled checkpoints+rows NEVER auto-deleted (owner: keep the failed 1% forever); completed stays 1h."
+    },
+    {
+      "id": "cover-naming-two-names",
+      "title": "coverHints keyed by outline vocabulary (titlePage) while everything else says frontCover — third scheme (pipeline coverType titlePage) too",
+      "reportedAt": "2026-08-23",
+      "source": "owner: \"why do we have 2 names for the same thing\" — the mismatch left the frontCover identity lines undressed through two fix rounds while other covers healed",
+      "status": "fixed",
+      "fixedIn": "fix(covers) 2026-08-23 (same commit)",
+      "note": "Unified: outline parser translates the Title Page section at its boundary and writes coverHints.frontCover (unified+legacy+shared keyword map); migration 026 renamed titlePage in all stored stories (prod 106, staging 122, 0 remaining); COVER_HINT_KEY/coverKeyToHintKey retired from coverKeys.js and all 6 consumers read coverHints[coverKey] directly; pipeline coverType token titlePage renamed frontCover (storyJobPipeline + trial coverTypes) with a one-boundary legacy normalizer for queued jobs. Trial UX fields (titlePageImage etc.) are a different concept and untouched."
+    },
+    {
+      "id": "eval-tdz-expectedagesblock",
+      "title": "evaluateImageQuality threw ReferenceError on EVERY call — expectedAgesBlock read in its temporal dead zone; two whole books shipped with no quality/semantic score and no auto-repair",
+      "reportedAt": "2026-08-24",
+      "source": "staging job_1787514666616_yw9qsv1vf (16pp) + prod job_1787514321173_gvs2ojo4o0n (18pp): analytics.models.quality=[], zero page_quality/semantic_compliance calls in generationLog, every page finalScore=100 semanticScore=null, scoreBreakdown.visual.score=0. Only two stories in either DB with 0/N semantic coverage; every prior story is N/N.",
+      "status": "fixed",
+      "fixedIn": "935a46b8b",
+      "note": "0c9fa78e3 added `expectedAges: expectedAgesBlock` at evalPipeline.js:929 inside the evaluateThreeStage launch, while `let expectedAgesBlock` stayed at :1046 — a TDZ read, so the function threw on entry and the outer catch returned null for every page and every cover. Declaration moved above the launch. Verified: page 15 of the prod story now evaluates to score 90 in 1.5s instead of returning null. Same failure class the function header already documents for the hoisted promise handles. NOTE: the repair endpoints in regeneration.js call the same function, so the repair workflow was dead in prod for the same window."
+    },
+    {
+      "id": "text-refine-join-discards-paid-work",
+      "title": "Text refine + blind audit completed and were discarded at the bounded join — $0.236 of grok audit and deepseek rewriting thrown away, original text shipped",
+      "reportedAt": "2026-08-24",
+      "source": "staging job_1787514666616_yw9qsv1vf (16pp, languageLevel standard): generationLog text_refine_start 20:38:36 -> text_refine_join_timeout 20:57:29, textRefineReport null, yet api_usage records text_audit 1 call grok-4.6 18,396 out $0.1169 and text_refine 1 call deepseek-v4-pro 29,931 out $0.1188. Same evening prod job_1787514321173_gvs2ojo4o0n (1st-grade) finished audit + 2 rounds in 584s and joined fine.",
+      "status": "fixed",
+      "fixedIn": "a6d92d25a",
+      "note": "refineStoryText returned all-or-nothing, so a finished audit and a finished round 1 were worth nothing when the join deadline landed during round 2. Two causes compounded: the 300s budget was measured 2026-08-17, before 77d0fae0a put the blind audit in front of the rounds and roughly doubled the stage; and standard/advanced reading levels produce far larger payloads (this audit emitted 2.3x the 1st-grade run tokens). Fix: onProgress publishes the audit and each completed round, the join salvages the last snapshot, and the cap is 600s for long-text levels + 10s/page past ten. Precedent the cap-raise alone did not fix: job_1786998860057_o6deqtv5s lost $0.16 the same way on 2026-08-17. Regression test tests/manual/test-text-refine-salvage.js."
+    },
+    {
+      "id": "trial-vb-has-no-animals-pool-species-word-deleted",
+      "title": "Every animal in a TRIAL story loses its species word before the image model sees it — the trial Visual Bible has no animals pool, so animals are filed as artifacts and the sanitizer replaces the name with the type",
+      "reportedAt": "2026-08-25",
+      "source": "staging job_1787683120734_qkgfbd86o (6pp trial, de-ch). VB stored ART002 \"Brauner Hund\", type \"Tier\", description \"Ein kleiner, flauschiger brauner Hund mit weichen Schlappohren...\". Every page cites ART002. The stored page prompts read \"Ein kleiner, flauschiger Tier mit weichen Schlappohren\" — the word Hund is gone from all six prompts, and the German agreement break (flauschiger Tier) shows it is a blind string replacement. With no species anchor the render is a free choice per page: shaggy ginger on p1/p2/p3/p6, golden retriever puppy on p5.",
+      "status": "fixed",
+      "note": "prompts/story-trial.txt VB schema offers only secondaryCharacters / artifacts / locations / backgrounds — no animals array. story-bible-from-beats.txt:138 and story-unified.txt:671 both have one, so this is trial-only. sanitizeVbIdsInPrompt (promptBuilders.js:3332) protects NAME_POOLS = mainCharacters/secondaryCharacters/animals and rewrites REF_POOLS = artifacts/vehicles/clothing to their type, which is correct for a prop (stops the name being lettered onto it, 2026-08-24 fix) and wrong for a living thing. Second defect visible in the same evidence: the substitution also fires INSIDE the entry own description, so the description that teaches the model what the thing looks like is the very text being degraded, and the bullet label becomes the first two words of the description (\"**Ein kleiner** (object)\", \"**Eine runde** (object)\").",
+      "fixedIn": "5e8a0d1e3"
+    },
+    {
+      "id": "char-repair-target-bad-logger-require-broke-staging-deploys",
+      "title": "Staging deploys failed for 34 minutes — charRepairTarget.js required ./logger, which does not exist, so server.js could not boot",
+      "reportedAt": "2026-08-25",
+      "source": "Railway staging deployment 0b5acc98-90c2-426a-b982-ba41d1a69191 (commit 1140e8176) status FAILED. Deploy log: \"Error: Cannot find module ./logger\" at /app/server/lib/charRepairTarget.js:22, require stack charRepairTarget -> repairPipeline -> storyJobPipeline -> server.js. Introduced by 3565fced9 (20:38 CH); every push after it failed to deploy, and the /api/health commit SHA kept reporting the last GOOD build (0fb99344), so the breakage was invisible from the outside.",
+      "status": "fixed",
+      "fixedIn": "bb933ca08",
+      "note": "charRepairTarget.js sits in server/lib/ and the logger lives at server/utils/logger.js, exported as { log }. Every sibling uses const { log } = require(\"../utils/logger\"); this file had const log = require(\"./logger\"). Two lessons: (1) /api/health reports RAILWAY_GIT_COMMIT_SHA, which is the last SUCCESSFUL build — it cannot detect a failed deploy, so gating a validation run on it is unsound; check a boot-time side effect (a migration column) or the Railway deployment status instead. (2) check-no-undef in the pre-push hook does not resolve require() paths, so a bad module path passes every gate and only fails at container start."
+    },
+    {
+      "id": "text-audit-empty-depicts",
+      "reported": "2026-08-28",
+      "summary": "buildTextAuditPrompt reads the picture side via a THIS IMAGE DEPICTS regex that only ever matches image prompts, never briefs; extractRefinablePages sceneIntent JSON.parse on outlineExtract (BEAT prose) also always fails. Every page reached the text audit as THE PICTURE SHOWS: (no picture description) — verified on 9 pages across 3 staging stories (job_1787867402809, job_1787812110559, job_1787777447720). The MISMATCH question could never fire.",
+      "status": "fixed",
+      "fixedIn": "f5e62bf34",
+      "note": "sceneMetadata.sceneIntent is the canonical one-line picture summary; extractRefinablePages now reads it first, buildTextAuditPrompt prefers p.sceneIntent over the depictsOf regex."
+    },
+    {
+      "id": "testlab-stale-withCarriedFindings",
+      "reported": "2026-08-28",
+      "summary": "runStoredBeatsScenes (testlab.js) required withCarriedFindings from carryRoutes, which exports withCarriedRulings since the carry-routes reduction — every useStoredBeats beats_scenes experiment crashed with \"withCarriedFindings is not a function\" (reproduced: Lab experiments 893-896).",
+      "status": "fixed",
+      "fixedIn": "3d1497d4a",
+      "note": "renamed to withCarriedRulings at all three call sites."
+    },
+    {
+      "id": "covers-const-coverPrompt-reassignment",
+      "reported": "2026-08-29",
+      "summary": "Every story since 2026-08-26 shipped with coverImages {} — zero covers on 7 consecutive staging runs (job_1787959478282_bz19gm36h, job_1787867402809_z9bwoo3yp, job_1787812110559_n311ykfmin and four more). The cover-template retirement (c0d594a75) declared 'const coverPrompt = buildCoverPrompt(...)' in the streaming cover path while the VB-id sanitizer ten lines below still reassigns it, so every cover threw TypeError: Assignment to constant variable BEFORE any image call — no usage, no genLog entry, no stored error. coverIterate.js:651 had the identical const (reassigned at 676/692/704), so manual cover regeneration was broken the same way. Last story with covers: 2026-08-25T20:23Z; first without: 2026-08-26T18:50Z, straddling the commit.",
+      "status": "fixed",
+      "fixedIn": "f1a92b312",
+      "note": "const -> let at storyJobPipeline.js:1626 and coverIterate.js:651. Per-cover failures now also written to the stored genLog (cover_failed / covers_all_failed) instead of console-only."
+    },
+    {
+      "id": "page-image-missing-ships-silently",
+      "reported": "2026-08-29",
+      "summary": "job_1787959478282_bz19gm36h shipped pages 1 and 3 with imageVersions[0].imageData = \"\" (no story_images scene row, no eval, no score). generateImageOnly THROWS when a provider returns no image (Grok primary fails -> Gemini fallback -> 3 sanitization levels -> throw); the per-page catch in the generation loop returns {imageData:null} and the story continued to persistence. Only trace was a console log.error and the \"14/16\" count in generation_complete — no genLog error, no retry, no flag, and the book audit silently skipped both pages.",
+      "status": "fixed",
+      "fixedIn": "f1a92b312",
+      "note": "Phase 5a now sweeps rawImages for missing bytes: genLog.error(page_image_missing) with the error text, ONE retry through generateImageOnly (skipCache), then genLog.error at save time plus data.missingImages / data.missingCovers on the stored story. Retry is fully guarded — it can never crash the job."
+    },
+    {
+      "id": "gemini-thinking-budget-truncates-image-analysis",
+      "reported": "2026-08-29",
+      "summary": "gemini-2.5-flash spends maxOutputTokens on THINKING before the answer. landmarkPhotos.js analyzeImageQuality (cap 300) measured finishReason=MAX_TOKENS, thoughts=284, answer=12 — the JSON died at {\"photoQuality\": 8, the /{[sS]*}/ match failed, and EVERY image returned null. The caller reads null as unusable and logs \"No good images found from any source\", so landmarks were indexed with no picture and no error; with forceReanalyze it can overwrite a stored photo with nothing. Likely origin of the 210 photoless Swiss rows. Sibling call analyzeLandmarkPhoto (cap 400) does not fail — it stores a 60-character truncated description that feeds the illustration prompt.",
+      "status": "fixed",
+      "fixedIn": "37646a21a",
+      "note": "thinkingConfig { thinkingBudget: 0 } + cap 600 on both; verified after fix finishReason=STOP, thoughts=0, answer 75/105 tok, JSON parses. Same defect patched in 4 historical-image admin scripts. server/routes/avatars.js left alone: 4096 has headroom, works, only wastes thinking tokens. Parse failure raised from log.debug to log.warn carrying finishReason, because at debug a config fault was indistinguishable from ordinary photo rejection."
+    },
+    {
+      "id": "beats-batch-expansion-truncates-silently",
+      "reported": "2026-08-31",
+      "summary": "The batched Art Director call truncated after page 11 and pages 12-16 silently fell back to per-page expansion (no batch retry, fallback booked under the same usageLabel). job_1788123310558: beats_scene_expansion shows 6 calls / 42,260 output tokens under one label; generationLog beats_scene_expansion_incomplete says 11/16 briefs. Root cause CONFIRMED as an undersized config cap: the default sceneDescription model gemini-3.1-pro carried maxOutputTokens 16384 in TEXT_MODELS while OpenRouter's top_provider.max_completion_tokens for google/gemini-3.1-pro-preview is 65536 (checked 2026-08-31) — the call site already passes maxTokens=null (full cap), so the config cap WAS the effective truncation point.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "models.js: gemini-3.1-pro maxOutputTokens 16384 -> 65536 (real OpenRouter limit; the old judge-context caveat kept — the cap was never the judge fix). beatsPipeline.js: the all-pages call now retries the batch ONCE when it parses fewer briefs than beats (first attempt's pages win the merge, retry only fills gaps), with a loud log.error + genLog beats_scene_expansion_truncated naming the missing pages; the existing beats_scene_expansion_incomplete warn still names every page that ultimately fell back. Per-page fallback calls now book under usageLabel beats_scene_expansion_fallback so a truncated batch is visible in the usage summary."
+    },
+    {
+      "id": "vantage-plates-skip-empty-scene-qc",
+      "reported": "2026-08-31",
+      "summary": "The vantage-plate block (storyJobPipeline Phase 5a-pre-vantage) never called validateEmptyScene while the per-page path always has — on job_1788123310558 empty-scene QC ran 0 times (all pages were vantage-covered) and the p2 plate shipped with a blocked foreground and paper margins, exactly the defect classes the validator checks.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "Reused, not redesigned: the same validateEmptyScene + one retry-with-feedback loop as the per-page path, called per plate. textPosition passed as null (a shared plate serves pages with different text zones, so no calm-zone grading; the pixel white/black-box artifact checks and the vision people/foreground/signage checks all still run). characterPlacements = union of sceneMetadata.fullData.characters across the plate's page group; storyEra derived identically to the per-page path. Retry validated pixel-only (skipVision) and kept only when it passes or has fewer issues. Outcomes genLogged (vantage_plate_qc / vantage_plate_qc_failed / vantage_plate_qc_retry) and the v1/v2 QC history stored on sceneBackgrounds in the same shape the per-page path stores. A validator error keeps the unvalidated plate — QC can never cost a plate."
+    },
+    {
+      "id": "proofread-withdrawn-fault-lines-counted",
+      "reported": "2026-08-31",
+      "summary": "The proofread stream leaked reasoning prose ('Let me work through this carefully page by page.') and a finding that withdraws itself mid-line ('...as a compound image is fine — withdraw. Let me re-examine.') into the corrective round: the withdrawn line still matches FAULT_LINE_RE so it was counted and merged raw (job_1788123310558 stored proofread: countFaults=9 vs the model's own FAULTS: 8). NOTE — the second half of the reported premise did NOT reproduce: proofread findings were NOT dropped from the corrective round; the stored audit2 of the same job contains the proofread faults verbatim (gleichmässig, Leimnaht), wired since the b81c5010c-era merge at textRefine.js. The corrective round ran with them and changed zero pages — a model outcome, not missing wiring.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "textRefine.js: sanitizeProofreadFindings() keeps only lines matching ^FAULT[TAG]*: and discards any FAULT line carrying a withdrawal marker (withdraw / '— fine' / re-examine); the sanitized form feeds countFaults and the audit2 merge, the raw stream stays persisted for traceability, and discarded lines are logged. Unit-checked against the stored output (scratchpad piraterun/q7-ai-dialogue/tr-proofread.txt): 9 -> 8 faults, the withdrawn Möwensegel line and the reasoning leak both dropped, matching the model's own FAULTS: 8 tally. The main audit stream is deliberately untouched (different format, out of scope)."
+    },
+    {
+      "id": "semantic-eval-judges-against-beats-scene",
+      "reported": "2026-08-31",
+      "summary": "The semantic evaluator received the beats SCENE (scene.outlineExtract/sceneHint) as SCENE_HINT — labeled 'the authoritative source' in prompts/image-semantic.txt — while page images are generated from the Art Director brief. Images were penalized for obeying their own generation prompt: job_1788123310558 p6 CRITICAL 'missing Fiona' and p9 MAJOR 'chart not in her hand', both absent from the AD brief the render followed.",
+      "status": "fixed",
+      "fixedIn": "fix(bugs) 2026-08-31 (same commit)",
+      "note": "Wiring only, prompt untouched. All SCENE_HINT producers greped and swapped to the content the image was MADE from: repairPipeline.js buildEvalInputs + baseline inputs (orig.scene.outlineExtract || entry.description || sceneDescription || scene.sceneHint — covers hit leg 1 unchanged because their outlineExtract IS the cover brief and pages never set outlineExtract; entry.description wins on an iterate rewrite), regeneration.js re-evaluate + eval-prompt routes (cover branch keeps the old expression), testlab.js ctx.outlineHint (Lab/prod parity). Shapes stable (string|null everywhere). Side benefit: evaluateThreeStage/interaction extraction now parse the METADATA block the AD brief carries."
+    },
+    {
+      "id": "character-avatars-store-base64-in-jsonb",
+      "reported": "2026-09-01",
+      "summary": "characters.data still stores base64 image bytes, violating the no-images-in-JSONB rule. extractInlineImagesToR2 is STORY-ONLY (every call site passes a storyId); the character write paths in server/routes/avatars.js and server/lib/storyAvatars.js never call it, so nothing offloads them. Measured on prod 2026-09-01: 40 of 59 character rows carry data:image, 73 MB; still happening today (newest row 2026-09-01, 4.2 MB inline). Worst fields, sampled over 4 rows: avatars.storyHistory[].sheetUrl 10.31 MB, avatars.styledAvatars.<style>.standard/.costumed.default 9.02 MB, preGeneratedAvatarSlides[] 1.13 MB, photos.bodyNoBg 1.13 MB, bodyNoBgUrl 0.65 MB — note sheetUrl and bodyNoBgUrl are NAMED url and hold data URIs. stories.data is clean since 2026-06 (0 inline in Jun/Jul/Aug/Sep), so the story path was fixed and characters were left behind. Cost impact: Postgres RAM tracks database size (shared_buffers is only 160 MB, the rest is OS page cache of the DB files), prod DB 1818 MB -> 2.14 GB container RAM.",
+      "status": "fixed",
+      "fixedIn": "fix(characters) 2026-09-01 (same commit)",
+      "note": "Leak closed at both write paths: storyAvatars.js uploads the 2x4 sheet to R2 before writing storyHistory[].sheetUrl (it was assigning raw bytes to a field named *Url), and the avatars.js character upsert runs extractCharacterInlineImagesToR2 over data AND metadata. That function is a GENERIC deep sweep, not a field list, so a new avatar field cannot reopen the hole. Both throw when R2 is unavailable instead of silently storing base64. Existing rows migrate via scripts/admin/migrate-inline-images-to-r2.js."
+    },
+    {
+      "id": "cast-unlisted-fires-forever-on-titled-bible-names",
+      "reported": "2026-09-01",
+      "summary": "sceneBriefCheck's cast_unlisted decided 'is this cast member listed?' with exact string equality (listed.has(name.toLowerCase())). The visual bible declared a secondary as 'Kapitänin Rossa'; every brief's characters[] listed her as 'Rossa'. The strings never match and the prose does contain the literal bible name, so she was reported missing from a list she was already on — on all six of her pages in job_1788215224103_avu132n7je. Unclearable by construction: prose and metadata already agreed, so no rewrite could resolve it. The scene review ran, the targeted second round ran, re-check returned before=6 after=6 at real token cost. Control in the same corpus: job_1788123310558_1yx71oyo1wg, same story and cast, bible name plain 'Rossa' — zero findings. Identical exact-equality flaw in the unified-path emitter sceneConsistencyCheck.js (prose_char_absent_from_metadata and four sibling types).",
+      "status": "fixed",
+      "fixedIn": "fix(brief-check): cast_unlisted compares figures, not strings — 2026-09-01 (same commit)",
+      "note": "THREE PRIOR FIXES MISSED THE MATCHER. 50b0ebc0c (2026-08-11) created the check. 68dcc717f (2026-08-16) widened castNames to visualBible.secondaryCharacters — the CAUSE, since bible names carry titles while briefs use the short form. edd75f3c2 (2026-08-25) added the post-review re-check: pure observation, made the repeat firing visible without a way to clear it. c92d56ff2 (2026-08-25) sharpened the finding text and added a targeted second round — re-asked an identical false question of the same model. All four touched plumbing around the finding; none touched the name comparison. Fix: one shared helper isSameFigureName (sceneMetadata.js) — same figure iff token lists are equal or the shorter is a leading/trailing RUN of the longer, parentheticals stripped and possessive tokens dropped. Admits 'Kapitänin Rossa'≡'Rossa', refuses 'Hans Meier'≢'Anna Meier' and \"Rossa's crew member (trapped)\"≢'Rossa'. Both emitters use it. Verified by replaying every stored staging story: 6 pages firing before, 0 after, each suppression a verified title/short-name pair, no other finding changed. Known remaining asymmetry (deliberate, asserted in tests, see docs/decisions.md 2026-09-01): the PROSE side still needs the full cast name, so prose saying only 'Rossa' with characters[] omitting her is a miss — widening it would false-positive on any two-word bible name ending in a common noun."
+    },
+    {
+      "id": "entity-charfix-gate-severity-casing-dead-plus-inpaint-instruction-refill",
+      "reported": "2026-09-01",
+      "summary": "repairLogic.js entity->char-fix gate (decideRepairMethod step 2) and selectCharRepairTasks both compared severity with lowercase-only string equality (issue.severity !== 'major' && !== 'critical') while the entity evaluator emits UPPERCASE severities (job_1788215224103_avu132n7je: MAJOR x96, CRITICAL x16) — the entity->char-fix route was dead code. On p16 the CRITICAL age_shift for Lorena fell through to inpaint, where the per_character_fixes entry had no fix_instruction and the fallback (p.fix_instruction || (p.issues||[]).join('; ')) pasted the defect diagnosis ('appears visibly older...') to Grok as the edit instruction: Lorena was painted into her 60s and that version shipped. Reproduced offline against stored story data: BEFORE p16 -> inpaint (4 quality, 2 targets); AFTER p16 -> char-fix (entity critical on Lorena).",
+      "status": "fixed",
+      "fixedIn": "504a5faf2",
+      "note": "Fix per owner ruling G5/option 2: gates case-insensitive AND restricted to CRITICAL only (MAJOR entity findings get no automatic repair; NOT_INPAINTABLE_TYPES keeps character types out of inpaint). Empty fix_instruction entries dropped loudly; issues-join refill deleted. Char repair pinned to grok-imagine-image 1.x via REPAIR_DEFAULTS.charRepairModel. See docs/decisions.md 2026-09-01 G5 entry."
+    },
+    {
+      "id": "text-refine-prompt-fed-arc-not-beats",
+      "reported": "2026-09-01",
+      "summary": "prompts/text-refine.txt tells the refiner 'where the beats and the story differ, the beats are the story's final form', but the only story block it ever received ({STORY_ARC}, filled at storyJobPipeline.js:3315 from arcReviewReport.finalArc, with beatsReviewReport.arc as fallback — also the arc, since beatsPipeline.js stamps plan.arc = approvedArc) was the ARC, never the locked beats. On job_1788215224103 p11 the beat text explicitly reads 'Dark water seeps toward the chest-space in the cistern, not toward any person' (a deliberate safety cut — no person is endangered), but the arc's page 11 entry has Rossa 'sending a crewman down on a rope' who gets trapped as the water rises. Believing its own 'beats win' instruction while blind to what the beats actually said, the refiner reinstated the arc's trapped crewman into the shipped text — the run's only CRITICAL finding. Confirmed by rendering the fixed prompt offline against the stored job's data: the new # THE BEATS section for p11 now carries the exact 'not toward any person' beat text.",
+      "status": "fixed",
+      "fixedIn": "b736f0ff7",
+      "note": "extractRefinablePages (textRefine.js) now reads each page's locked BEAT out of scene.outlineExtract (guarded on the 'BEAT:' marker so a unified-mode page, where outlineExtract holds the scene expansion's own JSON, never gets mistaken for one — same guard storyScorecard.js's finalBeats() already uses) and drops the PLAN line: PLAN is staging shorthand for the artist and on this exact page it names a person the BEAT text deliberately did not. buildTextRefinePrompt (promptBuilders.js) fills a new {STORY_BEATS} block from it. prompts/text-refine.txt now has two separate sections — '# THE ARC' ({STORY_ARC}, background judgment context) and '# THE BEATS' ({STORY_BEATS}, the story's final form, beats win on conflict) — mirroring the writer's own story-text-from-beats.txt, which already kept ARC and BEATS apart and was not affected. Empty on a unified-mode story (falls back to arc + scene outlines only, same as before). No plumbing changes needed in storyJobPipeline.js/testlab.js's three refineStoryText call sites — all three already run pages through extractRefinablePages, which now carries the beat automatically."
+    },
+    {
+      "id": "text-refine-audit-rulings-dropped-key-collision",
+      "reported": "2026-09-01",
+      "summary": "storyJobPipeline.js:5389 builds textRefineReport.roundsDetail as a per-round trace array (round/ok/modelKey/changedPages/...), overwriting the field of the SAME name that refineStoryText (textRefine.js) already returns holding something else entirely: parseAuditRulings' per-fault ledger (rulings each fixed/stands/withdrawn, plus which prior faults the re-audit never ruled on). usable.roundsDetail (the ledger) was never read anywhere in storyJobPipeline.js — the local object literal's own roundsDetail key silently shadowed it before persistence, so no story has ever shipped a per-fault ruling in its textRefineReport despite the mechanism (textRefine.js:319, parseAuditRulings) computing one every run with a re-audit.",
+      "status": "fixed",
+      "fixedIn": "fix(text-refine): auditRulings ledger no longer shadowed by the per-round trace field — 2026-09-01 (same commit)",
+      "note": "Renamed the per-round trace field to roundTrace and added auditRulings: usable.roundsDetail to textRefineReport, so both survive. Confirmed no other code (grepped server/, client/src/) reads textRefineReport.roundsDetail by that name, so the rename is non-breaking."
+    },
+    {
+      "id": "entity-report-duplicated-on-every-scene-image",
+      "reported": "2026-09-01",
+      "summary": "repairPipeline.js stamps the SAME story-level entity consistency report object onto every results row (entityReport per page), and storyJobPipeline.js:5241 copied it into every stored sceneImage — a 16-page story persisted 16 identical copies of a report that already ships once as finalChecksReport.entity (built from pipelineResult[0].entityReport at storyJobPipeline.js:5657). Confirmed on the pirate capstone working set: every sceneImage row carried the identical report. Only consumer of the per-scene copies was the garment-colour route (server/routes/stories.js:2083), which took the FIRST sceneImage carrying one.",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
+      "note": "storyJobPipeline.js no longer stamps entityReport per sceneImage (comment left at the site); the report is stored once at finalChecksReport.entity, which the repair endpoints (regeneration.js:5279, testlab.js) already read. The garment-colour route now reads finalChecksReport.entity first and falls back to the legacy per-sceneImage copies, so old stories keep working. No migration — old rows keep their copies; new stories just stop duplicating. database.js already R2-offloads grids in BOTH locations."
+    },
+    {
+      "id": "entity-severity-casing-not-normalized-at-parse",
+      "reported": "2026-09-01",
+      "summary": "entityConsistency.js parse boundary stored issue.severity verbatim from the model. The evaluator mostly emits UPPERCASE but not always: the pirate capstone entityReport carries \"MINOR\" (Fiona) and \"minor\" (Sarah) side by side in one report. Any case-sensitive severity filter downstream silently drops the lowercase variant (the historical repairLogic gate bug fixed 2026-09-01 was the mirror image: a lowercase-only compare that never matched UPPERCASE).",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
+      "note": "Parse boundary now stamps severity: String(issue.severity || \"MAJOR\").toUpperCase() (entityConsistency.js, evaluateEntityConsistency issue mapping). One casing from the source; scoring.js/repairLogic.js already lowercase their side."
+    },
+    {
+      "id": "entity-pagestofix-routing-empty-for-cell-only-findings",
+      "reported": "2026-09-01",
+      "summary": "Field-contract mismatch traced end-to-end on the stored capstone data: entityConsistency.js stamps manifest-resolved pageNumbers on each annotated issue (read only by feedbackConsolidator), while the char-fix routers (repairLogic.js:106 selectCharRepairTasks and :321 decideRepairMethod) read issue.pagesToFix || issue.pageNumber — BOTH of which came only from the model-volunteered pagesToFix field. Verdict from the trace: a bridge DOES exist when the model emits pagesToFix (on the capstone run every in-pipeline issue had it, e.g. clothing_inconsistent pagesToFix [2,6,13,14] vs pageNumbers [2] — findings DID reach char-fix, via the model-claimed multi-page set), but a finding that names only cells leaves pagesToFix undefined AND pageNumber null, so it can never reach char-fix at any severity — the exact survivorship the 2026-08 gridCellToPage fix documented (\"only findings where the model volunteered an absolute pagesToFix survived\").",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-01 (entity-eval reshape commit — same commit as this entry)",
+      "note": "Contract fixed at the producer, one name both sides: the annotation site (entityConsistency.js) backfills pagesToFix (and pageNumber) from the manifest-resolved pageNumbers whenever the model omitted pagesToFix, so pagesToFix is now guaranteed populated for every locatable finding and stays the single routing field the repair readers consume. The model-emitted pagesToFix wins when present (legitimately multi-page); pageNumbers keeps its deliberate first-cell-only consolidator semantics untouched."
+    },
+    {
+      "id": "age-shift-findings-routed-to-full-figure-repaint",
+      "title": "Identity-cue entity findings (age_shift etc.) routed to FULL-FIGURE repaint because repair-mode routing keyword-sniffed the prose — 'appears older' has no keyword",
+      "reportedAt": "2026-09-01",
+      "source": "owner doctrine (G7 follow-up): 'The char is needed if figure is distorted or limbs missing or position wrong. But age cue is the face.' Evidence: G7 job age_shift finding phrased 'appears older' matched no face keyword in resolveRepairAxes and fell through to the full-figure crosshatch path — the mode that was refused 12/12 on the busy p16 while a face insert-blend patch would have addressed the age cue.",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-02 (repair-mode type mapping commit — same commit as this entry)",
+      "note": "resolveRepairAxes accepts issueTypes (finding subType/type); structured types beat keyword sniffing: FACE_DEFECT_TYPES (age_shift, face_drift, face_mismatch, facial_hair, skin_tone) -> face insert-blend, BODY_DEFECT_TYPES (clothing_inconsistent, color_change, shape_change, missing, unexpected, garment) -> full-figure. Mixed -> full-figure; no face bbox degrades to full-figure; forceTarget still wins. Threaded from decideRepairMethod (repairLogic.js), runUnifiedRepairPipeline (repairPipeline.js) and the manual character-repair route (regeneration.js). Unit-tested in tests/unit/repair-axes-types.test.ts."
+    },
+    {
+      "id": "whiteout-region-uncovered-ships-white-hole",
+      "title": "Full-figure repair composite can ship a white rectangle: treated (whited-out/crosshatched) silhouette pixels the redrawn figure does not cover paste the model's residual white onto the page",
+      "reportedAt": "2026-09-02",
+      "source": "stored evidence scratchpad piraterun2/g7-deep/v2-f1-s5.png: Grok redrew the p16 figure at a different position/scale; union-blend steps show near-white candidate content across the uncovered old silhouette. The white-card gate averages over the WHOLE union (22% threshold), so a partial hole passes it; colour matching cannot rescue pure white.",
+      "status": "fixed",
+      "fixedIn": "staging 2026-09-02 (same commit as this entry)",
+      "note": "NEW coverage guard in samUnionBlend, default ON, runs BEFORE compositing: measureWhiteHole counts old-silhouette pixels not covered by the dilated new-figure cut whose candidate content is near-white (>=243 all channels, same threshold as white-card); >2% of the silhouette AND >150px rejects the attempt (gateWhiteHole/whiteHoleMaxFrac, threaded through faceRepair gates for Lab A/B). Deliberately whiteness-scoped, not geometric: legit shrink repairs (extra limb removed) leave uncovered old pixels filled with painted background and must pass. Busy-page full-figure rejections are accepted by owner ruling — no fallback. Pure helper unit-tested in tests/unit/white-hole-guard.test.ts."
+    },
+    {
+      "id": "torch-double-install-breaks-groundingdino",
+      "title": "Two torch wheels installed over each other: transformers cannot import, so GroundingDINO figure detection has been silently falling back to Gemini in production since late August",
+      "reportedAt": "2026-09-03",
+      "source": "Reproduced live on production via railway ssh. dist-packages holds BOTH torch-2.1.2.dist-info (PyPI CUDA wheel) and torch-2.14.0+cpu.dist-info (pytorch CPU index). torch.__version__ reports 2.1.2+cu121 while the file tree is the 2.14 layout (torch/onnx/_internal/exporter/ is a package, not a module), so 'from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection' raises RuntimeError: cannot import name 'ExportOptions'. That is exactly the import photo_analyzer.py get_groundingdino() performs, so /detect-figures-text returns 503 (photo_analyzer.py:2213); figureDetection.js:897 logs the HTTP 503, counts dino_detect_fail and returns null, and the pipeline falls back to the Gemini 2-pass path. Regression window from stored evidence: production story_metrics.counters show dino_calls 93 and 56 on 2026-08-25, then NO dino counters on 2026-08-31, 2026-09-01 or 2026-09-03.",
+      "status": "open",
+      "note": "Root cause is an UNPINNED torch in the Dockerfile CPU-index layer: 'pip install --index-url .../whl/cpu --extra-index-url pypi torch torchvision numpy==1.24.3' takes whatever is newest (2.14.0+cpu today), then 'pip install -r requirements.txt' resolves torch again against PyPI, where the numpy==1.24.3 co-pin forces 2.1.2 (the CUDA build), and installs it on top. The layer whose comments insist hardest on version discipline is the one with no version. Collateral: 2.9 GB of nvidia CUDA libraries and 277 MB of triton in a CPU-only container, plus 892 MB of GroundingDINO weights baked in that can never load, and Gemini billed for detections grounding-dino was adopted to do locally and free. Silent by construction: the graceful fallback means stories still generate and /api/health/config still reports figureDetectionBackend grounding-dino."
+    }
+  ]
 }
