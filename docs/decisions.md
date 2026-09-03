@@ -24164,17 +24164,28 @@ experiment 979 (stage `image`, story `job_1787777447720_ll5dyf4k8g` page 12,
 `maxRefSlots: 5` (each of the 4 characters gets its own slot). **Kept the
 production default at 3 — the 5-slot variant measured worse, not better.**
 
-**Rationale (the measurement):** baseline scored final -30 / semantic 70,
-5-slot scored final -210 / semantic 0. Visually the 5-slot render dropped 2 of
-4 characters entirely, lost the staged treasure chest and the
-fountain/statue, and produced a generic real-photo-style plaza (it even
-pulled in the giant chess set that is a real Lindenhof feature, apparently
-over-weighting the landmark reference once it had more room) instead of the
-staged interaction. The baseline kept all 4 characters and the props, despite
-its own placement issues (character on the chest instead of the stair-head).
-One page is not a statistically strong sample, but the failure mode (losing
-half the cast) is severe enough that this isn't worth pursuing further without
-a specific new reason to revisit.
+**Rationale (the measurement, 3 runs total — 2 repeats on the same page + 1 new
+page, all real Grok calls on staging):** on the Lindenhof page the result
+reproduced identically twice: baseline final -30/-20, semantic 70/80 (full
+cast, chest, fountain, statue both times) vs 5-slot final -210/-140, semantic
+0/0 both times (2 of 4 characters dropped, chest and fountain lost, replaced
+by a generic real-photo-style plaza — it pulled in the giant outdoor chess set
+that is a genuine Lindenhof landmark photo sent as reference slot 1, apparently
+over-weighting that one photographic reference once each character got an
+isolated slot instead of being paired two-to-a-slot). Confirmed by packing the
+same refs locally (`packReferences` is pure `sharp` compositing, no API call):
+`maxSlots=3` produced landmark+2-chars+2-chars/VB (3 slots), `maxSlots=5`
+produced landmark+4×solo-character/VB (5 slots) — the mechanism change is real,
+not a no-op. A THIRD run on a different page (Town-Hall Bridge, also 4
+characters + 2 landmarks) did **not** confirm the pattern — both the baseline
+and the 5-slot variant failed there (semantic 0 both, no characters rendered
+on either ship at all), so that page has its own pre-existing defect
+independent of the ref-slot count. **Verdict: the failure mode is real and
+reproducible where it showed up, not disproven elsewhere — but not confirmed
+as a universal rule either.** Not worth pursuing further as a blanket change;
+a landmark-heavy page with 4 characters is the one configuration to avoid
+(don't isolate each character into its own slot when a photographic landmark
+reference is also present).
 
 **Touched:** `server/lib/grok.js` (`editWithGrok` `maxRefs`, `packReferences`
 `maxSlots`, both default 3), `server/lib/images.js` (`generateImageOnly` /
@@ -24826,3 +24837,146 @@ own and needs no further change.
 status on the 2026-08-04 idle-shutdown entry.
 
 **Status:** ✅ active once the staging variables are set.
+
+---
+
+## 2026-09-03 — The text chain is TWO PARALLEL AUDITS → merge → ONE repair → ONE lector that returns corrected pages (owner ruling; supersedes today's earlier lector-chain entry)
+
+**Context:** the chain committed this morning in `81f1c0798` was
+audit → fix → **audit2 → corrective fix** → lector → **apply**: six model calls,
+two of them a second causality audit and its round, one of them a separate pass
+whose only job was to re-type the lector's quoted spans into the pages. The
+owner read that chain and ruled against its shape the same day:
+
+> "Do we actually need 2 rounds? Run 2 audits: the gemini we have today and a
+> grok that is blind. Combine all the findings and then do a single repair. Then
+> one lector round — have the lector output the pages that need correction
+> directly, so we don't need a 2nd round."
+
+Two independent finders on the writer's text, in parallel, instead of one finder
+re-interrogating its own output; and a lector that produces the artifact instead
+of instructions for producing it.
+
+**Decision — the chain, in call order:**
+
+1. **Two audits, concurrently, on the writer's text.**
+   - *arc-informed* — `textAuditModel` (gemini-3.1-pro),
+     `prompts/story-text-audit.txt`, unchanged: back cover + final arc + page
+     plan + pages + what each picture shows, twelve causality questions.
+   - *blind* — NEW `textAuditBlindModel` (grok-4.6),
+     NEW `prompts/story-text-audit-blind.txt`: the page text and NOTHING else,
+     five reader-side questions (CONFUSION, CONTRADICTION, IDLE, TRANSITION,
+     PAYOFF) asked as a fresh adult reading aloud. Same `FAULT[<QUESTION>]: p<N>
+     — <sentence>` output contract, so the two lists merge without translation.
+   Running them together costs the slower of the two, not their sum. A failed
+   audit is non-blocking: the merge proceeds with the other one's findings.
+2. **Merge + dedupe in code** (`mergeAuditFindings`). A pair is one fault when it
+   names the SAME PAGE, comes from a DIFFERENT auditor, and either shares the
+   CATEGORY TAG or overlaps ≥0.4 on content words. The category tag carries the
+   decision because word overlap cannot: the two prompts' own wording for the
+   same defect ("on the far bank with no page showing the crossing" vs "suddenly
+   on the far bank, nothing says how the crossing happened") shares 2 content
+   words of 12. The two question sets overlap exactly where the audits overlap by
+   design (TRANSITION, PAYOFF) and nowhere else. Deduping only ACROSS auditors is
+   deliberate — each audit is told to state a fault once, so a repeat inside one
+   list is two faults. Survivors keep a `sources` tag, so the ledger answers
+   "which audit found this" and "what did the blind one add".
+3. **ONE repair pass** over the merged list — `textRefineModel` (deepseek-v4-pro,
+   unchanged; a parallel bake-off is choosing the final model, and this stage now
+   reads the key in exactly one place so the swap is one line). Contract
+   unchanged: rewrite only pages with findings, return only changed pages,
+   omission means "keep". Implemented as `runRepairPass(findings, base)` —
+   findings in, next text + ledger entry out — and invoked exactly ONCE. No loop,
+   no convergence check, no dormant second-round path; a bounded second pass, if
+   the owner later wants one, is one more call to that function.
+4. **ONE lector pass, which returns the corrected pages itself** —
+   `textProofreadModel` (gemini-3.1-pro, temperature 0).
+   `prompts/story-text-proofread.txt` keeps its open-ended
+   "every objective language fault" scope and swaps its output contract from
+   `PAGE n: 'quoted' → 'fix'` lines to `---STORY TEXT---` + `## Page n` blocks,
+   parsed by the existing `parseRefinedText`. The separate apply pass is GONE.
+
+**The new guard.** Losing the quoted-span format loses the verbatim-quote
+hallucination filter, so it is replaced in code by a per-page EDIT-DISTANCE CAP
+(`screenLectorPages` / `pageDiffRatio`, `LECTOR_MAX_DIFF_RATIO = 0.15`): each
+returned page is compared, whitespace-normalised, against the page that was sent;
+a page that moved more than 15% of its characters is REJECTED, the input page is
+kept, and the ratio is logged as a WARN so an over-tight cap is visible instead
+of silent. 0.15 is set against both failure sizes — the measured lector output on
+the shipped 16-page German text moves 10-25 characters on a 300-800 character
+page (under 8% even with two findings on one page), while a re-narrated page
+moves well past half of it. A length-delta lower bound short-circuits the DP, and
+the bound is what gets logged so the number stays a real measurement.
+
+**Deleted, not bridged** (owner's standing rule: no parallel paths):
+`prompts/story-text-lector-apply.txt` + its `storyTextLectorApply` registration
++ `buildLectorApplyPrompt`; the `{PRIOR_FAULTS}` block of
+`story-text-audit.txt` and the `priorFaults` parameter of
+`buildTextAuditPrompt`; `parseAuditRulings`, `parseLectorFindings`,
+`sanitizeLectorFindings`; the `rounds` / `roundModels` options and the whole
+convergence loop; `TEXT_REFINE_ROUNDS`; the `audit2` / `audit2ByCategory` /
+`auditRulings` / `lectorFindings` / `lectorDropped` ledger fields and the Lab's
+"Max rounds" selector. A repo-wide grep for every one of those names returns
+nothing outside `docs/` and this file.
+
+**Ledger shape** (`textRefineReport`, ONE shape): `audits[]` (per-source
+`{source, modelKey, faults, byCategory, cost, raw}`), `mergedFindings[]`
+(`{pageNumber, category, text, sources}`), `mergeStats`, `roundTrace[]` with
+`kind: 'repair' | 'lector'` and the lector's `acceptedPages` /
+`rejectedPages` (each with its ratio), `proofread`, `lectorAccepted`,
+`lectorRejected` (rejected keeps its discarded text — the only place an
+over-tight cap is inspectable), plus the unchanged `pages` / `changedPages` /
+`durationMs` / `model` that every consumer already reads. Grepped every consumer
+of `textRefineReport`: `storyScorecard.provenanceOf` (`.model`),
+`storyMetrics.churnFromReport` (`.pages`), `testlab` exact-replay
+(`.pages[].before`), `scripts/analysis/refine-damage-report.js` (`.pages`),
+`StoryDisplay` diff panel (`.pages`) — all read only the unchanged fields, so
+stored pre-2026-09-03 reports keep rendering with no display branch.
+
+**Rationale.** Two independent finders up front beat one finder re-reading its
+own output: the re-audit's job was to catch what the first audit's round
+introduced or missed, and a second *different* pair of eyes on the ORIGINAL text
+finds more per dollar than the same eyes on a rewrite (the blind reader's five
+questions are the ones the twelve-question causality prompt dilutes). The
+accepted cost is real and the owner accepted it explicitly: a fault the single
+repair pass INTRODUCES now has nothing behind it — both measured nonsense cases
+(2026-08-31 / 2026-09-01) were caught by audit2. The owner may add a bounded
+second repair round after the repair-model bake-off reports; until then the
+mitigation is the lector's diff cap, which bounds how far the last writer may
+move a page. And a lector that emits the corrected page removes a whole model
+call whose only failure modes were re-typing errors.
+
+**Verified:** 84/84 templates load (+blind, −apply). Unit suite 401 passed / 3
+pre-existing `active-version-recompute` failures (identical with the change
+stashed). `tests/unit/text-lector.test.ts` rewritten, 19 tests: merge folds the
+cross-worded TRANSITION duplicate and keeps its two source tags, keeps two
+different faults on one page apart, survives one auditor failing; the cap accepts
+a one-span and a two-span fix and rejects a re-narration; and a stubbed-model
+chain-order test asserts the two audits open concurrently
+(`maxConcurrent === 2`), that the call sequence is
+`text_audit` ‖ `text_audit_blind` → `text_refine` → `text_lector`, that
+`text_audit2` and `text_lector_apply` are unreachable, that the ledger holds
+exactly `['repair', 'lector']`, and that no built prompt leaves a `{PLACEHOLDER}`
+unfilled. `tests/manual/test-text-refine-salvage.js` updated — the step a join
+deadline lands on is now the lector, and both audits plus the repair survive it.
+Client `tsc --noEmit` clean.
+
+**Touched:** `prompts/story-text-audit-blind.txt` (new),
+`prompts/story-text-proofread.txt` (output contract),
+`prompts/story-text-audit.txt` (`{PRIOR_FAULTS}` removed),
+`prompts/text-refine.txt` (findings header),
+`prompts/story-text-lector-apply.txt` (DELETED), `server/config/models.js`
+(`textAuditBlindModel`), `server/services/prompts.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`,
+`server/lib/textRefine.js` (rewritten), `storyJobPipeline.js` (ledger),
+`server/lib/testlab.js` (`text_refine` stage, `audit_replay level=text-blind`),
+`client/src/pages/TestLab.tsx`, `client/src/services/testlabService.ts`,
+`tests/unit/text-lector.test.ts`, `tests/manual/test-text-refine-salvage.js`,
+`docs/prompt-inventory.md`.
+
+**Status:** ✅ active — supersedes points 3 and 4 of "The lector: gemini-3.1-pro
+grammar pass runs LAST, and the rhetorical-device menu is deleted (owner,
+2026-09-03)", which lived less than a day. Points 1, 2 and 5 of that entry (the
+lector's scope, its model, the rhetorical-set-piece ban) stand. Also supersedes
+what was left of "Text refine: one audit-fed round, no self-checklist loop
+(2026-08-27)" — there is no round count left to configure.

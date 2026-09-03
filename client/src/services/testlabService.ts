@@ -284,11 +284,15 @@ export interface ExperimentResult {
   sentPrompts?: SentPrompt[];
   reviewRuns?: ReviewRun[];
   rounds?: ReviewRound[];
-  // text_refine: each round rewrites the WHOLE text and feeds it to the next.
+  // text_refine: two parallel audits -> merge -> one repair -> one lector.
   title?: string;
   language?: string;
   pageCount?: number;
   refineRounds?: RefineRound[];
+  /** The two parallel text audits and the merged, deduped list the repair answered. */
+  refineAudits?: RefineAudit[];
+  refineMerged?: MergedFinding[];
+  refineMergeStats?: { bySource?: Record<string, number>; duplicates?: number } | null;
   finalPages?: { pageNumber: number; original: string; final: string; changed: boolean }[];
   // beats_scenes
   timeToLockMs?: number;
@@ -307,8 +311,30 @@ export interface ExperimentResult {
   }[] | null;
 }
 
+export interface RefineAudit {
+  source: string;
+  ok: boolean;
+  error?: string;
+  modelKey?: string;
+  modelId?: string;
+  faults?: number;
+  byCategory?: Record<string, number>;
+  elapsedMs?: number;
+  cost?: number | null;
+  raw?: string;
+}
+
+export interface MergedFinding {
+  pageNumber: number | null;
+  category: string;
+  text: string;
+  sources: string[];
+}
+
 export interface RefineRound {
   round: number;
+  /** 'repair' | 'lector' — which step of the chain this entry is. */
+  kind?: string;
   ok: boolean;
   error?: string;
   modelKey?: string;
@@ -327,6 +353,10 @@ export interface RefineRound {
   ttftMs?: number | null;
   changedFromOriginal?: number[];
   converged?: boolean;
+  findingsCount?: number;
+  /** Lector only: the per-page verdict of the edit-distance cap. */
+  acceptedPages?: { pageNumber: number; ratio: number }[] | null;
+  rejectedPages?: { pageNumber: number; ratio: number }[] | null;
   pages?: { pageNumber: number; before: string; after: string; original: string; sceneIntent?: string }[];
 }
 
@@ -482,7 +512,7 @@ export const TESTLAB_STAGES = [
   // this book's briefs (or beat SCENE lines) demand, by class.
   { id: 'scene_hazard_count', label: 'Scene hazard count — render hazards per page in the briefs, by class', producesImage: false, overridable: true, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
-  { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
+  { id: 'text_refine', label: 'Text refine — 2 audits, merge, 1 repair, 1 lector', producesImage: false, overridable: true, storyLevel: true },
   // Step 2 (fast structural review) retired 2026-09-01 — this stage now only
   // plans + expands scenes; historical rows with a review still display.
   { id: 'beats_scenes', label: 'Beats + scenes (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },

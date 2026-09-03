@@ -251,6 +251,16 @@ const MODEL_DEFAULTS = {
   // retest)". Cap has since been raised to the real OpenRouter max (131072);
   // verdict on qwen3.8-max is open until a retest at the true limit is run.
   textAuditModel: process.env.TEXT_AUDIT_MODEL || 'gemini-3.1-pro',
+  // The BLIND text audit, run in parallel with the one above (owner ruling
+  // 2026-09-03: "run 2 audits: the gemini we have today and a grok that is
+  // blind"). It reads the pages and nothing else — no arc, no page plan — so
+  // the two auditors fail differently: the arc-informed one catches what the
+  // book dropped, this one catches what a reader cannot follow. grok-4.6 for
+  // vendor independence from the gemini auditor and from the deepseek fixer;
+  // its 3/10 score as the ARC-INFORMED auditor (2026-08-27 bake-off) was
+  // measured on the twelve-question causality prompt, not on this reader-side
+  // one, so it is not evidence about this slot.
+  textAuditBlindModel: process.env.TEXT_AUDIT_BLIND_MODEL || 'grok-4.6',
   // Arc/beats audit judges (2026-08-27 Lab experiments 876/877, frozen pirate
   // artifacts, known-defect ground truth). Arc: opus caught 8/8 + 3 finds no
   // other model made (incl. the only LIMIT catch); grok-4.6 caught 1. Beats:

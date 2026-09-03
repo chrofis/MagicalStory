@@ -3113,7 +3113,9 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
  * auditor bake-off as a repeatable Lab stage. Report only — writes nothing
  * back to the story.
  *
- * params.level  : 'arc' | 'text' (required). 'beats' was retired 2026-09-01
+ * params.level  : 'arc' | 'text' | 'text-blind' (required). 'text-blind' is the
+ *                 second production text auditor (owner ruling 2026-09-03):
+ *                 the pages and nothing else. 'beats' was retired 2026-09-01
  *                 along with the rest of the beats-review/audit machinery —
  *                 the production beats layer no longer runs a reviewer or
  *                 auditor (see planCheck in promptBuilders.js).
@@ -3129,10 +3131,12 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
 
   const level = String(params.level || '').toLowerCase();
   if (level === 'beats') throw new Error('audit_replay level=beats retired 2026-09-01 — the beats review/audit machinery was deleted (docs/decisions.md)');
-  if (!['arc', 'text'].includes(level)) throw new Error(`params.level must be arc | text, got "${params.level}"`);
+  if (!['arc', 'text', 'text-blind'].includes(level)) throw new Error(`params.level must be arc | text | text-blind, got "${params.level}"`);
   const defaultModel = level === 'text'
     ? (MODEL_DEFAULTS.textAuditModel || MODEL_DEFAULTS.arcReviewModel)
-    : (MODEL_DEFAULTS.arcAuditModel || MODEL_DEFAULTS.arcReviewModel);
+    : level === 'text-blind'
+      ? MODEL_DEFAULTS.textAuditBlindModel
+      : (MODEL_DEFAULTS.arcAuditModel || MODEL_DEFAULTS.arcReviewModel);
   const models = String(params.models || params.model || defaultModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
@@ -3147,12 +3151,15 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     if (!arc.trim()) throw new Error('story has no stored arc to audit');
     prompt = H.buildArcAuditPrompt(storyData, arc);
   } else {
-    templateKey = 'storyTextAudit';
+    const blind = level === 'text-blind';
+    templateKey = blind ? 'storyTextAuditBlind' : 'storyTextAudit';
     const pages = (storyData.sceneImages || [])
       .map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: p.sceneIntent || p.sceneDescription }))
       .filter(p => String(p.text || '').trim());
     if (!pages.length) throw new Error('story has no page text to audit');
-    prompt = H.buildTextAuditPrompt(storyData, pages);
+    prompt = blind
+      ? H.buildTextAuditBlindPrompt(storyData, pages)
+      : H.buildTextAuditPrompt(storyData, pages);
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
@@ -3922,9 +3929,10 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
 
   const res = await refineStoryText(storyData, pages, {
     arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
-    rounds: params.rounds,
     model: params.model,
-    roundModels: params.roundModels,
+    auditModel: params.auditModel,
+    blindAuditModel: params.blindAuditModel,
+    proofreadModel: params.proofreadModel,
     promptOverride,
     usageLabel: 'testlab_text_refine',
   });
@@ -3935,6 +3943,11 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     title: storyData.title || null,
     language: storyData.language || null,
     pageCount: pages.length,
+    // The two parallel audits and the merged list the single repair answered —
+    // the owner has to see every step of the chain, not only its output.
+    refineAudits: res.audits,
+    refineMerged: res.mergedFindings,
+    refineMergeStats: res.mergeStats,
     // NOT `rounds` — outline_review's iterate mode already returns that key with
     // a different shape, and both land in the same ExperimentResult.
     refineRounds: res.rounds,

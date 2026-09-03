@@ -3371,11 +3371,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // The whole story, read-only, for the refiner's judgment (beats mode
           // only — the unified path records no arc).
           arc: arcReviewReport?.finalArc || beatsReviewReport?.arc || '',
-          // 1 (owner, 2026-08-27): rounds past the first get no external
-          // findings — the audit feeds round 1, audit2 feeds the corrective
-          // round, and the lector runs last on the final text. Unfed
-          // self-checklist passes measured flat and invent work (decisions.md).
-          rounds: parseInt(process.env.TEXT_REFINE_ROUNDS || '1', 10),
+          // No `rounds`: the chain is fixed at two parallel audits → one repair
+          // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
           // Latest completed state, so the bounded join below can salvage the
           // audit and any finished round instead of discarding paid work when
@@ -5562,42 +5559,55 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // changed, and 10 of 14 pages were rewritten on the first real run.
         textRefineReport = {
           rounds: usable.rounds.length,
-          // Per-round trace (owner, 2026-08-27): the count alone made "what did
-          // round 2 change" unanswerable twice. Analyses capped — text only.
-          // Named roundTrace, NOT roundsDetail: refineStoryText's own
-          // `roundsDetail` (parseAuditRulings' per-fault fixed/stands/withdrawn
-          // ledger, see textRefine.js) used to be dropped on the floor here —
-          // this object's key of the same name silently shadowed it before it
-          // ever reached textRefineReport, so no ruling was ever persisted.
+          // Per-step trace (owner, 2026-08-27): the count alone made "what did
+          // this step change" unanswerable twice. `kind` says which step —
+          // 'repair' or 'lector'. Analyses capped — text only.
           roundTrace: usable.rounds.map(r => ({
             round: r.round,
+            kind: r.kind || null,
             ok: r.ok,
-            reAudit: !!r.reAudit,
-            lector: !!r.lector,
             modelKey: r.modelKey || null,
             modelId: r.modelId || null,
             elapsedMs: r.elapsedMs || 0,
             cost: r.cost ?? null,
             changedPages: r.changedPages || [],
-            converged: r.converged ?? null,
+            // Lector only: which returned pages the diff cap took and which it
+            // threw out, with the ratio that decided it.
+            acceptedPages: r.acceptedPages || null,
+            rejectedPages: r.rejectedPages || null,
             error: r.error || null,
             analysis: (r.analysis || '').slice(0, 15000),
           })),
-          // The re-audit's per-fault ruling on round 1's faults (fixed / stands /
-          // withdrawn) plus any it never ruled on — see parseAuditRulings.
-          auditRulings: usable.roundsDetail || null,
           changedPages: usable.changed,
-          audit: usable.audit || '',
-          // The lector's raw output plus the findings that survived the
-          // verbatim-quote guard and the ones it dropped (see textRefine.js).
+          // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
+          // output included so a fault can be traced to the auditor that found
+          // it, plus the merged list the single repair pass actually answered.
+          audits: (usable.audits || []).map(a => ({
+            source: a.source,
+            ok: !!a.ok,
+            modelKey: a.modelKey || null,
+            modelId: a.modelId || null,
+            faults: a.faults ?? 0,
+            byCategory: a.byCategory || {},
+            elapsedMs: a.elapsedMs || 0,
+            cost: a.cost ?? null,
+            error: a.error || null,
+            raw: (a.raw || '').slice(0, 40000),
+          })),
+          mergedFindings: (usable.mergedFindings || []).map(f => ({
+            pageNumber: f.pageNumber,
+            category: f.category,
+            text: f.text,
+            sources: f.sources,
+          })),
+          mergeStats: usable.mergeStats || null,
+          // The lector's raw output plus the per-page verdict of the
+          // edit-distance cap (see screenLectorPages in textRefine.js).
           proofread: usable.proofread || '',
-          lectorFindings: usable.lectorFindings || [],
-          lectorDropped: usable.lectorDropped || [],
-          auditByCategory: require('./server/lib/storyHelpers').faultsByCategory(usable.audit || ''),
-          // The re-audit of the FINAL text (2026-08-26) — same template and
-          // judge as `audit`, so the two FAULT counts are one yardstick.
-          audit2: usable.audit2 || '',
-          audit2ByCategory: require('./server/lib/storyHelpers').faultsByCategory(usable.audit2 || ''),
+          lectorAccepted: (usable.lectorAccepted || []).map(p => ({ pageNumber: p.pageNumber, ratio: p.ratio })),
+          // The REJECTED page keeps its text: it is the version the cap threw
+          // out, and the only place an over-tight cap becomes visible.
+          lectorRejected: usable.lectorRejected || [],
           durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
           model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
           pages: usable.pages

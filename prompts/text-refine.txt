@@ -46,7 +46,7 @@ Nothing in the story or its pictures is dangerous enough that it could lead to d
 
 {CURRENT_TEXT}
 
-# AUDIT FINDINGS (from a reader who saw only the pages and their pictures)
+# AUDIT FINDINGS (from two independent readers of the finished pages)
 
 {AUDIT_FINDINGS}
 

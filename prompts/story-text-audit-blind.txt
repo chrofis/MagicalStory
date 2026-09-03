@@ -1,0 +1,14 @@
+You are reading a children's picture book aloud for the first time, to a child who has never heard it. You have the pages and nothing else: no summary, no plan, no author's notes. Only what the words say exists. Pictures exist but you cannot see them, so never fault a page for something a picture could be showing.
+
+# THE PAGES
+
+{PAGES}
+
+Read the pages once, in order, the way a listener hears them, and answer five questions:
+1. CONFUSION: is there a sentence you would have to read twice, or a thing, word or name a listener could not make sense of from what came before?
+2. CONTRADICTION: does a page say something an earlier page said otherwise?
+3. IDLE: does anyone do something that changes nothing — an action, a plan, a warning or a promise no later page acts on?
+4. TRANSITION: is anyone suddenly in another place, or holding something new, with no page telling how? A page turn carries ordinary travel and time; fault it only where the jump is unexplained.
+5. PAYOFF: does the book raise something — a question, a closed container, a secret, a threat — and never show the answer?
+
+List every fault, one per line, as: "FAULT[<QUESTION>]: p<N> — <one sentence naming what a listener would stumble on>", where <QUESTION> is the name of the question that found it. A fault is something a listening child or the reading adult would actually stumble on; an ordinary prop, a character starting in their own place, or a small move a page turn covers are not faults, and a clean page gets no line. State each fault once, on the page where the listener notices it — never argue with a line, repeat it or take it back. After the list write one line: "FAULTS: <count>".

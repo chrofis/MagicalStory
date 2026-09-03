@@ -5139,46 +5139,29 @@ function buildTextProofreadPrompt(inputData, pages = []) {
 }
 
 /**
- * Application of the lector's corrections, and nothing else.
+ * The BLIND text audit (owner ruling 2026-09-03) — the second of the two
+ * audits that now run in PARALLEL on the writer's text.
  *
- * Deliberately NOT buildTextRefinePrompt: that template's task is to hunt weak
- * pages, and the refiner asked to find faults invented 4 typos in the A/B. This
- * one hands it a closed list to apply. Same output contract as the refine
- * rounds (`---STORY TEXT---` + `## Page n`), so parseRefinedText and the
- * page-merge machinery are reused unchanged.
- *
- * @param {Array<{pageNumber:number,text:string}>} pages the CURRENT text
- * @param {Array<{pageNumber:number,quote:string,correction:string}>} corrections
- *   already verbatim-checked against `pages` by sanitizeLectorFindings
+ * It gets the page text and NOTHING else: no back cover, no arc, no page plan,
+ * no picture description. That is the whole point of having two — the
+ * arc-informed audit above judges the pages against what the book had to
+ * deliver, this one judges only whether a listener can follow them, and the
+ * two miss different things. Same FAULT-line output contract, so the merge in
+ * textRefine.js needs no per-source translation.
  */
-function buildLectorApplyPrompt(inputData, pages = [], corrections = []) {
-  const template = PROMPT_TEMPLATES.storyTextLectorApply;
+function buildTextAuditBlindPrompt(inputData, pages = []) {
+  const template = PROMPT_TEMPLATES.storyTextAuditBlind;
   if (!template) {
-    log.error('[PROMPT] storyTextLectorApply template not loaded — lector corrections cannot be applied');
+    log.error('[PROMPT] storyTextAuditBlind template not loaded — blind text audit unavailable');
     return null;
   }
-  if (!corrections.length) return null;
-  const lang = inputData?.language
-    ? getLanguageNameEnglish(inputData.language)
-    : 'the language of the pages';
-  const currentText = pages
-    .map(p => `## Page ${p.pageNumber}\n${String(p.text || '').trim() || '(empty)'}`)
+  const body = pages
+    .map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`)
     .join('\n\n');
-  const list = corrections
-    .map(c => `PAGE ${c.pageNumber}: '${c.quote}' → '${c.correction}'`)
-    .join('\n');
-  return fillTemplate(template, { LANGUAGE: lang, CURRENT_TEXT: currentText, CORRECTIONS: list });
+  return fillTemplate(template, { PAGES: body });
 }
 
-/**
- * @param {string} [priorFaults] the previous round's raw FAULT lines. When
- *   given, the re-audit must rule on each one BY IDENTITY before adding new
- *   ones. Counts alone hid disappearances: on job_1788215224103 round 1 emitted
- *   24 faults and round 2 emitted 11, and six of the original 24 vanished with
- *   no ruling — never fixed, never withdrawn, still in the shipped book, and
- *   invisible because only the totals were compared.
- */
-function buildTextAuditPrompt(inputData, pages = [], priorFaults = '', arc = '') {
+function buildTextAuditPrompt(inputData, pages = [], arc = '') {
   const template = PROMPT_TEMPLATES.storyTextAudit;
   if (!template) {
     log.error('[PROMPT] storyTextAudit template not loaded — text audit unavailable');
@@ -5194,7 +5177,6 @@ function buildTextAuditPrompt(inputData, pages = [], priorFaults = '', arc = '')
   const body = pages.map(p =>
     `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${String(p.sceneIntent || '').trim() || depictsOf(p.sceneBrief) || '(no picture description)'}`
   ).join('\n\n');
-  const prior = String(priorFaults || '').trim();
   // The story and its division (2026-09-02). The LOADBEARING question asked
   // what "the story and the beat" treat as load-bearing while the audit was
   // shown neither — the question could not fire. It is answered against the
@@ -5209,15 +5191,6 @@ function buildTextAuditPrompt(inputData, pages = [], priorFaults = '', arc = '')
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
     PLAN_LINES: planLines || '(no page plan was recorded)',
     PAGES: body,
-    PRIOR_FAULTS: prior
-      ? [
-        "# THE PREVIOUS ROUND'S FAULTS",
-        '',
-        prior,
-        '',
-        'Before naming any new fault, go through this list item by item and write one line for each: "RULING: <the fault, quoted> — fixed" or "— stands" or "— withdrawn (<reason>)". A fault from this list that you do not mention is a fault of this audit.',
-      ].join('\n')
-      : '',
   });
 }
 
@@ -6289,8 +6262,8 @@ module.exports = {
   buildChildCriticPrompt,
   youngestMainAge,
   buildTextAuditPrompt,
+  buildTextAuditBlindPrompt,
   buildTextProofreadPrompt,
-  buildLectorApplyPrompt,
   countFaults,
   faultsByCategory,
   buildStoryShapeSection,

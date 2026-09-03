@@ -208,10 +208,14 @@ async function loadPromptTemplates() {
     // names faults; the reviewer's fix ledger must answer every one.
     ['storyArcAudit', 'story-arc-audit.txt'],
     ['storyTextAudit', 'story-text-audit.txt'],
-    // The LECTOR: objective language faults in the FINAL text, then a single
-    // application pass that may only apply what it listed.
+    // The second text audit, run in PARALLEL with the one above (owner ruling
+    // 2026-09-03): a fresh adult reading the pages aloud with NOTHING else —
+    // no arc, no page plan. Same FAULT line format, so the two fault lists
+    // merge without translation.
+    ['storyTextAuditBlind', 'story-text-audit-blind.txt'],
+    // The LECTOR: objective language faults in the FINAL text. It returns the
+    // corrected pages itself — there is no separate application pass.
     ['storyTextProofread', 'story-text-proofread.txt'],
-    ['storyTextLectorApply', 'story-text-lector-apply.txt'],
     // Final-book audit: the reader's-eye pass. A vision judge receives every
     // page's TEXT followed by that page's SHIPPED IMAGE, in reading order, and
     // routes each fault to the artefact that would fix it (IMG or TEXT).

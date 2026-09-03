@@ -725,7 +725,6 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [writerModel, setWriterModel] = useState('');
-  const [refineRounds, setRefineRounds] = useState(2);
   const [refineModel, setRefineModel] = useState('');
   const [reviewMode, setReviewMode] = useState<'compare' | 'iterate'>('compare');
   const [reviewAspect, setReviewAspect] = useState<'both' | 'text' | 'scene'>('both');
@@ -946,7 +945,6 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       if (stage === 'avatar_eval') { params.pass = Number(avatarPass); params.model = avatarEvalModel; params.splitRows = avatarSplitRows; }
       if (stage === 'cover') params.coverType = coverType;
       if (isTextRefine) {
-        params.rounds = refineRounds;
         if (refineModel) params.model = refineModel;
       }
       if (isOutlineReview) {
@@ -1259,22 +1257,16 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         {isTextRefine && (
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <label className="text-xs text-gray-600 flex items-center gap-1.5">
-              Max rounds:
-              <select className="border rounded-lg px-2 py-1 text-xs" value={refineRounds} onChange={e => setRefineRounds(Number(e.target.value))}>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-gray-600 flex items-center gap-1.5">
-              Model:
+              Repair model:
               <select className="border rounded-lg px-2 py-1 text-xs" value={refineModel} onChange={e => setRefineModel(e.target.value)}>
                 <option value="">(default reviewer)</option>
                 {textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
               </select>
             </label>
             <div className="text-xs text-gray-500">
-              Each round gets the story brief, the scene outlines (read-only) and the CURRENT text, and rewrites only the pages
-              that are weak. Round N+1's input is round N's output; no critique is carried forward. A ceiling, not a target —
-              it stops as soon as a round rewrites nothing.
+              Two audits run in parallel on the stored text (arc-informed gemini + blind grok), their findings are merged and
+              deduped, ONE repair pass answers the merged list, then the lector returns the pages that need language
+              corrections. No loop: the lector's pages are screened by a per-page edit-distance cap instead of a re-audit.
             </div>
           </div>
         )}
@@ -1783,6 +1775,8 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
  */
 function TextRefineView({ result }: { result: ExperimentResult }) {
   const rounds = result.refineRounds || [];
+  const audits = result.refineAudits || [];
+  const merged = result.refineMerged || [];
   const [page, setPage] = useState<number | null>(null);
   const pages = result.finalPages || [];
   const shown = page ?? pages[0]?.pageNumber ?? 1;
@@ -1795,11 +1789,50 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
         <b>{pages.filter(p => p.changed).length}</b> changed vs original
       </div>
 
-      {/* Per-round header: what moved, how fast, what it cost. */}
+      {/* THE TWO AUDITS — run in parallel on the input text; their merged,
+          deduped findings are what the single repair pass answered. */}
+      {!!audits.length && (
+        <div className="space-y-1">
+          {audits.map(a => (
+            <div key={a.source} className={`text-xs rounded-lg border px-3 py-2 ${a.ok ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
+              <b>AUDIT · {a.source}</b>
+              {a.ok ? (
+                <>
+                  {' '}· {a.modelKey} · {((a.elapsedMs || 0) / 1000).toFixed(1)}s · <b>{a.faults}</b> fault(s)
+                  {a.cost != null && ` · $${a.cost.toFixed(4)}`}
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-indigo-600">Raw findings</summary>
+                    <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-96 overflow-auto whitespace-pre-wrap text-[11px] text-gray-700">{a.raw}</pre>
+                  </details>
+                </>
+              ) : <> · failed: {a.error}</>}
+            </div>
+          ))}
+          <div className="text-xs rounded-lg border border-indigo-200 bg-indigo-50/40 px-3 py-2">
+            <b>MERGED</b> · {merged.length} finding(s)
+            {result.refineMergeStats?.duplicates != null && ` · ${result.refineMergeStats.duplicates} duplicate(s) folded`}
+            {!!merged.length && (
+              <details className="mt-1" open>
+                <summary className="cursor-pointer text-indigo-600">The list the repair pass answered</summary>
+                <div className="mt-1 space-y-0.5">
+                  {merged.map((f, i) => (
+                    <div key={i} className="text-[11px] text-gray-700">
+                      <span className="text-gray-500">p{f.pageNumber ?? '?'} [{f.category}]</span> {f.text}
+                      <span className="text-indigo-600"> · {f.sources.join(' + ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Per-step header: what moved, how fast, what it cost. */}
       <div className="space-y-1">
         {rounds.map(r => (
           <div key={r.round} className={`text-xs rounded-lg border px-3 py-2 ${r.ok ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
-            <b>Round {r.round}</b>
+            <b>{r.kind ? r.kind.toUpperCase() : `Round ${r.round}`}</b>
             {r.ok ? (
               <>
                 {' '}· {r.modelKey}{r.provider ? ` via ${r.provider}` : ''}
@@ -1808,6 +1841,11 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
                 {r.cost != null && ` · $${r.cost.toFixed(4)}`}
                 {' · '}rewrote: {r.changedPages?.length ? r.changedPages.join(', ') : <span className="text-emerald-600">nothing — converged, stopped here</span>}
                 {!!r.strayPages?.length && <span className="text-amber-600"> · ignored out-of-range page {r.strayPages.join(', ')}</span>}
+                {!!r.rejectedPages?.length && (
+                  <span className="text-red-600">
+                    {' · '}rejected by the diff cap: {r.rejectedPages.map(p => `p${p.pageNumber} (${(p.ratio * 100).toFixed(0)}%)`).join(', ')}
+                  </span>
+                )}
               </>
             ) : <> · failed: {r.error}</>}
             {/* The exact prompt sent this round, and the raw answer back. Both
@@ -1867,7 +1905,7 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
           return (
             <div key={r.round} className={`border rounded-lg p-3 ${moved ? 'border-indigo-300 bg-indigo-50/40' : 'border-gray-200'}`}>
               <div className="text-[11px] font-semibold text-gray-500 mb-1">
-                AFTER ROUND {r.round} {moved ? <span className="text-indigo-600">· rewritten</span> : <span className="text-gray-400">· unchanged this round</span>}
+                AFTER {r.kind ? r.kind.toUpperCase() : `ROUND ${r.round}`} {moved ? <span className="text-indigo-600">· rewritten</span> : <span className="text-gray-400">· unchanged this round</span>}
               </div>
               <div className="text-xs whitespace-pre-wrap text-gray-700">{pg?.after || '(none)'}</div>
             </div>
