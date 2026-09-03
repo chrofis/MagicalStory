@@ -25114,3 +25114,66 @@ the three existing landmark suites: 29 passed.
 `tests/unit/landmark-photo-store.test.ts`, `docs/landmark-database.md`.
 
 **Status:** ✅ active — backfill to completion is a BACKLOG item.
+
+---
+
+## 2026-09-03 — The chain's single repair pass runs on claude-opus (owner ruling, repair bake-off)
+
+**Context:** the restructured text chain (entry above) makes the repair pass the
+ONLY step that rewrites prose against the audits' findings — there is no
+re-audit behind it any more. That raised the stakes on which model holds the
+slot, so a repair bake-off was run on a frozen finding list
+(scratchpad `piraterun4/repair-bakeoff/report.html`, 12-page story).
+
+**Measured:**
+
+| arm | closures | how | inventions | blind judge |
+|---|---|---|---|---|
+| claude-opus | 22/22, incl. all four hard findings | by establishing the missing fact on an EARLIER page — what the template actually asks for | 0 | 6/6/8 |
+| deepseek-v4-pro | — | — | 2 in 12 pages: a spoiler, and a page-12 contradiction | 5/4/7 |
+
+**Decision (owner):** `MODEL_DEFAULTS.textRefineModel = 'claude-opus'` (env
+`TEXT_REFINE_MODEL`), and **exactly ONE repair invocation — no second round**,
+ruled explicitly after reading the bake-off. Cost is **+$0.39 per story**.
+
+**Rationale.** An invented plot fact is the one failure class the chain can no
+longer catch: the re-audit that used to read the repair's output is deleted, and
+the lector's diff cap bounds how far a page may MOVE, not whether what it now
+says is true. deepseek's two inventions in twelve pages are therefore
+disqualifying at this slot in a way they were not when a re-audit followed it.
+Opus also closes findings the way the template asks — establishing the missing
+cause on an earlier page rather than describing the moment more vividly, which
+is the failure mode `text-refine.txt` spends three paragraphs forbidding.
+
+**Latency is no longer the constraint that pinned this slot to deepseek.** The
+old comment in `models.js` justified deepseek with a "90s cap (storyJobPipeline
+JOIN_TIMEOUT_MS)" — that budget does not exist: the live join is 600s plus 10s
+per page beyond ten (`storyJobPipeline.js` JOIN_TIMEOUT_MS, 660s for a 16-page
+book), and opus measured 209s in the bake-off. The stale justification is
+removed. Every completed step is published as it finishes, so even an overrun
+costs only the step still running.
+
+**Also fixed here (owner rule: no output caps).** The repair call's output limit
+was a hand-picked `min(64000, model max)`; it is now the model's own
+`maxOutputTokens` (128000 for opus). The history is why the number kept moving:
+16000 truncated a 16-page long-text run, and a truncated reply parses as ZERO
+page blocks — it reports "nothing to rewrite" while the faulty pages ship
+(job_1787423677246 p1/p12). 64000 was the same hand-picked cap one size up. The
+loud throw on a cap hit stays.
+
+**Watch-item, not yet acted on: the blind grok audit's reasoning spend.** In the
+bake-off run it took **529s with 27.1k of its 27.4k completion tokens spent on
+reasoning** (Lab #984 measured 386s on a 4-page text). It runs in parallel with
+the gemini audit and with image generation, so it is not on the critical path by
+itself, and the per-audit deadline added in the addendum above (900s) bounds the
+pathological case. The dispatcher DOES support an OpenRouter `reasoning`
+parameter (`server/lib/textModels.js`, `options.reasoning` — already used
+elsewhere to take reasoning tokens to zero: measured 1.7x cheaper, 1.5x faster,
+same output), so capping grok's reasoning effort on this prompt is a one-line
+experiment. Not done: it changes what the blind auditor is, and that belongs in
+an A/B against its fault count, not in a latency patch.
+
+**Touched:** `server/config/models.js` (`textRefineModel`, comment),
+`server/lib/textRefine.js` (repair `MAX_OUT`).
+
+**Status:** ✅ active.

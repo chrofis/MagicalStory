@@ -435,15 +435,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
     const t0 = Date.now();
-    // 64000, raised from 16000 (2026-08-23): a 16-page long-text run's
-    // mandatory analysis plus rewrites hit the old cap exactly, and a truncated
-    // reply parses as zero page blocks — reported as "nothing to rewrite" while
-    // dash-carrying pages shipped (job_1787423677246 p1/p12). Worst measured
-    // rate is ~1350 output tokens/page, so a 25-page book (the wizard maximum)
-    // needs ~34k. The guard clamps to the model's own limit so a smaller
-    // override model still trips it, and makes any cap hit a loud failure
-    // instead of a silent "nothing to do".
-    const MAX_OUT = Math.min(64000, TEXT_MODELS[repairModel].maxOutputTokens || 64000);
+    // The model's OWN limit, never a hand-picked number (owner rule: no output
+    // caps). History: 16000 truncated a 16-page long-text run's mandatory
+    // analysis plus rewrites, and a truncated reply parses as ZERO page blocks
+    // — reported as "nothing to rewrite" while dash-carrying pages shipped
+    // (job_1787423677246 p1/p12). It was then clamped to 64000, which is the
+    // same hand-picked cap one size up; the real bound is the model. The
+    // throw below still turns any cap hit into a loud failure rather than a
+    // silent "nothing to do".
+    const MAX_OUT = TEXT_MODELS[repairModel].maxOutputTokens || 64000;
     const r = await callTextModelStreaming(prompt, MAX_OUT, null, repairModel, { usageLabel });
     const elapsedMs = Date.now() - t0;
     if ((r.usage?.output_tokens || 0) >= MAX_OUT) {

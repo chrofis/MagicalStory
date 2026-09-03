@@ -326,15 +326,27 @@ const MODEL_DEFAULTS = {
   // Wardrobe review: never measured. Pinned to the pre-2026-08-15 model so it
   // does not inherit a reviewer chosen on beats evidence.
   clothingReviewModel: process.env.CLOTHING_REVIEW_MODEL || 'deepseek-v4-pro',
-  // Text refinement: its own key for the same reason as the two above, plus a
-  // hard operational constraint. The refiner runs in PARALLEL with images and is
-  // joined with a 90s cap (storyJobPipeline JOIN_TIMEOUT_MS); a slow model does
-  // not merely score worse, its output is DISCARDED and the tokens are wasted.
-  // Measured on staging job_1786998860057_o6deqtv5s: with grok inherited from
-  // outlineReviewModel the two rounds ran >12 min against an 11-min image phase
-  // and were thrown away after charging $0.16. deepseek is the pre-switch model
-  // and the fastest of the arms that measured best on text.
-  textRefineModel: process.env.TEXT_REFINE_MODEL || 'deepseek-v4-pro',
+  // THE REPAIR PASS of the text chain — the one call that answers the merged
+  // findings of both audits (owner ruling 2026-09-03, after the repair
+  // bake-off). Its own key so it can be swapped without touching the beats,
+  // scene or wardrobe reviewers.
+  //
+  // claude-opus, from the 2026-09-03 bake-off on a frozen finding list
+  // (scratchpad piraterun4/repair-bakeoff/report.html): opus closed 22/22
+  // findings, including all four hard ones, and closed them the way the
+  // template asks — by establishing the missing fact on an EARLIER page — with
+  // zero inventions. deepseek-v4-pro invented plot facts twice in 12 pages (a
+  // spoiler and a page-12 contradiction), which is the one failure the chain
+  // can no longer catch now that the re-audit is gone. A blind judge scored
+  // opus 6/6/8 against deepseek 5/4/7. Cost is +$0.39 per story.
+  //
+  // Latency is NOT the constraint it used to be: opus measured 209s in the
+  // bake-off against a join budget of 600s + 10s per page beyond ten
+  // (storyJobPipeline.js JOIN_TIMEOUT_MS — 660s for a 16-page book), and every
+  // completed step is published as it finishes, so a deadline can only ever
+  // cost the step still running. The old "90s cap" note here described a
+  // budget that no longer exists.
+  textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-opus',
   // The LECTOR: dedicated grammar proofreader of the FINAL text, after the last
   // corrective round (owner ruling 2026-09-03). A sixth question on the
   // causality audit catches a different 1-2 of 4 known defects each run
