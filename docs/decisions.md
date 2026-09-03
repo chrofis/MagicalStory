@@ -22336,6 +22336,51 @@ user's own premise names a world. See tasks/BACKLOG.md.
 **Status:** ✅ active (prompt/rounds fixes shipped; Setting/location
 precedence shipped 2026-08-31 — see "Named location is binding" below).
 
+### Arc-machine refinement 5: a mechanism that does not do what the sentence claims IS an arc fault (owner, 2026-09-03)
+**Context:** Autopsy of the capstone pirate run (`job_1788380714660_4p9mr11xszu`;
+arc trail at `arcReviewReport.json`) found a beat-5 action that reads as
+purposeful but accomplishes nothing — one character calls out a bearing from a
+position the receiving character can already see, so the "help" transfers no
+information. It survived every arc round untagged. Cause: the exclusion sentence
+in `prompts/arc-create.txt` / `prompts/arc-retell.txt` (both critique blocks are
+byte-identical by design) told the critic that "the plausibility of a mechanism
+swappable without changing who does what and why" is not an arc fault because
+"later stages fix those". **No later stage checks mechanism plausibility** — the
+hand-off target does not exist. `prompts/arc-hints.txt` judges "story
+consistency and how relatable the characters are"; beats, text and the eval
+stages check none of it. The retell's fresh critique came closest and had to
+misfile the defect as "asserted rather than shown" — MINOR, below the repair
+threshold, so nothing was fixed. Origin of the exclusion: commit `8967db77b`
+("refactor(arc-machine): story-level critiques only + Fixing/Keeping re-tell
+contract", 2026-08-30) — the entry "Arc-machine refinement: arc critiques are
+story-level only" above; it bundled swappable-mechanism plausibility with
+numeric precision as one downstream-fixable class.
+**Decision (owner ruling):** Split the bundle. (1) The exclusion keeps only its
+numeric half — "Numeric precision and sourced measurements and times are not arc
+faults — later stages fix those; never list one." Clock numbers and measurements
+remain the teller's business; an arc must not be pinned on invented figures.
+(2) The fault taxonomy gains one archetype, in both prompts: **"an action that
+does not accomplish what the sentence claims it accomplishes"**. It is inserted
+before "a character who is anyone" so the following sentence's "The last two are
+MAJOR by default" keeps pointing at the same two character-truth archetypes.
+Scope is the two CRITIQUE lists only — `arc-hints.txt` was deliberately NOT
+expanded, and `arc-panel.txt`'s "never … replaces a working mechanism for
+plausibility's sake" is left as written (a mechanism that does not accomplish
+its claim is not a working mechanism).
+**Rationale:** An exclusion is only legitimate when the named later stage
+actually performs the check. Mechanism plausibility had no owner anywhere in the
+pipeline, so the exclusion was not a hand-off but a blind spot — and it is a
+story-level fault by nature: an action that accomplishes nothing is an event
+without a cause wearing a cause's clothes, exactly the class the arc stage
+exists to catch. The numeric half of the exclusion is kept because it has a real
+target (the teller sets times and quantities) and because detail-level critiques
+forcing structural rewrites is the regression `8967db77b` was written to stop.
+**Touched:** `prompts/arc-create.txt` (critique block, ~line 53),
+`prompts/arc-retell.txt` (critique block, ~line 59).
+**Status:** ✅ active (amends "Arc-machine refinement: arc critiques are
+story-level only" above — that entry's swappable-mechanism exclusion is
+superseded; its numeric-precision exclusion stands).
+
 ## 2026-08-31 — Story-idea world split made explicit: labels, rerun steering, persisted `ideaWorld`
 
 **Context.** The wizard has always generated idea 1 from the user's real
