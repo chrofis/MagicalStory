@@ -355,27 +355,7 @@ Scale proportionally for longer/shorter stories. The plan ensures variety BEFORE
 
 ## DO-NOT-WRITE LIST (canonical)
 
-These appear nowhere in the story text or scene prose. Forbidden at write time, not after — the analysis pass does NOT need to re-check them.
-
-**Gestures (banned outright):** hand on shoulder, ruffled hair, tousled hair, patted on back, nodded knowingly, nodded wisely, arm around shoulders.
-
-**Phrases (banned outright):** "little did they know", "suddenly" / "plötzlich", "without warning", "it was a [adjective] day", "it was a dark and stormy night".
-
-**Page 1 openings (banned):** weather descriptions ("It was a beautiful sunny day…"), characters waking up, narrated backstory. Start mid-action — something happens, someone speaks, a problem appears.
-
-**Trait labels in story text (banned):** "she was brave", "he was shy", "she felt curious". Show the trait through action, dialogue, body language.
-
-**Aesthetic buzzwords (banned everywhere):** dramatic, ethereal, haunting, cinematic, breathtaking, stunning. They carry no visual or narrative information.
-
-**Humor (banned):** no jokes, puns, or wordplay — they don't translate and AI humor isn't funny. Use funny situations, silly reactions, absurd moments, physical comedy instead.
-
-**Plot formulas (banned):** the "try-fail-try-succeed" loop; gathering-the-team montages; training sequences; "believe in yourself" speeches as the resolution.
-
-**Gesture re-use cap:** every gesture (hug, smile, wink, shrug, nod, fist-bump, high-five, thumbs up, pinky promise, silly salute, leaning shoulder-to-shoulder) appears at most ONCE in the entire story. The second time, vary it.
-
-**Scene prose verbs (banned in SCENE blocks only — see line above on plain concrete verbs):** hovers, cradled, perched upon, rests gently against. Use plain concrete verbs: holds, sits on, reaches for, walks toward, gazes at.
-
-**Use instead — for support, connection, warmth:** standing closer, walking side by side, sharing food, helping with a task; warm smile, wink, raised eyebrows, eyes lighting up; fist bump, high five, thumbs up, silly salute, pinky promise; leaning in, sitting next to, making eye contact, a quick nudge.
+{DO_NOT_WRITE_LIST}
 
 **PACING:**
 - Vary the rhythm: slow down for emotional moments, speed up for action

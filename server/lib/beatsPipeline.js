@@ -1,6 +1,7 @@
 
 
 const { runPlanCounters } = require('./planCounters');
+const { textZoneRulesActive } = require('../config/runtime');
 
 // The beats layer no longer audits the STORY (owner, 2026-09-01). Its only
 // check is arithmetic over the page division (./planCounters) plus one cheap
@@ -1039,6 +1040,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // No referencePhotos exist at this stage, so the contract is the only
         // outfit source — same reason the all-pages builder needs it.
         clothingRequirements,
+        // Decides whether the text-zone rule family is asked for at all.
+        story: inputData,
       }
     );
     let lastErr = null;
@@ -1215,7 +1218,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     const res = checkBriefs(
       expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
       castNames,
-      visualBible
+      visualBible,
+      { textZoneRules: textZoneRulesActive(inputData) }
     );
     for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
     briefFindings = renderBriefBlock(res.byPage);
@@ -1361,9 +1365,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const after = checkBriefs(
           expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
           briefCastNames,
-          visualBible
+          visualBible,
+          { textZoneRules: textZoneRulesActive(inputData) }
         );
-        const left = after.findings.filter(f => REVIEWABLE.has(f.type));
+        // pageNumber 0 is the whole-book text-position tally. It is reported,
+        // but it can never drive the targeted second round below — that round
+        // re-sends only the faulted PAGES, and rebalancing a distribution means
+        // re-sending the whole book at full cost.
+        const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
+        const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
+        if (bookLevel.length > 0) {
+          const d = bookLevel.map(f => f.type).join('; ');
+          log.warn(`⚠️ [BEATS] text-position distribution after review: ${d}`);
+          gl.warn('beats_textzone_distribution', `Text-position distribution still off after the scene review: ${d}`, null, { findings: bookLevel });
+        }
         const introduced = left.filter(f => !(briefBeforeByPage.get(f.pageNumber)?.has(f.type)));
         const survived = left.filter(f => briefBeforeByPage.get(f.pageNumber)?.has(f.type));
         briefUnfixedList = left;

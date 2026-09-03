@@ -949,7 +949,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
               artStyleId: inputData.artStyle,
               imageBackend: imgModelConfig?.backend,
-              referencePhotos: expansionPagePhotos
+              referencePhotos: expansionPagePhotos,
+              // Decides whether the text-zone rule family is asked for at all.
+              story: inputData,
             }
           );
 

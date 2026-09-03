@@ -167,10 +167,24 @@ async function loadPromptTemplates() {
     ['bboxRefine', 'bbox-refine.txt'],
     ['storyUnified', 'story-unified.txt'],
     ['storyUnifiedImageFirst', 'story-unified-imagefirst.txt'],
+    // THE canonical DO-NOT-WRITE list — banned gestures, phrases, page-1
+    // openings, trait labels, buzzwords, plot formulas, the gesture re-use cap.
+    // Body only; each consuming template keeps its own heading. Read by
+    // buildDoNotWriteSection (beats text writer + refiner), by the split-review
+    // reviewer, and by the two unified writer templates through their
+    // {DO_NOT_WRITE_LIST} placeholder — so there is exactly one copy.
+    // It used to be SLICED out of story-unified-imagefirst.txt at runtime,
+    // which made deleting that "legacy" template a silent way to strip the
+    // whole list from production (rule-survival audit 2026-09-03, item M2).
+    ['doNotWriteList', 'do-not-write-list.txt'],
     // Shared ANALYSIS instruction bodies — injected into the {ANALYSIS_INSTRUCTIONS}
     // placeholder of the matching unified template (single-call mode) AND into the
     // external reviewer prompt (split outline review). One source per variant so the
     // self-critique and the external review can never drift apart.
+    // NOT dead code when the unified pipeline is off: buildTextRefinePrompt
+    // slices its review CRITERIA out of the imageFirst body on every BEATS run
+    // (sliceAnalysisAspect, aspect 'text'), so deleting these files strips the
+    // refiner's criteria and it returns null. Verified 2026-09-03.
     ['outlineAnalysisTextFirst', 'outline-analysis-textfirst.txt'],
     ['outlineAnalysisImageFirst', 'outline-analysis-imagefirst.txt'],
     ['outlineReview', 'outline-review.txt'],

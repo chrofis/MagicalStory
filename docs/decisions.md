@@ -337,6 +337,130 @@ checker" backlog watch-item with the checker it was waiting on.
 `tasks/BACKLOG.md`.
 **Status:** ✅ active.
 
+### Text-zone rules restored BEHIND A FLAG; two sliced rule lists moved into owned files (rule-survival audit)
+**Context:** A read-only audit on 2026-09-03 (`scratchpad/rule-survival/report.html`, 142
+rules extracted) compared the rules the old unified/pre-beats chain enforced against the beats
+chain and found 26 that were silently dropped and still applicable. The owner ruled on each.
+This entry logs the text-zone cluster plus two structural items; the plan/text and Art
+Director clusters are logged in their own entries (commits `fc4985b8b`, `f56271999`).
+
+Owner rulings, verbatim:
+- text-zone distribution + surface rule: *"R1 and R2 must be behind a flag but do it... make
+  sure all this text zone is behind the flag and only active for the modes with little text"*
+- R4: restore the textPosition-vs-character collision half only; the character-vs-interaction-
+  target depth half is *skip*
+- R19 costumed-in-all-scenes: *"only for trial stories"*
+- R21 title-page landmark: restore
+- M1 (`sliceAnalysisAspect` drops section D on every beats run) and M2 (beats' rule lists live
+  inside the "legacy" unified templates): *fix*
+
+**Decision:**
+
+*The flag.* `textZoneRules: true` in `server/config/runtime.js` is the master switch for the
+family; `textZoneRulesActive(story)` is the per-story condition. It is DERIVED, not declared:
+how much text a page carries is the reading level (`LANGUAGE_LEVELS` — 1st-grade 25–50 words,
+standard 40–150, advanced 250–300), and where that text lands is `resolveLayout()`
+(`server/lib/layout.js`), driven by the same level — 1st-grade → `a4-overlay`, text painted
+INSIDE the picture (`textInImage: true`); standard and advanced → `square-below`, text typeset
+in a strip UNDER the picture. So "a SHORT text overlaid on the image" is exactly
+`layout.textInImage`, and that is the condition. A stamped `inputData.layout` wins over the
+level, so a developer `layoutOverride` keeps applying. Net: the rules are ON for `1st-grade`
+(or an explicit `a4-overlay` override) and OFF for `standard` and `advanced`.
+
+*R1 — distribution floors*, `server/lib/sceneBriefCheck.js` → `checkTextZoneDistribution()`,
+run from `beatsPipeline.js` through `checkScenes(..., { textZoneRules })`, findings rendered
+into the scene review as a `- Whole book:` row (they carry `pageNumber: 0`). Restores, from
+`story-unified.txt` "Distribution requirements across the full story" + `outline-analysis`
+check 20: full-width (`top-full`/`bottom-full`) between 30% and 50% of pages; at least 30%
+`top-*`; at least 30% `bottom-*`; never more than 3 consecutive pages in the same half. Parity
+is NOT re-checked — it survived into the Art Director's own rule set. A whole-book finding can
+never drive the targeted second review round (that round re-sends only faulted PAGES; a
+distribution rebalance means the whole book at full cost), so it is reported and ships.
+
+*R2 — the surface rule*, `prompts/scene-expansion.txt` + `prompts/scene-expansion-all.txt`.
+The text-zone block in both templates (prose rules AND the two JSON-schema lines) is now
+wrapped in `<!-- TEXT_OVERLAY_BEGIN --> … <!-- TEXT_OVERLAY_END -->` and gated by
+`applyTextZoneGate()` in the two AD builders — the same marker mechanism the unified writer,
+the reviewer and the iterate prompts already used, so overlay-off stories no longer pay for
+the rules or bend their composition to them. Inside the gate, restored: `top-*` takes sky /
+ceiling / cave roof / upper foliage / cliff face / calm distance, `bottom-*` takes ground /
+floor / water / cobblestones / grass / sand / low foliage, a vertical surface fits `top-*`
+only when the camera puts it across the top of the frame; and `emptyScenePrompt` names that
+same surface filling that same band. `*-full` re-declared valid on any page.
+
+*R4 — text half only*, `sceneBriefCheck.js` → `checkTextZoneCollision()`, per page, gated:
+flags a brief whose `textPosition` band is occupied by a named character (a `foreground`
+character fills the bottom of the frame, a `background` character sits high in it; `*-full`
+spans every side, a corner overlaps its own side and the centre) and names the cheapest three
+fixes. The depth-mismatch half of old check 24b is deliberately NOT restored.
+
+*R21*, `prompts/story-bible-from-beats.txt` cover rules: the Title Page backdrop is a LOC with
+`isRealLandmark: true` whenever the bible holds one — never fictional/underground/imagined.
+Restores the MUST semantics the beats bible had softened to "preferring".
+
+*R19, trial only*, `prompts/story-trial.txt`: a character with a `costumed` variant wears it in
+every scene except the very first. The main pipeline is unchanged — the bible picks which
+categories exist and the AD's C3 holds a category constant, with no costume preference.
+
+*M2 — the sliced lists move into owned files.* `prompts/do-not-write-list.txt` is new and
+registered in `prompts.js`; it holds the list BODY. `buildDoNotWriteSection()` and the
+split-review reviewer read it directly (the runtime slicing out of
+`story-unified-imagefirst.txt` is deleted), and BOTH unified templates read it back through a
+`{DO_NOT_WRITE_LIST}` placeholder — so there is exactly one copy and deleting the unified
+templates can no longer strip the ban list. Byte-identity verified against `HEAD`: every
+`buildDoNotWriteSection`, `buildUnifiedStoryPrompt`, `buildOutlineReviewPrompt` and
+`buildTextRefinePrompt` output is unchanged. The analysis templates are still sliced for the
+refiner's criteria; that dependency is now stated at their registration in `prompts.js`
+("NOT dead code when the unified pipeline is off").
+
+*M1 — the section-D drop.* `sliceAnalysisAspect(..., 'text')` dropped ALL of section D, so the
+beats refiner never received it. Section D was inventoried check by check rather than
+re-included wholesale, because most of it is restored elsewhere today or is metadata work a
+text refiner cannot emit:
+
+| D check | Disposition | Where it lives now |
+|---|---|---|
+| 15 character count | covered | `planCounters` CAST_OVER_CEILING + `scene-review.txt` |
+| 16 scene-sequence compliance | obsolete | plan lines ARE the lock; scene review check 5 |
+| 17 clothing / costume | restored elsewhere | R19 (trial), `clothingCheck` + AD C3 (main) |
+| **18 action match (text bends)** | **carried into the text slice** | marked in `outline-analysis-imagefirst.txt` |
+| 18b affect translation | obsolete for text | emits a SCENE/METADATA expression fix |
+| 19 / 19a depth vs size, position vs depth | obsolete for text | metadata-only |
+| 19b physical-trait lock | restored elsewhere | AD cluster, commit `f56271999` |
+| 19c camera-action consistency | obsolete for text | metadata-only |
+| 20 text-position distribution | restored elsewhere | R1 code counters (this entry) |
+| 21 text-zone description / 23 empty-scene alignment | restored elsewhere | R2 AD template (this entry) |
+| 22 forbidden-side intrusion | not restored | generative rule survives and is stronger; audit rates verification low-medium |
+| 24 character coverage | restored elsewhere | plan cluster, commit `fc4985b8b` |
+| 24a textPosition vs character collision | restored elsewhere | R4 code check (this entry) |
+| 24b character vs interaction-target depth | owner ruled skip | — |
+| **24c agents in TEXT vs the locked scene** | **carried into the text slice** | marked in `outline-analysis-imagefirst.txt` |
+
+The two carried checks are the only D entries that exist to bend the TEXT toward a locked
+picture, which is precisely what the refiner does. They are marked in the template with
+`<!-- TEXT_ASPECT_BEGIN/END -->` and appear in the text slice under a `**D. TEXT VS THE LOCKED
+SCENE**` heading; the `both` and `scene` slices are byte-identical to before.
+
+**Rationale:** The flag is derived from the layout rather than declared because the layout is
+already the single source of truth for "where does the text go" — a second, hand-maintained
+list of overlay reading levels is the drift the audit is full of. R1/R4 went into
+`sceneBriefCheck.js` rather than `planCounters.js` because `textPosition` does not exist at
+plan time: the AD emits it, and `sceneBriefCheck` is the deterministic, free, per-book check
+that already feeds the scene review. R2 reuses the existing `TEXT_OVERLAY` marker mechanism
+instead of inventing a second gate. Section D was inventoried rather than re-included so two
+agents restoring rules on the same day could not install the same rule at two sites.
+
+**Touched:** `server/config/runtime.js`, `server/lib/sceneBriefCheck.js`,
+`server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`, `server/services/prompts.js`,
+`storyJobPipeline.js`, `prompts/do-not-write-list.txt` (new), `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/outline-analysis-imagefirst.txt`,
+`prompts/story-bible-from-beats.txt`, `prompts/story-trial.txt`,
+`tests/manual/textZoneRules.test.js` (new), `tests/manual/promptOwnedSources.test.js` (new).
+**Status:** ✅ active.
+
+---
+
 ---
 
 ## Email

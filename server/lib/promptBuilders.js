@@ -10,6 +10,7 @@ const path = require('path');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
+const { textZoneRulesActive } = require('../config/runtime');
 const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens } = require('./visualBible');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -2274,7 +2275,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     log.error(`👕 [PROMPT] all-pages scene expansion resolved an outfit for only ${resolvedOutfits}/${characters.length} character(s) — the rest have no outfit text and the Art Director will invent one`);
   }
 
-  return fillTemplate(template, {
+  const filledAll = fillTemplate(template, {
     PAGE_COUNT: beats.length,
     ALL_PLAN_LINES: planBlocks(beats),
     // The whole story, read-only: the Art Director stages each page's plan line
@@ -2289,6 +2290,21 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     AVAILABLE_AVATARS: options.availableAvatars || buildAvailableAvatarsForPrompt(characters),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
   });
+  return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
+}
+
+/**
+ * Strip the `<!-- TEXT_OVERLAY_BEGIN --> … <!-- TEXT_OVERLAY_END -->` blocks —
+ * the text-zone rule family — keeping only the markers when they are active and
+ * dropping markers AND contents when they are not. Same gate the unified writer,
+ * the reviewer and the iterate prompts already apply; see
+ * runtime.textZoneRulesActive for which stories it is on for.
+ */
+function applyTextZoneGate(text, active) {
+  const s = String(text || '');
+  return active
+    ? s.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '')
+    : s.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
 }
 
 /**
@@ -2474,7 +2490,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   const languageInstruction = getLanguageInstruction(language);
   const languageName = getLanguageNameEnglish(language);
 
-  return fillTemplate(PROMPT_TEMPLATES.sceneExpansion, {
+  const filledPage = fillTemplate(PROMPT_TEMPLATES.sceneExpansion, {
     DRAFT_SCENE_DESCRIPTION: draftSceneDescription,
     SCENE_SUMMARY: sceneSummary,
     SCENE_CONTEXT: sceneContextText,
@@ -2500,6 +2516,15 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CORRECTION_NOTES: '',
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3
   });
+  // Text-zone rule family, same gate as the all-pages builder. A cover call
+  // (pageNumber <= 0) never gets it; a page call follows the story's layout,
+  // which the caller passes as `options.story` (or the boolean directly). With
+  // neither, the rules stay on — the pre-flag behaviour.
+  const zoneActive = pageNumber > 0 && (
+    typeof options.textZoneRules === 'boolean' ? options.textZoneRules
+      : options.story ? textZoneRulesActive(options.story)
+        : true);
+  return applyTextZoneGate(filledPage, zoneActive);
 }
 
 /**
@@ -3905,11 +3930,26 @@ Then continue directly with the ---TITLE--- section. Hard rules for this respons
  *   ([{page, issues:[{type, detail}]}]) surfaced to the reviewer as REVIEW HINTS
  * @returns {string|null} Filled reviewer prompt, or null when the template is missing
  */
+// Section D checks that are TEXT fixes, not scene fixes — marked in the
+// template with <!-- TEXT_ASPECT_BEGIN --> … <!-- TEXT_ASPECT_END -->.
+//
+// WHY: the beats pipeline's ONLY consumer of this file is the text refiner,
+// which asks for aspect 'text' — and 'text' dropped all of section D, so two
+// checks that exist only to bend the TEXT toward a locked picture never reached
+// a beats run at all (rule-survival audit 2026-09-03, item M1). Every other D
+// check is metadata or scene work the refiner cannot emit, or is restored
+// elsewhere; see the inventory in docs/decisions.md. Marked checks are carried
+// into the TEXT slice under their own heading and stay in place for the
+// full-section reviewer.
+const TEXT_ASPECT_BLOCK = /<!-- TEXT_ASPECT_BEGIN -->\r?\n([\s\S]*?)<!-- TEXT_ASPECT_END -->\r?\n?/g;
+const stripTextAspectMarkers = (s) => String(s || '').replace(/[ \t]*<!-- TEXT_ASPECT_(BEGIN|END) -->\r?\n?/g, '');
+
 // Slice the analysis instruction body to a single review aspect (Test Lab
 // split-review experiment). TEXT keeps sections A/B/C (narrative, character,
-// prose) + E (do-not-write); SCENE keeps section D (scene-hint mechanics).
-// 'both' returns the body unchanged (production behaviour). If the section
-// headers can't be located the body is returned intact (never silently blank).
+// prose) + E (do-not-write) + the TEXT-fix checks marked inside D; SCENE keeps
+// section D (scene-hint mechanics). 'both' returns the body unchanged
+// (production behaviour). If the section headers can't be located the body is
+// returned intact (never silently blank).
 function sliceAnalysisAspect(body, aspect, opts = {}) {
   // includeTail=false drops the FIXES REQUIRED block and its formatting rules,
   // keeping only the CRITERIA. The text-refinement stage reuses the same review
@@ -3917,23 +3957,28 @@ function sliceAnalysisAspect(body, aspect, opts = {}) {
   // not inherit an output contract that contradicts its own.
   const includeTail = opts.includeTail !== false;
   if (!body) return body;
-  if (aspect === 'both' && includeTail) return body;
+  if (aspect === 'both' && includeTail) return stripTextAspectMarkers(body);
   const idxA = body.indexOf('**A. ');
   const idxD = body.indexOf('**D. ');
   const idxE = body.indexOf('**E. ');
   const idxFixes = body.indexOf('**FIXES REQUIRED**');
   if (idxA < 0 || idxD < 0 || idxE < 0 || idxFixes < 0 || !(idxA < idxD && idxD < idxE && idxE < idxFixes)) {
-    return body;
+    return stripTextAspectMarkers(body);
   }
   const preamble = body.slice(0, idxA);
   const secABC = body.slice(idxA, idxD); // A + B + C
   const secD = body.slice(idxD, idxE);   // D
   const secE = body.slice(idxE, idxFixes); // E (do-not-write verification)
   const tail = includeTail ? body.slice(idxFixes) : '';  // FIXES REQUIRED + formatting rules
-  if (aspect === 'both') return preamble + secABC + secD + secE + tail;
-  return aspect === 'text'
-    ? preamble + secABC + secE + tail   // drop D (scene mechanics)
-    : preamble + secD + tail;           // drop A/B/C/E (all text checks)
+  const strip = stripTextAspectMarkers;
+  if (aspect === 'both') return strip(preamble + secABC + secD + secE + tail);
+  if (aspect !== 'text') return strip(preamble + secD + tail); // drop A/B/C/E (all text checks)
+  // TEXT: A/B/C + E, plus the D checks that emit TEXT fixes (see above).
+  const carried = [...secD.matchAll(TEXT_ASPECT_BLOCK)].map(m => m[1].trim()).filter(Boolean);
+  const dText = carried.length
+    ? `**D. TEXT VS THE LOCKED SCENE**\n\n${carried.join('\n')}\n\n`
+    : '';
+  return strip(preamble + secABC + dText + secE + tail);
 }
 
 // Strip the aspect-gated reference blocks in outline-review.txt. TEXT review
@@ -4002,27 +4047,13 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
     .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
     .join('\n\n') || '(no character details available)';
 
-  // Slice the canonical DO-NOT-WRITE LIST out of the matching writer template so
-  // the two never drift. Drop its header and the writer-only "the analysis pass
-  // does NOT need to re-check them" note (that guidance is for the writer's own
-  // self-critique; in split mode the external reviewer IS the re-check).
-  const writerTpl = (useImageFirst && PROMPT_TEMPLATES.storyUnifiedImageFirst)
-    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
-    : PROMPT_TEMPLATES.storyUnified;
-  let doNotWriteList = '';
-  if (writerTpl) {
-    const start = writerTpl.indexOf('## DO-NOT-WRITE LIST');
-    if (start >= 0) {
-      const rest = writerTpl.slice(start);
-      const stops = ['\n**PACING:**', '\n---', '\n# OUTPUT FORMAT']
-        .map(s => rest.indexOf(s)).filter(i => i > 0);
-      const end = stops.length ? Math.min(...stops) : rest.length;
-      doNotWriteList = rest.slice(0, end)
-        .replace(/^##\s*DO-NOT-WRITE LIST[^\n]*\n+/, '')
-        .replace(/^These appear nowhere[^\n]*\n+/m, '')
-        .trim();
-    }
-  }
+  // The canonical DO-NOT-WRITE LIST, from the file both pipelines own. Drop the
+  // writer-only "the analysis pass does NOT need to re-check them" note (that
+  // guidance is for the writer's own self-critique; in split mode the external
+  // reviewer IS the re-check).
+  const doNotWriteList = String(PROMPT_TEMPLATES.doNotWriteList || '')
+    .replace(/^These appear nowhere[^\n]*\n+/m, '')
+    .trim();
   if (!doNotWriteList) doNotWriteList = '(canonical DO-NOT-WRITE list unavailable — apply the ban categories named in check 25)';
 
   // Aspect scope note (split review) + prior-review context (repeated review).
@@ -5409,24 +5440,25 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
 }
 
 /**
- * The canonical DO-NOT-WRITE list, lifted out of the writer template so every
- * prompt that produces narrative text bans the same categories. Shared by the
- * refiner and by the beats-first text writer.
+ * The canonical DO-NOT-WRITE list, so every prompt that produces narrative text
+ * bans the same categories. Shared by the refiner and by the beats-first text
+ * writer.
+ *
+ * Reads prompts/do-not-write-list.txt directly. Until 2026-09-03 it SLICED the
+ * list back out of the unified writer template at runtime, which meant the
+ * beats pipeline's do-not-write list lived inside a file the beats pipeline
+ * does not use — and deleting that template as dead code would have stripped
+ * the list from production with the builder just returning '' (rule-survival
+ * audit, item M2). The list now lives in a file this pipeline owns, and the
+ * unified templates read it through their {DO_NOT_WRITE_LIST} placeholder.
  */
-function buildDoNotWriteSection(inputData = {}) {
-  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
-  const writerTpl = (variant !== 'textFirst' && PROMPT_TEMPLATES.storyUnifiedImageFirst)
-    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
-    : PROMPT_TEMPLATES.storyUnified;
-  if (!writerTpl) return '';
-  const start = writerTpl.indexOf('## DO-NOT-WRITE LIST');
-  if (start < 0) return '';
-  const rest = writerTpl.slice(start);
-  const stops = ['\n**PACING:**', '\n---', '\n# OUTPUT FORMAT']
-    .map(s => rest.indexOf(s)).filter(i => i > 0);
-  const end = stops.length ? Math.min(...stops) : rest.length;
-  const list = rest.slice(0, end).replace(/^##\s*DO-NOT-WRITE LIST[^\n]*\n+/, '').trim();
-  return list ? `# DO-NOT-WRITE LIST\n\n${list}` : '';
+function buildDoNotWriteSection() {
+  const list = String(PROMPT_TEMPLATES.doNotWriteList || '').trim();
+  if (!list) {
+    log.error('[PROMPT] do-not-write-list template not loaded — narrative prompts will ship without the ban list');
+    return '';
+  }
+  return `# DO-NOT-WRITE LIST\n\n${list}`;
 }
 
 /**
@@ -5897,7 +5929,10 @@ ${adventureGuide}` : ''}`;
       MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
       // Reader age for the title pick the writer makes in its ---TITLE---
       // section (2026-08-27, replaced the separate title-judge call).
-      AGE: readerAge(inputData)
+      AGE: readerAge(inputData),
+      // The list body under this template's own '## DO-NOT-WRITE LIST' heading.
+      // One copy, in prompts/do-not-write-list.txt.
+      DO_NOT_WRITE_LIST: String(PROMPT_TEMPLATES.doNotWriteList || '').trim()
     });
     // Hard gate for all text-overlay-only instructions. Layouts that render
     // text BELOW the image (square-below, advanced reading level) don't

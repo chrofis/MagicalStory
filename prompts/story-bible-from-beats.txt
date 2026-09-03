@@ -88,6 +88,7 @@ Each cover is a structured spec, not prose. The fields are the spec.
 
 - Each cover lists EXACTLY ONE LOC### in `Objects:`, first, as its backdrop — never two, never a LOC you did not put in the Visual Bible.
 - Each cover takes a different LOC as its backdrop, preferring LOCs with `isRealLandmark: true` that the story's pages already use. Never add a real landmark to the Visual Bible only for a cover; when the story uses fewer than three, reuse one or use an invented LOC.
+- The Title Page backdrop is a LOC with `isRealLandmark: true` whenever the Visual Bible holds one — never a fictional, underground or imagined LOC. With no real landmark in the bible at all, take the most story-defining invented LOC.
 - List every character by name. Never "the family", "everyone", "the group".
 - Clothing is one of `standard | winter | summer | costumed` and must be a category that character marked `used: true`.
 - `holds` is exactly one ART### from `Objects:`, or the word `nothing`.

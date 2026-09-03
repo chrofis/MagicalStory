@@ -97,6 +97,16 @@ const SETTINGS = {
     'pixar', 'comic', 'cartoon', 'manga', 'concept', 'oil',
   ],
 
+  // ── Text-zone layout rules ─────────────────────────────────────────────
+  // Master switch for the text-zone rule family: the distribution floors over
+  // the book's textPosition values, the surface rule the Art Director follows
+  // when it picks a corner, and the textPosition-vs-character collision check.
+  // They are only ever ASKED FOR when the page text is overlaid INSIDE the
+  // picture — see textZoneRulesActive() for the per-story condition. This flag
+  // exists so the whole family can be turned off in one place without hunting
+  // through three prompts and two modules.
+  textZoneRules: true,
+
   // ── Repair ─────────────────────────────────────────────────────────────
   // The ONE deliberate environment difference. A paying customer's book gets
   // every recovery attempt; staging runs a single pass so a showcase finishes
@@ -123,6 +133,40 @@ function runtime(name) {
 }
 
 /**
+ * Are the text-zone rules active for THIS story?
+ *
+ * DERIVATION — the two facts that decide it:
+ *   1. How much text a page carries is the reading level (LANGUAGE_LEVELS,
+ *      promptBuilders.js): 1st-grade 25–50 words, standard 40–150,
+ *      advanced 250–300.
+ *   2. Where that text lands is resolveLayout() (server/lib/layout.js), driven
+ *      by the same reading level: 1st-grade → `a4-overlay`, text painted INSIDE
+ *      the picture over a reserved calm corner (textInImage: true); standard and
+ *      advanced → `square-below`, text typeset in a strip UNDER the picture
+ *      (textInImage: false). A developer layoutOverride can force either.
+ *
+ * So "a SHORT text overlaid on the image" is exactly `layout.textInImage`, and
+ * that is the condition. For a text-below layout there is no text zone inside
+ * the frame at all: a full-width floor, a corner-surface rule and a
+ * textPosition/character collision check are noise the model still pays for —
+ * and worse, they bend the composition of a picture nothing will be written on.
+ *
+ * @param {Object} story - the story's inputData (or anything carrying
+ *   `layout` / `languageLevel` / `layoutOverride`).
+ * @returns {boolean}
+ */
+function textZoneRulesActive(story = {}) {
+  if (!runtime('textZoneRules')) return false;
+  const layout = story && story.layout;
+  // A stamped layout wins — it is what the rest of the pipeline already ran on.
+  if (layout && typeof layout.textInImage === 'boolean') return layout.textInImage;
+  // Required lazily: layout.js is a pure resolver, but config must not hold a
+  // load-time edge into lib/.
+  const { resolveLayout } = require('../lib/layout');
+  return resolveLayout(story && story.languageLevel, (story && story.layoutOverride) || 'auto').textInImage;
+}
+
+/**
  * Every effective value, for the admin config endpoint and boot logging —
  * so "what is this environment actually running" is one call, not two
  * dashboards and a guess.
@@ -133,4 +177,4 @@ function runtimeSnapshot() {
   return out;
 }
 
-module.exports = { runtime, runtimeSnapshot, environmentName, SETTINGS };
+module.exports = { runtime, runtimeSnapshot, environmentName, textZoneRulesActive, SETTINGS };
