@@ -11,6 +11,7 @@ Write in {LANGUAGE}. Never switch to a dialect or a spoken regional form.
 # TARGET
 
 Reading level: {READING_LEVEL}
+Each paragraph runs 2-4 sentences, a page holds at most four paragraphs, and a blank line separates them.
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 

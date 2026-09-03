@@ -62,7 +62,7 @@ Scan the page plan and list every element that must stay consistent across illus
 - At least {PAGE_COUNT} entries. Include an element even if it appears once.
 - `pages` is earned: only the pages whose plan line actually contains the element, never a blanket 1-{PAGE_COUNT} range. An element the story leaves behind ends its range there.
 - Empty categories are `[]`.
-- One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id.
+- One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id. Every character the story names is declared exactly once: a name that is neither in {CHARACTER_NAMES} nor a `secondaryCharacters` entry is a fault, and so are two entries for the same person under different names.
 
 Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
 

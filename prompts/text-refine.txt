@@ -11,6 +11,7 @@ Write in {LANGUAGE}. Keep the register of the current text. Never switch to a di
 # TARGET
 
 Reading level: {READING_LEVEL}
+A rewritten page keeps the paragraph shape: 2-4 sentences a paragraph, at most four paragraphs, a blank line between them.
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 

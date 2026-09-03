@@ -25301,3 +25301,111 @@ byte-identical across the two files.
 
 **Status:** ✅ active. The sibling clusters from the same audit (the plan/text
 rules; the text-zone flag) ship separately.
+
+---
+
+## 2026-09-03 — Rule-survival audit: six plan-checker / text / arc rules restored after the old-unified → beats migration (owner rulings, one batch)
+
+**Context:** Same read-only survival audit as the Art Director batch above
+(2026-09-03, `staging`; report plus the recovered legacy templates in the
+session scratchpad `rule-survival/`). This entry covers the rows the owner
+ruled RESTORE in the plan-checker / narrative-text / arc-critique cluster, plus
+the VB-authoring closure rule added mid-batch. Each was enforced by
+`story-unified.txt`, `story-beats.txt @ 75fc965e9^` or
+`story-beats-review.txt`, and reaches no beats run today.
+
+**Decision:** Six restorations, sited by property: arithmetic goes to the code
+counters, judgement goes to a model question, and a writing rule goes to the
+template that writes.
+
+| Ruling | Old source | Shape | Site |
+|---|---|---|---|
+| **R5** paragraph shape | `story-unified.txt:100–115` | RESTORE (minus the pagination half) | `prompts/story-text-from-beats.txt` + a preservation line in `prompts/text-refine.txt` |
+| **R14** consecutive pages differ | `story-beats.txt @ 75fc965e9^` | RESTORE as a counter | `CONSECUTIVE_SAME_SHOT_CAST` in `server/lib/planCounters.js` |
+| **R15** the most-wanted picture | `story-beats-review.txt` check 7 | RESTORE as a model question | question 4 in `prompts/plan-check.txt` |
+| **R17** life-skill delivery | `story-beats-review.txt` check 11 | RESTORE as an arc-critique question | `prompts/arc-create.txt` + `prompts/arc-retell.txt` |
+| **R20** per-character coverage floor | `story-unified.txt:300` | RESTORE as a counter, alongside `NO_FOCAL_PAGE` | `UNDER_COVERED_CHARACTER` in `server/lib/planCounters.js` |
+| **R22** every named character declared once | `story-unified.txt:82–90` | RESTORE authoring-side | the secondary-character rule in `prompts/story-bible-from-beats.txt` |
+
+Per-ruling detail:
+
+- **R5 — paragraph shape.** The blank-line half is load-bearing, not style: the
+  overlay renderer and the PDF lay out on those breaks, and no beats template
+  stated paragraph shape at all (zero hits for "blank line" outside
+  `story-unified*.txt`). Written as one line directly under
+  `Reading level: {READING_LEVEL}` so it composes with the per-level sentence
+  and word counts `getReadingLevel` already emits
+  (`promptBuilders.js:1508`) instead of restating them: "Each paragraph runs
+  2-4 sentences, a page holds at most four paragraphs, and a blank line
+  separates them." The refiner rewrites whole pages and gets the same string
+  filled at the same position, so it carries the preservation form of the rule
+  rather than the writing form. The old rule's second half — "a scene or
+  location change starts a NEW PAGE" — is obsolete and deliberately NOT
+  restored: pagination is the page plan's job now.
+- **R14 — consecutive pages differ in shot AND cast count.** The property
+  survived only downstream (`C4` in the AD, `[page_repetition]` in scene
+  review), i.e. after the division is locked, where the only available fix is
+  rewriting a brief instead of re-shooting the page. Restored where it can
+  still change the plan: a counter, whose finding feeds the existing one-round
+  re-plan. Pairs are skipped (not compared) when either plan line is
+  incomplete or either shot did not classify, per the module's
+  degrade-never-throw contract.
+- **R15 — the most-wanted picture.** A judgement no counter can make, so it is
+  the plan check's fourth question: name the picture a child most wants to see
+  (the transformation, the arrival, the reveal) and the page whose plan line
+  stages it as its instant; between two pages, or only reported by a page's
+  change, is a finding. The template's own "answer only these three" and the
+  matching comments in `planCounters.js` / `prompts.js` are updated to four.
+- **R17 — the life skill has to DO something.** The whole life-skills /
+  therapeutic category, and nothing in the chain verified it landed:
+  `{STORY_GUIDE_SECTION}` injects the guide into `arc-create.txt` and the
+  commission block carries `Theme:` / `Topic:`
+  (`buildStoryBriefBody`), but the arc critique asked only the four
+  child-listener questions. Restored as a fifth, conditional question, written
+  byte-identically into both critique lists: "Where the commission states a
+  theme, topic or life skill, does it drive the climax, and does the character
+  who most needs it visibly act on it before the end, acted on and never
+  stated as a moral?" The conditional clause matters — most commissions state
+  no life skill, and an unconditional question would manufacture faults. The
+  "never stated as a moral" tail composes with the existing ending-craft rule
+  that already bans stated morals.
+- **R20 — coverage floor, alongside the focal page.** `NO_FOCAL_PAGE` (every
+  commissioned character alone in frame once, or the subject of a close-up) is
+  a different property, not a replacement: a character can own one close-up and
+  be absent from the rest of the book. Both counters now run.
+- **R22 — declared exactly once.** Today this is caught only post-render by
+  `cast_unlisted`, after the image spend. Restored authoring-side as the
+  closure half of the existing one-entry-per-secondary rule: a name that is
+  neither in `{CHARACTER_NAMES}` nor a `secondaryCharacters` entry is a fault,
+  and so are two entries for the same person under different names. **No
+  plan-check mirror question and no counter**, deliberately: the bible is
+  authored AFTER the plan check (`beatsPipeline.js:841` vs `:714`), so at plan
+  check time the only cast list in existence is the one derived from the plan
+  lines themselves — every named figure is trivially "in" it, and there is
+  nothing to verify. The invented-cast counters (`INVENTED_DOMINANT_*`,
+  `NO_COMMISSIONED_ON_PAGE`) already report the plan-side half. Name matching
+  therefore stays out of code here, which also keeps the titles-vs-short-names
+  trap (`isSameFigureName`, `sceneMetadata.js:1204`) out of a new call site.
+
+**Rationale:** Restorations of already-settled rules lost mechanically in a
+migration, shipped as one batch on the owner's per-row rulings. Siting follows
+the audit's own lesson: arithmetic in code (free, deterministic, and it can
+still reach the re-plan), judgement in the one model call the beats layer
+makes, writing rules in the writing template. Verification: the two new
+counters have unit tests in `tests/unit/plan-counters.test.ts` (16 pass,
+including the negative cases — a differing cast count, a differing shot, an
+incomplete line and an unclassified shot must all stay clean); the template
+loader reports 84/84 with no new placeholder in any edited template.
+
+**Touched:**
+- `prompts/story-text-from-beats.txt` (paragraph shape under `READING_LEVEL`)
+- `prompts/text-refine.txt` (the preservation form of the same rule)
+- `prompts/plan-check.txt` (question 4; "three" → "four" in the header and task line)
+- `prompts/arc-create.txt`, `prompts/arc-retell.txt` (the fifth critique question, byte-identical)
+- `prompts/story-bible-from-beats.txt` (declared-exactly-once closure)
+- `server/lib/planCounters.js` (`UNDER_COVERED_CHARACTER`, `CONSECUTIVE_SAME_SHOT_CAST`, `stats.coveragePages`)
+- `server/services/prompts.js` (plan-check registry comment: three → four questions)
+- `tests/unit/plan-counters.test.ts` (three new cases)
+
+**Status:** ✅ active. Sibling clusters from the same audit (Art Director /
+image prompts; the text-zone flag) ship separately.

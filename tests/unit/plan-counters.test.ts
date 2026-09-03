@@ -92,6 +92,46 @@ describe('runPlanCounters', () => {
     expect(noFocal.join(' ')).not.toContain('Ana never');
   });
 
+  it('flags a commissioned character in frame on fewer than two pages', () => {
+    const pages = [
+      page(1, line('close-up', 'Ana')),
+      page(2, line('wide', 'Ana and Ben walk')),
+      page(3, line('medium', 'Ana and Ben talk')),
+      page(4, line('ultra-wide', 'Cara stands alone')),
+    ];
+    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const under = r.findings.filter((f: any) => f.code === 'UNDER_COVERED_CHARACTER');
+    expect(under.map((f: any) => f.detail).join(' ')).toContain('Cara');
+    expect(under.map((f: any) => f.detail).join(' ')).not.toContain('Ben');
+    expect(r.stats.coveragePages.Ben).toEqual([2, 3]);
+  });
+
+  it('flags consecutive pages sharing shot and cast count, and lets either alone differ', () => {
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(2, line('wide', 'Ana and Cara')),   // same shot, same count -> finding
+      page(3, line('wide', 'Ana')),            // same shot, different count -> clean
+      page(4, line('close-up', 'Ben')),        // different shot, same count -> clean
+    ];
+    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const same = r.findings.filter((f: any) => f.code === 'CONSECUTIVE_SAME_SHOT_CAST');
+    expect(same).toHaveLength(1);
+    expect(same[0].pages).toEqual([1, 2]);
+  });
+
+  it('never compares a pair whose plan line is incomplete or whose shot did not classify', () => {
+    const incomplete = runPlanCounters({
+      pages: [page(1, 'wide — Ana'), page(2, 'wide — Ben')],
+      commissionedNames: CAST,
+    });
+    expect(incomplete.findings.map((f: any) => f.code)).not.toContain('CONSECUTIVE_SAME_SHOT_CAST');
+    const unclassified = runPlanCounters({
+      pages: [page(1, line('worm-eye', 'Ana')), page(2, line('worm-eye', 'Ben'))],
+      commissionedNames: CAST,
+    });
+    expect(unclassified.findings.map((f: any) => f.code)).not.toContain('CONSECUTIVE_SAME_SHOT_CAST');
+  });
+
   it('flags a main character present on under half the pages', () => {
     const pages = [
       page(1, line('wide', 'Ana')),

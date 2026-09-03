@@ -6,7 +6,7 @@
  * machine owns story correctness; what is left at the beats layer is arithmetic
  * over the division — how many close-ups, how many people per page, who never
  * gets a page of their own. That arithmetic is deterministic, so it costs
- * nothing and never hallucinates: it runs here, in code, and only the three
+ * nothing and never hallucinates: it runs here, in code, and only the four
  * judgement calls a counter cannot make go to a model (prompts/plan-check.txt).
  *
  * Input is the parsed PAGE PLAN line per page plus its beat. A plan line is
@@ -278,6 +278,31 @@ function runPlanCounters({ pages = [], commissionedNames = [], maxCharactersPerS
     }
   }
 
+  // 8. Coverage floor: a commissioned character is in frame on at least two
+  //    pages. Separate property from the focal page above — a character can own
+  //    one close-up and still be absent from the rest of the book.
+  const coverage = {};
+  for (const name of cast.commissioned) {
+    coverage[name] = rows.filter(r => r.present.includes(name)).map(r => r.pageNumber);
+    if (coverage[name].length < 2) {
+      add('UNDER_COVERED_CHARACTER', coverage[name],
+        `${name} is in frame on ${coverage[name].length} page(s) — every commissioned character belongs in at least two`);
+    }
+  }
+
+  // 9. Consecutive pages differ: never the same shot AND the same number of
+  //    named characters twice in a row. Pairs whose shot did not classify, or
+  //    whose plan line is incomplete, are skipped rather than compared.
+  for (let i = 1; i < rows.length; i++) {
+    const prev = rows[i - 1];
+    const cur = rows[i];
+    if (!prev.complete || !cur.complete) continue;
+    if (prev.shot === 'other' || cur.shot === 'other') continue;
+    if (prev.shot !== cur.shot || prev.present.length !== cur.present.length) continue;
+    add('CONSECUTIVE_SAME_SHOT_CAST', [prev.pageNumber, cur.pageNumber],
+      `both pages are a ${prev.shot} shot with ${prev.present.length} named character(s) in frame`);
+  }
+
   const lines = findings.map(f =>
     `PLAN[${f.code}]${f.pages && f.pages.length ? ` page ${f.pages.join(', ')}` : ''}: ${f.detail}`);
 
@@ -294,6 +319,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], maxCharactersPerS
       castPerPage: rows.map(r => ({ pageNumber: r.pageNumber, names: r.present })),
       inventedDominantPages: dominant,
       focalPages: focal,
+      coveragePages: coverage,
     },
   };
 }

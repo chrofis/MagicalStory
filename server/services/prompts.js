@@ -184,8 +184,9 @@ async function loadPromptTemplates() {
     ['storyBeats', 'story-beats.txt'],
     // The beats layer's only model check (owner, 2026-09-01). Counts and shot
     // arithmetic run in code (server/lib/planCounters.js); this call answers
-    // only the three questions a counter cannot — emotional highlights,
-    // entrances, and whether a 3+-cast page's justification holds. It never
+    // only the four questions a counter cannot — emotional highlights,
+    // entrances, whether a 3+-cast page's justification holds, and whether the
+    // story's most wanted picture got a page of its own. It never
     // rewrites a beat; its findings go back to the PLANNER as one re-plan.
     ['planCheck', 'plan-check.txt'],
     // Arc-only review and its judge. The arc is ~15 lines where the beats are a
