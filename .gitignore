@@ -115,6 +115,20 @@ tmp/
 tests/manual/*.png
 tests/manual/*.jpg
 
+# Test OUTPUT images, anywhere under tests/ (2026-09-03).
+# The narrow tests/manual + tests/fixtures rules above let 1,050 rendered images
+# — 357 MB — get committed across tests/_outputs, tests/trial, tests/tell-curated,
+# tests/char-repair-overlap, the composite-* run dirs and friends, against
+# CLAUDE.md's "NEVER commit test output images". They were untracked in the same
+# commit as this rule. Text stays tracked on purpose: the READMEs, refs.html,
+# manifests and one-off debug scripts in those dirs are 2.3 MB total and are the
+# only remaining record of what each experiment was.
+tests/**/*.png
+tests/**/*.jpg
+tests/**/*.jpeg
+tests/**/*.webp
+tests/**/*.gif
+
 # Temp photos (debug/testing)
 temp_photos/
 
