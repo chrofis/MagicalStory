@@ -25177,3 +25177,127 @@ an A/B against its fault count, not in a latency patch.
 `server/lib/textRefine.js` (repair `MAX_OUT`).
 
 **Status:** ✅ active.
+
+---
+
+## 2026-09-03 — Rule-survival audit: eight Art Director rules restored or reconciled after the old-unified → beats migration (owner rulings, one batch)
+
+**Context:** A read-only survival audit (2026-09-03, branch `staging`; report
+plus the extracted old templates in the session scratchpad `rule-survival/`)
+pulled 142 rules out of the old unified/pre-beats chain and classified each as
+survived / transformed / re-derived / lost. 26 were **lost and still
+applicable** — silently dropped when the beats chain replaced
+`story-unified.txt` + `outline-analysis-imagefirst.txt`, whose section D never
+reaches a beats run at all (`sliceAnalysisAspect` requests `aspect: 'text'`,
+`promptBuilders.js:3913–3937`). Three of the losses had already been re-derived
+from render failures at real cost (NO POINTING, the blanket no-lettering guard,
+the one-camera-position rule), which is the argument for restoring the rest by
+audit rather than one autopsy at a time. The audit also surfaced one *new*
+collision rather than a loss: the counting ban added the same day (`d00d48160`)
+contradicted the surviving crowd rule that demanded a count.
+
+**Decision:** The owner ruled each row individually. This entry logs the eight
+that land in the Art Director / image-prompt cluster, all shipped in one commit.
+The two scene-expansion templates share their rule set, so every restored rule
+is written **byte-identically** into `prompts/scene-expansion.txt` (per-page,
+the unified pipeline's fallback) and `prompts/scene-expansion-all.txt`
+(all-pages, beats) — except the one cross-page rule, which only the all-pages
+template can hold.
+
+| Ruling | Shape | Site(s) |
+|---|---|---|
+| **M3** counting-vs-crowd collision | FIX (reconcile) | rule 3 + the metadata Counting rule + the plate crowd bullet, both files |
+| **R6** verbatim trait lock | RESTORE | new rule `10c`, both files |
+| **R7** back views | GUIDANCE, not a ban | rule 8, both files |
+| **R8** removed garment | RESTORE | new rule `10d`, both files |
+| **R9** everyday-prop size anchors | RESTORE | new rule `8g`, both files |
+| **R11** weather consistency | RESTORE | appended to `C2`, all-pages only |
+| **R12** (partial) open eyes + one scale | RESTORE two of three | new rules `6d` and `8h`, both files |
+| **R23** emptyScenePrompt geometry mirror | RESTORE | new `emptyScenePrompt` bullet, both files |
+
+Per-ruling detail:
+
+- **M3 — no exact numbers anywhere; crowds keep a SIZE IMPRESSION.** The
+  counting ban wins; the old count-continuity wording is realigned rather than
+  dropped. Rule 3 now asks for "the same size impression, role and placement"
+  (was "the same count, role, and placement") and states outright that such a
+  group never gets an exact number. The Counting rule gains the continuity half
+  ("A group that recurs across pages holds the same size impression, role and
+  placement, never a count"), so the property is stated at both the generative
+  and the metadata site. The plate's crowd bullet asked for "at least 3 garment
+  colours and at least two garment shapes" — an exact number above two, in one
+  of the three fields the ban names — and is now "a mix of several garment
+  colours and more than one garment shape".
+- **R6 — traits are copied, not paraphrased.** The trait *data* still reached
+  the AD (`buildCharacterPromptBlock` still emits the clean-shaven negation
+  string, `promptBuilders.js:1606`); the *lock instruction* did not, leaving
+  only "weave each character's physical description on first mention".
+  Restored: `Hair:` word for word, the `Facial hair:` negation as part of the
+  description, `Glasses:` verbatim and untranslated, the `Looks:` bucket
+  verbatim (already rule `8d`, cross-referenced rather than duplicated),
+  distinctive marks on every page — plus the old suppression clause: when the
+  page mood pulls toward grizzled / weathered / aged, suppress the pull.
+- **R7 — back views are guidance.** The old rule was a *ban* ("NO BACK VIEW FOR
+  THE PROTAGONIST'S OWN ACTION") and the surviving rule 8 pushed the opposite
+  way, recommending back view generally. The owner ruled neither: back views
+  are allowed, and **recommended on pages holding several people**, as guidance
+  and not a strict rule. The existing validity constraint (the target must sit
+  deeper in the frame than the character) is unchanged.
+- **R8 — a garment the page removes.** Zero hits anywhere in the beats chain.
+  Restored: when a page takes a normally-worn item off, the prose and
+  `sceneIntent` both state the character is WITHOUT it and name where it now
+  lies or is held, and the item gets an `interactions[]` entry for that place.
+  The avatar reference always wears the full outfit, so without the explicit
+  statement the item is painted on the character and on the ground at once.
+- **R9 — everyday-prop size anchors, with the garment exclusion.** Rules
+  `8e`/`8f` cover the far field only (a distant thing measured against a
+  neighbour; vessel/building-vs-figure ratio); near props had no calibration at
+  all, and the only surviving copy of the reference scales was an eval variant
+  (`prompts/variants/image-evaluation-verbose-v1.txt`). Restored with both
+  halves the old rule had: props get a familiar-size term, and garments are
+  sized by where they fall on the body — never by a prop calibration term.
+- **R11 — weather consistency.** Appended to `C2` (monotonic time of day) as
+  one line rather than a new block, per the ruling: weather holds across every
+  outdoor page unless a plan line changes it; an indoor page has no weather and
+  shows it only through a window. Cross-page, so all-pages template only — the
+  per-page fallback has no `C` section.
+- **R12 — two of three.** Open eyes (`6d`) and one scale per page (`8h`)
+  restored from `scene-iteration-free.txt` (rule 14 and check 1), which is live
+  only on the legacy iterate path a beats run never touches. The third half of
+  that row — the "safe settings" rule banning bedrooms / bathrooms / dark
+  scenes — the owner explicitly ruled **out**; it is not restored, and must not
+  be re-added later as a lost rule.
+- **R23 — the plate mirrors the page's geometry.** The plate is the
+  style-and-geometry anchor the page composites onto, and only "same camera
+  framing" survived. Restored as one bullet carrying the five old carry-overs
+  (path/river/road/shoreline/horizon direction, the vanishing point as a
+  concrete frame position, the dominant diagonals, a lighting direction
+  matching time + weather, and the corners left open for the composited
+  figures) plus the old side-by-side test. Two compositions with existing
+  rules: the reserved spots are written "as the scene's own ground continuing
+  through them", because the plate separately bans hypothetical phrasing
+  ("where children would stand"); and the mirror explicitly applies to the
+  from-aboard view (rule `11d`, `b24e3bfb9`) — the rail's line, the deck's
+  recession, the direction the light enters — never the vessel seen from
+  outside.
+
+**Rationale:** These are restorations of rules that were *already* settled and
+then lost mechanically, not new prompt ideas — so they ship as a batch on the
+owner's per-row rulings rather than one A/B at a time. Where a restored rule
+met a live rule, the live rule won and the old wording was realigned to it (M3,
+and R23's reserved-spot phrasing); where the owner ruled against the old rule,
+it stays out (R7 becomes guidance instead of the old ban; R12's safe-settings
+half). Verification is static, as prompt-text restorations with no code path to
+exercise: the template loader reports 84/84, both builders
+(`buildSceneExpansionPrompt`, `buildSceneExpansionAllPrompt`) render with zero
+unfilled `{PLACEHOLDER}` tokens, and the shared blocks are asserted
+byte-identical across the two files.
+
+**Touched:**
+- `prompts/scene-expansion-all.txt` (rule 3, rule 8, `6d`, `8g`, `8h`, `10c`,
+  `10d`, `C2`, the Counting rule, the plate geometry bullet, the plate crowd
+  bullet)
+- `prompts/scene-expansion.txt` (the same, byte-identical, minus `C2`)
+
+**Status:** ✅ active. The sibling clusters from the same audit (the plan/text
+rules; the text-zone flag) ship separately.
