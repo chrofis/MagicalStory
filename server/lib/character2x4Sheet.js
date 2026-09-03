@@ -84,7 +84,10 @@ async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = n
     const r = await editWithGeminiImage(prompt, refs, { aspectRatio, model: MODEL_DEFAULTS.avatarStyleTransferModel });
     return { ...r, provider: 'gemini_image' };
   }
-  const r = await editWithGrok(prompt, refs, { aspectRatio, model: GROK_MODELS.STANDARD });
+  // skipOutputCrop: the sheet is a panel GRID that gets split into cells. A
+  // drift crop trims whole rows/columns off the edges — i.e. it eats panels.
+  // stackRowsInto2x4 / the splitter already tolerate a drifted aspect.
+  const r = await editWithGrok(prompt, refs, { aspectRatio, model: GROK_MODELS.STANDARD, skipOutputCrop: true });
   return { ...r, provider: 'grok' };
 }
 
@@ -390,7 +393,9 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   // ── Stage 1: body row (max 1 retry, keep least-bad) ──
   let bestBody = null;
   for (let t = 1; t <= 2; t++) {
-    const res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
+    // 16:9 from a squarer output would slice the figures' heads/feet off.
+    const res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
     if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_body_row', res.modelId);
     let review = { valid: true, score: 10, bodies: null };
@@ -420,7 +425,10 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
   let bestHead = null;
   for (let t = 1; t <= 2; t++) {
-    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD });
+    // skipOutputCrop — 20:9 is the extreme end of Grok's enum and drift is
+    // common; cropping a near-square output down to 20:9 would decapitate the
+    // head row. stackRowsInto2x4 resizes by width and keeps the full row.
+    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
     let review = { valid: true, score: 10, heads: null, identity: null };

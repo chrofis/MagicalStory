@@ -24425,3 +24425,85 @@ cover, eval `textMode` gate, post-persist typography gate),
 
 **Status:** 🟡 conditional — live on staging only; promotion to production still
 needs owner-judged covers from real staging runs (unchanged from 2026-08-29).
+
+---
+
+## Grok output aspect-drift crop runs BY DEFAULT; registration-sensitive callers opt out (owner ruling 2026-09-03: "crop + keep current policy")
+
+**Context:** `editWithGrok` has had a drift corrector since 2026-04-13: Grok's
+`/images/edits` endpoint does not honour `aspect_ratio` reliably and frequently
+returns its preferred near-square frame for a portrait request, so the
+corrector re-fits the output to the aspect the caller asked for. It was **dead
+code for ~4.5 months**. The history:
+
+1. `9ea7c3cc5` (2026-04-13 21:16) added the `skipOutputPadding` flag, default
+   `false`, and had the two character-repair callers pass `true` — they run
+   their own border detection and the corrector's white bars double-padded them.
+2. `683cb9bf1` (2026-04-13 22:35) flipped the **default to `true`**. The stated
+   reason was entirely about padding: "Grok returns 896x1280 when we request
+   3:4 — previously every image got white letterbox bars."
+3. `e050e62c9` (2026-04-15) changed the corrector from **pad (fit:contain +
+   white) to crop (fit:cover)**, citing story `job_1776203653422_jxo5tdppl` p8,
+   where every stored version carried 136px white bars top and bottom.
+
+Step 3 removed the entire reason for step 2's default — but the flag kept both
+its padding-era **name** and its padding-era **default**, and no production
+caller ever passed `false`. The stale name is why nobody re-examined it: reading
+`skipOutputPadding = true` next to a comment about letterboxing looks correct.
+Flagged as `[P2]` in `docs/review-2026-07-25-full-code-review.md` and not acted
+on.
+
+Measured cost: capstone job `job_1788380714660_4p9mr11xszu`, pages 2 and 6 —
+empty-scene plates came back with portrait content pillarboxed in white
+(~42-44% white pixels). Plate QC failed both twice and, under the keep policy,
+they shipped. The corrector would have removed the bars on both.
+
+**Decision:** The flag is renamed `skipOutputCrop` and **defaults to `false`** —
+the crop runs unless a caller opts out. Callers opt out **only** when Grok's
+output is composited, sliced or re-registered against another image, because
+there the crop's zoom+shift is worse than a drifted aspect:
+
+| Caller | Crop | Why |
+|---|---|---|
+| `images.js` `_dispatchImageGeneration` (pages, empty-scene plates, covers) | **ON** | Output IS the final full-frame artwork. The p2/p6 fix target. |
+| `images.js` `editImageWithPrompt` grok path (+ sanitized retry) | **ON** | Iterate/edit replaces the whole page. |
+| `sceneComposite.js` blend passes (uniform, simple, stratified) | **ON** | Blend output is the returned final scene. |
+| `imageCompositing.js` `grokEditSceneExact` | OFF | Mirror-pad → edit → unpad; every original pixel must return to its coordinates (see `327eeb578`). |
+| `imageInpainting.js` grok inpaint | OFF | Each region is feather-blended back at original scene coordinates. |
+| `faceRepair.js` `callModel` | OFF | SAM re-detect + union blend run in the treated crop's coordinate space. |
+| `testlab.js` face-repair replay stage | OFF | Lab mirror of the above; needs identical crop/boxes. |
+| `coverTitlePaint.js` grok plate | OFF | Output is keyed against the `(offX, offY, W, stripH)` title strip; a crop discards ink and shifts the strip → lost letters. |
+| `phantomPoseRender.js` | OFF | Figure is cropped out and pasted at the phantom's bbox; already pads inputs for the same reason. |
+| `character2x4Sheet.js` (body row, head row, style transfer) | OFF | A sheet is a panel GRID that gets split into cells — a crop eats panels, and 20:9 head rows would be decapitated. |
+| `avatars.js` (3 grok paths) | OFF | Whole-figure asset used as a reference on every page; all three already pad inputs so the face isn't sliced. |
+| `sceneComposite.js` depopulate / anchor plate / front-fill plate | OFF | Depopulate is diffed pixel-for-pixel against the populated plate; figures are pasted onto the anchor at bbox coords; the front plate has its `(padLeft, padTop, cropW, cropH)` sub-rectangle extracted back out. |
+
+Threshold unchanged: the crop fires only at **≥1% relative** aspect drift, so
+pixel-rounding differences (a few px on a ~1000px side ≈ 0.1–0.2%) never trigger
+a re-encode.
+
+The **twice-failing-plate KEEP policy is untouched** per the owner ruling — QC
+retry/keep logic was not modified. The crop attacks the defect at the source
+instead.
+
+**Rationale:** Crop-by-default is right because the drift is a *provider
+defect*, not a caller preference: a caller that asks for 3:4 and is handed a
+square is being given something it did not ask for, and every consumer
+downstream (PDF layout, text-overlay zone maths, book spread) assumes the
+requested aspect. Making the default correct means a *new* full-frame caller
+gets the invariant for free, and the callers that must not be touched are
+exactly the ones already reasoning carefully about geometry (they all already
+pass `padInput` or run their own registration). The rename is part of the fix,
+not cosmetic: the padding-era name is the mechanism by which the padding-era
+default survived the switch to cropping, and a unit test now asserts the old
+name appears nowhere as a call-site option (where it would be silently ignored
+→ an unwanted crop in a repair path).
+
+**Touched:**
+- `server/lib/grok.js` — `skipOutputPadding` → `skipOutputCrop`, default `true` → `false`
+- `server/lib/imageCompositing.js`, `server/lib/imageInpainting.js`, `server/lib/faceRepair.js`, `server/lib/testlab.js`, `server/lib/coverTitlePaint.js`, `server/lib/phantomPoseRender.js`, `server/lib/character2x4Sheet.js`, `server/lib/sceneComposite.js`, `server/routes/avatars.js` — explicit opt-outs with per-site reasons
+- `tests/unit/grok-output-aspect-crop.test.ts` — crop geometry (default + opt-out + 1% threshold) against a mocked xAI endpoint, plus a call-site audit
+- `tests/manual/test-*.js` (6 files) — flag rename
+
+**Status:** ✅ active — supersedes the `skipOutputPadding` default in
+`683cb9bf1`, whose padding-era rationale was voided by `e050e62c9`.

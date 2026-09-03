@@ -255,7 +255,12 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     const refs = [`data:image/jpeg;base64,${plateBuf.toString('base64')}`];
     if (opts.sceneRef !== false) refs.push(`data:image/jpeg;base64,${sceneBuf.toString('base64')}`);
     result = await editWithGrok(PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct, spec?.lines), refs,
-      { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: presetName, resolution: '1k' });
+      { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: presetName, resolution: '1k',
+        // The output is read back at the padded-canvas size and keyed against
+        // the (offX, offY, W, stripH) title strip. A proportional fit:'fill'
+        // resize keeps ink where it was painted; a drift crop would discard
+        // content and shift the strip, so letters would be lost.
+        skipOutputCrop: true });
   } else {
     const { loadPromptTemplates } = require('../services/prompts');
     await loadPromptTemplates();

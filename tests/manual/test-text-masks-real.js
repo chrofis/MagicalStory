@@ -85,7 +85,7 @@ async function runTest(test) {
     const result = await editWithGrok(prompt, [mask], {
       model: GROK_MODELS.STANDARD,
       aspectRatio: '3:4',
-      skipOutputPadding: true,
+      skipOutputCrop: true,
     });
     if (result?.imageData) {
       const buf = Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');

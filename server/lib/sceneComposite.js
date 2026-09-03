@@ -2269,7 +2269,10 @@ async function generateSceneComposite(opts) {
   // Done BEFORE bbox detection so the diff-based detector has both images.
   log.info('[SCENE COMPOSITE] step 2/5 — depopulate (derive clean BG)');
   const depopulatePrompt = buildDepopulatePrompt(cast);
-  const depopulated = await editWithGrok(depopulatePrompt, [populated.imageData], { aspectRatio, model: GROK_MODELS.STANDARD });
+  // skipOutputCrop: step 3 DIFFS this plate against the populated one pixel for
+  // pixel to derive the silhouette masks. A drift crop on either side destroys
+  // that correspondence.
+  const depopulated = await editWithGrok(depopulatePrompt, [populated.imageData], { aspectRatio, model: GROK_MODELS.STANDARD, skipOutputCrop: true });
   if (usageTracker) usageTracker('grok', depopulated.usage, 'scene_composite_depopulate', depopulated.modelId);
   totalCost += depopulated.usage?.cost || 0;
   const bgImageData = depopulated.imageData;
@@ -3347,7 +3350,9 @@ async function _stratifiedBody(ctx) {
   const anchorPrompt = buildAnchorPlatePrompt(scene, frontCast, backCast, cleanBackgroundPrompt, hasAnchorIdentity);
   const anchorRefs = [emptySceneData];
   if (frontIdentityPack) anchorRefs.push(frontIdentityPack);
-  const anchor = await editWithGrok(anchorPrompt, anchorRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
+  // skipOutputCrop: rendered figures are pasted back onto this anchor plate at
+  // detected bbox coordinates — the plate must not be zoomed or shifted.
+  const anchor = await editWithGrok(anchorPrompt, anchorRefs, { aspectRatio, model: GROK_MODELS.STANDARD, skipOutputCrop: true });
   if (usageTracker) usageTracker('grok', anchor.usage, 'scene_composite_strat_anchor_plate', anchor.modelId);
   totalCost += anchor.usage?.cost || 0;
   const anchorBuf = Buffer.from(stripDataUriPrefix(anchor.imageData), 'base64');
@@ -3524,7 +3529,9 @@ async function _stratifiedBody(ctx) {
   // to match preset.name instead of cover-cropping. Both refs here have
   // white backgrounds (silhouette crop's surround is white; identity
   // pack's background is white) so the pad bars are invisible.
-  const frontPlate = await editWithGrok(fillPrompt, fillRefs, { aspectRatio: presetName, model: GROK_MODELS.STANDARD, padInput: true });
+  // skipOutputCrop: step 3 extracts the (padLeft, padTop, cropW, cropH)
+  // sub-rectangle back out of this output — the pad geometry must survive.
+  const frontPlate = await editWithGrok(fillPrompt, fillRefs, { aspectRatio: presetName, model: GROK_MODELS.STANDARD, padInput: true, skipOutputCrop: true });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_back_fill', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
   debug.frontPlate = frontPlate.imageData; // panel reads "frontPlate"; semantically this is the bg-fill plate

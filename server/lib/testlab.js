@@ -5534,7 +5534,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     result = { imageData, modelId: 'reused', cost: 0 };
   } else {
     result = params.backend === 'grok'
-      ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: params._grokAspect || '3:4', resolution: '1k' })
+      ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: params._grokAspect || '3:4', resolution: '1k', skipOutputCrop: true })
       : await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
   }
   const elapsedMs = Date.now() - t0;

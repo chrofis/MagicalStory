@@ -1755,6 +1755,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
                 model: modelConfig?.modelId || 'grok-imagine-image',
                 padInput: true,  // Body cutout is on white bg already; pad instead
                                  // of crop so the face isn't sliced off the top.
+                skipOutputCrop: true, // Same intent on the way out — an avatar is a
+                                 // whole-figure asset used as a reference on every
+                                 // page; a drift crop would slice arms/head off it.
               });
               if (result?.imageData) {
                 const compressedImage = await compressImageToJPEG(result.imageData);
@@ -2888,6 +2891,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           model: modelConfig?.modelId || 'grok-imagine-image',
           padInput: true,  // Avatars: pad to preserve the face/head when the
                            // bodyNoBg input is a taller-than-9:16 portrait.
+          skipOutputCrop: true, // Same intent on the way out — never slice the figure.
         });
         if (result?.imageData) {
           const compressed = await compressImageToJPEG(result.imageData, 85, 768);
@@ -3059,6 +3063,7 @@ These corrections OVERRIDE what is visible in the reference photo.
                 model: grokModel,
                 aspectRatio: '9:16',
                 padInput: true,  // Same reason as the generateAvatarWithGrok path.
+                skipOutputCrop: true, // Same intent on the way out — never slice the figure.
               });
               if (result.imageData) {
                 log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok Imagine`);

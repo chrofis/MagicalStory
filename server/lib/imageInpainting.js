@@ -982,7 +982,11 @@ async function inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, o
 
   const grokResult = await editWithGrok(grokPrompt, [whiteoutDataUri], {
     model: GROK_MODELS.STANDARD,
-    aspectRatio
+    aspectRatio,
+    // Every repaired region is feather-blended back at the ORIGINAL scene
+    // coordinates below. A centre-crop of Grok's output shifts and rescales
+    // the content, so the mask would land on the wrong pixels.
+    skipOutputCrop: true,
   });
 
   if (!grokResult?.imageData) {

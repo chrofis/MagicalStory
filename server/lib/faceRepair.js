@@ -513,7 +513,10 @@ async function buildBlurTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, fac
 async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, cropH }) {
   if (model === 'grok') {
     const { editWithGrok } = require('./grok');
-    const r = await editWithGrok(prompt, [treatedUri, avatarUri], { aspectRatio: aspect || '1:1', resolution: '1k' });
+    // skipOutputCrop: the output geometry must stay the treated crop's (rw×rh)
+    // so the SAM re-detect and union blend below run in the same coordinate
+    // space as the input. A drift crop would shift every mask.
+    const r = await editWithGrok(prompt, [treatedUri, avatarUri], { aspectRatio: aspect || '1:1', resolution: '1k', skipOutputCrop: true });
     if (!r?.imageData) throw new Error('Grok returned no image');
     return { imageData: r.imageData, usage: r.usage };
   }

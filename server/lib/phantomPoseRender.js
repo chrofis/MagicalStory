@@ -203,6 +203,10 @@ async function renderCharacterInPhantomPose({
     // instead of crop when coercing to target aspect — preserves the full
     // figure / full silhouette outline.
     padInput: true,
+    // Same reason on the way out: the rendered figure is cropped out and
+    // composited at the phantom's bbox, so it must not be zoomed or shifted,
+    // and no part of the figure may be sliced away.
+    skipOutputCrop: true,
   });
 
   if (usageTracker) usageTracker('grok', result.usage, 'phantom_pose_render', result.modelId);

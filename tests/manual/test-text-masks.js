@@ -69,7 +69,7 @@ Fill the frame edge-to-edge. No borders, no text, no watermarks.`;
     const result = await editWithGrok(prompt, [mask], {
       model: GROK_MODELS.STANDARD,
       aspectRatio: '3:4',
-      skipOutputPadding: true,
+      skipOutputCrop: true,
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

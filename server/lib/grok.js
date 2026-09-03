@@ -283,7 +283,17 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     model = require('../config/models').REPAIR_DEFAULTS.charRepairModel || GROK_MODELS.STANDARD,
     aspectRatio = '1:1',
     resolution = '1k',
-    skipOutputPadding = true, // Don't letterbox-pad Grok's output — callers handle varying aspects
+    skipOutputCrop = false,   // Opt OUT of the output aspect-drift correction below.
+                              // Set true ONLY when the caller composites, slices or
+                              // re-registers Grok's output against another image —
+                              // a centre-crop shifts and rescales every pixel, which
+                              // breaks scene-space masks and panel grids. Full-frame
+                              // artwork callers (pages, plates, covers) leave it false
+                              // so a drifted output is corrected to the aspect they
+                              // asked for. Renamed from `skipOutputPadding`: the
+                              // correction has cropped, not padded, since e050e62c9,
+                              // and the stale name is why its default stayed on the
+                              // padding-era value for months (see decisions.md).
     padInput = false,         // PAD inputs to target aspect instead of CROP. Use when the
                               // reference image is on a uniform/white background (avatars)
                               // — padding adds invisible margins. Don't use for inputs with
@@ -521,9 +531,14 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     // ~0.89 aspect fitted to 0.7 target end up with 20% of vertical space
     // being white. Center-cropping zooms the content slightly but keeps
     // the image fully illustrated, which is what children's book pages need.
-    // Character repair callers set skipOutputPadding=true because they handle
-    // border detection themselves.
-    if (!skipOutputPadding) try {
+    //
+    // Callers whose output is composited/sliced/registered against another
+    // image (character + face repair, inpaint feather, scene-composite plates,
+    // cover title strip, 2×4 sheets, avatars) pass skipOutputCrop=true: for
+    // them the crop's zoom+shift is worse than the drifted aspect.
+    // Threshold: 1% RELATIVE drift, so pixel-rounding differences (a few px on
+    // a ~1000px side ≈ 0.1-0.2%) never trigger a re-encode.
+    if (!skipOutputCrop) try {
       const outBuf = Buffer.from(imageBase64, 'base64');
       const outMeta = await sharp(outBuf).metadata();
       if (outMeta.width && outMeta.height) {

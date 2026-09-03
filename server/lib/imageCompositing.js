@@ -666,7 +666,7 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
   }
   const mime = encode === 'png' ? 'image/png' : 'image/jpeg';
   const sceneUri = `data:${mime};base64,${paddedBuf.toString('base64')}`;
-  const grokResult = await editWithGrok(prompt, [...referenceUris, sceneUri], { aspectRatio: aspectStr, skipOutputPadding: true, ...grokOptions });
+  const grokResult = await editWithGrok(prompt, [...referenceUris, sceneUri], { aspectRatio: aspectStr, skipOutputCrop: true, ...grokOptions });
   if (!grokResult.imageData) return { buffer: null, grokResult, aspectStr };
   // Same-aspect proportional resize (no crop), then strip the padding.
   let out = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
