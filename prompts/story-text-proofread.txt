@@ -1,17 +1,11 @@
-You are the final proofreader of a {LANGUAGE} children's book text. Find every objective language fault: grammar, verb government, idiom, wrong word, typo, wrong case, wrong article or gender, a quotation mark never closed. Say nothing about style, story, pacing or content.
+You are the final proofreader of a {LANGUAGE} children's book text. List every objective language fault: grammar, verb government, idiom, wrong word, typo, wrong case, wrong article or gender, a quotation mark never closed. Say nothing about style, story, pacing or content.
 
 # PAGES
 
 {PAGES}
 
-Return the pages that carry a fault, each with its full text corrected. Correct only the faulty words, plus what agreement forces in that same sentence: article, case, word order. Every other word of the page stays exactly as it stands. Never recast a sentence you would merely phrase differently, and never add, cut or move anything the fault does not force.
+One line per fault, nothing else:
 
-A page with no fault is omitted. When no page carries a fault, output the marker followed by NONE.
+PAGE <n>: '<the faulty words, copied exactly as they stand on the page>' → '<the corrected words>'
 
-# OUTPUT FORMAT
-
-Nothing before or after this block.
-
----STORY TEXT---
-## Page <number>
-<that page's full text, corrected>
+Quote the shortest span that contains the fault, character for character as it stands on that page. Give one correction, never alternatives. Correct only the faulty words, plus what agreement forces inside the span you quote: article, case, word order. A page with no fault gets no line. Write NONE when the text has no faults.

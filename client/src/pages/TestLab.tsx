@@ -1841,9 +1841,12 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
                 {r.cost != null && ` · $${r.cost.toFixed(4)}`}
                 {' · '}rewrote: {r.changedPages?.length ? r.changedPages.join(', ') : <span className="text-emerald-600">nothing — converged, stopped here</span>}
                 {!!r.strayPages?.length && <span className="text-amber-600"> · ignored out-of-range page {r.strayPages.join(', ')}</span>}
-                {!!r.rejectedPages?.length && (
+                {r.appliedCount != null && (
+                  <span>{' · '}{r.appliedCount} of {(r.findings || []).length} finding(s) applied</span>
+                )}
+                {!!r.droppedFindings?.length && (
                   <span className="text-red-600">
-                    {' · '}rejected by the diff cap: {r.rejectedPages.map(p => `p${p.pageNumber} (${(p.ratio * 100).toFixed(0)}%)`).join(', ')}
+                    {' · '}dropped: {r.droppedFindings.map(d => `p${d.pageNumber} (${d.reason})`).join(', ')}
                   </span>
                 )}
               </>

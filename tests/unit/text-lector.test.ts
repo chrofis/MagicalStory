@@ -3,17 +3,17 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 // @ts-ignore — CommonJS lib
 const {
   refineStoryText, parseFaultLines, mergeAuditFindings,
-  pageDiffRatio, screenLectorPages, LECTOR_MAX_DIFF_RATIO,
+  parseLectorFindings, applyLectorFindings, locateQuote,
 } = require('../../server/lib/textRefine.js');
 
 /**
  * THE CHAIN (owner ruling 2026-09-03): two audits in parallel → merge+dedupe →
- * ONE repair → ONE lector that returns the corrected pages itself.
+ * ONE repair → ONE lector whose quoted-span findings are applied in code.
  *
  * Three things are tested here because three things replaced deleted machinery:
- * the merge that replaced the sequential re-audit, the edit-distance cap that
- * replaced the verbatim-quote check, and the call order itself (nothing may
- * re-audit, nothing may apply findings in a second pass).
+ * the merge that replaced the sequential re-audit, the code-side applier that
+ * replaced the model apply pass, and the call order itself (nothing may
+ * re-audit, nothing may apply findings with a second model call).
  */
 
 // ─────────────────────────────── MERGE + DEDUPE ────────────────────────────────
@@ -96,73 +96,179 @@ describe('mergeAuditFindings', () => {
   });
 });
 
-// ─────────────────── LECTOR GUARD: PER-PAGE EDIT-DISTANCE CAP ──────────────────
+// ────────────── LECTOR: FINDINGS PARSED, CORRECTIONS APPLIED IN CODE ───────────
 
-describe('pageDiffRatio', () => {
-  const PAGE =
-    'Er schwamm die Leine zurück zum Schiff und band sie fest. Das Papier war alt und dünn, '
-    + 'und der Wind zog daran. Niemand sagte ein Wort, bis der Knoten hielt.';
+/**
+ * The lines below are the REAL gemini-3.1-pro and grok-4.6 output from the
+ * 6-model A/B on job_1788380714660_4p9mr11xszu (scratchpad
+ * piraterun4/lector-ab/out-*.txt). Two properties have to hold for the code-side
+ * applier to be safe: a line parses into page + span + replacement, and a
+ * finding whose quote is not verbatim on the page it names is DROPPED, never
+ * applied.
+ */
+const AB_GEMINI = [
+  "PAGE 1: 'alt: das Papier' → 'alt: Das Papier'",
+  "PAGE 3: 'Wer als Zweite ankommt' → 'Wer als Zweiter ankommt'",
+  "PAGE 6: 'nicht Wrack' → 'kein Wrack'",
+  "PAGE 9: 'könnte dort oben sitzen' → 'könnte dort oben liegen' (oder 'versteckt sein')",
+  "PAGE 9: 'beugte den Kopf in den Nacken' → 'legte den Kopf in den Nacken'",
+  "PAGE 11: 'schwamm die Leine zurück' → 'schwamm mit der Leine zurück'",
+  "PAGE 11: 'schwamm er es durch die Brandung' → 'zog er es schwimmend durch die Brandung' (oder 'schwamm er damit')",
+  "PAGE 13: 'fragte einmal, ruhig: «Das Buch.»' → 'fragte einmal, ruhig: «Das Buch?»'",
+  "PAGE 13: 'wütend auf das verlorene Buch' → 'wütend über das verlorene Buch'",
+  "PAGE 15: 'war einen Moment lang traurig für sie' → 'hatte einen Moment lang Mitleid mit ihr' (oder 'tat ihr einen Moment lang leid')",
+].join('\n');
 
-  it('is 0 for the same text and for a page only re-wrapped', () => {
-    expect(pageDiffRatio(PAGE, PAGE)).toBe(0);
-    expect(pageDiffRatio(PAGE, PAGE.replace(' und band', '\nund band'))).toBe(0);
+// grok-4.6 quoted the faulty span but left the correction BARE on every line.
+const AB_GROK = [
+  "PAGE 3: 'Wer als Zweite ankommt' → Wer als Zweiter ankommt",
+  "PAGE 13: 'wütend auf das verlorene Buch' → wütend über das verlorene Buch",
+  "PAGE 16: 'was jetzt am Mast hing, was ein Flickwerk' → was jetzt am Mast hing, war ein Flickwerk",
+].join('\n');
+
+describe('parseLectorFindings', () => {
+  it('parses page, quoted span and replacement from the measured A/B output', () => {
+    const f = parseLectorFindings(AB_GEMINI);
+    expect(f).toHaveLength(10);
+    expect(f[0]).toMatchObject({ pageNumber: 1, quote: 'alt: das Papier', correction: 'alt: Das Papier' });
+    expect(f[5]).toMatchObject({ pageNumber: 11, quote: 'schwamm die Leine zurück' });
   });
 
-  it('stays far under the cap for a real language fix', () => {
-    const fixed = PAGE.replace('schwamm die Leine', 'schwamm mit der Leine');
-    expect(pageDiffRatio(PAGE, fixed)).toBeLessThan(LECTOR_MAX_DIFF_RATIO / 2);
+  it('keeps only the first correction when the model offers an alternative', () => {
+    const f = parseLectorFindings(AB_GEMINI);
+    expect(f[3].correction).toBe('könnte dort oben liegen');
+    expect(f[9].correction).toBe('hatte einen Moment lang Mitleid mit ihr');
   });
 
-  it('stays under the cap for two fixes on one page', () => {
-    const fixed = PAGE
-      .replace('schwamm die Leine', 'schwamm mit der Leine')
-      .replace('Das Papier war alt', 'Das Papier war uralt');
-    expect(pageDiffRatio(PAGE, fixed)).toBeLessThan(LECTOR_MAX_DIFF_RATIO);
+  it('reads a bare (unquoted) correction, as grok-4.6 emitted every line', () => {
+    const f = parseLectorFindings(AB_GROK);
+    expect(f).toHaveLength(3);
+    expect(f[0]).toMatchObject({ quote: 'Wer als Zweite ankommt', correction: 'Wer als Zweiter ankommt' });
+    expect(f[2].correction).toBe('was jetzt am Mast hing, war ein Flickwerk');
   });
 
-  it('goes far over the cap when the page is re-narrated', () => {
-    const rewritten =
-      'Mit der Leine zwischen den Zähnen kämpfte er sich zurück, Zug um Zug, bis der Rumpf '
-      + 'über ihm aufragte. Erst dann atmete er wieder.';
-    expect(pageDiffRatio(PAGE, rewritten)).toBeGreaterThan(LECTOR_MAX_DIFF_RATIO);
+  it('keeps guillemets inside a quoted span intact', () => {
+    const f = parseLectorFindings("PAGE 13: 'fragte einmal, ruhig: «Das Buch.»' → 'fragte einmal, ruhig: «Das Buch?»'");
+    expect(f[0].quote).toBe('fragte einmal, ruhig: «Das Buch.»');
+    expect(f[0].correction).toBe('fragte einmal, ruhig: «Das Buch?»');
+  });
+
+  it('ignores everything that is not a finding line', () => {
+    const noise = [
+      'Let me work through this carefully page by page.',
+      'NONE',
+      '',
+      "PAGE 4: 'kniete hin' → 'kniete sich hin'",
+      'FAULTS: 1',
+    ].join('\n');
+    const f = parseLectorFindings(noise);
+    expect(f).toHaveLength(1);
+    expect(f[0].pageNumber).toBe(4);
+  });
+
+  it('accepts guillemet quoting, list bullets and an ASCII arrow', () => {
+    const f = parseLectorFindings('- PAGE 7: «Bei erstem Tageslicht» -> «Beim ersten Tageslicht»');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ pageNumber: 7, quote: 'Bei erstem Tageslicht', correction: 'Beim ersten Tageslicht' });
+  });
+
+  it('drops a line whose correction equals the quote', () => {
+    expect(parseLectorFindings("PAGE 2: 'das Boot' → 'das Boot'")).toHaveLength(0);
   });
 });
 
-describe('screenLectorPages', () => {
-  const pages = [
+describe('applyLectorFindings', () => {
+  const pages = () => [
     { pageNumber: 1, text: 'Die Karte ist alt: das Papier ist dünn und der Rand ist eingerissen.' },
-    { pageNumber: 2, text: 'Er schwamm die Leine zurück zum Schiff und zog sie über die Reling.' },
+    { pageNumber: 11, text: 'Er schwamm die Leine zurück zum Schiff und band sie am Mast fest.' },
+    { pageNumber: 15, text: 'Sie war einen Moment lang traurig für sie, dann lachte sie wieder.' },
   ];
 
-  it('accepts a bounded correction and records its ratio', () => {
-    const { accepted, rejected } = screenLectorPages(pages, [
-      { pageNumber: 2, text: 'Er schwamm mit der Leine zurück zum Schiff und zog sie über die Reling.' },
-    ]);
-    expect(accepted).toHaveLength(1);
-    expect(accepted[0].pageNumber).toBe(2);
-    expect(accepted[0].ratio).toBeGreaterThan(0);
-    expect(rejected).toHaveLength(0);
+  it('substitutes the quoted span, keeping umlauts and the rest of the page character for character', () => {
+    const { pages: out, applied, dropped } = applyLectorFindings(pages(), parseLectorFindings([
+      "PAGE 1: 'alt: das Papier' → 'alt: Das Papier'",
+      "PAGE 15: 'war einen Moment lang traurig für sie' → 'hatte einen Moment lang Mitleid mit ihr'",
+    ].join('\n')));
+    expect(dropped).toHaveLength(0);
+    expect(applied).toHaveLength(2);
+    expect(out[0].text).toBe('Die Karte ist alt: Das Papier ist dünn und der Rand ist eingerissen.');
+    expect(out[2].text).toBe('Sie hatte einen Moment lang Mitleid mit ihr, dann lachte sie wieder.');
+    expect(out[1].text).toBe(pages()[1].text);
   });
 
-  it('rejects a page the lector rewrote instead of correcting', () => {
-    const { accepted, rejected } = screenLectorPages(pages, [
-      { pageNumber: 1, text: 'Uralt war die Karte, brüchig wie ein trockenes Blatt, und niemand wagte es, sie ganz zu entfalten.' },
-    ]);
-    expect(accepted).toHaveLength(0);
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0].ratio).toBeGreaterThan(LECTOR_MAX_DIFF_RATIO);
+  it('replaces a span the page wraps across a line break', () => {
+    const wrapped = [{ pageNumber: 11, text: 'Er schwamm die\nLeine zurück zum Schiff.' }];
+    const { pages: out, applied } = applyLectorFindings(wrapped, parseLectorFindings(
+      "PAGE 11: 'schwamm die Leine zurück' → 'schwamm an der Leine zurück'"));
+    expect(applied).toHaveLength(1);
+    expect(out[0].text).toBe('Er schwamm an der Leine zurück zum Schiff.');
   });
 
-  it('drops a page number the story does not have', () => {
-    const { accepted, stray } = screenLectorPages(pages, [{ pageNumber: 99, text: 'anything' }]);
-    expect(accepted).toHaveLength(0);
-    expect(stray).toEqual([99]);
+  it('substitutes inside guillemets', () => {
+    const p = [{ pageNumber: 13, text: 'Lorena fragte einmal, ruhig: «Das Buch.» Niemand antwortete.' }];
+    const { pages: out, applied } = applyLectorFindings(p, parseLectorFindings(
+      "PAGE 13: '«Das Buch.»' → '«Das Buch?»'"));
+    expect(applied).toHaveLength(1);
+    expect(out[0].text).toBe('Lorena fragte einmal, ruhig: «Das Buch?» Niemand antwortete.');
   });
 
-  it('counts a page returned unchanged as neither accepted nor rejected', () => {
-    const { accepted, rejected } = screenLectorPages(pages, [{ pageNumber: 1, text: pages[0].text }]);
-    expect(accepted).toHaveLength(0);
-    expect(rejected).toHaveLength(0);
+  it('applies several findings on one page without shifting each other', () => {
+    const p = [{ pageNumber: 1, text: 'Die Karte ist alt: das Papier ist dünn, und die Kapitänin kniete hin.' }];
+    const { pages: out, applied } = applyLectorFindings(p, parseLectorFindings([
+      "PAGE 1: 'alt: das Papier' → 'alt: Das Papier'",
+      "PAGE 1: 'kniete hin' → 'kniete sich hin'",
+    ].join('\n')));
+    expect(applied).toHaveLength(2);
+    expect(out[0].text).toBe('Die Karte ist alt: Das Papier ist dünn, und die Kapitänin kniete sich hin.');
+  });
+
+  it('drops the second of two findings whose spans overlap, keeping the first', () => {
+    const p = [{ pageNumber: 11, text: 'Er schwamm die Leine zurück zum Schiff.' }];
+    const { pages: out, applied, dropped } = applyLectorFindings(p, parseLectorFindings([
+      "PAGE 11: 'schwamm die Leine zurück' → 'schwamm an der Leine zurück'",
+      "PAGE 11: 'die Leine' → 'an der Leine'",
+    ].join('\n')));
+    expect(applied).toHaveLength(1);
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0].reason).toBe('overlap');
+    expect(out[0].text).toBe('Er schwamm an der Leine zurück zum Schiff.');
+  });
+
+  it('drops a finding whose quote is not on the page it names — the hallucination guard', () => {
+    // The measured false-positive class: a claim about two distinct cast
+    // members being the same person, and a suggestion to write the eszett.
+    // Neither quotes anything the page contains.
+    const { pages: out, applied, dropped } = applyLectorFindings(pages(), parseLectorFindings(
+      "PAGE 1: 'die Karte war grösser' → 'die Karte war groesser'"));
+    expect(applied).toHaveLength(0);
+    expect(dropped[0].reason).toBe('quote-absent');
+    expect(out[0].text).toBe(pages()[0].text);
+  });
+
+  it('drops a finding pointing at a page the story does not have', () => {
+    const { applied, dropped } = applyLectorFindings(pages(), parseLectorFindings(
+      "PAGE 99: 'das Papier ist dünn' → 'das Papier war dünn'"));
+    expect(applied).toHaveLength(0);
+    expect(dropped[0].reason).toBe('no-such-page');
+  });
+
+  it('leaves every page alone when there are no findings', () => {
+    const before = pages();
+    const { pages: out, applied } = applyLectorFindings(before, []);
+    expect(applied).toHaveLength(0);
+    expect(out.map(p => p.text)).toEqual(before.map(p => p.text));
+  });
+});
+
+describe('locateQuote', () => {
+  it('returns source offsets that slice the original characters', () => {
+    const text = 'Er schwamm die\nLeine zurück zum Schiff.';
+    const span = locateQuote(text, 'schwamm die Leine zurück');
+    expect(text.slice(span.start, span.end)).toBe('schwamm die\nLeine zurück');
+  });
+
+  it('returns null when the span is absent', () => {
+    expect(locateQuote('Er schwamm zurück.', 'schwamm die Leine')).toBeNull();
   });
 });
 
@@ -200,9 +306,11 @@ describe('refineStoryText — chain order', () => {
       else if (label === 'text_audit_blind') text = 'FAULT[TRANSITION]: p2 — he is suddenly in the water, nothing says how.\nFAULTS: 1';
       else if (label === 'text_refine') text = '---ANALYSIS---\nthe crossing is stated on p2\n---STORY TEXT---\nNONE';
       else if (label === 'text_lector') {
-        text = '---STORY TEXT---\n## Page 2\nEr schwamm mit der Leine zurück zum Schiff und zog sie über die Reling.'
-          // p1 is an overhaul — the cap must throw it out.
-          + '\n\n## Page 1\nUralt war die Karte, brüchig wie ein trockenes Blatt, und niemand wagte es, sie ganz zu entfalten.';
+        text = [
+          "PAGE 2: 'schwamm die Leine zurück' → 'schwamm mit der Leine zurück'",
+          // Quotes nothing that is on page 1 — the hallucination guard drops it.
+          "PAGE 1: 'die Karte war grösser' → 'die Karte war weiter'",
+        ].join('\n');
       }
       return { text, modelId: `stub-${model}`, usage: { input_tokens: 10, output_tokens: 20, direct_cost: 0 } };
     };
@@ -232,11 +340,13 @@ describe('refineStoryText — chain order', () => {
     expect(res.mergedFindings[0].sources).toEqual(['arc-informed', 'blind']);
     expect(res.audits.map((a: any) => a.source)).toEqual(['arc-informed', 'blind']);
 
-    // The lector's bounded fix landed; its overhaul of page 1 did not.
+    // The lector's finding was applied IN CODE — there is no apply call in the
+    // ledger — and the one quoting nothing on its page was dropped.
     expect(res.pages[1].text).toContain('mit der Leine');
     expect(res.pages[0].text).toBe(PAGES[0].text);
-    expect(res.lectorAccepted.map((p: any) => p.pageNumber)).toEqual([2]);
-    expect(res.lectorRejected.map((p: any) => p.pageNumber)).toEqual([1]);
+    expect(res.lectorFindings).toHaveLength(2);
+    expect(res.lectorApplied.map((f: any) => f.pageNumber)).toEqual([2]);
+    expect(res.lectorDropped.map((f: any) => f.reason)).toEqual(['quote-absent']);
     expect(res.changed).toEqual([2]);
   });
 

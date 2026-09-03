@@ -25409,3 +25409,88 @@ loader reports 84/84 with no new placeholder in any edited template.
 
 **Status:** ✅ active. Sibling clusters from the same audit (Art Director /
 image prompts; the text-zone flag) ship separately.
+
+---
+
+## 2026-09-03 — The lector emits FINDINGS again and the corrections are applied IN CODE (owner ruling; supersedes the page-return contract of the same day)
+
+**Context:** the restructured chain (entries above) had the lector return whole
+corrected pages, to remove the separate apply model call. It removed the call and
+bought a worse bill. Measured:
+
+- **page-return format:** $0.300 and 201s for a FOUR-page story (Lab #984).
+- **findings format:** ~$0.10 for a whole SIXTEEN-page book (the 6-model A/B in
+  scratchpad `piraterun4/lector-ab`, the run its 4/4 accuracy was measured on).
+
+The cause is structural, not a bad draw: returning pages means the lector needs
+the repair pass's output room, and gemini-3.1-pro reasons into whatever room it
+is given. A grammar pass does not get cheaper by being handed a bigger budget.
+
+**Decision (owner):** revert the OUTPUT contract to findings and apply them in
+code — no second model call, no page-return.
+
+1. `prompts/story-text-proofread.txt` emits `PAGE <n>: '<quoted>' →
+   '<corrected>'` again (shortest span, one correction, no alternatives), with
+   the focused-duty wording kept as it is.
+2. **`applyLectorFindings` (code).** For each finding: locate the quoted span on
+   its page and substitute the correction. Whitespace is normalised on both
+   sides before matching, via an index map (`locateQuote`) that turns a
+   normalised hit back into a slice of the ORIGINAL characters — a model
+   re-wraps a quote across a line break, and a plain `includes` could verify
+   such a quote but not replace it.
+3. **Three drop reasons, each logged**: `quote-absent` (the hallucination guard
+   — the finding's words are not on the page it names), `overlap` (its span
+   overlaps a finding already applied to that page; the first in the model's
+   listing order wins), `no-such-page`.
+4. **Ordering is a code concern, not a model's.** Spans are applied in
+   DESCENDING position order so an earlier substitution cannot shift a later
+   one's offsets.
+5. The lector's output limit is the model's own `maxOutputTokens` (owner rule:
+   no output caps). The cost of this call is decided by the output CONTRACT, not
+   by the ceiling — which is the whole finding above.
+6. **Deleted, not kept alongside** (no parallel paths): `screenLectorPages`,
+   `pageDiffRatio`, `LECTOR_MAX_DIFF_RATIO`, the Levenshtein helper, and the
+   ledger's `acceptedPages` / `rejectedPages` / `lectorAccepted` /
+   `lectorRejected`. The diff-ratio cap existed only because the page-return
+   format had no verbatim quote to check; the quote is back, so the cap goes.
+
+**Ledger:** the lector round entry now carries `findings[]` (page, quote,
+correction), `appliedCount`, `droppedCount` and `droppedFindings[]` (with the
+reason); `textRefineReport` carries `lectorFindings` / `lectorApplied` /
+`lectorDropped`. The Lab's text_refine view shows "N of M finding(s) applied"
+plus each drop and its reason.
+
+**Rationale.** The corrections are quoted spans with replacements — applying
+them is string substitution, and the two things a model was there to handle
+(offset shifting, overlapping spans) are exactly what code does correctly and a
+model does not. Removing the apply CALL was right; removing the findings FORMAT
+was what cost the money. The chain is now four model calls: two audits, one
+repair, one lector.
+
+**Estimated chain cost for a 16-page book:** audits ~$0.15 (gemini,
+arc-informed) + ~$0.12 (grok, blind) + repair ~$0.42 (claude-opus, the
+bake-off's +$0.39 over deepseek's ~$0.03) + lector ~$0.10 = **~$0.79**, against
+~$0.30 for the deleted six-call chain at deepseek repair prices. The increase is
+the owner's deliberate trade: the repair model that invents nothing, and a second
+independent auditor, in exchange for the re-audit and the apply call.
+
+**Verified:** `tests/unit/text-lector.test.ts` 29 tests — parser round-trip on
+the REAL A/B output of both gemini (10 lines, incl. `(oder …)` alternatives that
+must be discarded) and grok (bare, unquoted corrections on every line);
+substitution keeping umlauts and guillemets; a span the page wraps across a line
+break; two findings on one page not shifting each other; overlap → first
+applied, second dropped; quote-absent and no-such-page drops; and the chain-order
+test now asserting `lectorApplied` / `lectorDropped` with no apply call in the
+ledger. Suite green (33 with the beats file). Client `tsc --noEmit` clean.
+`tests/manual/test-text-refine-salvage.js` still passes.
+
+**Touched:** `prompts/story-text-proofread.txt`, `server/lib/textRefine.js`
+(`parseLectorFindings`, `locateQuote`, `applyLectorFindings`; diff-cap block
+deleted), `storyJobPipeline.js` (ledger), `client/src/pages/TestLab.tsx`,
+`client/src/services/testlabService.ts`, `tests/unit/text-lector.test.ts`,
+`docs/prompt-inventory.md`.
+
+**Status:** ✅ active — supersedes point 4 of "The text chain is TWO PARALLEL
+AUDITS → merge → ONE repair → ONE lector that returns corrected pages" (the
+page-return contract and its diff cap) and the lector-cost open question in the
+Lab #984 addendum. Everything else in both entries stands.

@@ -354,9 +354,11 @@ export interface RefineRound {
   changedFromOriginal?: number[];
   converged?: boolean;
   findingsCount?: number;
-  /** Lector only: the per-page verdict of the edit-distance cap. */
-  acceptedPages?: { pageNumber: number; ratio: number }[] | null;
-  rejectedPages?: { pageNumber: number; ratio: number }[] | null;
+  /** Lector only: its quoted-span findings and what the code-side applier did. */
+  findings?: { pageNumber: number; quote: string; correction: string }[];
+  appliedCount?: number | null;
+  droppedCount?: number | null;
+  droppedFindings?: { pageNumber: number; quote: string; reason: string }[];
   pages?: { pageNumber: number; before: string; after: string; original: string; sceneIntent?: string }[];
 }
 

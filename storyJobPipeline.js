@@ -5571,10 +5571,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             elapsedMs: r.elapsedMs || 0,
             cost: r.cost ?? null,
             changedPages: r.changedPages || [],
-            // Lector only: which returned pages the diff cap took and which it
-            // threw out, with the ratio that decided it.
-            acceptedPages: r.acceptedPages || null,
-            rejectedPages: r.rejectedPages || null,
+            // Lector only: how many of its findings the code-side applier
+            // landed, and how many it dropped (see applyLectorFindings).
+            appliedCount: r.appliedCount ?? null,
+            droppedCount: r.droppedCount ?? null,
             error: r.error || null,
             analysis: (r.analysis || '').slice(0, 15000),
           })),
@@ -5601,13 +5601,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sources: f.sources,
           })),
           mergeStats: usable.mergeStats || null,
-          // The lector's raw output plus the per-page verdict of the
-          // edit-distance cap (see screenLectorPages in textRefine.js).
+          // The lector's raw output, its parsed findings, and what the
+          // code-side applier did with each (see applyLectorFindings).
           proofread: usable.proofread || '',
-          lectorAccepted: (usable.lectorAccepted || []).map(p => ({ pageNumber: p.pageNumber, ratio: p.ratio })),
-          // The REJECTED page keeps its text: it is the version the cap threw
-          // out, and the only place an over-tight cap becomes visible.
-          lectorRejected: usable.lectorRejected || [],
+          lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+          lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+          // A dropped finding keeps its REASON: quote-absent is the
+          // hallucination guard firing, overlap is two findings on one span.
+          lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
           durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
           model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
           pages: usable.pages

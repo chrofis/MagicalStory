@@ -19,15 +19,16 @@
  *           nothing else)
  *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
  *   3. ONE REPAIR PASS over the merged findings (textRefineModel)
- *   4. ONE LECTOR PASS which returns the corrected pages itself, screened by a
- *      per-page edit-distance cap (screenLectorPages)
+ *   4. ONE LECTOR PASS emitting quoted-span findings, applied by
+ *      code-side substitution of its quoted spans (applyLectorFindings)
  *
  * What this replaced: audit → fix → re-audit → corrective fix → lector →
  * separate apply pass. The multi-round convergence loop, the re-audit and the
  * apply call are DELETED, not bridged. Two independent finders up front beat
  * sequential re-audits of one; the accepted cost is that a fault the repair
- * pass introduces has nothing behind it, which is what the lector's diff cap
- * bounds. A second bounded repair pass would slot in as one more
+ * pass introduces has nothing reading its output, which is why the repair slot
+ * went to the model that invented nothing in the bake-off (claude-opus, owner
+ * ruling 2026-09-03). A second bounded repair pass would slot in as one more
  * `runRepairPass` call — nothing here loops, and nothing here is dormant
  * machinery waiting for one.
  *
@@ -157,93 +158,148 @@ function mergeAuditFindings(lists = []) {
   return { findings, duplicates, bySource, text };
 }
 
-// ────────────────────── LECTOR: PER-PAGE EDIT-DISTANCE CAP ────────────────────
+// ─────────────── LECTOR: FINDINGS PARSED, CORRECTIONS APPLIED IN CODE ──────────
 
 /**
- * The lector returns corrected pages rather than quoted spans (owner ruling
- * 2026-09-03), which removes the verbatim-quote check that used to be the
- * hallucination guard. This replaces it: a page whose returned text differs
- * from its input by more than this fraction of its characters is REJECTED and
- * the input page kept.
+ * Lector findings: `PAGE <n>: '<faulty words>' → '<corrected words>'`, one per
+ * line (see prompts/story-text-proofread.txt).
  *
- * 0.15 is chosen against both failure sizes. A real language fix is a span: the
- * measured lector output on a shipped 16-page German text (six findings, the
- * largest "war einen Moment lang traurig für sie" → "hatte einen Moment lang
- * Mitleid mit ihr") moves 10-25 characters on a 300-800 character page — under
- * 8% even when two findings land on one page. A page the lector re-narrates
- * instead of correcting moves well past half its characters. 15% sits roughly
- * twice above the worst legitimate case and far below any rewrite, and it is a
- * cap on WHAT the lector may change, never on how many pages it may fix.
+ * A quoted-span-plus-replacement format is what makes the application step
+ * mechanical — it is string substitution, done below in code, with no second
+ * model call — and it is also the hallucination guard: a finding whose quote is
+ * not on the page it names cannot be applied and is dropped. That is the whole
+ * class a free-prose or whole-page format cannot filter; the previous
+ * proofreader's two false faults on job_1788380714660 were a claim about two
+ * distinct cast members being "the same person" and a suggestion to write ß,
+ * neither of which quotes anything the page contains.
+ *
+ * Everything that is not a parseable finding line is ignored, which subsumes the
+ * old withdraw/leaked-reasoning filter (2026-08-31, job_1788123310558): a model
+ * musing between findings simply produces no line.
  */
-const LECTOR_MAX_DIFF_RATIO = 0.15;
+const LECTOR_LINE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s*[:.–—-]\s*(.+?)\s*(?:→|->|=>)\s*(.+)$/i;
+const QUOTE_PAIRS = { "'": "'", '"': '"', '«': '»', '‹': '›', '„': '“', '“': '”', '‘': '’', '`': '`' };
 
-/** Whitespace-normalised, so a re-wrapped page is not a change. */
-function normalizeForDiff(s) {
-  return String(s || '').replace(/\s+/g, ' ').trim();
+/** The first quoted run of a fragment, or null when it does not open with a quote. */
+function firstQuoted(s) {
+  const t = String(s || '').trim();
+  const close = QUOTE_PAIRS[t[0]];
+  if (!close) return null;
+  const end = t.indexOf(close, 1);
+  return end > 1 ? t.slice(1, end) : null;
 }
 
-/** Levenshtein distance, two-row DP. */
-function editDistance(a, b) {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  let prev = new Uint32Array(b.length + 1);
-  let cur = new Uint32Array(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    cur[0] = i;
-    const ca = a.charCodeAt(i - 1);
-    for (let j = 1; j <= b.length; j++) {
-      const cost = ca === b.charCodeAt(j - 1) ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+/**
+ * Unquoted fallback: strip a trailing parenthetical alternative ("(oder …)").
+ * Both halves need it — the measured output quotes the faulty span but often
+ * leaves the correction bare (grok-4.6 did so on every line of the A/B).
+ */
+function bareSpan(s) {
+  return String(s || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
+function parseLectorFindings(text) {
+  const out = [];
+  for (const raw of String(text || '').split('\n')) {
+    const m = raw.trim().match(LECTOR_LINE_RE);
+    if (!m) continue;
+    const pageNumber = parseInt(m[1], 10);
+    const quote = firstQuoted(m[2]) ?? bareSpan(m[2]);
+    const correction = firstQuoted(m[3]) ?? bareSpan(m[3]);
+    if (!Number.isFinite(pageNumber) || !quote || !correction || quote === correction) continue;
+    out.push({ pageNumber, quote, correction, raw: raw.trim() });
+  }
+  return out;
+}
+
+/** Collapse whitespace runs to one space, keeping a map back to source indices. */
+function normalizeWithMap(s) {
+  const src = String(s || '');
+  let norm = '';
+  const map = [];
+  let pendingSpace = false;
+  for (let i = 0; i < src.length; i++) {
+    if (/\s/.test(src[i])) { if (norm.length > 0) pendingSpace = true; continue; }
+    if (pendingSpace) { norm += ' '; map.push(i); pendingSpace = false; }
+    norm += src[i];
+    map.push(i);
+  }
+  return { norm, map };
+}
+
+/**
+ * Locate a finding's quoted span in its page and return the SOURCE offsets.
+ *
+ * Whitespace is normalised on both sides before matching, because a model
+ * re-wraps a quote across a line break; nothing else is. The index map is what
+ * turns a normalised hit back into a slice of the original text, so the
+ * replacement lands on the real characters — a plain `includes` check could
+ * verify a quote but not replace it.
+ *
+ * The FIRST occurrence wins when a page repeats the quoted span: the lector
+ * quotes "the shortest span that contains the fault", so a repeat is the same
+ * fault twice and a second finding for it will be dropped as overlapping or
+ * applied on the next pass over the text.
+ */
+function locateQuote(pageText, quote) {
+  const { norm, map } = normalizeWithMap(pageText);
+  const nq = String(quote || '').replace(/\s+/g, ' ').trim();
+  if (!nq) return null;
+  const at = norm.indexOf(nq);
+  if (at < 0) return null;
+  return { start: map[at], end: map[at + nq.length - 1] + 1 };
+}
+
+/**
+ * Apply the lector's findings to the page text. No model call: each finding is a
+ * quoted span and its replacement, so this is substitution.
+ *
+ * Three drop reasons, all logged by the caller:
+ *   `no-such-page`  the finding names a page the story does not have
+ *   `quote-absent`  the quoted words are not on that page — the hallucination guard
+ *   `overlap`       its span overlaps a finding already applied to that page
+ *
+ * Spans are applied in DESCENDING position order so an earlier replacement
+ * cannot shift a later one's offsets. Overlaps are resolved in the model's own
+ * listing order: the first finding wins, the second is dropped.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages
+ * @param {Array<{pageNumber:number,quote:string,correction:string}>} findings
+ * @returns {{pages:Array, applied:Array, dropped:Array}}
+ */
+function applyLectorFindings(pages = [], findings = []) {
+  const byPage = new Map(pages.map(p => [p.pageNumber, String(p.text || '')]));
+  const applied = [];
+  const dropped = [];
+  // Page -> the spans already claimed on it, in listing order.
+  const claimed = new Map();
+
+  for (const f of findings) {
+    const pageText = byPage.get(f.pageNumber);
+    if (pageText === undefined) { dropped.push({ ...f, reason: 'no-such-page' }); continue; }
+    const span = locateQuote(pageText, f.quote);
+    if (!span) { dropped.push({ ...f, reason: 'quote-absent' }); continue; }
+    const taken = claimed.get(f.pageNumber) || [];
+    if (taken.some(s => span.start < s.end && s.start < span.end)) {
+      dropped.push({ ...f, reason: 'overlap' });
+      continue;
     }
-    const swap = prev; prev = cur; cur = swap;
+    taken.push(span);
+    claimed.set(f.pageNumber, taken);
+    applied.push({ ...f, ...span });
   }
-  return prev[b.length];
-}
 
-/**
- * Normalised edit distance between two versions of one page, 0..1.
- * 0 = identical (ignoring whitespace), 1 = nothing in common.
- */
-function pageDiffRatio(before, after) {
-  const a = normalizeForDiff(before);
-  const b = normalizeForDiff(after);
-  const max = Math.max(a.length, b.length);
-  if (max === 0) return 0;
-  // A length difference is a lower bound on the edit distance, so an overhaul
-  // is rejected without running the DP over it. The bound itself is returned,
-  // not 1 — the logged ratio has to stay a real measurement.
-  const bound = Math.abs(a.length - b.length) / max;
-  if (bound > LECTOR_MAX_DIFF_RATIO) return bound;
-  return editDistance(a, b) / max;
-}
+  const next = pages.map((p) => {
+    const spans = applied.filter(a => a.pageNumber === p.pageNumber);
+    if (spans.length === 0) return { ...p };
+    let text = String(p.text || '');
+    for (const a of spans.slice().sort((x, y) => y.start - x.start)) {
+      text = text.slice(0, a.start) + a.correction + text.slice(a.end);
+    }
+    return { ...p, text };
+  });
 
-/**
- * Screen the lector's returned pages against the text it was given.
- *
- * Three outcomes per returned page: ACCEPTED (a bounded correction), REJECTED
- * (changed more than the cap — the input page is kept, and the ratio is logged
- * so an over-tight cap is visible rather than silent), STRAY (a page number the
- * story does not have).
- *
- * @param {Array<{pageNumber:number,text:string}>} inputPages the text sent
- * @param {Array<{pageNumber:number,text:string}>} returned parseRefinedText output
- */
-function screenLectorPages(inputPages = [], returned = []) {
-  const byPage = new Map(inputPages.map(p => [p.pageNumber, String(p.text || '')]));
-  const accepted = [];
-  const rejected = [];
-  const stray = [];
-  for (const r of returned) {
-    const before = byPage.get(r.pageNumber);
-    if (before === undefined) { stray.push(r.pageNumber); continue; }
-    const ratio = pageDiffRatio(before, r.text);
-    if (ratio === 0) continue;                       // returned unchanged
-    const entry = { pageNumber: r.pageNumber, ratio: Math.round(ratio * 1000) / 1000, text: r.text };
-    (ratio <= LECTOR_MAX_DIFF_RATIO ? accepted : rejected).push(entry);
-  }
-  return { accepted, rejected, stray };
+  return { pages: next, applied, dropped };
 }
 
 // ───────────────────────────────── THE CHAIN ──────────────────────────────────
@@ -299,8 +355,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let mergedFindings = [];
   let mergeStats = { bySource: {}, duplicates: 0 };
   let proofread = '';
-  let lectorAccepted = [];
-  let lectorRejected = [];
+  let lectorFindings = [];
+  let lectorApplied = [];
+  let lectorDropped = [];
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -320,8 +377,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
     mergedFindings: mergedFindings.slice(),
     mergeStats,
     proofread,
-    lectorAccepted: lectorAccepted.slice(),
-    lectorRejected: lectorRejected.slice(),
+    lectorFindings: lectorFindings.slice(),
+    lectorApplied: lectorApplied.slice(),
+    lectorDropped: lectorDropped.slice(),
     partial: true,
   });
   const publish = () => {
@@ -503,12 +561,19 @@ async function refineStoryText(storyData, pages, opts = {}) {
     publish();
   }
 
-  // THE LECTOR — LAST, and it returns the corrected pages itself (owner ruling
-  // 2026-09-03). It reads the text the repair pass left, so a grammar fault the
-  // repair introduced is still caught, and there is no second model in the loop
-  // re-typing its findings. What keeps it from becoming a second refiner is
-  // screenLectorPages: a returned page that moved more than
-  // LECTOR_MAX_DIFF_RATIO of its characters is discarded and the input kept.
+  // THE LECTOR — LAST. It reads the text the repair pass left, so a grammar
+  // fault the repair introduced is still caught, and it emits FINDINGS: quoted
+  // span + replacement, one line each. The corrections are applied HERE, in
+  // code (applyLectorFindings) — no second model call.
+  //
+  // Reverted from returning whole pages (owner ruling 2026-09-03, measured):
+  // page-return handed the lector the repair pass's output room and
+  // gemini-3.1-pro reasons into whatever room it is given — $0.30 and 201s for
+  // FOUR pages on Lab #984, against $0.10 for a whole 16-page book in this
+  // findings format (the A/B where its 4/4 accuracy was measured). The
+  // verbatim-quote check comes back with the format and is again the
+  // hallucination guard, which is why the diff-ratio cap that stood in for it
+  // is deleted rather than kept alongside.
   //
   // Non-blocking, and the publish() above means a join deadline can only cost
   // this pass.
@@ -516,29 +581,31 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const lectorPrompt = buildTextProofreadPrompt(storyData, current);
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
       const t0 = Date.now();
-      // Full pages come back now, not quoted spans, so the lector needs the
-      // same output room as the repair pass.
-      const MAX_OUT = Math.min(64000, TEXT_MODELS[lectorModel].maxOutputTokens || 64000);
+      // The model's own limit (owner rule: no output caps). A finding list is a
+      // few hundred tokens — the cost of this call is decided by the output
+      // CONTRACT, not by the ceiling.
+      const MAX_OUT = TEXT_MODELS[lectorModel].maxOutputTokens || 16000;
       // temperature 0: the A/B measured this prompt at 0, and a lector must not
-      // paraphrase the page it is correcting.
+      // paraphrase the page it quotes.
       let lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, { temperature: 0, usageLabel: 'text_lector' });
       if (!String(lr.text || '').trim()) {
         log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
         lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, { temperature: 0, usageLabel: 'text_lector' });
       }
       proofread = String(lr.text || '').trim();
-      const parsed = parseRefinedText(proofread, expected);
-      const screened = screenLectorPages(current, parsed.pages);
-      lectorAccepted = screened.accepted;
-      lectorRejected = screened.rejected;
-      for (const r of lectorRejected) {
-        log.warn(`⚠️ [LECTOR] page ${r.pageNumber} changed ${(r.ratio * 100).toFixed(1)}% of its characters (cap ${(LECTOR_MAX_DIFF_RATIO * 100).toFixed(0)}%) — rejected, original kept`);
+      lectorFindings = parseLectorFindings(proofread);
+      const result = applyLectorFindings(current, lectorFindings);
+      lectorApplied = result.applied;
+      lectorDropped = result.dropped;
+      for (const d of lectorDropped) {
+        const why = d.reason === 'quote-absent'
+          ? `the quoted words are not on page ${d.pageNumber}`
+          : d.reason === 'overlap'
+            ? `its span overlaps a correction already applied to page ${d.pageNumber}`
+            : `page ${d.pageNumber} is not in this story`;
+        log.warn(`⚠️ [LECTOR] dropped "${d.quote}" — ${why}`);
       }
-      if (screened.stray.length > 0) {
-        log.warn(`⚠️ [LECTOR] returned page(s) ${screened.stray.join(', ')} the story does not have — discarded`);
-      }
-      const byPage = new Map(lectorAccepted.map(p => [p.pageNumber, p.text]));
-      const next = current.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
+      const next = result.pages;
       const changedPages = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
       rounds.push({
         round: rounds.length + 1,
@@ -550,9 +617,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
         usage: { input_tokens: lr.usage?.input_tokens || 0, output_tokens: lr.usage?.output_tokens || 0 },
         cost: lr.usage?.direct_cost ?? calculateTextCost(lr.modelId || TEXT_MODELS[lectorModel].modelId, lr.usage || {}),
         rawResponse: proofread.slice(0, 40000),
-        acceptedPages: lectorAccepted.map(p => ({ pageNumber: p.pageNumber, ratio: p.ratio })),
-        rejectedPages: lectorRejected.map(p => ({ pageNumber: p.pageNumber, ratio: p.ratio })),
-        strayPages: screened.stray,
+        findings: lectorFindings.map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+        appliedCount: lectorApplied.length,
+        droppedCount: lectorDropped.length,
+        droppedFindings: lectorDropped.map(d => ({ pageNumber: d.pageNumber, quote: d.quote, reason: d.reason })),
         changedPages,
         // Same per-page shape as the repair entry, so the Lab renders both
         // steps in one column set instead of special-casing this one.
@@ -566,7 +634,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       });
       current = next;
       publish();
-      log.info(`✍️  [LECTOR] ${lectorModel}: corrected page(s) ${changedPages.join(', ') || 'none'}, rejected ${lectorRejected.length} in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      log.info(`✍️  [LECTOR] ${lectorModel}: ${lectorFindings.length} finding(s), ${lectorApplied.length} applied to page(s) ${changedPages.join(', ') || 'none'}, ${lectorDropped.length} dropped, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
   } catch (le) {
     log.warn(`⚠️ [LECTOR] failed (${le.message}) — text kept as the repair pass left it`);
@@ -579,7 +647,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   return {
     pages: current, original, rounds, changed,
     audits, mergedFindings, mergeStats,
-    proofread, lectorAccepted, lectorRejected,
+    proofread, lectorFindings, lectorApplied, lectorDropped,
     partial: false,
   };
 }
@@ -655,8 +723,8 @@ module.exports = {
   startBackgroundRefine,
   parseFaultLines,
   mergeAuditFindings,
-  pageDiffRatio,
-  screenLectorPages,
-  LECTOR_MAX_DIFF_RATIO,
+  parseLectorFindings,
+  applyLectorFindings,
+  locateQuote,
   DUPLICATE_OVERLAP,
 };
