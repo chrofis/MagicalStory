@@ -14,3 +14,38 @@ coverage
 .nyc_output
 .vscode
 .idea
+
+# ── Image size is the memory bill (2026-09-03) ───────────────────────────────
+# A container's page cache counts toward Railway's memory charge, and the whole
+# image gets written to the overlay filesystem at startup. Production was billed
+# 2,062 MB of page cache — 2,036 MB of it `inactive_file`, read once and never
+# referenced — against a 2.2 GB /app. Every MB shipped here is a MB billed for
+# the life of the container, and production redeploys rarely.
+#
+# Nothing excluded below is read at build OR runtime. The parts of these trees
+# that ARE read stay in the image — note the exclusions are deliberately narrow
+# rather than whole-tree:
+#   - scripts/lib/          — required by server/lib/failureLog.js and
+#                             server/lib/storyMetrics.js (chTime)
+#   - scripts/prerender.mjs — the build's prerender step
+#     (only scripts/analysis and scripts/ads are excluded, not scripts/)
+#   - docs/story-ideas      — read by server/lib/swissStories.js:65, so it is
+#                             negated back in after the docs exclusion
+# Verify with a grep for the path before adding anything here.
+
+# 364 MB of committed test OUTPUT artifacts (tests/_outputs 151 MB,
+# tests/tell-curated 68 MB, tests/trial 21 MB, composite + char-repair dirs).
+tests
+
+# 16 MB, of which docs/tests alone is 10 MB. story-ideas is the one part the
+# server reads at runtime.
+docs
+!docs/story-ideas
+
+# 57 MB of analysis output and 11 MB of ads tooling; neither is imported by the
+# server. scripts/lib and scripts/prerender.mjs are required and re-included.
+scripts/analysis
+scripts/ads
+
+# A stray 16 MB JSON in the repo root with zero references anywhere in the code.
+noah.json
