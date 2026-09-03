@@ -24780,3 +24780,49 @@ write-what-the-picture-cannot-show list, clamp/exemption lines),
 `prompts/text-refine.txt` (clamp mirror)
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-03 — Staging idle cost: arm the self-shutdown; Railway's app sleeping cannot fire here
+
+**Context:** Chasing the under-$5/week Railway target. Measured that day: $1.79
+over 21.9 h ⇒ $13.74/week, of which the two `MagicalStory` app containers were
+$1.26 and both Postgres containers only $0.40 — so after the database purge
+(entry above) the staging APP is the barrier, not the data. `sleepApplication`
+was turned on for `MagicalStory / staging`.
+
+**Correction to the 2026-08 entry.** That entry rejected Railway's built-in app
+sleeping because it "decides on inbound HTTP alone and would sleep the container
+mid-generation". That premise is **wrong**: Railway's docs say inactivity is
+measured by **outbound packets** — "once a service stops sending packets it is
+considered inactive after 5 minutes", with the actual sleep landing 5–10 min
+after the last outbound traffic, and open database connections or telemetry are
+called out as things that keep a service awake. A story generation makes
+continuous outbound calls (Grok, Anthropic, Postgres), so it would have kept
+*itself* awake. App sleeping was never the mid-generation hazard we thought.
+
+**But it is ineffective here, for the same reason.** `sweepStaleJobs`
+(`server.js:2623`) and `checkStripeRetryBuffer` (`server.js:2675`) each run a
+`dbPool.query` **every 5 minutes**, against a 5-minute inactivity threshold. The
+container never accumulates the outbound silence sleeping requires, so the flag
+is close to a no-op.
+
+**Decision:** keep `server/lib/idleShutdown.js` as the mechanism and ARM it on
+staging (`STAGING_IDLE_SHUTDOWN=true` + `RAILWAY_API_TOKEN`). Railway's
+`sleepApplication` stays on as a harmless backstop. The self-stop is strictly
+better here: it is **busy-aware** (no HTTP for 30 min AND no `story_jobs` in
+`pending`/`processing` AND no busy probe raised, failed probe = busy), it fully
+**stops the deployment** rather than idling it, and it is explicit about waking
+(`npm run staging:up`). Timers were deliberately NOT gated off on staging to
+make Railway's sleep work — that would silence the stale-job sweep and the
+Stripe retry monitor on the environment where they get exercised.
+
+**Rationale for keeping both:** they cannot fight. The self-stop stops the
+deployment outright; sleeping only suspends a running one. If the timers are
+ever removed or moved to an external scheduler, sleeping starts working on its
+own and needs no further change.
+
+**Touched files:** none (configuration only) — supersedes the "ships inert"
+status on the 2026-08-04 idle-shutdown entry.
+
+**Status:** ✅ active once the staging variables are set.
