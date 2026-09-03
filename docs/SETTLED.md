@@ -49,7 +49,7 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **Grok inpaint handles structural changes** (pose, gaze, body rotation) — don't route facing-direction issues to iterate.
 - **Repaired versions are evaluated against their OWN scene contract; finalScore is the one score everywhere.**
 - **Cover gaze is code-owned: always at the viewer**; `gazes at:` is banned from cover hints.
-- **Cover title text is painted in (plate/strip pass), never model-spelled.**
+- **Cover title text: `coverTitleMode` decides — app-painted in production, model-baked on staging.** `runtime('coverTitleMode')` = `perEnvironment({ staging: 'baked', default: 'composited' })` (decisions.md 2026-08-29, wiring completed 2026-09-03). `composited` (production, and the older settled verdict) renders TEXTLESS art and stamps the title from a real font — spelling is safe BY CONSTRUCTION, which is why real books keep it. `baked` (staging) renders the title INTO the artwork in ONE call on `coverTitleBakedModel` (`grok-imagine-2`), front cover only, and the app-side typography pass is skipped — measured cost-neutral, spelling correct across 5 stories / 5 art styles including umlauts. **This line was stale, not reversed:** the flag shipped 2026-08-29 by owner order and SETTLED was never updated; the flag reads through ONE resolver (`resolveCoverTitleMode`) so first generation, trials and every later repaint agree. Promoting `baked` to production still needs owner-judged covers from real staging runs — that promotion IS a reversal and needs the full protocol.
 - **Test Lab sets are generic, never per-stage** (a parallel title_sets mechanism was reverted).
 
 ## Data & infrastructure

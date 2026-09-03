@@ -24335,3 +24335,93 @@ that no brief emits an `action: "pointing"` label or a pointing arm in its prose
 `prompts/scene-expansion-all.txt`
 
 **Status:** ✅ active
+
+## 2026-09-03 — The baked cover title is wired into FIRST GENERATION (one resolver, three consumers) — completes the 2026-08-29 decision
+
+**Context.** `coverTitleMode` shipped 2026-08-29 (`perEnvironment({ staging:
+'baked', default: 'composited' })`, `coverTitleBakedModel: 'grok-imagine-2'`)
+by owner order after the Lab measured baked titles over 5 stories in 5 art
+styles: spelling correct in all five including umlauts, lettering built from
+each scene's own materials, cost-neutral. But `runtime('coverTitleMode')` was
+read in exactly ONE place — `iterateCover()`, the POST-generation repaint path.
+The two first-generation cover paths in `storyJobPipeline.js` (full-account
+streaming cover, trial front cover) called `buildCoverPrompt` with no
+`bakeTitle`, and the persistence gates keyed off the stale global boolean
+`MODEL_DEFAULTS.appSideCoverType`. **So no cover a story actually shipped with
+was ever baked.** Staging said `baked` and rendered `composited`.
+
+**Motivating evidence.** `job_1788380714660_4p9mr11xszu` ("Fiona und der
+Feigenbaum", staging, 2026-09-02) — the capstone. Its front cover carries the
+full two-pass artifact set: `frontCoverArt`, `frontCoverTitleIn`,
+`frontCoverTitleOut` rows and `coverImages.frontCover.typography.fontId =
+'luckiest'`, i.e. an app-stamped font title. `modelId` is
+`grok-imagine-image-2.0` only because staging's `coverRenderModel` is 2.0 —
+nothing to do with the title flag. Owner's ruling today: single-pass was tested
+in the Lab, he ordered it wired, finish it.
+
+**Decision.** ONE resolver — `resolveCoverTitleMode(coverType, title, {
+modeOverride })` in `server/lib/coverTypography.js` — returns `{ mode, isFront,
+baked, bakeTitle, bakedModel }`, and every cover path calls it instead of
+re-deriving the ternary. Baked mode implies three things together and all three
+now read that one answer:
+1. **Prompt**: `options.bakeTitle` → `buildCoverPrompt` appends the TITLE block
+   (front cover only; the title is passed explicitly, never as a template
+   placeholder — a revived `{STORY_TITLE}` is what rendered `Paint ""` in exps
+   957/958).
+2. **Render**: `imageModelOverride: bakedModel` wins over the routed cover /
+   page-tier model, matching `iterateCover`'s precedence. Only the
+   typography-aware model renders legible lettering.
+3. **Typography skipped**: the render records `titleBaked: true` on its cover
+   entry, and `bakeCoverTypographyPostPersist` takes a new `skipKeys` argument
+   so the front cover is left alone while the initial page and back cover keep
+   their app-side dedication / branding. A baked front cover therefore gets NO
+   `frontCoverArt` / `TitleIn` / `TitleOut` rows and no `paintServedCoverTitle`
+   pass — that skip is the whole point: stamping it would print a SECOND title,
+   the exact double-stamp bug of exps 957/958.
+
+The eval gate moves with it: a baked front cover is `textMode: 'painted'` with
+`expectedText = title` even while `appSideCoverType` is true, because the model
+painted the title and spelling is the whole risk baked mode takes on. Other
+covers keep `appOverlay`. The flag is recorded per render (`titleBaked`) rather
+than re-read at persistence time, so a mode flip mid-job can never double-title.
+
+The trial front cover is wired identically — it is a first-generation cover path,
+and a parallel exception would be a second source of truth.
+
+**Rationale.** `'composited'` is unchanged BY CONSTRUCTION: with an empty
+`bakeTitle` the prompt gets no TITLE block, `bakedModel` is null so the model
+override falls through to the previous value, and `skipKeys` is empty. An empty
+story title also resolves to NOT baked — there is nothing to paint. Production
+keeps the font-stamped title, whose spelling cannot drift; staging carries the
+model-spelling risk, exactly as the 2026-08-29 entry decided.
+
+**Downstream consumers checked** (a baked cover has no textless art layer):
+- `iterateCover` — skips the restamp on `bakeTitle` BEFORE it checks the
+  `${key}Art` row, so a staging repaint re-bakes and never double-stamps; the
+  `forceRestampWhenUnbaked` regen routes are covered by that same ordering.
+- `repairPipeline` cover inpaint — gated on the `${key}Art` row existing;
+  absent → the served image is inpainted, nothing restamped. Correct.
+- `styleRepair` → `usedArt: !!art` → false → the Step-5 restamp is skipped.
+- `restampServedCover` (typography picker / title edit) — throws
+  `NO_ART_LAYER`, already a clean 409: a baked title cannot be restyled without
+  a new render, which is true.
+- `pdf.js` and the viewer read the SERVED cover row and never the art layer —
+  unaffected.
+
+**Verified.** `resolveCoverTitleMode` unit-tested (staging+front → baked with
+`grok-imagine-2`; staging+back/initial → two-pass; production/local → two-pass
+for every cover; empty title → two-pass, never `Paint ""`; Lab override wins
+both ways). Prompt shape re-verified with templates loaded: baked front prompt
+contains `**TITLE:**` and the real title, composited front and baked back
+contain no TITLE block. 83/83 templates load. Unit suite 354 passed, same 3
+pre-existing `active-version-recompute` failures.
+
+**Touched files:** `server/lib/coverTypography.js`
+(`resolveCoverTitleMode`, `bakeCoverTypographyPostPersist` `skipKeys`),
+`server/lib/coverIterate.js`, `storyJobPipeline.js` (streaming cover, trial
+cover, eval `textMode` gate, post-persist typography gate),
+`server/lib/repairPipeline.js` (comment), `tests/unit/cover-title-mode.test.ts`,
+`docs/SETTLED.md`.
+
+**Status:** 🟡 conditional — live on staging only; promotion to production still
+needs owner-judged covers from real staging runs (unchanged from 2026-08-29).

@@ -1638,6 +1638,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // later — before the model was ever called, so three covers failed
         // identically on every run with no usage, no genLog entry and an empty
         // coverImages {} (job_1787959478282 and the six runs before it).
+        // COVER TITLE MODE — same resolver iterateCover uses, so first
+        // generation and every later repaint agree about which mode this
+        // environment is in. 'baked' (staging) appends the TITLE block to the
+        // cover prompt, routes the render to the typography-aware model below,
+        // and suppresses the app-side typography pass post-persist. Front cover
+        // only; 'composited' (production) leaves this path unchanged.
+        const { resolveCoverTitleMode } = require('./server/lib/coverTypography');
+        // Title source: `streamingTitle` (unified parser's onTitle, arrives long
+        // before covers) falling back to the finalized `title` — which beats
+        // mode sets, and which is always initialized by the time covers start
+        // (startCoverGeneration is only ever called after the story text). Do
+        // NOT reach for `storyData` here: it is declared much later in this same
+        // function, so touching it from this closure is a TDZ ReferenceError.
+        const coverTitleModeInfo = resolveCoverTitleMode(
+          coverType,
+          streamingTitle || title || inputData.title || inputData.storyTitle || '',
+          { modeOverride: modelOverrides.coverTitleMode || null }
+        );
+        if (coverTitleModeInfo.baked) {
+          log.info(`🅰️ [STREAM-COVER] ${coverLabel}: BAKED title mode — "${coverTitleModeInfo.bakeTitle}" rendered into the artwork on ${coverTitleModeInfo.bakedModel}, typography composite skipped`);
+        }
         let coverPrompt = buildCoverPrompt(
           coverType === 'frontCover' ? 'front' : coverType === 'backCover' ? 'back' : 'initialPage',
           {
@@ -1651,6 +1672,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               customStyleDescription: styleDescription,
               characterReferenceListOverride: characterRefList,
               visualBibleOverride: visualBibleText,
+              // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
+              bakeTitle: coverTitleModeInfo.bakeTitle,
             },
           }
         );
@@ -1703,7 +1726,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // covers in the shared repair pipeline (Step 1 evaluateImageBatch +
         // Phase 5b-pre detection), same as every story page.
         const coverResult = await generateImageOnly(coverPrompt, coverPhotos, {
-          imageModelOverride: coverImageModel,
+          // Baked title wins over the routed cover model: only the
+          // typography-aware model renders legible lettering (the standard model
+          // produces flat outline type and breaks the full-bleed rule). Same
+          // precedence iterateCover applies.
+          imageModelOverride: coverTitleModeInfo.bakedModel || coverImageModel,
           landmarkPhotos: coverLandmarkPhotos,
           visualBibleGrid: coverVbGrid,
           sceneBackground: coverSceneBackground,
@@ -1749,7 +1776,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           landmarkPhotos: coverLandmarkPhotos,
           emptySceneImage: coverSceneBackground || null,
           modelId: coverResult.modelId,
-          grokRefImages: coverResult.grokRefImages || null
+          grokRefImages: coverResult.grokRefImages || null,
+          // Records what this render ACTUALLY did, not what the flag says now:
+          // the persistence gates (eval textMode, post-persist typography) read
+          // it, so a mode flip mid-job can never double-title a cover.
+          titleBaked: coverTitleModeInfo.baked
         };
       });
 
@@ -2104,6 +2135,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // bakeCoverTypographyPostPersist stamped a second one over it
             // (job_1786815617426: two titles on the trial cover).
             // Same builder as pages and as every other cover path.
+            // COVER TITLE MODE — same resolver as the full-account cover path
+            // and iterateCover. In 'baked' mode (staging) the trial's front
+            // cover also renders its title in one typography-aware call and
+            // skips the app-side stamp; 'composited' leaves this unchanged.
+            const { resolveCoverTitleMode: resolveTrialCoverTitleMode } = require('./server/lib/coverTypography');
+            const trialCoverTitleMode = resolveTrialCoverTitleMode(
+              'frontCover', coverTitle, { modeOverride: modelOverrides.coverTitleMode || null }
+            );
+            if (trialCoverTitleMode.baked) {
+              log.info(`[TRIAL-COVER] BAKED title mode — "${trialCoverTitleMode.bakeTitle}" rendered into the artwork on ${trialCoverTitleMode.bakedModel}, typography composite skipped`);
+            }
             let coverPrompt = buildCoverPrompt('front', {
               sceneDescription,
               inputData,
@@ -2114,6 +2156,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 customStyleDescription: styleDescription,
                 characterReferenceListOverride: characterRefList,
                 visualBibleOverride: visualBibleText,
+                // Empty unless baked mode is on; buildCoverPrompt appends the TITLE block.
+                bakeTitle: trialCoverTitleMode.bakeTitle,
               },
             });
 
@@ -2160,8 +2204,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Generate the image using simplePageImage model (same as trial pages)
             const result = await generateImageOnly(coverPrompt, coverPhotos, {
-              imageModelOverride: pageImageModel,
-              imageBackendOverride: pageImageBackend,
+              // Baked title wins over the page-tier model, and the backend is
+              // left to the registry so it cannot disagree with that model.
+              imageModelOverride: trialCoverTitleMode.bakedModel || pageImageModel,
+              ...(trialCoverTitleMode.baked ? {} : { imageBackendOverride: pageImageBackend }),
               landmarkPhotos: coverLandmarkPhotos,
               visualBibleGrid: coverVbGrid,
               aspectRatio: MODEL_DEFAULTS.coverAspect,
@@ -2196,7 +2242,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               modelId: result.modelId,
               referencePhotos: coverPhotos,
               landmarkPhotos: coverLandmarkPhotos,
-              grokRefImages: result.grokRefImages || null
+              grokRefImages: result.grokRefImages || null,
+              titleBaked: trialCoverTitleMode.baked
             };
           } catch (err) {
             log.warn(`[TRIAL-COVER] Title page generation failed: ${err.message}`);
@@ -3217,6 +3264,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               landmarkPhotos: result.landmarkPhotos,
               grokRefImages: result.grokRefImages || null,
               modelId: result.modelId,
+              // Title rendered INTO the artwork (baked mode) — the app-side
+              // typography pass must not stamp a second one.
+              titleBaked: result.titleBaked === true,
               generatedAt: new Date().toISOString()
             };
           }
@@ -4825,7 +4875,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // (server/lib/coverTypography.js) — the evaluator must never flag
             // missing/present title text (a good textless cover otherwise
             // tanks to 0 and triggers a destructive re-iteration).
-            const textMode = MODEL_DEFAULTS.appSideCoverType ? 'appOverlay' : 'painted';
+            // A BAKED front cover (coverTitleMode='baked') is Mode A for this
+            // one cover even while the flag says app-side: the model painted the
+            // title, so the evaluator must VERIFY it — spelling is the whole risk
+            // baked mode takes on. The other covers keep app-side typography.
+            const textMode = (coverData.titleBaked === true || !MODEL_DEFAULTS.appSideCoverType) ? 'painted' : 'appOverlay';
             let expectedText = null;
             if (textMode === 'painted') {
               if (coverKey === 'frontCover') {
@@ -6166,11 +6220,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (MODEL_DEFAULTS.appSideCoverType) {
       try {
         const { bakeCoverTypographyPostPersist } = require('./server/lib/coverTypography');
+        // A baked-title front cover carries its title in the pixels already —
+        // stamping here would print a second one (the exact double-title bug of
+        // Lab exps 957/958). The initial page and back cover have no baked text
+        // and keep their app-side dedication / branding either way.
+        const bakedCoverKeys = Object.entries(storyData.coverImages || {})
+          .filter(([, c]) => c?.titleBaked === true)
+          .map(([k]) => k);
+        if (bakedCoverKeys.length) {
+          log.info(`🅰️ [UNIFIED] Cover typography skipped for baked-title cover(s): ${bakedCoverKeys.join(', ')}`);
+        }
         await bakeCoverTypographyPostPersist(storyId, storyData, {
           title: storyData.title || '',
           dedication: storyData.dedication || inputData.dedication || '',
           seed: jobId,
           trial: !!inputData.skipQualityEval,
+          skipKeys: bakedCoverKeys,
         });
       } catch (e) {
         log.warn(`⚠️ [UNIFIED] Post-persist cover typography failed: ${e.message}`);

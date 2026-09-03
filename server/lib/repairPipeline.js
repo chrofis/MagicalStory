@@ -1064,6 +1064,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // so Grok can't mangle it. During INITIAL generation (${key}Art absent) the
     // cover is already textless and bakeCoverTypographyPostPersist stamps it
     // later — inpaint the served (textless) image as-is, no restamp.
+    // A BAKED-title front cover (runtime coverTitleMode='baked') also has no
+    // ${key}Art row, by design: its title lives in the pixels and there is no
+    // textless layer to inpaint. The same branch handles it correctly — the
+    // served image is inpainted and nothing is restamped over it.
     const coverKey = img.pageNumber === -1 ? 'frontCover'
       : img.pageNumber === -2 ? 'initialPage'
       : img.pageNumber === -3 ? 'backCover' : null;

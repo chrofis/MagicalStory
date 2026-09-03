@@ -20,6 +20,44 @@ const FONT_FILES = [
 ].map(f => path.join(FONT_DIR, f));
 
 // ---------------------------------------------------------------------------
+// resolveCoverTitleMode — THE one place the cover-title mode is decided.
+//
+// `runtime('coverTitleMode')` has two values (decisions.md 2026-08-29):
+//   'composited' (production): art renders TEXTLESS and this module stamps the
+//      title from a real font — spelling is safe by construction, two image
+//      calls (art + letter plate).
+//   'baked' (staging): ONE typography-aware call renders the artwork WITH the
+//      title in it, on runtime('coverTitleBakedModel'), and the app-side
+//      typography pass MUST NOT run — otherwise the cover carries two titles
+//      (exactly what Lab exps 957/958 produced).
+//
+// Baked mode implies all three things together, so all three read this helper:
+// the TITLE block appended to the cover prompt (`options.bakeTitle`), the
+// render routed to the baked model, and the typography composite skipped.
+// Front cover only — back cover and initial page have no title.
+//
+// An empty story title resolves to NOT baked: there is nothing to paint, so the
+// prompt gets no TITLE block and the render stays on the normal cover model.
+// `modeOverride` lets a Test Lab arm force either side regardless of environment.
+//   coverType: 'front' | 'frontCover' | 'back' | 'backCover' | 'initialPage'
+//   → { mode, isFront, baked, bakeTitle, bakedModel }
+// ---------------------------------------------------------------------------
+function resolveCoverTitleMode(coverType, storyTitle, { modeOverride = null } = {}) {
+  const { runtime } = require('../config/runtime');
+  const mode = modeOverride || runtime('coverTitleMode');
+  const isFront = coverType === 'front' || coverType === 'frontCover';
+  const bakeTitle = (mode === 'baked' && isFront) ? String(storyTitle || '').trim() : '';
+  const baked = bakeTitle.length > 0;
+  return {
+    mode,
+    isFront,
+    baked,
+    bakeTitle,
+    bakedModel: baked ? runtime('coverTitleBakedModel') : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // colour helpers (verbatim from prototype)
 // ---------------------------------------------------------------------------
 function hash(str, salt) { let h = 2166136261 ^ salt; str = String(str); for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -567,15 +605,23 @@ async function applyCoverTypography(coverImages, { title, dedication, seed, tria
 // render, and keeps the textless original in ${key}Art so a later title/
 // dedication edit re-composites with no AI call. Idempotent: skips a cover whose
 // ${key}Art row already exists.
+//
+// skipKeys: cover keys this pass must LEAVE ALONE. A baked-title front cover
+// (resolveCoverTitleMode → baked) already carries its title in the pixels, so
+// stamping it here would print a second one; the pipeline passes
+// ['frontCover'] in that mode while the initial page and back cover keep their
+// app-side dedication / branding.
 // ---------------------------------------------------------------------------
-async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedication, seed, trial = false } = {}) {
+async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedication, seed, trial = false, skipKeys = [] } = {}) {
   const { log } = require('../utils/logger');
   const r2 = require('./r2');
   const { saveStoryImage, dbQuery } = require('../services/database');
   const meta = ((await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [storyId]))[0]?.image_version_meta) || {};
   const ded = trial ? '' : (dedication || '');
+  const skip = new Set(skipKeys || []);
   for (const [key, kind] of [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']]) {
     try {
+      if (skip.has(key)) { log.info(`🅰️ [COVER TYPO POST] ${key}: SKIPPED — title is baked into the render`); continue; }
       const already = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyId, `${key}Art`]);
       if (already.length) { log.debug(`[COVER TYPO POST] ${key}: already baked — skip`); continue; }
       const activeIdx = meta[key]?.activeVersion ?? 0;
@@ -933,6 +979,7 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
 
 module.exports = {
   composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
+  resolveCoverTitleMode,
   restampCover, restampServedCover, paintServedCoverTitle, sanitizeTitleStyle, sanitizeDedicationStyle,
   TITLE_LAYOUTS, TITLE_FONT_IDS: Object.keys(FONTS), DEDICATION_FONTS: WFONTS.map(f => f.family),
   // exported for the standalone verify CLI / tests
