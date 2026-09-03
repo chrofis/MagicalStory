@@ -114,13 +114,86 @@ router.post('/health/release-memory', authenticateToken, requireAdmin, async (re
 // returning them to the OS — that retention is why RSS used to climb to a peak
 // and stay there until a redeploy. If rss stays high while heapUsed and
 // external have fallen back, the allocator is holding freed pages, not the app.
+// Read the container's OWN memory accounting — the number Railway bills.
+//
+// WHY THIS EXISTS. On 2026-09-03 production was billed 2.74-2.93 GB while the
+// two processes in the container held 567 MB between them (Node RSS 447 with a
+// 70 MB heap, analyzer 119 with no models loaded). Everything the app could
+// plausibly be holding was ruled out — heap cap in force, no models, and every
+// grid/thumbnail disk write is behind `saveGrids: false`. The missing ~2.3 GB
+// is not visible to `process.memoryUsage()` by construction.
+//
+// The cgroup is the only thing that can say what it is. `file` (v2) / `cache`
+// (v1) is the OS page cache: every file the container reads or writes stays
+// resident, the cgroup counts it as used memory, and Linux evicts it only under
+// pressure — so it accumulates for the life of the container. That is the same
+// accounting that made a 1,818 MB database look like a 2.14 GB Postgres
+// container. If `file` is the bulk, the fix is about file I/O and restarts, not
+// about the app's working set; if `anon` is the bulk, something really is
+// holding memory and the process numbers above are lying.
+//
+// Both cgroup versions are handled: v2 exposes memory.current + memory.stat
+// with `anon`/`file` keys, v1 exposes memory.usage_in_bytes + memory.stat with
+// `rss`/`cache`. Absent or unreadable (macOS, Windows, some sandboxes) returns
+// a reason rather than throwing — this is a diagnostic, it must never take the
+// endpoint down.
+function readCgroupMemory() {
+  const fsSync = require('fs');
+  const mb = (n) => Math.round(n / 1024 / 1024 * 10) / 10;
+  const readNum = (p) => {
+    const raw = fsSync.readFileSync(p, 'utf8').trim();
+    return raw === 'max' ? null : Number(raw);
+  };
+  const parseStat = (p) => {
+    const out = {};
+    for (const line of fsSync.readFileSync(p, 'utf8').split('\n')) {
+      const [k, v] = line.split(/\s+/);
+      if (k && v !== undefined) out[k] = Number(v);
+    }
+    return out;
+  };
+
+  try {
+    if (fsSync.existsSync('/sys/fs/cgroup/memory.current')) {
+      const stat = parseStat('/sys/fs/cgroup/memory.stat');
+      return {
+        version: 'v2',
+        usage_mb: mb(readNum('/sys/fs/cgroup/memory.current')),
+        limit_mb: (() => { const l = readNum('/sys/fs/cgroup/memory.max'); return l === null ? 'max' : mb(l); })(),
+        anon_mb: mb(stat.anon || 0),          // process memory
+        file_mb: mb(stat.file || 0),          // page cache — the suspect
+        slab_mb: mb(stat.slab || 0),          // kernel structures (inodes/dentries)
+        file_mapped_mb: mb(stat.file_mapped || 0),
+        file_dirty_mb: mb(stat.file_dirty || 0),
+        file_writeback_mb: mb(stat.file_writeback || 0),
+      };
+    }
+    if (fsSync.existsSync('/sys/fs/cgroup/memory/memory.usage_in_bytes')) {
+      const stat = parseStat('/sys/fs/cgroup/memory/memory.stat');
+      return {
+        version: 'v1',
+        usage_mb: mb(readNum('/sys/fs/cgroup/memory/memory.usage_in_bytes')),
+        limit_mb: mb(readNum('/sys/fs/cgroup/memory/memory.limit_in_bytes')),
+        anon_mb: mb(stat.rss || 0),
+        file_mb: mb(stat.cache || 0),
+        file_mapped_mb: mb(stat.mapped_file || 0),
+      };
+    }
+    return { error: 'no cgroup memory interface found' };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
 router.get('/health/memory', async (req, res) => {
   const m = process.memoryUsage();
   const mb = (n) => Math.round(n / 1024 / 1024 * 10) / 10;
 
   // The Python analyzer is a separate process in the same container, so it is
   // billed with us but invisible to process.memoryUsage(). Fetch it so the two
-  // add up to what Railway charges for. Never fail the endpoint over it.
+  // can be compared with what Railway charges for. They do NOT add up to it —
+  // see the `cgroup` block below, which is the number Railway actually bills.
+  // Never fail the endpoint over it.
   let python = null;
   try {
     const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
@@ -154,7 +227,11 @@ router.get('/health/memory', async (req, res) => {
       mallocArenaMax: process.env.MALLOC_ARENA_MAX || '(unset)',
       railwayEnv: process.env.RAILWAY_ENVIRONMENT_NAME || '(unset)',
     },
-    container_total_mb: python && python.rss_mb ? Math.round(mb(m.rss) + python.rss_mb) : null,
+    // Renamed from container_total_mb: it is the sum of the two PROCESSES, and
+    // measurement on 2026-09-03 showed that is not the container total at all
+    // (567 MB of processes against 2.9 GB billed). `cgroup` below is.
+    process_total_mb: python && python.rss_mb ? Math.round(mb(m.rss) + python.rss_mb) : null,
+    cgroup: readCgroupMemory(),
   });
 });
 
