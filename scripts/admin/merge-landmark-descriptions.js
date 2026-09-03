@@ -89,6 +89,10 @@ function planCompaction(row, discardSlots, kept) {
 // Returns a reason string when the entry is malformed, else null.
 function validate(v) {
   if (!v || typeof v !== 'object') return 'not an object';
+  if (v.discard !== null && v.discard !== undefined) {
+    // A discarded photo is removed, never described: only the reason has to be sound.
+    return typeof v.discard === 'string' && v.discard.trim().length >= 3 ? null : 'discard must be a non-empty reason';
+  }
   for (const [k, allowed] of Object.entries(ENUMS)) {
     if (!allowed.includes(v[k])) return `${k}=${JSON.stringify(v[k])} not in ${allowed.join('|')}`;
   }
