@@ -11,6 +11,7 @@ const { getPool } = require('../services/database');
 const { callAnthropicAPI } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2 = require('./r2');
+const { servedPhotoUrl } = require('./landmarkPhotoStore');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -3525,12 +3526,12 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
     // Query all photo descriptions for these landmarks (6 variants)
     const result = await pool.query(`
       SELECT id, name,
-        photo_url, photo_description, photo_attribution, photo_type,
-        photo_url_2, photo_description_2, photo_attribution_2, photo_type_2,
-        photo_url_3, photo_description_3, photo_attribution_3, photo_type_3,
-        photo_url_4, photo_description_4, photo_attribution_4, photo_type_4,
-        photo_url_5, photo_description_5, photo_attribution_5, photo_type_5,
-        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6
+        photo_url, photo_description, photo_attribution, photo_type, photo_r2_url,
+        photo_url_2, photo_description_2, photo_attribution_2, photo_type_2, photo_r2_url_2,
+        photo_url_3, photo_description_3, photo_attribution_3, photo_type_3, photo_r2_url_3,
+        photo_url_4, photo_description_4, photo_attribution_4, photo_type_4, photo_r2_url_4,
+        photo_url_5, photo_description_5, photo_attribution_5, photo_type_5, photo_r2_url_5,
+        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6, photo_r2_url_6
       FROM landmark_index
       WHERE id = ANY($1)
     `, [ids]);
@@ -3541,13 +3542,16 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
       const variants = [];
 
       // Add variants 1-6 if they exist
+      // `url` is what the pipeline fetches (our R2 copy when stored, else the
+      // Commons source — servedPhotoUrl is the one chokepoint for that choice);
+      // `sourceUrl` keeps the Commons provenance beside it.
       const variantConfigs = [
-        { num: 1, url: row.photo_url, desc: row.photo_description, attr: row.photo_attribution, kind: row.photo_type },
-        { num: 2, url: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2, kind: row.photo_type_2 },
-        { num: 3, url: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3, kind: row.photo_type_3 },
-        { num: 4, url: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4, kind: row.photo_type_4 },
-        { num: 5, url: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5, kind: row.photo_type_5 },
-        { num: 6, url: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6, kind: row.photo_type_6 }
+        { num: 1, url: servedPhotoUrl(row, 1), sourceUrl: row.photo_url, desc: row.photo_description, attr: row.photo_attribution, kind: row.photo_type },
+        { num: 2, url: servedPhotoUrl(row, 2), sourceUrl: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2, kind: row.photo_type_2 },
+        { num: 3, url: servedPhotoUrl(row, 3), sourceUrl: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3, kind: row.photo_type_3 },
+        { num: 4, url: servedPhotoUrl(row, 4), sourceUrl: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4, kind: row.photo_type_4 },
+        { num: 5, url: servedPhotoUrl(row, 5), sourceUrl: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5, kind: row.photo_type_5 },
+        { num: 6, url: servedPhotoUrl(row, 6), sourceUrl: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6, kind: row.photo_type_6 }
       ];
 
       for (const cfg of variantConfigs) {
@@ -3564,6 +3568,7 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
             kind,
             vantage: kind === 'interior' ? 'interior' : 'exterior',
             url: cfg.url,
+            sourceUrl: cfg.sourceUrl,
             description: cfg.desc || null,
             attribution: cfg.attr || null
           });
@@ -3802,7 +3807,8 @@ function servedLandmark(l, judged) {
       variantNumber: f.slot,
       vantage: f.framing,
       photoScore: f.photoScore,
-      url: col('photo_url', f.slot),
+      url: servedPhotoUrl(l, f.slot),
+      sourceUrl: col('photo_url', f.slot),
       description: col('photo_description', f.slot),
       attribution: col('photo_attribution', f.slot),
     }))
@@ -3813,7 +3819,8 @@ function servedLandmark(l, judged) {
         // photo_type is recorded per slot; the old v>=4 rule was a guess
         // about how the indexer filled the columns, not the stored fact.
         vantage: col('photo_type', v) || (v >= 4 ? 'interior' : 'exterior'),
-        url: col('photo_url', v),
+        url: servedPhotoUrl(l, v),
+        sourceUrl: col('photo_url', v),
         description: col('photo_description', v),
         attribution: col('photo_attribution', v),
       }));
@@ -3824,7 +3831,10 @@ function servedLandmark(l, judged) {
     score: l.score,
     lat: parseFloat(l.latitude),
     lon: parseFloat(l.longitude),
-    photoUrl: at('photo_url') || l.photo_url,
+    // photoUrl is what gets FETCHED (R2 copy when stored, else Commons);
+    // photoSourceUrl is the Commons provenance for the same slot.
+    photoUrl: servedPhotoUrl(l, served) || servedPhotoUrl(l, 1),
+    photoSourceUrl: at('photo_url') || l.photo_url,
     photoDescription: at('photo_description'),
     attribution: at('photo_attribution'),
     photoType: at('photo_type'),

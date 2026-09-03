@@ -24,14 +24,14 @@ not drawn, so it always ranks below one that has a picture.
 
 ## 2. Tables
 
-### `landmark_index` — 53 columns
+### `landmark_index` — 59 columns
 
 | Group | Columns | Notes |
 |---|---|---|
 | Identity | `id`, `name`, `wikipedia_page_id`, `wikidata_qid`, `lang` | `wikidata_qid` is UNIQUE and is the upsert key |
 | Place | `latitude`, `longitude`, `nearest_city`, `municipality`, `locality`, `country`, `region` | three-level model, §3 |
 | Classification | `type`, `categories[]`, `boost_amount`, `score` | `boost_amount`/`score` are legacy, superseded by §5 |
-| Photos ×6 | `photo_url[_2..6]`, `photo_attribution[_2..6]`, `photo_description[_2..6]`, `photo_type[_2..6]` | slot 1 has no suffix |
+| Photos ×6 | `photo_url[_2..6]`, `photo_attribution[_2..6]`, `photo_description[_2..6]`, `photo_type[_2..6]`, `photo_r2_url[_2..6]` | slot 1 has no suffix; `photo_url` = Commons source (provenance), `photo_r2_url` = our R2 copy (what is fetched), §11 Photo storage |
 | Photo meta | `photo_source`, `commons_photo_count` | |
 | Text | `wikipedia_extract` | fed to the writer as DESCRIPTION |
 | Fame | `fame_sitelinks`, `fame_pageviews`, `fame_updated_at` | migration 025 |
@@ -46,7 +46,7 @@ not drawn, so it always ranks below one that has a picture.
 Migrations: `020_landmark_photo_type`, `025_landmark_fame`,
 `028_landmark_municipality`, `029_landmark_story_score`,
 `031_landmark_photo_scores`, `032_landmark_locality`,
-`033_landmark_photo_framing`. **Schema changes go in a new `migrations/*.sql`
+`033_landmark_photo_framing`, `035_landmark_photo_r2`. **Schema changes go in a new `migrations/*.sql`
 only** — the DDL in `database.js` never runs.
 
 ---
@@ -292,6 +292,36 @@ photo, and that landmark's kept descriptions land at their post-compaction slot
 prints the resulting per-slot layout per landmark. Run on prod 2026-09-02: 82
 descriptions, 19 slots cleared across 13 landmarks)
 
+**Photo storage (R2, migration 035).** `photo_url[_N]` is a Wikimedia Commons
+URL — 19,377 of them on prod, nothing stored locally — and Commons throttles
+sustained pulls, so every story that drew a landmark fetched its reference
+plate from a third party at generation time. `photo_r2_url[_N]` holds our own
+copy (~1280px wide, JPEG q85, ~5 GB total) on the shared R2 bucket. The Commons
+URL stays as provenance (attribution is a licence condition tied to it) and is
+never overwritten. `server/lib/landmarkPhotoStore.js`:
+- `servedPhotoUrl(row, slot)` — THE chokepoint readers use: R2 copy when set,
+  else Commons. `servedLandmark` and `loadLandmarkPhotoDescriptions` hand the
+  story `url`/`photoUrl` from it (with `sourceUrl`/`photoSourceUrl` beside it),
+  so `loadLandmarkPhotoVariant`, the lazy on-demand fetch, the plate resolver
+  and covers all follow without knowing about R2.
+- `storeLandmarkPhoto(db, id, slot, sourceUrl, {currentR2Url, bytes})` — fetch
+  at 1280px (`Special:FilePath?width=`, 429 backoff via `r2.fetchImageBytes`),
+  normalise with sharp, upload, write the column. Idempotent (skips when the
+  column's object exists); the UPDATE is guarded on the slot still holding
+  `sourceUrl`, so a slot compacted mid-flight is left alone.
+- **Key = `landmarks/index/<id>/<sha1(sourceUrl)[:12]>.jpg`** — derived from the
+  landmark and the source, NOT the slot number. Slot compaction
+  (`merge-landmark-descriptions.js --apply-discards`) moves `photo_r2_url` with
+  the other four columns and never re-keys an object; a discarded slot's
+  object is deleted after the transaction commits (`deleteStoredPhotos`).
+- Writers: `prep-landmark-descriptions.js` stores each slot as it downloads
+  the agent thumbnail (one Commons fetch: 1280px → R2, then 640px for the
+  agent; `--no-r2` skips) and `backfill-landmark-photos-to-r2.js` (all slots
+  with a source and no copy, ~2 s apart, resumable, `--limit --ids --staging
+  --dry-run`, exit 1 if any failed; ~11 h for the full prod set).
+  `sync-landmark-index-to-staging.js` copies the columns (one bucket, so the
+  URLs are valid on staging).
+
 **Judging**
 `prep-landmark-judging.js` → agents → `merge-landmark-judgments.js` ·
 `score-landmarks-for-stories.js` · `landmark-rankings.js`
@@ -364,3 +394,4 @@ search for `landmark`. The load-bearing ones:
 - 2026-08-28 — every photo judged by looking at it; two scores, a framing, a 40 cutoff
 - 2026-08-28 — a landmark answers to BOTH its village and its municipality
 - 2026-08-29 — a failed photo analysis is not a verdict about the place
+- 2026-09-03 — landmark photos are stored on R2; Commons URL kept as provenance

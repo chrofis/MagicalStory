@@ -25056,3 +25056,61 @@ answers and asserts the merge, the repair and the lector all still run.
 audit `MAX_OUT`), `tests/unit/text-lector.test.ts`.
 
 **Status:** ✅ active — the chain has run live once, on staging.
+
+## 2026-09-03 — Landmark reference photos are stored on R2; the Commons URL stays as provenance
+
+**Context:** `landmark_index.photo_url[_2..6]` were 19,377 Wikimedia Commons
+URLs and nothing else — every story that drew a landmark fetched its reference
+plate from Commons at generation time, and Commons throttles sustained pulls
+(a 429 leaves the illustrator with no plate). The repo rule is images on R2,
+never inline; the landmark table was the one image source still pointing at a
+third party.
+
+**Decision:** Migration `035_landmark_photo_r2` adds `photo_r2_url[_2..6]`.
+`server/lib/landmarkPhotoStore.js` owns the store: `storeLandmarkPhoto` fetches
+the Commons file at ~1280px, normalises to JPEG, uploads, and writes the column
+(idempotent; UPDATE guarded on the slot still holding the source URL);
+`servedPhotoUrl(row, slot)` is the single reader chokepoint — R2 copy when set,
+else Commons — applied where index rows become the story's landmark shape
+(`servedLandmark`, `loadLandmarkPhotoDescriptions`), so every downstream fetch
+(`loadLandmarkPhotoVariant`, the lazy on-demand fetch, the plate resolver,
+covers) follows without a second copy of the rule. The Commons URL is never
+overwritten (attribution is a licence condition tied to that source); the
+served shape carries `sourceUrl` / `photoSourceUrl` beside `url` / `photoUrl`.
+**R2 keys are content-stable** — `landmarks/index/<id>/<sha1(sourceUrl)[:12]>.jpg`,
+derived from the landmark and the source, not the slot: slot compaction in
+`merge-landmark-descriptions.js` moves the column with its slot and never
+re-keys an object; a discarded slot's object is deleted after the transaction
+commits. Writers: `prep-landmark-descriptions.js` stores each slot as it
+downloads the agent thumbnail (one Commons fetch serves both; `--no-r2` skips),
+and `scripts/admin/backfill-landmark-photos-to-r2.js` fills the rest at ~2 s
+spacing, resumable.
+
+**Rationale:** A slot-numbered key (`<id>/<slot>.jpg`) was the obvious shape but
+compaction would then have to copy+delete every surviving object on each
+shift, inside or around a DB transaction; a source-hashed key makes the column
+the only thing that moves. One reader chokepoint instead of patching five
+fetch sites: the served landmark shape is where index rows become story data,
+and every fetch already reads `url` from it. Storing at 1280px keeps the set at
+~5 GB while exceeding what the image models are given (compressed to 800px).
+Commons is not dropped from the readers — a row without a copy still works —
+so the backfill can run over ~11 h with nothing waiting on it.
+
+**Verified:** migration applied and `information_schema` checked on staging and
+prod (prod also had 034 pending; applied). `--limit=3` proof on prod:
+landmark 2710 slots 1-3 stored, all three public URLs HTTP 200 `image/jpeg`
+(402/338/255 KB), columns set, source URLs untouched, a re-run selects 0 slots
+for that landmark. `tests/unit/landmark-photo-store.test.ts` (10 tests) plus
+the three existing landmark suites: 29 passed.
+
+**Touched:** `migrations/035_landmark_photo_r2.sql`, `server/lib/r2.js`
+(`keyForLandmarkIndexPhoto`, `keyFromPublicUrl`, `objectExists`,
+`deleteObject`), `server/lib/landmarkPhotoStore.js` (new),
+`server/lib/landmarkPhotos.js` (`servedLandmark`,
+`loadLandmarkPhotoDescriptions`), `scripts/admin/prep-landmark-descriptions.js`,
+`scripts/admin/merge-landmark-descriptions.js`,
+`scripts/admin/backfill-landmark-photos-to-r2.js` (new),
+`scripts/admin/sync-landmark-index-to-staging.js`,
+`tests/unit/landmark-photo-store.test.ts`, `docs/landmark-database.md`.
+
+**Status:** ✅ active — backfill to completion is a BACKLOG item.

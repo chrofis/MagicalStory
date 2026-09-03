@@ -22,7 +22,8 @@
  * env vars land.
  */
 
-const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand, HeadObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const crypto = require('crypto');
 const { log } = require('../utils/logger');
 
 /**
@@ -106,6 +107,25 @@ function keyForCharacterPhoto(storyId, characterId, slot) {
 // distinct from the per-story snapshot above).
 function keyForUserCharacterPhoto(userId, characterId, slot) {
   return `characters/${userId}/${characterId}/photos/${slot}.jpg`;
+}
+
+// landmark_index reference photos (our copy of a Commons file). The key is
+// derived from the landmark id and the SOURCE URL, not the slot number: slots
+// compact when a photo is discarded (merge-landmark-descriptions.js), and a
+// slot-numbered key would have to be re-keyed on every shift. A content-stable
+// key moves with its column for free and only needs a delete on discard.
+function keyForLandmarkIndexPhoto(landmarkId, sourceUrl) {
+  const id = String(landmarkId).replace(/[^0-9a-zA-Z_-]/g, '_');
+  const hash = crypto.createHash('sha1').update(String(sourceUrl || '')).digest('hex').slice(0, 12);
+  return `landmarks/index/${id}/${hash}.jpg`;
+}
+
+// Inverse of publicUrlForKey: the object key behind one of OUR public URLs,
+// or null when the URL is not on this bucket.
+function keyFromPublicUrl(url) {
+  if (!url || !process.env.R2_PUBLIC_URL) return null;
+  const base = process.env.R2_PUBLIC_URL.replace(/\/$/, '') + '/';
+  return String(url).startsWith(base) ? String(url).slice(base.length) : null;
 }
 
 function keyForHistoricalLocationPhoto(rowId, slug) {
@@ -318,6 +338,31 @@ async function bytesFromAnyImage(value) {
   }
 }
 
+/** True when an object exists at `key` (HEAD). False when missing or not configured. */
+async function objectExists(key) {
+  if (!isConfigured() || !key) return false;
+  try {
+    await getClient().send(new HeadObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }));
+    return true;
+  } catch (err) {
+    if (err?.$metadata?.httpStatusCode === 404 || err?.name === 'NotFound') return false;
+    log.warn(`[R2] objectExists(${key}) failed: ${err.message}`);
+    return false;
+  }
+}
+
+/** Delete one object. Idempotent; returns true on success (or already absent). */
+async function deleteObject(key) {
+  if (!isConfigured() || !key) return false;
+  try {
+    await getClient().send(new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }));
+    return true;
+  } catch (err) {
+    log.warn(`[R2] deleteObject(${key}) failed: ${err.message}`);
+    return false;
+  }
+}
+
 /**
  * Delete every object under a given key prefix. Used by story-delete paths
  * to prune all R2 artefacts for a story (active scenes/covers, debug refs,
@@ -430,7 +475,11 @@ module.exports = {
   bytesFromAnyImage,
   deleteByPrefix,
   deleteStoryArtefacts,
+  objectExists,
+  deleteObject,
   publicUrlForKey,
+  keyFromPublicUrl,
+  keyForLandmarkIndexPhoto,
   keyForStoryImage,
   keyForRetryImage,
   keyForStyleLabImage,

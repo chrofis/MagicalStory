@@ -34,6 +34,10 @@ Last full sweep: **2026-08-20**.
 
 ## In flight
 
+- [ ] Run the landmark-photo R2 backfill to completion on prod — ~19,374 slots at 2 s ≈ 11 h in the
+      background: `node scripts/admin/backfill-landmark-photos-to-r2.js` (resumable; re-run until
+      "0 slot(s) still without an R2 copy"), then sync to staging → `docs/landmark-database.md` §11 Photo storage
+
 - [ ] Analyzer worker architecture — session-scoped worker processes, recyclers deleted;
       staging verification pending (photo upload, 4-page smoke, Lab experiment, RSS ~53MB idle)
       → `tasks/analyzer-workers-2026-08-23.md`

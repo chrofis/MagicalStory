@@ -46,6 +46,8 @@ const COLUMNS = [
   'photo_url_5', 'photo_attribution_5', 'photo_description_5',
   'photo_url_6', 'photo_attribution_6', 'photo_description_6',
   'photo_type', 'photo_type_2', 'photo_type_3', 'photo_type_4', 'photo_type_5', 'photo_type_6',
+  // Our R2 copies (migration 035) — one shared bucket, so the URLs are valid on staging too.
+  'photo_r2_url', 'photo_r2_url_2', 'photo_r2_url_3', 'photo_r2_url_4', 'photo_r2_url_5', 'photo_r2_url_6',
   'fame_sitelinks', 'fame_pageviews', 'fame_updated_at',
   // Enrichment lives on prod and must travel with the row, or staging silently
   // ranks on the old signals while prod ranks on the new ones.

@@ -19,9 +19,13 @@
  *
  * --apply-discards REMOVES THE PHOTO: every discarded slot is dropped from the
  * landmark and the later slots shift down so slots stay contiguous (slot 1 is
- * the unsuffixed column). All four per-slot columns move together —
- * photo_url, photo_attribution, photo_description, photo_type — because the
- * attribution is a licence condition tied to THAT picture. landmark_photo_scores
+ * the unsuffixed column). All five per-slot columns move together —
+ * photo_url, photo_attribution, photo_description, photo_type, photo_r2_url —
+ * because the attribution is a licence condition tied to THAT picture. The R2
+ * object of a discarded slot is deleted AFTER the transaction commits; R2 keys
+ * are content-stable (landmarks/index/<id>/<hash-of-source>.jpg, see
+ * landmarkPhotoStore.js), so a surviving photo's object never needs re-keying
+ * when its slot number changes. landmark_photo_scores
  * rows are keyed (landmark_id, slot), so the discarded slot's row is deleted and
  * the surviving rows are re-numbered with their photo. The whole landmark is
  * rewritten in ONE transaction (row locked FOR UPDATE, current slots read from
@@ -43,6 +47,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const { Pool } = require('pg');
 const fs = require('fs');
 const { ch } = require('../lib/chTime');
+const { deleteStoredPhotos } = require('../../server/lib/landmarkPhotoStore');
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
@@ -64,7 +69,7 @@ const ENUMS = {
 };
 
 const SLOTS = [1, 2, 3, 4, 5, 6];
-const SLOT_FIELDS = ['photo_url', 'photo_attribution', 'photo_description', 'photo_type'];
+const SLOT_FIELDS = ['photo_url', 'photo_attribution', 'photo_description', 'photo_type', 'photo_r2_url'];
 const colName = (field, slot) => (slot === 1 ? field : `${field}_${slot}`);
 
 // Compaction plan for one landmark. `row` is the live landmark_index row,
@@ -206,7 +211,7 @@ function validate(v) {
     return;
   }
 
-  let written = 0, failed = 0, compacted = 0, cleared = 0;
+  let written = 0, failed = 0, compacted = 0, cleared = 0, r2Deleted = 0;
 
   // Plain path: landmarks without a discard get one UPDATE per description.
   for (const v of Object.values(merged)) {
@@ -248,10 +253,14 @@ function validate(v) {
           `INSERT INTO landmark_photo_scores (landmark_id, slot, draw_score, photo_score, reason, judged_at, framing) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [id, ns, sr.draw_score, sr.photo_score, sr.reason, sr.judged_at, sr.framing]);
       }
+      // R2 objects of the discarded slots, read from the locked row BEFORE the
+      // UPDATE overwrote the columns; deleted only once the commit is in.
+      const droppedR2 = plan.filled.filter(s => ds.has(s)).map(s => liveRows[id][colName('photo_r2_url', s)]).filter(Boolean);
       await client.query('COMMIT');
       compacted++;
       cleared += plan.filled.filter(s => ds.has(s)).length;
       written += Object.keys(kept).filter(o => plan.newSlotOf[Number(o)]).length;
+      r2Deleted += await deleteStoredPhotos(droppedR2);
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
       failed += Object.keys(kept).length;
@@ -262,7 +271,7 @@ function validate(v) {
   }
 
   console.log(`\n${ch(new Date())}  ${written} description(s) written, ${failed} failed, ${Object.keys(discards).length} discarded (discards.json)` +
-    (APPLY_DISCARDS ? `, ${cleared} slot(s) cleared across ${compacted} compacted landmark(s)` : '') + `, ${missing.length} still missing.`);
+    (APPLY_DISCARDS ? `, ${cleared} slot(s) cleared across ${compacted} compacted landmark(s), ${r2Deleted} R2 object(s) deleted` : '') + `, ${missing.length} still missing.`);
   await pool.end();
   if (failed) process.exit(1);
 })().catch(e => { console.error('ERR:', e.message); process.exit(1); });

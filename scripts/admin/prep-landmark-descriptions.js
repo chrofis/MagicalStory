@@ -25,8 +25,14 @@
  * it is really the named subject, and duplicates across slots). The exact brief
  * is printed by --brief. merge-landmark-descriptions.js applies it.
  *
+ * R2: the same download also becomes our own copy of the photo — one Commons
+ * fetch at 1280px is stored on R2 (landmarkPhotoStore.storeLandmarkPhoto, which
+ * writes photo_r2_url_<slot> immediately) and then shrunk to the 640px agent
+ * thumbnail. --no-r2 skips the store (thumbnail straight from Commons). A slot
+ * whose R2 copy already exists is not fetched from Commons again for the store.
+ *
  *   node scripts/admin/prep-landmark-descriptions.js [--limit=N landmarks] [--staging] [--dry-run]
- *        [--ids=a,b,c] [--out=DIR] [--delay=MS] [--brief]
+ *        [--ids=a,b,c] [--out=DIR] [--delay=MS] [--brief] [--no-r2]
  */
 'use strict';
 
@@ -35,10 +41,12 @@ require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const { Pool } = require('pg');
 const fs = require('fs');
 const { ch } = require('../lib/chTime');
+const { storeLandmarkPhoto, commonsThumbUrl } = require('../../server/lib/landmarkPhotoStore');
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const STAGING = args.includes('--staging');
+const NO_R2 = args.includes('--no-r2');
 const flag = name => { const a = args.find(x => x.startsWith(`--${name}=`)); return a ? a.split('=').slice(1).join('=') : null; };
 const LIMIT = flag('limit') ? parseInt(flag('limit'), 10) : null;
 const IDS = flag('ids') ? flag('ids').split(',').map(s => parseInt(s, 10)).filter(Number.isFinite) : null;
@@ -82,13 +90,8 @@ function cutBatches(entries) {
   return batches;
 }
 
-// Width-limited Commons rendering — photo_url can be a 100 MB master (see
-// prep-landmark-judging.js thumbUrl).
-function thumbUrl(url, width = 900) {
-  const m = /\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?]+)/.exec(url || '');
-  if (!m) return url;
-  return `https://commons.wikimedia.org/wiki/Special:FilePath/${m[1]}?width=${width}`;
-}
+// Width-limited Commons rendering — photo_url can be a 100 MB master.
+const thumbUrl = url => commonsThumbUrl(url, 900);
 
 (async () => {
   if (args.includes('--brief')) { console.log(BRIEF); return; }
@@ -102,14 +105,15 @@ function thumbUrl(url, width = 900) {
   // of a landmark's photos for duplicate detection).
   const rows = (await pool.query(`
     WITH slots AS (
-      SELECT id, name, type, coalesce(locality, municipality, nearest_city) town, story_score, s.slot, s.url
+      SELECT id, name, type, coalesce(locality, municipality, nearest_city) town, story_score, s.slot, s.url, s.r2_url
         FROM landmark_index
         CROSS JOIN LATERAL unnest(
           ARRAY[1,2,3,4,5,6],
           ARRAY[photo_url, photo_url_2, photo_url_3, photo_url_4, photo_url_5, photo_url_6],
           ARRAY[photo_description, photo_description_2, photo_description_3,
-                photo_description_4, photo_description_5, photo_description_6]
-        ) AS s(slot, url, description)
+                photo_description_4, photo_description_5, photo_description_6],
+          ARRAY[photo_r2_url, photo_r2_url_2, photo_r2_url_3, photo_r2_url_4, photo_r2_url_5, photo_r2_url_6]
+        ) AS s(slot, url, description, r2_url)
        WHERE s.url IS NOT NULL AND s.description IS NULL
          ${IDS ? 'AND id = ANY($1)' : ''}
     ),
@@ -119,7 +123,7 @@ function thumbUrl(url, width = 900) {
       SELECT id, max(story_score) story_score FROM slots GROUP BY id
        ORDER BY max(story_score) DESC NULLS LAST, id${LIMIT ? ` LIMIT ${LIMIT}` : ''}
     )
-    SELECT s.id, s.name, s.type, s.town, s.slot, s.url
+    SELECT s.id, s.name, s.type, s.town, s.slot, s.url, s.r2_url
       FROM slots s JOIN picked p USING (id)
      ORDER BY p.story_score DESC NULLS LAST, s.id, s.slot`, IDS ? [IDS] : [])).rows;
 
@@ -139,7 +143,7 @@ function thumbUrl(url, width = 900) {
   fs.mkdirSync(OUT, { recursive: true });
   const sharp = require('sharp');
   const manifest = [];
-  let ok = 0, failed = 0;
+  let ok = 0, failed = 0, stored = 0;
   for (const [i, l] of rows.entries()) {
     const file = `${l.id}_${l.slot}.jpg`;
     const dest = path.join(OUT, file);
@@ -150,12 +154,24 @@ function thumbUrl(url, width = 900) {
       continue;
     }
     try {
-      const r = await fetch(thumbUrl(l.url), {
-        headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch) landmark-QA' },
-        signal: AbortSignal.timeout(25000),
-      });
-      if (!r.ok) throw new Error(String(r.status));
-      const buf = Buffer.from(await r.arrayBuffer());
+      let buf = null;
+      if (!NO_R2) {
+        // One Commons fetch serves both: the 1280px copy goes to R2 and
+        // photo_r2_url_<slot> is written now; the thumbnail is cut from it.
+        // An already-stored slot is skipped (bytes null) and falls through to
+        // the plain thumbnail fetch below.
+        const st = await storeLandmarkPhoto(pool, l.id, l.slot, l.url, { currentR2Url: l.r2_url });
+        if (!st.skipped) stored++;
+        buf = st.bytes;
+      }
+      if (!buf) {
+        const r = await fetch(thumbUrl(l.url), {
+          headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch) landmark-QA' },
+          signal: AbortSignal.timeout(25000),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        buf = Buffer.from(await r.arrayBuffer());
+      }
       await sharp(buf).resize(640, 640, { fit: 'inside' }).jpeg({ quality: 75 }).toFile(dest);
       manifest.push(entry); ok++;
     } catch (e) {
@@ -180,7 +196,7 @@ function thumbUrl(url, width = 900) {
     })), null, 1));
   }
 
-  console.log(`\n${ch(new Date())}  ${ok} thumbnail(s) in ${Math.ceil(manifest.length / BATCH)} batch(es) of ${BATCH} -> ${OUT}; ${failed} download failure(s)`);
+  console.log(`\n${ch(new Date())}  ${ok} thumbnail(s) in ${Math.ceil(manifest.length / BATCH)} batch(es) of ${BATCH} -> ${OUT}; ${failed} download failure(s)` + (NO_R2 ? '' : `; ${stored} photo(s) newly stored on R2`));
   console.log('Next: agents describe each batch (see --brief), then node scripts/admin/merge-landmark-descriptions.js --dir=' + OUT + (STAGING ? ' --staging' : ''));
   await pool.end();
   if (failed) process.exit(1);
