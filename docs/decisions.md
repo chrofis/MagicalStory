@@ -22000,7 +22000,10 @@ portal) is returned through. Writer/refine/proofread: rhetorical set-pieces
 rationed to one use per book.
 **Touched:** `prompts/story-beats.txt`, `prompts/story-text-from-beats.txt`,
 `prompts/text-refine.txt`, `prompts/story-text-proofread.txt`.
-**Status:** ✅ active
+**Status:** 🗄 the set-piece RATION is superseded by "The lector … and the
+rhetorical-device menu is deleted (owner, 2026-09-03)" — the ration read as a
+menu and planted one of each device. The story-beats.txt structure rules stay
+✅ active.
 
 ## 2026-08-29 — An indexed town never triggers indexing again
 
@@ -24100,6 +24103,45 @@ magenta-extension padded.
 
 ---
 
+## Raising Grok's reference-slot budget from 3 to 5 was tried and rejected (measured)
+
+**Context:** xAI's docs (re-verified 2026-09-02, `docs.x.ai/developers/model-capabilities/images/multi-image-editing`)
+now state the edit endpoint accepts up to **5** source images, up from the 3
+verified 2026-08-30. `packReferences`'/`editWithGrok`'s 3-slot budget predates
+this and was never revisited. Owner asked to try it on a 4-character page to
+see whether an extra raw slot per character beats the current 2-per-slot
+bundling.
+
+**Decision:** Parametrized the cap (`maxSlots`/`maxRefs`, default 3, unchanged
+in production) so Test Lab can override it via `params.maxRefSlots`, then ran
+experiment 979 (stage `image`, story `job_1787777447720_ll5dyf4k8g` page 12,
+4 characters + a landmark + a prop): baseline (3 slots, current bundling) vs
+`maxRefSlots: 5` (each of the 4 characters gets its own slot). **Kept the
+production default at 3 — the 5-slot variant measured worse, not better.**
+
+**Rationale (the measurement):** baseline scored final -30 / semantic 70,
+5-slot scored final -210 / semantic 0. Visually the 5-slot render dropped 2 of
+4 characters entirely, lost the staged treasure chest and the
+fountain/statue, and produced a generic real-photo-style plaza (it even
+pulled in the giant chess set that is a real Lindenhof feature, apparently
+over-weighting the landmark reference once it had more room) instead of the
+staged interaction. The baseline kept all 4 characters and the props, despite
+its own placement issues (character on the chest instead of the stair-head).
+One page is not a statistically strong sample, but the failure mode (losing
+half the cast) is severe enough that this isn't worth pursuing further without
+a specific new reason to revisit.
+
+**Touched:** `server/lib/grok.js` (`editWithGrok` `maxRefs`, `packReferences`
+`maxSlots`, both default 3), `server/lib/images.js` (`generateImageOnly` /
+`_dispatchImageGeneration` thread `maxRefSlots` through), `server/lib/testlab.js`
+(image stage reads `params.maxRefSlots`). The knob stays in the code (harmless,
+off by default) since it's what made this measurement possible without a
+temporary patch.
+
+**Status:** ✅ active (production stays at 3 slots; the override knob exists for future Lab probes)
+
+---
+
 ## 2026-09-03 — The Visual Bible authoring contract states sex, earns its page ranges, and gives every named vessel its own entry
 
 **Context:** The capstone rerun `job_1788380714660_4p9mr11xszu` (staging, 16
@@ -24425,6 +24467,88 @@ cover, eval `textMode` gate, post-persist typography gate),
 
 **Status:** 🟡 conditional — live on staging only; promotion to production still
 needs owner-judged covers from real staging runs (unchanged from 2026-08-29).
+
+---
+
+### The lector: gemini-3.1-pro grammar pass runs LAST, and the rhetorical-device menu is deleted (owner, 2026-09-03)
+
+**Context.** Two faults in the same shipped book, `job_1788380714660_4p9mr11xszu`
+(16 pages, de-ch).
+
+*Grammar.* The proofread slot ran in PARALLEL with audit2, so it read the text
+BEFORE the corrective round rewrote it — the last thing to touch the prose was
+the refiner, and nothing read its output. Transitive «schwimmen» survived on p11
+twice and p15 once («Er schwamm die Leine zurück», «schwamm er es durch die
+Brandung», «Facundo schwamm die Leine») along with the Anglicism «war einen
+Moment lang traurig für sie». A 6-model A/B on that shipped text (scratchpad
+`piraterun4/lector-ab`: `run-ab.js`, `ground-truth.md`, `results.json`,
+`report.html`; one focused call per model, temperature 0) showed the slot was
+also mis-scoped and mis-modelled: **claude-sonnet on the old prompt caught 0/4
+core faults and produced 2 hallucinations** (claiming two distinct cast members
+were "the same person"; suggesting ß in a Swiss text), while **gemini-3.1-pro
+with a grammar-only prompt caught 4/4 core and 0 hard false positives.** The old
+prompt was a CLOSED defect list (article/gender, quote nesting, spelling,
+self-contradiction, non-words, repeats, dash, set-piece ration) and so excluded
+everything it did not name — verb government was not on it, which is exactly how
+«schwamm die Leine» survived three passes.
+
+*Rhetoric.* The 2026-08-29 "one use per book" ration (entry above) turned out to
+license the devices it meant to limit: the writer reads the list as a menu and
+plants one of each. p6 of the same book stacked three "first uses" — a paired
+negation, a coined saying and a one-sentence drama paragraph — and every one was
+within its ration.
+
+**Decision.**
+1. `prompts/story-text-proofread.txt` is rewritten as the LECTOR: final
+   proofreader of a `{LANGUAGE}` children's book, listing every objective
+   language fault (grammar, verb government, idiom, wrong word, typo, case,
+   article/gender, unclosed quote) as `PAGE <n>: '<quoted>' → '<corrected>'`,
+   open-ended, no style or story commentary. Scope and wording come from the
+   measured A/B artifact.
+2. `MODEL_DEFAULTS.textProofreadModel` = `gemini-3.1-pro` (was `claude-sonnet`),
+   env `TEXT_PROOFREAD_MODEL`, called at temperature 0.
+3. The pass MOVED. Chain is now audit → fix → audit2 → corrective fix → **lector
+   → apply**. The lector reads the FINAL text; its findings drive ONE targeted
+   application pass and nothing re-audits after it — the findings are quoted
+   spans with their replacements, so applying them is mechanical, not a judgment
+   that needs reviewing. The parallel-with-audit2 slot is REMOVED, not
+   duplicated: audit2 no longer merges proofread findings.
+4. The application pass gets its own narrow template
+   (`prompts/story-text-lector-apply.txt`), NOT `text-refine.txt`, and reuses
+   `parseRefinedText` + the page-merge machinery unchanged. Two code guards keep
+   it from becoming a second proofreader — the measured failure mode is the
+   refiner inventing 4 typos when asked to FIND faults: findings are
+   verbatim-checked against the page they name before they are sent
+   (`sanitizeLectorFindings`), and a page the findings never named is discarded
+   from the reply even if the applier rewrote it (`strayPages`).
+5. The rhetorical-device menu is DELETED and replaced by a ban at both sites:
+   "No rhetorical set-pieces: no paired negations, no coined sayings or
+   incantations, no one-sentence paragraphs for drama."
+
+**Rationale.** A proofreader that runs before the last rewrite proofreads text
+that no longer ships. An enumerated defect list is a ceiling on what can be
+found; an open "every objective language fault" instruction measured 4/4 on the
+same text where the list measured 0/4. The quoted-span format is what makes the
+apply step safe: it doubles as the hallucination filter, because a finding that
+misquotes its page cannot be applied and is dropped — the exact class the old
+free-prose format could not filter. And a ration is a menu: naming three devices
+and allowing one of each guarantees three appear.
+
+**Touched:** `prompts/story-text-proofread.txt` (rewritten),
+`prompts/story-text-lector-apply.txt` (new), `prompts/story-text-from-beats.txt`,
+`prompts/text-refine.txt`, `server/config/models.js`,
+`server/lib/promptBuilders.js` (`buildLectorApplyPrompt`,
+`buildTextProofreadPrompt` note), `server/lib/storyHelpers.js`,
+`server/services/prompts.js`, `server/lib/textRefine.js`
+(`parseLectorFindings`, `sanitizeLectorFindings`, lector pass;
+`sanitizeProofreadFindings` deleted), `storyJobPipeline.js`,
+`tests/unit/text-lector.test.ts`.
+
+**Status:** ✅ active — supersedes the set-piece-ration half of "Story-structure
+rules made un-cheatable + AI set-piece ration (owner, 2026-08-29)" and the
+"audit2 + proofread → corrective fix" chain in "Text refine: one audit-fed
+round, no self-checklist loop (2026-08-27)". The story-beats.txt structure rules
+in the 2026-08-29 entry are untouched.
 
 ---
 

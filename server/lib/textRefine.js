@@ -19,16 +19,71 @@
 
 const { log } = require('../utils/logger');
 
-// Proofread fault-line hygiene (2026-08-31, job_1788123310558). The proofread
-// model leaks reasoning prose between findings ("Let me work through this
-// carefully page by page.") and sometimes WITHDRAWS a finding mid-line
-// ("… but «weisses Möwensegel» as a compound image is fine — withdraw. Let me
-// re-examine.") while the line still starts with FAULT[...]: and so still
-// matches FAULT_LINE_RE. Both used to be merged raw into the corrective
-// round's findings block. Keep only genuine FAULT lines; a FAULT line that
-// withdraws itself is discarded.
-const PROOFREAD_FAULT_RE = /^FAULT(?:\[[A-Z]+\])*:/;
-const PROOFREAD_WITHDRAW_RE = /\bwithdraw\b|—\s*fine\b|\bre-?examine\b/i;
+/**
+ * Lector findings: `PAGE <n>: '<faulty words>' → '<corrected words>'`, one per
+ * line (see prompts/story-text-proofread.txt).
+ *
+ * A quoted-span-plus-replacement format is what makes the application step
+ * mechanical, and it is also the hallucination guard: a finding whose quote is
+ * not verbatim on the page it names cannot be applied and is dropped. That is
+ * the whole class the old free-prose format could not filter — the previous
+ * proofreader's two false faults on job_1788380714660 were a claim about two
+ * distinct cast members being "the same person" and a suggestion to write ß,
+ * neither of which quotes anything the page contains.
+ *
+ * Everything that is not a parseable finding line is ignored, which subsumes the
+ * old withdraw/leaked-reasoning filter (2026-08-31, job_1788123310558): a model
+ * musing between findings simply produces no line.
+ */
+const LECTOR_LINE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s*[:.–—-]\s*(.+?)\s*(?:→|->|=>)\s*(.+)$/i;
+const QUOTE_PAIRS = { "'": "'", '"': '"', '«': '»', '‹': '›', '„': '“', '“': '”', '‘': '’', '`': '`' };
+
+/** The first quoted run of a fragment, or null when it does not open with a quote. */
+function firstQuoted(s) {
+  const t = String(s || '').trim();
+  const close = QUOTE_PAIRS[t[0]];
+  if (!close) return null;
+  const end = t.indexOf(close, 1);
+  return end > 1 ? t.slice(1, end) : null;
+}
+
+/** Unquoted fallback: strip a trailing parenthetical alternative ("(oder …)"). */
+function bareSpan(s) {
+  return String(s || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
+function parseLectorFindings(text) {
+  const out = [];
+  for (const raw of String(text || '').split('\n')) {
+    const m = raw.trim().match(LECTOR_LINE_RE);
+    if (!m) continue;
+    const pageNumber = parseInt(m[1], 10);
+    const quote = firstQuoted(m[2]) ?? bareSpan(m[2]);
+    const correction = firstQuoted(m[3]) ?? bareSpan(m[3]);
+    if (!Number.isFinite(pageNumber) || !quote || !correction || quote === correction) continue;
+    out.push({ pageNumber, quote, correction, raw: raw.trim() });
+  }
+  return out;
+}
+
+/**
+ * Split lector findings into the ones that quote their page verbatim and the
+ * ones that do not. Whitespace is normalised (a model re-wraps a quote across a
+ * line break); nothing else is.
+ */
+function sanitizeLectorFindings(text, pages = []) {
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ');
+  const byPage = new Map(pages.map(p => [p.pageNumber, String(p.text || '')]));
+  const kept = [];
+  const dropped = [];
+  for (const f of parseLectorFindings(text)) {
+    const pageText = byPage.get(f.pageNumber);
+    const hit = pageText && (pageText.includes(f.quote) || norm(pageText).includes(norm(f.quote)));
+    (hit ? kept : dropped).push(f);
+  }
+  return { kept, dropped };
+}
+
 /**
  * Match the re-audit's "RULING: <fault> — fixed|stands|withdrawn (reason)" lines
  * back onto the previous round's FAULT lines.
@@ -81,14 +136,6 @@ function parseAuditRulings(reauditText, priorFaults) {
   };
 }
 
-function sanitizeProofreadFindings(text) {
-  return String(text || '')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => PROOFREAD_FAULT_RE.test(l) && !PROOFREAD_WITHDRAW_RE.test(l))
-    .join('\n');
-}
-
 /**
  * @param {Object} storyData - story record fields (language, characters, brief, …)
  * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
@@ -135,10 +182,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let audit2 = '';
   // Per-fault rulings the re-audit gave on round 1's faults (addendum 2026-09-01).
   let roundsDetail = null;
-  // Proofread findings on their own — audit2 merges them for the corrective
-  // round, but traceability needs the two streams separable, and an empty
-  // string here still proves the proofread ran.
+  // The lector's raw output, its accepted findings, and the ones its own quotes
+  // disowned. Declared with the two above, ABOVE the snapshot closure that
+  // reads them (the 2026-08-24 TDZ lesson).
   let proofread = '';
+  let lectorFindings = [];
+  let lectorDropped = [];
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so a finished audit and a
@@ -159,6 +208,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audit2,
     roundsDetail,
     proofread,
+    lectorFindings: lectorFindings.slice(),
+    lectorDropped: lectorDropped.slice(),
     partial: true,
   });
   const publish = () => {
@@ -282,7 +333,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // step, never the rounds already done.
   if (auditFindings) {
     try {
-      const { buildTextAuditPrompt, buildTextProofreadPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
+      const { buildTextAuditPrompt, countFaults, faultsByCategory } = require('./storyHelpers');
       // The re-audit receives round 1's faults and must rule on each BY
       // IDENTITY (fixed / stands / withdrawn) before naming a new one —
       // comparing counts alone let faults disappear silently. See
@@ -290,32 +341,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
       const audit2Prompt = buildTextAuditPrompt(storyData, current, auditFindings, arc);
       if (audit2Prompt && TEXT_MODELS[auditModel]) {
         const t0 = Date.now();
-        // Proofread runs alongside the re-audit: a narrow sentence-level pass
-        // (article/gender, quote nesting, spelling, self-contradiction,
-        // non-words) on a model that is not the refiner, merged into the same
-        // corrective round. Never blocks — a failure contributes nothing.
-        const proofModel = MODEL_DEFAULTS.textProofreadModel;
-        const proofPrompt = buildTextProofreadPrompt(storyData, current);
-        const proofPromise = (proofPrompt && TEXT_MODELS[proofModel])
-          ? callTextModelStreaming(proofPrompt, 8000, null, proofModel, { usageLabel: 'text_proofread' })
-            .then(r => String(r.text || '').trim())
-            .catch(e => { log.warn(`⚠️ [PROOFREAD] failed (${e.message}) — skipped`); return ''; })
-          : Promise.resolve('');
         let a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
         if (!String(a2.text || '').trim()) {
           log.warn(`⚠️ [TEXT-AUDIT2] ${auditModel} returned empty output — retrying once`);
           a2 = await callTextModelStreaming(audit2Prompt, 12000, null, auditModel, { usageLabel: 'text_audit2' });
         }
-        const proofRaw = await proofPromise;
-        // Raw stream persisted for traceability; the CORRECTIVE round gets the
-        // sanitized form only (no leaked reasoning, no withdrawn findings).
-        proofread = proofRaw;
-        const proofFindings = sanitizeProofreadFindings(proofRaw);
-        const proofFaults = countFaults(proofFindings);
-        const withdrawn = countFaults(proofRaw) - proofFaults;
-        if (withdrawn > 0) log.info(`🔎 [PROOFREAD] ${withdrawn} withdrawn/leaked FAULT line(s) discarded before the corrective round`);
-        if (proofFaults > 0) log.info(`🔎 [PROOFREAD] ${proofModel}: ${proofFaults} sentence-level fault(s)`);
-        audit2 = [String(a2.text || '').trim(), proofFaults > 0 ? proofFindings : ''].filter(Boolean).join('\n');
+        audit2 = String(a2.text || '').trim();
         // One entry per prior fault the re-audit ruled on. A prior round's
         // fault that appears in NEITHER the rulings nor the new fault list
         // is the disappearance this mechanism exists to make visible.
@@ -360,11 +391,93 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   }
 
+  // THE LECTOR — LAST (owner ruling 2026-09-03). It used to run in PARALLEL with
+  // the re-audit, which meant it proofread text the corrective round then
+  // rewrote: the round's output shipped unread, and a grammar fault the round
+  // introduced (or left) had nothing after it. The lector now reads the FINAL
+  // text and its findings drive one targeted application pass. No re-audit
+  // afterwards: the findings are quoted spans with their replacements, so
+  // applying them is mechanical, not a judgment that needs reviewing.
+  //
+  // Two guards keep the applier from becoming a second proofreader — the
+  // measured failure mode, 4 invented typos when the refiner was asked to find
+  // faults: findings are verbatim-checked against the page before they are sent
+  // (sanitizeLectorFindings), and a page the findings never named is discarded
+  // from the reply even if the applier rewrote it.
+  //
+  // Non-blocking like every step above; publish() means a join deadline can only
+  // cost this pass.
+  try {
+    const { buildTextProofreadPrompt, buildLectorApplyPrompt } = require('./storyHelpers');
+    const lectorModel = opts.proofreadModel || MODEL_DEFAULTS.textProofreadModel;
+    const lectorPrompt = buildTextProofreadPrompt(storyData, current);
+    if (lectorPrompt && TEXT_MODELS[lectorModel]) {
+      const t0 = Date.now();
+      const MAX_LECTOR = TEXT_MODELS[lectorModel].maxOutputTokens || 16000;
+      // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
+      // retry, same call, as the audit does. temperature 0: the A/B measured
+      // this prompt at 0 and a lector must not paraphrase the page it quotes.
+      let lr = await callTextModelStreaming(lectorPrompt, MAX_LECTOR, null, lectorModel, { temperature: 0, usageLabel: 'text_lector' });
+      if (!String(lr.text || '').trim()) {
+        log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
+        lr = await callTextModelStreaming(lectorPrompt, MAX_LECTOR, null, lectorModel, { temperature: 0, usageLabel: 'text_lector' });
+      }
+      proofread = String(lr.text || '').trim();
+      const sane = sanitizeLectorFindings(proofread, current);
+      lectorFindings = sane.kept;
+      lectorDropped = sane.dropped;
+      if (lectorDropped.length > 0) {
+        log.info(`🔎 [LECTOR] ${lectorDropped.length} finding(s) dropped — quoted text is not on the page named`);
+      }
+      log.info(`🔎 [LECTOR] ${lectorModel}: ${lectorFindings.length} language fault(s) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      publish();   // the findings survive even if the application pass fails
+
+      if (lectorFindings.length > 0) {
+        const applyModel = opts.lectorApplyModel || defaultModel;
+        const applyPrompt = buildLectorApplyPrompt(storyData, current, lectorFindings);
+        if (applyPrompt && TEXT_MODELS[applyModel]) {
+          const t1 = Date.now();
+          const MAX_OUT = Math.min(64000, TEXT_MODELS[applyModel].maxOutputTokens || 64000);
+          const ra = await callTextModelStreaming(applyPrompt, MAX_OUT, null, applyModel, { usageLabel: 'text_lector_apply' });
+          const parsedA = parseRefinedText(ra.text || '', expected);
+          // SCOPE GUARD: only the pages the lector named may change.
+          const named = new Set(lectorFindings.map(f => f.pageNumber));
+          const outOfScope = parsedA.pages.map(p => p.pageNumber).filter(n => !named.has(n));
+          if (outOfScope.length > 0) {
+            log.warn(`⚠️ [LECTOR] applier returned page(s) ${outOfScope.join(', ')} with no finding — discarded`);
+          }
+          const byPageA = new Map(parsedA.pages.filter(p => named.has(p.pageNumber)).map(p => [p.pageNumber, p.text]));
+          const nextA = current.map(p => ({ ...p, text: byPageA.get(p.pageNumber) || p.text }));
+          const changedA = nextA.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
+          rounds.push({
+            round: rounds.length + 1,
+            ok: true,
+            lector: true,
+            modelKey: applyModel,
+            modelId: ra.modelId || TEXT_MODELS[applyModel].modelId,
+            elapsedMs: Date.now() - t1,
+            usage: { input_tokens: ra.usage?.input_tokens || 0, output_tokens: ra.usage?.output_tokens || 0 },
+            cost: ra.usage?.direct_cost ?? calculateTextCost(ra.modelId || TEXT_MODELS[applyModel].modelId, ra.usage || {}),
+            rawResponse: (ra.text || '').slice(0, 40000),
+            changedPages: changedA,
+            strayPages: outOfScope,
+            converged: changedA.length === 0,
+          });
+          current = nextA;
+          publish();
+          log.info(`✍️  [LECTOR] corrections applied to page(s) ${changedA.join(', ') || 'none'}`);
+        }
+      }
+    }
+  } catch (le) {
+    log.warn(`⚠️ [LECTOR] failed (${le.message}) — text kept as the rounds left it`);
+  }
+
   const changed = current
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
-  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, roundsDetail, proofread, partial: false };
+  return { pages: current, original, rounds, changed, audit: auditFindings, audit2, roundsDetail, proofread, lectorFindings, lectorDropped, partial: false };
 }
 
 /**
@@ -433,4 +546,4 @@ function startBackgroundRefine(storyData, pages, opts = {}) {
     });
 }
 
-module.exports = { refineStoryText, extractRefinablePages, startBackgroundRefine, sanitizeProofreadFindings };
+module.exports = { refineStoryText, extractRefinablePages, startBackgroundRefine, parseLectorFindings, sanitizeLectorFindings };

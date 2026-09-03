@@ -1,0 +1,23 @@
+A proofreader has listed language faults in the text of a {LANGUAGE} children's book. Apply the listed corrections. You are not proofreading: find nothing of your own, change nothing that is not listed.
+
+# CURRENT TEXT
+
+{CURRENT_TEXT}
+
+# CORRECTIONS
+
+{CORRECTIONS}
+
+For each correction, replace the quoted words on that page with the corrected words. Adjust only what agreement forces in that same sentence: article, case, word order. Every other word of every page stays exactly as it is. Skip a correction whose quoted words are not on that page, and skip one that would make the sentence wrong.
+
+Return only the pages you changed, each with its full text.
+
+# OUTPUT FORMAT
+
+Nothing before or after this block.
+
+---STORY TEXT---
+## Page <number>
+<that page's full text with the corrections applied>
+
+When no correction applied, output the marker followed by NONE.

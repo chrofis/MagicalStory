@@ -325,11 +325,17 @@ const MODEL_DEFAULTS = {
   // and were thrown away after charging $0.16. deepseek is the pre-switch model
   // and the fastest of the arms that measured best on text.
   textRefineModel: process.env.TEXT_REFINE_MODEL || 'deepseek-v4-pro',
-  // Proofreader for the FINAL text (2026-08-26): sentence-level defects only.
-  // A sixth question on the 16-page causality audit catches a different 1-2 of
-  // 4 known defects each run (measured twice on the same text) — too diluted.
-  // Sonnet: fast, cheap, and not the refiner (deepseek must not proof itself).
-  textProofreadModel: process.env.TEXT_PROOFREAD_MODEL || 'claude-sonnet',
+  // The LECTOR: dedicated grammar proofreader of the FINAL text, after the last
+  // corrective round (owner ruling 2026-09-03). A sixth question on the
+  // causality audit catches a different 1-2 of 4 known defects each run
+  // (measured twice) — too diluted; a narrow pass is deterministic about them.
+  // gemini-3.1-pro chosen from a 6-model A/B on one shipped 16-page German text
+  // (scratchpad piraterun4/lector-ab, job_1788380714660_4p9mr11xszu): with the
+  // focused grammar-only prompt it caught 4/4 core faults and produced 0 hard
+  // false positives; claude-sonnet on the old closed defect-list prompt caught
+  // 0/4 with 2 hallucinations. Never the refiner (deepseek must not proof its
+  // own prose — it invented 4 typos when asked to find faults).
+  textProofreadModel: process.env.TEXT_PROOFREAD_MODEL || 'gemini-3.1-pro',
   // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
   // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
   scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',

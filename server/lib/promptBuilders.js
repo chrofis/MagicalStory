@@ -5113,10 +5113,15 @@ function buildChildCriticPrompt(inputData, arc) {
  * page prose, and what each picture shows (the DEPICTS block only — the rest
  * of a scene brief describes intent the viewer never sees).
  */
-// Sentence-level proofread of the FINAL text (2026-08-26): article/gender,
-// quote nesting, spelling, self-contradiction, non-words, repeats. Separate
-// from the causality audit — a sixth question there catches a different 1-2 of
-// 4 known defects per run (measured); a narrow pass is deterministic about them.
+// THE LECTOR (2026-08-26, refocused 2026-09-03): the last thing that reads the
+// finished prose, and it looks for one class of thing only — objective language
+// faults, listed as `PAGE n: 'quoted' → 'corrected'`. The old closed defect
+// list (article/gender, quote nesting, spelling, non-words, repeats) enumerated
+// what to look for and so excluded everything it did not name: transitive
+// «schwimmen» and an Anglicism survived three rounds on
+// job_1788380714660_4p9mr11xszu because verb government was not on the list.
+// Scope, format and model come from the 6-model A/B in
+// scratchpad piraterun4/lector-ab — keep the prompt open-ended.
 function buildTextProofreadPrompt(inputData, pages = []) {
   const template = PROMPT_TEMPLATES.storyTextProofread;
   if (!template) {
@@ -5131,6 +5136,38 @@ function buildTextProofreadPrompt(inputData, pages = []) {
     : 'the language of the pages';
   const body = pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n');
   return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
+}
+
+/**
+ * Application of the lector's corrections, and nothing else.
+ *
+ * Deliberately NOT buildTextRefinePrompt: that template's task is to hunt weak
+ * pages, and the refiner asked to find faults invented 4 typos in the A/B. This
+ * one hands it a closed list to apply. Same output contract as the refine
+ * rounds (`---STORY TEXT---` + `## Page n`), so parseRefinedText and the
+ * page-merge machinery are reused unchanged.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages the CURRENT text
+ * @param {Array<{pageNumber:number,quote:string,correction:string}>} corrections
+ *   already verbatim-checked against `pages` by sanitizeLectorFindings
+ */
+function buildLectorApplyPrompt(inputData, pages = [], corrections = []) {
+  const template = PROMPT_TEMPLATES.storyTextLectorApply;
+  if (!template) {
+    log.error('[PROMPT] storyTextLectorApply template not loaded — lector corrections cannot be applied');
+    return null;
+  }
+  if (!corrections.length) return null;
+  const lang = inputData?.language
+    ? getLanguageNameEnglish(inputData.language)
+    : 'the language of the pages';
+  const currentText = pages
+    .map(p => `## Page ${p.pageNumber}\n${String(p.text || '').trim() || '(empty)'}`)
+    .join('\n\n');
+  const list = corrections
+    .map(c => `PAGE ${c.pageNumber}: '${c.quote}' → '${c.correction}'`)
+    .join('\n');
+  return fillTemplate(template, { LANGUAGE: lang, CURRENT_TEXT: currentText, CORRECTIONS: list });
 }
 
 /**
@@ -6253,6 +6290,7 @@ module.exports = {
   youngestMainAge,
   buildTextAuditPrompt,
   buildTextProofreadPrompt,
+  buildLectorApplyPrompt,
   countFaults,
   faultsByCategory,
   buildStoryShapeSection,

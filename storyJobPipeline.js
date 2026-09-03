@@ -3372,9 +3372,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // only — the unified path records no arc).
           arc: arcReviewReport?.finalArc || beatsReviewReport?.arc || '',
           // 1 (owner, 2026-08-27): rounds past the first get no external
-          // findings — the audit feeds round 1, audit2+proofread feed the
-          // corrective round. Unfed self-checklist passes measured flat and
-          // invent work (see decisions.md).
+          // findings — the audit feeds round 1, audit2 feeds the corrective
+          // round, and the lector runs last on the final text. Unfed
+          // self-checklist passes measured flat and invent work (decisions.md).
           rounds: parseInt(process.env.TEXT_REFINE_ROUNDS || '1', 10),
           usageLabel: 'text_refine',
           // Latest completed state, so the bounded join below can salvage the
@@ -5573,6 +5573,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             round: r.round,
             ok: r.ok,
             reAudit: !!r.reAudit,
+            lector: !!r.lector,
             modelKey: r.modelKey || null,
             modelId: r.modelId || null,
             elapsedMs: r.elapsedMs || 0,
@@ -5587,7 +5588,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           auditRulings: usable.roundsDetail || null,
           changedPages: usable.changed,
           audit: usable.audit || '',
+          // The lector's raw output plus the findings that survived the
+          // verbatim-quote guard and the ones it dropped (see textRefine.js).
           proofread: usable.proofread || '',
+          lectorFindings: usable.lectorFindings || [],
+          lectorDropped: usable.lectorDropped || [],
           auditByCategory: require('./server/lib/storyHelpers').faultsByCategory(usable.audit || ''),
           // The re-audit of the FINAL text (2026-08-26) — same template and
           // judge as `audit`, so the two FAULT counts are one yardstick.
