@@ -25618,3 +25618,60 @@ deleted), `storyJobPipeline.js` (ledger), `client/src/pages/TestLab.tsx`,
 AUDITS → merge → ONE repair → ONE lector that returns corrected pages" (the
 page-return contract and its diff cap) and the lector-cost open question in the
 Lab #984 addendum. Everything else in both entries stands.
+
+---
+
+## 2026-09-04 — The app container's memory bill is page cache left by one story run
+
+**Context:** Production's `MagicalStory` container was billed 2.74–2.93 GB while
+`/api/health/memory` reported 567 MB of processes. Chasing the gap ruled out, in
+order: the Node heap (69.7 MB against a 3,120 MB limit — the August cap was never
+the constraint), the analyzer log (`/tmp/python-service.log` is 26 KB), analyzer
+restarts (PID 5, same 27.4 h elapsed as node), image bloat, and the CUDA
+libraries (importing torch costs 8 MB). Every one of those was a wrong guess.
+
+**Measurement.** `/api/health/memory` gained a cgroup reader, and a 30-second
+sampler ran across a full 16-page beats story on staging
+(`job_1788471969309_9cg9dqyirre`, 45.8 min) from a freshly restarted container:
+
+```
+23:42:56  file    0 MB   anon   112 MB   container restart, clean slate
+23:53:03  file  428 MB   anon 1,553 MB   worker warmup — models preloaded (TEXT phase)
+00:04:41  file  589 MB   anon 1,609 MB   scene briefs
+00:16:49  file  665 MB   anon 1,867 MB   illustrations begin
+00:18:20  file 1,983 MB  anon 9,851 MB   illustration 16/16 — the parallel burst
+00:32:01  file 2,011 MB  anon   657 MB   job idle — anon collapses, file does NOT
+```
+
+**Findings:**
+
+1. **One story leaves ~2 GB of page cache, permanently.** When the analyzer's
+   workers exit, `anon` returns 2.4 GB to the OS — the short-lived-worker design
+   does what it promises. The page cache of the model weights and page images
+   they read stays resident, because Linux evicts cache only under memory
+   pressure and a long-lived service never supplies any. Production idles at
+   2,062 MB; staging finished this run at 2,011 MB. Same mechanism.
+2. **Image size is NOT the memory bill.** Staging and production run the same
+   ~12 GB image; a fresh container idles at 26–90 MB of cache. Cache tracks work
+   done, not bytes shipped. The multi-stage build (2.2 → 1.6 GB of /app) and the
+   torch pin (python stack 7.8 → 3.8 GB) are build/deploy/disk wins, not memory
+   wins — an earlier version of this reasoning claimed otherwise and was wrong.
+3. **`/api/health/memory` is blind to the workers.** `photo_analyzer.py:105` runs
+   a parent ROUTER that spawns short-lived worker processes per role; the
+   endpoint measures only the router. Measured mid-run: router 89 MB while two
+   workers held 1.43 GB and 365 MB. Peak `anon` hit **9.85 GB** during the
+   parallel illustration burst — ~15× what the endpoint reports. Any memory
+   reading taken from that endpoint during a story understates the container by
+   more than a gigabyte. `process_total_mb` is named for that limit; `cgroup` is
+   the number Railway bills.
+
+**Decision:** the lever is RESTARTING the container after heavy work, not
+shrinking the image. On staging that is exactly what `server/lib/idleShutdown.js`
+already does, still inert pending `STAGING_IDLE_SHUTDOWN=true` +
+`RAILWAY_API_TOKEN`. Production needs the equivalent in an idle window. At
+$10/GB-month, the residual 2 GB is ~$20/month for cache nothing will read again.
+
+**Touched files:** `server/routes/health.js` (cgroup reader, `container_total_mb`
+→ `process_total_mb`)
+
+**Status:** ✅ measured — supersedes any claim that image size drives the bill
