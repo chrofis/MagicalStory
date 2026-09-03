@@ -43,6 +43,7 @@ The plan line's instant is a single drawable moment:
 - Everyone stands on the ground. A figure up high only when the event IS that height — then one figure up there and no one else off the ground.
 - Never two characters interlocked at one instant — a shared grip on one object, an object in flight, a hand-over: pick the moment before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).
 - Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.
+- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.
 - The action at the moment it happens, never the state that follows it.
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
 - Never compose the frame — what fills it, how large something looks, where it sits; the shot type is enough.
