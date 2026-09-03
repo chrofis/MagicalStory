@@ -125,17 +125,22 @@ RUN npm install --omit=dev
 # which drag in ~2.5GB of CUDA libraries this CPU-only container can't use.
 #
 # THE VERSION MUST BE PINNED, AND PINNED WITH ITS `+cpu` LOCAL VERSION (bug
-# torch-double-install-breaks-groundingdino, 2026-09-03). This line used to say
-# a bare `torch torchvision`, which takes whatever is NEWEST on the CPU index —
+# torch-double-install-cuda-bloat, 2026-09-03). This line used to say a bare
+# `torch torchvision`, which takes whatever is NEWEST on the CPU index —
 # 2.14.0+cpu by September. The `-r requirements.txt` layer below then resolved
 # torch a SECOND time against PyPI, where the numpy==1.24.3 co-pin forces 2.1.2,
-# and installed that CUDA wheel straight over the first one. Production ended up
-# with both torch-2.1.2.dist-info and torch-2.14.0+cpu.dist-info, a 2.1.2 version
-# stamp on a 2.14 file layout, and `from transformers import AutoProcessor`
-# raising `cannot import name 'ExportOptions'` — which is the exact import
-# get_groundingdino() makes, so /detect-figures-text 503'd and figure detection
-# silently fell back to Gemini from late August onward. It also left 2.9 GB of
-# unusable nvidia CUDA libraries in a CPU-only container.
+# and installed that CUDA wheel straight over the first one: both
+# torch-2.1.2.dist-info and torch-2.14.0+cpu.dist-info present, a 2.1.2 version
+# stamp on a 2.14 file layout, and 2.9 GB of nvidia CUDA libraries (plus 277 MB
+# of triton) in a container where torch.cuda.is_available() is False.
+#
+# NOT a DINO outage. An earlier version of this comment claimed the collision had
+# silently broken GroundingDINO in production; that was wrong. SAM and DINO ran
+# throughout — staging story_metrics carry sam_calls/dino_calls on every
+# substantial story, and the production runs missing those counters are 6-page
+# unified TRIALS, which skip figure detection. The `cannot import name
+# 'ExportOptions'` seen in a cold shell is the known first-import race already
+# retried at photo_analyzer.py:2130. The defect here is size and determinism.
 #
 # 2.1.2 is not a new choice — it is the version the numpy==1.24.3 co-pin already
 # forced. Pinning makes that explicit so the second resolution is a no-op instead
@@ -195,17 +200,15 @@ RUN pip3 install --no-cache-dir --break-system-packages "typing_extensions>=4.12
 # FATAL BY DESIGN — everything above this line is now installed, so this is the
 # last moment the build can tell the truth about the Python environment.
 #
-# The GroundingDINO and ArcFace pre-fetches below are deliberately non-fatal, and
-# that is exactly how bug torch-double-install-breaks-groundingdino shipped: a
-# second torch overwrote the CPU build, `from transformers import ...` started
-# raising, the pre-fetch's `|| echo WARN` swallowed it, and production ran for a
-# week silently falling back to Gemini while /api/health/config still reported
-# grounding-dino. A broken transformers import is NOT an optional degradation
-# when the figure-detection backend defaults to grounding-dino everywhere.
+# The GroundingDINO and ArcFace pre-fetches below are deliberately non-fatal, so
+# nothing downstream can tell you that the environment underneath them is wrong —
+# their `|| echo WARN` swallows it. The torch double-install sat here undetected
+# for weeks precisely because every later step tolerated it.
 #
 # Two assertions, both cheap: torch must be the +cpu build (a bare 2.x.y means
 # the PyPI CUDA wheel won again and 2.9 GB of nvidia libraries came with it), and
-# the transformers import must actually work. Either failure fails the build.
+# the transformers DINO classes must import. Either failure fails the build,
+# which is the point — a wrong Python tree should never reach a deploy.
 RUN python3 -c "import torch, transformers; \
     assert torch.__version__.endswith('+cpu'), \
         f'torch is not the CPU build: {torch.__version__} — a second torch was installed over it'; \
