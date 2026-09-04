@@ -7,7 +7,7 @@
       "reportedAt": "2026-09-04",
       "source": "dragonrun1 staging run job_1788551692337_bc479p945: killed at 89% by a status poll at job age 64 min ('Job timed out after 64 minutes') while the pipeline was healthily in best-version selection; pipeline kept running in the background (progress advanced to 94% after the flip), story saved, completion UPDATE blocked by the WHERE status='processing' guard",
       "status": "fixed",
-      "fixedIn": "PENDING",
+      "fixedIn": "2998a1e91",
       "note": "Owner ruling 2026-09-04: heartbeat staleness (10 min) is the sole stall detector; total age becomes a 180-min runaway backstop (server/routes/jobs.js, both kill sites incl. the age-only 'abandoned' branch that fired regardless of a fresh heartbeat). Added JOB_SPEND_CAP_USD=15 (~3x a normal $4.93 run) in storyJobPipeline.js: live cost accumulates in addUsage (exact direct_cost for Grok/Runware, MODEL_PRICING for token providers, per-image fallback) and trips at the next checkCancellation checkpoint, failing the job loudly — covers paid-call loops that keep the heartbeat fresh."
     },
     {
