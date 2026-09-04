@@ -29,7 +29,7 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 7a. **Every `per_character_fixes[]` entry carries `types`** — the declared types of the findings it consolidates, copied from `deduped_issues`. An entry whose types are all identity, age, hair, skin or clothing belongs in `dropped_issues` under rule 7, never in the plan.
 
-7b. **Inpaint cannot move the camera.** Set `scene_fix.requires_regeneration: true` only for a change to the camera angle, viewpoint, or shot distance (overhead vs eye-level, close-up vs wide) — the whole frame is re-shot. Moving or restaging a figure, changing a pose, gesture, or body orientation, and adding, removing, or repositioning an object are not camera changes; leave it `false` so inpaint handles them. When `true`, write the target framing in `instruction`.
+7b. **Inpaint cannot move the camera or restage a figure into a different medium.** Set `scene_fix.requires_regeneration: true` only for a change to the camera angle, viewpoint, or shot distance (overhead vs eye-level, close-up vs wide), or for a fix that relocates a figure onto or into a different supporting medium or surface than the one painted (on the shore when the scene requires wading, on deck when the scene requires swimming, on the ground when the scene requires riding). Changing a pose, gesture, or body orientation in place on the same surface, and adding, removing, or repositioning an object, are neither — leave it `false` so inpaint handles them. When `true`, write the target framing or staging in `instruction`.
 
 ## Drop policy
 

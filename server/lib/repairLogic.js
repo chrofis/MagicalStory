@@ -23,7 +23,9 @@ const { log } = require('../utils/logger');
  * @param {Object} [options]
  * @param {number} [options.scoreThreshold] - Pages scoring below this need redo
  * @param {number} [options.issueThreshold] - Pages with >= this many fixable issues need redo
- * @returns {number[]} Sorted page numbers needing redo
+ * @returns {number[]} Page numbers needing redo — pages carrying a
+ *   CRITICAL/CATASTROPHIC finding first (worst first matters wherever a cap
+ *   or budget consumes this list from the front), then the rest by page number
  */
 function findBadPages(evalPages, options = {}) {
   const scoreThreshold = options.scoreThreshold ?? REPAIR_DEFAULTS.scoreThreshold ?? SCORE_THRESHOLDS.REDO;
@@ -39,7 +41,7 @@ function findBadPages(evalPages, options = {}) {
     // ships as "completed" because score==null skipped the threshold check.
     if (result?.evaluated === false) {
       log.warn(`[FIND-BAD] page ${pageNum}: eval failed (${result.evalError || 'unknown'}) — marking bad for redo`);
-      bad.push(pageNum);
+      bad.push({ pageNum, critical: false });
       continue;
     }
 
@@ -47,11 +49,39 @@ function findBadPages(evalPages, options = {}) {
     const issueCount = result.fixableIssues?.length ?? 0;
     if (score == null) continue;
 
-    if (score < scoreThreshold || issueCount >= issueThreshold) {
-      bad.push(pageNum);
+    // A CRITICAL/CATASTROPHIC finding makes a page bad REGARDLESS of its
+    // score, and ranks it ahead of merely low-scoring pages (owner, item 15,
+    // 2026-09-04). piraterun5 shipped CRITICAL fixable findings on four pages
+    // whose scores cleared the threshold while the round's work went to a
+    // page that was only low-scoring. Severity is read from the evaluators'
+    // structured fields only — the prompts own the classification.
+    const critical = hasCriticalSeverityFinding(result);
+    if (critical && score >= scoreThreshold && issueCount < issueThreshold) {
+      log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a CRITICAL finding — marking bad for repair`);
+    }
+
+    if (score < scoreThreshold || issueCount >= issueThreshold || critical) {
+      bad.push({ pageNum, critical });
     }
   }
-  return bad.sort((a, b) => a - b);
+  // CRITICAL-carrying pages first, then by page number within each group.
+  bad.sort((a, b) => (b.critical - a.critical) || (a.pageNum - b.pageNum));
+  return bad.map(b => b.pageNum);
+}
+
+/**
+ * Does this eval carry any CRITICAL or CATASTROPHIC finding? Reads the
+ * structured severity field on the three finding pools (quality fixableIssues,
+ * semantic issues, consolidated deduped_issues) — never the prose.
+ */
+function hasCriticalSeverityFinding(result) {
+  const pools = [
+    result?.fixableIssues,
+    result?.semanticResult?.semanticIssues || result?.semanticResult?.issues,
+    result?.consolidatedPlan?.deduped_issues,
+  ];
+  return pools.some(list => Array.isArray(list)
+    && list.some(i => /^(critical|catastrophic)$/i.test(String(i?.severity || ''))));
 }
 
 /**
@@ -275,18 +305,22 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     return { method: 'iterate', reason: `CATASTROPHIC issue — ${desc || 'full regen required'}` };
   }
 
-  // 1d. Composition/viewpoint change — a new camera angle, shot distance, or
-  // reframing. Inpaint edits bounded regions and cannot move the camera; sent
-  // there it regenerates part of the frame with no style anchor and drifts the
-  // medium (photoreal). The consolidator (rule 7b) owns the classification and
-  // sets this flag — code only routes on the boolean, never sniffs prose.
+  // 1d. Composition/viewpoint change (camera angle, shot distance, reframing)
+  // OR a restage — figures that must be relocated into a different supporting
+  // medium/surface than the one painted (on the quay instead of wading in the
+  // water, on deck instead of swimming). Inpaint edits bounded regions: it
+  // cannot move the camera, and repainting a figure's whole lower staging plus
+  // its contact with the medium regenerates part of the frame with no style
+  // anchor and drifts the medium (photoreal). The consolidator (rule 7b) owns
+  // the classification and sets this flag — code only routes on the boolean,
+  // never sniffs prose.
   // ADDITIVE to SETTLED "Grok inpaint handles pose/gaze/body-rotation": those
-  // are the FIGURE's orientation inside a fixed frame; this is the CAMERA, a
-  // case that verdict never covered. Overrides the salvage floor deliberately —
-  // no local repair can fix framing, so a decent finalScore is no reason to
-  // keep a wrongly-framed page in inpaint.
+  // are the FIGURE's orientation inside a fixed frame; camera moves and
+  // medium restages are cases that verdict never covered. Overrides the
+  // salvage floor deliberately — no local repair can fix framing or restaging,
+  // so a decent finalScore is no reason to keep such a page in inpaint.
   if (evaluator.consolidatedPlan?.scene_fix?.requires_regeneration === true) {
-    return { method: 'iterate', reason: 'scene fix requires reframing (camera/composition) — full regen' };
+    return { method: 'iterate', reason: 'scene fix requires restaging (camera/composition/medium) — full regen' };
   }
 
   // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
