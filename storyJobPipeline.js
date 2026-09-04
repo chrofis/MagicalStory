@@ -472,6 +472,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     return 0.04 * imageCount;
   };
 
+  // ── Per-job spend cap (owner ruling 2026-09-04, sibling of the 180-min age
+  // backstop in server/routes/jobs.js). The heartbeat staleness check cannot
+  // catch a loop that keeps making PAID calls — updated_at stays fresh while
+  // money burns — so the job's live accumulated provider cost is capped at
+  // ~3x a normal full run ($4.93 measured). Direct-cost providers (Grok,
+  // Runware) report exact dollars; token providers are priced via
+  // MODEL_PRICING; token-less image calls fall back to the per-image rate.
+  const JOB_SPEND_CAP_USD = 15;
+  let jobSpentUsd = 0;
+
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     // Idempotency guard: the text chokepoint records every callTextModel result;
     // if a caller ALSO hands the same usage object here, count it once. Marks the
@@ -512,11 +522,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         tokenUsage.byFunction[functionName].direct_cost += usage.direct_cost;
       }
     }
+    // Live spend estimate for JOB_SPEND_CAP_USD. Never throws and never aborts
+    // mid-call — the cap trips at the next checkCancellation checkpoint.
+    try {
+      if (usage && usage.direct_cost != null) {
+        jobSpentUsd += usage.direct_cost || 0;
+      } else if (usage && (usage.input_tokens || usage.output_tokens)) {
+        const mid = typeof modelName === 'string' ? modelName : (modelName && (modelName.modelId || modelName.model)) || null;
+        jobSpentUsd += calculateCost(mid || provider, usage.input_tokens || 0, usage.output_tokens || 0, usage.thinking_tokens || 0).total;
+      } else if (provider === 'gemini_image' || provider === 'grok' || provider === 'runware') {
+        jobSpentUsd += calculateImageCost(typeof modelName === 'string' ? modelName : '', 1);
+      }
+    } catch { /* accounting is best-effort; the cap must never break a render */ }
   };
   // Register addUsage as the text-usage sink for this job's async context, so
   // every callTextModel/callTextModelStreaming records automatically (the
   // chokepoint is the single source of truth — see usageContext.js).
   require('./server/lib/usageContext').setUsageSink(addUsage);
+
+  // Spend guard shares the cancellation checkpoints: same call sites, same loud
+  // failure path (the outer catch marks the job failed and refunds credits).
+  const checkCancellationUpstream = checkCancellation;
+  checkCancellation = async () => {
+    await checkCancellationUpstream();
+    if (jobSpentUsd > JOB_SPEND_CAP_USD) {
+      throw new Error(`Job spend cap exceeded: ~$${jobSpentUsd.toFixed(2)} in provider calls (cap $${JOB_SPEND_CAP_USD}) — aborting a probable paid-call loop`);
+    }
+  };
 
   const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
     const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };

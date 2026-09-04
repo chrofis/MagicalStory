@@ -2,6 +2,15 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "status-poll-total-timeout-false-kill",
+      "title": "60-min total-age cap in the status poll (and the create-path 120-min 'abandoned' branch) kills healthy long runs; heartbeat defeated by paid-call loops had no spend backstop",
+      "reportedAt": "2026-09-04",
+      "source": "dragonrun1 staging run job_1788551692337_bc479p945: killed at 89% by a status poll at job age 64 min ('Job timed out after 64 minutes') while the pipeline was healthily in best-version selection; pipeline kept running in the background (progress advanced to 94% after the flip), story saved, completion UPDATE blocked by the WHERE status='processing' guard",
+      "status": "fixed",
+      "fixedIn": "PENDING",
+      "note": "Owner ruling 2026-09-04: heartbeat staleness (10 min) is the sole stall detector; total age becomes a 180-min runaway backstop (server/routes/jobs.js, both kill sites incl. the age-only 'abandoned' branch that fired regardless of a fresh heartbeat). Added JOB_SPEND_CAP_USD=15 (~3x a normal $4.93 run) in storyJobPipeline.js: live cost accumulates in addUsage (exact direct_cost for Grok/Runware, MODEL_PRICING for token providers, per-image fallback) and trips at the next checkCancellation checkpoint, failing the job loudly — covers paid-call loops that keep the heartbeat fresh."
+    },
+    {
       "id": "hollow-eval-scores-100",
       "title": "Failed eval becomes evaluated:true / finalScore 100 and beats every real repair in pick-best",
       "reportedAt": "2026-09-02",

@@ -263,18 +263,23 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           ? (Date.now() - new Date(activeJob.updated_at).getTime()) / (1000 * 60)
           : jobAgeMinutes;
 
-        // Two failure modes:
-        // 1. Total timeout: Job running for more than 60 minutes total
-        // 2. Heartbeat timeout: No progress update for 5 minutes (something is stuck)
-        const TOTAL_TIMEOUT_MINUTES = 60;
+        // Two detectors (owner ruling 2026-09-04, evidence job_1788551692337_bc479p945):
+        // 1. Heartbeat staleness (10 min) — the REAL stall detector. Every pipeline
+        //    phase touches updated_at at least once a minute (20s text-phase timer,
+        //    60s image-phase timer, every progress write), so a dead or wedged
+        //    process goes stale within minutes of dying.
+        // 2. Total age (180 min) — runaway BACKSTOP only. The old 60-min cap
+        //    predated the beats pipeline and killed a healthy 18-page run at 89%;
+        //    a legitimate run must never hit this, only a job that heartbeats
+        //    forever without finishing.
+        const TOTAL_TIMEOUT_MINUTES = 180;
         const HEARTBEAT_TIMEOUT_MINUTES = 10;
 
         const isStale = jobAgeMinutes > TOTAL_TIMEOUT_MINUTES ||
           minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES;
 
         if (isStale) {
-          const reason = jobAgeMinutes > 120 ? 'abandoned' :
-            minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
+          const reason = minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
           log.info(`🧹 Auto-cancelling stale job ${activeJob.id} (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago)`);
 
           // Refund reserved credits for stale job (atomic to prevent double-refund)
@@ -324,11 +329,9 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           }
 
           // Mark as failed with appropriate message based on failure reason
-          const errorMessage = jobAgeMinutes > 120
-            ? 'Job was abandoned (cleaned up automatically)'
-            : minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES
-              ? `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes)`
-              : `Job timed out after ${Math.round(jobAgeMinutes)} minutes`;
+          const errorMessage = minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES
+            ? `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes)`
+            : `Job timed out after ${Math.round(jobAgeMinutes)} minutes`;
 
           await getDbPool().query(
             `UPDATE story_jobs
@@ -527,19 +530,19 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
           ? (Date.now() - new Date(job.updated_at).getTime()) / (1000 * 60)
           : jobAgeMinutes;
 
-        // Two failure modes:
-        // 1. Total timeout: Job running for more than 60 minutes total
-        // 2. Heartbeat timeout: No progress update for 5 minutes (something is stuck)
-        const TOTAL_TIMEOUT_MINUTES = 60;
+        // Two detectors (owner ruling 2026-09-04, evidence job_1788551692337_bc479p945):
+        // 1. Heartbeat staleness (10 min) — the REAL stall detector; every pipeline
+        //    phase touches updated_at at least once a minute, so a dead process
+        //    (crash, server restart, wedge) goes stale within minutes.
+        // 2. Total age (180 min) — runaway BACKSTOP only. The old 60-min cap killed
+        //    a healthy 18-page beats run at 89% while the pipeline kept working;
+        //    the old 120-min 'abandoned' branch was the same age-based false kill.
+        const TOTAL_TIMEOUT_MINUTES = 180;
         const HEARTBEAT_TIMEOUT_MINUTES = 10;
 
         let errorMessage = null;
 
-        if (jobAgeMinutes > 120) {
-          // Very old job - was abandoned (server restart, browser closed, etc.)
-          errorMessage = 'Job was abandoned (server may have restarted)';
-          log.info(`🧹 [STATUS] Job ${jobId} is abandoned (${Math.round(jobAgeMinutes)} minutes old), cleaning up`);
-        } else if (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES) {
+        if (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES) {
           // Job stopped making progress - something is stuck
           errorMessage = `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes) - please try again`;
           log.warn(`💔 [STATUS] Job ${jobId} heartbeat timeout: no progress for ${Math.round(minutesSinceUpdate)} minutes (last progress: ${job.progress}%)`);
