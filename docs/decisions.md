@@ -25754,3 +25754,58 @@ All evidence: piraterun5 (`job_1788471969309_9cg9dqyirre`), investigations in th
 
 ### Repair selection: CRITICAL findings outrank low scores; medium-restage is a regeneration
 **Context:** piraterun5 shipped CRITICAL fixable findings on p3/p4/p14/p15 unrepaired (two cleared the score threshold entirely) while the round's one regen went to p13 (38, no CRITICALs, un-inpaintable class). **Decision:** (a) findBadPages — CRITICAL/CATASTROPHIC-carrying pages are bad regardless of score and rank first (structured severity fields only, no prose matching); (b) consolidator rule 7b also sets the existing `scene_fix.requires_regeneration` flag when a fix relocates a figure into a different supporting medium (shore↔wading, deck↔swimming); in-place pose/gaze stays inpaint (additive to the SETTLED inpaint verdict). Pending: Lab consolidator-stage check of 7b on a restage-class page. **Touched:** server/lib/repairLogic.js, prompts/feedback-consolidator.txt (8eb622229).
+
+---
+
+## 2026-09-04 — The photo analyzer becomes its own Railway service
+
+**Context:** measured in the two entries above — the web container carried a
+Python ML stack whose shared objects stay in the cgroup page cache Railway bills
+(1,361 MB attributable of 1,603 MB resident, led by `libtensorflow_cc` 378 MB and
+`libtorch_cpu` 185 MB), and absorbed a 9.85 GB `anon` peak during the parallel
+illustration burst — inside the container serving the website. Restarting only
+resets the meter; the libraries reload on the next story. Owner chose the
+structural fix.
+
+**Decision:** `Dockerfile.analyzer` + `start-analyzer.sh` build the analyzer as a
+separate Railway service; the web image keeps Node only. Node reaches it over
+Railway private networking via the existing `PHOTO_ANALYZER_URL` seam, which
+every call site already honours, so no call site changes.
+
+**Rationale / what the split turns on:**
+
+- **`PHOTO_ANALYZER_URL` is the only coupling.** Redirecting Node is config, not
+  code. The in-flight cap self-sizes from the analyzer's own `/health` →
+  `cpu.cpu_quota`, so a differently-sized service is handled automatically, and
+  the worker ports (5001/5003/5004) are addressed on 127.0.0.1 *inside* the
+  analyzer, so the parent/worker arrangement moves as one unit.
+- **The bind had to change: `0.0.0.0` → `*` (IPv4 + IPv6).** Railway's private
+  network is IPv6-ONLY, so `analyzer.railway.internal` resolves to an AAAA record
+  and an IPv4-only listener accepts nothing. This was invisible while everything
+  spoke over 127.0.0.1.
+- **Every failure mode here is SILENT.** A refused or timed-out
+  `/detect-figures-text` makes `figureDetection.js:897` count `dino_detect_fail`
+  and return null, and the pipeline falls back to Gemini — stories still
+  generate. That is how the torch double-install hid for a week. So warmup
+  readiness must be explicit, and `dino_detect_fail` is the signal to watch, not
+  the absence of errors.
+- **Base image stays `node:22`** for the analyzer even though nothing there runs
+  Node: it keeps the OS, python3.11 and every dist-packages path identical to the
+  working image. These pip layers have a history of silent breakage; the base is
+  not a variable to change in the same step as the split. A slim python base is a
+  follow-up worth ~1.1 GB of DISK — not memory, since image size is not what is
+  billed.
+- **The analyzer's COPY list is an allowlist reproducing production exactly.**
+  Deliberately absent: `blaze_face_short_range.tflite` and `yolo11n-pose.pt`,
+  which exist on dev machines but are untracked and have never been in the
+  deployed image — so `/pose-heads` already fails in production today. Copying
+  them in would be a behaviour change smuggled into a refactor; it is in BACKLOG.
+
+**Touched files:** `Dockerfile.analyzer` (new), `start-analyzer.sh` (new),
+`photo_analyzer.py` (dual-stack bind), `server/lib/character2x4Sheet.js` (two
+inline URLs → `photoAnalyzerClient`)
+
+**Status:** 🟡 in progress — analyzer service building on staging; the web image
+still ships Python until the service is proven, because stripping it first would
+take every analyzer call down. Plan and remaining steps:
+`tasks/analyzer-service-split-2026-09-04.md`
