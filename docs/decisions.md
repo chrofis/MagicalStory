@@ -25675,3 +25675,51 @@ $10/GB-month, the residual 2 GB is ~$20/month for cache nothing will read again.
 → `process_total_mb`)
 
 **Status:** ✅ measured — supersedes any claim that image size drives the bill
+
+---
+
+## 2026-09-04 — CORRECTION: the resident cache is ML shared LIBRARIES, not weights
+
+**Supersedes the composition claim in the entry above.** That entry said the ~2 GB
+of page cache was "model weights and page images read during a run". Measured with
+`mincore(2)` against staging 21.4 h after the run (1,603 MB still resident), it is
+neither — it is the Python ML stack's **shared objects**:
+
+```
+  378.4 MB  tensorflow/libtensorflow_cc.so.2
+  185.1 MB  torch/lib/libtorch_cpu.so
+  153.6 MB  llvmlite/binding/libllvmlite.so
+   62.8 MB  cv2/cv2.abi3.so
+   38.8 MB  mobile_sam.pt          <- the ONLY weight file resident
+   36.6 MB  tensorflow/libtensorflow_framework.so.2
+  ~180 MB   mediapipe, onnxruntime, 3x openblas, libvips, Qt5Gui
+ 1,361 MB   attributed of 1,603 MB
+```
+
+GroundingDINO's 892 MB `.hf_cache` is **0 bytes resident** — those pages were
+already evicted, so the "cold model weights" theory was wrong too.
+
+**What this means.** Each spawned analyzer worker imports torch/tensorflow/cv2/
+mediapipe; the kernel maps those .so files in; the pages stay cached after the
+worker exits (`file_mapped` is down to 15 MB — nothing maps them any more). So it
+is CODE, it is BOUNDED by the size of the library set (it plateaus, and decayed
+2,011 → 1,603 MB on its own over 21 h), and it is not a leak.
+
+Consequences for the fix:
+- `posix_fadvise(DONTNEED)` on model weights would achieve nothing — weights are
+  not what is cached.
+- Lowering the cgroup limit to force reclaim is blocked by the measured 9.85 GB
+  `anon` peak during the parallel illustration burst.
+- "Restart periodically" is a workaround, not a fix. The real cost is structural:
+  a Python ML stack living inside the web container.
+
+**The reducible parts, in order of size:** TensorFlow (415 MB resident, 1.3 GB on
+disk) exists ONLY for `deepface`'s ArcFace avatar-likeness gate
+(`photo_analyzer.py:3500`) — and `onnxruntime` is already installed, so an ONNX
+ArcFace would remove TF entirely (re-validating `arcfaceGate: 0.45` first, since
+a different embedding implementation moves the scores). `llvmlite` (153.6 MB) is
+not in requirements.txt at all — a transitive dependency worth tracing. The
+structural fix is splitting the analyzer into its own service so the web
+container stays ~200 MB.
+
+**Status:** ✅ measured — no code change yet, options open for the owner
