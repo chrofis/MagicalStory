@@ -161,7 +161,7 @@ function consecutiveRuns(sorted) {
  * @param {Object} args
  * @param {Array}  args.pages  [{pageNumber, beat, planLine}]
  * @param {string[]} [args.commissionedNames] the characters the book was commissioned for
- * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one portrait/arrival page
+ * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one whole-cast page
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object}}
  */
 function runPlanCounters({ pages = [], commissionedNames = [], maxCharactersPerScene = 3 } = {}) {
@@ -264,17 +264,19 @@ function runPlanCounters({ pages = [], commissionedNames = [], maxCharactersPerS
       'a peopled page with none of the commissioned characters in frame');
   }
 
-  // 7. Every commissioned character earns at least one focal page: alone in
-  //    frame, or named first in a close-up.
+  // 7. Every commissioned character earns at least one focal page: in frame
+  //    with at most one companion, or named first in a close-up. Solo is not
+  //    required (owner, 2026-09-04) — two people sharing one action carry a
+  //    focal page; the visible-action requirement lives in the prompt.
   const focalOf = (name) => rows
-    .filter(r => (r.present.length === 1 && r.present[0] === name)
+    .filter(r => (r.present.length <= 2 && r.present.includes(name))
       || (r.shot === 'close-up' && r.present[0] === name))
     .map(r => r.pageNumber);
   const focal = {};
   for (const name of cast.commissioned) {
     focal[name] = focalOf(name);
     if (focal[name].length === 0) {
-      add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never alone in frame, never the subject of a close-up`);
+      add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up`);
     }
   }
 
