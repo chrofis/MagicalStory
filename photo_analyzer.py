@@ -4575,7 +4575,16 @@ if __name__ == '__main__':
         _cores = _container_cpus()
         _threads = int(os.environ.get('ANALYZER_THREADS') or _cores)
         print(f"   Serving via waitress ({_threads} threads, {_cores} vCPUs available) on port {port}")
-        serve(app, host='0.0.0.0', port=port, threads=_threads, channel_timeout=600)
+        # `listen='*:port'` binds IPv4 AND IPv6; plain host='0.0.0.0' is IPv4-only.
+        # That distinction is load-bearing once this runs as its own Railway
+        # service (2026-09-04): Railway's private network is IPv6-ONLY, so
+        # `analyzer.railway.internal` resolves to an AAAA record and an IPv4-only
+        # listener accepts nothing — the web service would see connection
+        # refused, and figureDetection.js turns that into a SILENT Gemini
+        # fallback rather than an error. Harmless in a single container, where
+        # callers use 127.0.0.1 either way.
+        serve(app, listen=f'*:{port}', threads=_threads, channel_timeout=600)
     except ImportError:
         print("   waitress unavailable — falling back to Flask dev server")
-        app.run(host='0.0.0.0', port=port, debug=False)
+        # '::' accepts IPv6 and, via IPv4-mapped addresses, IPv4 too.
+        app.run(host='::', port=port, debug=False)
