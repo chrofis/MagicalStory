@@ -513,8 +513,8 @@
       "title": "merge-landmark-descriptions.js --apply-discards discards by SLOT NUMBER against the live row, so a re-run of the same descs dir after a compaction deletes the photo that shifted into that slot",
       "reportedAt": "2026-09-04",
       "source": "Owner-reported; reproduced from stored evidence: scratchpad dirs lm_desc2/lm_w1..w4 (manifests + discards.json) vs prod landmark_index rows matched to the pre-run staging rows on wikidata_qid. Prod order is a strict subsequence of staging for 345/350 affected landmarks, yet prod holds 958 photo slots where staging-minus-true-discards implies ~1076 — ~118 surviving photos wrongly removed (row columns NULLed, landmark_photo_scores rows dropped, R2 object deleted by deleteStoredPhotos). Example #6652 Torneresse: staging 3 photos, one true discard (slot 2 duplicate), prod now holds 1.",
-      "status": "open",
-      "fixedIn": null,
+      "status": "fixed",
+      "fixedIn": "staging 37660bd2f (2026-09-04); prod data repaired 2026-09-04 21:16 CH by repair-landmark-slots-2026-09-04.js: 119 landmarks rewritten, 117 photos restored with scores + R2 copies, 42 true discards removed, 0 failed; post-repair dry-run 0 landmarks differ; 5 Andelfingen-cluster rows diverged from staging and were left untouched",
       "note": "planCompaction() keyed discards on slot numbers the agent saw at prep time; after the first compaction those numbers point at different photos, and the merge treats an occupied slot as still-to-discard. Kept descriptions had the same defect on the plain path (written at the prep-time slot number). Fix: prep writes the per-slot source URL into manifest.json; merge applies a discard only when the live slot still holds that URL and writes a kept description to whichever live slot holds the photo now (skipped with a log line otherwise). Data repair: scripts/admin/repair-landmark-slots-2026-09-04.js rebuilds the intended layout from staging (by wikidata_qid) minus the true discards, restores scores + R2 copies."
     }
   ]
