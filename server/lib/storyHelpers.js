@@ -49,9 +49,15 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
  * Supports on-demand loading of photo variants for Swiss landmarks
  * @param {Object} visualBible - Visual Bible object with locations
  * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location, and landmarkVariants
+ * @param {Object} [opts]
+ * @param {number} [opts.pageNumber] - Current page. When given (positive int), a
+ *   landmark is served only if its VB pages list includes this page — the
+ *   writer's pages list is the authority on WHERE a landmark appears; an AD
+ *   reference alone is not enough. Cover callers pass nothing (covers pick
+ *   their backdrop by a different rule and have no positive page number).
  * @returns {Promise<Array<{name: string, photoData: string, attribution: string, source: string, variantNumber: number}>>} Landmark photos
  */
-async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
+async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) {
   if (!visualBible?.locations) return [];
 
   // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001.2]"
@@ -111,10 +117,30 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   const perLandmarkVariants = { ...variantMap, ...(sceneMetadata?.landmarkVariants || {}) };
 
   // Find matching locations
-  const matchingLocations = visualBible.locations.filter(loc =>
+  let matchingLocations = visualBible.locations.filter(loc =>
     (locIds.includes(loc.id) || locNames.includes(loc.name?.toLowerCase())) &&
     loc.isRealLandmark
   );
+
+  // PAGE GATE (owner, 2026-09-04): the writer's VB pages list decides WHERE a
+  // landmark appears; an AD objects[] reference alone must not pull it in.
+  // piraterun5: LOC007 (a real Zurich fountain) had pages:[] — staged on no
+  // page by the writer — yet the AD listed it on pages 4/5 and the photo was
+  // served into a Mediterranean harbour scene. An empty pages list fails the
+  // gate on every page; entries with NO pages field (legacy stored stories)
+  // are served as before. Parse-time now also drops pages:[] landmarks
+  // entirely (outlineParser/unified.js), so this gate is the backstop for
+  // stories parsed before that fix.
+  const gatePage = Number.isInteger(opts.pageNumber) && opts.pageNumber > 0 ? opts.pageNumber : null;
+  if (gatePage != null) {
+    matchingLocations = matchingLocations.filter(loc => {
+      const pages = Array.isArray(loc.pages) ? loc.pages
+        : (Array.isArray(loc.appearsInPages) ? loc.appearsInPages : null);
+      if (pages == null || pages.includes(gatePage)) return true;
+      log.warn(`[LANDMARK-SCENE] Page ${gatePage}: scene references "${loc.name}" [${loc.id}] but its VB pages [${pages.join(',')}] does not include this page — landmark photo not served`);
+      return false;
+    });
+  }
 
   if (matchingLocations.length === 0) {
     // Debug: explain why no matches

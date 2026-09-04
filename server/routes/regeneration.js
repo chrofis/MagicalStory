@@ -692,7 +692,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         closeUp: sceneMetadata?.fullData?.shot === 'close-up',
       });
     }
-    const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+    const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
     if (pageLandmarkPhotos.length > 0) {
       log.debug(`🌍 [REGEN] Page ${pageNumber} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
     }
@@ -1153,7 +1153,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       sceneMetadata = extractSceneMetadata(desc);
-      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
         const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
         const secLm = landmarkPhotos.slice(1);
@@ -2019,7 +2019,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
           closeUp: sceneMetadata?.fullData?.shot === 'close-up',
         });
       }
-      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+      landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
         const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
         const secLm = landmarkPhotos.slice(1);

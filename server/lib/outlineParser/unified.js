@@ -214,6 +214,22 @@ class UnifiedStoryParser {
         }
         if (this._cache.visualBible.locations) {
           this._cache.visualBible.locations = normalizeVisualBibleEntries(this._cache.visualBible.locations);
+          // A real landmark the writer staged on NO page never enters the VB
+          // (owner, 2026-09-04). The writer's pages list is the authority on
+          // where a landmark appears; an entry with pages:[] is one the story
+          // does not use, and leaving it in the bible lets the Art Director
+          // stage it anywhere (piraterun5: LOC007, a real Zurich fountain with
+          // pages:[], was staged by the AD on pages 4/5 of a Mediterranean
+          // story and its photo served into the scene). Covers lose it from
+          // their backdrop pool too — deliberate: a landmark the story never
+          // visits is no better a cover backdrop than an invented location.
+          const unstaged = this._cache.visualBible.locations
+            .filter(l => l.isRealLandmark && !(l.appearsInPages || []).length);
+          if (unstaged.length > 0) {
+            this._cache.visualBible.locations = this._cache.visualBible.locations
+              .filter(l => !unstaged.includes(l));
+            log.warn(`[UNIFIED-PARSER] Dropped ${unstaged.length} real-landmark location(s) with an empty pages list: ${unstaged.map(l => `${l.id} "${l.name}"`).join(', ')} — staged on no page, so the Art Director never sees ${unstaged.length === 1 ? 'it' : 'them'}`);
+          }
         }
         if (this._cache.visualBible.clothing) {
           this._cache.visualBible.clothing = normalizeVisualBibleEntries(this._cache.visualBible.clothing);

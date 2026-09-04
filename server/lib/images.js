@@ -3752,7 +3752,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   }
 
   // Build landmark photos
-  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
+  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata, { pageNumber }) : [];
 
   // Determine image model and backend (needed before empty scene generation)
   // A page REDO renders on the page tier, not on the edit/inpaint tier. Falling
