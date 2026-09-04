@@ -162,6 +162,12 @@ const MAX_SEVERITY_TYPES = {
   // drifted a shade. A different colour FAMILY or style CATEGORY stays
   // hair_change and is not capped.
   hair_nuance: 'minor',
+  // structure_scale capped at MAJOR (owner-approved addition, 2026-09-04):
+  // image-evaluation D-31 defines an undersized vessel/building/vehicle beside
+  // adjacent figures as MAJOR. The cap holds that line the way `accessory`'s
+  // does — an evaluator escalating one to CRITICAL must not let a scale defect
+  // outrank a missing or wrong character.
+  structure_scale: 'major',
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever

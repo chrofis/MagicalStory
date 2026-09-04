@@ -106,6 +106,12 @@ const BUCKETS = {
   // style_consistency, which owns the page's MEDIUM, not its continuity.
   composite_seam:       { owner: 'quality',  kind: 'binary', repair: 'regen' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
+  // A vessel, building or vehicle rendered undersized against adjacent figures
+  // (image-evaluation D-31). Its own bucket, NOT an alias of `scale`: `scale`
+  // covers oversized everyday props and figure age and routes to
+  // composition_textzone / iterate_placement, which repositions art — it cannot
+  // rebuild an undersized structure. Only a full redo can.
+  structure_scale:      { owner: 'quality',  kind: 'graded', repair: 'regen' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
   character_marking:    { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   anachronism:          { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
@@ -152,6 +158,7 @@ const TYPE_TO_BUCKET = {
   paste_edge: 'composite_seam', composite_artifact: 'composite_seam',
   composition: 'composition_textzone', position_and_scale: 'composition_textzone',
   scale: 'composition_textzone', position: 'composition_textzone', textzone: 'composition_textzone',
+  structure_scale: 'structure_scale', undersized_structure: 'structure_scale',
   rendered_text: 'rendered_text', text: 'rendered_text',
   character_marking: 'character_marking', marking: 'character_marking',
   anachronism: 'anachronism',
