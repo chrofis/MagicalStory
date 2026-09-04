@@ -27,7 +27,7 @@ The arc above delivers the commission; keep its names and world as written.
 Before dividing, plan the pictures — simple pages first:
 1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?
 2. Which pages show only a thing or a place — an artifact, a landscape, no people in frame?
-3. Where is the one calm group picture — everyone present, nobody doing much — or a group seen from behind?
+3. Where does the whole cast share one simple action — boarding, hauling one line together, all turned toward one thing ahead of them, or seen from behind moving off? Never a row of figures facing the viewer, never everyone present doing nothing.
 4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it.
 5. Where does each close-up land, where does each ultra-wide?
 Rough distribution: about two close-ups and two ultra-wides, the rest medium or wide — more close-ups when a moment earns one, but never just two shot types across the book.
@@ -35,9 +35,9 @@ Then one line per page: shot — who is in frame — the instant the picture sho
 A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page.
 
 The plan line's instant is a single drawable moment:
-- One moment — no montage, no before-and-after, no "then", no passage of time inside one picture.
+- One moment — no montage, no before-and-after, no "then", no passage of time inside one picture, no sequence of actions by one character; when a beat contains a change, pick the single moment that shows it.
 - One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
-- At most three named characters in frame, and two carry a page better than three. The whole cast together is the portrait or arrival page, the book has at most one, and it holds up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
+- At most three named characters in frame, and two carry a page better than three. The book has at most one whole-cast page, holding up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant, all sharing one simple action or seen from behind moving off — never a row of figures facing the viewer. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
 - Everyone stands on the ground. A figure up high only when the event IS that height — then one figure up there and no one else off the ground.
@@ -54,6 +54,7 @@ Requirements:
 - Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.
 - Every page is visible: something happens that a picture can show. Any character who forces or blocks something is in frame where it happens.
 - The main character appears on most pages; the others come and go in different combinations, not the whole group on every page. A close-up page is a waist-up moment (holding, reading, reacting), never a kneeling or floor action.
+- A page staging one character alone stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened — or the rest of the cast small in the background; never a lone motionless figure.
 - When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.
