@@ -1297,9 +1297,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         }
 
         if (evalResult.usage) {
-          report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
-          report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
-          report.tokenUsage.calls++;
+          // The two-pass head-grid split (2026-08-27) merges identity+wardrobe
+          // into ONE evalResult whose usage is an ARRAY of usageMetadata objects.
+          // Reading .promptTokenCount off the array recorded 0 tokens for every
+          // character since then.
+          for (const u of (Array.isArray(evalResult.usage) ? evalResult.usage : [evalResult.usage])) {
+            report.tokenUsage.inputTokens += u.promptTokenCount || 0;
+            report.tokenUsage.outputTokens += u.candidatesTokenCount || 0;
+            report.tokenUsage.calls++;
+          }
         }
       }
 

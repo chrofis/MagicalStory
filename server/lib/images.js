@@ -4358,7 +4358,10 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
       log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
       return {
         imageData: grokResult.imageData,
-        usage: { model: modelId, cost: grokResult.usage?.cost }
+        // direct_cost carried through: addUsage (storyJobPipeline) only sums
+        // usage.direct_cost — dropping it here made every Grok edit routed via
+        // this dispatcher (style_repair etc.) record $0.
+        usage: { model: modelId, cost: grokResult.usage?.cost, direct_cost: grokResult.usage?.direct_cost ?? grokResult.usage?.cost }
       };
     } catch (grokErr) {
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
@@ -4378,7 +4381,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
             log.info(`✅ [IMAGE EDIT] Sanitized retry succeeded via Grok`);
             return {
               imageData: retryResult.imageData,
-              usage: { model: modelId, cost: retryResult.usage?.cost }
+              usage: { model: modelId, cost: retryResult.usage?.cost, direct_cost: retryResult.usage?.direct_cost ?? retryResult.usage?.cost }
             };
           } catch (retryErr) {
             log.warn(`⚠️ [IMAGE EDIT] Sanitized retry also blocked, falling back to Gemini`);

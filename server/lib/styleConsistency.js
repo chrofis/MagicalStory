@@ -314,7 +314,10 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     ]);
     const usage = result.response.usageMetadata || {};
     if (usageTracker && (usage.promptTokenCount || usage.candidatesTokenCount)) {
-      usageTracker('gemini', {
+      // 'gemini_quality', not bare 'gemini': the provider rollup only has
+      // gemini_text/gemini_image/gemini_quality buckets — a bare 'gemini' tag
+      // kept these eval calls out of every provider aggregate.
+      usageTracker('gemini_quality', {
         input_tokens: usage.promptTokenCount || 0,
         output_tokens: usage.candidatesTokenCount || 0,
         thinking_tokens: usage.thoughtsTokenCount || 0,
