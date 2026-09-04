@@ -1987,7 +1987,39 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
  * @param {number} maxRefs
  * @returns {Array} Vehicle + non-landmark location references for this page
  */
-function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null) {
+/**
+ * Does the Art Director's objects[] list name this VB entry?
+ *
+ * objects[] entries come in three shapes ("VEH001", "the Goldene Möwe
+ * [VEH001]", { id, name, position }); VB entries carry id + name. Matching is
+ * by id token (substring, so bracketed and dotted forms both hit) or exact
+ * name. Shared by the empty-scene plate prompt (services/prompts.js) and the
+ * plate grid (getEmptySceneElementReferences) so the prompt text and the
+ * attached reference always agree on what is in frame.
+ *
+ * @param {Array} sceneObjects - AD metadata objects[] (strings or {id,name})
+ * @param {Object} entry - VB entry with id/name
+ * @returns {boolean}
+ */
+function sceneObjectsNameEntry(sceneObjects, entry) {
+  if (!Array.isArray(sceneObjects) || !entry) return false;
+  const entryId = String(entry.id || '').trim().toUpperCase();
+  const entryName = String(entry.name || '').trim().toLowerCase();
+  for (const obj of sceneObjects) {
+    if (obj == null) continue;
+    if (typeof obj === 'string') {
+      const s = obj.trim();
+      if (entryId && s.toUpperCase().includes(entryId)) return true;
+      if (entryName && s.toLowerCase() === entryName) return true;
+    } else if (typeof obj === 'object') {
+      if (entryId && String(obj.id || '').trim().toUpperCase() === entryId) return true;
+      if (entryName && String(obj.name || '').trim().toLowerCase() === entryName) return true;
+    }
+  }
+  return false;
+}
+
+function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null, sceneObjects = null) {
   if (!visualBible) return [];
 
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
@@ -2001,11 +2033,24 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
 
   const refs = [];
 
-  // Vehicles (ships, cars, carriages, spacecraft) — part of the setting
+  // Vehicles (ships, cars, carriages, spacecraft) — part of the setting.
+  //
+  // AD IS THE AUTHORITY on vehicle presence (owner, 2026-09-04): when the
+  // caller supplies the scene's Art Director objects[] list, a vehicle enters
+  // the plate grid only when that list names its VEH id. The VB pages array is
+  // the writer's MENU of where a vehicle MAY appear — the AD brief decides
+  // what is actually in frame. Gating on pages alone painted the crew's ship
+  // into harbour-square and cave plates whose briefs never staged it
+  // (piraterun5 p4/p13: VEH001 pages listed 1-13, AD objects had no VEH id).
+  // Callers with no AD metadata (trial plates built before briefs exist,
+  // covers) pass no sceneObjects and keep the pages behaviour.
+  const adAuthored = Array.isArray(sceneObjects);
   for (const entry of visualBible.vehicles || []) {
     if (skip(entry)) continue;
     if (!hasRef(entry)) continue;
-    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    if (adAuthored) {
+      if (!sceneObjectsNameEntry(sceneObjects, entry)) continue;
+    } else if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
     refs.push({
       id: entry.id,
       name: entry.name,
@@ -2308,5 +2353,6 @@ module.exports = {
   updateElementReferenceImage,
   getElementReferenceImagesForPage,
   getEmptySceneElementReferences,
-  getElementReferenceImagesByIds
+  getElementReferenceImagesByIds,
+  sceneObjectsNameEntry
 };

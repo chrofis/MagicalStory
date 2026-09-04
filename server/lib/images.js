@@ -3832,8 +3832,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           visualBible,
           pageNumber,
           aboardId: iterateAboardId,
+          // AD objects[] gates which vehicles enter the plate prompt + grid
+          // (AD is the authority on vehicle presence; VB pages is only the menu).
+          sceneObjects: iterateSceneMetadata?.objects || null,
         });
-        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId);
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId, iterateSceneMetadata?.objects || null);
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           // Plates stay on the Standard tier regardless of the page tier.

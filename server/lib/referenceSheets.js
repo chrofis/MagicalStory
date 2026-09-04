@@ -587,9 +587,14 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
  * @param {Array} pageLandmarkPhotos - Landmark photos already loaded for this page
  * @param {string|null} aboardId - VB id of the element the camera stands on/inside;
  *   its render is dropped from the grid (an exterior view corrupts an aboard plate)
+ * @param {Array|null} sceneObjects - The scene's AD metadata objects[] list. When
+ *   supplied, a VEHICLE enters the grid only if this list names its VEH id — the
+ *   AD brief, not the VB pages array, decides what is in frame (owner, 2026-09-04).
+ *   Must be the same list the caller passes to buildEmptyScenePrompt so the prompt
+ *   text and the attached reference agree.
  * @returns {Promise<Buffer|null>} VB grid buffer (with rawElements property), or null if empty
  */
-async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos = [], aboardId = null) {
+async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos = [], aboardId = null, sceneObjects = null) {
   if (!visualBible) return null;
   // ONE reference family per plate (owner, 2026-08-29): a landmark photo when
   // the plate's location is a real landmark, otherwise the VB element
@@ -602,7 +607,7 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
     return null;
   }
   const { getEmptySceneElementReferences } = require('./visualBible');
-  const vehicleAndLocationRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9, aboardId);
+  const vehicleAndLocationRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9, aboardId, sceneObjects);
   // A landmark photo NEVER enters the grid (owner, 2026-08-18). The grid is a
   // composite of style-rendered element cells; pasting a real photograph among
   // them feeds photographic pixels into a stylised render and corrupts it —

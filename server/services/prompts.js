@@ -376,6 +376,11 @@ function fillTemplate(template, replacements) {
  * @param {string} [opts.aboardId]      - VB id of the vehicle the camera stands on;
  *   that vehicle's VEHICLES entry becomes a name-only from-the-deck instruction
  *   instead of its full exterior description.
+ * @param {Array}  [opts.sceneObjects]  - The scene's AD metadata objects[] list.
+ *   When supplied, a vehicle enters the VEHICLES block only if this list names
+ *   its VEH id (or it is the aboardId) — the Art Director brief, not the VB
+ *   pages array, decides what is in frame. Pass the SAME list to
+ *   buildEmptySceneVbGrid so prompt and reference grid agree.
  * @param {number} [opts.pageNumber]       - Page number, for sanitizer logging
  * @param {'landmark'|'element'} [opts.referenceKind] - Which single reference family
  *   is attached to this plate call (landmark photo XOR Visual Bible element render).
@@ -404,9 +409,25 @@ function buildEmptyScenePrompt(opts = {}) {
   // the plate's pixels. Conditional wording so a plate whose framing shows no
   // vehicle doesn't gain one.
   if (opts.visualBible && opts.pageNumber != null) {
+    // AD IS THE AUTHORITY on vehicle presence (owner, 2026-09-04). The VB
+    // pages array is the writer's menu of where a vehicle MAY appear; the Art
+    // Director's per-scene objects[] list decides what is actually in frame.
+    // Gating on pages alone injected the crew's ship into plates whose briefs
+    // never staged it (piraterun5 p4: harbour square, p13: sea cave — VEH001
+    // listed pages 1-13, neither AD brief named it). The aboardId vehicle is
+    // always included (the AD set `aboard`, so its deck-level line is
+    // AD-authorized). Callers with no AD metadata (trial plates built before
+    // briefs exist, covers) pass no sceneObjects and keep the pages behaviour.
+    const gateAboardId = opts.aboardId || null;
+    const adAuthored = Array.isArray(opts.sceneObjects);
+    const { sceneObjectsNameEntry } = require('../lib/visualBible');
     const pageVehicles = (opts.visualBible.vehicles || []).filter(v => {
+      if (!v.description) return false;
+      if (adAuthored) {
+        return (gateAboardId && v.id === gateAboardId) || sceneObjectsNameEntry(opts.sceneObjects, v);
+      }
       const pages = v.pages || v.appearsInPages;
-      return Array.isArray(pages) && pages.includes(opts.pageNumber) && v.description;
+      return Array.isArray(pages) && pages.includes(opts.pageNumber);
     });
     if (pageVehicles.length > 0) {
       // The vehicle the camera stands ON gets a name-only mention, never its

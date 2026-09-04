@@ -633,6 +633,9 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     visualBible: ctx.visualBible,
     pageNumber: ctx.pageNumber ?? null,
     aboardId,
+    // AD objects[] gates which vehicles enter the plate prompt + grid — same
+    // gate production runs (AD is the authority on vehicle presence).
+    sceneObjects: meta.objects || null,
   });
 
   // Production attaches the VB element grid to every plate call
@@ -641,7 +644,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // was invisible to the Lab. Same helper, same aboard filter.
   const { buildEmptySceneVbGrid } = require('./referenceSheets');
   const emptySceneVbGrid = await buildEmptySceneVbGrid(
-    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId
+    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
   );
 
   const t0 = Date.now();

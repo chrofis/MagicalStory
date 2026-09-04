@@ -3789,7 +3789,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // buildEmptySceneVbGrid returns null when a landmark photo is
               // present (owner, 2026-08-29).
               const repAboardId = repPageData.sceneMetadata?.aboard || null;
-              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos, repAboardId);
+              // AD objects[] of the SAME rep page whose prose frames the plate —
+              // gates which vehicles enter the plate prompt + grid (AD is the
+              // authority on vehicle presence; VB pages is only the menu).
+              const repSceneObjects = repPageData.sceneMetadata?.objects || null;
+              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos, repAboardId, repSceneObjects);
               const emptySceneVbGridDataUrl = emptySceneVbGrid
                 ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
                 : null;
@@ -3806,6 +3810,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 visualBible,
                 pageNumber: repPageData.pageNumber,
                 aboardId: repAboardId,
+                sceneObjects: repSceneObjects,
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -3886,6 +3891,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     visualBible,
                     pageNumber: repPageData.pageNumber,
                     aboardId: repAboardId,
+                    sceneObjects: repSceneObjects,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -4102,7 +4108,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // character's hand on the page). Returns null when a landmark photo is
             // attached — one reference family per plate (owner, 2026-08-29).
             const pageAboardId = sceneMetadata?.aboard || null;
-            const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || [], pageAboardId);
+            // AD objects[] gates which vehicles enter the plate prompt + grid
+            // (AD is the authority on vehicle presence; VB pages is only the menu).
+            const pageSceneObjects = sceneMetadata?.objects || null;
+            const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || [], pageAboardId, pageSceneObjects);
             // Persist the filtered grid as a data URL so the dev UI can show what
             // was actually attached to the empty-scene call (main-scene VB grid is
             // different; before this, the UI was displaying the wrong one).
@@ -4124,6 +4133,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               visualBible,
               pageNumber: pageData.pageNumber,
               aboardId: pageAboardId,
+              sceneObjects: pageSceneObjects,
             });
 
             try {
@@ -4205,6 +4215,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     visualBible,
                     pageNumber: pageData.pageNumber,
                     aboardId: pageAboardId,
+                    sceneObjects: pageSceneObjects,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
