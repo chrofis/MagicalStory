@@ -1920,6 +1920,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             maxPerBatch: 4,
             maxElements: 6,  // trial cap — story-trial.txt limits to max 2 secondaries + 2 artifacts + 2 locations
             storyId: jobId,
+            // See the full-mode call site for why: non-character elements
+            // should match the page aspect, not avatarAspect.
+            elementAspect: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
           }).catch(err => {
             log.warn(`⚠️ [TRIAL] Early VB reference sheet generation failed: ${err.message}`);
             return { generated: 0, failed: 0, elements: [] };
@@ -2812,6 +2815,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         maxPerBatch: 4,    // Max 4 elements per grid for quality
         maxElements: null, // Generate reference sheets for all qualifying elements
         storyId: jobId,    // Phase 1d R2 dual-write: refs upload to stories/{jobId}/vb/{entryId}.jpg
+        // Location/vehicle/artifact/animal elements render at the story's own
+        // page aspect — not avatarAspect — so a single-element plate reference
+        // (composeVbSlot) doesn't need heavy white pillar-padding to fit.
+        elementAspect: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
       }).catch(err => {
         log.warn(`⚠️ [UNIFIED] Reference sheet generation failed: ${err.message}`);
         return { generated: 0, failed: 0, elements: [] };

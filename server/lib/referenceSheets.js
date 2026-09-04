@@ -295,26 +295,36 @@ function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4
   const letteringNames = vbDeclaredLetteringNames(visualBible);
 
   const solo = [];
-  const batchable = [];
+  // Characters and non-characters (locations/vehicles/artifacts/animals) never
+  // share a batch: a batch renders as ONE grid image at ONE aspect ratio, and
+  // characters want the tall avatarAspect portrait while everything else wants
+  // to match the page/plate aspect (see the elementAspect option below) — a
+  // mixed batch couldn't honour both.
+  const batchableChars = [];
+  const batchableOther = [];
   for (const el of needsReference) {
     const name = String((el && el.name) || '').trim().toLowerCase();
-    if (name && letteringNames.has(name)) solo.push(el);
-    else batchable.push(el);
+    if (name && letteringNames.has(name)) { solo.push(el); continue; }
+    (el.type === 'character' ? batchableChars : batchableOther).push(el);
   }
 
-  const batches = [];
-  const N = batchable.length;
-  if (N > 0) {
+  const chunk = (list) => {
+    const chunks = [];
+    const N = list.length;
+    if (N === 0) return chunks;
     const batchCount = Math.max(1, Math.ceil(N / maxPerBatch));
     const basePer = Math.floor(N / batchCount);
     const remainder = N - basePer * batchCount; // first `remainder` batches get +1
     let cursor = 0;
     for (let b = 0; b < batchCount; b++) {
       const size = basePer + (b < remainder ? 1 : 0);
-      batches.push(batchable.slice(cursor, cursor + size));
+      chunks.push(list.slice(cursor, cursor + size));
       cursor += size;
     }
-  }
+    return chunks;
+  };
+
+  const batches = [...chunk(batchableChars), ...chunk(batchableOther)];
   for (const el of solo) batches.push([el]);
 
   return batches;
@@ -348,6 +358,24 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     maxElements = null,
     storyId = null,    // when present, each generated reference image is
                        // uploaded to R2 and the URL is stored on the VB entry.
+    // Aspect ratio for non-character element grids (locations/vehicles/
+    // artifacts/animals) — should be the story's actual page/plate aspect
+    // (e.g. MODEL_DEFAULTS.pageAspect, or square for a square-format book).
+    // Character batches are unaffected and keep the avatarAspect portrait.
+    // Falls back to MODEL_DEFAULTS.pageAspect (via resolveOutputAspect) if
+    // the caller doesn't pass one.
+    //
+    // Why this exists: every element used to render at avatarAspect (9:16),
+    // including locations and vehicles, because the whole grid call used
+    // evaluationType='avatar'. A location/vehicle element that's the ONLY
+    // reference for an empty-scene plate then gets fit into composeVbSlot's
+    // single-cell slot with `fit:'contain'` — a 9:16 source can't fill a
+    // squarer target without white pillar bars, and Grok's edit echoes that
+    // padded composition straight into the plate (and from there into the
+    // page). Reproduced live on staging job_1788471969309_9cg9dqyirre p12:
+    // its sole location element rendered at 365x641 (9:16), producing a
+    // plate whose painted content filled only ~59% of a 1024x1024 canvas.
+    elementAspect = null,
   } = options;
   const { saveVbReferenceToR2 } = storyId ? require('../services/database') : { saveVbReferenceToR2: null };
 
@@ -438,7 +466,17 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
 
       // Generate the grid image using the configured image model (Gemini, Grok, etc.)
       const imageModelOverride = imageModel || null;
-      const result = await callGeminiAPIForImage(prompt, [], null, 'avatar', null, imageModelOverride, null, '');
+      // Batches are type-homogeneous (buildReferenceSheetBatches never mixes
+      // characters with locations/vehicles/artifacts/animals), so one check
+      // on the first element decides the whole batch. evaluationType stays
+      // 'avatar' for every batch (preserves the existing eval-skip / no-retry
+      // behaviour for one-shot reference grids) — only the aspect changes.
+      const isCharacterBatch = batch[0]?.type === 'character';
+      const batchAspectOverride = isCharacterBatch ? null : elementAspect;
+      const result = await callGeminiAPIForImage(
+        prompt, [], null, 'avatar', null, imageModelOverride, null, '',
+        null, [], 0, null, null, null, null, batchAspectOverride
+      );
 
       if (!result || !result.imageData) {
         throw new Error('Image generation did not return an image');
