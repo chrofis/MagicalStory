@@ -4,7 +4,7 @@ You are auditing the Art Director briefs of a children's picture book for RENDER
 {BRIEFS}
 
 Hazard classes:
-CROWD: four or more figures the brief expects to read as individuals. The book's one whole-cast portrait or arrival page is exempt.
+CROWD: four or more figures the brief expects to read as individuals. The book's one whole-cast shared-action page is exempt.
 MULTIACT: two or more distinct actions demanded as happening at once. A passive hold or carry of a small object, watching, or standing is not an action.
 GAZE: a gaze aimed at something that is not the frame's dominant element, or a second gaze target on the page.
 CONTACT: a load-bearing grip or support demanded without the visible pose that would show it. A plain hold of a small object is not a contact hazard.
