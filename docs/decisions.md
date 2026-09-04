@@ -25956,3 +25956,31 @@ workers 1.47 GB + 1.22 GB, cgroup `anon` 1,879 MB.
 **Status:** 🟡 analyzer service live and proven on staging;
 `PHOTO_ANALYZER_URL` not yet pointed at it. Remaining steps and the rollback
 (unset the variable) in `tasks/analyzer-service-split-2026-09-04.md`.
+
+## 2026-09-04 — Per-job $15 spend cap, sibling of the 180-min heartbeat backstop
+
+**Context:** the existing stall detector kills a job whose `updated_at` goes
+stale, but a loop that keeps making PAID calls (retry loop stuck re-calling a
+provider) keeps `updated_at` fresh while money burns — the heartbeat never
+trips. Bug `status-poll-total-timeout-false-kill` (fixed in `2998a1e91`) needed
+both fixes together: the 180-minute age backstop for genuinely stuck jobs, and
+a separate cost-based guard for jobs that are still "alive" but burning cash.
+
+**Decision:** `processUnifiedStoryJob` tracks a live `jobSpentUsd` estimate as
+`addUsage()` records each provider call (direct-cost providers read
+`usage.direct_cost` verbatim; token providers are priced via
+`calculateCost`/`MODEL_PRICING`; token-less image calls fall back to the flat
+per-image rate). `checkCancellation` — already called at every pipeline
+checkpoint — now also throws once `jobSpentUsd` exceeds `JOB_SPEND_CAP_USD =
+15`, roughly 3x a normal full run's measured cost (~$4.93). A trip fails the
+job through the existing failure path (marked failed, credits refunded) — the
+same as any other `checkCancellation` throw.
+
+**Rationale:** reuses the job's existing checkpoint/cancellation plumbing
+rather than adding a second monitoring path; the cap is sized off a measured
+normal-run cost, not guessed. The estimate is best-effort (wrapped in try/catch
+so accounting never breaks a render) and only needs to be roughly right — it
+exists to stop a probable paid-call loop, not to bill precisely.
+
+**Touched files:** `storyJobPipeline.js` (`JOB_SPEND_CAP_USD`, `jobSpentUsd`
+accumulation in `addUsage`, cap check wrapped around `checkCancellation`).
