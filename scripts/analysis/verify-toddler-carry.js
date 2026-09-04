@@ -2,7 +2,7 @@
 /**
  * Verify the 2026-08-25 review fixes actually fired on a stored story:
  *
- *   1. {TODDLER_MODE} reaches the arc review and the beats review prompts
+ *   1. {AGE_MODE} reaches the arc review and the beats review prompts
  *      (previously only the planner and the trial got it).
  *   2. The carried findings travel WITH the reviewer's rulings — the
  *      `REVIEWER'S RULINGS` block appears in the downstream prompt that
@@ -45,17 +45,20 @@ function mark(ok) { return ok ? '✅' : '❌'; }
   const arc = d.arcReviewReport || null;
   const beats = d.beatsReviewReport || null;
 
-  // ── 1. Toddler mode in the two review prompts ───────────────────────────
-  console.log('\n1. TODDLER MODE reaches the reviewers');
-  const arcHas = !!(arc?.prompt || '').includes('# TODDLER MODE');
-  const beatsHas = !!(beats?.prompt || '').includes('# TODDLER MODE');
+  // ── 1. Age-band section in the two review prompts ───────────────────────────
+  console.log('\n1. AGE MODE reaches the reviewers');
+  // Any of the five band headers counts — which one depends on the main
+  // character's age (prompts/age-band-*.txt).
+  const BAND_HEADER = /^# (ROUTINE BOOK|REPETITION QUEST|THREE TRIES|FEAR AND CHOICE|MINI HERO'S JOURNEY)/m;
+  const arcHas = BAND_HEADER.test(arc?.prompt || '');
+  const beatsHas = BAND_HEADER.test(beats?.prompt || '');
   console.log(`   ${mark(!!arc)} arcReviewReport stored${arc ? '' : ' — arc stage did not run'}`);
-  console.log(`   ${mark(arcHas)} arc review prompt carries # TODDLER MODE`);
+  console.log(`   ${mark(arcHas)} arc review prompt carries the age-band section`);
   console.log(`   ${mark(!!beats)} beatsReviewReport stored${beats ? '' : ' — beats review did not run'}`);
-  console.log(`   ${mark(beatsHas)} beats review prompt carries # TODDLER MODE`);
+  console.log(`   ${mark(beatsHas)} beats review prompt carries the age-band section`);
   // An unfilled placeholder means the builder never passed the field.
   for (const [name, p] of [['arc', arc?.prompt], ['beats', beats?.prompt]]) {
-    if (p && p.includes('{TODDLER_MODE}')) console.log(`   ❌ ${name} review prompt has an UNFILLED {TODDLER_MODE} placeholder`);
+    if (p && p.includes('{AGE_MODE}')) console.log(`   ❌ ${name} review prompt has an UNFILLED {AGE_MODE} placeholder`);
   }
 
   // ── 2. Carried findings + the reviewer's rulings ────────────────────────
@@ -85,8 +88,8 @@ function mark(ok) { return ok ? '✅' : '❌'; }
     }
   }
 
-  // ── 3. Did the reviewers respect toddler mode? (prose signal, advisory) ──
-  console.log('\n3. Toddler rules in the shipped book (advisory — read the pages too)');
+  // ── 3. Did the reviewers respect the age band? (prose signal, advisory) ──
+  console.log('\n3. Age-band rules in the shipped book (advisory — read the pages too)');
   const pages = scenes.length;
   console.log(`   pages: ${pages}`);
   const beatsChanged = beats?.changedPages || [];

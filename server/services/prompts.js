@@ -262,10 +262,14 @@ async function loadPromptTemplates() {
     ['clothingReview', 'clothing-review.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
-    // Content rules for a main character aged 3 or under. Injected as
-    // {TODDLER_MODE} into the idea, trial and beats prompts, empty otherwise —
-    // see buildToddlerModeSection in promptBuilders.js.
-    ['toddlerMode', 'toddler-mode.txt'],
+    // Plot-shape rules per age band of the OLDEST MAIN character. One of these
+    // is injected as {AGE_MODE} into the idea, trial, arc and beats prompts;
+    // empty from age 6 up — see buildAgeModeSection in promptBuilders.js.
+    ['ageBandRoutine', 'age-band-routine.txt'],
+    ['ageBandQuest', 'age-band-quest.txt'],
+    ['ageBandTries', 'age-band-tries.txt'],
+    ['ageBandFearChoice', 'age-band-fear-choice.txt'],
+    ['ageBandJourney', 'age-band-journey.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],
     ['boundingBoxDetection', 'bounding-box-detection.txt'],
     ['repairVerification', 'repair-verification.txt'],

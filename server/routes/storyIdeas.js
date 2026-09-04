@@ -204,20 +204,20 @@ ${adventureGuideContent}`
   // and sampled ACROSS categories with the five AI-default categories (A, C, D,
   // F, G) capped, so variety comes from the sample itself. ~40 entries is ~900
   // tokens (~$0.003/call); a fresh sample per call varies a customer's stories.
-  // A book for a main character of three or under has no challenge at all, so
-  // there is nothing to sample for (the catalogue's lowest band is 3–5 anyway).
-  const { buildToddlerModeSection, resolveAgeMode } = require('../lib/promptBuilders');
-  const toddlerModeSection = buildToddlerModeSection({ characters });
-  const isToddler = resolveAgeMode({ characters }) === 'toddler';
+  // The three simple bands (routine/quest/tries) carry no budgeted challenge at
+  // all, so there is nothing to sample for — challengeCatalogueBands returns an
+  // empty list for them, and picks the bands for every other age.
+  const { buildAgeModeSection, resolveAgeBand, challengeCatalogueBands } = require('../lib/promptBuilders');
+  const ageModeSection = buildAgeModeSection({ characters });
+  const bands = challengeCatalogueBands({ characters });
 
   let challengeCatalogueSection = '';
-  if (isToddler) {
-    log.debug('[IDEAS] toddler mode — challenge catalogue skipped');
+  if (!bands.length) {
+    log.debug(`[IDEAS] ${resolveAgeBand({ characters })} band — challenge catalogue skipped`);
   } else try {
     const rawCat = await fs.readFile(path.join(__dirname, '../../prompts', 'challenge-catalogue.txt'), 'utf-8');
     const ages = (characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
     const youngest = ages.length ? Math.min(...ages) : 8;
-    const bands = youngest <= 5 ? ['3'] : youngest <= 8 ? ['3', '6'] : ['6', '9'];
     const entries = rawCat.split('\n')
       .filter(l => l && !l.startsWith('#'))
       .map(l => l.split('|'))
@@ -306,7 +306,7 @@ ${adventureGuideContent}`
     AVAILABLE_LANDMARKS: availableLandmarksSection,
     STORY_LENGTH_CATEGORY: storyLengthCategory,
     CHALLENGE_CATALOGUE: challengeCatalogueSection,
-    TODDLER_MODE: toddlerModeSection,
+    AGE_MODE: ageModeSection,
     LANGUAGE_INSTRUCTION: languageInstruction,
     ...extraReplacements,
   });

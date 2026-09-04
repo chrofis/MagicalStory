@@ -10,7 +10,7 @@ Reading level: {READING_LEVEL}
 
 {STORY_SHAPE}
 
-{TODDLER_MODE}
+{AGE_MODE}
 
 # RULES OF THE TELLING
 - Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.

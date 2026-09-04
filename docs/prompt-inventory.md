@@ -43,7 +43,11 @@ Three loading mechanisms feed these templates:
 | text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines) |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
-| toddler-mode.txt | promptBuilders.js `buildToddlerModeSection` → `{TODDLER_MODE}` in story-trial, story-beats, trial-idea, generate-story-idea(s) | Content rules when the oldest MAIN character is ≤ 3; empty at every other age |
+| age-band-routine.txt | promptBuilders.js `buildAgeModeSection` → `{AGE_MODE}` in arc-create, arc-retell, story-arc-review, story-beats, story-trial, trial-idea, generate-story-idea(s) | Plot shape when the oldest MAIN character is 0–1: a day's rhythm, no plot, naming and repetition |
+| age-band-quest.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 2: one tiny goal, one search place per page, a repeated phrase, cosy close |
+| age-band-tries.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 3: one problem, try-fail / try-fail / try-succeed by the child's own doing |
+| age-band-fear-choice.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 4: something scary faced, resolved by the hero's brave, clever or kind choice |
+| age-band-journey.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 5: mini hero's journey with a required low point the hero's own idea turns |
 | generate-story-ideas.txt | storyIdeas.js `buildIdeasPromptContext` | Wizard story ideas (multi) |
 | generate-story-idea-single.txt | storyIdeas.js `buildIdeasPromptContext` | Wizard story idea (single) |
 | story-idea-requirements-adventure-1/-2.txt | storyIdeas.js `buildIdeasPromptContext` | Idea requirements (adventure) |

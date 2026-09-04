@@ -4326,8 +4326,6 @@ function pickMainCharacters(inputData = {}) {
   return { mains, focus, others: chars.filter(c => !mains.includes(c)) };
 }
 
-const TODDLER_MAX_AGE = 3;
-
 /**
  * Does this character carry any usable trait at all?
  *
@@ -4349,31 +4347,75 @@ function hasAnyTraits(char) {
 }
 
 /**
- * Which age band the story is written for.
+ * Which age band the story is written for — the plot SHAPE a child of that age
+ * can follow (owner, 2026-09-04; supersedes the two-way toddler/standard split
+ * of 2026-08-25, see docs/decisions.md).
  *
- * Owner rule (2026-08-25): the OLDEST main character decides, and secondary
- * characters never do. Two mains aged 5 and 1 get a 5-year-old's story; a
- * 1-year-old main with a 5-year-old secondary gets a toddler's story. Because
- * pickMainCharacters already sorts mains oldest-first, the focus character IS
- * the oldest main.
+ *   0-1 routine     a day's rhythm, no plot
+ *   2   quest       one tiny goal, repeated search
+ *   3   tries       one problem, try-fail-fail-succeed
+ *   4   fear-choice something scary resolved by the hero's own choice
+ *   5   journey     mini hero's journey with a real low point
+ *   6+  standard    the full pipeline behaviour, unchanged
+ *
+ * Owner rule (2026-08-25, retained): the OLDEST main character decides, and
+ * secondary characters never do. Two mains aged 5 and 1 get a 5-year-old's
+ * story; a 1-year-old main with a 5-year-old secondary gets a 1-year-old's.
+ * Because pickMainCharacters already sorts mains oldest-first, the focus
+ * character IS the oldest main.
  *
  * An unreadable or absent age falls back to 'standard' — the existing
  * behaviour, and the safe direction to be wrong in.
  */
-function resolveAgeMode(inputData = {}) {
+const AGE_BANDS = ['routine', 'routine', 'quest', 'tries', 'fear-choice', 'journey'];
+
+function resolveAgeBand(inputData = {}) {
   const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
-  return Number.isFinite(age) && age >= 0 && age <= TODDLER_MAX_AGE ? 'toddler' : 'standard';
+  if (!Number.isFinite(age) || age < 0) return 'standard';
+  return AGE_BANDS[age] || 'standard';
 }
 
 /**
- * Content rules for a main character aged 3 or under (prompts/toddler-mode.txt),
- * or '' at every other age. Scope is deliberately narrow — WHAT the story is
- * about and what happens in it. Text length belongs to the reading level and is
- * not touched here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0).
+ * The bands whose books carry no budgeted challenge at all, so the page
+ * arithmetic and the challenge catalogue are skipped rather than run down to
+ * zero: every line of them prices work these stories are not allowed to contain.
  */
-function buildToddlerModeSection(inputData = {}) {
-  if (resolveAgeMode(inputData) !== 'toddler') return '';
-  return PROMPT_TEMPLATES.toddlerMode || '';
+const SIMPLE_BANDS = new Set(['routine', 'quest', 'tries']);
+
+const AGE_BAND_TEMPLATE_KEYS = {
+  routine: 'ageBandRoutine',
+  quest: 'ageBandQuest',
+  tries: 'ageBandTries',
+  'fear-choice': 'ageBandFearChoice',
+  journey: 'ageBandJourney',
+};
+
+/**
+ * The plot-shape rules for the resolved band (prompts/age-band-*.txt), or '' at
+ * age 6 and up. Scope is deliberately narrow — WHAT the story is about and what
+ * happens in it. Text length belongs to the reading level and is not touched
+ * here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0, still standing).
+ */
+function buildAgeModeSection(inputData = {}) {
+  const key = AGE_BAND_TEMPLATE_KEYS[resolveAgeBand(inputData)];
+  return key ? (PROMPT_TEMPLATES[key] || '') : '';
+}
+
+/**
+ * Which catalogue age bands (prompts/challenge-catalogue.txt column 5) a story
+ * may draw obstacles from. The three simple bands take none — their single
+ * obstacle, where they have one, comes from their own band file. The peril
+ * filter is NOT here: it stays keyed on the YOUNGEST cast member at each call
+ * site, being a safety rule rather than a plot-shape one.
+ */
+function challengeCatalogueBands(inputData = {}) {
+  const band = resolveAgeBand(inputData);
+  if (SIMPLE_BANDS.has(band)) return [];
+  if (band === 'fear-choice') return ['3'];
+  if (band === 'journey') return ['3', '6'];
+  const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
+  const youngest = ages.length ? Math.min(...ages) : 8;
+  return youngest <= 5 ? ['3'] : youngest <= 8 ? ['3', '6'] : ['6', '9'];
 }
 
 /**
@@ -4407,19 +4449,27 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const { mains, focus, others } = pickMainCharacters(inputData);
   const topic = String(inputData.storyTopic || inputData.storyTheme || '').trim();
 
-  // A book for a child of three or under has no challenge to budget pages for,
-  // so the arithmetic below is skipped entirely rather than run down to zero:
-  // every line of it prices challenges the story is not allowed to contain.
-  // The content rules themselves live in prompts/toddler-mode.txt.
-  if (resolveAgeMode(inputData) === 'toddler') {
+  const band = resolveAgeBand(inputData);
+  const mainName = focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character';
+  const othersNames = others.map(c => c.name).join(', ');
+  const shapeHeader = '# STORY SHAPE (fixed by the age of the main character — not yours to change)';
+  const alongside = othersNames
+    ? `Everyone else — ${othersNames} — is simply there alongside the main character. No moment of their own, no arc.`
+    : '';
+
+  // The three simple bands carry no budgeted challenge, so the arithmetic below
+  // is skipped entirely rather than run down to zero: every line of it prices
+  // challenges these stories are not allowed to contain. The content rules
+  // themselves live in prompts/age-band-{routine,quest,tries}.txt.
+  if (band === 'routine') {
     return [
-      '# STORY SHAPE (fixed by the age of the main character — not yours to change)',
+      shapeHeader,
       '',
       `Pages: ${pages}. ${pages} different moments, one per page — each shows something the page before it did not.`,
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
-      `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — every page is theirs to enjoy, none is theirs to solve.`,
+      `Main character: ${mainName} — every page is theirs to enjoy, none is theirs to solve.`,
       'Challenges: one, small. Something is taken, dropped or will not work, the main character minds, and it is put right within a page or two. Nothing they must work out, nothing frightening.',
       'Feelings: three different ones across the book, plain on the face — delight, surprise, and a moment of being upset. The last page is happy.',
       // Traits are optional — plenty of characters carry none (owner,
@@ -4428,10 +4478,43 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       hasAnyTraits(focus)
         ? 'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.'
         : 'No traits are recorded for them, so the pages come from what every small child is: hungry, sleepy, curious, delighted, grumpy.',
-      others.length
-        ? `Everyone else — ${others.map(c => c.name).join(', ')} — is simply there alongside the main character. No moment of their own, no arc.`
-        : '',
+      alongside,
       `Page budget: ${pages} pages, ${pages} distinct events. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
+    ].filter(Boolean).join('\n');
+  }
+
+  if (band === 'quest') {
+    const searchPages = Math.max(2, pages - 2);
+    return [
+      shapeHeader,
+      '',
+      `Pages: ${pages}. Opening 1, ${searchPages} places searched at one place per page, ending 1.`,
+      topic
+        ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
+        : '',
+      `Main character: ${mainName} — they do the looking and they do the finding.`,
+      'Goal: one tiny thing, named on the first page and found near the end. No second goal, no subplot, no twist.',
+      `Search pattern: look in ${searchPages} places, one per page, each a new place with a new thing to see there. The same call or question is repeated word for word at every one of them.`,
+      'Feelings: friendly throughout — no danger, no villain, nobody unkind. The last page is happy.',
+      alongside,
+      'Ending: the thing is found, then home, a meal or sleep.',
+    ].filter(Boolean).join('\n');
+  }
+
+  if (band === 'tries') {
+    const tryPages = Math.max(3, pages - 2);
+    return [
+      shapeHeader,
+      '',
+      `Pages: ${pages}. Opening 1, the three tries ${tryPages}, ending 1.`,
+      topic
+        ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
+        : '',
+      `Main character: ${mainName} — the problem is theirs and the solving is theirs.`,
+      'Challenges: one, met three times — two tries fail, the third succeeds by the main character\'s own doing. Never luck, never a grown-up doing it for them.',
+      'Feelings: named plainly, one per turn of the story — sad, then helped, then happy.',
+      alongside,
+      'Ending: the problem is solved and somebody is glad.',
     ].filter(Boolean).join('\n');
   }
 
@@ -4465,16 +4548,24 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const challenges = `exactly ${majors}`;
 
   const level = String(inputData.languageLevel || 'standard').toLowerCase();
-  const focusAge = parseInt(focus?.age, 10) || 0;
   const simplest = level.includes('1st') || level.includes('early') || pages <= 10;
   const mainLine = mains.length >= 2
     ? `Main characters: ${mains.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ')} — at most two carry a book. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
-    : `Main character: ${focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character'} — carries the challenges and the one visible change; the ending belongs to them.`;
-  const difficulty = simplest
+    : `Main character: ${mainName} — carries the challenges and the one visible change; the ending belongs to them.`;
+  const levelDifficulty = simplest
     ? 'Simplest level: every challenge is one a small child solves by trying, asking or noticing. Nothing frightening beyond a moment.'
-    : (focusAge && focusAge <= 5)
-      ? 'The focus character is very young, so the challenges stay simple even at this reading level: no long plans, no reasoning a small child could not follow.'
-      : 'The reading level allows real difficulty: a setback that lasts, a choice with a cost, a darker middle — still resolved.';
+    : 'The reading level allows real difficulty: a setback that lasts, a choice with a cost, a darker middle — still resolved.';
+  // The band rule rides ALONGSIDE the reading-level line rather than replacing
+  // it: length governs how hard the sentences are, the band governs what shape
+  // the resolution takes. This pair replaces the old blanket "focus is under
+  // six, so keep it simple" soften, which flattened exactly the two bands that
+  // are supposed to carry a real fear and a real low point.
+  const bandDifficulty = band === 'fear-choice'
+    ? 'Challenges resolve through the main character\'s own choice — a brave, clever or kind act. An opponent is beaten by wit or kindness, never by force. Nothing frightening beyond the fear the story is about.'
+    : band === 'journey'
+      ? 'A real low point before the end is required: the plan has failed and it looks like it will stay that way. The main character\'s own idea turns it — never luck, never a grown-up arriving to fix it.'
+      : '';
+  const difficulty = [levelDifficulty, bandDifficulty].filter(Boolean).join('\n');
 
   // Arc stage: the story, not the page allocation. The subject and cast are
   // already binding in the commission; the page budget belongs to the beats.
@@ -4643,7 +4734,8 @@ function buildStoryContextFields(inputData) {
 // category caps).
 let challengeCatalogueCache = null;
 function buildChallengeIdeasSection(inputData, count = 15) {
-  if (resolveAgeMode(inputData) === 'toddler') return '';
+  const bands = challengeCatalogueBands(inputData);
+  if (!bands.length) return '';
   try {
     if (challengeCatalogueCache === null) {
       challengeCatalogueCache = require('fs').readFileSync(
@@ -4651,7 +4743,6 @@ function buildChallengeIdeasSection(inputData, count = 15) {
     }
     const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
     const youngest = ages.length ? Math.min(...ages) : 8;
-    const bands = youngest <= 5 ? ['3'] : youngest <= 8 ? ['3', '6'] : ['6', '9'];
     const entries = challengeCatalogueCache.split('\n')
       .filter(l => l && !l.startsWith('#'))
       .map(l => l.split('|'))
@@ -4735,9 +4826,15 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     return null;
   }
   const ctx = buildStoryContextFields(inputData);
-  const readerLine = resolveAgeMode(inputData) === 'toddler'
-    ? 'toddler age'
-    : `elementary-school age (about ${readerAge(inputData)} years old)`;
+  const READER_LINES = {
+    routine: 'toddler age (under two)',
+    quest: 'toddler age (about two)',
+    tries: 'preschool age (about three)',
+    'fear-choice': 'preschool age (about four)',
+    journey: 'kindergarten age (about five)',
+  };
+  const readerLine = READER_LINES[resolveAgeBand(inputData)]
+    || `elementary-school age (about ${readerAge(inputData)} years old)`;
   return fillTemplate(template, {
     LANGUAGE: ctx.LANGUAGE,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
@@ -4754,7 +4851,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
       '',
       buildStoryBriefBody(inputData),
     ].join('\n'),
-    TODDLER_MODE: buildToddlerModeSection(inputData),
+    AGE_MODE: buildAgeModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
@@ -4844,7 +4941,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
-    TODDLER_MODE: buildToddlerModeSection(inputData),
+    AGE_MODE: buildAgeModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
@@ -4878,7 +4975,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
-    TODDLER_MODE: buildToddlerModeSection(inputData),
+    AGE_MODE: buildAgeModeSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -5236,7 +5333,7 @@ function buildArcReviewPrompt(inputData, arc, auditFindings = '') {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: inputData.pages || (inputData.sceneImages || []).length || 10,
     STORY_SHAPE: buildStoryShapeSection(inputData, inputData.pages || (inputData.sceneImages || []).length || 10),
-    TODDLER_MODE: buildToddlerModeSection(inputData),
+    AGE_MODE: buildAgeModeSection(inputData),
     CURRENT_ARC: String(arc || '').trim(),
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
   });
@@ -6073,7 +6170,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       LANGUAGE_NOTE: getLanguageNote(language),
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
-      TODDLER_MODE: buildToddlerModeSection(inputData),
+      AGE_MODE: buildAgeModeSection(inputData),
       AVATAR_SELECTION: avatarSelection,
       LANDMARKS: landmarksInstruction,
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
@@ -6303,8 +6400,9 @@ module.exports = {
   faultsByCategory,
   buildStoryShapeSection,
   pickMainCharacters,
-  resolveAgeMode,
-  buildToddlerModeSection,
+  resolveAgeBand,
+  buildAgeModeSection,
+  challengeCatalogueBands,
   parseArcReview,
   buildClothingReviewPrompt,
   parseClothingReview,

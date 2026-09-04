@@ -20,7 +20,7 @@ The arc above delivers the commission; keep its names and world as written.
 
 {AVAILABLE_LANDMARKS_SECTION}
 
-{TODDLER_MODE}
+{AGE_MODE}
 
 # PAGE PLAN
 

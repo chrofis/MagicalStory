@@ -25809,3 +25809,64 @@ inline URLs → `photoAnalyzerClient`)
 still ships Python until the service is proven, because stripping it first would
 take every analyzer call down. Plan and remaining steps:
 `tasks/analyzer-service-split-2026-09-04.md`
+
+---
+
+## Five whole-year age bands replace toddler-vs-standard (2026-09-04)
+
+**Context:** The pipeline had three age regimes: toddler mode when the oldest
+MAIN character was ≤ 3 (`prompts/toddler-mode.txt`, 2026-08-25), a blanket
+"focus character is under six, keep the challenges simple" soften inside
+`buildStoryShapeSection`, and standard for everyone else. That put a one-year-old
+and a three-year-old on identical rules, and flattened four- and five-year-olds —
+the ages that are supposed to carry a real fear and a real low point — into the
+same "nothing difficult" instruction.
+
+**Decision:** Five whole-year plot bands below six, each with its own prompt file
+and its own story-shape block, resolved by `resolveAgeBand(inputData)`:
+
+| Age | Band | Plot shape |
+|---|---|---|
+| 0–1 | `routine` | a day's rhythm, no plot; naming and repetition are the payoff |
+| 2 | `quest` | one tiny goal, one search place per page with a repeated phrase |
+| 3 | `tries` | one problem, try-fail / try-fail / try-succeed by the child's own doing |
+| 4 | `fear-choice` | something scary resolved by the hero's brave, clever or kind choice |
+| 5 | `journey` | mini hero's journey with a required low point the hero's own idea turns |
+| 6+ | `standard` | unchanged current behaviour |
+
+Owner rulings behind this: the full five-band system (not a two- or three-way
+split), whole-year ages mapped one year per band with 6+ standard, and the
+**oldest-main rule retained** from 2026-08-25 — the oldest MAIN character
+decides and secondaries never do. An unreadable or absent age falls to
+`standard`, as before.
+
+Mechanically: `{TODDLER_MODE}` is renamed `{AGE_MODE}` in all eight templates
+that carry it; `routine`/`quest`/`tries` skip the page-budget arithmetic and the
+challenge catalogue entirely (`challengeCatalogueBands` returns `[]`);
+`fear-choice` draws catalogue band `['3']` and `journey` `['3','6']`; the peril
+filter stays keyed on the YOUNGEST cast member, being a safety rule rather than a
+plot-shape one. The `focusAge <= 5` soften is deleted — a band-specific
+difficulty line now rides alongside the reading-level line instead.
+
+**Rationale:** These are five developmentally distinct book forms, not one form
+with a dial. A two-year-old's book is a repeated search with a phrase to join in
+on; a five-year-old's is a hero's journey with a low point — writing both from
+"keep it simple, nothing frightening" produces the wrong book twice. Keying on
+whole years rather than ranges is what the owner asked for and is what makes the
+mapping auditable: each band file states one shape, and the resolver is a table
+lookup. Reading level is untouched (2026-08-25 §0 still stands): these rules
+govern WHAT happens in the story, never how long the sentences are.
+
+**Touched files:** `server/lib/promptBuilders.js` (`resolveAgeBand`,
+`buildAgeModeSection`, `challengeCatalogueBands`, `SIMPLE_BANDS`, per-band
+`buildStoryShapeSection` blocks, band difficulty lines, `READER_LINE`),
+`server/services/prompts.js` (five new template registrations),
+`prompts/age-band-{routine,quest,tries,fear-choice,journey}.txt` (new),
+`prompts/toddler-mode.txt` (deleted), the eight `{AGE_MODE}` templates,
+`server/routes/trial.js`, `server/routes/storyIdeas.js`,
+`tests/unit/age-band.test.ts` (replaces `toddler-mode.test.ts`),
+`scripts/analysis/verify-toddler-carry.js`, `scripts/analysis/toddler-page-review.js`
+
+**Status:** ✅ active — supersedes the ≤ 3 toddler boundary of 2026-08-25
+(`tasks/toddler-mode-2026-08-25.md`), whose content rules survive as the
+`routine` band. Staging only at time of writing; not pushed to master.

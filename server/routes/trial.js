@@ -2082,8 +2082,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Load prompt template from prompts/trial-idea.txt
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
-    const { buildToddlerModeSection, resolveAgeMode } = require('../lib/promptBuilders');
-    const isToddler = resolveAgeMode({ characters }) === 'toddler';
+    const { buildAgeModeSection } = require('../lib/promptBuilders');
 
     const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
       CHARACTER: charDesc,
@@ -2091,7 +2090,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       TITLE: trialTitle || '',
       LANDMARKS: landmarksText,
       LANG_INSTRUCTION: langInstruction,
-      TODDLER_MODE: buildToddlerModeSection({ characters }),
+      AGE_MODE: buildAgeModeSection({ characters }),
     });
     // The two ideas exist to offer a real choice, so they differ in KIND, not
     // just in detail (owner, 2026-08-25): one grounded in the child's own town

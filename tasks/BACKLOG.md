@@ -172,7 +172,10 @@ The first two are corroborated by more than one source, which is why they lead.
       story `job_1787683120734_qkgfbd86o` the two collided: pages 1-5 are on a pirate ship at sea,
       then p6 opens "Später sitzt Leynor am Stüssibrunnen in Dübendorf" — an unexplained teleport on
       the last page. Fix is a choice: drop the landmark requirement in toddler mode, or set the whole
-      story at the landmark from p1. → `prompts/story-trial.txt` (LANDMARKS), `prompts/toddler-mode.txt`
+      story at the landmark from p1. STILL OPEN after the 2026-09-04 age-band split — the rule now
+      lives in the `routine` and `quest` band files, which both keep "opens and closes where the child
+      really is". → `prompts/story-trial.txt` (LANDMARKS), `prompts/age-band-routine.txt`,
+      `prompts/age-band-quest.txt`
       SECOND occurrence, same shape: `job_1787687259758_k7mennm8c` p1-p5 are on a pirate ship at sea,
       p6 opens "Nach dem grossen Abenteuer auf dem Piratenschiff sitzt Leynor am Lindenhofbrunnen in
       Dübendorf". Every toddler story with a landmark has done this, so it is systematic, not luck.
@@ -186,7 +189,9 @@ The first two are corroborated by more than one source, which is why they lead.
       level is `1st-grade`); `toddler` exists only as body proportions. Prod trial
       `job_1787647410717_5dvfqu8jg` gave a 1-year-old main a solo train journey, a map to reason
       from, and 100–140 words/page. Trigger rule settled by owner: oldest MAIN character ≤ 3.
-      → `tasks/toddler-mode-2026-08-25.md`
+      SUPERSEDED 2026-09-04 by the five whole-year age bands (0–1 routine, 2 quest, 3 tries,
+      4 fear-choice, 5 journey, 6+ standard); the oldest-MAIN trigger rule was retained.
+      → `tasks/toddler-mode-2026-08-25.md`, `docs/decisions.md` (2026-09-04 age-band entry)
 - ~~The trial ignores reading level entirely~~ — **won't do (owner, 2026-08-25: "leave trial on 100
       words per page that is fine")**. `prompts/story-trial.txt:14` and `:181` hardcode "100–140 words
       per page" and never reference `{READING_LEVEL}`; the `1st-grade`-trial consequence is known and

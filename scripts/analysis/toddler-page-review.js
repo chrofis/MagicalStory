@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Dump a story's pages against the toddler-mode rules so the prose can be
- * judged page by page (prompts/toddler-mode.txt).
+ * Dump a story's pages against the age-band plot rules so the prose can be
+ * judged page by page (prompts/age-band-*.txt).
  *
  * Prints the page text and the scene brief's prose for each page, plus a set of
  * mechanical flags for the rules that are literally checkable. The flags are a
@@ -22,7 +22,7 @@ if (!storyId) {
   process.exit(1);
 }
 
-// Words that signal the story shapes toddler mode forbids: a quest, a search,
+// Words that signal the story shapes the routine and quest bands forbid: a quest, a search,
 // a rescue, a secret or a prize. German + English, matched on the shipped text.
 const QUEST_WORDS = /\b(schatz|schätze|quest|mission|rätsel|geheimnis|geheime|karte|hinweis|spur|retten|rettung|gewinn|preis|beute|suche|suchen|gesucht|versteckt|vergraben|treasure|clue|riddle|secret|rescue|prize|hunt)\b/gi;
 const SWEETS = /\b(süssigkeit|süßigkeit|bonbon|schokolade|kuchen|eis|glace|zucker|keks|candy|chocolate|ice cream|sweets|cookie)\b/gi;

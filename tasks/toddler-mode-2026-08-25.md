@@ -1,5 +1,11 @@
 # Toddler mode (ages 1–3) — plan
 
+> **SUPERSEDED 2026-09-04** by the five whole-year age bands (0–1 routine, 2 quest, 3 tries,
+> 4 fear-choice, 5 journey, 6+ standard). The ≤ 3 boundary and `prompts/toddler-mode.txt` are gone;
+> the content rules below survive as the `routine` band. The oldest-MAIN trigger rule and the
+> "reading level is untouched" ruling (§0) both still stand. → `docs/decisions.md`,
+> "Five whole-year age bands replace toddler-vs-standard (2026-09-04)"
+
 **Date:** 2026-08-25
 **Owner decision:** stories for 1–3 year olds are a distinct book form, not a shortened 5-year-old book.
 **Trigger rule (settled by owner, 2026-08-25):** toddler mode is on when the **oldest MAIN character is ≤ 3**.
