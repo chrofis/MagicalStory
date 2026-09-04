@@ -4576,6 +4576,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       '',
       mainLine,
       `Build the story on ${challengeBudget} challenges.`,
+      alongside,
       difficulty,
     ].join('\n');
   }
