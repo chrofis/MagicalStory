@@ -66,6 +66,7 @@ const TOPIC_PATTERNS: Record<string, RegExp> = {
   'making-friends': /making.*friends|echte freunde finden|se faire.*amis/i,
   'sharing': /learning.*share|teilen lernen|apprendre.*partager/i,
   'managing-emotions': /managing.*emotions|grosse gefühle|gérer.*émotions/i,
+  'telling-truth': /telling.*truth|die wahrheit sagen|dire la vérité/i,
   'pirate': /pirate|piraten/i,
   'space': /space.*explorer|weltraum|espace/i,
   'dinosaur': /dinosaur|dinosaurier|dinosaure/i,
@@ -1095,6 +1096,24 @@ test.describe('Demo Story Generation', () => {
       throw new Error(`Could not find topic button for: ${entry.storyTopic}`);
     }
     await page.waitForTimeout(1000);
+
+    // A WORLD layered on top of a non-adventure lesson — e.g. "telling the
+    // truth" set in a superhero world. The wizard renders its "Optional: add an
+    // adventure theme" grid only AFTER a topic is chosen, which is why this runs
+    // here and not with the category. For an `adventure` entry the theme IS the
+    // topic and was already clicked above, so this is skipped.
+    if (entry.storyTheme && entry.storyCategory !== 'adventure') {
+      const themePattern = TOPIC_PATTERNS[entry.storyTheme];
+      if (!themePattern) {
+        throw new Error(`No TOPIC_PATTERNS entry for storyTheme '${entry.storyTheme}'`);
+      }
+      console.log(`  Adding optional world theme: ${entry.storyTheme}...`);
+      const themeBtn = page.locator('button').filter({ hasText: themePattern }).first();
+      await expect(themeBtn).toBeVisible({ timeout: 20000 });
+      await themeBtn.click();
+      await page.waitForTimeout(1000);
+    }
+
     // Selecting an adventure theme auto-advances the wizard to the Style
     // step (handleThemeChange → safeSetStep(4)). Only click Next if we are
     // still on the Story step — otherwise we'd skip straight past Style.
