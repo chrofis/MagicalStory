@@ -1131,7 +1131,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // Resolve landmarks and VB grid for Grok reference slots
           // (sceneMetadata is parsed above, before the cell crop that needs it)
-          const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
+          const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata, { pageNumber: page.pageNumber });
           // Wait for the parallel ref-sheet generation (started in onVisualBible
           // alongside empty scenes + costumed avatars) before reading element
           // refs — otherwise getElementReferenceImagesForPage returns an empty
@@ -2356,8 +2356,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // beatsResult carries the parsed pages + already-expanded scenes when the
     // beats pipeline ran; null on the unified path.
     let beatsResult = null;
-    try {
-    if (beatsMode) {
+    // One writer invocation via the beats pipeline. Also the retry unit for the
+    // hard landmark minimum below: a re-run repeats the paid text stages, so it
+    // runs at most twice per job. Safe to call again — onClothingRequirementsReady
+    // is idempotent (see its declaration), so avatars never double-start.
+    const runBeatsWriter = async () => {
       beatsResult = await generateStoryViaBeats(inputData, {
         jobId,
         genLog,
@@ -2390,6 +2393,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedResponse = beatsResult.rawOutline;
       unifiedModelId = beatsResult.meta?.textModelId || modelOverrides.outlineModel;
       unifiedUsage = { input_tokens: 0, output_tokens: 0 };
+    };
+    try {
+    if (beatsMode) {
+      await runBeatsWriter();
     } else {
       const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
         progressiveParser.processChunk(chunk, fullText);
@@ -2409,6 +2416,40 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📊 [UNIFIED] Story usage - model: ${unifiedModelId}, provider: ${unifiedProvider}, input: ${unifiedUsage.input_tokens}, output: ${unifiedUsage.output_tokens}`);
     // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
     log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
+
+    // ── Hard landmark minimum (owner ruling, 2026-09-04) ──
+    // When the reader's location is the BINDING setting (premiseNamedWorld=false)
+    // and real landmarks were offered to the writer, the story MUST build in at
+    // least two of them — the landmark section's "builds two to four of them in"
+    // is a requirement, not an invitation. Enforced post-parse: count VB
+    // locations with isRealLandmark and a non-empty page list (the parser
+    // already drops real-landmark entries staged on no page, so this counts
+    // what survives). One full writer retry, mirroring the OUTLINE-REVIEW
+    // attempt pattern below; two strikes fail the job loudly — never silently
+    // continue. Beats mode only: the streaming path (trials) launches scene
+    // expansions mid-stream, so a post-hoc rewrite could not retract them.
+    if (beatsMode && inputData.premiseNamedWorld === false && (inputData.availableLandmarks?.length || 0) > 0) {
+      const countStagedLandmarks = (text) => {
+        const vb = new UnifiedStoryParser(text).extractVisualBible() || {};
+        return (vb.locations || []).filter(l => l.isRealLandmark && (l.appearsInPages || []).length > 0).length;
+      };
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const stagedCount = countStagedLandmarks(unifiedResponse);
+        if (stagedCount >= 2) {
+          if (attempt > 1) log.info(`✅ [LANDMARK-MIN] Writer retry staged ${stagedCount} real landmark(s) — minimum met`);
+          break;
+        }
+        if (attempt < 2) {
+          log.error(`🚨 [LANDMARK-MIN] Binding location offered ${inputData.availableLandmarks.length} landmark(s) but the story staged only ${stagedCount} (minimum 2) — retrying the writer once`);
+          genLog.error('landmark_minimum', `Story staged ${stagedCount} real landmark(s); the binding location requires at least 2 — retrying the outline`);
+          await checkCancellation();
+          await runBeatsWriter();
+        } else {
+          genLog.error('landmark_minimum_failed', `Story staged ${stagedCount} real landmark(s) after a writer retry; the binding location requires at least 2 — failing the job`);
+          throw new Error(`Landmark minimum not met: the story staged ${stagedCount} real landmark(s) from the offered list after one writer retry (minimum 2 when the reader's location is the binding setting)`);
+        }
+      }
+    }
 
     // ── Split outline review (cross-model: writer drafted, reviewer critiques) ──
     // With MODEL_DEFAULTS.splitOutlineReview ON, call 1 (writer) skipped its
@@ -3552,7 +3593,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             };
           }
         }
-        const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
+        const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber: pageNum });
         // The page prompt lists the scene's objects[] (the Art Director's pick);
         // pass the same ids so a prop the prompt describes brings its reference
         // image even when the VB filed it under a different page.

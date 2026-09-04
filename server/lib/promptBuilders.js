@@ -6142,7 +6142,7 @@ function buildAvailableLandmarksSection(landmarks) {
 
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
 
-  return `**REAL LANDMARKS — use only where they belong to the world the commission names. A story set in their world may build two to four of them in; a story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. Never relocate the story or bend the plot to reach one; a landmark carried as background scenery counts as used:**
+  return `**REAL LANDMARKS — use only where they belong to the world the commission names. A story set in their world builds two to four of them in; a story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. Never relocate the story or bend the plot to reach one; a landmark carried as background scenery counts as used:**
 
 ${landmarkList}
 
