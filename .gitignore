@@ -187,6 +187,11 @@ drafts/
 # three things deliberately NOT built (reading level, refrain form, trial word
 # count). Untracked, those pointers dangle for the next agent.
 !tasks/toddler-mode-2026-08-25.md
+# An owner-chosen architectural plan, not a session plan: BACKLOG.md and the
+# decisions.md entries both point at it for the measured cache composition and
+# for the risk list. The split spans two Dockerfiles and a Railway service, so it
+# will outlive whichever session finishes it.
+!tasks/analyzer-service-split-2026-09-04.md
 
 # ─── Credentials: never commit ────────────────────────────────────────────────
 # Google OAuth client secret + Search Console refresh token, minted by
