@@ -507,6 +507,15 @@
       "status": "fixed",
       "fixedIn": "staging e89b26d63 (2026-09-03)",
       "note": "RETRACTION — this entry originally claimed the collision had silently broken GroundingDINO in production since late August. THAT WAS WRONG, corrected by the owner. Evidence against it: staging story_metrics carry sam_calls/dino_calls on every substantial story through 2026-09-02, and the production stories with no dino counters are all 6-page ~140s unified TRIAL runs (which skip figure detection) — every 18-page beats story has them, including one on 2026-08-25 sitting between trials. The 'cannot import name ExportOptions' error I reproduced in a fresh shell is a KNOWN first-import race already documented and retried at photo_analyzer.py:2130 (2026-08-23); inside the analyzer torch is already imported, so DINO and SAM were working throughout. FIX (still worth it on its own terms): pin torch==2.1.2+cpu / torchvision==0.16.2+cpu — 2.1.2 is the version the numpy co-pin already forced, so this makes the second resolution a no-op instead of an overwrite. Verified on staging: a single torch-2.1.2+cpu.dist-info, nvidia tree gone, python stack 7.8 GB -> 3.8 GB, transformers imports in a cold shell, and GroundingDinoForObjectDetection + ultralytics SAM both load from the baked cache. A build-time assertion (torch must end in +cpu) now fails the build if a second torch ever lands again."
+    },
+    {
+      "id": "merge-landmark-descriptions-slot-number-rerun",
+      "title": "merge-landmark-descriptions.js --apply-discards discards by SLOT NUMBER against the live row, so a re-run of the same descs dir after a compaction deletes the photo that shifted into that slot",
+      "reportedAt": "2026-09-04",
+      "source": "Owner-reported; reproduced from stored evidence: scratchpad dirs lm_desc2/lm_w1..w4 (manifests + discards.json) vs prod landmark_index rows matched to the pre-run staging rows on wikidata_qid. Prod order is a strict subsequence of staging for 345/350 affected landmarks, yet prod holds 958 photo slots where staging-minus-true-discards implies ~1076 — ~118 surviving photos wrongly removed (row columns NULLed, landmark_photo_scores rows dropped, R2 object deleted by deleteStoredPhotos). Example #6652 Torneresse: staging 3 photos, one true discard (slot 2 duplicate), prod now holds 1.",
+      "status": "open",
+      "fixedIn": null,
+      "note": "planCompaction() keyed discards on slot numbers the agent saw at prep time; after the first compaction those numbers point at different photos, and the merge treats an occupied slot as still-to-discard. Kept descriptions had the same defect on the plain path (written at the prep-time slot number). Fix: prep writes the per-slot source URL into manifest.json; merge applies a discard only when the live slot still holds that URL and writes a kept description to whichever live slot holds the photo now (skipped with a log line otherwise). Data repair: scripts/admin/repair-landmark-slots-2026-09-04.js rebuilds the intended layout from staging (by wikidata_qid) minus the true discards, restores scores + R2 copies."
     }
   ]
 }

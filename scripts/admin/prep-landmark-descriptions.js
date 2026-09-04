@@ -147,7 +147,10 @@ const thumbUrl = url => commonsThumbUrl(url, 900);
   for (const [i, l] of rows.entries()) {
     const file = `${l.id}_${l.slot}.jpg`;
     const dest = path.join(OUT, file);
-    const entry = { id: l.id, slot: l.slot, file, name: l.name, type: l.type, city: l.town };
+    // `url` is the slot's Commons source at prep time: merge-landmark-descriptions.js
+    // applies a discard / description only to the live slot that still holds it,
+    // so a re-run after a compaction cannot hit the photo that shifted into the slot.
+    const entry = { id: l.id, slot: l.slot, file, name: l.name, type: l.type, city: l.town, url: l.url };
     if (fs.existsSync(dest) && fs.statSync(dest).size > 2000) {   // resume
       manifest.push(entry); ok++;
       if (manifest.length % BATCH === 0) writeManifest();
@@ -192,7 +195,7 @@ const thumbUrl = url => commonsThumbUrl(url, 900);
     // Batch id keyed on content (first image's id+slot), never the loop index.
     fs.writeFileSync(path.join(OUT, 'batches.json'), JSON.stringify(batches.map(b => ({
       batch: b[0].id * 10 + b[0].slot, dir: OUT, brief: BRIEF,
-      items: b.map(x => ({ id: x.id, slot: x.slot, file: x.file, name: x.name, type: x.type, city: x.city })),
+      items: b.map(x => ({ id: x.id, slot: x.slot, file: x.file, name: x.name, type: x.type, city: x.city, url: x.url })),
     })), null, 1));
   }
 
