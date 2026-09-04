@@ -1,0 +1,145 @@
+# The Python photo-analyzer, as its OWN Railway service.
+#
+# WHY IT LEFT THE WEB CONTAINER (2026-09-04, measured — docs/decisions.md).
+# Railway bills a container's page cache as used memory. Every analyzer worker
+# spawn maps this ML stack's shared objects in, and those pages stay resident
+# after the worker exits. Measured with mincore(2) on staging 21.4 h after a
+# story: 1,361 MB attributable of 1,603 MB resident — libtensorflow_cc 378 MB,
+# libtorch_cpu 185 MB, libllvmlite 154 MB, cv2 63 MB. `anon` additionally peaked
+# at 9.85 GB during the parallel illustration burst. All of that sat in the
+# container serving the website. Here it is isolated, and this service can sleep
+# between stories while the web service never does.
+#
+# BASE IMAGE IS node:22 ON PURPOSE, even though nothing here runs Node.
+# It is the base the working image already used, so the OS, the python3.11 build
+# and every dist-packages path stay byte-identical to what is in production
+# today. This file's pip layers have a documented history of subtle, silent
+# breakage (the numpy co-pin, typing_extensions ordering, the torch collision
+# found on 2026-09-03) — moving to python:3.11-bookworm at the same time as
+# splitting the service would change two variables at once and make any failure
+# ambiguous. Switching to a slim python base is a follow-up, worth ~1.1 GB of
+# DISK; it is not worth memory, because image size is not what Railway bills
+# (a fresh container on the same 12 GB image idles at 26-90 MB of cache).
+FROM node:22
+
+# Install Python and pip
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt ./
+
+# ── The pip layers below are VERBATIM from the single-image Dockerfile, in the
+# ── same order. That order is load-bearing; each comment records a bug it fixes.
+
+# Torch CPU build FIRST — requirements.txt's ultralytics depends on torch,
+# and without a preinstalled CPU build pip resolves the default Linux wheels,
+# which drag in ~2.5GB of CUDA libraries this CPU-only container can't use.
+#
+# THE VERSION MUST BE PINNED, AND PINNED WITH ITS `+cpu` LOCAL VERSION (bug
+# torch-double-install-cuda-bloat, 2026-09-03). A bare `torch torchvision` takes
+# whatever is NEWEST on the CPU index (2.14.0+cpu by September); the
+# `-r requirements.txt` layer below then resolves torch a SECOND time against
+# PyPI, where the numpy==1.24.3 co-pin forces 2.1.2, and installs that CUDA wheel
+# straight over the first one — leaving two dist-infos, a 2.1.2 version stamp on
+# a 2.14 file layout, and 2.9 GB of nvidia libraries. 2.1.2 is not a new choice;
+# it is what the co-pin already forced. torchvision 0.16.2 is its match.
+#
+# numpy MUST be co-pinned here to the same version requirements.txt pins.
+# Without it, torch pulls numpy 2.x, and the later `-r requirements.txt`
+# DOWNGRADE to numpy==1.24.3 leaves a mixed 2.x/1.x tree in dist-packages
+# (--break-system-packages overlay) → `AttributeError: numpy._globals has no
+# attribute '_signature_descriptor'` at import → the whole Python service
+# (face detection, rembg, MobileSAM) failed to boot on every staging deploy
+# from 2026-07-10 21:28 onward. Co-pinning makes the second install a no-op
+# for numpy so no downgrade ever happens.
+RUN pip3 install --no-cache-dir --break-system-packages \
+    --timeout 120 --retries 5 \
+    --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple \
+    "torch==2.1.2+cpu" "torchvision==0.16.2+cpu" "numpy==1.24.3"
+
+# Install Python dependencies. mediapipe / opencv are large (>30 MB each) and
+# files.pythonhosted.org occasionally stalls mid-download — give pip more
+# breathing room and let it retry rather than failing the whole build.
+# (--break-system-packages is safe in Docker containers.)
+RUN pip3 install --no-cache-dir --break-system-packages \
+    --timeout 120 --retries 5 \
+    -r requirements.txt
+
+# MobileSAM weights baked into the image so cold starts don't re-download.
+# photo_analyzer.py reads MOBILESAM_WEIGHTS (get_mobilesam).
+RUN curl -fL -o /app/mobile_sam.pt \
+    https://github.com/ultralytics/assets/releases/download/v8.3.0/mobile_sam.pt
+ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
+
+# GroundingDINO-base weights pre-fetched into the image (~900MB) so the
+# /detect-figures-text cold start doesn't download from HuggingFace at runtime.
+# Cache lives under HF_HOME; photo_analyzer.py reads GROUNDINGDINO_MODEL.
+# REQUIRED: FIGURE_DETECTION_BACKEND is grounding-dino in every environment,
+# confirmed live via /api/health/config. The pre-fetch stays NON-FATAL so a flaky
+# HuggingFace fetch cannot break the build, but a failure means the first
+# detection call pays a ~900MB download.
+ENV HF_HOME=/app/.hf_cache
+ENV GROUNDINGDINO_MODEL=IDEA-Research/grounding-dino-base
+# MUST RUN BEFORE THE DINO PRE-FETCH (bug staging-analyzer-dino-crashloop,
+# 2026-08-22): requirements.txt's TF 2.13 resolution DOWNGRADES
+# typing_extensions below torch/transformers' floor, so the pre-fetch import
+# below failed, its || WARN swallowed the failure, and the image shipped
+# WITHOUT DINO weights — every runtime load then re-downloaded ~900MB from
+# HF and died. Ordered here, both the pre-fetch and runtime see the working
+# version.
+# deepface's import chain needs typing_extensions>=4.10 (TypeIs) while
+# tensorflow 2.13 declares <4.6, so pip refuses to resolve both from one
+# requirements file. TF runs fine against the newer one — install it separately,
+# after requirements.txt, exactly as the torch CPU build is sequenced above.
+RUN pip3 install --no-cache-dir --break-system-packages "typing_extensions>=4.12"
+
+# FATAL BY DESIGN — everything above this line is now installed, so this is the
+# last moment the build can tell the truth about the Python environment. The
+# pre-fetches below are non-fatal, which is exactly how the torch double-install
+# sat here undetected for weeks: every later step tolerated it.
+RUN python3 -c "import torch, transformers; \
+    assert torch.__version__.endswith('+cpu'), \
+        f'torch is not the CPU build: {torch.__version__} — a second torch was installed over it'; \
+    from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
+    print(f'✓ torch {torch.__version__} / transformers {transformers.__version__} / DINO classes import')"
+
+RUN python3 -c "from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
+    AutoProcessor.from_pretrained('IDEA-Research/grounding-dino-base'); \
+    AutoModelForZeroShotObjectDetection.from_pretrained('IDEA-Research/grounding-dino-base')" \
+    || echo "WARN: GroundingDINO pre-fetch failed — will download lazily at runtime if used"
+
+# ArcFace recognition weights (~137MB) baked in so the first avatar check does
+# not stall on a download. DeepFace looks in $DEEPFACE_HOME/.deepface/weights.
+# NON-FATAL, same reasoning as GroundingDINO above: likeness scoring is a
+# quality gate, not a rendering dependency.
+ENV DEEPFACE_HOME=/app
+RUN python3 -c "from deepface import DeepFace; \
+    DeepFace.build_model('ArcFace')" \
+    || echo "WARN: ArcFace pre-fetch failed — will download lazily on first use"
+
+# Only what the analyzer actually reads at runtime. Deliberately an allowlist,
+# not `COPY . .`: this service has no business holding the client bundle, the
+# server source or the prompts.
+#
+# Reproduces the production image's contents EXACTLY. Note what is NOT here:
+# blaze_face_short_range.tflite (photo_analyzer.py:168, MediaPipe) and
+# yolo11n-pose.pt (POSE_WEIGHTS, /pose-heads) exist on dev machines but are
+# untracked and have never been in the deployed image — so those paths already
+# fall back or fail in production today. Copying them in would be a silent
+# behaviour change smuggled into a refactor; it is filed in BACKLOG instead.
+COPY photo_analyzer.py ./
+COPY lbpcascade_animeface.xml ./
+COPY start-analyzer.sh ./
+
+EXPOSE 5000
+
+CMD ["bash", "start-analyzer.sh"]

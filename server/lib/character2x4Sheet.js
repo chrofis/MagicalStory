@@ -27,6 +27,7 @@ const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('../config/models');
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 
@@ -991,7 +992,7 @@ function isEchoedStyleVerdict(verdict) {
 // than hard-failing on a cold service.
 async function detectBodyRowHeads(bottomBodyImageData) {
   try {
-    const url = (process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000') + '/pose-heads';
+    const url = photoAnalyzerUrl() + '/pose-heads';
     const r = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: bottomBodyImageData, cols: 4 }),
@@ -1010,7 +1011,7 @@ async function detectBodyRowHeads(bottomBodyImageData) {
 
 async function detectSheetRowDivider(imageData, buf, W, H) {
   try {
-    const url = (process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000') + '/split-reference-sheet';
+    const url = photoAnalyzerUrl() + '/split-reference-sheet';
     const r = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageData, count: 8, cols: 4, rows: 2 }),
