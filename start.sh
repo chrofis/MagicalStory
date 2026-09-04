@@ -1,68 +1,40 @@
 #!/bin/bash
 set -e
 
+# Web service entrypoint: Node ONLY.
+#
+# The Python photo analyzer used to be supervised from here, in this same
+# container. It moved to its own Railway service on 2026-09-04 (see
+# docs/decisions.md and Dockerfile.analyzer / start-analyzer.sh); Node now reaches
+# it over private networking via PHOTO_ANALYZER_URL.
+#
+# WHY IT LEFT, measured: Railway bills a container's page cache as used memory,
+# and every analyzer worker spawn mapped the ML stack's shared objects in — they
+# stayed resident after the worker exited. mincore(2) on staging 21.4 h after a
+# story found 1,361 MB attributable of 1,603 MB, led by libtensorflow_cc 378 MB
+# and libtorch_cpu 185 MB, plus a 9.85 GB `anon` peak during the parallel
+# illustration burst. All of it inside the container serving the website.
+#
+# Note what does NOT matter here: the image still CONTAINS torch and TensorFlow
+# (one image, two start commands — railway.json forces a single dockerfilePath).
+# That costs disk, not memory. Page cache is driven by what is READ, and a
+# container that never imports them never pays for them — a fresh container on
+# the same image idles at 26-90 MB of cache.
+
 # ── Memory hygiene (Railway bills resident MB per MINUTE, 24/7) ──────────────
 # glibc gives each malloc arena its own free-list and never returns those pages
-# to the OS. Both processes here are heavy multi-threaded allocators (Node's
-# libuv threadpool; Python's torch/opencv), so the default cap of 8 arenas per
-# core lets RSS ratchet upward across requests and stay there — we pay for the
-# high-water mark around the clock even while idle. Capping arenas at 2 trades a
-# little allocator contention for a much flatter RSS curve.
+# to the OS. Node's libuv threadpool is a multi-threaded allocator, so the
+# default cap of 8 arenas per core lets RSS ratchet upward across requests and
+# stay there — we pay for the high-water mark around the clock even while idle.
+# Capping arenas at 2 trades a little allocator contention for a much flatter RSS
+# curve. (start-analyzer.sh sets the same cap for the analyzer's own process.)
 export MALLOC_ARENA_MAX=2
 
 echo "================================"
-echo "Starting MagicalStory Services"
+echo "Starting MagicalStory web service"
 echo "================================"
+echo "Photo analyzer: ${PHOTO_ANALYZER_URL:-http://127.0.0.1:5000 (default — expected to be set to the analyzer service)}"
 
-echo ""
-echo "[1/2] Starting Python photo analyzer service on port 5000..."
-echo "Python version: $(python3 --version)"
-
-# Supervised: the analyzer deliberately EXITS itself once it is idle and bloated,
-# and this loop brings it straight back.
-#
-# Why exiting is the only option: after heavy SAM/GDINO/rembg inference the
-# process holds ~1GB that a forced malloc_trim(0) reclaims *nothing* of
-# (measured on staging: 1192.2MB -> 1192.9MB with every model already unloaded).
-# It is fragmentation and torch's own pools — freed blocks interleaved with live
-# ones, which glibc can only return when a whole page is free. Unloading models
-# gets their weights back; it cannot defragment what remains. Ending the process
-# is what returns 100% to the OS, and Railway bills that RSS every minute.
-#
-# The exit is idle-gated inside photo_analyzer.py (no in-flight inference, no
-# recent requests) so it can never land mid-story. Node tolerates the few
-# seconds of downtime: analyzer calls have timeouts and fall back.
-run_analyzer() {
-  while true; do
-    python3 -u photo_analyzer.py 2>&1 | tee /tmp/python-service.log
-    code=$?
-    echo "[SUPERVISOR] photo_analyzer exited (code $code) — restarting in 1s"
-    sleep 1
-  done
-}
-run_analyzer &
-PYTHON_PID=$!
-
-echo "Python service PID: $PYTHON_PID"
-echo "Waiting for Python service to initialize (3 seconds)..."
-sleep 3
-
-# Check if Python service is still running
-if kill -0 $PYTHON_PID 2>/dev/null; then
-    echo "✓ Python service process is running"
-    # Try to hit the health endpoint
-    echo "Testing health endpoint..."
-    curl -s http://127.0.0.1:5000/health || echo "Health endpoint not responding yet"
-else
-    echo "✗ Python service failed to start"
-    echo "=== Python service log ==="
-    cat /tmp/python-service.log || echo "No log file found"
-    echo "==========================="
-    echo "WARNING: Continuing without photo analysis service"
-fi
-
-echo ""
-echo "[2/2] Starting Node.js server..."
 # NOTE: this is the real production entrypoint (Dockerfile CMD is `bash start.sh`),
 # NOT `npm start` — any node flag must be set HERE to take effect in the container.
 #
@@ -80,7 +52,4 @@ echo "[2/2] Starting Node.js server..."
 # without re-measuring, an OOM here kills in-flight story generation.
 NODE_HEAP_MB="${NODE_HEAP_MB:-3072}"
 echo "Node heap cap: ${NODE_HEAP_MB}MB | MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX}"
-node --max-old-space-size="${NODE_HEAP_MB}" server.js
-
-# If Node.js exits, kill Python service
-kill $PYTHON_PID 2>/dev/null || true
+exec node --max-old-space-size="${NODE_HEAP_MB}" server.js

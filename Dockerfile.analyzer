@@ -1,5 +1,22 @@
 # The Python photo-analyzer, as its OWN Railway service.
 #
+# ⚠️ NOT THE DEPLOYED BUILD PATH (2026-09-04). `railway.json` at the repo root is
+# config-as-code and hardcodes `dockerfilePath: "Dockerfile"`, which overrides any
+# per-service setting, and Railway REFUSES to let a service point at its own
+# config file: "Config as Code (railway.json / railway.toml) is deprecated. Use
+# Infrastructure as Code (.railway/railway.ts) instead."
+#
+# So today both services build the single root Dockerfile and differ only by
+# start command — the analyzer service sets `startCommand: bash start-analyzer.sh`
+# plus `PORT=5000`. That achieves the memory goal in full, because page cache is
+# driven by what a container READS: the web container simply never imports the ML
+# stack. What it does not achieve is a smaller analyzer image (it still carries
+# node_modules and the client bundle) or faster deploys.
+#
+# This file is the target state, kept so the migration is a config change rather
+# than a rewrite. Making it live means migrating the project to
+# `.railway/railway.ts`. Tracked in tasks/analyzer-service-split-2026-09-04.md.
+#
 # WHY IT LEFT THE WEB CONTAINER (2026-09-04, measured — docs/decisions.md).
 # Railway bills a container's page cache as used memory. Every analyzer worker
 # spawn maps this ML stack's shared objects in, and those pages stay resident

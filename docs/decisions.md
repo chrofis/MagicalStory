@@ -25870,3 +25870,89 @@ govern WHAT happens in the story, never how long the sentences are.
 **Status:** ✅ active — supersedes the ≤ 3 toddler boundary of 2026-08-25
 (`tasks/toddler-mode-2026-08-25.md`), whose content rules survive as the
 `routine` band. Staging only at time of writing; not pushed to master.
+
+## 2026-09-04 — MAJOR entity findings stay unrepaired: the critical-only char-fix gate is CONFIRMED after visual review
+
+**Context:** The repair-routing review of piraterun5
+(`job_1788471969309_9cg9dqyirre`) showed MAJOR entity findings route to no
+repair method at all: `decideRepairMethod` gate 2 accepts severity exactly
+`critical` (2026-09-01 ruling, commit 504a5faf2), the MAJOR entity types
+(`face_mismatch`, `face_drift`) sit in `NOT_INPAINTABLE_TYPES`, and the
+consolidator's `requires_char_fix_not_inpaint` drop reason is read by nothing.
+Pages 3/4/12 shipped with Lorena's white facial markings absent and Saira's
+face slightly drifted, unrepaired.
+
+**Decision:** Keep it exactly as it is. The owner reviewed the actual page
+images against the reference avatars (2026-09-04) and ruled: "major is
+actually quite good, no need to redo." MAJOR entity findings are deliberately
+left unrepaired; char-fix remains exactly-`critical`. The proposed
+alternatives — lowering the gate to major, consolidator escalation of
+persistent majors, or reclassifying erased facial markings as CRITICAL in the
+entity prompt — were all declined.
+
+**Rationale:** At page scale a MAJOR-level face difference still reads as the
+same person (that is what MAJOR means in the entity ladder —
+`prompts/entity-consistency-check.txt`); repairing it is churn and cost for a
+difference mostly visible only in a side-by-side grid. CRITICAL ("reads as a
+different person") is the line where automatic repair earns its cost.
+
+**Touched:** nothing — this entry records a confirmed non-change.
+`server/lib/repairLogic.js` gate 2, `NOT_INPAINTABLE_TYPES`,
+`tasks/BACKLOG.md` entry closed 2026-09-04.
+
+**Status:** ✅ active — reconfirms the 2026-09-01 critical-only ruling with
+owner-reviewed visual evidence. Re-proposing a lower gate needs new evidence
+(≥3 stories where a MAJOR-only mismatch is objectionable at page scale) and
+the reversal protocol.
+
+---
+
+## 2026-09-04 — Analyzer split, as-built: one image, two start commands
+
+**Supersedes the "Status: in progress" plan in the entry above** on the mechanism
+(not the reason). The reason is unchanged and measured: the ML stack's shared
+objects sat permanently in the page cache of the container serving the website.
+
+**What blocked the clean version.** `railway.json` at the repo root is
+config-as-code and hardcodes `dockerfilePath: "Dockerfile"` plus
+`healthcheckPath: "/api/health"` for EVERY service in the project. It is
+deprecated but still authoritative, and the API refuses to let a service point at
+its own config file: *"Config as Code (railway.json / railway.toml) is
+deprecated. Use Infrastructure as Code (.railway/railway.ts) instead."* Two
+analyzer deploys built the web image and died on `FATAL: JWT_SECRET` before this
+was understood — a missing `RAILWAY_DOCKERFILE_PATH` target does not fail the
+build, it silently builds something else.
+
+**Decision:** both services build the SAME image and differ only by start
+command. The analyzer service sets `startCommand: bash start-analyzer.sh` and
+`PORT=5000`; the web service keeps `start.sh`, now Node-only.
+
+**Rationale — why this is not a compromise on the goal.** Page cache is driven by
+what a container READS, not what its filesystem contains: a fresh container on
+the same 12 GB image idles at 26-90 MB. The web container carrying an unread
+torch and TensorFlow costs DISK, not memory. What cost 1.3 GB was importing them,
+and the web container no longer does. The genuine losses are image size and
+deploy speed, both of which the `.railway/railway.ts` migration recovers later.
+
+**Two traps found on the way, both silent:**
+- **`host='0.0.0.0'` is IPv4-only and Railway's private network is IPv6-only.**
+  `analyzer.railway.internal` resolves to an AAAA record, so the old bind accepted
+  nothing. Now `listen='*:port'`. A failed analyzer call becomes a Gemini fallback
+  with no error, so this would have looked like "working, slightly worse".
+- **Railway healthchecks the port it injects as `PORT`**, not the app's default.
+  Pinning `PORT=5000` was needed; without it the container ran correctly and the
+  deployment was still marked FAILED.
+
+**Verified on staging before any web-side change:** `/health` 200 (747 bytes,
+0.28 s, `"service":"photo-analyzer"`, `cpu_quota: 24`), and `/warmup` over the
+private network spawned workers INSIDE the analyzer container — router 94 MB,
+workers 1.47 GB + 1.22 GB, cgroup `anon` 1,879 MB.
+
+**Touched files:** `start.sh` (Node-only), `start-analyzer.sh` (new),
+`Dockerfile.analyzer` (new, target state, not yet the build path),
+`railway.analyzer.json` (new, for the IaC migration), `photo_analyzer.py`
+(dual-stack bind), `server/lib/character2x4Sheet.js`
+
+**Status:** 🟡 analyzer service live and proven on staging;
+`PHOTO_ANALYZER_URL` not yet pointed at it. Remaining steps and the rollback
+(unset the variable) in `tasks/analyzer-service-split-2026-09-04.md`.
