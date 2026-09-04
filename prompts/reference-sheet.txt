@@ -29,6 +29,10 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}.{GRID_SEPARATION} Each cell
 - A comparison in the description gives size or shape only. Draw the named object, never the thing it is compared to, and never a blend of the two
 - One object per cell, even when the description mentions its parts or what it is made of
 
+**FOR VEHICLES/VESSELS/STRUCTURES:**
+- Real-world proportions at real-world scale: fittings such as a bell, wheel, barrel or railing stay small against the hull or body, exactly as on the real thing — never enlarged as on a toy or model kit
+- Stated dimensions in the description set the scale of every part
+
 **FOR ANIMALS:**
 - Full body visible in a natural pose
 - Show distinctive coloring and features
