@@ -68,8 +68,14 @@ describe('recomputeActiveVersion — pin semantics', () => {
   });
 });
 
-describe('recomputeAllActiveVersions — blob mirror', () => {
-  it('mirrors the picked activeVersion onto unpinned scenes and covers', async () => {
+/**
+ * image_version_meta is the SINGLE source of truth (82abc73ca, 2026-07-13):
+ * the legacy blob mirror (sceneImages[].activeVersion / coverImages[].activeVersion)
+ * was deleted — readers resolve from meta via arrayIndexForDb. This walk
+ * therefore PERSISTS picks through setActiveVersion and never writes the blob.
+ */
+describe('recomputeAllActiveVersions — meta persistence, no blob mirror', () => {
+  it('persists the picked version for unpinned scenes and covers via setActiveVersion', async () => {
     const storyData: any = {
       sceneImages: [
         { pageNumber: 1, imageVersions: [{ finalScore: 4 }, { finalScore: 8 }] },
@@ -79,12 +85,15 @@ describe('recomputeAllActiveVersions — blob mirror', () => {
       },
     };
     const summary = await recomputeAllActiveVersions('story1', storyData);
-    expect(summary.switches).toBe(2);
-    expect(storyData.sceneImages[0].activeVersion).toBe(1);
-    expect(storyData.coverImages.frontCover.activeVersion).toBe(0);
+    expect(summary).toEqual({ scenes: 1, covers: 1, switches: 2 });
+    expect(setActiveVersion).toHaveBeenCalledWith('story1', 1, 1);
+    expect(setActiveVersion).toHaveBeenCalledWith('story1', 'frontCover', 0);
+    // The legacy blob field stays deleted — meta is the one source of truth.
+    expect(storyData.sceneImages[0].activeVersion).toBeUndefined();
+    expect(storyData.coverImages.frontCover.activeVersion).toBeUndefined();
   });
 
-  it('leaves pinned keys untouched and mirrors the PINNED choice onto the blob', async () => {
+  it('skips pinned keys entirely (explicit user choice wins over scoring)', async () => {
     getActiveVersionMeta.mockResolvedValue({
       '1': { activeVersion: 0, pinned: true },  // user picked v0; v1 scores higher
     });
@@ -96,21 +105,19 @@ describe('recomputeAllActiveVersions — blob mirror', () => {
     const summary = await recomputeAllActiveVersions('story1', storyData);
     expect(summary.switches).toBe(0);
     expect(setActiveVersion).not.toHaveBeenCalled();
-    // Blob mirror must reflect the pinned version, not the best-scored one.
-    expect(storyData.sceneImages[0].activeVersion).toBe(0);
+    expect(storyData.sceneImages[0].activeVersion).toBeUndefined();
   });
 
-  it('maps a pinned DB index back through a dbVersionIndex stamp', async () => {
-    getActiveVersionMeta.mockResolvedValue({
-      '1': { activeVersion: 7, pinned: true },
-    });
+  it('persists a lazy-migrated version through its dbVersionIndex stamp', async () => {
     const storyData: any = {
       sceneImages: [
-        { pageNumber: 1, imageVersions: [{ finalScore: 4 }, { dbVersionIndex: 7 }] },
+        { pageNumber: 1, imageVersions: [{ finalScore: 4 }, { finalScore: 9, dbVersionIndex: 7 }] },
       ],
     };
-    await recomputeAllActiveVersions('story1', storyData);
-    expect(storyData.sceneImages[0].activeVersion).toBe(1);
+    const summary = await recomputeAllActiveVersions('story1', storyData);
+    expect(summary.switches).toBe(1);
+    // Array position 1 wins, but the DB write carries the stamped row index.
+    expect(setActiveVersion).toHaveBeenCalledWith('story1', 1, 7);
   });
 });
 

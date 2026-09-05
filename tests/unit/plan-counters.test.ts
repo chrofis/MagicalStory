@@ -80,16 +80,21 @@ describe('runPlanCounters', () => {
   });
 
   it('flags a commissioned character who never gets a focal page', () => {
+    // Focal needn't be solo (owner, 2026-09-04): in frame with at most ONE
+    // companion satisfies it. Ben only ever appears with two companions.
     const pages = [
       page(1, line('close-up', 'Ana')),
-      page(2, line('wide', 'Ana and Ben walk')),
-      page(3, line('wide', 'Ana and Cara walk')),
+      page(2, line('wide', 'Ana, Ben and Cara walk')),
+      page(3, line('medium', 'Ana and Cara talk')),
     ];
     const r = runPlanCounters({ pages, commissionedNames: CAST });
     const noFocal = r.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').map((f: any) => f.detail);
     expect(noFocal.join(' ')).toContain('Ben');
-    expect(noFocal.join(' ')).toContain('Cara');
+    // Cara's two-person page 3 is focal for BOTH people on it.
+    expect(noFocal.join(' ')).not.toContain('Cara');
     expect(noFocal.join(' ')).not.toContain('Ana never');
+    expect(r.stats.focalPages['Cara']).toEqual([3]);
+    expect(r.stats.focalPages['Ben']).toEqual([]);
   });
 
   it('flags a commissioned character in frame on fewer than two pages', () => {

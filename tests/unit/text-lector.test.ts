@@ -335,9 +335,15 @@ describe('refineStoryText — chain order', () => {
     // Exactly one repair pass and one lector pass in the ledger.
     expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'lector']);
 
-    // The audits merged to ONE finding, credited to both.
-    expect(res.mergedFindings).toHaveLength(1);
-    expect(res.mergedFindings[0].sources).toEqual(['arc-informed', 'blind']);
+    // The audits merged to ONE finding, credited to both — and the word-budget
+    // counter (third source, 2026-09-05) adds one FAULT[LENGTH] per page
+    // outside the 1st-grade 25-50 budget (both stub pages sit under 25 words).
+    expect(res.mergedFindings).toHaveLength(3);
+    const transition = res.mergedFindings.find((f: any) => f.category === 'TRANSITION');
+    expect(transition.sources).toEqual(['arc-informed', 'blind']);
+    const counterFindings = res.mergedFindings.filter((f: any) => f.category === 'LENGTH');
+    expect(counterFindings.map((f: any) => f.pageNumber)).toEqual([1, 2]);
+    for (const f of counterFindings) expect(f.sources).toEqual(['counter']);
     expect(res.audits.map((a: any) => a.source)).toEqual(['arc-informed', 'blind']);
 
     // The lector's finding was applied IN CODE — there is no apply call in the
@@ -408,7 +414,11 @@ describe('refineStoryText - a stalled audit is abandoned, the chain continues', 
     expect(blind.ok).toBe(false);
     expect(blind.error).toMatch(/no answer within/);
     expect(res.audits.find((a: any) => a.source === 'arc-informed').ok).toBe(true);
-    expect(res.mergedFindings).toHaveLength(1);
+    // One finding from the audit that answered + one from the word-budget
+    // counter (the 8-word stub page is under the 1st-grade 25-word floor) —
+    // the counter never stalls, so it contributes even when an auditor does.
+    expect(res.mergedFindings).toHaveLength(2);
+    expect(res.mergedFindings.map((f: any) => f.sources)).toEqual([['arc-informed'], ['counter']]);
     expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'lector']);
     expect(res.changed).toEqual([1]);
     expect(labels).toContain('text_lector');
