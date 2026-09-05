@@ -26196,3 +26196,54 @@ Owner rulings on the dragon salvage (`job_1788551692337_bc479p945`); per-item de
 
 ### Baked cover TITLE block lives at the absolute end of the prompt, inside the shrink-protected tail
 **Context:** the run's baked cover shipped titleless. Proven trace: the title existed before covers and WAS handed over — but the 4-character cover prompt (~15.6k chars rebuilt) blew Grok's 7,900 cap, and `shrinkPromptForModel`'s protected tail starts at ART STYLE (cover prompts carry no REQUIRED OBJECTS block), so the TITLE block — appended before ART STYLE — sat in the compressible head and was silently deleted. Grok was never told to paint a title. **Decision:** `buildCoverPrompt` appends TITLE after ART STYLE at the prompt's absolute end — protected by construction in both shrink fallbacks. An empty title reaching a baked cover is a loud ERROR (handover bug), never a silent degrade; NO post-hoc stamping fallback for baked covers (owner: telling the model beats checking-and-stamping). Partial rescues stamp the real checkpoint title + ' [PARTIAL]'. **Touched:** server/lib/promptBuilders.js, coverTypography.js, storyJobPipeline.js (81f2b6c42).
+
+---
+
+## 2026-09-05 — Stuck-session recovery: the split broke the accident that used to save us
+
+**Context:** an independent review of the cache-drop work found that its central
+justification no longer held. `/session/reset` was given the cache-drop hook on
+the grounds that it is the recovery path for a leaked session. It is — but the
+recovery itself is not guaranteed:
+
+- `_active_sessions` is a refcount. A session that never ends pins it above
+  zero, so `_maybe_reap_workers` can never fire, workers stay resident, and the
+  page cache is never released.
+- This used to self-heal **by accident**: the analyzer ran inside the Node
+  container, so a Node restart restarted the analyzer and zeroed the counter
+  whether or not the `/session/reset` HTTP call was delivered. `server.js:2536`
+  still says so — *"belt-and-suspenders — start.sh dies with Node"*.
+- The service split (2026-09-04) removed that coupling. Node now restarts
+  without touching the analyzer's counter, and `sessionReset()` is
+  fire-and-forget with a single 5s retry (`analyzerClient.js`) — most likely to
+  miss on exactly the crash paths that leak a session in the first place.
+
+**Decision:** `_maybe_reap_workers` reclaims a session that has seen **no request
+traffic** for `SESSION_LEAK_TIMEOUT_S` (default 30 min): reset the count, kill
+the workers, drop the cache. The guard is request activity rather than
+wall-clock, because a genuinely long story issues analyzer calls throughout and
+any in-flight request blocks it.
+
+**Also fixed in the same pass:**
+- `/release-memory?unload=true` killed workers with **no busy check**, unlike the
+  idle reaper. One analyzer serves every concurrent story, so an admin reclaiming
+  RAM could silently kill another user's generation. Now 409 while sessions are
+  open or other requests are in flight; `&force=true` overrides.
+- The sweep walked all of `/app` — the entire monorepo, since both services build
+  the same root Dockerfile. Narrowed to the site-packages dirs plus
+  `.hf_cache` / `.deepface` / `mobile_sam.pt`.
+- No debounce, so sessionless photo uploads re-ran a full sweep each. Minimum
+  interval added; the lock only ever prevented *overlapping* sweeps.
+- Root de-dup was one-directional, and had no floor against a misresolved prefix
+  returning `/` or `/usr`.
+- `_cgroup_file_mb` caught only `OSError`, so a malformed line killed the
+  reporting thread and a sweep that ran looked like one that never fired.
+
+**Left open, filed in BACKLOG:** `kill_workers()` has a TOCTOU race that can
+terminate a worker mid-inference (pre-existing, `8d1f1c572`); every cache drop
+rides on it. And `/api/health/memory`'s `python` field still reports only the
+router process.
+
+**Touched files:** `photo_analyzer.py`
+
+**Status:** ✅ active on staging

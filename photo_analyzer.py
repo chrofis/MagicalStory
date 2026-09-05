@@ -450,12 +450,20 @@ def kill_workers(reason):
             _workers.pop(role, None)
 
 
+# A session that has seen no request traffic for this long did not end cleanly.
+# Generous on purpose: a real story issues analyzer calls throughout, and the
+# gap between its stages is minutes, not half an hour.
+_SESSION_LEAK_TIMEOUT_S = int(os.environ.get('SESSION_LEAK_TIMEOUT_S', '1800'))
+
+
 def _maybe_reap_workers():
     """Kill workers when no session is active and nothing is in flight.
 
     Called from session/end AND from request teardown — the latter is what
     reaps sessionless work (photo uploads) seconds after it finishes.
+    Also reclaims a session that leaked (see the stuck-session block below).
     """
+    global _active_sessions
     with _request_lock:
         # Only ever called from request TEARDOWN, after the decrement — so the
         # finishing request is no longer counted and >0 means someone else is
@@ -468,6 +476,35 @@ def _maybe_reap_workers():
         # this is the one moment the page cache is droppable. Story over, cache
         # released, without waiting for a restart that may never come.
         _drop_file_cache_async('workers reaped')
+        return
+
+    # ── Stuck-session recovery (2026-09-05) ──
+    # `sessions` is a refcount, and a session that never ends pins it above zero
+    # forever: the reap above can then NEVER fire, workers stay resident and the
+    # page cache is never released.
+    #
+    # This used to self-heal by accident. The analyzer ran inside the Node
+    # container, so a Node restart restarted the analyzer and zeroed the counter
+    # whether or not /session/reset was delivered. Since the analyzer became its
+    # own Railway service (2026-09-04) that coupling is GONE — Node can restart
+    # all it likes and this process keeps its stale count. `sessionReset()` is
+    # fire-and-forget with one 5s retry (analyzerClient.js), and the paths that
+    # leak a session are exactly the ones where that call is most likely to
+    # miss.
+    #
+    # So: a session that has seen no request traffic at all for this long did not
+    # end cleanly. Reclaim it. The guard is REQUEST activity, not wall-clock —
+    # a genuinely long story is issuing analyzer calls throughout, and any
+    # in-flight request blocks this.
+    if sessions > 0 and not busy and _workers:
+        idle_for = time.time() - _last_request_ts
+        if idle_for > _SESSION_LEAK_TIMEOUT_S:
+            print(f"[SESSIONS] {sessions} session(s) open but no request for "
+                  f"{idle_for:.0f}s — treating as leaked, resetting to 0")
+            with _request_lock:
+                _active_sessions = 0
+            kill_workers('leaked session reclaimed')
+            _drop_file_cache_async('leaked session reclaimed')
 
 
 @app.route('/session/begin', methods=['POST'])
@@ -1804,14 +1841,34 @@ def _cache_drop_roots():
                 roots.append(p)
     except Exception:
         pass
-    roots.append(os.path.dirname(os.path.abspath(__file__)))  # /app
-    # De-duplicate while keeping order, and drop anything nested in an earlier
-    # root so os.walk does not cover the same tree twice.
-    out = []
+    # The ML WEIGHT caches, not the whole of /app. Both Railway services build
+    # the same root Dockerfile today (railway.json pins one dockerfilePath), so
+    # /app is the entire monorepo — node_modules, the client bundle, docs, tests.
+    # The analyzer never reads any of it, and walking it was what made this a
+    # ~74,000-inode sweep instead of a few hundred.
+    app = os.path.dirname(os.path.abspath(__file__))
+    for sub in ('.hf_cache', '.deepface', 'mobile_sam.pt', 'yolo11n-pose.pt'):
+        roots.append(os.path.join(app, sub))
+
+    # De-duplicate, keeping the SHORTEST path when one contains another. The
+    # previous version only rejected a new candidate nested under a kept root,
+    # never the reverse, so a broader root arriving later kept both and walked
+    # the child tree twice.
+    cand = []
     for r in roots:
-        if not r or not os.path.isdir(r):
-            continue
+        if r and (os.path.isdir(r) or os.path.isfile(r)) and r not in cand:
+            cand.append(r)
+    cand.sort(key=len)
+    out = []
+    for r in cand:
         if any(r == k or r.startswith(k.rstrip('/') + '/') for k in out):
+            continue
+        # Floor: never accept a root shallow enough to sweep the system. A
+        # misresolved PYTHONHOME returning '/' or '/usr' would otherwise walk
+        # millions of inodes. The hardcoded list was bounded by inspection; a
+        # derived one needs the rail written down.
+        if len([p for p in r.split('/') if p]) < 3:
+            print(f"[CACHE-DROP] refusing suspiciously broad root: {r}")
             continue
         out.append(r)
     return out
@@ -1828,26 +1885,34 @@ def drop_file_cache(roots=None):
     started = time.time()
     roots = roots or _cache_drop_roots()
     touched = 0
+
+    def _advise(path):
+        nonlocal touched
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except OSError:
+            return
+        try:
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+            touched += 1
+        except (OSError, AttributeError):
+            pass  # not Linux, or the fd cannot be advised — fail safe
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
     for root in roots:
+        # Roots may be single files (mobile_sam.pt is 39 MB on its own).
+        if os.path.isfile(root):
+            _advise(root)
+            continue
         if not os.path.isdir(root):
             continue
         for dirpath, _dirs, filenames in os.walk(root, onerror=lambda e: None):
             for fn in filenames:
-                path = os.path.join(dirpath, fn)
-                try:
-                    fd = os.open(path, os.O_RDONLY)
-                except OSError:
-                    continue
-                try:
-                    os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
-                    touched += 1
-                except (OSError, AttributeError):
-                    pass
-                finally:
-                    try:
-                        os.close(fd)
-                    except OSError:
-                        pass
+                _advise(os.path.join(dirpath, fn))
     return touched, int((time.time() - started) * 1000)
 
 
@@ -1860,18 +1925,37 @@ def _cgroup_file_mb():
                     key, _, value = line.partition(' ')
                     if key in ('file', 'cache'):
                         return int(value) / 1048576.0
-        except OSError:
+        except Exception:
+            # Deliberately broad: a malformed line raising ValueError inside the
+            # loop used to escape this handler and kill the reporting thread, so
+            # the [CACHE-DROP] line never printed and a sweep that HAD run
+            # looked like one that never fired.
             continue
     return None
+
+
+# Minimum gap between sweeps. Sessionless work — a character photo upload, which
+# spawns a worker and reaps it on its own teardown — would otherwise re-trigger a
+# full sweep per upload. The single-flight lock stops two overlapping; it does
+# not stop three in a row a few hundred ms apart, which is pure I/O for nothing
+# since the first one already released the pages.
+_CACHE_DROP_MIN_INTERVAL_S = int(os.environ.get('CACHE_DROP_MIN_INTERVAL_S', '120'))
+_last_cache_drop_ts = 0.0
 
 
 def _drop_file_cache_async(reason):
     """Run the sweep off the request path — it walks a few thousand inodes."""
     def _run():
+        global _last_cache_drop_ts
         if not _cache_drop_lock.acquire(blocking=False):
             print(f"[CACHE-DROP] {reason}: skipped, a sweep is already running")
             return
         try:
+            since = time.time() - _last_cache_drop_ts
+            if since < _CACHE_DROP_MIN_INTERVAL_S:
+                print(f"[CACHE-DROP] {reason}: skipped, last sweep {since:.0f}s ago")
+                return
+            _last_cache_drop_ts = time.time()
             before = _cgroup_file_mb()
             touched, ms = drop_file_cache()
             after = _cgroup_file_mb()
@@ -2537,6 +2621,23 @@ def release_memory_endpoint():
     # Parent role: the models live in worker processes, so "unload" means
     # killing them — which, unlike every in-process scheme, returns 100%.
     if ANALYZER_ROLE == 'parent' and request.args.get('unload') == 'true':
+        # REFUSE while work is in flight (2026-09-05). This is one shared service
+        # for every concurrent story and Test Lab run, and `_active_sessions` is
+        # a count, not a set of identities — so an admin reclaiming RAM here was
+        # able to kill the workers out from under a DIFFERENT user's generation,
+        # silently, with nothing in the response to say so. The idle reaper has
+        # always had this guard; the on-demand path did not.
+        with _request_lock:
+            other_inflight = _inflight_requests > 1  # this request is counted
+            sessions_open = _active_sessions
+        if (sessions_open > 0 or other_inflight) and request.args.get('force') != 'true':
+            return jsonify({
+                "success": False,
+                "refused": "work in flight",
+                "active_sessions": sessions_open,
+                "other_inflight_requests": other_inflight,
+                "hint": "retry when idle, or pass &force=true to kill it anyway",
+            }), 409
         if _workers:
             unloaded = [f"worker:{r}" for r in _workers]
             kill_workers('release-memory')
