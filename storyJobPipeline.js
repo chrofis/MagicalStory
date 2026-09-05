@@ -59,7 +59,8 @@ const {
 const {
   prefetchLandmarkPhotos,
   getIndexedLandmarks,
-  loadLandmarkPhotoDescriptions
+  loadLandmarkPhotoDescriptions,
+  isSwissCountry
 } = require('./server/lib/landmarkPhotos');
 const {
   getCharactersInScene,
@@ -75,6 +76,7 @@ const {
   buildTrialStoryPrompt,
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,
+  ensureLandmarkPhotoBytes,
   extractSceneMetadata,
   findCastMissingFromMetadata,
   getHistoricalLocations,
@@ -239,6 +241,12 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
     let outlinePrompt = '';
     let outlineModelId = null;
     let outlineUsage = null;
+    // The REAL generated title, when a checkpoint carries it (unified_story /
+    // story_text store `title`, the front partial_cover stores `storyTitle`).
+    // The dragon salvage (job_1788551692337_bc479p945) had "Fünkli findet den
+    // Weg nach Hause" sitting in its checkpoints and still shipped a
+    // "Partial Story (date)" placeholder row title.
+    let checkpointTitle = '';
     let fullStoryText = '';
     const sceneDescMap = new Map();
     let sceneImages = [];
@@ -261,6 +269,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
           try { pageClothingData = extractPageClothing(outline, inputData?.pages || 15); } catch { /* ignore */ }
         }
       } else if (cp.step_name === 'unified_story') {
+        if (data.title && String(data.title).trim()) checkpointTitle = String(data.title).trim();
         if (data.storyPages?.length) {
           fullStoryText = data.storyPages.map(p => `## ${pageWord} ${p.pageNumber}\n\n${p.text}`).join('\n\n');
           for (const page of data.storyPages) {
@@ -278,6 +287,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
           outlineUsage = data.unifiedUsage || null;
         }
       } else if (cp.step_name === 'story_text') {
+        if (!checkpointTitle && data.title && String(data.title).trim()) checkpointTitle = String(data.title).trim();
         if (!fullStoryText && data.pageTexts) {
           const pageNums = Object.keys(data.pageTexts).sort((a, b) => Number(a) - Number(b));
           fullStoryText = pageNums.map(n => `## ${pageWord} ${n}\n\n${data.pageTexts[n]}`).join('\n\n');
@@ -298,8 +308,12 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
           sceneImages.push({ pageNumber: pageNum, imageData: data.imageData, description: sceneDesc, prompt: data.prompt || data.imagePrompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, totalAttempts: data.totalAttempts, retryHistory: data.retryHistory, wasRegenerated: data.wasRegenerated, originalImage: data.originalImage, originalScore: data.originalScore, originalReasoning: data.originalReasoning, modelId: data.modelId || null, referencePhotos: data.referencePhotos || null, imageAspect: inputData?.layout?.imageAspect || data.imageAspect, textInImage: inputData?.layout?.textInImage ?? data.textInImage });
         }
       } else if (cp.step_name === 'cover' || cp.step_name === 'partial_cover') {
+        if (!checkpointTitle && data.storyTitle && String(data.storyTitle).trim()) checkpointTitle = String(data.storyTitle).trim();
         if (data.imageData && data.type) {
-          coverImages[data.type] = { imageData: data.imageData, description: data.description || '', prompt: data.prompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, modelId: data.modelId || null };
+          // titleBaked travels with the render (checkpointed at generation) so
+          // downstream consumers of a salvaged cover — eval textMode, the
+          // post-persist typography skip — treat a baked-title cover correctly.
+          coverImages[data.type] = { imageData: data.imageData, description: data.description || '', prompt: data.prompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, modelId: data.modelId || null, titleBaked: data.titleBaked === true };
         }
       }
     }
@@ -308,7 +322,10 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
     const hasContent = outline || fullStoryText || sceneImages.length > 0;
     if (!hasContent) return;
 
-    const storyTitle = inputData?.title || `Partial Story (${new Date().toLocaleDateString()})`;
+    // The generated title from the checkpoints wins — it is the story's real
+    // name; the dated placeholder is only for a job that died before the writer
+    // ever named it.
+    const storyTitle = checkpointTitle || inputData?.title || `Partial Story (${new Date().toLocaleDateString()})`;
     const storyData = {
       id: jobId, title: storyTitle + ' [PARTIAL]',
       storyType: inputData?.storyType || 'unknown', storyTypeName: inputData?.storyTypeName || '',
@@ -1163,7 +1180,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // Resolve landmarks and VB grid for Grok reference slots
           // (sceneMetadata is parsed above, before the cell crop that needs it)
-          const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata, { pageNumber: page.pageNumber });
+          // Same miss/downgrade contract as the full-mode pageData build: a
+          // cited landmark whose photo can't be served renders prose-only,
+          // loudly (fidelity blocks are built from landmarkPhotos[0], so no
+          // "preserve exactly" ships without its photo).
+          const trialLandmarkMisses = [];
+          let pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata, { pageNumber: page.pageNumber, misses: trialLandmarkMisses });
+          pageLandmarkPhotos = await ensureLandmarkPhotoBytes(pageLandmarkPhotos, { misses: trialLandmarkMisses });
+          if (trialLandmarkMisses.length > 0) {
+            log.warn(`⚠️ [LANDMARK] Trial page ${page.pageNumber} renders WITHOUT its landmark reference photo (${trialLandmarkMisses.map(m => `${m.name}: ${m.reason}`).join('; ')}) — downgraded to prose description`);
+          }
           // Wait for the parallel ref-sheet generation (started in onVisualBible
           // alongside empty scenes + costumed avatars) before reading element
           // refs — otherwise getElementReferenceImagesForPage returns an empty
@@ -1789,7 +1815,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           type: coverKey,
           imageData: coverResult.imageData,
           description: sceneDescription,
-          modelId: coverResult.modelId
+          modelId: coverResult.modelId,
+          // What this render ACTUALLY did — the partial-save salvage reads it so
+          // its post-persist typography stamp never double-titles a baked cover.
+          titleBaked: coverTitleModeInfo.baked
         };
         // Include title for frontCover so UI can transition to story display
         if (coverType === 'frontCover' && streamingTitle) {
@@ -2266,7 +2295,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               await saveCheckpoint(jobId, 'partial_cover', {
                 type: 'frontCover',
                 imageData: result.imageData,
-                storyTitle: coverTitle
+                storyTitle: coverTitle,
+                titleBaked: trialCoverTitleMode.baked
               }, 0);
               log.debug(`[TRIAL-COVER] Saved partial_cover checkpoint`);
             }
@@ -2819,8 +2849,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
     if (nonVariantLandmarks.length > 0 && !skipImages) {
       landmarkCount = nonVariantLandmarks.length;
-      log.info(`🌍 [UNIFIED] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)`);
-      landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
+      // Source routing (owner, 2026-09-05): a Swiss story's landmarks come
+      // STRICTLY from the landmark index — a VB landmark that didn't link
+      // (linkPreDiscoveredLandmarks miss) is re-resolved against the index by
+      // name and serves NOTHING on a miss. Only genuinely non-Swiss
+      // locations use the free-form Wikipedia fetch routine.
+      const swissIndexOnly = isSwissCountry(inputData.userLocation?.country);
+      log.info(`🌍 [UNIFIED] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)${swissIndexOnly ? ' (Swiss: index-only)' : ''}`);
+      landmarkFetchPromise = prefetchLandmarkPhotos(visualBible, { swissIndexOnly });
       // Release the cover barrier once the fetch settles (success or failure) so
       // covers resolve their backdrop against fully-populated locations.
       landmarkFetchPromise.finally(() => resolveLandmarksReady());
@@ -3365,9 +3401,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
     }
 
-    // Wait for landmark photos before generating page images
+    // Wait for landmark photos before generating page images — BOUNDED
+    // (owner, 2026-09-05): a page whose scene uses a real landmark must not
+    // render before its photo fetch resolves, but a hung fetch must not hang
+    // the story either. On timeout the fetch keeps running in the background;
+    // pages whose landmark is still unresolved are downgraded per-page below
+    // (miss → WARN → prose-only, no fidelity block).
     if (landmarkFetchPromise) {
-      await landmarkFetchPromise;
+      const LANDMARK_FETCH_TIMEOUT_MS = 75_000;
+      const timedOut = Symbol('landmark-fetch-timeout');
+      let fetchTimer = null;
+      const raced = await Promise.race([
+        landmarkFetchPromise,
+        new Promise((r) => { fetchTimer = setTimeout(() => r(timedOut), LANDMARK_FETCH_TIMEOUT_MS); fetchTimer.unref?.(); }),
+      ]);
+      if (fetchTimer) clearTimeout(fetchTimer);
+      if (raced === timedOut) {
+        log.warn(`⚠️ [UNIFIED] Landmark photo fetch still unresolved after ${LANDMARK_FETCH_TIMEOUT_MS / 1000}s — pages whose landmark has no photo yet render from their prose description only`);
+      }
       const successCount = (visualBible.locations || []).filter(l => l.photoFetchStatus === 'success').length;
       log.info(`🌍 [UNIFIED] Landmark photos ready: ${successCount}/${landmarkCount} fetched successfully`);
     }
@@ -3632,7 +3683,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             };
           }
         }
-        const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber: pageNum });
+        // Misses = landmarks this scene cites that SHOULD have produced a
+        // photo but couldn't (fetch failed / nothing servable). The page then
+        // renders from its prose description only, and because every prompt
+        // fidelity block is built from landmarkPhotos[0], no "preserve this
+        // exact building / immediately recognisable" block ships without its
+        // photo. ensureLandmarkPhotoBytes enforces the same invariant for
+        // URL-only entries (block ⇔ bytes). Dragon run
+        // job_1788551692337_bc479p945 rendered 5 landmark pages blind with
+        // zero warnings; this makes that failure loud and the downgrade
+        // deliberate.
+        const landmarkPhotoMisses = [];
+        let pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber: pageNum, misses: landmarkPhotoMisses });
+        pageLandmarkPhotos = await ensureLandmarkPhotoBytes(pageLandmarkPhotos, { misses: landmarkPhotoMisses });
+        if (landmarkPhotoMisses.length > 0) {
+          log.warn(`⚠️ [LANDMARK] Page ${pageNum} renders WITHOUT its landmark reference photo (${landmarkPhotoMisses.map(m => `${m.name}: ${m.reason}`).join('; ')}) — downgraded to prose description, no exact-building fidelity block`);
+        }
         // The page prompt lists the scene's objects[] (the Art Director's pick);
         // pass the same ids so a prop the prompt describes brings its reference
         // image even when the VB filed it under a different page.
@@ -3726,6 +3792,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           prompt: imagePrompt,
           characterPhotos: pagePhotos,
           landmarkPhotos: pageLandmarkPhotos,
+          // Landmarks this page cited but renders without (photo unavailable) —
+          // names only, for logs/dev UI; the downgrade already happened above.
+          landmarkPhotoMisses: landmarkPhotoMisses.map(m => m.name),
           // Built in Phase 5a-pre-grid, once the plates are known.
           visualBibleGrid: null,
           vbElementRefs: elementReferences,

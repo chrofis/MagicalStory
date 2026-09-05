@@ -1394,13 +1394,97 @@ async function analyzeAndFilterImages(candidates, landmarkName, locationContext,
 }
 
 /**
+ * Is this country string Switzerland? Accepts the English/German/French/
+ * Italian/Romansh names plus ISO codes — IP detection and user profiles are
+ * not consistent about which one they store.
+ */
+const SWISS_COUNTRY_RE = /^(switzerland|schweiz|suisse|svizzera|svizra|ch|che)$/i;
+function isSwissCountry(country) {
+  return SWISS_COUNTRY_RE.test(String(country || '').trim());
+}
+
+/**
+ * Resolve a landmark QUERY (the writer's landmarkQuery, usually a bare name
+ * like "Lindenhof") against the landmark index — Swiss rows with a servable
+ * photo only. Owner's source-routing rule (2026-09-05): a Swiss story's
+ * landmarks come STRICTLY from the index; the free-form Wikipedia
+ * fetch/disambiguation path is barred for them (that path once resolved a
+ * bare city-square name to the wrong same-named Wikipedia article).
+ *
+ * Matching mirrors linkPreDiscoveredLandmarks: fold accents/case, strip
+ * parens and punctuation, then require an exact match or containment where
+ * the contained side is >= 5 chars. SQL prefilters on folded substring
+ * tokens; candidates rank by fame_pageviews (same prominence signal the
+ * serving queries use) and the first strong match with usable photos wins.
+ *
+ * @param {string} query - landmark name/query to resolve
+ * @returns {Promise<{row: Object, variants: Array}|null>} index row + its
+ *   photoVariants (variantsFromIndexRow shape), or null when nothing in the
+ *   index matches.
+ */
+async function resolveSwissLandmarkFromIndex(query) {
+  const pool = getPool();
+  if (!pool || !query || typeof query !== 'string') return null;
+
+  const foldName = s => normalizeForCompare(String(s || ''))
+    .replace(/[()[\],.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const normQuery = foldName(query);
+  if (!normQuery) return null;
+  const tokens = normQuery.split(' ').filter(t => t.length >= 4);
+  if (tokens.length === 0) return null;
+
+  try {
+    const NORM_NAME = NORM_SQL(`regexp_replace(name, '[()\\[\\],.]', ' ', 'g')`);
+    const { rows } = await pool.query(`
+      SELECT id, name, fame_pageviews,
+        photo_url, photo_description, photo_attribution, photo_type, photo_r2_url,
+        photo_url_2, photo_description_2, photo_attribution_2, photo_type_2, photo_r2_url_2,
+        photo_url_3, photo_description_3, photo_attribution_3, photo_type_3, photo_r2_url_3,
+        photo_url_4, photo_description_4, photo_attribution_4, photo_type_4, photo_r2_url_4,
+        photo_url_5, photo_description_5, photo_attribution_5, photo_type_5, photo_r2_url_5,
+        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6, photo_r2_url_6
+      FROM landmark_index
+      WHERE country = 'Switzerland'
+        AND ${HAS_PHOTO_SQL}
+        AND ${JUDGED_USABLE_SQL}
+        AND ${NEVER_A_SETTING_SQL}
+        AND ${LANDMARK_CLASS_SQL} > 0
+        AND ${NORM_NAME} LIKE ANY($1::text[])
+      ORDER BY coalesce(fame_pageviews, 0) DESC
+      LIMIT 25
+    `, [tokens.map(t => `%${t}%`)]);
+
+    for (const row of rows) {
+      const n = foldName(row.name);
+      const strong = n === normQuery
+        || (normQuery.includes(n) && n.length >= 5)
+        || (n.includes(normQuery) && normQuery.length >= 5);
+      if (!strong) continue;
+      const variants = variantsFromIndexRow(row);
+      if (variants.length > 0) return { row, variants };
+    }
+    return null;
+  } catch (err) {
+    log.error(`[LANDMARK-INDEX] Name resolution failed for "${query}": ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Pre-fetch photos for all landmarks in a Visual Bible
  * Designed to run in background as soon as landmarks are detected
  * Handles both regular discovery and Swiss pre-indexed landmarks (lazy loading)
  * @param {Object} visualBible - Parsed Visual Bible object
+ * @param {Object} [opts]
+ * @param {boolean} [opts.swissIndexOnly] - Swiss story: landmarks that did not
+ *   link to the index resolve against it BY NAME; on a miss they serve
+ *   NOTHING. The free-form Wikipedia fetch (fetchLandmarkPhoto) never runs.
  * @returns {Promise<Object>} Updated Visual Bible with photo data
  */
-async function prefetchLandmarkPhotos(visualBible) {
+async function prefetchLandmarkPhotos(visualBible, opts = {}) {
+  const { swissIndexOnly = false } = opts;
   if (!visualBible?.locations) {
     return visualBible;
   }
@@ -1448,8 +1532,33 @@ async function prefetchLandmarkPhotos(visualBible) {
     }
   }));
 
-  // Fetch regular landmarks using full discovery
+  // Fetch regular landmarks using full discovery — except for Swiss stories,
+  // which resolve strictly from the landmark index (owner, 2026-09-05): a
+  // query that misses the index serves NOTHING rather than whatever a
+  // free-form Wikipedia search disambiguates a bare name to.
   const regularResults = await Promise.allSettled(regularLandmarks.map(async (loc) => {
+    if (swissIndexOnly) {
+      try {
+        const hit = await resolveSwissLandmarkFromIndex(loc.landmarkQuery);
+        if (hit) {
+          loc.photoVariants = hit.variants;
+          loc.isSwissPreIndexed = true;
+          loc.swissLandmarkId = hit.row.id;
+          loc.photoFetchStatus = 'pending_lazy'; // variant shape: photos load on-demand at page render
+          loc.referencePhotoUrl = hit.variants[0].url;
+          loc.photoAttribution = hit.variants[0].attribution || loc.photoAttribution || null;
+          log.info(`[LANDMARK] 🇨🇭 Index-resolved "${loc.landmarkQuery}" → "${hit.row.name}" (id ${hit.row.id}, ${hit.variants.length} variant(s))`);
+          return { name: loc.name, success: true, type: 'swiss-index' };
+        }
+        loc.photoFetchStatus = 'failed';
+        log.warn(`[LANDMARK] ⚠️ Swiss story: "${loc.landmarkQuery}" has no landmark_index match — serving no photo (free-form Wikipedia lookup is barred for Swiss locations)`);
+        return { name: loc.name, success: false, type: 'swiss-index' };
+      } catch (err) {
+        loc.photoFetchStatus = 'failed';
+        log.error(`[LANDMARK] Error index-resolving "${loc.landmarkQuery}":`, err.message);
+        return { name: loc.name, success: false, error: err.message, type: 'swiss-index' };
+      }
+    }
     try {
       const photo = await fetchLandmarkPhoto(loc.landmarkQuery);
 
@@ -3561,6 +3670,48 @@ function pickVariantForView(location, view) {
   return null;
 }
 
+/**
+ * Build the photoVariants array for one landmark_index row (slots 1-6).
+ * `url` is what the pipeline fetches (our R2 copy when stored, else the
+ * Commons source — servedPhotoUrl is the one chokepoint for that choice);
+ * `sourceUrl` keeps the Commons provenance beside it. Shared by
+ * loadLandmarkPhotoDescriptions and resolveSwissLandmarkFromIndex so both
+ * hand the story the same shape.
+ */
+function variantsFromIndexRow(row) {
+  const variants = [];
+  const variantConfigs = [
+    { num: 1, url: servedPhotoUrl(row, 1), sourceUrl: row.photo_url, desc: row.photo_description, attr: row.photo_attribution, kind: row.photo_type },
+    { num: 2, url: servedPhotoUrl(row, 2), sourceUrl: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2, kind: row.photo_type_2 },
+    { num: 3, url: servedPhotoUrl(row, 3), sourceUrl: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3, kind: row.photo_type_3 },
+    { num: 4, url: servedPhotoUrl(row, 4), sourceUrl: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4, kind: row.photo_type_4 },
+    { num: 5, url: servedPhotoUrl(row, 5), sourceUrl: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5, kind: row.photo_type_5 },
+    { num: 6, url: servedPhotoUrl(row, 6), sourceUrl: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6, kind: row.photo_type_6 }
+  ];
+
+  for (const cfg of variantConfigs) {
+    if (cfg.url) {
+      // kind = the indexer's own classification of this photo
+      // (exterior | distant | close | interior | view-from; 'bad' = reject).
+      // Slot position is only a fallback for rows indexed before the
+      // classification existed — the slot convention (1-3 exterior,
+      // 4-6 interior) is a guess, the column is data.
+      const kind = normalizePhotoKind(cfg.kind) || (cfg.num >= 4 ? 'interior' : 'exterior');
+      if (kind === 'bad') continue;
+      variants.push({
+        variantNumber: cfg.num,
+        kind,
+        vantage: kind === 'interior' ? 'interior' : 'exterior',
+        url: cfg.url,
+        sourceUrl: cfg.sourceUrl,
+        description: cfg.desc || null,
+        attribution: cfg.attr || null
+      });
+    }
+  }
+  return variants;
+}
+
 async function loadLandmarkPhotoDescriptions(visualBible) {
   if (!visualBible?.locations) return visualBible;
 
@@ -3602,43 +3753,7 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
     // Build a lookup map
     const descriptionMap = new Map();
     for (const row of result.rows) {
-      const variants = [];
-
-      // Add variants 1-6 if they exist
-      // `url` is what the pipeline fetches (our R2 copy when stored, else the
-      // Commons source — servedPhotoUrl is the one chokepoint for that choice);
-      // `sourceUrl` keeps the Commons provenance beside it.
-      const variantConfigs = [
-        { num: 1, url: servedPhotoUrl(row, 1), sourceUrl: row.photo_url, desc: row.photo_description, attr: row.photo_attribution, kind: row.photo_type },
-        { num: 2, url: servedPhotoUrl(row, 2), sourceUrl: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2, kind: row.photo_type_2 },
-        { num: 3, url: servedPhotoUrl(row, 3), sourceUrl: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3, kind: row.photo_type_3 },
-        { num: 4, url: servedPhotoUrl(row, 4), sourceUrl: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4, kind: row.photo_type_4 },
-        { num: 5, url: servedPhotoUrl(row, 5), sourceUrl: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5, kind: row.photo_type_5 },
-        { num: 6, url: servedPhotoUrl(row, 6), sourceUrl: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6, kind: row.photo_type_6 }
-      ];
-
-      for (const cfg of variantConfigs) {
-        if (cfg.url) {
-          // kind = the indexer's own classification of this photo
-          // (exterior | distant | close | interior | view-from; 'bad' = reject).
-          // Slot position is only a fallback for rows indexed before the
-          // classification existed — the slot convention (1-3 exterior,
-          // 4-6 interior) is a guess, the column is data.
-          const kind = normalizePhotoKind(cfg.kind) || (cfg.num >= 4 ? 'interior' : 'exterior');
-          if (kind === 'bad') continue;
-          variants.push({
-            variantNumber: cfg.num,
-            kind,
-            vantage: kind === 'interior' ? 'interior' : 'exterior',
-            url: cfg.url,
-            sourceUrl: cfg.sourceUrl,
-            description: cfg.desc || null,
-            attribution: cfg.attr || null
-          });
-        }
-      }
-
-      descriptionMap.set(row.id, variants);
+      descriptionMap.set(row.id, variantsFromIndexRow(row));
     }
 
     // Update Visual Bible locations with photo variants
@@ -4062,5 +4177,10 @@ module.exports = {
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,
   pickVariantForView,
-  loadLandmarkPhotoVariant
+  loadLandmarkPhotoVariant,
+
+  // Swiss source routing (owner, 2026-09-05): Swiss stories resolve landmarks
+  // strictly from the index — see prefetchLandmarkPhotos({ swissIndexOnly }).
+  isSwissCountry,
+  resolveSwissLandmarkFromIndex
 };

@@ -55,6 +55,14 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
  *   writer's pages list is the authority on WHERE a landmark appears; an AD
  *   reference alone is not enough. Cover callers pass nothing (covers pick
  *   their backdrop by a different rule and have no positive page number).
+ * @param {Array} [opts.misses] - caller-owned array; every landmark the scene
+ *   cites that SHOULD have produced a photo but could not (fetch failed, no
+ *   photo source at all) is pushed as {id, name, reason}. By-design "attach
+ *   nothing" outcomes (.0 variant, no photo for the scene's vantage) are NOT
+ *   misses. Lets the page renderer downgrade loudly instead of silently
+ *   rendering a real landmark blind (dragon run job_1788551692337_bc479p945:
+ *   Commons fetches failed, 5 pages rendered with zero reference photos and
+ *   no warning).
  * @returns {Promise<Array<{name: string, photoData: string, attribution: string, source: string, variantNumber: number}>>} Landmark photos
  */
 async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) {
@@ -156,6 +164,7 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
     const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
       explicitVariant: perLandmarkVariants[loc.id],
       sceneView,
+      misses: opts.misses,
     });
     if (photo) results.push(photo);
   }
@@ -197,15 +206,32 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
  * @param {Object} [opts]
  * @param {number} [opts.explicitVariant] - `.N` from the brief; 0 = attach nothing
  * @param {string|null} [opts.sceneView] - declared landmark view; null picks an exterior
+ * @param {Array} [opts.misses] - see getLandmarkPhotosForScene; failure-to-serve
+ *   entries {id, name, reason} are pushed here (never by-design nulls)
  * @returns {Promise<Object|null>} landmark photo entry, or null to attach nothing
  */
 async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
+  const misses = Array.isArray(opts.misses) ? opts.misses : null;
   const decision = decideLandmarkPhotoSource(loc, opts);
-  if (!decision) return null;
+  if (!decision) {
+    // A variant-backed landmark returning null is by design (.0, or no photo
+    // for the scene's vantage — the prose carries the setting). A landmark
+    // with NO variants and no successful photo is a genuine miss: the scene
+    // cites a real landmark and we have nothing to show the model.
+    if (misses && !(loc.photoVariants?.length > 0)) {
+      misses.push({ id: loc.id, name: loc.name, reason: `no photo available (fetchStatus=${loc.photoFetchStatus || 'none'})` });
+    }
+    return null;
+  }
 
   if (decision.mode === 'variant') {
     const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, decision.variantNumber);
-    if (!variant) return null;
+    if (!variant) {
+      if (misses) {
+        misses.push({ id: loc.id, name: loc.name, reason: `variant ${decision.variantNumber} photo fetch failed` });
+      }
+      return null;
+    }
     log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${decision.variantNumber})`);
     return {
       name: loc.name,
@@ -258,6 +284,47 @@ function decideLandmarkPhotoSource(loc, opts = {}) {
 
   log.debug(`[LANDMARK-SCENE] "${loc.name}" (${loc.id}) has no photos (variants=${loc.photoVariants?.length || 0}, fetchStatus=${loc.photoFetchStatus || 'none'})`);
   return null;
+}
+
+/**
+ * Guarantee that every landmark photo entry the renderer keeps actually has
+ * image BYTES. Post-R2, legacy/single-photo entries can carry a photoUrl with
+ * no inline data; if that URL cannot be fetched, the page prompt would still
+ * ship the "preserve this exact building / immediately recognisable"
+ * fidelity block with no photo attached — worse than no landmark at all
+ * (owner, 2026-09-05). Entries whose bytes cannot be resolved inside the
+ * timeout are DROPPED (and reported via `misses`), so the fidelity block and
+ * the photo can never disagree: block ⇔ bytes.
+ *
+ * @param {Array} photos - entries from getLandmarkPhotosForScene
+ * @param {Object} [opts]
+ * @param {number} [opts.timeoutMs=20000] - per-photo fetch bound
+ * @param {Array} [opts.misses] - {id?, name, reason} pushed per dropped entry
+ * @returns {Promise<Array>} the entries that have photoData
+ */
+async function ensureLandmarkPhotoBytes(photos, opts = {}) {
+  const { timeoutMs = 20000 } = opts;
+  const misses = Array.isArray(opts.misses) ? opts.misses : null;
+  const kept = [];
+  for (const p of (photos || [])) {
+    if (p.photoData) { kept.push(p); continue; }
+    if (!p.photoUrl) {
+      if (misses) misses.push({ name: p.name, reason: 'no photo bytes and no URL' });
+      continue;
+    }
+    try {
+      const res = await fetch(p.photoUrl, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const mime = (res.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
+      p.photoData = `data:${mime};base64,${buf.toString('base64')}`;
+      kept.push(p);
+    } catch (err) {
+      log.warn(`[LANDMARK-SCENE] "${p.name}": photo fetch failed (${err.message}) — dropping entry so no fidelity block ships without its photo`);
+      if (misses) misses.push({ name: p.name, reason: `photo URL fetch failed: ${err.message}` });
+    }
+  }
+  return kept;
 }
 
 /**
@@ -421,6 +488,7 @@ module.exports = {
   getLandmarkPhotosForScene,
   resolveLandmarkPhotoForLocation,
   decideLandmarkPhotoSource,
+  ensureLandmarkPhotoBytes,
   buildAvailableLandmarksSection,
 
   // Location vantages (canvas-per-vantage pipeline)
