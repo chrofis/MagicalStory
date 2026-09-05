@@ -342,8 +342,8 @@ async function printVolumes() {
   console.log('');
 }
 
-async function printLogs(filter) {
-  const dep = await latestDeployment(ENV_PROD, SVC_ANALYZER);
+async function printLogs(filter, envId) {
+  const dep = await latestDeployment(envId || ENV_PROD, SVC_ANALYZER);
   if (!dep) {
     console.log('no analyzer deployment in production');
     return;
@@ -364,7 +364,7 @@ async function printLogs(filter) {
 (async () => {
   try {
     if (has('logs')) {
-      await printLogs(arg('grep', null));
+      await printLogs(arg('grep', null), arg('env', '') === 'staging' ? ENV_STAGING : ENV_PROD);
       return;
     }
     if (has('volumes')) {
