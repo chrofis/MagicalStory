@@ -334,6 +334,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // at 1% "Starting story generation..." for the entire ~10-minute text
     // phase — heartbeat only bumps updated_at, never the visible bar.
     onStage = null,
+    // Fired once with the parsed Visual Bible the moment it exists (after the
+    // bible stage, before wardrobe review and the avatar kickoff). The caller
+    // may THROW from it to abort the run early — that is the landmark
+    // guideline's retry seam: aborting here costs arc+bible only, not the
+    // scene briefs and the full page-text phase (measured ~30min per attempt,
+    // of which the post-bible stages are ~20min). Not called when the bible
+    // stage failed (visualBible stays null — the run ships degraded by design).
+    onVisualBible = null,
   } = opts;
   const gl = genLog || NOOP_LOG;
   const onChunk = heartbeat ? () => heartbeat() : null;
@@ -879,6 +887,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with an empty Visual Bible`);
     }
   }
+
+  // Deliberately OUTSIDE the bible try/catch: a throw from the caller's hook
+  // must abort the run, not be swallowed into "ships with an empty bible".
+  if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
   // ── Step 3b: wardrobe review, BEFORE the avatars are kicked off ───────────
   // The bible writes clothingRequirements and nothing checked it: a costume

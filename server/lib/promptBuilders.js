@@ -4869,7 +4869,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
       buildStoryBriefBody(inputData),
     ].join('\n'),
     AGE_MODE: buildAgeModeSection(inputData),
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
   });
 }
 
@@ -4982,7 +4982,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
     AGE_MODE: buildAgeModeSection(inputData),
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
@@ -5739,7 +5739,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
     CHARACTER_PHYSICAL_BLOCK: chars
       .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
       .join('\n\n') || '(no character appearance available)',
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
     PLAN_LINES: planBlocks(beats),
   });
 }
@@ -5992,7 +5992,7 @@ ${adventureGuide}` : ''}`;
     .join('\n\n');
 
   // Build available landmarks section if landmarks were pre-discovered
-  const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks);
+  const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote);
   if (inputData.availableLandmarks?.length > 0) {
     log.debug(`[PROMPT] Including ${inputData.availableLandmarks.length} pre-discovered landmarks in unified prompt`);
   }
@@ -6260,7 +6260,10 @@ function buildVbLocationLines(loc) {
   return `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
 }
 
-function buildAvailableLandmarksSection(landmarks) {
+// `retryNote` (optional): one generic sentence injected when a previous writer
+// attempt fell short of the landmark guideline — see the landmark check in
+// storyJobPipeline.js. Never story-specific.
+function buildAvailableLandmarksSection(landmarks, retryNote = '') {
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
@@ -6281,8 +6284,8 @@ function buildAvailableLandmarksSection(landmarks) {
 
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
 
-  return `**REAL LANDMARKS — use only where they belong to the world the commission names. A story set in their world builds two to four of them in; a story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. Never relocate the story or bend the plot to reach one; a landmark carried as background scenery counts as used:**
-
+  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
+${retryNote ? `\n${retryNote}\n` : ''}
 ${landmarkList}
 
 When you use a landmark from the list (even if you rename it in your story):

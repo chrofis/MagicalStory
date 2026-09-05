@@ -2425,11 +2425,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // hard landmark minimum below: a re-run repeats the paid text stages, so it
     // runs at most twice per job. Safe to call again — onClothingRequirementsReady
     // is idempotent (see its declaration), so avatars never double-start.
-    const runBeatsWriter = async () => {
+    const runBeatsWriter = async (writerOpts = {}) => {
       beatsResult = await generateStoryViaBeats(inputData, {
         jobId,
         genLog,
         checkCancellation,
+        // Landmark guideline seam: attempt 1 passes a hook that aborts at the
+        // bible stage on a shortfall, so the retry never burns the scene-brief
+        // and page-text stages (see the landmark check below).
+        onVisualBible: writerOpts.onVisualBible || null,
         pageCount: sceneCount,
         modelOverrides,
         heartbeat: unifiedHeartbeat,
@@ -2459,9 +2463,63 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedModelId = beatsResult.meta?.textModelId || modelOverrides.outlineModel;
       unifiedUsage = { input_tokens: 0, output_tokens: 0 };
     };
+
+    // ── Landmark guideline (owner rulings 2026-09-04 / 2026-09-05) ──
+    // When the reader's location is the BINDING setting (premiseNamedWorld=false)
+    // and real landmarks were offered, the story should build in at least two of
+    // them. Two is a strong guideline, NOT an iron rule: a shortfall retries the
+    // writer ONCE with the failure fed back into the landmark section of its
+    // prompts (a blind retry made the same choice again — dragon run
+    // job_1788599801317_644e65uob staged 1 twice); a second shortfall SHIPS the
+    // story with a loud warn and `landmarkMinimumShortfall` on the story data,
+    // never fails the job. The attempt-1 check runs at the bible stage via
+    // onVisualBible — the staging is fully knowable there (beats order:
+    // arc → beats → bible → briefs → page text), so aborting saves the
+    // scene-brief and page-text stages (~20 of ~30 min per attempt).
+    // Beats mode only: the streaming path (trials) launches scene expansions
+    // mid-stream, so a post-hoc rewrite could not retract them.
+    let landmarkMinimumShortfall = null;
+    const stagedRealLandmarks = (vb) =>
+      ((vb || {}).locations || []).filter(l => l.isRealLandmark && (l.appearsInPages || []).length > 0);
+    const describeStaged = (staged) => staged.length
+      ? staged.map(l => `"${l.landmarkQuery || l.name}"`).join(', ')
+      : 'none';
+    const runBeatsWriterWithLandmarkGuideline = async () => {
+      const guidelineActive = inputData.premiseNamedWorld === false && (inputData.availableLandmarks?.length || 0) > 0;
+      if (!guidelineActive) { await runBeatsWriter(); return; }
+      const offeredNames = inputData.availableLandmarks.map(l => l.name);
+      class LandmarkShortfallAbort extends Error {}
+      try {
+        await runBeatsWriter({
+          onVisualBible: async (vb) => {
+            const staged = stagedRealLandmarks(vb);
+            if (staged.length < 2) {
+              const e = new LandmarkShortfallAbort(`staged ${staged.length}`);
+              e.staged = staged;
+              throw e;
+            }
+          },
+        });
+        return;
+      } catch (err) {
+        if (!(err instanceof LandmarkShortfallAbort)) throw err;
+        const staged = err.staged || [];
+        log.error(`🚨 [LANDMARK-MIN] Binding location offered ${offeredNames.length} landmark(s) but the bible staged only ${staged.length} (${describeStaged(staged)}; offered e.g. ${offeredNames.slice(0, 5).join(', ')}) — retrying the writer once with feedback`);
+        genLog.warn('landmark_minimum', `Story staged ${staged.length} real landmark(s) (${describeStaged(staged)}); the binding location asks for at least 2 — retrying the writer with feedback`);
+      }
+      await checkCancellation();
+      // Generic wording only — rides into the REAL LANDMARKS section of the
+      // arc/beats/bible prompts via buildAvailableLandmarksSection.
+      inputData.landmarkRetryNote = 'A previous attempt staged too few real landmarks from this list. Stage at least two, woven into the story\'s action.';
+      try {
+        await runBeatsWriter();  // no early abort: strike two ships
+      } finally {
+        delete inputData.landmarkRetryNote;
+      }
+    };
     try {
     if (beatsMode) {
-      await runBeatsWriter();
+      await runBeatsWriterWithLandmarkGuideline();
     } else {
       const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
         progressiveParser.processChunk(chunk, fullText);
@@ -2482,37 +2540,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
     log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
 
-    // ── Hard landmark minimum (owner ruling, 2026-09-04) ──
-    // When the reader's location is the BINDING setting (premiseNamedWorld=false)
-    // and real landmarks were offered to the writer, the story MUST build in at
-    // least two of them — the landmark section's "builds two to four of them in"
-    // is a requirement, not an invitation. Enforced post-parse: count VB
-    // locations with isRealLandmark and a non-empty page list (the parser
-    // already drops real-landmark entries staged on no page, so this counts
-    // what survives). One full writer retry, mirroring the OUTLINE-REVIEW
-    // attempt pattern below; two strikes fail the job loudly — never silently
-    // continue. Beats mode only: the streaming path (trials) launches scene
-    // expansions mid-stream, so a post-hoc rewrite could not retract them.
+    // ── Landmark guideline: final count on the shipped transcript ──
+    // Counts VB locations with isRealLandmark and a non-empty page list (the
+    // parser already drops real-landmark entries staged on no page). A
+    // shortfall here NEVER fails the job (owner ruling 2026-09-05: "2 is a
+    // strong guideline, not an iron rule") — it warns loudly, naming the
+    // staged and offered landmarks, and stamps `landmarkMinimumShortfall` on
+    // the story data so the shortfall is visible in rating.
     if (beatsMode && inputData.premiseNamedWorld === false && (inputData.availableLandmarks?.length || 0) > 0) {
-      const countStagedLandmarks = (text) => {
-        const vb = new UnifiedStoryParser(text).extractVisualBible() || {};
-        return (vb.locations || []).filter(l => l.isRealLandmark && (l.appearsInPages || []).length > 0).length;
-      };
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        const stagedCount = countStagedLandmarks(unifiedResponse);
-        if (stagedCount >= 2) {
-          if (attempt > 1) log.info(`✅ [LANDMARK-MIN] Writer retry staged ${stagedCount} real landmark(s) — minimum met`);
-          break;
-        }
-        if (attempt < 2) {
-          log.error(`🚨 [LANDMARK-MIN] Binding location offered ${inputData.availableLandmarks.length} landmark(s) but the story staged only ${stagedCount} (minimum 2) — retrying the writer once`);
-          genLog.error('landmark_minimum', `Story staged ${stagedCount} real landmark(s); the binding location requires at least 2 — retrying the outline`);
-          await checkCancellation();
-          await runBeatsWriter();
-        } else {
-          genLog.error('landmark_minimum_failed', `Story staged ${stagedCount} real landmark(s) after a writer retry; the binding location requires at least 2 — failing the job`);
-          throw new Error(`Landmark minimum not met: the story staged ${stagedCount} real landmark(s) from the offered list after one writer retry (minimum 2 when the reader's location is the binding setting)`);
-        }
+      const staged = stagedRealLandmarks(new UnifiedStoryParser(unifiedResponse).extractVisualBible());
+      if (staged.length >= 2) {
+        log.info(`✅ [LANDMARK-MIN] Story staged ${staged.length} real landmark(s): ${describeStaged(staged)}`);
+      } else {
+        landmarkMinimumShortfall = staged.length;
+        const offeredNames = inputData.availableLandmarks.map(l => l.name);
+        log.warn(`⚠️ [LANDMARK-MIN] Story ships BELOW the landmark guideline: staged ${staged.length} (${describeStaged(staged)}) of minimum 2; offered ${offeredNames.length} (e.g. ${offeredNames.slice(0, 5).join(', ')})`);
+        genLog.warn('landmark_minimum_shortfall', `Story ships with ${staged.length} real landmark(s) (${describeStaged(staged)}) — below the guideline of 2 after one fed-back writer retry`);
       }
     }
 
@@ -6247,6 +6290,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Visible defect flags — non-empty means the book shipped incomplete.
       missingImages: missingImages.length > 0 ? missingImages : null,
       missingCovers: missingCovers.length > 0 ? missingCovers : null,
+      // Set (to the staged count) when the story shipped below the 2-real-
+      // landmark guideline after one fed-back writer retry; null when met or
+      // when the guideline didn't apply (premise-named world / no landmarks).
+      landmarkMinimumShortfall,
       coverHints: coverHints, // Cover scene hints with per-character clothing from outline
       pageClothing: pageClothingData, // Clothing per page
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
