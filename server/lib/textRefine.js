@@ -158,6 +158,47 @@ function mergeAuditFindings(lists = []) {
   return { findings, duplicates, bySource, text };
 }
 
+// ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
+
+/** Whitespace-token word count — deterministic, no model involved. */
+function countPageWords(text) {
+  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Count each page against the reading level's word budget and emit violations
+ * as FAULT lines (owner ruling 2026-09-05: "count the words in code, no AI
+ * call, give it to the reviewer"). The budget comes from the SAME
+ * LANGUAGE_LEVELS table the writer prompt renders (promptBuilders) — one source
+ * of truth, never a duplicated number. The lines feed mergeAuditFindings as a
+ * third source ('counter'), so the one existing repair pass shortens the pages;
+ * no extra model call for counting and no extra repair round.
+ *
+ * Motivating evidence: job_1788551692337_bc479p945 (1st-grade, budget 25-50)
+ * averaged 71 words/page, 14/18 pages over budget, finale at 149 — and neither
+ * AI auditor flagged length.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages
+ * @param {string} languageLevel
+ * @returns {string} newline-joined FAULT[LENGTH] lines ('' when all pages fit)
+ */
+function buildWordBudgetFindings(pages = [], languageLevel) {
+  const { LANGUAGE_LEVELS } = require('./promptBuilders');
+  const level = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
+  const min = level.wordsPerPageMin;
+  const max = level.wordsPerPageMax;
+  const lines = [];
+  for (const p of pages) {
+    const n = countPageWords(p.text);
+    if (n > max) {
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — shorten without losing content`);
+    } else if (n < min) {
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — expand without padding`);
+    }
+  }
+  return lines.join('\n');
+}
+
 // ─────────────── LECTOR: FINDINGS PARSED, CORRECTIONS APPLIED IN CODE ──────────
 
 /**
@@ -476,7 +517,18 @@ async function refineStoryText(storyData, pages, opts = {}) {
   for (const a of audits) {
     if (!a.ok && a.error) log.warn(`⚠️ [TEXT-AUDIT/${a.source}] ${a.error}`);
   }
-  const merged = mergeAuditFindings(audits.filter(a => a.ok).map(a => ({ source: a.source, raw: a.raw })));
+  // THE COUNTER — third finding source, deterministic and free. Runs on the
+  // writer's text (`current` is untouched here), and its LENGTH category
+  // matches no audit category, so the merge treats it as its own auditor: the
+  // AI audits are passed first and win any (unlikely) duplicate.
+  const counterRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+  if (counterRaw) {
+    log.info(`🔢 [TEXT-COUNTER] ${counterRaw.split('\n').length} page(s) outside the '${storyData?.languageLevel || 'standard'}' word budget`);
+  }
+  const merged = mergeAuditFindings([
+    ...audits.filter(a => a.ok).map(a => ({ source: a.source, raw: a.raw })),
+    ...(counterRaw ? [{ source: 'counter', raw: counterRaw }] : []),
+  ]);
   mergedFindings = merged.findings;
   mergeStats = { bySource: merged.bySource, duplicates: merged.duplicates.length };
   log.info(`🔀 [TEXT-AUDIT] merged ${JSON.stringify(merged.bySource)} → ${merged.findings.length} finding(s), ${merged.duplicates.length} duplicate(s) folded`);
@@ -723,6 +775,8 @@ module.exports = {
   startBackgroundRefine,
   parseFaultLines,
   mergeAuditFindings,
+  countPageWords,
+  buildWordBudgetFindings,
   parseLectorFindings,
   applyLectorFindings,
   locateQuote,
