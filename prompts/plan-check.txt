@@ -1,4 +1,4 @@
-Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the seven points below.
+Check how a finished story was divided into {PAGE_COUNT} pages. The story itself is settled — never judge, repair or rewrite it. Only the division is in question, and only on the eight points below.
 
 Commissioned characters: {CHARACTER_NAMES}
 
@@ -20,18 +20,19 @@ Counters have measured the division; these are their results, for reference. Do 
 
 # YOUR TASK
 
-Answer only these seven:
+Answer only these eight:
 
 1. Emotional highlights. Name every page the plan stages as one character showing a strong feeling, and say whether that page is truly one person's felt moment. A page holding a second actor, an event, or a feeling nobody shows is a finding.
 2. Entrances. Name the page each character first appears on. That page stages an arrival or a naming by someone present. A badge, a garment, a title or an epithet never counts as a naming, and a character already in frame before anyone says who they are is a finding.
 3. Cast of three or more. For each page with three or more named characters in frame, say whether its plan line justifies the third. A justification that repeats the action, names the place, or asserts the characters are needed does not hold.
-4. The most wanted picture. Name the picture a child most wants to see — the transformation, the arrival, the reveal — and the page whose plan line stages it as its instant. A picture that falls between two pages, or that only a page's change reports as already done, is a finding.
+4. The most wanted pictures. For each act — setup, middle, ending — name the picture a child most wants to see there and the page whose plan line stages it as its instant. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is a finding.
 5. The instant. Name every page whose plan line's instant only states presence or position — stands, together, visible, gathered, waits — instead of an action being performed, and every page whose instant is the state after an action rather than the action itself.
 6. Peopleless pages. Name every page with no people in frame and say whether its subject is something the story has been driving toward — a discovery, an arrival, a payoff. A peopleless page whose subject carries no story weight is a finding.
 7. Plants and payoffs. Name every object or flaw a page plants and the later page where it pays off, and for every payoff the earlier page that planted it. A plant no later page pays off, and a payoff no earlier page planted, are findings.
+8. The last page. When the story's ending has an event of its own, say whether the last page stages that event as its instant. A last page staging a different moment while the ending's event happened earlier, off the page, or not at all is a finding.
 
 # OUTPUT FORMAT
 
-Numbered findings, one line each, nothing before or after. Each line names the page and what is wrong. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
+Numbered findings, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
 
 When nothing is wrong anywhere, output exactly: NONE

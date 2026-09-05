@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters, collectPlaceNames } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, highActionPageBudget } = require('./planCounters');
 const { textZoneRulesActive } = require('../config/runtime');
 
 // The beats layer no longer audits the STORY (owner, 2026-09-01). Its only
@@ -735,7 +735,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * rather than skipping the check entirely.
    */
   const runCheck = async (label, pages, planText) => {
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast });
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount) });
     let modelFindings = [];
     let checkModelId = null;
     let prompt = null;
@@ -753,11 +753,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.warn(`⚠️ [BEATS] Plan check (${label}) failed (${err.message}) — the counters' findings stand alone`);
       gl.warn(`${label}_failed`, `Plan check failed: ${err.message} — the counters' findings stand alone`);
     }
-    const all = [...counters.lines, ...modelFindings.map(f => `CHECK: ${f}`)];
+    // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
+    // model finding the check number it answered, so buildReplanSection can rank
+    // them without reading their prose. `lines` stays the flat rendering the
+    // report and the logs have always carried.
+    const structured = [
+      ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+      ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+    ];
+    const all = structured.map(f => f.line);
     gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
       counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
     });
-    return { counters, modelFindings, lines: all, checkModelId, prompt };
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt };
   };
 
   t = Date.now();
@@ -772,7 +780,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
         finalArc: approvedArc,
         arcHints,
-        replan: buildReplanSection(pagePlan, check1.lines),
+        replan: buildReplanSection(pagePlan, check1.findings),
       });
       if (!replanPrompt) throw new Error('story-beats template unavailable');
       const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });

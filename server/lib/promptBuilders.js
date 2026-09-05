@@ -21,6 +21,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote } = require('./season');
+const { highActionPagesPhrase } = require('./planCounters');
 
 /**
  * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
@@ -4830,21 +4831,55 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  * a plan line, so the only thing that can change a page is the planner planning
  * it again. Empty string when there is nothing to re-plan, which is the normal case.
  */
+/**
+ * Plan-check questions whose findings outrank every counter (owner, 2026-09-05).
+ * Q4 is the wanted picture per act, Q8 the ending's own event on the last page —
+ * the two things a book is remembered for. Story job_1788614817116_vxnu60yjg
+ * lost its reunion because the Q4 finding against page 17 arrived as one
+ * unranked line among twelve, beside counter findings pulling the other way.
+ */
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
+
+/**
+ * Counter codes that outrank the rest: a commissioned character the division
+ * left out. Everything else a counter measures — shot distribution, repetition,
+ * consecutive-page sameness — is a preference next to these.
+ */
+const REPLAN_MUST_FIX_CODES = new Set([
+  'NO_FOCAL_PAGE', 'UNDER_COVERED_CHARACTER', 'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE',
+]);
+
+/**
+ * Rank one finding. Findings arrive structured — a counter carries its `code`,
+ * a model finding the `check` number it answered — so nothing here reads a
+ * finding's PROSE to work out what it means. A bare string (legacy caller) is
+ * "also noted": unranked, never dropped.
+ */
+function replanRank(finding) {
+  if (!finding || typeof finding === 'string') return 'also';
+  if (finding.check != null && REPLAN_MUST_FIX_CHECKS.has(Number(finding.check))) return 'must';
+  if (finding.code && REPLAN_MUST_FIX_CODES.has(finding.code)) return 'must';
+  return 'also';
+}
+
 function buildReplanSection(pagePlan, findingLines) {
-  const findings = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
-    .map(l => String(l || '').trim()).filter(Boolean);
-  if (findings.length === 0) return '';
+  const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
+    .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
+    .filter(f => f.line);
+  if (items.length === 0) return '';
+  const must = items.filter(f => replanRank(f) === 'must').map(f => f.line);
+  const also = items.filter(f => replanRank(f) !== 'must').map(f => f.line);
   return [
     '# RE-DIVIDE',
     '',
-    'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Output the full plan again.',
+    'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Output the full plan again.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
     '',
-    '## FINDINGS',
-    findings.join('\n'),
-  ].join('\n');
+    ...(must.length ? ['## MUST FIX', must.join('\n'), ''] : []),
+    ...(also.length ? ['## ALSO NOTED', also.join('\n')] : []),
+  ].join('\n').trimEnd();
 }
 
 function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '' } = {}) {
@@ -4868,6 +4903,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
     PAGE_COUNT: pageCount,
+    // Mechanical budget, computed in code and injected — never prose (owner,
+    // 2026-09-05: 2-3 pages per story may stage a high-action instant).
+    HIGH_ACTION_PAGES: highActionPagesPhrase(pageCount),
     READER_LINE: readerLine,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     ARC_HINTS: String(arcHints || '').trim()
@@ -5204,12 +5242,19 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
 function parsePlanCheck(raw) {
   const text = String(raw || '').trim();
   if (!text || /^none\.?$/i.test(text)) return [];
+  // The leading number is the CHECK the finding answers (prompts/plan-check.txt:
+  // "Each line begins with the number of the check it answers"). It is kept, not
+  // discarded: the re-plan ranks Q4/Q8 above the rest, and reading a finding's
+  // prose to work out which question produced it is what this codebase forbids.
   return text
     .split('\n')
     .map(l => l.trim())
     .filter(l => /^\d+[.)]\s+/.test(l))
-    .map(l => l.replace(/^\d+[.)]\s*/, '').trim())
-    .filter(Boolean);
+    .map((l) => {
+      const m = l.match(/^(\d+)[.)]\s*(.*)$/);
+      return { check: parseInt(m[1], 10), text: m[2].trim() };
+    })
+    .filter(f => f.text);
 }
 
 /**
@@ -6446,6 +6491,7 @@ module.exports = {
   buildPlanCheckPrompt,
   parsePlanCheck,
   buildReplanSection,
+  replanRank,
   buildArcReviewPrompt,
   buildArcAuditPrompt,
   buildChildCriticPrompt,

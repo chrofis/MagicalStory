@@ -26756,3 +26756,189 @@ rewritten confirmation block), `server/lib/repairPipeline.js` (Step 5:
 decision above.
 
 ---
+
+---
+
+## Landmark protection is era-aware: a present-day page never has its real landmark removed (2026-09-05)
+
+**Context:** Staging story `job_1788614817116_vxnu60yjg`, page 2. v0 rendered the
+Uetliberg Fernsehturm and the Uto Kulm spire on the ridge — faithfully, from the
+landmark photo attached to that page (`sceneImages[1].landmarkPhotos`, name
+"Oppidum Uetliberg Rampart") — plus the Zürichsee with a sailboat below the crest,
+which is what you actually see from there. The three-stage compliance judge emitted
+three `object_presence` findings against exactly those real features
+(`"Setting includes unrequested modern infrastructure: red-white transmission tower
+and smaller grey-red tower in background"`, fix `"Remove transmission towers and
+replace background with … historically appropriate landscape consistent with ancient
+earthwork"`; `"Unprompted body of water and sailboat added in midground"`; `"Stone
+wall and hedges present in foreground/midground not described in prompt"`).
+The story has **no era anywhere** — `sceneMetadata.era` is literally `"present day"`,
+VB era null, scene-brief era null — so `buildEraGuard()` returns `''` and the render
+carried no anachronism guard. The judge invented a historical setting from the words
+"ancient earthwork" in the prose. The consolidator's `scene_fix.preserve` listed six
+prose items ("grass-covered crest", "dark green moss", "curving earth wall", "morning
+sun lighting", "long warm shadows", "clear pale blue sky") and **no landmark**, so the
+instruction reached Grok as `"1. Remove red-white transmission tower and grey-red
+tower from background."` with `targetBbox: null` — an unmasked whole-frame edit. v1
+(towers erased) scored **83** against v0's **55** and shipped.
+
+**Decision:** Landmark protection is computed in code, per page, and injected into
+BOTH the critic and the fixer (the "mechanical rules + fed-back retries" pattern):
+
+- `landmarkPresent = page.landmarkPhotos?.length > 0`, and
+  `eraIsHistorical = !!buildEraGuard(era)` — the **existing** era classifier in
+  `promptBuilders.js:709`, no second one. Era comes from `sceneMetadata.era` /
+  `sceneMetadata.fullData.era`, the same value `buildImagePrompt` and the iterate
+  path read, so page / iterate / cover / eval all agree.
+- **Landmark + non-historical era** → a `LANDMARK ELEMENTS — PRESENT BY DESIGN:
+  <names>` block is filled into the new `{LANDMARK_CONTEXT}` input of
+  `prompts/image-prompt-compliance.txt`, stating that the real place's terrain,
+  skyline, towers, masts, buildings and signage can never be reported as
+  unrequested / modern / anachronistic / a setting mismatch; the consolidator input
+  gains the same block; and `scene_fix.preserve` is seeded with the landmark names
+  **unconditionally**.
+- **Landmark + historical era** → the era guard text is injected instead, so modern
+  infrastructure remains a legitimate finding. This is the owner's ruling: a story
+  set in the middle ages SHOULD have modern towers removed.
+- **No landmark** → behaviour unchanged.
+- **Hard guard**: on a protected page, an `object_presence` finding whose **fix** is
+  removal-shaped is dropped with a WARN naming the page and the landmark. Applied at
+  three gates — the compliance stage (so the penalty never reaches the score either),
+  the consolidator (all evaluator lists), and immediately before `inpaintPage` in
+  `runUnifiedRepairPipeline`.
+
+**Rationale:** The classification lives in the PROMPT (a new typed input the judge
+reads), per the eval-logic rule; the code contributes only a mechanical fact — "this
+page was rendered from a photo of a real place, and the story is set now". The hard
+guard classifies nothing by prose: the finding's own declared `type` does that, and
+the guard only asks whether the proposed **edit instruction** is a destructive
+removal — the exact operation that must not run unmasked over a real landmark. It is
+scoped to `fix`, never to `description`. Protection is deliberately NOT enabled at
+the two generation-time eval sites in `images.js` where the era is not in scope:
+enabling it there would silently protect a *historical* story's modern towers.
+Covers carry no landmark refs (`coverIterate.js` attaches none), so they are
+unaffected; they still pass through the same guard at pages −1/−2/−3 with
+`protect === false`.
+
+**Touched:** `server/lib/landmarkProtection.js` (new), `server/lib/evalPipeline.js`
+(evaluateThreeStage options + `{LANDMARK_CONTEXT}` + stage-2 filter; evaluateImageQuality
+plumbing), `server/lib/feedbackConsolidator.js` (consolidateFeedback / consolidateEvaluation
+params, guarded issue lists, preserve seeding, precount), `server/lib/repairPipeline.js`
+(buildEvalInputs, baseline eval inputs, consolidatePageEval, pre-inpaint hard guard,
+inpaintPage options), `server/lib/images.js` (inpaintPage options → consolidator, batch-eval
+evalOptions, iterate eval), `server/lib/testlab.js` (eval + consolidate + inpaint stages),
+`server/routes/regeneration.js` (page regen eval, stampCanonicalScore consolidation ctx),
+`prompts/image-prompt-compliance.txt`, `tests/unit/landmark-protection.test.ts`,
+`docs/image-generation-methods.html`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-05 — The beats planner gets a high-action budget, the plan check asks for a wanted picture per act, and the re-plan is ranked
+
+**Context:** Story `job_1788614817116_vxnu60yjg` (staging, 18 pages) lost its
+climax. The approved arc wrote beat 17 as "a wide shadow lands on the roof, the
+raven flaps back to its empty nest, and Fünkli's mother lifts her son in her
+claws" and beat 18 as the shell hand-over, head against cheek, then the walk
+home. The planner staged neither event. Its committed plan lines were:
+
+> Page 17: wide — a great dragon shadow landing on the roof of the Aussichtsturm
+> Uetliberg, the raven startled from its nest, the shell spinning down through
+> the air — Fünkli's mother lands and the shell drops from the raven — the mother
+> has come; Julian's hands are open below
+
+> Page 18: medium — Levin pushing his bike along the dark path below the
+> Uetliberg, head tipped back, mouth open in a shout toward the night sky —
+> Levin calls "Gute Nacht, Fünkli!" into the valley — the valley calls it back
+
+The mother arrives as a *shadow* with no body and no Fünkli; the reunion — the
+one picture the whole book is built toward — is absent, and page 18 stages a
+different moment than the arc's ending. Three prompt rules jointly forced it:
+`story-beats.txt` forbade interlocked characters, hand-overs and objects in
+flight as the instant ("pick the moment before or after"), allowed only one
+elevated figure, and forbade two creatures each with their own state. A
+*reunion* is by definition all four at once, so the planner had no legal way to
+draw it.
+
+The check half then failed to recover it. Plan-check Q4 ("the most wanted
+picture", singular) *did* catch page 17 — "stages the mother's arrival and the
+falling shell, but not the wanted picture of Fünkli's mother lifting and
+reclaiming him" — but that finding entered `buildReplanSection` as one unranked
+line among twelve, next to counter findings pulling the opposite way (shot
+distribution, consecutive-page sameness), and the re-plan did not act on it.
+Page 18 was never examined at all, because Q4 is singular and had already spent
+itself on page 17.
+
+**Decision:** Four changes, all inside the beats planner and its check. The
+2026-09-01 "checker counts, never fixes" ruling stands untouched: there is still
+exactly one re-plan, the checker still never proposes a plan line, and findings
+are still advisory.
+
+1. **A high-action budget (owner: "relax it so that 2-3 pages per story can have
+   more action").** `story-beats.txt` now allows, on a budgeted number of pages,
+   a high-action instant the strict rules forbid: two characters interlocked, a
+   hand-over, an object in flight, a second figure off the ground, two creatures
+   each with its own state — spent on the climax and the moments of contact.
+   The number is mechanical, so it is computed in code and injected as
+   `{HIGH_ACTION_PAGES}` (`highActionPageBudget`: 1 for ≤8 pages, 2 for 9-16,
+   3 for 17+), never written into prose.
+2. **Splitting and priority.** A beat holding two such actions splits across two
+   adjacent pages, or the picture drops the secondary action. The beat's main
+   event wins the frame: "a secondary figure or action is dropped before the
+   main one is reduced to a shadow, a silhouette or a sound". Written
+   archetypally — "the arriving creature is in frame as itself", "the reunion
+   outranks the bystander" — with no name from this story in the template.
+3. **Plan-check Q4 becomes plural, and a new Q8 guards the last page.** Q4 now
+   names the most wanted picture *per act* (setup / middle / ending) and the
+   ending's own event is always one of them; Q8 asks whether the last page
+   stages that ending event as its instant. The checker's output format now
+   requires each finding to begin with the number of the check it answers.
+4. **The re-plan is ranked.** `buildReplanSection` splits findings into
+   `## MUST FIX` (Q4 and Q8 findings; the counter codes for a commissioned
+   character the division left out) and `## ALSO NOTED` (everything else), and
+   states that where the two pull opposite ways the must-fix wins. No finding is
+   dropped.
+
+**Rationale:** The defect was a *rule interaction*, not a bad model call — every
+individual rule was doing its job, and their intersection made the book's
+climax undrawable. Loosening the rules globally would bring back the crowded,
+undrawable pages they were written to prevent, so the relaxation is budgeted and
+scales with book length. The ranking is what turns a correct finding into a
+change: twelve equal lines is not a priority order, and the checker is forbidden
+(correctly) from proposing the fix itself, so the only lever left is telling the
+planner which finding outranks which.
+
+Ranking reads **structure, never prose**: `parsePlanCheck` now returns
+`{check, text}` and keeps the check number the prompt asks for, and counter
+findings already carry their `code`. Nothing pattern-matches a finding's
+description text to work out what it means — the failure mode CLAUDE.md forbids.
+
+On the counters: none of them penalises the allowance. Nothing in
+`planCounters.js` counts elevated figures, interlocked pairs or creatures; the
+only per-page cast counters (`CAST_OVER_3`, `CAST_OVER_CEILING`) count *names*
+in the who-column, and a high-action instant adds no name to a page. The budget
+is threaded through to `stats.highActionAllowance` so the stored report records
+what the plan was checked against, and a unit test pins the fact that a
+high-action page raises no cast finding.
+
+**Validation:** No paid call. `scripts/analysis/dump-beats-prompt.js` rebuilds
+this story's filled planner prompt from its stored `inputData` and arc at $0 —
+the 18-page book renders "Up to three pages in the book may stage a high-action
+instant", with no unfilled placeholder. 89/89 prompt templates load; the plan
+counter, plan-parse and template suites pass, plus a new
+`tests/unit/plan-replan-ranking.test.ts`. The behavioural half — whether the
+planner actually spends the budget on the reunion — needs a beats re-plan on a
+stored arc, and **no Test Lab stage runs the beats planner**: `STAGE_RUNNERS`
+(`server/lib/testlab.js`) covers image, eval, repair and scene-expansion stages
+only. Validating it costs one story generation on the smoke account, or a new
+`plan` stage in the Lab.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/plan-check.txt`,
+`server/lib/planCounters.js` (`highActionPageBudget`, `highActionPagesPhrase`,
+`stats.highActionAllowance`), `server/lib/promptBuilders.js`
+(`HIGH_ACTION_PAGES` injection, `replanRank`, `buildReplanSection`,
+`parsePlanCheck`), `server/lib/beatsPipeline.js` (structured findings into the
+re-plan), `tests/unit/plan-replan-ranking.test.ts`
+
+**Status:** ✅ active (staging; not yet on master)

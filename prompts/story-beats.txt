@@ -48,6 +48,10 @@ The plan line's instant is a single drawable moment:
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
 - Never compose the frame — what fills it, how large something looks, where it sits; the shot type is enough.
 
+Up to {HIGH_ACTION_PAGES} in the book may stage a high-action instant the rules above forbid: two characters interlocked, a hand-over, an object in flight, a second figure off the ground, two creatures each with its own state. Spend them on the climax and on the moments of contact — a reunion, a rescue, a parting hold. Every other page keeps the rules above.
+- A beat holding two such actions splits across two adjacent pages — one page the contact, the next page the second action — or the picture drops the secondary action and keeps the main event.
+- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.
+
 Requirements:
 - Each page follows causally from the one before it.
 - A character in frame on a page is in frame on the next one unless a plan line says where they went. What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.
