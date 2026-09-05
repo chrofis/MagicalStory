@@ -2915,10 +2915,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // four still-photographic pages with nothing stored to say whether the
         // gate rejected a good repaint or a bad one. Every outcome lands here.
         styleConsistency.repairs = [];
-        const recordRepair = (page, outcome, rep) => {
+        // Repaints that passed the proximity gate, held back until they can be
+        // SCORED. Nothing is pushed as a version, and nothing is called 'kept',
+        // until the batch eval below gives each one a number of its own.
+        const accepted = [];
+        // OUTCOME IS DECIDED BY THE SELECTOR, NOT BY THE GATE (2026-09-05).
+        // 'kept' used to be written the moment a repaint passed the proximity
+        // gate, while the version it pushed inherited the previous best's score
+        // and therefore lost the earliest-tie in selectBestVersion — on
+        // job_1788614817116_vxnu60yjg BOTH "kept" repaints (page 6 and the
+        // initial page) tied at finalScore 70 and never became active. A
+        // repaint is 'kept' only when it is the version the page ships.
+        const recordRepair = (page, outcome, rep, extra = {}) => {
           styleConsistency.repairs.push({
             page,
-            outcome,                                    // 'kept' | 'rejected' | 'error'
+            outcome,                                    // 'kept' | 'not_selected' | 'rejected' | 'error'
+            ...extra,
             passedGate: rep?.passedGate ?? null,
             better: rep?.styleComparison?.better || null,
             changed: rep?.styleComparison?.changed || [],
@@ -2994,24 +3006,84 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               recordRepair(target.page, 'error', { ...rep, error: 'no version array for this page' });
               continue;
             }
-            // New version through the normal plumbing — inherits the picked
-            // best's evaluation/entity record (a style transfer preserves
-            // content; no re-eval here), canonical applyScore stamp, then
-            // re-point finalBestPerPage so the final assembly ships it.
-            const { applyScore: stampStyleRepair } = require('./scoring');
+            // SCORED ON ITS OWN, LIKE EVERY OTHER REPAIR METHOD. Deferred to a
+            // single batch eval after the loop — see the block below.
+            accepted.push({ target, rep, versions, prevBest, pageLabel });
+            continue;
+          } catch (repErr) {
+            log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed: ${repErr.message} — original kept`);
+            recordRepair(target.page, 'error', { error: repErr.message });
+          }
+        }
+
+        // =====================================================================
+        // SCORE THE ACCEPTED REPAINTS, THEN LET THEM COMPETE
+        // =====================================================================
+        // Every other repair method in this pipeline scores its output on its
+        // own bytes — garment-recolour and each inpaint/iterate round run
+        // `evaluateImageBatch` on the new image and stamp applyScore from THAT
+        // evaluation. Style repair alone inherited `prevBest.score`, which made
+        // it structurally unable to win: selectBestVersion breaks a tie with
+        // 'earliest', so a repaint carrying its predecessor's exact score always
+        // lost to the predecessor. Measured on job_1788614817116_vxnu60yjg: two
+        // repaints passed the gate (page 6 and the initial page), both were
+        // logged 'kept', both tied at finalScore 70, and neither shipped.
+        //
+        // So it is scored like everything else — the SAME evaluateImageBatch,
+        // for the same reason: a version with a borrowed score is not a
+        // candidate, it is an appointment. Cost is one quality eval per
+        // gate-passing repaint (they are rare — 7 of 9 were rejected on the
+        // evidence story), which is the price the recolour path already pays.
+        if (accepted.length > 0) {
+          const { applyScore: stampStyleRepair } = require('./scoring');
+          let styleEvals = [];
+          try {
+            styleEvals = await images().evaluateImageBatch(
+              buildEvalInputs(accepted.map(a => ({ pageNumber: a.target.page, imageData: a.rep.imageData }))),
+              { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }
+            );
+          } catch (err) {
+            log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repaint eval failed (${err.message}) — no repaint can compete this run; originals kept`);
+            styleEvals = [];
+          }
+          const evalByPage = new Map(styleEvals.map(ev => [ev.pageNumber, ev]));
+          for (const { target, rep, versions, prevBest, pageLabel } of accepted) {
+            const ev = evalByPage.get(target.page) || null;
+            if (!ev) {
+              // Unscored means it cannot compete — so it is not pushed at all.
+              // Step 3b has already run; an unscored version added here would
+              // sit in the array forever with a null finalScore.
+              log.warn(`🎨 [UNIFIED PIPELINE] Step 5: ${pageLabel} repaint could not be scored — discarded (an unscored version cannot win)`);
+              recordRepair(target.page, 'error', { ...rep, error: 'repaint eval returned no result' });
+              continue;
+            }
+            if (ev.usage && usageTracker) {
+              usageTracker('gemini_quality', ev.usage, 'unified_pipeline_style_repair', ev.modelId);
+            }
+            const entityResult = getEntityPenaltyAndIssues(target.page, currentEntityReport);
+            // Same dedupe step every other eval gets. A style transfer does not
+            // rewrite the scene, so the page's own contract still applies.
+            let consolidatedPlan = null;
+            try {
+              consolidatedPlan = await consolidatePageEval(ev, entityResult.issues, target.page, null, prevBest.description || null);
+            } catch (e) {
+              log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: ${pageLabel} repaint consolidation failed (${e.message}) — scoring without it`);
+            }
             const newVersion = {
               imageData: rep.imageData,
-              // Covers only: the repainted TEXTLESS art, so ${key}Art tracks the
-              // served cover instead of going stale against it.
+              // Covers only: the repainted TEXTLESS art, so the ${coverKey}Art
+              // record tracks the served cover instead of going stale.
               ...(rep.artImageData ? { artImageData: rep.artImageData } : {}),
-              score: prevBest.score ?? null,
+              score: ev.score ?? ev.qualityScore ?? null,
               source: `style-repair-${styleRepairModel}`,
-              evaluation: prevBest.evaluation || null,
+              method: 'style-repair',
+              evaluation: ev,
               modelId: rep.modelId,
-              entityIssues: prevBest.entityIssues || [],
+              entityIssues: entityResult.issues,
               evaluatedAt: new Date().toISOString(),
               prompt: null,
               description: prevBest.description || null,
+              consolidatedPlan,
               styleRepair: {
                 targetRefPage: target.targetRefPage,
                 // Null on the normal path; names the anchor asset in
@@ -3027,28 +3099,32 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               },
               pageNumber: target.page,
             };
-            newVersion.consolidatedPlan = prevBest.consolidatedPlan || null;
-            stampStyleRepair(newVersion, {
-              evalResult: newVersion.evaluation,
-              entityResult: { issues: newVersion.entityIssues, penalty: prevBest.entityPenaltyRaw ?? prevBest.entityPenalty ?? 0 },
-              consolidatedPlan: newVersion.consolidatedPlan,
-            });
+            // Canonical stamp from THIS version's own evaluation.
+            stampStyleRepair(newVersion, { evalResult: ev, entityResult, consolidatedPlan });
             versions.push(newVersion);
             // COMPETE, DO NOT APPOINT — see the text-space note above.
-            finalBestPerPage.set(target.page, selectBestVersion(versions));
-            recordRepair(target.page, 'kept', rep);
-            log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair applied on ${pageLabel} (${styleRepairModel}, gate=${rep.passedGate === null ? 'unavailable' : 'pass'}, ref=${target.targetRefLabel || `Page ${target.targetRefPage}`})`);
-          } catch (repErr) {
-            log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed: ${repErr.message} — original kept`);
-            recordRepair(target.page, 'error', { error: repErr.message });
+            const winner = selectBestVersion(versions);
+            finalBestPerPage.set(target.page, winner);
+            const scoreOf = (v) => computeFinalScore(v);
+            if (winner === newVersion) {
+              recordRepair(target.page, 'kept', rep, { finalScore: scoreOf(newVersion), previousScore: scoreOf(prevBest) });
+              log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair SHIPPED on ${pageLabel} (${styleRepairModel}, score ${scoreOf(newVersion)} vs ${scoreOf(prevBest)}, ref=${target.targetRefLabel || `Page ${target.targetRefPage}`})`);
+            } else {
+              // The gate said the repaint looks more like the commissioned
+              // style; the evaluator said the page it would replace is at least
+              // as good. The page keeps what it had, and the ledger says so.
+              recordRepair(target.page, 'not_selected', rep, { finalScore: scoreOf(newVersion), previousScore: scoreOf(prevBest) });
+              log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair on ${pageLabel} passed the style gate but scored ${scoreOf(newVersion)} against ${scoreOf(winner)} — stored as a version, not shipped`);
+            }
           }
         }
+
         // One line that answers "did style-repair help this book" without
         // reading 18 scattered log entries.
         const tally = styleConsistency.repairs.reduce((a, r) => { a[r.outcome] = (a[r.outcome] || 0) + 1; return a; }, {});
         const contentVetoes = styleConsistency.repairs.filter(r => (r.changed || []).length > 0).length;
         log.info(`🎨 [UNIFIED PIPELINE] Step 5: ${styleConsistency.repairs.length} repaint(s) — ` +
-          `kept ${tally.kept || 0}, rejected ${tally.rejected || 0} (${contentVetoes} for altering content), error ${tally.error || 0}`);
+          `shipped ${tally.kept || 0}, out-scored ${tally.not_selected || 0}, rejected ${tally.rejected || 0} (${contentVetoes} for altering content), error ${tally.error || 0}`);
       } else if ((styleConsistency.outliers?.length || 0) > 0) {
         log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair disabled (STYLE_REPAIR_PRODUCTION=false) — ${styleConsistency.outliers.length} outlier(s) surfaced only`);
       }

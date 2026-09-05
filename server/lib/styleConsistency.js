@@ -105,6 +105,139 @@ function extractDeclaredLight(sceneDescription) {
   return { token: best.token, text: (sentence || brief).trim().slice(0, 200) };
 }
 
+// Cells per grid. Also the unit the confirmation pass has to BREAK UP: a
+// collapsed judge call answers for its whole grid at once, so re-running the
+// identical grid re-runs the identical failure (measured on
+// job_1788614817116_vxnu60yjg — byte-identical grid, same prompt, same model,
+// temperature 0, all nine cells "confirmed").
+const CHUNK = 9;
+
+/**
+ * Contiguous batching — the FIRST pass's grids: cells 0..8, 9..17, …
+ * @param {Array} cells
+ * @param {number} [chunk=CHUNK]
+ * @returns {Array<Array>} batches
+ */
+function batchCells(cells, chunk = CHUNK) {
+  const batches = [];
+  for (let i = 0; i < cells.length; i += chunk) batches.push(cells.slice(i, i + chunk));
+  return batches;
+}
+
+/**
+ * RE-CUT the grids for the confirmation pass so the second sample is an
+ * INDEPENDENT one.
+ *
+ * Perfect separation is arithmetically impossible: with n cells in b = ceil(n/CHUNK)
+ * first-pass grids, any second-pass grid of CHUNK cells must, by pigeonhole,
+ * contain at least ceil(CHUNK / b) cells from one first-pass grid (for a
+ * 21-cell book: 3 of 9). So this MINIMISES the carry-over instead of
+ * eliminating it, deterministically and with no randomness: batch sizes are
+ * kept identical to pass 1 (same call count, same cost), and each pass-1 grid's
+ * cells are spread across the new grids in proportion to their remaining
+ * capacity (largest-remainder rounding), which is the flattest split the
+ * margins allow.
+ *
+ * ACHIEVED BOUND for the 21-cell / CHUNK 9 case, asserted in
+ * tests/unit/style-collapse-guard.test.js: 24 of the 75 first-pass pairs
+ * survive (32%), and no cell keeps more than 4 of its ≤8 first-pass
+ * grid-mates. 24 is the arithmetic floor for grid sizes [9,9,3].
+ *
+ * @param {Array} cells
+ * @param {number} [chunk=CHUNK]
+ * @returns {Array<Array>} re-cut batches, same sizes as batchCells(cells, chunk)
+ */
+function recutBatches(cells, chunk = CHUNK) {
+  const n = cells.length;
+  if (n === 0) return [];
+  const rows = batchCells(cells, chunk).map(b => b.length);      // pass-1 grid sizes
+  const caps = rows.slice();                                     // new grids: same sizes
+  const nb = caps.length;
+  // x[b][j] = how many of pass-1 grid b's cells go into new grid j. Filled row
+  // by row with largest-remainder rounding against each new grid's REMAINING
+  // capacity, which is what makes the split as even as the margins allow — a
+  // plain round-robin fills the short last grid entirely from one pass-1 grid
+  // and pays for it (26 surviving pairs instead of 24 on a 21-cell book).
+  const x = rows.map(() => new Array(nb).fill(0));
+  const remaining = caps.slice();
+  for (let b = 0; b < rows.length; b++) {
+    const total = remaining.reduce((a, c) => a + c, 0);
+    const want = remaining.map(c => (rows[b] * c) / total);
+    const take = want.map(w => Math.floor(w));
+    let left = rows[b] - take.reduce((a, c) => a + c, 0);
+    const order = want
+      .map((w, j) => ({ j, frac: w - Math.floor(w) }))
+      .sort((a, c) => (c.frac - a.frac) || (a.j - c.j));
+    for (let k = 0; left > 0 && k < order.length; k++) {
+      const j = order[k].j;
+      if (take[j] < remaining[j]) { take[j]++; left--; }
+    }
+    // Any residue (capacity math cornered by rounding) goes wherever there is room.
+    for (let j = 0; left > 0 && j < nb; j++) {
+      while (left > 0 && take[j] < remaining[j]) { take[j]++; left--; }
+    }
+    for (let j = 0; j < nb; j++) { x[b][j] = take[j]; remaining[j] -= take[j]; }
+  }
+  // Deal the cells out according to x, in original order within each pair.
+  const buckets = caps.map(() => []);
+  const cursor = new Array(nb).fill(0);
+  for (let i = 0; i < n; i++) {
+    const b = Math.floor(i / chunk);
+    let j = cursor[b];
+    while (j < nb && x[b][j] === 0) j++;
+    cursor[b] = j;
+    x[b][j]--;
+    buckets[j].push(cells[i]);
+  }
+  return buckets;
+}
+
+/**
+ * STRUCTURAL COLLAPSE GUARD.
+ *
+ * A collapsed judge call is one answer wearing nine hats: the model reads the
+ * grid as a whole, condemns it, and the per-cell JSON shape faithfully copies
+ * that one verdict into every cell. The signature is structural and needs no
+ * reading of the words — a batch flags 100% of its OWN cells, and the flagged
+ * cells carry at most two DISTINCT rationale arrays between them. Grid 0 of
+ * job_1788614817116_vxnu60yjg: 9/9 flagged, 2 distinct arrays (eight identical,
+ * one differing in a single trailing string); all nine were on-style by eye.
+ *
+ * Structural check only, and this is exactly what "structural" means here:
+ * rationale arrays are compared for EQUALITY (a JSON round-trip of the array of
+ * strings) and counted. Nothing interprets, matches or classifies the words
+ * inside them — the guard would fire the same on nine copies of any sentence,
+ * in any language, saying anything at all.
+ *
+ * A voided batch contributes no outliers. Its cells are not "confirmed
+ * on-style", they are UNJUDGED — which for this pipeline is the same thing,
+ * because only a flag ever costs anything.
+ *
+ * @param {Array<{pages:number[], outliers:Array}>} batchResults
+ * @returns {{results:Array, voided:Array<{pages:number[], flagged:number, distinctRationales:number}>}}
+ */
+const MAX_DISTINCT_RATIONALES = 2;
+
+function voidCollapsedBatches(batchResults) {
+  const results = [];
+  const voided = [];
+  for (const r of (batchResults || [])) {
+    const pages = Array.isArray(r?.pages) ? r.pages : [];
+    const outliers = Array.isArray(r?.outliers) ? r.outliers : [];
+    // A one-cell grid cannot collapse — it has nothing to stamp its verdict
+    // onto. That is what makes the per-cell confirmation pass trustworthy.
+    if (pages.length < 2 || outliers.length !== pages.length) { results.push(r); continue; }
+    const distinct = new Set(outliers.map(o => JSON.stringify(Array.isArray(o?.differences) ? o.differences : [])));
+    if (distinct.size > MAX_DISTINCT_RATIONALES) { results.push(r); continue; }
+    voided.push({ pages, flagged: outliers.length, distinctRationales: distinct.size });
+    log.warn(`🎨 [STYLE-CHECK] COLLAPSE GUARD: voiding the grid of cell(s) ${pages.join(', ')} — it flagged all ${outliers.length} of its own cells with only ${distinct.size} distinct rationale array(s); one call answering for the whole grid, not ${outliers.length} verdicts`);
+    // The batch's own book-level medium verdict came out of the same collapsed
+    // call, so it is voided with it — neutral, not 'wrong_medium'.
+    results.push({ ...r, outliers: [], dominantStyleVerdict: 'matches', requestedStyleDifferences: [], collapsed: true });
+  }
+  return { results, voided };
+}
+
 /**
  * Build a labelled thumbnail-grid JPEG from a list of page images.
  * Each cell = label strip + 256x256 thumbnail. Layout = COLS columns.
@@ -246,9 +379,7 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   // by the model → faces big enough to judge medium). Safe because the judgment
   // is ABSOLUTE per-page — there is no cross-page clustering to lose across
   // batches. ceil(17/9) = 2 cheap Flash calls for a typical book.
-  const CHUNK = 9;
-  const batches = [];
-  for (let i = 0; i < cells.length; i += CHUNK) batches.push(cells.slice(i, i + CHUNK));
+  const batches = batchCells(cells, CHUNK);
   log.info(`🎨 [STYLE-CHECK] ${cells.length} images (${cells.length - coverCount} pages + ${coverCount} cover(s)) → ${batches.length} grid(s) of ≤${CHUNK}`);
 
   // Prompt: cluster by style, return strict JSON.
@@ -400,6 +531,9 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
       log.warn(`🎨 [STYLE-CHECK] batch answered ${answered.size}/${batch.length} cells — unanswered cells counted as on-style`);
     }
     return {
+      // The codes this grid actually carried — the collapse guard needs the
+      // denominator ("did it flag ALL of its own cells?"), not just the flags.
+      pages: batch.map(c => c.page),
       outliers,
       observations,
       dominantStyleVerdict: ['matches', 'drifted', 'wrong_medium'].includes(parsed.dominantStyleVerdict) ? parsed.dominantStyleVerdict : 'matches',
@@ -410,8 +544,8 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
   };
 
   // One failed batch (parse/API) shouldn't sink the whole check.
-  const runAllBatches = async () => {
-    const settled = await Promise.allSettled(batches.map(judgeBatch));
+  const runAllBatches = async (theBatches = batches) => {
+    const settled = await Promise.allSettled(theBatches.map(judgeBatch));
     const done = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
     if (done.length === 0) throw new Error(settled[0]?.reason?.message || 'all style-check batches failed');
     return done;
@@ -433,7 +567,11 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     return [...seen.values()];
   };
 
-  const results = await runAllBatches();
+  const rawResults = await runAllBatches();
+  // GUARD BEFORE INTERSECT. A grid that condemned every one of its own cells
+  // with ≤2 distinct rationale arrays never enters the outlier set at all —
+  // there is nothing there to confirm or to intersect.
+  const { results } = voidCollapsedBatches(rawResults);
   let outliers = mergeOutliers(results);
 
   // CONFIRMATION PASS (owner ruling 2026-09-05; Lab experiments 985-987).
@@ -442,15 +580,64 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
   // stamping a shared verdict into every one of its cells (seen 2026-08-25,
   // 2026-08-31, 2026-09-04: whole grids flagged "major" with an identical
   // rationale, 0/9 confirmed by eye) — not real drift. The gate only exists
-  // to catch true outliers, so the suspect verdict gets ONE full re-audit and
-  // only pages flagged in BOTH runs survive. Structural check only: nothing
-  // here reads the rationale text.
+  // to catch true outliers, so the suspect verdict is re-sampled and only the
+  // pages flagged in EVERY pass survive.
+  //
+  // ONE full re-audit of the identical grids was the 2026-09-05 shape, and it
+  // is not a second sample: same bytes, same prompt, same model, temperature 0
+  // reproduces the same collapsed answer. It did, on
+  // job_1788614817116_vxnu60yjg, "confirming" nine on-style cells. So the
+  // confirmation now re-cuts the grids (step 1) and then judges each surviving
+  // cell alone (step 2), and the collapse guard above voids the collapsed grid
+  // before any of it runs.
+  //
+  // STRUCTURAL, PRECISELY: the only thing any of this does with a rationale is
+  // compare whole arrays of strings for EQUALITY and count the distinct ones
+  // (see voidCollapsedBatches). No rule anywhere reads, matches, or classifies
+  // the words — what a rationale MEANS is the prompt's job, never this code's.
   if (cells.length && outliers.length / cells.length > CONFIRMATION_FLAG_RATIO) {
-    log.warn(`🎨 [STYLE-CHECK] ${outliers.length}/${cells.length} cells flagged (>${Math.round(CONFIRMATION_FLAG_RATIO * 100)}%) — suspect verdict, running one confirmation re-audit`);
-    const confirmedPages = new Set(mergeOutliers(await runAllBatches()).map(o => o.page));
+    log.warn(`🎨 [STYLE-CHECK] ${outliers.length}/${cells.length} cells flagged (>${Math.round(CONFIRMATION_FLAG_RATIO * 100)}%) — suspect verdict, running an independent confirmation`);
+
+    // CONFIRMATION STEP 1 — RE-CUT GRIDS. Re-running the identical grids is not
+    // a second sample: same bytes, same prompt, same model, temperature 0
+    // reproduces the same collapse (job_1788614817116_vxnu60yjg "confirmed" all
+    // nine of grid 0's cells that way). recutBatches re-deals the cells so each
+    // one faces mostly new neighbours — same number of calls, same cost.
     const before = outliers.length;
+    const { results: recut } = voidCollapsedBatches(await runAllBatches(recutBatches(cells, CHUNK)));
+    const confirmedPages = new Set(mergeOutliers(recut).map(o => o.page));
     outliers = outliers.filter(o => confirmedPages.has(o.page));
-    log.warn(`🎨 [STYLE-CHECK] confirmation pass kept ${outliers.length}/${before} outlier(s) — ${before - outliers.length} voided as unconfirmed`);
+    log.warn(`🎨 [STYLE-CHECK] re-cut confirmation kept ${outliers.length}/${before} outlier(s) — ${before - outliers.length} voided as unconfirmed`);
+
+    // CONFIRMATION STEP 2 — PER-CELL. A grid call can always collapse, however
+    // it is cut. A grid of ONE cannot: there is no neighbour to stamp a shared
+    // verdict onto. Every cell still standing gets its own single-image call
+    // against the COMMISSIONED style, through the same judge and the same
+    // prompt as every other pass. Cost is bounded by construction: exactly one
+    // call per still-flagged cell, and only on a story that already tripped the
+    // >20% gate.
+    if (outliers.length > 0) {
+      const stillFlagged = new Set(outliers.map(o => o.page));
+      const soloCells = cells.filter(c => stillFlagged.has(c.page));
+      log.warn(`🎨 [STYLE-CHECK] per-cell confirmation: ${soloCells.length} single-cell call(s)`);
+      const solo = await Promise.allSettled(soloCells.map(c => judgeBatch([c])));
+      const soloConfirmed = new Set();
+      solo.forEach((r, i) => {
+        const page = soloCells[i].page;
+        if (r.status !== 'fulfilled') {
+          // Cannot disprove a cell that two grid passes already flagged — keep
+          // it. The repaint it triggers is gated on its own merits anyway.
+          log.warn(`🎨 [STYLE-CHECK] per-cell confirmation for ${page} failed (${r.reason?.message || 'unknown'}) — keeping the outlier`);
+          soloConfirmed.add(page);
+          return;
+        }
+        if ((r.value.outliers || []).some(o => o.page === page)) soloConfirmed.add(page);
+      });
+      const beforeSolo = outliers.length;
+      // A cell is an outlier only if EVERY pass agrees.
+      outliers = outliers.filter(o => soloConfirmed.has(o.page));
+      log.warn(`🎨 [STYLE-CHECK] per-cell confirmation kept ${outliers.length}/${beforeSolo} outlier(s)`);
+    }
   }
   const outlierPages = new Set(outliers.map(o => o.page));
 
@@ -533,4 +720,9 @@ module.exports = {
   checkStoryStyleConsistency,
   buildStyleGrid,
   extractDeclaredLight,
+  batchCells,
+  recutBatches,
+  voidCollapsedBatches,
+  CHUNK,
+  CONFIRMATION_FLAG_RATIO,
 };

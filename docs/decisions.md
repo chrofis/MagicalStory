@@ -26651,3 +26651,101 @@ branch, `composeCharWithVbRow` floor + drop),
 `docs/image-generation-methods.html` §5b.
 
 **Status:** ✅ active (staging)
+
+## 2026-09-05 — Completing the style-audit confirmation: re-cut grids, a per-cell pass, a structural collapse guard, and a repaint that is scored on its own bytes
+
+**Context:** this **completes the 2026-09-05 confirmation decision above ("Style
+audit: >20% flagged cells triggers one confirmation re-audit"), it does not
+reverse it.** That decision was right about the diagnosis — a >20% flag rate
+signals a collapsed judge call — and right that only an independent second
+sample kills a collapse. What it shipped was not an independent sample.
+Staging story `job_1788614817116_vxnu60yjg` shows all four failures in one run:
+
+- `finalChecksReport.styleConsistency` flagged exactly grid 0's nine cells
+  (-1, -2, -3, 1…6), 9 of 21, verdict `fragmented`. Eight of the nine rationale
+  arrays were byte-identical, the ninth differed by one trailing string.
+- The confirmation pass re-ran **the same function on the same byte-identical
+  grid, with the same prompt, the same model and temperature 0** — and
+  "confirmed" all nine. A deterministic call repeated is not a second sample.
+- Nine Grok repaints followed. Seven were rejected by the proximity judge as
+  visually identical to their originals.
+- The two that passed the gate (page 6, the initial page) pushed a version
+  carrying `score: prevBest.score`. `selectBestVersion` breaks a full tie with
+  `'earliest'`, so both tied at `finalScore` 70 and **neither ever became the
+  active version** — while the ledger recorded them as `outcome: 'kept'`.
+
+The owner viewed all nine pages: every one is on-style watercolour. Precision of
+the collapse, again, 0/9 — the same signature as 2026-08-25, 08-31 and 09-04
+(memory `project_grid_judge_collapse.md`, Lab experiments 985-987).
+
+**Decision — four changes.**
+
+1. **The confirmation pass re-cuts the grids.** `recutBatches()` re-deals the
+   cells so each faces mostly new neighbours, keeping the pass-1 batch sizes
+   (same call count, same cost). Zero carry-over is arithmetically impossible —
+   21 cells in 3 grids means any 9-cell grid must, by pigeonhole, contain ≥3
+   cells from one first-pass grid — so it minimises instead, spreading each
+   pass-1 grid across the new ones by largest-remainder rounding against
+   remaining capacity. **Achieved bound, asserted in the unit test: 24 of the 75
+   first-pass pairs survive (32%), and no cell keeps more than 4 of its ≤8
+   first-pass grid-mates. 24 is the floor for grid sizes [9,9,3].** Intersect
+   semantics are unchanged: only pages flagged in both passes survive.
+2. **Then a per-cell pass.** Any grid can collapse, however it is cut; a grid of
+   ONE cannot, because there is no neighbour to stamp a shared verdict onto.
+   Each still-flagged cell gets its own single-image call through the same
+   `judgeBatch` and the same prompt — a batch of one — against the commissioned
+   style. A cell is an outlier only if every pass agrees. Cost is bounded by
+   construction at N calls, N = cells still flagged after the re-cut pass, and
+   only on a story that already tripped the 20% gate. (`checkStyleMatch` in
+   styleAnalysis.js was checked as the reuse candidate and rejected: it compares
+   one image against *another image*, not against the commissioned style.)
+3. **A structural collapse guard runs BEFORE any intersect.** `voidCollapsedBatches()`
+   voids a batch that flags 100% of its own cells when its flagged cells carry
+   ≤2 distinct rationale arrays. Structural in the strict sense the repo means:
+   rationale arrays are compared for **equality** (a JSON round-trip) and
+   counted — nothing reads, matches or classifies the words, so the guard fires
+   identically on nine copies of any sentence in any language. A voided batch
+   contributes no outliers and its own book-level medium verdict is voided with
+   it; a WARN names the voided grid's cells. Its cells are not "confirmed
+   on-style", they are unjudged — which costs nothing, because only a flag ever
+   costs anything. Single-cell grids are exempt by construction, which is what
+   makes change 2 trustworthy.
+4. **A style repaint is scored on its own bytes.** Chosen over "don't push a
+   version that cannot win" because it is **what every other repair method in
+   `repairPipeline.js` already does**: garment-recolour and every inpaint/iterate
+   round run `evaluateImageBatch` on the new image and stamp `applyScore` from
+   *that* evaluation. Style repair alone inherited its predecessor's score,
+   which is not a candidate but an appointment. Gate-passing repaints are now
+   held back and scored in one batch eval after the loop, then pushed and left
+   to `selectBestVersion`. Cost: one quality eval per gate-passing repaint —
+   rare (7 of 9 were rejected before scoring on the evidence story), and the
+   price the recolour path already pays. The ledger follows the selector, not
+   the gate: `outcome: 'kept'` is written only when the new version IS the one
+   `finalBestPerPage` now points at; a repaint that passed the style gate and
+   lost on score is `'not_selected'`, with both scores recorded. An
+   unscoreable repaint is discarded rather than pushed, because Step 3b has
+   already run and an unscored version can never win. **Pages and covers use
+   the identical path** — covers ride the pipeline as pages -1/-2/-3, and the
+   evidence story confirms the initial-page repaint failed exactly the same tie
+   (finalScore 70 vs 70) rather than shipping unscored.
+
+**Verification.** The stored per-batch outputs of `job_1788614817116_vxnu60yjg`
+were replayed offline through the new guard (read-only DB, no model calls):
+grid 0 → **voided** (9/9 flagged, 2 distinct rationale arrays), 0 of 21 outliers
+survive, the >20% gate never trips, **0 repaints queued instead of 9**, verdict
+`consistent` instead of `fragmented`. `tests/unit/style-collapse-guard.test.ts`
+(15 assertions) covers the re-cut overlap bound, the guard's fire/no-fire cases
+including that evidence grid, intersect semantics, and the version-selection tie.
+Full suite: 486 passed / 39 files.
+
+**Touched files:** `server/lib/styleConsistency.js` (`batchCells`,
+`recutBatches`, `voidCollapsedBatches`, `MAX_DISTINCT_RATIONALES`, module-level
+`CHUNK`, `judgeBatch` now returns `pages`, `runAllBatches(theBatches)`, the
+rewritten confirmation block), `server/lib/repairPipeline.js` (Step 5:
+`accepted[]`, the post-loop scoring block, `recordRepair(..., extra)` and its
+`not_selected` outcome), `tests/unit/style-collapse-guard.test.ts`.
+
+**Status:** ✅ active (staging) — completes, does not reverse, the confirmation
+decision above.
+
+---
