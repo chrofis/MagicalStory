@@ -658,7 +658,7 @@ export function WizardStep6Summary({
                 <option value="legacy-square-2page">Legacy: separate image + text pages (stub)</option>
               </select>
               <p className="text-xs text-gray-600 mt-1">
-                Auto: 1st-grade & standard ⇒ A4+overlay. Advanced ⇒ square+below. The legacy mode is a stub — it routes to square+below until the old 2-page code (commit 4d953cba) is revived.
+                Auto: every reading level ⇒ square+below (no level's word budget fits the overlay calm zone). A4+overlay is override-only. The legacy mode is a stub — it routes to square+below until the old 2-page code (commit 4d953cba) is revived.
               </p>
             </div>
           )}

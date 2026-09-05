@@ -25,14 +25,15 @@ const LAYOUTS: Record<LayoutMode, LayoutResult> = {
   'legacy-square-2page': { imageAspect: '1:1', textInImage: false, mode: 'legacy-square-2page' },
 };
 
-export function resolveLayout(languageLevel: LanguageLevel | string | undefined, override: LayoutOverride = 'auto'): LayoutResult {
+// `_languageLevel` no longer selects a layout (every level is square-below) but stays
+// in the signature to mirror server/lib/layout.js and to keep every call site working.
+export function resolveLayout(_languageLevel: LanguageLevel | string | undefined, override: LayoutOverride = 'auto'): LayoutResult {
   if (override && override !== 'auto' && LAYOUTS[override as LayoutMode]) {
     return { ...LAYOUTS[override as LayoutMode] };
   }
-  if (languageLevel === '1st-grade') {
-    return { ...LAYOUTS['a4-overlay'] };
-  }
-  // standard, advanced, and any unknown value → square image + text below.
+  // MIRROR of server/lib/layout.js: no reading level's word budget fits the
+  // overlay calm zone, so every level — 1st-grade, standard, advanced and any
+  // unknown value — gets a square image + text below. a4-overlay is override-only.
   return { ...LAYOUTS['square-below'] };
 }
 

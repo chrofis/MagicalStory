@@ -585,7 +585,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // require threading through many existing helpers. inputData is request-
   // local (sanitized in the route handler, not shared), so augmenting it here
   // is safe.
-  // 'advanced' → square + text-below. Others → A4 + text-overlay.
+  // Every reading level → square + text-below (2026-09-05). A4 + text-overlay
+  // is reachable only through inputData.layoutOverride.
   const { resolveLayout } = require('./server/lib/layout');
   const layout = resolveLayout(inputData.languageLevel, inputData.layoutOverride);
   inputData.layout = layout;
@@ -7091,12 +7092,15 @@ async function _processStoryJobImpl(jobId) {
 
     // Stamp the layout from languageLevel onto inputData so image generation,
     // scene expansion, and PDF rendering all read from the same source of
-    // truth. Advanced stories → square image + text-below strip; standard
-    // and 1st-grade → A4 image + overlay. Without this, buildImagePrompt
-    // falls through to its default (textInImage=true) regardless of level.
+    // truth. Every reading level → square image + text-below strip since
+    // 2026-09-05; A4 + overlay only on an explicit layoutOverride. Without
+    // this, buildImagePrompt falls through to its default (textInImage=true)
+    // regardless of level.
     try {
       const { resolveLayout } = require('./server/lib/layout');
-      inputData.layout = resolveLayout(inputData.languageLevel);
+      // The override must be passed: now that no level resolves to a4-overlay,
+      // dropping it here would make the overlay layout unreachable on this path.
+      inputData.layout = resolveLayout(inputData.languageLevel, inputData.layoutOverride);
       log.info(`📐 [PROCESS] Layout for level=${inputData.languageLevel}: mode=${inputData.layout.mode}, aspect=${inputData.layout.imageAspect}, textInImage=${inputData.layout.textInImage}`);
     } catch (e) {
       log.warn(`📐 [PROCESS] resolveLayout failed: ${e.message} — layout not stamped`);

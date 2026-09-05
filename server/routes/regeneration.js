@@ -2613,7 +2613,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       );
     }
 
-    // Per-scene layout: 'advanced' stories generate at 1:1 (square + text-below).
+    // Per-scene layout: every level now generates at 1:1 (square + text-below);
+    // only an a4-overlay override produces 3:4.
     // Iterating a page must keep the scene's saved aspect — otherwise a square
     // page comes back as 3:4 and looks wrong sitting above the text strip sized
     // for a 1:1 image. Falls back to the global default for legacy stories that

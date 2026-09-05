@@ -139,11 +139,12 @@ function runtime(name) {
  *   1. How much text a page carries is the reading level (LANGUAGE_LEVELS,
  *      promptBuilders.js): 1st-grade 25–50 words, standard 40–150,
  *      advanced 250–300.
- *   2. Where that text lands is resolveLayout() (server/lib/layout.js), driven
- *      by the same reading level: 1st-grade → `a4-overlay`, text painted INSIDE
- *      the picture over a reserved calm corner (textInImage: true); standard and
- *      advanced → `square-below`, text typeset in a strip UNDER the picture
- *      (textInImage: false). A developer layoutOverride can force either.
+ *   2. Where that text lands is resolveLayout() (server/lib/layout.js). Since
+ *      2026-09-05 EVERY level resolves to `square-below` — text typeset in a
+ *      strip UNDER the picture (textInImage: false) — because no level's word
+ *      budget fits the overlay calm zone (~53–71 words at 14pt). `a4-overlay`
+ *      (textInImage: true) is reachable only through a developer layoutOverride,
+ *      so in practice these rules are now OFF unless someone asks for overlay.
  *
  * So "a SHORT text overlaid on the image" is exactly `layout.textInImage`, and
  * that is the condition. For a text-below layout there is no text zone inside

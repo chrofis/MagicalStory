@@ -44,15 +44,19 @@ console.log('\n── The flag: which reading levels activate the rules ──')
 {
   // Fact base this derivation rests on, asserted so a layout change breaks here
   // rather than silently switching the rules on for a text-below story.
-  ok("1st-grade lays text INSIDE the picture", () =>
-    assert.strictEqual(resolveLayout('1st-grade').textInImage, true));
+  ok('1st-grade lays text BELOW the picture (2026-09-05: no level overlays by default)', () =>
+    assert.strictEqual(resolveLayout('1st-grade').textInImage, false));
+  ok('an a4-overlay override still lays text INSIDE the picture', () =>
+    assert.strictEqual(resolveLayout('1st-grade', 'a4-overlay').textInImage, true));
   ok('standard lays text BELOW the picture', () =>
     assert.strictEqual(resolveLayout('standard').textInImage, false));
   ok('advanced lays text BELOW the picture', () =>
     assert.strictEqual(resolveLayout('advanced').textInImage, false));
 
-  ok('active for 1st-grade', () =>
-    assert.strictEqual(textZoneRulesActive({ languageLevel: '1st-grade' }), true));
+  ok('OFF for 1st-grade — it is text-below like every other level', () =>
+    assert.strictEqual(textZoneRulesActive({ languageLevel: '1st-grade' }), false));
+  ok('active only for an explicit a4-overlay override', () =>
+    assert.strictEqual(textZoneRulesActive({ languageLevel: '1st-grade', layoutOverride: 'a4-overlay' }), true));
   ok('OFF for standard', () =>
     assert.strictEqual(textZoneRulesActive({ languageLevel: 'standard' }), false));
   ok('OFF for advanced', () =>
@@ -76,7 +80,7 @@ console.log('\n── The flag: which reading levels activate the rules ──')
     const saved = SETTINGS.textZoneRules;
     try {
       SETTINGS.textZoneRules = false;
-      assert.strictEqual(textZoneRulesActive({ languageLevel: '1st-grade' }), false);
+      assert.strictEqual(textZoneRulesActive({ languageLevel: '1st-grade', layoutOverride: 'a4-overlay' }), false);
       assert.strictEqual(textZoneRulesActive({ languageLevel: '1st-grade', layout: { textInImage: true } }), false);
     } finally { SETTINGS.textZoneRules = saved; }
   });

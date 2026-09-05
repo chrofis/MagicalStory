@@ -556,12 +556,14 @@ const MODEL_DEFAULTS = {
   // no code; imageRouter reads the per-request inputData.phantomPoseRender.)
   enableSceneComposite: false,
   enableTextOverlay: true,             // Global kill switch for the text-overlay pipeline. ON by
-                                       // default — `1st-grade` stories use the a4-overlay layout
-                                       // (text composited onto image, calm-zone reserved). Set to
-                                       // false to disable the entire post-gen text-region phase
-                                       // for every story regardless of layout. The per-story
-                                       // `inputData.layout.textInImage === false` (set by
-                                       // resolveLayout for `standard`/`advanced`) is the normal
+                                       // default, but since 2026-09-05 no reading level resolves
+                                       // to the a4-overlay layout — only an explicit
+                                       // `layoutOverride: 'a4-overlay'` does — so the phase runs
+                                       // only for those stories. Set to false to disable the
+                                       // entire post-gen text-region phase for every story
+                                       // regardless of layout. The per-story
+                                       // `inputData.layout.textInImage === false` (what
+                                       // resolveLayout now returns for every level) is the normal
                                        // route to skip overlay; this flag is the kill switch.
   // Reference mode for character refs / VB grid attached to page generation.
   //   'strict'      — photo + costumed + styled avatars; full VB grid (current default)

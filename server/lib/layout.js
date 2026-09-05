@@ -2,16 +2,22 @@
  * Page layout resolver — single source of truth for "what aspect + how is text shown"
  * decision per page.
  *
- * Driven by the existing `languageLevel` setting on the story:
- *   - '1st-grade'  → A4 portrait + text overlaid on image (current pipeline: calm-zone, mask, QC, repair)
- *   - 'standard'   → A4 portrait + text overlaid on image (current pipeline)
- *   - 'advanced'   → square image + text below in a white strip (no calm-zone, no mask, no QC, no repair)
+ * Every reading level defaults to `square-below`: a square image with the page
+ * text typeset in a white strip underneath. `a4-overlay` (text painted INSIDE
+ * the picture over a reserved calm zone) survives only as an explicit developer
+ * override.
  *
- * The reason: `advanced` stories have long page text. Overlaying long text on the
- * image would dominate the picture; instead we render a square image at the top
- * 2/3 of the A4 page and typeset text on a white strip below (bottom 1/3).
- *
- * A developer override can force any layout (or invoke the legacy 2-page mode).
+ * The reason is measured, not aesthetic. Overlay text has to fit a calm zone
+ * inside the frame, and `requiredTextPixels()` (server/config/textRegion.js)
+ * prices a word at ~1399 px² at 14pt and ~1028 px² at 12pt. The largest zone the
+ * text-region pass actually offers is ~99,360 px² (a full-width band; a corner or
+ * half zone is ~74,675 px²) — about 71 and 53 words at 14pt. Against the
+ * LANGUAGE_LEVELS budgets (1st-grade 25–50 words, standard 40–150, advanced
+ * 250–300) only 1st-grade's FLOOR fits with room to spare; its 50-word ceiling
+ * already eats 94% of the smaller zone, and standard/advanced cannot fit at all.
+ * A budget whose top end has no headroom is not a layout that can be the default:
+ * `job_1788614817116_vxnu60yjg` (1st-grade, 18 pages) came in at 73–118 words a
+ * page and failed the text-fit check on 18 pages out of 18.
  *
  * Returns a stable object the rest of the pipeline reads from: imageAspect drives
  * Grok aspect_ratio; textInImage gates the text-zone instructions, mask reference
@@ -38,9 +44,9 @@ const LAYOUTS = {
 /**
  * Resolve the page layout for a story.
  *
- *   - '1st-grade' (very short text) → a4-overlay (text on image, calm-zone reserved)
- *   - 'standard'  (middle text)     → square-below (square image + text strip below)
- *   - 'advanced'  (long text)       → square-below (square image + text strip below)
+ *   - every reading level ('1st-grade', 'standard', 'advanced', unknown)
+ *     → square-below (square image + text strip below)
+ *   - an explicit override → whatever it names, including a4-overlay
  *
  * @param {string} languageLevel - Story-wide reading level ('1st-grade' | 'standard' | 'advanced').
  * @param {LayoutOverride} [override='auto'] - Developer override. 'auto' (default) follows the languageLevel mapping.
@@ -50,10 +56,8 @@ function resolveLayout(languageLevel, override = 'auto') {
   if (override && override !== 'auto' && LAYOUTS[override]) {
     return { ...LAYOUTS[override] };
   }
-  if (languageLevel === '1st-grade') {
-    return { ...LAYOUTS['a4-overlay'] };
-  }
-  // standard, advanced, and any unknown value → square image + text below.
+  // No reading level's word budget fits the overlay calm zone (see the header
+  // note) — every level gets a square image + text below.
   return { ...LAYOUTS['square-below'] };
 }
 

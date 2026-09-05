@@ -496,9 +496,13 @@ function computeTextBelowRatio(pages, languageLevel) {
   else if (maxWords <= 150) ratio = 0.28;
   else if (maxWords <= 250) ratio = 0.34;
   else                      ratio = 0.40;
-  // Clamp to languageLevel's expected band so a one-page outlier doesn't
-  // distort the whole book.
-  if (languageLevel === '1st-grade') ratio = Math.min(ratio, 0.24);
+  // Clamp UP to languageLevel's expected band so a one-page outlier doesn't
+  // distort the whole book. There is no 1st-grade cap: capping the strip is the
+  // wrong move exactly when it fires — a 1st-grade book whose pages overshoot
+  // their 25–50 word budget needs MORE strip, not less, and a cap only pushes
+  // the adaptive font toward its 10pt floor. Measured on
+  // job_1788614817116_vxnu60yjg: 73–118 words a page, i.e. the 0.28 bucket,
+  // which the old `Math.min(ratio, 0.24)` shrank. (decisions.md 2026-09-05)
   if (languageLevel === 'advanced')  ratio = Math.max(ratio, 0.30);
   return ratio;
 }

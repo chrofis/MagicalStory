@@ -26507,3 +26507,82 @@ rules above, which are deliberately event-driven.
 `tests/manual/test_worker_bringup_race.py` (new; fake Popen + fake health probe,
 loads no model).
 **Status:** ✅ active
+
+## 2026-09-05 — No reading level defaults to the A4 text-overlay layout any more; `a4-overlay` is override-only
+
+**Supersedes** the layout half of the 2026-09-03 entry *"Text-zone rules restored BEHIND A FLAG"*
+(this file, "1st-grade → `a4-overlay`, text painted INSIDE the picture"). The flag mechanism,
+`textZoneRulesActive()` and the "a stamped `inputData.layout` wins over the level" rule are all
+unchanged — only the level→layout mapping the flag derives from moves.
+
+**Context:** `job_1788614817116_vxnu60yjg` (staging, Uetliberg dragon egg, de-ch, 1st-grade,
+18 pages) was stamped `a4-overlay` and **failed the overlay text-fit check on 18 pages out of 18**
+(`textCoverageReport.passed === false` on every page; three pages burned their two text-space
+repair retries and still failed). Measured per page, `words` / `calmNeededPx` / `calmFoundPx`
+at 14pt:
+
+| p | words | needed px² | found px² | | p | words | needed px² | found px² |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 88 | 123,133 | 74,675 | | 10 | 94 | 131,529 | 74,675 |
+| 2 | 74 | 103,544 | 99,360 | | 11 | 110 | 153,917 | 74,675 |
+| 3 | 98 | 137,126 | 74,675 | | 12 | 104 | 145,521 | 74,675 |
+| 4 | 90 | 125,932 | 99,360 | | 13 | 79 | 110,540 | 99,360 |
+| 5 | 101 | 141,324 | 99,360 | | 14 | 80 | 111,940 | 99,360 |
+| 6 | 83 | 116,137 | 74,675 | | 15 | 73 | 102,145 | 74,675 |
+| 7 | 94 | 131,529 | 74,675 | | 16 | 103 | 144,122 | 99,360 |
+| 8 | 102 | 142,723 | 74,675 | | 17 | 101 | 141,324 | 74,675 |
+| 9 | 77 | 107,742 | 74,675 | | 18 | 118 | 165,111 | 99,360 |
+
+Two facts fall out of that table, and together they are the ruling.
+
+*The zone is small.* `calmFoundPx` takes exactly two values across all 18 pages — 74,675 and
+99,360 — one per text-zone shape (corner/half band vs full-width band). At
+`PIXELS_PER_WORD[14] ≈ 1399 px²/word` (`server/config/textRegion.js`) that is a **53-word and a
+71-word zone**. Set against `LANGUAGE_LEVELS` (`server/lib/promptBuilders.js`) — 1st-grade
+25–50 words, standard 40–150, advanced 250–300 — standard and advanced were never candidates
+(150 words at 12pt needs 154,200 px², advanced 308,400), and 1st-grade only fits at the FLOOR:
+its 50-word ceiling costs 69,950 px², **94% of the smaller zone**. A layout whose best case is
+94% occupancy of the tighter of its two zones has no headroom at all.
+
+*The budget is not a contract.* This book's pages ran 73–118 words — 1.5–2.4× the 1st-grade
+ceiling. Whether that is a writer defect is a separate question (the text-fit failure is the
+symptom, not the disease), but the layout default cannot be built on the assumption that the
+budget holds, because when it does not hold the page is unreadable rather than merely long.
+
+**Decision:** `resolveLayout()` returns `square-below` for **every** reading level. `a4-overlay`
+remains a first-class mode and is reachable only through an explicit developer
+`layoutOverride: 'a4-overlay'` (which the wizard's Layout dropdown still offers). The owner's
+instruction, verbatim: *"Just change the default, leave this story as is."* — `job_1788614817116_vxnu60yjg`
+keeps its stamped `a4-overlay` layout and its 18 pages; nothing was rewritten.
+
+Two consistency follow-ons, so a 1st-grade `square-below` story renders correctly end to end:
+1. `computeTextBelowRatio()` (`server/lib/pdf.js`) loses its `1st-grade → Math.min(ratio, 0.24)`
+   cap. The cap only ever bit when a 1st-grade book overshot its budget — the case that needs a
+   TALLER strip, not a shorter one — and shrinking it just pushed the adaptive font toward its
+   10pt floor. This book's 73–118 words a page is the 0.28 bucket the cap was cutting to 0.24.
+   The `advanced → Math.max(ratio, 0.30)` floor is untouched: clamping UP is always safe.
+2. The `processStoryJob` layout stamp passed only the level, dropping `inputData.layoutOverride`.
+   Harmless while a level could produce overlay; now it would make `a4-overlay` unreachable on
+   that path entirely. It passes the override, like the unified path already did.
+
+**Rationale for "every level" rather than "1st-grade joins standard/advanced":** there is no
+shorter level to keep on overlay. `LANGUAGE_LEVELS` has exactly three entries and 1st-grade is
+the shortest; since even its ceiling does not clear the zone with headroom, no level qualifies.
+Stated plainly so the next session does not read the code as an oversight: **the overlay
+pipeline is now dormant by default** — the text-zone prompt rules, calm-zone detection, mask
+reference cell, empty-scene QC and text-space repair all gate on `layout.textInImage` and so
+run only for an overridden story. That is deliberate, and it is the cheap half of the change:
+nothing was deleted, and flipping one level back to `a4-overlay` is a one-line change once the
+zone is bigger or the word budget is actually enforced.
+
+**Not fixed here (parked by the owner):** the text-region measurement itself — `calmFoundPx`
+returning one of only two values across 18 different illustrations is the zone's area, not a
+measurement of the calm pixels inside it, so the check reports zone capacity rather than
+image calmness. Left alone deliberately.
+
+**Touched files:** `server/lib/layout.js`, `client/src/utils/layout.ts`, `server/lib/pdf.js`,
+`storyJobPipeline.js`, `server/routes/regeneration.js`, `server/config/runtime.js`,
+`server/config/models.js`, `client/src/pages/wizard/WizardStep6Summary.tsx`,
+`tests/manual/textZoneRules.test.js`
+
+**Status:** ✅ active
