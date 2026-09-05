@@ -7,7 +7,7 @@
       "reportedAt": "2026-09-05",
       "source": "prod landmark_index: 577 rows with photo_url NULL pass the serving filters; 'Schloss Mandach' (id 9019, no photo, unjudged) offered as row 10 to Bad Zurzach stories (reproduced with scratchpad verify-serving.js against DATABASE_URL, read-only)",
       "status": "fixed",
-      "fixedIn": "8d0783c57",
+      "fixedIn": "a826447f0",
       "note": "AND HAS_PHOTO_SQL added to the WHERE of all three town-name queries and the proximity query in server/lib/landmarkPhotos.js; HAS_PHOTO_SQL dropped from every ORDER BY. The weakOnly JS guard stays as a tripwire. After: Bad Zurzach 10 -> 9 rows, no photoless row served for Bern/Baden/Bad Zurzach/Endingen."
     },
     {
@@ -16,7 +16,7 @@
       "reportedAt": "2026-09-05",
       "source": "prod Bern (168 rows, cap 30): Kronenbrunnen (Fountain, 79 pv, story_score 40) served at #30; Bundeshaus (Building, 873 pv, ss 70) and Baerenpark (458 pv) absent. LANDMARK_RANK_SQL ranked class DESC ahead of fame; the proximity path had already replaced the tier with a CLASS_BONUS score (comment at FAME_MINUS_DISTANCE_SQL)",
       "status": "fixed",
-      "fixedIn": "8d0783c57",
+      "fixedIn": "a826447f0",
       "note": "LANDMARK_RANK_SQL is now one score of the proximity path's shape: class>0 leading boolean, then fame_pageviews/10 + CLASS_BONUS(6) for class 2, then sitelinks, score. PAGEVIEWS_PER_SITELINK=10 makes the bonus worth ~60 views. After: Bundeshaus #6, Baerenpark #12 for Bern. story_score stays a filter only. Not covered (reported, not fixed): Nydeggbruecke (45 pv) ranks 65th on pageviews alone; Tierpark Bern is class 0 because its category 'Unternehmensgruendung 1937' matches the NON_PLACE_CATEGORIES regex."
     },
     {
