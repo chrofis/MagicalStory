@@ -36,6 +36,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const THUMB_SIZE = 448;        // px per cell — big enough for the model to judge medium (photographic vs painted) after it downscales the composite
 const COLS = 3;                // grid columns
 
+// Above this share of flagged cells (across ALL of a story's grids) the
+// verdict is suspect and a confirmation re-audit runs — see the confirmation
+// pass in checkStoryStyleConsistency (owner ruling 2026-09-05).
+const CONFIRMATION_FLAG_RATIO = 0.2;
+
 // ─────────────────────────────────────────────────────────────────────
 // VISUAL FLOW — time-of-day and facing, measured on the same grid pass.
 //
@@ -390,23 +395,48 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
   };
 
   // One failed batch (parse/API) shouldn't sink the whole check.
-  const settled = await Promise.allSettled(batches.map(judgeBatch));
-  const results = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
-  if (results.length === 0) throw new Error(settled[0]?.reason?.message || 'all style-check batches failed');
+  const runAllBatches = async () => {
+    const settled = await Promise.allSettled(batches.map(judgeBatch));
+    const done = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+    if (done.length === 0) throw new Error(settled[0]?.reason?.message || 'all style-check batches failed');
+    return done;
+  };
 
   // Merge per-page outliers (each page is in exactly one batch); keep the
   // highest severity and union the reasons.
   const SEV = { major: 3, moderate: 2, minor: 1 };
-  const seen = new Map();
-  for (const r of results) {
-    for (const o of r.outliers) {
-      if (typeof o?.page !== 'number') continue;
-      const cand = { page: o.page, severity: SEV[o.severity] ? o.severity : 'moderate', differences: Array.isArray(o.differences) ? o.differences : [] };
-      const prev = seen.get(o.page);
-      if (!prev || (SEV[cand.severity] || 0) > (SEV[prev.severity] || 0)) seen.set(o.page, cand);
+  const mergeOutliers = (batchResults) => {
+    const seen = new Map();
+    for (const r of batchResults) {
+      for (const o of r.outliers) {
+        if (typeof o?.page !== 'number') continue;
+        const cand = { page: o.page, severity: SEV[o.severity] ? o.severity : 'moderate', differences: Array.isArray(o.differences) ? o.differences : [] };
+        const prev = seen.get(o.page);
+        if (!prev || (SEV[cand.severity] || 0) > (SEV[prev.severity] || 0)) seen.set(o.page, cand);
+      }
     }
+    return [...seen.values()];
+  };
+
+  const results = await runAllBatches();
+  let outliers = mergeOutliers(results);
+
+  // CONFIRMATION PASS (owner ruling 2026-09-05; Lab experiments 985-987).
+  // grok-imagine-2 output is reliably consistent, so a flag rate above
+  // CONFIRMATION_FLAG_RATIO signals a collapsed judge call — one batch
+  // stamping a shared verdict into every one of its cells (seen 2026-08-25,
+  // 2026-08-31, 2026-09-04: whole grids flagged "major" with an identical
+  // rationale, 0/9 confirmed by eye) — not real drift. The gate only exists
+  // to catch true outliers, so the suspect verdict gets ONE full re-audit and
+  // only pages flagged in BOTH runs survive. Structural check only: nothing
+  // here reads the rationale text.
+  if (cells.length && outliers.length / cells.length > CONFIRMATION_FLAG_RATIO) {
+    log.warn(`🎨 [STYLE-CHECK] ${outliers.length}/${cells.length} cells flagged (>${Math.round(CONFIRMATION_FLAG_RATIO * 100)}%) — suspect verdict, running one confirmation re-audit`);
+    const confirmedPages = new Set(mergeOutliers(await runAllBatches()).map(o => o.page));
+    const before = outliers.length;
+    outliers = outliers.filter(o => confirmedPages.has(o.page));
+    log.warn(`🎨 [STYLE-CHECK] confirmation pass kept ${outliers.length}/${before} outlier(s) — ${before - outliers.length} voided as unconfirmed`);
   }
-  const outliers = [...seen.values()];
   const outlierPages = new Set(outliers.map(o => o.page));
 
   // VISUAL FLOW — one row per cell, in page order. Covers (-1/-2/-3) ride along
