@@ -26024,14 +26024,27 @@ the per-page scene prompt) means the image model has an actual reference for
 the character's face at that angle, rather than inventing it fresh on every
 page that needs it.
 
-**Known gap, deliberately deferred:** the static phantom guide images used
-as the ONLY-for-facing-direction reference in `character2x4Sheet.js`
-(`assets/phantom-watercolor-*.png`, one set per age tier) still show a flat
-180° back for cells 4/8. The generation prompts now explicitly override
-Image 1's implied direction for those two cells ("turn further than Image 1
-shows"), which should work but leaves a text/image mismatch until the guide
-assets themselves are redrawn — tracked in `tasks/BACKLOG.md` since it needs
-actual asset editing, not a text change.
+**Update, same day — the phantom guide image was NOT the blocker.** A live
+test against a real character (Hans, staging) proved the "turn further than
+Image 1 shows" wording above did not work: Grok rendered a flat back-of-head
+in cell 4 and a duplicate profile, not a turned head. Opening the actual
+phantom asset (`phantom-watercolor-adult-axes.png`) showed why the deferred
+gap above was a misdiagnosis: cells 1/2/4 in that asset are all the SAME
+front-facing mannequin, only the arrow overlay direction changes — there is
+no literal back-view image in the reference to conflict with the text at
+all. The real cause was the phrase "back view" itself pulling Grok toward
+its familiar flat-back rendering regardless of qualifiers stacked onto it.
+Fix: renamed the pose to **"REAR TURN"** everywhere it's requested for cell
+4/8, dropping "back view"/"back of head" wording entirely for those two
+cells, stated as a distinct pose rather than a modifier on an existing one,
+and made explicit it must differ from cell 3's profile and must not copy
+Image 1's placeholder angle. Re-tested against the same character: cell 4/8
+now show the shoulders away from camera with the head rotated back, one eye
+and cheek visible, correct identity. The phantom asset itself was left
+untouched — it was never the problem. Touched in this pass:
+`prompts/styled-costumed-avatar-2x4.txt`, `server/lib/character2x4Sheet.js`
+(`buildHairBlock`, `buildBodyRowPrompt`, `buildHeadRowPrompt`, `buildPrompt`),
+`prompts/sheet-2x4-evaluation.txt`, `prompts/sheet-row-heads-eval.txt`.
 
 **Touched files:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`
 (rule 8i, the characters[] example, the expression field rule),
