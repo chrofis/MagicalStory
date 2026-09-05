@@ -50,13 +50,19 @@ function beat(token, surface = 'unknown') {
   tokens.set(token, { lastBeat: Date.now(), surface });
   log.debug(`[PRESENCE] ${surface} arrived (${tokens.size} present) — opening analyzer session + warm`);
   sessionBegin(`presence:${surface}`);
-  // Warm the photo-upload path only: face (mediapipe) + rembg. DINO's 1.9GB
-  // stays out of it — the story pipeline warms torch at story start, which is
-  // 20+ minutes before the repair phase needs it.
+  // Warm the photo-upload path only: face (mediapipe) + rembg. The story
+  // pipeline warms torch at story start, which is 20+ minutes before the repair
+  // phase needs it.
+  //
+  // `workers: ['face']` is what actually enforces that (2026-09-05). Sending
+  // `dino: false` alone did NOT: it only stops GroundingDINO loading INSIDE the
+  // torch worker, while the parent spawned torch regardless and loaded
+  // MobileSAM into it. Measured on staging — one presence beat took the
+  // analyzer to 1,877MB, for a user who was only sitting in the wizard.
   analyzerFetch('/warmup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dino: false }),
+    body: JSON.stringify({ dino: false, workers: ['face'] }),
     signal: AbortSignal.timeout(8000),
   }, { retries: 1, retryDelayMs: 3000 }).catch(() => {});
   return { ok: true, active: tokens.size, new: true };

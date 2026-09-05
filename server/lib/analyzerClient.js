@@ -64,7 +64,7 @@ const WARM_INTERVAL_MS = 5 * 60 * 1000;
  * Tell the analyzer to preload its models because a user is active.
  * Fire-and-forget: never block or fail a user request over warming.
  */
-function ensureWarm(reason = 'user-active', { force = false } = {}) {
+function ensureWarm(reason = 'user-active', { force = false, workers = null } = {}) {
   const now = Date.now();
   // force bypasses the debounce for a known-critical moment (e.g. the repair
   // phase is about to run detection after a long text/image phase that let the
@@ -81,10 +81,17 @@ function ensureWarm(reason = 'user-active', { force = false } = {}) {
   // runtime() has no env override, that env var is dead on this side — the
   // analyzer cannot read the truth even in principle. So we send it.
   const wantDino = require('../config/runtime').runtime('figureDetectionBackend') === 'grounding-dino';
+  // `workers` names the worker PROCESSES to spawn; the model flags only say
+  // what each preloads once it exists. Needed because `dino` selects a model
+  // INSIDE the torch worker and so could never express "don't spawn torch" —
+  // and torch owns MobileSAM too, so overloading `dino` for that would be
+  // wrong. Omitted -> the analyzer's historical default (face + torch).
+  const payload = { dino: wantDino };
+  if (Array.isArray(workers) && workers.length) payload.workers = workers;
   analyzerFetch('/warmup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dino: wantDino }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(8000),
   }, { retries: 1, retryDelayMs: 3000 })
     .then(() => log.debug(`[ANALYZER] warmup requested (${reason})`))

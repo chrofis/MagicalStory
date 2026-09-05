@@ -2600,6 +2600,11 @@ def warmup_endpoint():
     each preload its own models" — the spawn happens now, during the wizard/text
     phase, so the story's repair phase never pays a cold start. No warm-hold
     timer: workers live until the session count hits zero, however long that is.
+
+    Body: {"dino": bool, "arcface": bool, "workers": ["face", "torch", ...]}.
+    `workers` names the worker PROCESSES to spawn; the model flags say what each
+    should preload. Omit `workers` for the historical default (face + torch,
+    plus arcface when asked).
     """
     global _warmup_thread
     if _warmup_thread is not None and _warmup_thread.is_alive():
@@ -2630,13 +2635,30 @@ def warmup_endpoint():
     # Callers that know an avatar is coming send {"arcface": true}.
     want_arcface = bool(body.get('arcface', False))
 
+    # WHICH WORKERS, not just which models (2026-09-05). `dino` selects a model
+    # INSIDE the torch worker, so it could never express "don't spawn torch at
+    # all" — and torch also owns MobileSAM, so overloading `dino` to mean that
+    # would be wrong. Presence-warm asks for the photo path only; measured, the
+    # torch worker it used to get anyway put ~1.9GB behind a user who was merely
+    # sitting in the wizard. Same principle as `dino` above: the caller answers,
+    # this process does not guess. Omitted -> the previous default.
+    requested_workers = body.get('workers')
+    if isinstance(requested_workers, list) and requested_workers:
+        want_roles = [r for r in requested_workers if r in WORKER_PORTS]
+        unknown = [r for r in requested_workers if r not in WORKER_PORTS]
+        if unknown:
+            print(f"[WARMUP] ignoring unknown worker role(s): {', '.join(map(str, unknown))}")
+    else:
+        want_roles = None
+
     def _warm():
         t0 = time.time()
         if ANALYZER_ROLE == 'parent':
             # Spawn the workers this session will need; forward the SAME warmup
             # body to each so it preloads its own models. face loads mediapipe
             # at boot; rembg/torch preload below; arcface only when asked.
-            roles = ['face', 'torch'] + (['arcface'] if want_arcface else [])
+            roles = want_roles if want_roles is not None else (
+                ['face', 'torch'] + (['arcface'] if want_arcface else []))
             for role in roles:
                 try:
                     base = ensure_worker(role)

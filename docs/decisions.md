@@ -26942,3 +26942,39 @@ only. Validating it costs one story generation on the smoke account, or a new
 re-plan), `tests/unit/plan-replan-ranking.test.ts`
 
 **Status:** ✅ active (staging; not yet on master)
+
+## 2026-09-05 — /warmup takes `workers`: the caller names the PROCESSES, not just the models
+
+**Context:** `presenceSessions.beat()` sends `{dino: false}` and its comment
+states the intent — "warm the photo-upload path only: face (mediapipe) + rembg.
+DINO's 1.9GB stays out of it". It did not work. `dino` selects a model INSIDE
+the torch worker, so the parent spawned torch regardless and loaded MobileSAM
+into it. Measured on staging: one presence beat, no other traffic, took the
+analyzer from 92MB to **1,877MB** — held for as long as the user was present in
+the wizard plus the 5-minute TTL, and billed per minute.
+
+Overloading `dino` to also mean "no torch worker" would be wrong: torch owns
+MobileSAM, which the repair phase needs whether or not GroundingDINO is in play.
+The flag names a model; the missing concept was a worker.
+
+**Decision:** `/warmup` accepts `workers: ["face", "torch", ...]` naming the
+worker PROCESSES to spawn, alongside the existing model flags saying what each
+preloads. Presence-warm sends `workers: ['face']`. Omitting the field keeps the
+historical default (face + torch, plus arcface when asked), so every other
+caller is unchanged. Unknown role names are logged and ignored rather than
+throwing — a warmup must never fail a user request.
+
+**Rationale:** Same principle as the 2026-08-17 entry that made `dino` a caller
+decision: what to preload is the caller's answer, and this process does not
+guess. The caller could already say which models but not which processes, which
+is exactly the gap that let a wizard page view pin 1.9GB.
+
+**Not changed:** `photos.js` `/remove-bg` still warms the default face+torch.
+Its comment documents that as deliberate ("rather than on the first mask call
+inside character repair"), so narrowing it is a separate decision — the story
+pipeline already force-warms torch at the repair phase, 20+ minutes later, which
+suggests it may be unnecessary there too. Open question, not a silent change.
+
+**Touched:** `photo_analyzer.py` (`warmup_endpoint`), `server/lib/analyzerClient.js`
+(`ensureWarm({ workers })`), `server/lib/presenceSessions.js`.
+**Status:** ✅ active
