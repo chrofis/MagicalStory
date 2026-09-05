@@ -2810,10 +2810,27 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const { COVER_PAGE_NUMBERS } = require('./coverKeys');
     // Build a minimal storyData-shaped object from finalBestPerPage so we
     // never accidentally feed pre-repair pixels to the audit.
+    // The brief must ride along. `finalBestPerPage` holds image VERSION objects
+    // (pixels + scores), not page rows, so a projection of `{pageNumber,
+    // imageData}` alone left the visual-flow pass with `sceneDescription`
+    // undefined on every page: extractDeclaredLight returned `{token: null}`
+    // for all 21 cells of job_1788614817116_vxnu60yjg even though 13 of its 18
+    // briefs state an hour outright ("Warm golden morning light…", p6). With
+    // nothing declared, a rendered time can never be a mismatch and the whole
+    // measurement was inert. The brief lives on the story's page rows.
+    const briefByPage = new Map(
+      (storyData?.sceneImages || [])
+        .filter(s => s?.sceneDescription)
+        .map(s => [s.pageNumber, s.sceneDescription])
+    );
     const stylePages = [...finalBestPerPage.entries()]
       .filter(([pn]) => pn > 0)
       .sort((a, b) => a[0] - b[0])
-      .map(([pageNumber, best]) => ({ pageNumber, imageData: best?.imageData }));
+      .map(([pageNumber, best]) => ({
+        pageNumber,
+        imageData: best?.imageData,
+        sceneDescription: best?.sceneDescription || briefByPage.get(pageNumber) || null,
+      }));
     // Covers = pages (owner directive): all three covers join the audit at
     // their negative page numbers. Prefer the pipeline's picked-best pixels
     // (covers run through the repair rounds as pages -1/-2/-3); fall back to

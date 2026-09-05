@@ -204,15 +204,30 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   const pages = (storyData.sceneImages || [])
     .filter(s => s.imageData)
     .sort((a, b) => a.pageNumber - b.pageNumber);
+  // The brief is what a rendered time is judged AGAINST, so losing it does not
+  // fail — it silently makes the whole visual-flow pass inert (every cell
+  // `declared: null`, zero possible mismatches). That is exactly what a caller
+  // projecting only `{pageNumber, imageData}` did to
+  // job_1788614817116_vxnu60yjg. Fall back to the story's own scene-description
+  // rows, and say so loudly when no page carries one at all.
+  const briefFallback = new Map(
+    (storyData.sceneDescriptions || [])
+      .filter(d => d?.description)
+      .map(d => [d.pageNumber, d.description])
+  );
   for (const s of pages) {
+    const brief = s.sceneDescription || briefFallback.get(s.pageNumber) || '';
     cells.push({
       label: `Page ${s.pageNumber}`,
       imageData: s.imageData,
       page: s.pageNumber,
       // Covers declare nothing (they have no brief), so they stay undefined and
       // can never contribute a time mismatch.
-      declared: extractDeclaredLight(s.sceneDescription),
+      declared: extractDeclaredLight(brief),
     });
+  }
+  if (pages.length && !pages.some(s => s.sceneDescription || briefFallback.has(s.pageNumber))) {
+    log.warn(`🕑 [VISUAL-FLOW] no page brief reached the style check (${pages.length} page(s)) - time-of-day measurement is inert for this run`);
   }
 
   if (cells.length < 2) {

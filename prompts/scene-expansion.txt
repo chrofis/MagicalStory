@@ -100,7 +100,7 @@ The prose must include, interleaved naturally:
 - the main action of this page, opening the prose
 - each named character described on first mention (age look, build, hair, eyes, distinctive features, and the full outfit: top, bottom, footwear — or the tail/fin in place of bottom and footwear when the outfit replaces the legs)
 - where each character is positioned (left/right/center, foreground/midground/background), what they hold, how they face
-- the setting: location, time of day, weather, lighting, mood
+- the setting: location, time of day, weather, lighting, mood — the season is **{SEASON}** on every page of this book: foliage, ground cover, sky and daylight colour are that season's, and stay identical from page to page for the same place
 - any recurring visual element in frame, named with the identifying detail this shot shows, at the size and visibility the shot gives it
 - a short note on shot type (close-up / medium / wide / aerial) if not obvious from the action
 

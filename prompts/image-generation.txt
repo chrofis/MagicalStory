@@ -21,6 +21,8 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 
 {ERA_GUARD}
 
+{SEASON_NOTE}
+
 {TEXT_AREA_INSTRUCTION}
 
 {COVER_COMPOSITION}

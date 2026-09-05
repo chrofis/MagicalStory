@@ -26323,3 +26323,85 @@ stop the entire story."
 
 **Touched files:** `storyJobPipeline.js`, `server/lib/{beatsPipeline,landmarkPhotos,promptBuilders}.js`,
 `tests/unit/premise-landmark-match.test.ts`
+
+## 2026-09-05 — Season is resolved ONCE and injected everywhere; a missing one derives from the story's date
+
+**Context:** `job_1788614817116_vxnu60yjg` (staging, Uetliberg dragon egg, de-ch, 18 pages)
+stored `input_data.season = ""`. The wizard always sends a season (`getCurrentSeason()` in
+`WizardStep3BookSettings.tsx` defaults it from today's date), but an admin rerun
+(`scripts/admin/rerun-story-on-staging.js`) copies a source job's `input_data` verbatim, so a
+blank propagates. Every consumer was written as
+`inputData.season ? \`Season: ${inputData.season}\` : null` — an empty string is falsy, so the
+Season line vanished from `STORY_BRIEF` entirely. Nothing downstream then stated a season: the
+Visual Bible, every scene brief and every image prompt were silent about it, and the UI
+(`GenerationSettingsPanel`) correctly reported "Jahreszeit: Nicht angegeben". Page 6 rendered
+autumn-orange foliage while pages 1 and 3 stayed green — the Uetliberg landmark reference photos
+carried into the VB are themselves described `[distant, autumn, day]`, and with no declared
+season to repaint them into, the photo's own season won. That directly contradicts the
+2026-08-16 ruling ("the photo defines the STRUCTURE only … season, time of day, weather and
+light come from the scene description").
+
+Season also never reached the Art Director or the renderer even when it WAS provided:
+`scene-expansion.txt` and `image-generation.txt` had no season placeholder at all. The only
+carrier to pixels was whatever the bible model happened to copy out of the brief.
+
+**Decision:**
+1. One resolver, `server/lib/season.js`. `resolveSeason(inputData, {now})` normalises the stored
+   value (aliases: `fall`, `Sommer`, `Herbst`, …) and, when it is absent OR empty, derives the
+   season from the story's own date using the same Northern-hemisphere month boundaries as the
+   wizard, so a stamped story and a wizard-launched story agree.
+2. The pipeline stamps the result onto `inputData.season` at job start, right beside the
+   existing `resolveLayout` stamp. Everything downstream — writer brief, bible, scene briefs,
+   image prompts, and the stored `stories.data.season` the UI reads — then sees one value.
+   The reference date is the job's `created_at`, never "now", so a repair run months later
+   resolves the season the pages were drawn in.
+3. Season is injected at every stage, not just the brief: `{SEASON}` in `scene-expansion.txt`
+   (the Art Director writes both the scene prose and `emptyScenePrompt`, so this is the one
+   place a season can reach the background plate) and `{SEASON_NOTE}` in `image-generation.txt`,
+   shaped like the existing `ERA_GUARD` and explicitly overriding a reference photo shot in
+   another season.
+
+**Rationale:** Derive-from-date over "require an explicit season": the wizard already derives it
+that way, so the pipeline default and the UI default now agree instead of diverging, and no
+launcher or rerun can produce a book with no stated season. Requiring it would break every
+script-launched and rerun job, including the smoke account's.
+
+**Known limitation (open):** derive-from-date resolves THIS job to `autumn`, because it was
+launched on 5 September — while the story itself is a summer one (short sleeves, dragon egg
+hunt). The date is a proxy for intent, not intent. The alternative — deriving the season from
+the story text/premise with a cheap model call, or from `storyType` for seasonal types
+(christmas → winter, easter → spring) — is deliberately NOT built here; it is a new inference
+stage and needs the owner's call. The correct immediate fix for a rerun is for the LAUNCHER to
+send the intended season: `scripts/admin/rerun-story-on-staging.js` should carry
+`inputs.season` and refuse a blank, rather than relying on the date fallback.
+
+**Touched files:** `server/lib/season.js` (new), `server/lib/promptBuilders.js`,
+`storyJobPipeline.js`, `prompts/scene-expansion.txt`, `prompts/image-generation.txt`,
+`tests/unit/season-and-visual-flow.test.ts`
+
+**Status:** ✅ active
+
+## 2026-09-05 — The style audit's caller must carry the page brief, or the whole time-of-day pass is silently inert
+
+**Context:** On the same story, the visual-flow measurement in
+`server/lib/styleConsistency.js` reported `declared: null` for all 21 cells, although 10 of the
+18 briefs name an hour outright ("Warm golden **morning** light filters through the beech and
+oak canopy…", p6; "casting long amber **evening** shadows…", p13; "the deep blue-black **night**
+sky", p16). `extractDeclaredLight` was never at fault — it resolves all ten correctly when run
+against the stored briefs. The caller was: `repairPipeline.js` builds its style input from
+`finalBestPerPage`, which holds image VERSION objects (pixels + scores), and projected them to
+`{ pageNumber, imageData }`. `sceneDescription` was `undefined` on every page, so every cell
+declared nothing — and since a rendered time can only ever be wrong against a DECLARED time,
+zero mismatches were possible. The two other callers (`testlab.js` runStyleCheckStage, the
+`/api/stories/:id/style-check` endpoint) pass full `storyData` and were unaffected.
+
+**Decision:** The projection carries `sceneDescription` (from the story's page rows, keyed by
+page number). `styleConsistency` additionally falls back to `storyData.sceneDescriptions[].description`
+and logs a WARN when no page brief reached it at all — losing the brief must be visible, not a
+silently empty measurement. The keyword list was NOT changed: the eight pages that still resolve
+to `null` genuinely state no time of day, so `null` is the correct answer there.
+
+**Touched files:** `server/lib/repairPipeline.js`, `server/lib/styleConsistency.js`,
+`tests/unit/season-and-visual-flow.test.ts`
+
+**Status:** ✅ active

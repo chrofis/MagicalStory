@@ -20,6 +20,7 @@ const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
+const { seasonLabel, buildSeasonNote } = require('./season');
 
 /**
  * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
@@ -2528,7 +2529,13 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     LANGUAGE_INSTRUCTION: languageInstruction,
     LANGUAGE_NOTE: getLanguageNote(language),
     CORRECTION_NOTES: '',
-    MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3
+    MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
+    // Season governs foliage, ground cover and daylight colour, and it must be
+    // the SAME on every page. The Art Director is the only writer of the scene
+    // prose and of `emptyScenePrompt` (the background plate), so this is the
+    // one place a season can reach the pixels. `options.story` is the job's
+    // inputData where a caller has it; the resolver falls back to the date.
+    SEASON: seasonLabel(options.story || {})
   });
   // Text-zone rule family, same gate as the all-pages builder. A cover call
   // (pageNumber <= 0) never gets it; a page call follows the story's layout,
@@ -3518,7 +3525,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // arrangement, bottom margin). '' for pages, so the placeholder is
       // stripped and a page prompt is byte-identical to before.
       COVER_COMPOSITION: options.coverComposition || '',
-      SCENE_INTENT: sceneIntentLine
+      SCENE_INTENT: sceneIntentLine,
+      // Season note, same shape as ERA_GUARD: a book-wide condition the
+      // renderer must honour even when an attached landmark reference photo
+      // was shot in a different season (decisions.md 2026-08-16).
+      SEASON_NOTE: buildSeasonNote(inputData || {})
     })));
   }
 
@@ -4219,7 +4230,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
     inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
     inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
-    inputData.season ? `Season: ${inputData.season}` : null,
+    `Season: ${seasonLabel(inputData)}`,
     buildSettingLine(inputData),
     rel ? `Relationships:\n${rel}` : null,
     // The commission itself, last so it reads as the payload — wrapped the same
@@ -4664,7 +4675,7 @@ function buildStoryBriefBody(inputData) {
     inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
     inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
     inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
-    inputData.season ? `Season: ${inputData.season}` : null,
+    `Season: ${seasonLabel(inputData)}`,
     buildSettingLine(inputData),
     rel ? `Relationships:\n${rel}` : null,
     inputData.storyDetails ? `\nStory idea (the user's own words):\n${wrapUserInput(inputData.storyDetails)}` : null,

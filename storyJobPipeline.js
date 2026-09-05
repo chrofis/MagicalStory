@@ -7102,6 +7102,27 @@ async function _processStoryJobImpl(jobId) {
       log.warn(`📐 [PROCESS] resolveLayout failed: ${e.message} — layout not stamped`);
     }
 
+    // Stamp the resolved SEASON the same way, and for the same reason: every
+    // consumer wrote `inputData.season ? ... : null`, so a launcher that sent
+    // `season: ""` (an admin rerun copies the source job's input_data verbatim)
+    // silently dropped the Season line from the story brief, left the Visual
+    // Bible, every scene brief and every image prompt with nothing to say, and
+    // showed "Jahreszeit: Nicht angegeben" in the UI. Resolving it ONCE here
+    // means the writer, the bible, the Art Director, the image prompt AND the
+    // stored story row (which reads inputData.season) all agree. Derived from
+    // the job's own created_at, not from "now", so a repair run months later
+    // resolves the season the pages were drawn in.
+    try {
+      const { resolveSeason } = require('./server/lib/season');
+      const resolved = resolveSeason(inputData, { now: job.created_at });
+      if (inputData.season !== resolved) {
+        log.info(`🍁 [PROCESS] Season "${inputData.season || '(none)'}" → "${resolved}" (derived from job date)`);
+      }
+      inputData.season = resolved;
+    } catch (e) {
+      log.warn(`🍁 [PROCESS] resolveSeason failed: ${e.message} — season not stamped`);
+    }
+
     // Debug: Log inputData values when job starts processing
     log.debug(`📝 [JOB PROCESS] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
     log.debug(`📝 [JOB PROCESS] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
