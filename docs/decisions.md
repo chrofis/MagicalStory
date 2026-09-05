@@ -26040,3 +26040,44 @@ suffixed value), `prompts/styled-costumed-avatar-2x4.txt`,
 `server/lib/character2x4Sheet.js` (`buildHairBlock`, `buildBodyRowPrompt`,
 `buildHeadRowPrompt`, `buildPrompt`), `prompts/sheet-2x4-evaluation.txt`,
 `prompts/sheet-row-heads-eval.txt`.
+
+---
+
+## 2026-09-05 — The analyzer drops its page cache when the workers are reaped
+
+**Context:** killing the analyzer's workers returns their anonymous memory in
+full — that is what `kill_workers` is for — but leaves the ML stack's page cache
+resident, and Railway bills the cgroup total. Measured on staging with a
+controlled warm/kill/drop cycle:
+
+```
+  baseline            file    19 MB   anon    48 MB
+  after warmup        file 2,384 MB   anon 2,492 MB
+  workers killed      file 2,384 MB   anon    48 MB   <- anon returned, cache did NOT
+  after fadvise       file   210 MB   anon    48 MB   <- 2,174 MB in 529 ms
+```
+
+The kernel never evicts it on its own: page cache is reclaimed under memory
+PRESSURE, and a 24 GB cgroup limit against a ~2.5 GB working set never supplies
+any. Before this, the only thing that cleared it was a container restart — which
+is why the number looked healthy after every deploy and crept back after every
+story.
+
+**Decision:** `_maybe_reap_workers()` now follows `kill_workers` with an async
+`posix_fadvise(POSIX_FADV_DONTNEED)` sweep over the Python packages and /app.
+That is the one safe moment — the workers are gone, so the library mappings are
+gone with them, and the pages are clean, read-only and unmapped.
+`/release-memory?unload=true` does the same synchronously and reports the count.
+
+**Rationale — why not just restart the container.** It would also work, and it
+additionally reclaims anon. But the analyzer is on the critical path for
+character photo upload (`/remove-bg`), so a restart window is a failed upload for
+whoever is mid-signup. The sweep reaches the same end state in half a second with
+no availability gap. The cost is that the next story re-reads those libraries
+from disk — a few seconds of cold start against a run that takes half an hour.
+
+**Touched files:** `photo_analyzer.py` (`drop_file_cache`,
+`_drop_file_cache_async`, hook in `_maybe_reap_workers`, `/release-memory`)
+
+**Status:** ✅ mechanism measured on staging before shipping. Applies wherever the
+analyzer runs — so it lands on production together with the service split.

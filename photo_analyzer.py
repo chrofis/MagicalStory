@@ -464,6 +464,10 @@ def _maybe_reap_workers():
         sessions = _active_sessions
     if sessions == 0 and not busy and _workers:
         kill_workers('sessions=0, idle')
+        # The workers are gone, so their library mappings are gone with them —
+        # this is the one moment the page cache is droppable. Story over, cache
+        # released, without waiting for a restart that may never come.
+        _drop_file_cache_async('workers reaped')
 
 
 @app.route('/session/begin', methods=['POST'])
@@ -1750,6 +1754,72 @@ def _release_memory():
         pass
 
 
+# ── Page cache: the other half of the bill ───────────────────────────────────
+# Railway charges for the container's cgroup total, and that INCLUDES the OS
+# page cache. Measured with mincore(2) on staging 21.4 h after a story: 1,361 MB
+# of 1,603 MB resident was this ML stack's shared objects —
+# libtensorflow_cc 378 MB, libtorch_cpu 185 MB, libllvmlite 154 MB, cv2 63 MB.
+# Every spawned worker maps them in; when the worker exits its ANON memory comes
+# back (that is what kill_workers achieves) but the file pages stay cached. The
+# kernel has no reason to evict them — page cache is reclaimed under memory
+# PRESSURE, and a 22 GB cgroup limit never supplies any — so they sit there
+# being billed until the container is torn down.
+#
+# posix_fadvise(POSIX_FADV_DONTNEED) is the direct instruction to drop them. It
+# only affects CLEAN, UNMAPPED pages, which is exactly our case once the workers
+# are gone: read-only libraries nobody has open. It cannot corrupt anything —
+# the next reader simply faults them back in from disk, costing a few seconds of
+# cold start on the next story against a run that takes half an hour.
+#
+# Deliberately NOT a container restart: the analyzer is not user-facing but it
+# IS on the critical path (character photo upload calls /remove-bg), so a
+# restart window means a failed upload for whoever is mid-signup. This reaches
+# the same end state with no availability gap.
+_CACHE_DROP_ROOTS = [
+    '/usr/local/lib/python3.11/dist-packages',
+    '/usr/lib/python3/dist-packages',
+    '/app',
+]
+
+
+def drop_file_cache(roots=None):
+    """Hand back the page cache of files nothing is using. Returns (files, ms)."""
+    started = time.time()
+    roots = roots or _CACHE_DROP_ROOTS
+    touched = 0
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, _dirs, filenames in os.walk(root, onerror=lambda e: None):
+            for fn in filenames:
+                path = os.path.join(dirpath, fn)
+                try:
+                    fd = os.open(path, os.O_RDONLY)
+                except OSError:
+                    continue
+                try:
+                    os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+                    touched += 1
+                except (OSError, AttributeError):
+                    pass
+                finally:
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
+    return touched, int((time.time() - started) * 1000)
+
+
+def _drop_file_cache_async(reason):
+    """Run the sweep off the request path — it walks a few thousand inodes."""
+    def _run():
+        before = _rss_mb()
+        touched, ms = drop_file_cache()
+        print(f"[CACHE-DROP] {reason}: advised {touched} file(s) in {ms}ms "
+              f"(process rss {before:.1f}MB — the win is cgroup file cache, not rss)")
+    threading.Thread(target=_run, daemon=True, name='cache-drop').start()
+
+
 # _rss_mb() is defined at the top of this file, above the heavy imports, so the
 # boot instrumentation can measure them. Do not redefine it here.
 
@@ -2405,6 +2475,10 @@ def release_memory_endpoint():
         if _workers:
             unloaded = [f"worker:{r}" for r in _workers]
             kill_workers('release-memory')
+        # Synchronous here (not the async helper): a caller asking to reclaim on
+        # demand wants the numbers in the response, not eventually.
+        cache_files, cache_ms = drop_file_cache()
+        unloaded.append(f'page-cache:{cache_files}files/{cache_ms}ms')
     elif request.args.get('unload') == 'true':
         if _mobilesam_model is not None:
             _mobilesam_model = None
