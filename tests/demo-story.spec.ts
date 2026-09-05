@@ -1189,7 +1189,13 @@ test.describe('Demo Story Generation', () => {
       console.log('  WARN: no popular art-style button visible after 15s — chunk may have failed to load');
     });
     async function findAndClickArtStyle(): Promise<boolean> {
-      const direct = page.locator('button').filter({ hasText: artStyleLabel }).first();
+      // Match the style CARD by its thumbnail alt text, never by button text:
+      // the collapsible group headers ("Realistic" / "Illustrated" / "Creative")
+      // carry the SAME label as a style whose name equals its category, so a
+      // hasText locator matched the header, merely expanded the group, and the
+      // wizard shipped its DEFAULT style (watercolor) — the task-#62 failure
+      // again, seen 2026-09-05 with DEMO_ART_STYLE=realistic.
+      const direct = page.locator('button').filter({ has: page.locator(`img[alt="${artStyleLabel}"]`) }).first();
       // First try direct — popular styles (Aquarell/Anime/Comic/Pixar) are
       // always visible at the top.
       try {
@@ -1231,6 +1237,16 @@ test.describe('Demo Story Generation', () => {
       } catch { /* genuinely missing */ }
       return false;
     }
+    // The selected card gets border-indigo-500 (ArtStyleSelector). Assert it,
+    // so a mis-click can never again ship a showcase in the default style.
+    async function assertArtStyleSelected() {
+      const card = page.locator('button.border-indigo-500').filter({ has: page.locator(`img[alt="${artStyleLabel}"]`) }).first();
+      await card.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
+        throw new Error(`Art style "${artStyleLabel}" (${artStyleId}) was clicked but is NOT the selected card — the wizard would generate in its default style.`);
+      });
+      console.log(`  Art style confirmed selected: ${artStyleLabel}`);
+    }
+
     // Check if the wizard is currently on Step 5 (Übersicht) — meaning Step 4
     // (Stil) was auto-advanced past with whatever default style was preselected
     // (server-side or localStorage). Use the progress bar — the bottom-of-page
@@ -1279,6 +1295,7 @@ test.describe('Demo Story Generation', () => {
     }
     if (styleClicked) {
       await page.waitForTimeout(1000);
+      await assertArtStyleSelected();
       const nextBtnAfterArt = page.getByRole('button', { name: NEXT_BTN_RE }).first();
       if (await nextBtnAfterArt.isVisible({ timeout: 3000 }).catch(() => false)) {
         await clickNext(page);
