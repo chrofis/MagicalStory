@@ -26463,3 +26463,47 @@ place names next to `commissionedNames` and passes them to both counter runs),
 `tests/unit/plan-counters.test.ts` (this story's plan lines as the fixture).
 **Status:** ✅ active
 
+
+## 2026-09-05 — A worker that is starting is not reap-eligible, and "alive" is not "ready"
+
+**Context:** The first `/api/photos/remove-bg` after a fresh analyzer container
+returned 502 `face worker call failed: <urlopen error [Errno 111] Connection
+refused>`; a retry succeeded. Found immediately after the analyzer split reached
+production (`cadd4ee72`). The prod analyzer log has all three lines inside one
+second: `spawning face worker on :5001`, `killing face worker (sessions=0,
+idle)`, `[WARMUP] face worker warm failed: face worker exited during startup`.
+
+Two independent defects produced it:
+1. `/warmup` returns immediately and brings workers up on a BACKGROUND thread,
+   so the warmup request's own teardown fires `_maybe_reap_workers()` with
+   `sessions=0` and nothing in flight — killing the worker it had just asked
+   for. `kill_workers`' `expect_epoch` guard only observes REQUESTS, so an
+   off-request bring-up was invisible to it. Only the first role in the warmup
+   loop died, which is why `torch` survived and `face` did not.
+2. `ensure_worker()` returned early on `_worker_alive()`, which is only
+   `poll() is None`. A process that has started but not yet bound its port
+   passes that test, so the caller received a URL that refused the connection.
+
+**Decision:** Track bring-up explicitly in `_bringing_up` and refuse to reap
+through it; and make a live-but-unproven worker fall through to the readiness
+poll instead of short-circuiting. `_bringing_up` is REFCOUNTED, not a set:
+`/warmup`'s thread and a concurrent photo upload can await the same role, and
+whichever finished first would otherwise drop the protection while the other was
+still waiting. `kill_workers(..., force=True)` is kept for the two callers whose
+contract is "kill it anyway" — `/release-memory?force=true` and the Node-boot
+`session_reset`.
+
+**Rationale:** The alternative — retrying the failed call in
+`analyzerClient.js` — treats a self-inflicted kill as a transient network fault
+and leaves warmup silently useless. Note the scale of that: warmup never worked
+at all in the split service, because every warm spawn of the first role was
+killed seconds later. Fixing the lifecycle restores the thing warmup exists for
+(loading models while the user is still in the wizard) instead of masking it.
+No timers and no thresholds were added — consistent with the worker-lifecycle
+rules above, which are deliberately event-driven.
+
+**Touched:** `photo_analyzer.py` (`_bringing_up`, `ensure_worker`,
+`kill_workers`, `session_reset`, `/release-memory`),
+`tests/manual/test_worker_bringup_race.py` (new; fake Popen + fake health probe,
+loads no model).
+**Status:** ✅ active

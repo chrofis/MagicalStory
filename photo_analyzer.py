@@ -386,6 +386,12 @@ import urllib.error as _urlerr
 _workers_lock = threading.Lock()
 _workers = {}            # role -> subprocess.Popen
 _active_sessions = 0
+# Roles currently being brought up — spawned, or alive but not yet answering
+# /health. A worker in here is NOT reap-eligible: see kill_workers().
+# REFCOUNTED, not a set: /warmup's thread and a concurrent photo upload can both
+# be waiting on the same role, and whichever finished first would otherwise drop
+# the protection while the other was still waiting.
+_bringing_up = {}
 
 def _note_arcface_used():
     """Stub kept for the embed paths; lifecycle is session-driven now."""
@@ -411,21 +417,39 @@ def ensure_worker(role, wait_ready=True):
     Adoption: if something already answers /health on the role's port — an
     orphan from a previous parent that hasn't noticed the PID change yet — use
     it rather than colliding with the port.
+
+    ALIVE IS NOT READY (2026-09-05). `_worker_alive` only tests `poll() is
+    None`, which a process that has started but not yet bound its port passes.
+    Returning early on it handed callers a URL that answers `[Errno 111]
+    Connection refused` — the 502 a user got on the first photo upload after a
+    deploy. So a live-but-unproven worker falls through to the readiness poll
+    below instead of short-circuiting; once it is serving, the poll costs one
+    loopback /health call.
+
+    The role is held in `_bringing_up` for the whole wait so the idle reaper
+    cannot terminate a worker that is still starting. Without that, warmup
+    could never work at all: /warmup returns immediately and spawns on a
+    background thread, so its own request teardown fires `_maybe_reap_workers`
+    with sessions=0 and nothing in flight, and killed the worker it had just
+    asked for.
     """
+    url = f"http://127.0.0.1:{WORKER_PORTS[role]}"
     with _workers_lock:
-        if _worker_alive(role):
-            return f"http://127.0.0.1:{WORKER_PORTS[role]}"
-        if _worker_health_ok(role):
-            print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
-            return f"http://127.0.0.1:{WORKER_PORTS[role]}"
-        env = dict(os.environ)
-        env['ANALYZER_ROLE'] = role
-        env['PHOTO_ANALYZER_PORT'] = str(WORKER_PORTS[role])
-        env['ANALYZER_PARENT_PID'] = str(os.getpid())
-        print(f"[WORKERS] spawning {role} worker on :{WORKER_PORTS[role]}")
-        _workers[role] = subprocess.Popen(
-            [sys.executable, '-u', os.path.abspath(__file__)], env=env)
-    if wait_ready:
+        if not _worker_alive(role):
+            if _worker_health_ok(role):
+                print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
+                return url
+            env = dict(os.environ)
+            env['ANALYZER_ROLE'] = role
+            env['PHOTO_ANALYZER_PORT'] = str(WORKER_PORTS[role])
+            env['ANALYZER_PARENT_PID'] = str(os.getpid())
+            print(f"[WORKERS] spawning {role} worker on :{WORKER_PORTS[role]}")
+            _workers[role] = subprocess.Popen(
+                [sys.executable, '-u', os.path.abspath(__file__)], env=env)
+        if not wait_ready:
+            return url
+        _bringing_up[role] = _bringing_up.get(role, 0) + 1
+    try:
         # Model imports gate readiness (mediapipe ~5s, TF ~15s). Poll rather
         # than sleep so the fast workers don't pay the slow ones' budget.
         deadline = time.time() + 120
@@ -437,10 +461,16 @@ def ensure_worker(role, wait_ready=True):
             time.sleep(0.5)
         else:
             raise RuntimeError(f"{role} worker not ready within 120s")
-    return f"http://127.0.0.1:{WORKER_PORTS[role]}"
+    finally:
+        with _workers_lock:
+            if _bringing_up.get(role, 0) > 1:
+                _bringing_up[role] -= 1
+            else:
+                _bringing_up.pop(role, None)
+    return url
 
 
-def kill_workers(reason, expect_epoch=None):
+def kill_workers(reason, expect_epoch=None, force=False):
     """Terminate every worker. Deterministic, total reclaim — that's the point.
 
     `expect_epoch` closes a TOCTOU race. `_maybe_reap_workers` reads "no session,
@@ -461,6 +491,17 @@ def kill_workers(reason, expect_epoch=None):
               f"idle check (epoch {expect_epoch} -> {_request_epoch})")
         return False
     with _workers_lock:
+        # The epoch guard above only sees REQUESTS. A worker brought up off a
+        # request — /warmup does exactly that, on a background thread — is
+        # invisible to it, and killing one mid-startup surfaces to the user as
+        # a 502 from their first photo upload after a deploy.
+        # `force` is the deliberate override: /release-memory?force=true is
+        # documented as "kill it anyway", and a Node-boot reset is claiming a
+        # clean slate. Everything else waits.
+        if _bringing_up and not force:
+            print(f"[WORKERS] kill aborted ({reason}): "
+                  f"{', '.join(sorted(_bringing_up))} still starting")
+            return False
         for role, proc in list(_workers.items()):
             if proc.poll() is None:
                 print(f"[WORKERS] killing {role} worker ({reason})")
@@ -566,7 +607,9 @@ def session_reset():
     global _active_sessions
     with _request_lock:
         _active_sessions = 0
-    kill_workers('session reset (Node boot)')
+    # force: a restarted Node is claiming a clean slate, so a worker left
+    # starting by the previous era must not survive the reset.
+    kill_workers('session reset (Node boot)', force=True)
     # Same reasoning as the idle reap: the workers are gone, so their library
     # mappings are gone and the page cache is droppable. This path matters MORE,
     # not less — it is the recovery route for a session that leaked (a crashed
@@ -2679,7 +2722,8 @@ def release_memory_endpoint():
             }), 409
         if _workers:
             unloaded = [f"worker:{r}" for r in _workers]
-            kill_workers('release-memory')
+            kill_workers('release-memory',
+                         force=request.args.get('force') == 'true')
         # Synchronous here (not the async helper): a caller asking to reclaim on
         # demand wants the numbers in the response, not eventually.
         cache_files, cache_ms = drop_file_cache()
