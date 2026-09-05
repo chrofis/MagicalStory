@@ -26586,3 +26586,68 @@ image calmness. Left alone deliberately.
 `tests/manual/textZoneRules.test.js`
 
 **Status:** ✅ active
+
+## 2026-09-05 — A recurring creature is cast: it gets a reference slot, or a minimum cell size
+
+**Context:** On staging story `job_1788614817116_vxnu60yjg` the Visual Bible
+creature `ANI001` "Fünkli" (juvenile dragon, `appearsInPages` 4–18 of 18)
+rendered on-model on page 9 and as a stiff gold figurine on page 16. The cause
+is slot geometry, not the prompt. Page 9 has one child: `packReferences` packs
+scene → 1 character → **VB own slot**, and the dragon's reference fills a
+768×1024 slot. Page 16 has four children: the 3-slot budget goes scene → A+B →
+C+D, so the VB grid has no slot and rides as a thumbnail strip under the last
+character card (`composeCharWithVbRow`). A single element there gets one
+full-width cell of height `0.32·W`, and `fit: 'contain'` shrinks the square
+reference to `0.32·W` of actual pixels. Measured on the stored slot
+(`sceneImages-15-grokRefImages-2.jpg`, 768×1024): the dragon's ink is **113×149
+px** beside character cards ~200 px wide and ~860 px tall — about a seventh of
+their linear size. The code comment at `referenceSheets.js:677` (owner,
+2026-08-29, cap 4 not 6) predicted exactly this failure mode for the grid; it
+applies with equal force to a single cell shaped wrong.
+
+**Decision:** Define a **recurring creature** — a `visualBible.animals` entry
+with a reference image appearing on ≥ 4 pages AND ≥ 50% of the story's pages
+(story length = the highest page number any VB entry claims). Fünkli (15/18)
+qualifies; `ANI002` "Rabe" (5/18) does not. Two guarantees follow:
+
+1. **Pinned** to priority 0 in `getElementReferenceImagesForPage`, so a
+   cast-heavy page cannot slice it off under the cap-4 element budget. Every
+   caller of that function inherits it (page gen, iterate/repair, covers, the
+   Test Lab image stage).
+2. **Own slot when one is free** under the cap; otherwise a **cell-size floor**
+   in `composeCharWithVbRow`: every strip cell becomes a square whose edge
+   equals the character card's width, and lower-priority cells are *dropped*
+   from the strip rather than allowed to shrink the creature.
+
+The slot cap is NOT raised (the 3→5 probe was tested and rejected, see "Raising
+Grok's reference-slot budget from 3 to 5 was tried and rejected"), and the
+element grid's cap of 4 is untouched.
+
+**Rationale:** The alternatives were worse. Raising the cap re-opens a rejected
+experiment. Repacking four children into fewer slots trades a real child's
+identity for the dragon's — children outrank props and creatures. Shrinking the
+other props instead is exactly the priority order the VB already encodes, so
+dropping the tail of a priority-sorted list is the cheapest correct move. The
+floor is expressed relative to the character card rather than in absolute
+pixels so it survives any aspect ratio and any future slot resize.
+
+**Offline replay** of page 16's real inputs (4 character cell-refs + ANI001,
+3:4, no Grok call): slot layout unchanged (scene → A+B → C+D+VB), dragon ink
+**113×149 px → 190×216 px** in the same 768×1024 slot (~1.7× linear, ~2.5×
+area); strip cell 281×281 vs a 281 px character card.
+
+**Auditability:** three INFO lines say which path a page took —
+`🔲 [VB-REFS] Page n: recurring creature pinned…`,
+`🎨 [GROK Pn] Recurring creature present — VB takes an own slot…`,
+`🎨 [GROK Pn] VB strip: recurring-creature floor active…` (plus a drop line
+naming every cell it removed).
+
+**Touched:** `server/lib/visualBible.js` (`isRecurringCreature`,
+`getRecurringCreatureIds`, `vbStoryPageCount`, pin + flag in
+`getElementReferenceImagesForPage`), `server/lib/referenceSheets.js` (carry
+`recurring` onto grid elements), `server/lib/grok.js` (`packReferences` own-slot
+branch, `composeCharWithVbRow` floor + drop),
+`tests/unit/recurring-creature-slot.test.ts`,
+`docs/image-generation-methods.html` §5b.
+
+**Status:** ✅ active (staging)

@@ -741,7 +741,9 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
     const bytes = await loadVbReferenceBytes(el);
     if (!bytes) return;
     const imageData = `data:image/jpeg;base64,${bytes}`;
-    allElements.push({ id: el.id || null, name: el.name, type: el.type, imageData });
+    // `recurring` rides through to packReferences, which guarantees a recurring
+    // creature a minimum cell size in whatever slot it lands in.
+    allElements.push({ id: el.id || null, name: el.name, type: el.type, imageData, recurring: !!el.recurring });
   }));
 
   // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo).

@@ -2083,6 +2083,76 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
   return refs.slice(0, maxRefs);
 }
 
+/**
+ * Story length as the Visual Bible sees it: the highest page number any VB
+ * entry claims to appear on. The VB is built for the whole story before any
+ * page renders, so its last-referenced page IS the last page. Used only to
+ * turn an absolute page count into a fraction — no caller has to thread the
+ * story length down into reference assembly.
+ */
+function vbStoryPageCount(visualBible) {
+  let max = 0;
+  const scan = (entries) => {
+    for (const e of entries || []) {
+      for (const p of e?.appearsInPages || []) {
+        if (Number.isFinite(p) && p > max) max = p;
+      }
+    }
+  };
+  scan(visualBible?.animals);
+  scan(visualBible?.secondaryCharacters);
+  scan(visualBible?.artifacts);
+  scan(visualBible?.vehicles);
+  scan(visualBible?.locations);
+  return max;
+}
+
+/**
+ * RECURRING CREATURE (owner, 2026-09-05 — story job_1788614817116_vxnu60yjg).
+ *
+ * A named animal that walks through the whole book is a cast member, not a
+ * prop: it carries as much identity load as a child, and readers notice the
+ * moment it goes off-model. The rule:
+ *
+ *   a `visualBible.animals` entry, WITH a reference image, appearing on
+ *   >= RECURRING_CREATURE_MIN_PAGES pages AND on >= 50% of the story's pages.
+ *
+ * The two clauses together keep it honest at both ends: the fraction stops a
+ * 4-page trial from promoting an animal that shows up twice, and the absolute
+ * floor stops a long book's one-scene animal from qualifying on a rounding
+ * edge. On job_1788614817116_vxnu60yjg (18 pages) ANI001 "Fünkli" (15 pages)
+ * qualifies and ANI002 "Rabe" (5 pages) does not — which is the intended
+ * split: the dragon is the co-lead, the raven is a visitor.
+ *
+ * Consequences, both downstream of this one predicate:
+ *   - the entry is pinned to the FRONT of the page's element references, so a
+ *     cast-heavy page cannot slice it off under the cap-4 element budget;
+ *   - `recurring: true` rides along on the reference and reaches Grok's slot
+ *     packer, which guarantees it a minimum cell size (server/lib/grok.js).
+ */
+const RECURRING_CREATURE_MIN_PAGES = 4;
+const RECURRING_CREATURE_MIN_FRACTION = 0.5;
+
+function isRecurringCreature(visualBible, entry) {
+  if (!entry) return false;
+  if (!(entry.referenceImageData || entry.referenceImageUrl)) return false;
+  const pages = Array.isArray(entry.appearsInPages) ? entry.appearsInPages.length : 0;
+  if (pages < RECURRING_CREATURE_MIN_PAGES) return false;
+  const total = vbStoryPageCount(visualBible);
+  if (total <= 0) return false;
+  return pages / total >= RECURRING_CREATURE_MIN_FRACTION;
+}
+
+/**
+ * Ids of every recurring creature in a Visual Bible (see isRecurringCreature).
+ */
+function getRecurringCreatureIds(visualBible) {
+  return (visualBible?.animals || [])
+    .filter(a => isRecurringCreature(visualBible, a))
+    .map(a => a.id)
+    .filter(Boolean);
+}
+
 function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, sceneObjectIds = null) {
   if (!visualBible) return [];
 
@@ -2102,6 +2172,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   );
 
   const relevantRefs = [];
+  const recurringIds = new Set(getRecurringCreatureIds(visualBible).map(id => String(id).toUpperCase()));
 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
@@ -2110,6 +2181,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       const named = entry.id && askedFor.has(String(entry.id).toUpperCase());
       if (!onPage && !named) continue;
 
+      const recurring = recurringIds.has(String(entry.id || '').toUpperCase());
       relevantRefs.push({
         id: entry.id,
         name: entry.name,
@@ -2117,7 +2189,12 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
         description: entry.extractedDescription || entry.description,
         referenceImageData: entry.referenceImageData,
         referenceImageUrl: entry.referenceImageUrl,
-        priority // Lower = higher priority
+        recurring,
+        // A recurring creature outranks every other element type, including
+        // secondary characters. Without this pin a page with enough cast to
+        // fill the cap-4 element budget silently drops the animal that appears
+        // on nearly every page of the book.
+        priority: recurring ? 0 : priority
       });
     }
   };
@@ -2149,7 +2226,12 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
 
   // Sort by priority and limit
   relevantRefs.sort((a, b) => a.priority - b.priority);
-  return relevantRefs.slice(0, maxRefs);
+  const kept = relevantRefs.slice(0, maxRefs);
+  const pinned = kept.filter(r => r.recurring).map(r => `${r.name} (${r.id})`);
+  if (pinned.length > 0) {
+    log.info(`🔲 [VB-REFS] Page ${pageNumber}: recurring creature pinned to the element refs — ${pinned.join(', ')}`);
+  }
+  return kept;
 }
 
 /**
@@ -2353,6 +2435,9 @@ module.exports = {
   updateElementReferenceImage,
   getElementReferenceImagesForPage,
   getEmptySceneElementReferences,
+  isRecurringCreature,
+  getRecurringCreatureIds,
+  vbStoryPageCount,
   getElementReferenceImagesByIds,
   sceneObjectsNameEntry
 };

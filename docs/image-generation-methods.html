@@ -408,6 +408,57 @@
 
 <p>This is the single most common cause of "the new model produces weird shapes" — switching from Gemini to Grok without realising the wrapper now crops the input. See <code>tests/avatar-debug/</code> for a worked example.</p>
 
+<h2 id="slots">5b. Grok reference slots — who gets one, and how big</h2>
+
+<p>Every Grok page/cover render packs its references through
+<code>packReferences</code> (<code>server/lib/grok.js</code>). Production budget is
+<strong>3 slots</strong> (xAI's API cap is 5 since 2026-09-02; raising it was tested
+and rejected — <code>docs/decisions.md</code> → "Raising Grok's reference-slot budget
+from 3 to 5"). Test Lab can override with <code>params.maxRefSlots</code>.</p>
+
+<p>Slot order is scene &rarr; characters &rarr; Visual Bible elements (owner,
+2026-08-15):</p>
+
+<table>
+<thead><tr><th>Characters on the page</th><th>Slot 1</th><th>Slot 2</th><th>Slot 3</th></tr></thead>
+<tbody>
+<tr><td>1–2</td><td>scene plate / landmark photo</td><td>all characters</td><td>VB elements, <strong>own slot, full size</strong></td></tr>
+<tr><td>3</td><td>scene plate</td><td>A+B</td><td>C + VB elements as a thumbnail strip</td></tr>
+<tr><td>4+</td><td>scene plate</td><td>A+B</td><td>C+D + VB elements as a thumbnail strip</td></tr>
+</tbody>
+</table>
+
+<p>The element grid itself is capped at <strong>4 cells</strong>
+(<code>buildPageCompositeRefs</code>, owner 2026-08-29) because the whole grid shares
+ONE slot and cell size scales as 1/n. The empty-scene grid is a different grid with
+its own cap of 9.</p>
+
+<h3>Recurring creature — minimum cell size (owner, 2026-09-05)</h3>
+
+<p>A named animal that walks through the whole book is cast, not a prop.
+<code>isRecurringCreature</code> (<code>server/lib/visualBible.js</code>) defines it as
+a <code>visualBible.animals</code> entry <em>with a reference image</em> appearing on
+<strong>&ge; 4 pages AND &ge; 50% of the story's pages</strong> (story length = the
+highest page any VB entry claims). Two consequences:</p>
+
+<ul>
+<li><strong>Pinned</strong> to priority 0 in <code>getElementReferenceImagesForPage</code>,
+so a cast-heavy page cannot slice it off under the cap-4 element budget. Every caller
+of that function inherits this — page gen, iterate/repair, covers, Test Lab.</li>
+<li><strong>Own slot when one is free</strong> under the cap (1–2 characters already
+had this; with 3+ characters it only happens when the cap is raised), otherwise a
+<strong>cell-size floor</strong> in <code>composeCharWithVbRow</code>: every cell in
+the thumbnail strip becomes a square whose edge equals the character card's width, and
+lower-priority cells are <em>dropped</em> from the strip rather than allowed to shrink
+the creature.</li>
+</ul>
+
+<p>The cap is never raised to make room. Both paths log at INFO
+(<code>🔲 [VB-REFS] … recurring creature pinned</code>,
+<code>🎨 [GROK Pn] Recurring creature present — VB takes an own slot</code>,
+<code>🎨 [GROK Pn] VB strip: recurring-creature floor active …</code>), so which path a
+page took is auditable from the run log.</p>
+
 <h2 id="dispatch">6. Dispatch &amp; override layers</h2>
 
 <p>Three places control which model runs for a given image:</p>

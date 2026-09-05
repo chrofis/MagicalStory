@@ -1300,8 +1300,9 @@ async function packReferences(refs = {}, options = {}) {
     let slotBuf = composed;
     let vbCount = 0;
     if (willAddVb) {
-      slotBuf = await composeCharWithVbRow(composed, rawVbElements, aspectRatio);
-      vbCount = Math.min(rawVbElements.length, 6);
+      const rowResult = await composeCharWithVbRow(composed, rawVbElements, aspectRatio, { charsInSlot: group.length, tag });
+      slotBuf = rowResult.buffer;
+      vbCount = rowResult.cellCount;
     }
     // quality 92 not 85: the input avatars were already encoded at 90, so a
     // second pass at 85 stacked visible artefacts on top. Matching the other
@@ -1358,6 +1359,11 @@ async function packReferences(refs = {}, options = {}) {
     : [];
   const availableCharSlots = maxSlots - slots.length;
   const vbAvailable = vbSlotElements.length > 0;
+  // A recurring creature (visualBible.js isRecurringCreature — a named animal
+  // on >= half the book's pages) is cast, not a prop. It gets an own slot
+  // whenever one is free under the cap, and a minimum cell size when it has to
+  // share (composeCharWithVbRow's floor). The cap itself is never raised here.
+  const hasRecurringCreature = vbSlotElements.some(e => e && e.recurring);
   let charGroups = [];
   let vbOwnSlot = false;
 
@@ -1365,6 +1371,13 @@ async function packReferences(refs = {}, options = {}) {
     if (vbAvailable && charCount <= 2 && availableCharSlots >= 2) {
       charGroups = [rawCharData];   // 1–2 characters share slot 2
       vbOwnSlot = true;             // VB takes slot 3 at full size
+    } else if (vbAvailable && hasRecurringCreature && charCount <= availableCharSlots - 1) {
+      // 3+ characters, but the cap leaves a slot spare (Test Lab maxRefSlots,
+      // or a page with no scene plate): spend it on the creature's own slot
+      // rather than bundling it as a thumbnail under a character.
+      charGroups = rawCharData.map(c => [c]);
+      vbOwnSlot = true;
+      log.info(`🎨 ${tag} Recurring creature present — VB takes an own slot (${charCount} chars, ${availableCharSlots} slots free)`);
     } else if (charCount <= availableCharSlots) {
       charGroups = rawCharData.map(c => [c]); // each in own slot
     } else if (availableCharSlots >= 2) {
@@ -1608,10 +1621,16 @@ async function packReferences(refs = {}, options = {}) {
  * Keeps the char composite at natural size and adds 1-6 labeled cells as a
  * bottom strip, so VB references travel with the avatars rather than polluting
  * the scene background.
+ *
+ * @param {Object} options - { charsInSlot: how many character cards share this
+ *   slot (drives the recurring-creature cell floor), tag: log prefix }
+ * @returns {Promise<{buffer: Buffer, cellCount: number, cellW: number,
+ *   cellH: number, floored: boolean}>}
  */
-async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '1:1') {
+async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '1:1', options = {}) {
+  const { charsInSlot = 1, tag = '[GROK]' } = options;
   const elements = vbElements.slice(0, 6);
-  if (elements.length === 0) return charBuffer;
+  if (elements.length === 0) return { buffer: charBuffer, cellCount: 0 };
 
   const meta = await sharp(charBuffer).metadata();
   const W = meta.width;
@@ -1636,15 +1655,51 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
   // character avatars lose. Two rows roughly doubles cell width while costing
   // the avatars about a tenth of their size; deeper strips start trading away
   // face identity, which matters more than prop identity.
-  const perRow = elements.length <= 3 ? elements.length : Math.ceil(elements.length / 2);
-  const rowCount = Math.ceil(elements.length / perRow);
-  const cellW = Math.floor(W / perRow);
-  const cellH = Math.min(cellW, Math.round(W * 0.32));
+  //
+  // MINIMUM CELL SIZE for a recurring creature (owner, 2026-09-05 — staging
+  // story job_1788614817116_vxnu60yjg). The rules above optimise the strip for
+  // props, and for props they are right. They are wrong for a named animal
+  // that appears on nearly every page: on p16 of that story (4 children, so
+  // two character slots and no free slot for the VB grid) the juvenile dragon
+  // ANI001 rode in as ONE full-width cell — and a full-width, 0.32·W-tall cell
+  // `contain`s a square reference down to 0.32·W of actual pixels, ~1/7 the
+  // linear size of the character cards beside it. It rendered as a stiff gold
+  // figurine. On p9 (1 child) the same creature had the VB own slot and
+  // rendered on-model. Fix: when the strip carries a recurring creature, every
+  // cell becomes a SQUARE whose edge is the character card's width — the
+  // creature is never smaller than a cast member's card — and the row keeps
+  // only the cells that fit at that size. Lower-priority elements are DROPPED
+  // rather than allowed to shrink the creature. Element order is already
+  // priority-sorted (visualBible.js pins recurring creatures to the front), so
+  // "keep the first k" is "drop the least important".
+  const floorCount = elements.filter(e => e && e.recurring).length;
+  let perRow;
+  let cellW;
+  let cellH;
+  let cells = elements;
+  if (floorCount > 0) {
+    const cardW = Math.max(1, Math.floor(W / Math.max(1, charsInSlot)));
+    const floorEdge = Math.max(1, Math.min(cardW, charHOrig));
+    perRow = Math.max(1, Math.floor(W / floorEdge));
+    cellW = floorEdge;
+    cellH = floorEdge;
+    if (elements.length > perRow) {
+      const dropped = elements.slice(perRow).map(e => `${e.name} (${e.type})`).join(', ');
+      cells = elements.slice(0, perRow);
+      log.info(`🎨 ${tag} VB strip: floor ${floorEdge}px for recurring creature — dropped ${elements.length - perRow} lower-priority cell(s): ${dropped}`);
+    }
+    log.info(`🎨 ${tag} VB strip: recurring-creature floor active (${cells.length} cell(s) @ ${cellW}x${cellH}, character card ${cardW}px wide)`);
+  } else {
+    perRow = elements.length <= 3 ? elements.length : Math.ceil(elements.length / 2);
+    cellW = Math.floor(W / perRow);
+    cellH = Math.min(cellW, Math.round(W * 0.32));
+  }
+  const rowCount = Math.ceil(cells.length / perRow);
   const finalH = charHOrig + cellH * rowCount;
 
   const composites = [{ input: charBuffer, left: 0, top: 0 }];
-  for (let i = 0; i < elements.length; i++) {
-    const el = elements[i];
+  for (let i = 0; i < cells.length; i++) {
+    const el = cells[i];
     if (!el.imageData) continue;
     try {
       const base64 = r2.stripDataUriPrefix(el.imageData);
@@ -1668,11 +1723,12 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
     }
   }
 
-  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charHOrig} + VB ${elements.length} cells in ${rowCount} row(s) @ ${cellW}x${cellH}), target ${aspectRatio}`);
-  return sharp({ create: { width: W, height: finalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charHOrig} + VB ${cells.length} cells in ${rowCount} row(s) @ ${cellW}x${cellH}), target ${aspectRatio}`);
+  const buffer = await sharp({ create: { width: W, height: finalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite(composites)
     .jpeg({ quality: 88 })
     .toBuffer();
+  return { buffer, cellCount: cells.length, cellW, cellH, floored: floorCount > 0 };
 }
 
 /**
@@ -1917,6 +1973,10 @@ module.exports = {
   isGrokConfigured,
   packReferences,
   composeVbSlot,
+  // Exported for its unit test: the recurring-creature cell floor is pure
+  // layout arithmetic, and reaching it through packReferences means composing
+  // four character cards just to read back two numbers.
+  composeCharWithVbRow,
   cropToFrontColumn,
   extractBottomBody3Columns,
   detectMinVarianceSeparator,
