@@ -105,8 +105,15 @@ Three ordered mechanisms, applied in this order:
 Excluding junk by pattern was a losing game — each new category had to be
 discovered in a shipped list first. Inverting it makes the default safe.
 
-**b. `LANDMARK_RANK_SQL`** — `HAS_PHOTO DESC, class DESC, fame_pageviews DESC,
-fame_sitelinks DESC, score DESC`.
+**b. `LANDMARK_RANK_SQL`** (town-name path, since 2026-09-05) — `class > 0 DESC,
+(fame_pageviews / 10 + CLASS_BONUS if class 2) DESC, fame_sitelinks DESC, score DESC`.
+One score, the same shape as the proximity path: the class is a **bonus**
+(`CLASS_BONUS` = 6 ≈ 60 pageviews), not a tier. A hard tier put the Bundeshaus
+(typed `Building`, 873 views) and the Bärenpark (458) outside Bern's top 30
+while a 79-view fountain was served. Class 0 is pushed out by a leading boolean
+because a city aerial carries tens of thousands of views. The proximity path
+uses `fame_sitelinks − 2/km + CLASS_BONUS` instead, because distance is the
+localising signal there.
 
 `fame_pageviews` (99.8% populated, free) ranks every city sensibly.
 `fame_sitelinks` is the *worst* signal and is only a last resort: a motorway has
@@ -170,15 +177,24 @@ the ideas route and the story pipeline. `getIndexedLandmarks()` tries in order:
 4. **proximity** at 20 → 50 → 100 km (only when lat/lon are numbers)
 5. the town's own `(Stadt)` aerial, as last resort
 
+**Every serving query requires a photo** (`AND HAS_PHOTO_SQL`, all three
+town-name queries and the proximity query, since 2026-09-05). Before that the
+photo was only a sort key: 577 photoless rows in prod passed the filters, and
+Bad Zurzach stories were offered the unjudged, photoless `Schloss Mandach`.
+The town-name queries order by `LOCALITY_FIRST_SQL` then `LANDMARK_RANK_SQL`
+(§5b); the photo is no longer part of the order.
+
 A name match containing **nothing servable** counts as *no match* and lets
 proximity run. Two cases fall under it: only the town's `(Stadt)` aerial —
 otherwise Locarno was served its own aerial while the Madonna del Sasso sat 2 km
-away under Ascona's anchor — and **only photoless rows**. `HAS_PHOTO_SQL` merely
-sorts, so before 2026-08-29 a single photoless row suppressed proximity and the
-story was set somewhere nobody can draw: Ehrikon was handed `Ruine Alt-Wildberg`,
-a castle burned down c.1320 with nothing standing. Measured across the index,
-42 towns were affected; 41 now get a photographed landmark and none lost one,
-because the weak rows are still returned when nothing is found within 100 km.
+away under Ascona's anchor — and **only photoless rows**. When `HAS_PHOTO_SQL`
+merely sorted, before 2026-08-29 a single photoless row suppressed proximity and
+the story was set somewhere nobody can draw: Ehrikon was handed
+`Ruine Alt-Wildberg`, a castle burned down c.1320 with nothing standing.
+Measured across the index, 42 towns were affected; 41 now get a photographed
+landmark and none lost one, because the weak rows are still returned when
+nothing is found within 100 km. The JS guard stays as the tripwire behind the
+SQL filter.
 
 Then `resolveAvailableLandmarks` layers on: best-slot photo selection, per-framing
 `photoVariants`, language-matched Wikidata name variants, and optional

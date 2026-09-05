@@ -2406,7 +2406,25 @@ const LANDMARK_CLASS_SQL = `(CASE
 // churches), and every one of them outranked a properly photographed landmark
 // in the same town purely for being typed Castle.
 const HAS_PHOTO_SQL = `(photo_url IS NOT NULL)`;
-const LANDMARK_RANK_SQL = `${HAS_PHOTO_SQL} DESC, ${LANDMARK_CLASS_SQL} DESC, fame_pageviews DESC NULLS LAST, fame_sitelinks DESC NULLS LAST, score DESC`;
+// Since 2026-09-05 the photo is a FILTER on every serving query, not a sort key:
+// prod carried 577 photoless rows through the filters, and an unjudged
+// photoless "Schloss Mandach" was offered to Bad Zurzach stories.
+//
+// Town-name ranking: the same shape as the proximity path below (one score,
+// class as a bonus, not a tier — see CLASS_BONUS), with pageviews as the
+// prominence signal because there is no distance to charge for. Ten pageviews
+// weigh one language edition, so CLASS_BONUS (6) is worth ~60 pageviews:
+// enough to lift a 20-view chapel over a 40-view office block, far too little
+// to bury the 873-view Bundeshaus (typed Building) under a 79-view fountain —
+// which is exactly what the class tier did to Bern. A not-a-place is pushed
+// out by a leading boolean rather than a -1000: a city's own aerial carries
+// tens of thousands of pageviews (Bern 20,837), and no constant survives that.
+const CLASS_BONUS = 6;
+const PAGEVIEWS_PER_SITELINK = 10;
+const LANDMARK_RANK_SQL = `(${LANDMARK_CLASS_SQL} > 0) DESC, (
+  coalesce(fame_pageviews, 0) / ${PAGEVIEWS_PER_SITELINK}.0
+  + CASE ${LANDMARK_CLASS_SQL} WHEN 2 THEN ${CLASS_BONUS} ELSE 0 END
+) DESC, fame_sitelinks DESC NULLS LAST, score DESC`;
 
 // A landmark is only offered as a town's OWN when it is actually in that town.
 //
@@ -2552,10 +2570,10 @@ function premiseMentionsLandmark(name, premiseText) {
   return tokens.every(t => words.has(t));
 }
 
-// Own-village landmarks rank ahead of ones inherited from the municipality —
-// but BELOW having a photo at all, so this sorts after HAS_PHOTO_SQL. Ranked
-// above it, Langnau opened on photoless Burg Spitzenberg instead of its own
-// church, because "in the village" beat "can be illustrated".
+// Own-village landmarks rank ahead of ones inherited from the municipality.
+// (Photoless rows no longer reach the sort — HAS_PHOTO_SQL filters — so this
+// can lead: before, Langnau opened on photoless Burg Spitzenberg instead of
+// its own church because "in the village" beat "can be illustrated".)
 const LOCALITY_FIRST_SQL = `CASE WHEN ${NORM_SQL(`coalesce(locality, '')`)} = $1 THEN 0 ELSE 1 END`;
 
 // An EVENT or an ORGANISATION can never be a scene setting — a cyclocross
@@ -2612,7 +2630,6 @@ const DISTANCE_PENALTY_PER_KM = 2;
 // class is worth a BONUS instead: enough to lift a small parish church over an
 // equally obscure office block, not enough to bury a national icon. Fame and
 // distance then settle it, and a not-a-place is pushed out of reach entirely.
-const CLASS_BONUS = 6;
 const FAME_MINUS_DISTANCE_SQL = `(
   coalesce(fame_sitelinks, 0)
   - ${DISTANCE_PENALTY_PER_KM} * ${D_KM}
@@ -2666,7 +2683,8 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
         -- finds nothing, the caller falls back to that aerial anyway.
         AND ${LANDMARK_CLASS_SQL} > 0
         AND ${JUDGED_USABLE_SQL}
-      ORDER BY ${SAME_CITY_SQL}, ${HAS_PHOTO_SQL} DESC, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
+        AND ${HAS_PHOTO_SQL}
+      ORDER BY ${SAME_CITY_SQL}, ${LANDMARK_CLASS_SQL} DESC, ${FAME_MINUS_DISTANCE_SQL}, score DESC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit, radiusKm, normalizeForCompare(city || '')]);
 
@@ -2724,7 +2742,8 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       WHERE ${TOWN_MATCHES_SQL}
         AND ${NEVER_A_SETTING_SQL}
         AND ${JUDGED_USABLE_SQL}
-      ORDER BY ${HAS_PHOTO_SQL} DESC, ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
+        AND ${HAS_PHOTO_SQL}
+      ORDER BY ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
 
@@ -2736,7 +2755,8 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
         WHERE TRIM(REPLACE(LOWER(translate(${TOWN_SQL}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
           AND ${NEVER_A_SETTING_SQL}
         AND ${JUDGED_USABLE_SQL}
-        ORDER BY ${HAS_PHOTO_SQL} DESC, ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
+        AND ${HAS_PHOTO_SQL}
+        ORDER BY ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [inputNorm, limit]);
       if (result.rows.length > 0) {
@@ -2753,7 +2773,8 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
                OR LOWER(translate(${TOWN_SQL}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) LIKE $1 || ',%')
           AND ${NEVER_A_SETTING_SQL}
           AND ${JUDGED_USABLE_SQL}
-        ORDER BY ${HAS_PHOTO_SQL} DESC, ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
+          AND ${HAS_PHOTO_SQL}
+        ORDER BY ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
         LIMIT $2
       `, [firstWord, limit]);
       if (result.rows.length > 0) {
@@ -2778,13 +2799,15 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // run. The weak rows are kept as the fallback-of-last-resort below, so a
     // village with genuinely nothing nearby still gets its aerial.
     //
-    // A PHOTOLESS row counts as no match for the same reason. `HAS_PHOTO_SQL`
-    // only sorts — it never filtered — so a town whose single row has no
-    // picture "matched", proximity was suppressed, and the story was set at a
-    // place nobody can draw. Ehrikon was served `Ruine Alt-Wildberg`, a castle
-    // that burned down around 1320 and has nothing standing: no photo exists
-    // because there is nothing to photograph, and the illustrator invented one.
-    // A real landmark a few km away beats a local one that cannot be drawn.
+    // A PHOTOLESS row counts as no match for the same reason. Until 2026-09-05
+    // `HAS_PHOTO_SQL` only sorted — it never filtered — so a town whose single
+    // row had no picture "matched", proximity was suppressed, and the story was
+    // set at a place nobody can draw. Ehrikon was served `Ruine Alt-Wildberg`, a
+    // castle that burned down around 1320 and has nothing standing: no photo
+    // exists because there is nothing to photograph, and the illustrator
+    // invented one. The queries now filter on the photo, so this guard is the
+    // tripwire that keeps proximity running should a photoless row ever slip
+    // through again. A real landmark a few km away beats one that cannot be drawn.
     const isServable = r => !NON_PLACE_TYPES_SET.has(r.type || 'x') && r.photo_url;
     const weakOnly = result.rows.length > 0 && !result.rows.some(isServable);
     const weakRows = weakOnly ? result.rows : [];
