@@ -150,6 +150,45 @@ async function loginAs(page: Page, email: string, password: string) {
   await page.waitForLoadState('domcontentloaded');
 }
 
+/**
+ * DEMO_LOCATION="Baden" (or "Baden, Switzerland") sets the story location on the
+ * Book Settings step, driving the real location picker: open the editor (pencil
+ * when an IP-geolocated city is already shown, "Add location" when it is not),
+ * type city + country, wait for the debounced verify-location check to go green,
+ * then confirm with OK. Fails loudly if the place cannot be verified — silently
+ * continuing without a location would set the story somewhere else.
+ */
+async function setDemoLocation(page: Page, spec: string) {
+  const [cityRaw, countryRaw] = spec.split(',');
+  const city = (cityRaw || '').trim();
+  const country = (countryRaw || 'Switzerland').trim();
+  if (!city) throw new Error(`DEMO_LOCATION has no city: "${spec}"`);
+  console.log(`  Setting location: ${city}, ${country}...`);
+
+  const openEditor = page
+    .locator('button[title="Ort ändern"], button[title="Change location"], button[title="Modifier le lieu"]')
+    .or(page.locator('button').filter({ hasText: /^(Add location|Ort hinzufügen|Ajouter un lieu)$/ }))
+    .first();
+  await openEditor.click({ timeout: 15000 });
+
+  const cityInput = page.locator('input[placeholder="City"], input[placeholder="Stadt"], input[placeholder="Ville"]').first();
+  const countryInput = page.locator('input[placeholder="Country"], input[placeholder="Land"], input[placeholder="Pays"]').first();
+  const plzInput = page.locator('input[placeholder="PLZ"]').first();
+  await cityInput.waitFor({ state: 'visible', timeout: 10000 });
+  await plzInput.fill('');
+  await cityInput.fill(city);
+  await countryInput.fill(country);
+
+  // Debounce is 500ms; the geocoder round-trip can take a few seconds.
+  const verified = page.locator('[aria-label="Location found"], [aria-label="Ort gefunden"], [aria-label="Lieu trouvé"]').first();
+  const ok = await verified.waitFor({ state: 'visible', timeout: 30000 }).then(() => true).catch(() => false);
+  if (!ok) throw new Error(`Location "${city}, ${country}" did not verify — refusing to run without it.`);
+
+  await page.locator('button').filter({ hasText: /^OK$/ }).first().click();
+  await expect(page.getByText(new RegExp(city, 'i')).first()).toBeVisible({ timeout: 10000 });
+  console.log(`  Location set: ${city}, ${country}`);
+}
+
 async function clickNext(page: Page) {
   const nextBtn = page.getByRole('button', { name: NEXT_BTN_RE }).first();
   await expect(nextBtn).toBeEnabled({ timeout: 10000 });
@@ -952,6 +991,9 @@ test.describe('Demo Story Generation', () => {
     // specific style, same pattern as DEMO_PAGES).
     const artStyleId = process.env.DEMO_ART_STYLE || entry.artStyle;
     const artStyleLabel = ART_STYLE_LABELS[entry.language][artStyleId];
+    // DEMO_LOCATION="Baden" / "Baden, Switzerland" — overrides the IP-geolocated
+    // story location on the Book Settings step. Unset = whatever the IP resolves to.
+    const demoLocation = (process.env.DEMO_LOCATION || '').trim();
     if (!artStyleLabel) throw new Error(`Unknown art style '${artStyleId}' for language ${entry.language}`);
 
     console.log('\n=== Demo Story Generation ===');
@@ -961,6 +1003,7 @@ test.describe('Demo Story Generation', () => {
     console.log(`  Category:       ${entry.storyCategory}`);
     console.log(`  Topic:          ${entry.storyTopic}`);
     console.log(`  Art Style:      ${artStyleId} (${artStyleLabel})`);
+    console.log(`  Location:       ${demoLocation || '(IP-geolocated)'}`);
     console.log(`  Pages:          ${STORY_PAGES}`);
     console.log('================================\n');
 
@@ -1054,6 +1097,7 @@ test.describe('Demo Story Generation', () => {
       await slider.fill(String(STORY_PAGES));
       await page.waitForTimeout(500);
     }
+    if (demoLocation) await setDemoLocation(page, demoLocation);
     await clickNext(page);
 
     // ── Step 3: Story Type ──

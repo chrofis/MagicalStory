@@ -23,6 +23,7 @@
  *   node scripts/admin/showcase.js --entry=7               # specific rotation index (Miller/EN/Space)
  *   node scripts/admin/showcase.js --upload-only           # provision only, skip Playwright
  *   node scripts/admin/showcase.js --fresh-account         # old per-run throwaway account
+ *   node scripts/admin/showcase.js --location=Baden        # pin the story location
  *
  *   TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js  # local backend
  *
@@ -302,13 +303,15 @@ async function main() {
   const family = families.find(f => f.id === entry.familyId);
   if (!family) throw new Error(`Family not found: ${entry.familyId}`);
   const dedication = pickDedication(entry);
+  const storyLocation = (args.location || process.env.DEMO_LOCATION || '').trim();
 
   console.log('═══ Showcase Run ════════════════════════════════════════');
   console.log(`  Entry:    #${entry.index} — ${entry.description}`);
   console.log(`  Family:   ${family.label} (${family.id})`);
   console.log(`  Language: ${entry.language}`);
   console.log(`  Topic:    ${entry.storyCategory} → ${entry.storyTopic}`);
-  console.log(`  Style:    ${entry.artStyle}`);
+  console.log(`  Style:    ${process.env.DEMO_ART_STYLE || entry.artStyle}`);
+  console.log(`  Location: ${storyLocation || '(IP-geolocated)'}`);
   console.log(`  Widmung:  ${dedication || '(none)'}`);
   console.log(`  Backend:  ${apiBase}`);
   console.log('═══════════════════════════════════════════════════════════');
@@ -372,6 +375,9 @@ async function main() {
     DEMO_PASSWORD,
     DEMO_ENTRY_INDEX: String(entry.index),
     DEMO_DEDICATION: dedication,
+    // --location=Baden (or "Baden, Switzerland") overrides the IP-geolocated
+    // story location the wizard would otherwise pick. Unset = IP geolocation.
+    ...(storyLocation ? { DEMO_LOCATION: storyLocation } : {}),
     // Skip character creation whenever the account already holds the family —
     // re-uploading every run is what mints a fresh character-id set each time.
     ...((reuseEmail || reuseCharacters) ? { DEMO_REUSE_ACCOUNT: '1' } : {}),
