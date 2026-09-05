@@ -4933,6 +4933,29 @@ function arcLengthRange(pageCount) {
   return `${Math.round(pages * 0.8)}-${pages}`;
 }
 
+/**
+ * Concrete budgets for the arc prompts ({ARC_BUDGETS} in arc-create and
+ * arc-retell). Event budget scales with reading level: pages/3 at 1st-grade
+ * (one obstacle chain), pages/2 at standard, pages/1.5 at advanced, floor 3.
+ * Invented-named-figure allowance from commissioned cast size + page count:
+ * round(pages/8) - floor(cast/2), clamped 0..3 (owner anchors, 2026-09-05:
+ * 1 character/20 pages → 3; 5 characters/10 pages → 0).
+ */
+function buildArcBudgetSection(inputData, pageCount) {
+  const pages = Math.max(4, parseInt(pageCount, 10) || 10);
+  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
+  const divisor = lvl === '1st-grade' ? 3 : lvl === 'advanced' ? 1.5 : 2;
+  const events = Math.max(3, Math.round(pages / divisor));
+  const cast = (inputData?.characters || []).length || 1;
+  const allowance = Math.max(0, Math.min(3, Math.round(pages / 8) - Math.floor(cast / 2)));
+  const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
+  return [
+    '# BUDGETS',
+    `- This book carries at most ${events} events${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
+    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line in the arc stating why the story cannot work without them.`,
+  ].join('\n');
+}
+
 /** CREATE: the creator writes two arcs with self-critiques and commits to one. */
 function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, priorChallenges = '' } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
@@ -4946,6 +4969,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
     AGE_MODE: buildAgeModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -4979,6 +5003,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
     AGE_MODE: buildAgeModeSection(inputData),
+    ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -6385,6 +6410,7 @@ module.exports = {
   buildArcPanelPrompt,
   buildArcRetellPrompt,
   buildArcHintsPrompt,
+  buildArcBudgetSection,
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
