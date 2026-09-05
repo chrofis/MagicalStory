@@ -1,3 +1,4 @@
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 /**
  * Reference sheets and Visual Bible grids — the reference imagery a page
  * generation is given, not the page itself.
@@ -35,9 +36,9 @@ async function splitGridIntoReferences(gridImage, count) {
 
   // Try Python service first — variance-based separator detection that
   // finds the ACTUAL cell boundaries instead of blindly dividing pixels.
-  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+  const analyzerBase = photoAnalyzerUrl();
   try {
-    const response = await fetch(`${photoAnalyzerUrl}/split-reference-sheet`, {
+    const response = await fetch(`${analyzerBase}/split-reference-sheet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

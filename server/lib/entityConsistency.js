@@ -1,3 +1,4 @@
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 /**
  * Entity Consistency Module
  *
@@ -26,7 +27,7 @@ const geminiPad = require('./geminiPad');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
 /**
  * Resolve the active version for a scene image. Each version stores its own

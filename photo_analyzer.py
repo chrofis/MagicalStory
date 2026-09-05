@@ -99,6 +99,9 @@ MAX_IMAGE_DIM = 2048
 _request_lock = threading.Lock()
 _inflight_requests = 0
 _last_request_ts = time.time()
+# Monotonic count of request ARRIVALS. Only ever compared for equality, so
+# wraparound is irrelevant; see kill_workers(expect_epoch=...).
+_request_epoch = 0
 
 # ── Process role ─────────────────────────────────────────────────────────────
 # The analyzer runs as a lean PARENT (port 5000, pure cv2/PIL — ~53MB) that
@@ -314,9 +317,13 @@ def _is_activity(path):
 @app.before_request
 def _track_request_start():
     """Count in-flight work so the recycler can prove the process is idle."""
-    global _inflight_requests, _last_request_ts
+    global _inflight_requests, _last_request_ts, _request_epoch
     with _request_lock:
         _inflight_requests += 1
+        # Bumped on EVERY arrival so a reaper that has already read "idle" can
+        # detect that the world changed under it before it terminates anything.
+        # See kill_workers(expect_epoch=...).
+        _request_epoch += 1
         if _is_activity(request.path):
             _last_request_ts = time.time()
 
@@ -433,8 +440,26 @@ def ensure_worker(role, wait_ready=True):
     return f"http://127.0.0.1:{WORKER_PORTS[role]}"
 
 
-def kill_workers(reason):
-    """Terminate every worker. Deterministic, total reclaim — that's the point."""
+def kill_workers(reason, expect_epoch=None):
+    """Terminate every worker. Deterministic, total reclaim — that's the point.
+
+    `expect_epoch` closes a TOCTOU race. `_maybe_reap_workers` reads "no session,
+    nothing in flight" under `_request_lock`, RELEASES it, and only then calls
+    here — so a request arriving in that gap increments the in-flight count,
+    calls `ensure_worker()` (which sees a live worker), issues its HTTP call, and
+    is then terminated underneath, surfacing as a 502. Holding `_request_lock`
+    across the kill is not an option: `terminate()` + `wait(5)` would block all
+    request accounting for up to five seconds.
+
+    So the caller passes the epoch it made its decision on, and we abort if any
+    request has arrived since. The int read needs no lock — it is a single
+    CPython bytecode — and the remaining window is microseconds instead of the
+    whole check-to-kill span. Returns True if the kill actually happened.
+    """
+    if expect_epoch is not None and _request_epoch != expect_epoch:
+        print(f"[WORKERS] kill aborted ({reason}): a request arrived since the "
+              f"idle check (epoch {expect_epoch} -> {_request_epoch})")
+        return False
     with _workers_lock:
         for role, proc in list(_workers.items()):
             if proc.poll() is None:
@@ -448,6 +473,7 @@ def kill_workers(reason):
                 except Exception as e:
                     print(f"[WORKERS] kill {role} failed: {e}")
             _workers.pop(role, None)
+    return True
 
 
 # A session that has seen no request traffic for this long did not end cleanly.
@@ -470,12 +496,15 @@ def _maybe_reap_workers():
         # genuinely mid-request.
         busy = _inflight_requests > 0
         sessions = _active_sessions
+        epoch = _request_epoch
     if sessions == 0 and not busy and _workers:
-        kill_workers('sessions=0, idle')
-        # The workers are gone, so their library mappings are gone with them —
-        # this is the one moment the page cache is droppable. Story over, cache
-        # released, without waiting for a restart that may never come.
-        _drop_file_cache_async('workers reaped')
+        # Pass the epoch: if a request arrived between the check above and the
+        # kill, abort rather than terminate a worker mid-call.
+        if kill_workers('sessions=0, idle', expect_epoch=epoch):
+            # The workers are gone, so their library mappings are gone with them
+            # — this is the one moment the page cache is droppable. Story over,
+            # cache released, without waiting for a restart that may never come.
+            _drop_file_cache_async('workers reaped')
         return
 
     # ── Stuck-session recovery (2026-09-05) ──
@@ -503,8 +532,8 @@ def _maybe_reap_workers():
                   f"{idle_for:.0f}s — treating as leaked, resetting to 0")
             with _request_lock:
                 _active_sessions = 0
-            kill_workers('leaked session reclaimed')
-            _drop_file_cache_async('leaked session reclaimed')
+            if kill_workers('leaked session reclaimed', expect_epoch=epoch):
+                _drop_file_cache_async('leaked session reclaimed')
 
 
 @app.route('/session/begin', methods=['POST'])
@@ -1916,6 +1945,16 @@ def drop_file_cache(roots=None):
     return touched, int((time.time() - started) * 1000)
 
 
+def _proc_rss_mb(pid):
+    """RSS of another process, in MB. None if it is gone or unreadable."""
+    try:
+        with open(f'/proc/{pid}/statm') as fh:
+            pages = int(fh.read().split()[1])
+        return round(pages * os.sysconf('SC_PAGE_SIZE') / 1048576.0, 1)
+    except Exception:
+        return None
+
+
 def _cgroup_file_mb():
     """Cgroup page cache in MB, or None off-Linux. This is the number billed."""
     for path in ('/sys/fs/cgroup/memory.stat', '/sys/fs/cgroup/memory/memory.stat'):
@@ -2785,10 +2824,26 @@ def health_check():
     }
     if ANALYZER_ROLE == 'parent':
         body["active_sessions"] = _active_sessions
-        body["workers"] = {
-            role: {"port": WORKER_PORTS[role], "up": _worker_alive(role)}
-            for role in WORKER_PORTS
-        }
+        # Per-worker RSS, not just up/down. `rss_mb` above is the ROUTER only,
+        # and the router is the small one: measured mid-story the router held
+        # 89 MB while two workers held 1.43 GB and 985 MB. Anything reading this
+        # endpoint to answer "how much is this container using" was understating
+        # it by more than a gigabyte, which is how a 9.85 GB peak went unseen.
+        # `python_total_rss_mb` is the number to compare against the cgroup.
+        workers = {}
+        worker_rss = 0.0
+        for role in WORKER_PORTS:
+            entry = {"port": WORKER_PORTS[role], "up": _worker_alive(role)}
+            proc = _workers.get(role)
+            if proc is not None and proc.poll() is None:
+                rss = _proc_rss_mb(proc.pid)
+                if rss is not None:
+                    entry["rss_mb"] = rss
+                    worker_rss += rss
+            workers[role] = entry
+        body["workers"] = workers
+        body["workers_rss_mb"] = round(worker_rss, 1)
+        body["python_total_rss_mb"] = round(body.get("rss_mb", 0) + worker_rss, 1)
     if request.args.get('probe') == 'sam' and ANALYZER_ROLE == 'parent':
         # SAM lives in the torch worker; loading it here would put 570MB into
         # the process that is supposed to stay at 53MB. Forward the probe.

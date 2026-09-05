@@ -17,8 +17,9 @@
 'use strict';
 
 const { log } = require('../utils/logger');
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
-const BASE = () => process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+const BASE = () =>photoAnalyzerUrl();
 
 // Connection-level failures only. A 500 from the analyzer is a real answer and
 // must NOT be retried — retrying real errors hides bugs and multiplies load.

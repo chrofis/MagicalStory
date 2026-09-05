@@ -25,7 +25,7 @@ const { closestGrokAspect, GROK_ASPECT_PRESETS } = require('./grokAspect');
 const { editWithGrok } = require('./grok');
 const r2Lib = require('./r2');
 const { MODEL_DEFAULTS } = require('../config/models');
-const { withAnalyzerSlot } = require('./photoAnalyzerClient');
+const { withAnalyzerSlot, photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
 function computePresetAlignedExtract({ pixelLeft, pixelTop, pixelWidth, pixelHeight, padFactor, sceneWidth, sceneHeight }) {
   // Start from the minimum-padded box
@@ -158,9 +158,9 @@ async function detectGrokBorder(buffer) {
  * tweaks to colour, alpha, or transport go in one place.
  */
 async function fetchSilhouettePng(cropJpegBuffer) {
-  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+  const analyzerBase = photoAnalyzerUrl();
   try {
-    const res = await fetch(`${photoAnalyzerUrl}/silhouette-edge`, {
+    const res = await fetch(`${analyzerBase}/silhouette-edge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -549,9 +549,9 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
 async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   const backend = MODEL_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
-    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    const analyzerBase = photoAnalyzerUrl();
     try {
-      const res = await withAnalyzerSlot(() => fetch(`${photoAnalyzerUrl}/figure-mask`, {
+      const res = await withAnalyzerSlot(() => fetch(`${analyzerBase}/figure-mask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

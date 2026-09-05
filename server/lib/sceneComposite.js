@@ -1,3 +1,4 @@
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 /**
  * Scene composite page-generation pipeline.
  *
@@ -44,7 +45,7 @@ const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { rembgRemoveBackground } = require('./rembg');
 
-const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
 // ─── Pose enum → cell index in the 2×4 sheet ──────────────────────────────
 // Cells 1–4 are head-only views (not used by scene composite).

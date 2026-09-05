@@ -1,3 +1,4 @@
+const { photoAnalyzerUrl } = require('../lib/photoAnalyzerClient');
 /**
  * Avatar Routes
  *
@@ -174,10 +175,10 @@ setInterval(() => {
  */
 async function splitGridAndExtractFace(imageData) {
   try {
-    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-    log.debug(`🔪 [SPLIT-GRID] Calling Python service at ${photoAnalyzerUrl}/split-grid`);
+    const analyzerBase = photoAnalyzerUrl();
+    log.debug(`🔪 [SPLIT-GRID] Calling Python service at ${analyzerBase}/split-grid`);
 
-    const response = await fetch(`${photoAnalyzerUrl}/split-grid`, {
+    const response = await fetch(`${analyzerBase}/split-grid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageData }),
@@ -1230,15 +1231,15 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     const imageType = imageData.substring(0, 30);
     log.debug(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}..., selectedFaceId: ${selectedFaceId}, cachedFaces: ${cachedFaces ? cachedFaces.length : 'none'}`);
 
-    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-    log.debug(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
+    const analyzerBase = photoAnalyzerUrl();
+    log.debug(`📸 [PHOTO] Calling Python service at: ${analyzerBase}/analyze`);
 
     const startTime = Date.now();
 
     try {
       // Call Python service with optional selectedFaceId and cachedFaces
       // cachedFaces prevents re-detection (face IDs are unstable between calls)
-      const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
+      const analyzerResponse = await fetch(`${analyzerBase}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -17,8 +17,9 @@
  */
 
 const { log } = require('../utils/logger');
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
-const BASE = () => process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+const BASE = () =>photoAnalyzerUrl();
 
 /**
  * Gate threshold (owner's call, 2026-08-22). On the measured corpus this flags

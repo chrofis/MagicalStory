@@ -1,3 +1,4 @@
+const { photoAnalyzerUrl } = require('../lib/photoAnalyzerClient');
 /**
  * Health & Utility Routes - /api/health, /api/check-ip, /api/log-error
  *
@@ -71,7 +72,7 @@ router.get('/health/config', (req, res) => {
 // GroundingDINO); they reload on next use in a few seconds.
 // Admin-only: this evicts models and briefly slows the next request.
 router.post('/health/release-memory', authenticateToken, requireAdmin, async (req, res) => {
-  const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+  const url = photoAnalyzerUrl();
   // Forward BOTH flags. `recycle` was previously dropped here, so the only way
   // to reclaim a framework that cannot be unloaded in-process (TensorFlow keeps
   // ~350MB of allocator arenas after its weights are freed) was to redeploy.
@@ -196,10 +197,23 @@ router.get('/health/memory', async (req, res) => {
   // Never fail the endpoint over it.
   let python = null;
   try {
-    const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    const url = photoAnalyzerUrl();
     const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) });
     const j = await r.json();
-    python = { rss_mb: j.rss_mb, rembg_loaded: j.rembg_loaded, mobilesam_loaded: j.mobilesam_loaded, groundingdino_loaded: j.groundingdino_loaded, boot_rss: j.boot_rss, cpu: j.cpu };
+    // rss_mb is the analyzer's ROUTER process alone, and the router is the small
+    // one — it proxies to short-lived workers that hold the models. Measured
+    // mid-story: router 89 MB, workers 1.43 GB + 985 MB. Reporting only rss_mb
+    // understated the container by >1 GB and hid a 9.85 GB peak entirely, so
+    // total_rss_mb (router + workers) is what to compare against the cgroup.
+    python = {
+      rss_mb: j.rss_mb,
+      workers_rss_mb: j.workers_rss_mb,
+      total_rss_mb: j.python_total_rss_mb ?? j.rss_mb,
+      workers: j.workers,
+      active_sessions: j.active_sessions,
+      rembg_loaded: j.rembg_loaded, mobilesam_loaded: j.mobilesam_loaded, groundingdino_loaded: j.groundingdino_loaded,
+      boot_rss: j.boot_rss, cpu: j.cpu,
+    };
   } catch (err) {
     python = { error: err.message };
   }
@@ -230,7 +244,7 @@ router.get('/health/memory', async (req, res) => {
     // Renamed from container_total_mb: it is the sum of the two PROCESSES, and
     // measurement on 2026-09-03 showed that is not the container total at all
     // (567 MB of processes against 2.9 GB billed). `cgroup` below is.
-    process_total_mb: python && python.rss_mb ? Math.round(mb(m.rss) + python.rss_mb) : null,
+    process_total_mb: python && python.total_rss_mb ? Math.round(mb(m.rss) + python.total_rss_mb) : null,
     cgroup: readCgroupMemory(),
   });
 });

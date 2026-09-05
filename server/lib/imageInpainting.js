@@ -1,3 +1,4 @@
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 /**
  * "Inpainting" — MOSTLY DEAD. Read this before trusting the name.
  *
@@ -341,7 +342,7 @@ function padBoundingBox(bbox, issueType) {
 // user decision (mark, do not delete). Do NOT document as live behavior.
 async function verifyInpaintWithLPIPS(beforeImage, afterImage, bbox = null) {
   try {
-    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    const analyzerBase = photoAnalyzerUrl();
 
     const requestBody = {
       image1: beforeImage,
@@ -354,7 +355,7 @@ async function verifyInpaintWithLPIPS(beforeImage, afterImage, bbox = null) {
       requestBody.bbox = bbox;
     }
 
-    const response = await fetch(`${photoAnalyzerUrl}/lpips`, {
+    const response = await fetch(`${analyzerBase}/lpips`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),

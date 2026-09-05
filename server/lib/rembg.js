@@ -13,8 +13,9 @@
 
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('./r2');
+const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
-const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
 async function rembgRemoveBackground(buf, { maxSize } = {}) {
   try {

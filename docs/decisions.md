@@ -26247,3 +26247,50 @@ router process.
 **Touched files:** `photo_analyzer.py`
 
 **Status:** ✅ active on staging
+
+---
+
+## 2026-09-05 — Closing the review's remaining findings: kill race, worker RSS, one URL definition
+
+Three items the 2026-09-05 review left open are fixed rather than deferred.
+
+**1. `kill_workers()` could terminate a worker mid-inference (TOCTOU, pre-existing
+since `8d1f1c572`).** `_maybe_reap_workers` read "no session, nothing in flight"
+under `_request_lock`, released it, and only then killed — so a request arriving
+in that gap incremented the count, got a live worker from `ensure_worker()`,
+issued its call, and was terminated underneath as a 502. Holding `_request_lock`
+across the kill is not viable: `terminate()` + `wait(5)` would block all request
+accounting for five seconds.
+
+Fixed with an epoch instead of a longer lock. `_request_epoch` increments on
+every request ARRIVAL; the reaper captures it with the busy check and passes it
+to `kill_workers(expect_epoch=…)`, which aborts if it has moved. The int read
+needs no lock (single bytecode in CPython) and the window shrinks from the whole
+check-to-kill span to microseconds. `kill_workers` now returns whether it acted,
+and the cache drop only follows a kill that actually happened.
+
+**2. `/api/health/memory` reported the analyzer's ROUTER only.** The router is the
+small process — measured mid-story it held 89 MB while two workers held 1.43 GB
+and 985 MB, and the container peaked at 9.85 GB anon. Every reading taken from
+that endpoint during real work understated the container by more than a
+gigabyte, which is how the peak went unseen for so long. `/health` now reports
+per-worker `rss_mb`, `workers_rss_mb` and `python_total_rss_mb` (read from
+`/proc/<pid>/statm`), and the Node side exposes `total_rss_mb`;
+`process_total_mb` is computed from that instead of the router figure.
+
+**3. One definition of the analyzer URL.** Ten files inlined
+`process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000'` — the exact
+duplication `photoAnalyzerClient.js` was extracted to end. All now call
+`photoAnalyzerUrl()`.
+
+A note on how that last one nearly shipped broken: the mechanical rewrite
+produced `const photoAnalyzerUrl = photoAnalyzerUrl();` in six places, shadowing
+the import with a const in the same scope — a temporal-dead-zone `ReferenceError`
+at runtime, in code paths that only execute during compositing and avatar work.
+`node --check` passes it happily. The local bindings are now `analyzerBase`.
+
+**Touched files:** `photo_analyzer.py`, `server/routes/health.js`,
+`server/lib/{analyzerClient,entityConsistency,faceIdentity,imageCompositing,imageInpainting,referenceSheets,rembg,sceneComposite}.js`,
+`server/routes/avatars.js`
+
+**Status:** ✅ active on staging — BACKLOG entries for all three removed
