@@ -1986,15 +1986,8 @@ function buildCoverPrompt(coverType, {
   // cover comes back with no title at all (Lab exps 957/958: ten covers, every
   // one titleless). Never reintroduce that placeholder.
   const bakedTitle = key === 'front' ? String(options.bakeTitle || '').trim() : '';
-  if (bakedTitle) {
-    const titleBlock = [
-      '**TITLE:**',
-      `Paint "${bakedTitle}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`,
-    ].join('\n');
-    composition = composition ? `${composition}\n\n${titleBlock}` : titleBlock;
-  }
 
-  return buildImagePrompt(
+  const prompt = buildImagePrompt(
     sceneDescription,
     inputData,
     characters,
@@ -2005,6 +1998,27 @@ function buildCoverPrompt(coverType, {
     referencePhotos,
     { ...options, coverComposition: composition }
   );
+  if (!bakedTitle) return prompt;
+
+  // The TITLE block goes at the ABSOLUTE END of the prompt — after **ART
+  // STYLE** — never inside the cover composition. Position IS the protection:
+  // shrinkPromptForModel keeps everything from '**REQUIRED OBJECTS' /
+  // '**ART STYLE' onward verbatim (its head-only compression and the
+  // section-aware cut both preserve that tail by construction), and cover
+  // prompts carry no REQUIRED OBJECTS block, so a title placed before ART
+  // STYLE sits in the compressible head. That is how the dragon run
+  // (job_1788551692337_bc479p945) shipped a titleless baked cover: its 4-cover-
+  // character prompt blew Grok's 7900-char cap, the shrink pass rewrote the
+  // head, and the TITLE paint instruction — which no shrink rule protected —
+  // was silently deleted, so the model was never told to paint one. The
+  // 2-character runs either side (6,952 / 7,662 chars, under the cap) kept
+  // their titles. Same failure class as the frame-colour map and rules block,
+  // which earned verbatim carve-outs; the title gets tail placement instead,
+  // which needs no carve-out code.
+  return prompt + '\n\n' + [
+    '**TITLE:**',
+    `Paint "${bakedTitle}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`,
+  ].join('\n');
 }
 
 function buildReferenceCardColours(chars, referencePhotos) {

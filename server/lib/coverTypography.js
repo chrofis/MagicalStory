@@ -48,6 +48,16 @@ function resolveCoverTitleMode(coverType, storyTitle, { modeOverride = null } = 
   const isFront = coverType === 'front' || coverType === 'frontCover';
   const bakeTitle = (mode === 'baked' && isFront) ? String(storyTitle || '').trim() : '';
   const baked = bakeTitle.length > 0;
+  if (mode === 'baked' && isFront && !baked) {
+    // LOUD by owner ruling (2026-09-05): an empty title reaching a baked front
+    // cover is a BUG to surface, never a silent degrade. The pipeline sets the
+    // story title before any cover starts (title is finalized before
+    // startCoverGeneration is ever called, verified on the dragon run's
+    // checkpoints: title 18:47:05, covers 18:48+), so this firing means a
+    // caller handed the cover path an empty title — find and fix that caller.
+    const { log } = require('../utils/logger');
+    log.error(`❌ [COVER TITLE] baked mode requested for the front cover but the story title is EMPTY/MISSING — this is a title-handover bug at the call site; the cover will render textless`);
+  }
   return {
     mode,
     isFront,
@@ -622,6 +632,16 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
   for (const [key, kind] of [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']]) {
     try {
       if (skip.has(key)) { log.info(`🅰️ [COVER TYPO POST] ${key}: SKIPPED — title is baked into the render`); continue; }
+      // EMPTY TITLE = nothing to stamp on the front cover (composited mode's
+      // own path — this stamp IS the title mechanism there). LOUD, and
+      // crucially do NOT write the ${key}Art row: the idempotency guard below
+      // would then treat this cover as "already baked" forever and a later run
+      // with the real title could never stamp it. Leaving the cover untouched
+      // keeps a later legitimate stamp possible.
+      if (key === 'frontCover' && !String(title || '').trim()) {
+        log.error(`❌ [COVER TYPO POST] frontCover: story title is EMPTY — cannot stamp a title; cover left un-baked so a later pass with the real title can still stamp it`);
+        continue;
+      }
       const already = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyId, `${key}Art`]);
       if (already.length) { log.debug(`[COVER TYPO POST] ${key}: already baked — skip`); continue; }
       const activeIdx = meta[key]?.activeVersion ?? 0;
@@ -629,10 +649,10 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
         "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
         [storyId, key, activeIdx]);
       const row = rows[0];
-      if (!row) { log.warn(`[COVER TYPO POST] ${key}: no served version v${activeIdx}`); continue; }
+      if (!row) { log.error(`❌ [COVER TYPO POST] ${key}: no served version v${activeIdx} in story_images — cover ships WITHOUT title/dedication/branding`); continue; }
       const src = row.image_url || (row.image_data ? 'data:image/jpeg;base64,' + row.image_data.toString('base64') : null);
       const bytes = await r2.bytesFromAnyImage(src);
-      if (!bytes) { log.warn(`[COVER TYPO POST] ${key}: could not resolve served bytes`); continue; }
+      if (!bytes) { log.error(`❌ [COVER TYPO POST] ${key}: could not resolve served bytes (url=${row.image_url ? 'yes' : 'no'}) — cover ships WITHOUT title/dedication/branding`); continue; }
       const figures = storyData?.coverImages?.[key]?.bboxDetection?.figures || [];
       const { buffer, spec } = await composeCover({ artBuffer: bytes, kind, title: title || '', dedication: ded, seed: seed || title, figures });
       // Textless original first (for no-AI re-edits), then overwrite the served
@@ -745,7 +765,7 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
         await paintServedCoverTitle(storyId, storyData, { coverKey: 'frontCover' });
       }
     } catch (err) {
-      log.warn(`[COVER TYPO POST] ${key}: ${err.message}`);
+      log.error(`❌ [COVER TYPO POST] ${key}: ${err.message} — cover may ship WITHOUT title/dedication/branding`);
     }
   }
 }
