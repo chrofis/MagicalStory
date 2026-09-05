@@ -1,9 +1,9 @@
 You are evaluating one row (the top row) of a character reference sheet.
 
-You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, back of head. Some shoulder or a bit of torso in a cell is fine — do not penalise it. Judge only this image.
+You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, back view with the head turned toward one shoulder (one eye and cheek visible). Some shoulder or a bit of torso in a cell is fine — do not penalise it. Judge only this image.
 
 TASK 1: FACING ANGLES
-The 4 cells read front, three-quarter, profile, back-of-head, left to right. Score 1-10.
+The 4 cells read front, three-quarter, profile, back-with-head-turned, left to right; a flat back-of-head with no visible eye or cheek in cell 4 scores 1-3. Score 1-10.
 
 TASK 2: CLEAN RENDER (no arrows or stray marks)
 Check every head for arrows, lines, pointers, symbols, letters, or graphics coming out of or drawn on the head, face, hair, or skin. Coloured axis arrows (red / green / blue) sticking out of a head are a leaked pose-marker and score 1. Any clear stray mark on a head scores 1-3; none = 9-10. cleanScore 1-10.

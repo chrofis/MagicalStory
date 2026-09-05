@@ -25984,3 +25984,59 @@ exists to stop a probable paid-call loop, not to bill precisely.
 
 **Touched files:** `storyJobPipeline.js` (`JOB_SPEND_CAP_USD`, `jobSpentUsd`
 accumulation in `addUsage`, cap check wrapped around `checkCancellation`).
+
+## 2026-09-05 — A reacting back-view character turns the head; the avatar sheet's back cell follows
+
+**Context:** owner review of a 4-page smoke story (`job_1788555701112_99txp8evx`)
+found a group-reaction page where every character was tagged `perspective:
+back view`, yet the render showed some with a natural partial head turn and
+others with a flat 180° back — an inconsistency traced to the scene-expansion
+schema itself: its own worked example paired `perspective: back view` with
+`expression: calm, faint smile`, a physically impossible combination (a full
+back view shows no face), and the field-rules text required a legible
+`expression` for every character with no back-view exemption. Separately,
+`character2x4Sheet.js`'s avatar identity sheet only has 4 fixed head angles
+per row (front / 45° / profile-90° / a pure faceless 180° back) — no reference
+between profile and full back, exactly the pose a reacting back-view character
+now needs, so the image model had to invent an unseen face angle from
+scratch and drifted from the character's established look (reported as "Hans
+looks totally different").
+
+**Decision:** `back view` stays a true, faceless 180° pose for characters with
+nothing to show (walking away, no reaction). A NEW discrete pose, `back view,
+head turned toward [left|right] shoulder`, is used whenever a back-view
+character's expression is the point of the moment — describing only what
+that partial turn reveals (a cheek, one eye, a brow). The avatar identity
+sheet's cell 4 (face row) and cell 8 (body row) generation prompts were
+changed to match: instead of a flat back-of-head/back-view, they now request
+the same turned-head pose by default, so the sheet itself carries a real
+identity anchor for that pose instead of leaving the image model to
+extrapolate into a gap. The two sheet-quality eval prompts
+(`sheet-2x4-evaluation.txt`, `sheet-row-heads-eval.txt`) were updated in step
+so they score the turned pose as correct rather than penalizing it as a
+defect.
+
+**Rationale:** the contradiction was structural (an impossible pose+expression
+pairing baked into the schema's own example), not a one-off model mistake —
+fixing the text closes the gap at its source rather than patching the
+symptom on one story. Anchoring the new pose in the avatar sheet (not just
+the per-page scene prompt) means the image model has an actual reference for
+the character's face at that angle, rather than inventing it fresh on every
+page that needs it.
+
+**Known gap, deliberately deferred:** the static phantom guide images used
+as the ONLY-for-facing-direction reference in `character2x4Sheet.js`
+(`assets/phantom-watercolor-*.png`, one set per age tier) still show a flat
+180° back for cells 4/8. The generation prompts now explicitly override
+Image 1's implied direction for those two cells ("turn further than Image 1
+shows"), which should work but leaves a text/image mismatch until the guide
+assets themselves are redrawn — tracked in `tasks/BACKLOG.md` since it needs
+actual asset editing, not a text change.
+
+**Touched files:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`
+(rule 8i, the characters[] example, the expression field rule),
+`server/lib/promptBuilders.js` (perspective-directive fallthrough for the new
+suffixed value), `prompts/styled-costumed-avatar-2x4.txt`,
+`server/lib/character2x4Sheet.js` (`buildHairBlock`, `buildBodyRowPrompt`,
+`buildHeadRowPrompt`, `buildPrompt`), `prompts/sheet-2x4-evaluation.txt`,
+`prompts/sheet-row-heads-eval.txt`.

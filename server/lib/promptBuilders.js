@@ -3086,6 +3086,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     for (const [name, ann] of Object.entries(metadata.characterPerspectives)) {
       if (ann.perspective === 'back view' || ann.perspective === 'back-view') {
         lines.push(`- ${name}: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.`);
+      } else if (String(ann.perspective || '').startsWith('back view')) {
+        lines.push(`- ${name}: ${ann.perspective} — shoulders, hips, and both feet turned away from the camera, but the head turns toward the named shoulder so a cheek, one eye or a brow is visible.`);
       } else if (ann.perspective === 'side' || ann.perspective === 'profile') {
         lines.push(`- ${name}: side profile — shoulders, hips, and feet all line up sideways. Nose points to one edge, not at the camera.`);
       } else if (ann.perspective === 'over-the-shoulder') {
