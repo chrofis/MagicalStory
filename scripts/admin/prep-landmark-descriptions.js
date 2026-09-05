@@ -99,7 +99,8 @@ const thumbUrl = url => commonsThumbUrl(url, 900);
   if (!url) throw new Error(`${STAGING ? 'STAGING_DATABASE_URL' : 'DATABASE_URL'} is not set`);
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
 
-  // One row per (landmark, slot) that has a picture and no words for it.
+  // One row per (landmark, slot) that has a picture and no NEW-FORMAT words for it
+  // (`[scope, season, time] text`); a pre-2026-09 prose description is rewritten.
   // Slot 1's columns carry no suffix. --limit counts LANDMARKS, not slots, so a
   // landmark's slots are never cut in half by the limit (batches must hold all
   // of a landmark's photos for duplicate detection).
@@ -114,7 +115,7 @@ const thumbUrl = url => commonsThumbUrl(url, 900);
                 photo_description_4, photo_description_5, photo_description_6],
           ARRAY[photo_r2_url, photo_r2_url_2, photo_r2_url_3, photo_r2_url_4, photo_r2_url_5, photo_r2_url_6]
         ) AS s(slot, url, description, r2_url)
-       WHERE s.url IS NOT NULL AND s.description IS NULL
+       WHERE s.url IS NOT NULL AND (s.description IS NULL OR s.description NOT LIKE '[%')
          ${IDS ? 'AND id = ANY($1)' : ''}
     ),
     -- Best-judged places first: agents work batch by batch, and a run that
