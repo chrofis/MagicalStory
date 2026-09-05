@@ -17,7 +17,13 @@
  *
  * COSTS REAL MONEY — a full story is ~CHF 2 and 30-45 min. Run only when asked.
  *
- *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--yes]
+ * Season comes from the DATE. The source job's stored season is dropped (it is
+ * often blank — `job_1788614817116_vxnu60yjg` carried `season: ""` — or stale,
+ * from whenever the original was launched), so the field travels ABSENT and the
+ * pipeline's single resolver (server/lib/season.js) derives it from this job's
+ * own creation date. `--season=` overrides that, for tests that need a fixed one.
+ *
+ *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--yes]
  */
 'use strict';
 
@@ -25,14 +31,27 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const { Pool } = require('pg');
 const { execFileSync } = require('child_process');
+const { normalizeSeason, resolveSeason, SEASONS } = require('../../server/lib/season');
 
 const args = process.argv.slice(2);
 const storyId = args.find((a) => !a.startsWith('--'));
 const YES = args.includes('--yes');
 const pagesOverride = args.find((a) => a.startsWith('--pages='));
+const seasonFlag = args.find((a) => a.startsWith('--season='));
 const BASE = 'https://staging.magicalstory.ch';
 
-if (!storyId) { console.error('Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--yes]'); process.exit(1); }
+const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--yes]';
+if (!storyId || args.includes('--help') || args.includes('-h')) { console.error(USAGE); process.exit(storyId ? 0 : 1); }
+
+let seasonOverride = null;
+if (seasonFlag) {
+  const raw = seasonFlag.split('=').slice(1).join('=');
+  seasonOverride = normalizeSeason(raw);
+  if (!seasonOverride) {
+    console.error(`--season="${raw}" is not a season. Use one of: ${SEASONS.join(', ')} (aliases like fall/Sommer/Herbst are accepted).`);
+    process.exit(1);
+  }
+}
 
 /** Append the story's characters to the admin account's row (idempotent). */
 async function ensureCharactersOnAdmin(characters) {
@@ -103,10 +122,18 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   const inputs = { ...src, characters };
   if (pagesOverride) inputs.pages = Number(pagesOverride.split('=')[1]);
 
+  // Season: the date decides. Drop whatever the source job stored — it is blank
+  // on some jobs and stale on the rest — so the field is ABSENT and the pipeline
+  // derives it from this job's creation date. --season= is the test override.
+  delete inputs.season;
+  if (seasonOverride) inputs.season = seasonOverride;
+  const season = seasonOverride || resolveSeason({}, { now: new Date() });
+
   const withAvatars = characters.filter((c) => c.avatars?.standardUrl || c.avatars?.summerUrl || c.avatars?.winterUrl).length;
   console.log(`Story    : ${storyId}`);
   console.log(`Inputs   : ${inputs.pages}p, ${inputs.language}, ${inputs.artStyle}, ${inputs.storyCategory}/${inputs.storyType}`);
   console.log(`Characters: ${characters.map((c) => c.name).join(', ')} (${withAvatars}/${characters.length} carry avatar sheets)`);
+  console.log(`Season   : ${season}${seasonOverride ? ' (--season override)' : " (derived from today's date by the pipeline)"}`);
   console.log(`Main     : ${(inputs.mainCharacters || []).join(', ')}`);
   console.log(`Details  : ${String(inputs.storyDetails || '').slice(0, 120)}…`);
 

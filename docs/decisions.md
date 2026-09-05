@@ -26371,9 +26371,16 @@ launched on 5 September — while the story itself is a summer one (short sleeve
 hunt). The date is a proxy for intent, not intent. The alternative — deriving the season from
 the story text/premise with a cheap model call, or from `storyType` for seasonal types
 (christmas → winter, easter → spring) — is deliberately NOT built here; it is a new inference
-stage and needs the owner's call. The correct immediate fix for a rerun is for the LAUNCHER to
-send the intended season: `scripts/admin/rerun-story-on-staging.js` should carry
-`inputs.season` and refuse a blank, rather than relying on the date fallback.
+stage and needs the owner's call. **Follow-up (2026-09-05, owner ruling): the season is defined by the DATE, full stop.**
+`scripts/admin/rerun-story-on-staging.js` therefore sends NO season: it `delete`s the field
+copied from the source job (blank on some jobs, stale on the rest) so it travels ABSENT and
+`resolveSeason` derives it from this job's creation date. The script prints the season that
+will be derived in its launch summary, and takes an optional `--season=<spring|summer|autumn|
+winter>` (season.js aliases accepted) purely as a test override, marked as such in the summary.
+No launcher refuses a blank. Other launchers send nothing either: the showcase drives the real
+wizard (`tests/demo-story.spec.ts`), which sends the client's date-derived season; the
+4-page smoke (`scripts/test-scene-composite-smoke.js`) and the trial showcase send no season
+and get the date default; `scripts/admin/run-testlab-set.js` runs stages, not story jobs.
 
 **Touched files:** `server/lib/season.js` (new), `server/lib/promptBuilders.js`,
 `storyJobPipeline.js`, `prompts/scene-expansion.txt`, `prompts/image-generation.txt`,
