@@ -26294,3 +26294,32 @@ at runtime, in code paths that only execute during compositing and avatar work.
 `server/routes/avatars.js`
 
 **Status:** ✅ active on staging — BACKLOG entries for all three removed
+
+## 2026-09-05 — Landmark minimum is a guideline, not a gate (supersedes the 2026-09-04 hard minimum)
+
+**Context:** the refire of the dragon commission (`job_1788599801317_644e65uob`) died at the
+2026-09-04 hard 2-landmark gate after burning two full ~30-min text phases (~$8): the new
+peopleless-page rule (5d4ef1fb7) had removed exactly the city place-still opener that used to
+supply landmark #2, the retry re-ran the writer with an unchanged prompt (same choice again),
+the offered list held only ONE landmark compatible with the Uetliberg-forest premise (the two
+summit rows sat under locality Stallikon, invisible to a Zurich lookup), and the prompt itself
+said "never bend the plot to reach one" — the code demanded what the prose forbade.
+
+**Decision (owner, all four options):** "2 is a strong guideline, not an iron rule that should
+stop the entire story."
+1. The attempt-1 check moved to the bible stage (`onVisualBible` hook in beatsPipeline) —
+   staging is fully knowable there; an abort saves the scene-brief + page-text stages.
+2. The retry carries feedback: `inputData.landmarkRetryNote` rides into the REAL LANDMARKS
+   section of the arc/beats/bible prompts (generic wording, never story-specific).
+3. Strike two SHIPS: loud WARN naming staged + offered landmarks, `landmarkMinimumShortfall`
+   stamped on story data. The throw is gone; no job fails on landmark count.
+4. `premiseMentionsLandmark` matches on the name-FINAL place token (naming convention:
+   "Festung Aarburg", "Fernsehturm Uetliberg"), with the story city's own tokens excluded and
+   the SQL prefilter narrowed to rule-eligible tokens — a premise saying "Uetliberg" now pins
+   all three summit landmarks first (verified against staging: Aussichtsturm 85, Oppidum 60,
+   Fernsehturm 45; no cross-canton noise).
+5. Prompt header reconciled: "when the story's own places offer landmarks, build at least two
+   in … never relocate the story or bend the plot to collect them."
+
+**Touched files:** `storyJobPipeline.js`, `server/lib/{beatsPipeline,landmarkPhotos,promptBuilders}.js`,
+`tests/unit/premise-landmark-match.test.ts`

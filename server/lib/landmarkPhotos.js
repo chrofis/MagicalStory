@@ -2685,12 +2685,27 @@ function premiseNameTokens(name) {
   return premiseWords(core).filter(t => t.length > 1 && !PREMISE_GENERIC_WORDS.has(t));
 }
 
-function premiseMentionsLandmark(name, premiseText) {
+// A name matches when the premise contains either EVERY distinctive token
+// (the original strict rule) or the name's FINAL distinctive token alone.
+// The strict rule missed the motivating case (owner ruling 2026-09-05): a
+// premise saying "Uetliberg" never matched "Aussichtsturm Uetliberg" because
+// "aussichtsturm" was absent, so a story bound to the mountain was offered
+// none of its summit landmarks. The final token carries the relaxation because
+// that is where the naming convention puts the PLACE ("Festung Aarburg",
+// "Fernsehturm Uetliberg", "Château de Chillon") — a mid-name token alone is
+// noise ("Museum Bruder Klaus Sachseln" must not ride in on a premise's
+// "Bruder"). `excludeWords` guards it further: callers pass the story city's
+// own name tokens, otherwise every "<thing> <City>" row would match any
+// premise that mentions the city — which is all of them.
+function premiseMentionsLandmark(name, premiseText, excludeWords = null) {
   const tokens = premiseNameTokens(name);
   if (!tokens.length) return false;
-  if (tokens.reduce((n, t) => n + t.length, 0) < PREMISE_MIN_TOKEN_CHARS) return false;
   const words = new Set(premiseWords(premiseText));
-  return tokens.every(t => words.has(t));
+  if (excludeWords) for (const w of excludeWords) words.delete(w);
+  const strict = tokens.reduce((n, t) => n + t.length, 0) >= PREMISE_MIN_TOKEN_CHARS
+    && tokens.every(t => words.has(t));
+  const placeToken = tokens[tokens.length - 1];
+  return strict || (placeToken.length >= PREMISE_MIN_TOKEN_CHARS && words.has(placeToken));
 }
 
 // Own-village landmarks rank ahead of ones inherited from the municipality.
@@ -4110,7 +4125,10 @@ async function resolveAvailableLandmarks(location, opts = {}) {
   // the family asked for instead of a random neighbour. Matches already in
   // the list move to the front; new ones are added ahead of it.
   if (premiseText && premiseWords(premiseText).length) {
-    const pinned = await premiseNamedLandmarks(premiseText);
+    // The city's own name tokens never count as a premise mention — with the
+    // relaxed single-token match every "<City> <thing>" row would match any
+    // premise that names the city (all of them do).
+    const pinned = await premiseNamedLandmarks(premiseText, premiseWords(location.city));
     if (pinned.length) {
       const ids = new Set(pinned.map(p => p.landmarkIndexId));
       landmarks = [...pinned, ...landmarks.filter(l => !ids.has(l.landmarkIndexId))];
@@ -4124,10 +4142,15 @@ async function resolveAvailableLandmarks(location, opts = {}) {
 // story_score first, at most 3. The SQL is a cheap accent-folded, word-bounded
 // prefilter — any premise word occurring in the name — and the pure helper
 // applies the full rule on what comes back, so the rule lives in one place.
-async function premiseNamedLandmarks(premiseText) {
+async function premiseNamedLandmarks(premiseText, excludeWords = null) {
   const pool = getPool();
   if (!pool) return [];
-  const words = [...new Set(premiseWords(premiseText).filter(w => w.length > 1))];
+  const excluded = new Set(excludeWords || []);
+  // Only tokens the decision rule can accept (PREMISE_MIN_TOKEN_CHARS+) go into
+  // the SQL prefilter: shorter premise words ("im", "Wald") match hundreds of
+  // rows, fill the LIMIT window with names the JS filter then rejects, and
+  // crowd out genuine matches ranked below them.
+  const words = [...new Set(premiseWords(premiseText).filter(w => w.length >= PREMISE_MIN_TOKEN_CHARS && !excluded.has(w)))];
   if (!words.length) return [];
   const { rows } = await pool.query(`
     SELECT * FROM landmark_index
@@ -4138,7 +4161,7 @@ async function premiseNamedLandmarks(premiseText) {
        AND ${NORM_SQL('name')} ~ ('\\m(' || $1 || ')\\M')
      ORDER BY story_score DESC NULLS LAST, name ASC
      LIMIT 50`, [words.join('|')]);
-  const matched = rows.filter(r => premiseMentionsLandmark(r.name, premiseText)).slice(0, 3);
+  const matched = rows.filter(r => premiseMentionsLandmark(r.name, premiseText, excluded)).slice(0, 3);
   const bestSlot = await bestPhotoSlots(matched.map(l => l.id));
   return matched.map(l => servedLandmark(l, bestSlot.get(l.id)));
 }
