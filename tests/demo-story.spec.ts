@@ -1263,9 +1263,30 @@ test.describe('Demo Story Generation', () => {
 
     // ── Step 5: Summary & Generate ──
     console.log('Step 5: Waiting for ideas...');
-    const ideaOption = page.locator('button').filter({ hasText: USE_THIS_RE }).first();
-    await expect(ideaOption).toBeVisible({ timeout: 180000 });
-    await ideaOption.click();
+    // WHICH idea matters, not just that one is picked (2026-09-05). The wizard
+    // offers two by fixed positional convention: index 0 plays in the reader's
+    // HOME TOWN, index 1 in a make-believe world (generate-story-ideas.txt,
+    // resolveIdeaWorlds). That index sets premiseNamedWorld, and
+    // storyJobPipeline.js:2466 fails the whole job when the home town is the
+    // binding setting and the story stages fewer than two real landmarks.
+    //
+    // So a themed entry MUST take index 1. Taking index 0 asks the writer for a
+    // superhero (or pirate, or mermaid) story that also builds in two real Swiss
+    // landmarks — it retries once and then fails by design. That is exactly how
+    // job_1788558535073_dm6qxomqe died at 56%. The landmark rule landed
+    // 2026-09-04, so every themed entry here has the same problem; none had run
+    // since.
+    const ideaButtons = page.locator('button').filter({ hasText: USE_THIS_RE });
+    await expect(ideaButtons.first()).toBeVisible({ timeout: 180000 });
+    const wantsOwnWorld = !!entry.storyTheme;
+    let ideaIndex = 0;
+    if (wantsOwnWorld && (await ideaButtons.count()) > 1) {
+      ideaIndex = 1;
+      console.log('  Entry has a world theme — choosing the make-believe idea (index 1)');
+    } else if (wantsOwnWorld) {
+      console.log('  WARNING: themed entry but only one idea offered — the landmark minimum may fail this job');
+    }
+    await ideaButtons.nth(ideaIndex).click();
     await page.waitForTimeout(1000);
 
     // Widmung (dedication): the StorySettings textarea lives on THIS step (Step 5 /
