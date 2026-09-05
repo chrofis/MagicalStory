@@ -105,15 +105,60 @@ function nameCandidates(text) {
 }
 
 /**
+ * The named PLACES this story already knows about, from the authoritative data
+ * the job carries into the beats stage — never a word list and never a guess.
+ *
+ * Three sources, all resolved before `generateStoryViaBeats` runs and all the
+ * same names the planner was handed in its own prompt:
+ *   - `inputData.availableLandmarks[].name` — the landmark index entries
+ *     resolved for the family's town (storyJobPipeline, before the beats call).
+ *   - `inputData.userLocation.city` / `.country` — the town itself.
+ *   - `extraNames` — the caller's canonical named things for this story
+ *     (historical locations and period objects, which are places and props by
+ *     definition and are looked up by name the same way).
+ *
+ * @param {Object} inputData
+ * @param {string[]} [extraNames]
+ * @returns {string[]} unique trimmed names
+ */
+function collectPlaceNames(inputData = {}, extraNames = []) {
+  const names = [
+    ...(Array.isArray(inputData.availableLandmarks) ? inputData.availableLandmarks.map(l => l && l.name) : []),
+    inputData.userLocation?.city,
+    inputData.userLocation?.region,
+    inputData.userLocation?.country,
+    ...extraNames,
+  ].map(n => String(n || '').trim()).filter(Boolean);
+  return [...new Set(names)];
+}
+
+/** Whole-word regex for a literal name. */
+function nameRe(name, flags = 'iu') {
+  return new RegExp(`\\b${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, flags);
+}
+
+/**
  * Which candidates behave like people across the whole plan.
  *
- * A person acts: somewhere in the book the name is followed by a lowercase word
- * (a verb — "X stands", "X pulls"). A place is named and then punctuated. This
- * is the one heuristic in the module that can be wrong, so the resolved list
- * travels to the model check, which sees the same pages and can contradict it.
+ * A candidate is dropped outright when the story's own place data names it: a
+ * landmark, the town or region, or a canonical historical location/object.
+ * Whole-word containment counts in BOTH directions, because the index stores a
+ * hill's structures rather than the hill: "Aussichtsturm <hill>" and "Oppidum
+ * <hill>" are index entries, so the bare "<hill>" a plan line actually writes
+ * only matches as a token INSIDE them. Commissioned names are resolved first,
+ * so a character sharing a token with a landmark stays a character; an invented
+ * person who shares one does not, and the model half of the check sees the same
+ * pages and can contradict the list.
+ *
+ * What is left: a person acts: somewhere in the book the name is followed by a
+ * lowercase word (a verb — "X stands", "X pulls"). A place is named and then
+ * punctuated. This is the one heuristic in the module that can be wrong, so the
+ * resolved list travels to the model check, which sees the same pages and can
+ * contradict it.
  */
-function resolveCast(pages, commissionedNames = []) {
+function resolveCast(pages, commissionedNames = [], placeNames = []) {
   const commissioned = commissionedNames.map(n => String(n || '').trim()).filter(Boolean);
+  const places = (Array.isArray(placeNames) ? placeNames : []).map(n => String(n || '').trim()).filter(Boolean);
   // PLAN LINES ONLY — never the beats. The plan is written in English by
   // contract (prompts/story-beats.txt: "Plan in ENGLISH"), while the beats are
   // free to carry the book's language. German capitalises every noun, so
@@ -123,15 +168,21 @@ function resolveCast(pages, commissionedNames = []) {
   const corpus = pages.map(p => String(p.planLine || '')).join('\n');
   const clean = stripQuoted(corpus);
   const invented = [];
+  const excludedPlaces = [];
   for (const cand of nameCandidates(corpus)) {
     if (commissioned.some(c => c.toLowerCase() === cand.toLowerCase())) continue;
     // A candidate that CONTAINS a commissioned name is that character wearing a
     // title ("Captain <name>"), never a second person.
     if (commissioned.some(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(cand))) continue;
+    // The story's own place data outranks the acts-like-a-person heuristic.
+    if (places.some(pl => pl.toLowerCase() === cand.toLowerCase() || nameRe(pl).test(cand) || nameRe(cand).test(pl))) {
+      if (!excludedPlaces.includes(cand)) excludedPlaces.push(cand);
+      continue;
+    }
     const acts = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:'s|s')?\\s+[a-zäöüß]`, 'u').test(clean);
     if (acts && !invented.includes(cand)) invented.push(cand);
   }
-  return { commissioned, invented, all: [...commissioned, ...invented] };
+  return { commissioned, invented, places: excludedPlaces, all: [...commissioned, ...invented] };
 }
 
 /** Names from `cast` present in a piece of text (possessives count as present). */
@@ -161,14 +212,16 @@ function consecutiveRuns(sorted) {
  * @param {Object} args
  * @param {Array}  args.pages  [{pageNumber, beat, planLine}]
  * @param {string[]} [args.commissionedNames] the characters the book was commissioned for
+ * @param {string[]} [args.placeNames] named places/things this story already knows about
+ *   (collectPlaceNames): they can never be cast, whatever the plan grammar looks like
  * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one whole-cast page
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], maxCharactersPerScene = 3 } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3 } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
-  const cast = resolveCast(pages, commissionedNames);
+  const cast = resolveCast(pages, commissionedNames, placeNames);
   const pageCount = pages.length;
 
   // Per-page derived facts. A plan line with fewer than four segments is
@@ -328,6 +381,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], maxCharactersPerS
 
 module.exports = {
   runPlanCounters,
+  collectPlaceNames,
   planSegments,
   classifyShot,
   nameCandidates,

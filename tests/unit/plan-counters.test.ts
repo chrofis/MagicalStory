@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — CommonJS lib
 import planCounters from '../../server/lib/planCounters.js';
-const { runPlanCounters, classifyShot, planSegments, resolveCast } = planCounters as any;
+const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames } = planCounters as any;
 
 /** A well-formed plan line: shot — who — instant — change. */
 const line = (shot: string, who: string, instant = 'something happens', change = 'something is now true') =>
@@ -41,6 +41,60 @@ describe('resolveCast', () => {
   it('treats a titled commissioned name as that character, not a second one', () => {
     const pages = [{ pageNumber: 1, planLine: line('wide', 'Captain Ana stands at the rail'), beat: '' }];
     expect(resolveCast(pages, CAST).invented).toHaveLength(0);
+  });
+});
+
+describe('place names are never cast (story job_1788614817116_vxnu60yjg)', () => {
+  // The Zurich landmark_index entries this job resolved, plus its town. The
+  // index stores the hill's structures, not the hill, so the bare "Uetliberg"
+  // the plan writes is only reachable as a token inside them.
+  const INPUT = {
+    userLocation: { city: 'Zurich', region: 'Zurich', country: 'Switzerland' },
+    availableLandmarks: [
+      { name: 'Aussichtsturm Uetliberg' }, { name: 'Fernsehturm Uetliberg' }, { name: 'Oppidum Uetliberg' },
+    ],
+  };
+  const PLACES = collectPlaceNames(INPUT);
+  const BOYS = ['Levin', 'Julian', 'Max', 'Kiaan'];
+  // Verbatim plan lines from that story's stored beatsReviewReport.
+  const PAGES = [
+    { pageNumber: 1, planLine: 'ultra-wide — Levin alone on his bike on the Uetliberg path, the old earth walls of the Oppidum Uetliberg ahead — Levin pedals toward the rampart — the destination is set', beat: '' },
+    { pageNumber: 2, planLine: 'medium — Levin kneeling with Fünkli on his knee, the Aussichtsturm Uetliberg visible on the hill behind him — Levin says Fünkli must reach high ground — the deadline is spoken', beat: '' },
+    { pageNumber: 3, planLine: "close-up — Fünkli pressed against Levin's chest at the railing — Fünkli's light is almost out — this is the low point", beat: '' },
+    { pageNumber: 4, planLine: "wide — Max on the platform, the Fernsehturm Uetliberg's red lights lit behind him — Max flashes the shell — the signal brings no answer", beat: '' },
+  ];
+
+  it('collects the landmark, town and region names the job already carries', () => {
+    expect(PLACES).toContain('Aussichtsturm Uetliberg');
+    expect(PLACES).toContain('Zurich');
+    expect(collectPlaceNames({}, ['Marktplatz Altdorf'])).toEqual(['Marktplatz Altdorf']);
+  });
+
+  it('keeps places out of the invented cast, and keeps a real invented character in', () => {
+    const cast = resolveCast(PAGES, BOYS, PLACES);
+    expect(cast.invented).not.toContain('Uetliberg');
+    expect(cast.invented).not.toContain('Aussichtsturm Uetliberg');
+    expect(cast.invented).not.toContain('Oppidum Uetliberg');
+    expect(cast.invented).not.toContain('Fernsehturm Uetliberg');
+    expect(cast.invented).toContain('Fünkli');
+    expect(cast.places).toContain('Uetliberg');
+  });
+
+  it('without the place names the same lines manufacture invented-dominant findings', () => {
+    const blind = runPlanCounters({ pages: PAGES, commissionedNames: BOYS });
+    expect(blind.cast.invented).toContain('Uetliberg');
+    expect(blind.findings.map((f: any) => f.code)).toContain('INVENTED_DOMINANT_EXCESS');
+
+    const fixed = runPlanCounters({ pages: PAGES, commissionedNames: BOYS, placeNames: PLACES });
+    expect(fixed.findings.map((f: any) => f.code)).not.toContain('INVENTED_DOMINANT_EXCESS');
+    expect(fixed.stats.castPerPage[0].names).toEqual(['Levin']);
+  });
+
+  it('a commissioned character sharing a token with a landmark stays commissioned', () => {
+    const pages = [{ pageNumber: 1, planLine: 'wide — Uetli walks the path — she climbs — she is up', beat: '' }];
+    const cast = resolveCast(pages, ['Uetli'], collectPlaceNames({ availableLandmarks: [{ name: 'Uetli Tower' }] }));
+    expect(cast.commissioned).toContain('Uetli');
+    expect(cast.invented).toHaveLength(0);
   });
 });
 

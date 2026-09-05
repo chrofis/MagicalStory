@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames } = require('./planCounters');
 const { textZoneRulesActive } = require('../config/runtime');
 
 // The beats layer no longer audits the STORY (owner, 2026-09-01). Its only
@@ -87,6 +87,8 @@ const {
   parseRefinedText,
   buildAvailableAvatarsForPrompt,
   extractSceneMetadata,
+  getHistoricalLocations,
+  getHistoricalObjects,
 } = require('./storyHelpers');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { stableCandidateIndex } = require('./outlineParser/shared');
@@ -711,6 +713,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let beats = plan.pages;
   let beatsReviewReport = null;
   const commissionedNames = (inputData?.characters || []).map(c => c && c.name).filter(Boolean);
+  // The counters must never read a PLACE as a person. The names come from the
+  // same authoritative data the planner itself was given — the resolved
+  // landmark list, the family's town, and (historical stories) the canonical
+  // locations and period objects — never from a word list or a prose pattern.
+  // Story job_1788614817116_vxnu60yjg entered "Uetliberg" and "Aussichtsturm
+  // Uetliberg" into the invented cast and manufactured six INVENTED_DOMINANT
+  // pages off it (docs/decisions.md, 2026-09-05).
+  const placeNames = collectPlaceNames(inputData, [
+    ...(inputData?.storyCategory === 'historical'
+      ? [...getHistoricalLocations(inputData.storyTopic), ...getHistoricalObjects(inputData.storyTopic)].map(e => e && e.name)
+      : []),
+  ]);
+  if (placeNames.length) log.debug(`[BEATS] plan counters know ${placeNames.length} place name(s) that can never be cast`);
   const maxCast = IMAGE_MODELS[inputData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
   const planCheckModel = modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel;
 
@@ -720,7 +735,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * rather than skipping the check entirely.
    */
   const runCheck = async (label, pages, planText) => {
-    const counters = runPlanCounters({ pages, commissionedNames, maxCharactersPerScene: maxCast });
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast });
     let modelFindings = [];
     let checkModelId = null;
     let prompt = null;

@@ -26405,3 +26405,61 @@ to `null` genuinely state no time of day, so `null` is the correct answer there.
 `tests/unit/season-and-visual-flow.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-05 — The plan counters get the story's place names; a landmark can never be invented cast
+
+**Context:** in `job_1788614817116_vxnu60yjg` (staging, Zurich, four boys and a
+hatched dragon) the beats plan check reported
+`PLAN[INVENTED_DOMINANT_EXCESS] page 1, 5, 7, 14, 17` and
+`PLAN[NO_COMMISSIONED_ON_PAGE] page 7, 17`, and the stored
+`beatsReviewReport.cast.invented` read
+`["Uetliberg", "Oppidum Uetliberg", "Alps", "Fünkli", "Aussichtsturm Uetliberg",
+"Weggli", "Fernsehturm Uetliberg"]` — one actual invented character and six
+places or objects. `resolveCast()` in `server/lib/planCounters.js` decided
+personhood with one heuristic: a capitalised token followed anywhere in the
+plan by a lowercase word "acts", therefore it is a person. A hill whose plan
+line reads "the Fernsehturm Uetliberg with its red lights" satisfies that
+exactly. The false cast inflated `castPerPage`, made half the book's pages
+"carried by invented characters", and pushed the re-plan in the wrong
+direction on p17.
+
+**Decision:** the counters are given the story's PLACE NAMES from the
+authoritative data the job already carries at that point, and a candidate that
+those names cover is never cast — whatever the plan grammar looks like.
+`collectPlaceNames(inputData, extraNames)` (new, in `planCounters.js`) reads
+`inputData.availableLandmarks[].name` (the `landmark_index` entries
+`storyJobPipeline` resolves for the family's town before the beats call),
+`inputData.userLocation.city/region/country`, and — for historical stories —
+the canonical `getHistoricalLocations()` / `getHistoricalObjects()` names.
+`resolveCast(pages, commissionedNames, placeNames)` and
+`runPlanCounters({ placeNames })` take the list; matching is whole-word and
+bidirectional, because the index stores a hill's structures rather than the
+hill ("Aussichtsturm Uetliberg", "Oppidum Uetliberg"), so the bare "Uetliberg"
+a plan line actually writes is only reachable as a token inside them.
+Commissioned names resolve first, so a character sharing a token with a
+landmark stays a character. The excluded names are reported as `cast.places`.
+
+**Rationale:** this is the same data the planner itself was handed in its
+prompt, so the counters and the planner now agree on what is a place — no word
+list, no prose pattern, nothing to tune per story. Replaying the stored plan
+lines through the fixed counters: `invented` goes from
+`[Uetliberg, Oppidum Uetliberg, Fünkli, Aussichtsturm Uetliberg, Fernsehturm
+Uetliberg]` to `[Fünkli]`, and the findings from `CAST_OVER_3 p5 /
+CAST_OVER_CEILING p5 / INVENTED_DOMINANT_EXCESS p1,5,7,14,17 /
+NO_COMMISSIONED_ON_PAGE p7,17` down to `NO_COMMISSIONED_ON_PAGE p7` (the
+whole-cast "all four boys" page, which names nobody — a true finding) plus one
+`CONSECUTIVE_SAME_SHOT_CAST`. **Known residual:** names with no authoritative
+source at this stage — "Alps", "Weggli" in this story — can still be read as
+invented cast. They are not in the landmark index and are not the town, so
+excluding them would mean either a hard-coded word list or a prose heuristic,
+both rejected. The model half of the plan check sees the same pages and can
+contradict the list.
+
+**Touched:** `server/lib/planCounters.js` (`collectPlaceNames`, `nameRe`,
+`resolveCast`, `runPlanCounters`), `server/lib/beatsPipeline.js` (collects the
+place names next to `commissionedNames` and passes them to both counter runs),
+`tests/unit/plan-counters.test.ts` (this story's plan lines as the fixture).
+**Status:** ✅ active
+
