@@ -9,7 +9,7 @@ You receive UP TO THREE images:
 
 Image LAST is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. Intended layout:
 
-  Row 1 (cells 1–4, top):     HEAD AND NECK ONLY. No shoulders, no torso, no arms, no clothing. Four facing angles: front, three-quarter, profile, back view with the head turned toward one shoulder (one eye and cheek visible — not a flat back-of-head).
+  Row 1 (cells 1–4, top):     HEAD AND NECK ONLY. No shoulders, no torso, no arms, no clothing. Four facing angles: front, three-quarter, profile, rear turn (shoulders away from camera, head rotated back to reveal one eye and cheek — never a second profile, never a flat back-of-head with no face).
   Row 2 (cells 5–8, bottom):  FULL BODY head to feet, wearing the requested costume. Same four facing angles.
 
 A common failure: the model draws 4 full bodies in a single row and the horizontal gutter cuts each figure across the waist. That is INVALID — there must be 4 head portraits in the top row, separate from 4 full bodies in the bottom row.

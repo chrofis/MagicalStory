@@ -1,14 +1,14 @@
 Create a reference sheet showing the SAME person in 8 panels arranged as 2 rows and 4 columns. Equal panel sizes. Light grey studio background. Each panel is self-contained: the figure, hair, limbs, shadow, and any clothing graphic stay fully inside their own panel, with plain light-grey gutters between panels that nothing touches or crosses.
 
 Row 1 (top) — face only (forehead to chin), in the ORIGINAL reference photo's style. No shoulders, no clothing visible.
-  Panel 1: face front. Panel 2: face turned 45° to camera's right. Panel 3: face profile (90° right). Panel 4: back view, head turned toward the right shoulder — one eye and cheek visible.
+  Panel 1: face front. Panel 2: face turned 45° to camera's right. Panel 3: face profile (90° right). Panel 4: rear turn — shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek show. Not a profile, not a flat back of the head.
 
 Row 2 (bottom) — full body from head to feet, in {ART_STYLE_PROMPT} style, wearing {COSTUME_DESCRIPTION}. Plain light-grey background, figure standing. Each bottom-row figure fits entirely inside its panel with empty margin above the head and below the shoes; both feet and shoes fully visible; never cropped at the thigh, knee, or ankle.
-  Panel 5: full body front. Panel 6: full body turned 45° right. Panel 7: full body side profile (90° right). Panel 8: full body back view, head turned toward the right shoulder — one eye and cheek visible.
+  Panel 5: full body front. Panel 6: full body turned 45° right. Panel 7: full body side profile (90° right). Panel 8: full body rear turn — shoulders and body fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek show. Not a profile, not a flat back view.
 
 Same person in every panel. Hair colour matches the reference photo exactly. If the reference person wears glasses, include glasses in all 8 panels; if not, none. Body proportions match the age below.
 
-Show only the person and the requested clothing. No arrows, symbols, letters, numbers, logos, badges, motifs, or decorative marks anywhere on skin, hair, face, or clothing. Back-view panels show plain hair and plain clothing, plus the sliver of face the head turn reveals.
+Show only the person and the requested clothing. No arrows, symbols, letters, numbers, logos, badges, motifs, or decorative marks anywhere on skin, hair, face, or clothing. Rear-turn panels show plain hair and plain clothing, plus the sliver of face the head turn reveals.
 
 PHYSICAL TRAITS TO PRESERVE:
 {PHYSICAL_TRAITS}
