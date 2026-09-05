@@ -171,7 +171,18 @@ folded whole-word overlap; same usable/never-a-setting filters, class > 0,
 `resolveAvailableLandmarks(location, opts)` is the **single entry point** for both
 the ideas route and the story pipeline. `getIndexedLandmarks()` tries in order:
 
-1. exact town-name match (locality **or** municipality/nearest_city, diacritics folded)
+1. exact town-name match, in two rungs (since 2026-09-05, owner's call):
+   - **1a own locality** — rows whose `locality` is the town, plus rows with
+     `locality IS NULL` inside a `municipality` of that name (Nominatim zoom 14
+     returns no sub-locality for the town proper: 33 of Baden's 40 rows are
+     NULL and mean Baden itself). Served alone when it has at least
+     `MIN_OWN_LOCALITY_ROWS` (5) usable rows — a Baden story no longer gets
+     Turgi's station and church, merged into Baden's commune in 2024.
+   - **1b municipality-wide** — otherwise `TOWN_MATCHES_SQL` (locality **or**
+     municipality/nearest_city) widened to the commune the own rows name in
+     `municipality`, own-locality rows first (`LOCALITY_FIRST_SQL`). Turgi's
+     three widen to all of Baden; a village with no own row and no known
+     commune gets the plain name match as before.
 2. comma-normalised match — `Bremgarten Aargau` → `Bremgarten, Aargau`
 3. first-word match — `Bremgarten` from `Bremgarten Aargau`
 4. **proximity** at 20 → 50 → 100 km (only when lat/lon are numbers)

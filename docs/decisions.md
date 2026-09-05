@@ -26081,3 +26081,40 @@ from disk — a few seconds of cold start against a run that takes half an hour.
 
 **Status:** ✅ mechanism measured on staging before shipping. Applies wherever the
 analyzer runs — so it lands on production together with the service split.
+
+## 2026-09-05 — Town-name landmark lookup serves the locality alone; the commune only when it has fewer than 5
+
+**Context:** Swiss municipal mergers (Turgi into Baden 2024, Baldingen into
+Zurzach 2022) make `municipality` lump villages together, and the 2026-08-28
+rule matched either name with own-village rows merely ranked first. A Baden
+story was offered Bahnhof Turgi and Reformierte Kirche Turgi. Owner decision
+2026-09-05 (AskUserQuestion): a town-name lookup serves ONLY that locality's
+rows and widens to the whole municipality only when the locality has fewer
+than 5 usable landmarks.
+
+**Decision:** `getIndexedLandmarks` rung 1 is split. Rung 1a (`OWN_LOCALITY_SQL`)
+matches `locality = town`, or `locality IS NULL` inside a municipality of that
+name — in prod every Baden row has `locality_updated_at` set but 33 of 40 are
+NULL, because Nominatim zoom 14 returns no sub-locality for the town proper;
+NULL inside X means X itself (Ruine Stein, Stadtturm, Holzbrücke). If rung 1a
+returns fewer than `MIN_OWN_LOCALITY_ROWS = 5`, rung 1b runs the existing
+`TOWN_MATCHES_SQL`, extended to the commune named in the own rows'
+`municipality` (`$3`), own-locality rows first via `LOCALITY_FIRST_SQL`. The
+rung that served is logged. Later rungs (comma/first-word, weak-row guard,
+proximity) are unchanged.
+
+**Rationale:** ordering could not separate a village from its commune once
+the ideas prompt hands the model the top 10 and lets it pick on narrative fit.
+Exclusion with a floor keeps the 2026-08-28 coverage argument intact: the 327
+municipalities whose only landmarks are tagged with a hamlet still widen,
+because a locality with under 5 rows always does. Verified read-only on prod:
+Baden → 27 rows, none Turgi/Dättwil/Ennetbaden; Turgi → its own 4 first, then
+Baden's (widened via `municipality=Baden`); Bad Zurzach → its 9 own rows only;
+Bern → 30 own; Endingen → 3 (its rows are tagged locality Unterendingen,
+rung 1a empty, plain widening). Baldingen returns 0 by name exactly as before:
+no prod row carries `locality=Baldingen` (its aerial and Ruine Böbikon are
+tagged Böbikon), so it falls to proximity — a tagging gap, not a serving one.
+
+**Touched:** `server/lib/landmarkPhotos.js` (`MIN_OWN_LOCALITY_ROWS`,
+`OWN_LOCALITY_SQL`, `getIndexedLandmarks`), `docs/landmark-database.md` §7.
+**Status:** ✅ active

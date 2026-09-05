@@ -2537,6 +2537,20 @@ const NORM_SQL = t => `LOWER(translate(${t}, 'üùäàâöôéèêëîïçñß',
 const TOWN_MATCHES_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
   OR ${NORM_SQL('coalesce(municipality, nearest_city)')} = $1)`;
 
+// Ranking below the commune was not separation enough (owner's call,
+// 2026-09-05): a Baden story was set at Turgi's station and church, both
+// inside Baden's commune since the 2024 merger. So the town-name lookup serves
+// the locality ALONE first and widens to the commune only when the locality
+// has fewer than MIN_OWN_LOCALITY_ROWS usable landmarks (Turgi's three widen
+// to Baden; Baldingen's two widen to Zurzach).
+//
+// A NULL locality inside commune X means X itself: Nominatim zoom 14 returns
+// no sub-locality for the town proper (33 of Baden's 40 rows — Ruine Stein,
+// Stadtturm, Holzbrücke), while Turgi, Dättwil and Ennetbaden rows carry theirs.
+const MIN_OWN_LOCALITY_ROWS = 5;
+const OWN_LOCALITY_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
+  OR (locality IS NULL AND ${NORM_SQL('coalesce(municipality, nearest_city)')} = $1))`;
+
 // A landmark the premise NAMES is pinned to the front of the offered list
 // (resolveAvailableLandmarks `premiseText`). The rule is lexical only: strip a
 // trailing "(Town)" disambiguator, fold accents and case, drop the generic
@@ -2736,16 +2750,42 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // Normalize diacritics on both sides (e.g. "Zurich" matches "Zürich")
     const normalizedCity = normalizeForCompare(city);
 
-    // Exact match on either name the row lives under; own-village rows rank first.
+    // Rung 1a: the locality alone. Rung 1b: the whole commune, own-locality
+    // rows first — only when the locality has too few of its own.
     let result = await pool.query(`
       SELECT * FROM landmark_index
-      WHERE ${TOWN_MATCHES_SQL}
+      WHERE ${OWN_LOCALITY_SQL}
         AND ${NEVER_A_SETTING_SQL}
         AND ${JUDGED_USABLE_SQL}
         AND ${HAS_PHOTO_SQL}
-      ORDER BY ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
+      ORDER BY ${LANDMARK_RANK_SQL}, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
+    if (result.rows.length >= MIN_OWN_LOCALITY_ROWS) {
+      log.info(`[LANDMARK-INDEX] Own-locality match: "${city}" has ${result.rows.length} landmarks of its own`);
+    } else {
+      const own = result.rows.length;
+      // The commune a village belongs to is only known from its own rows
+      // (Turgi rows say municipality=Baden); $3 is that name, or $1 again.
+      const communeOf = ownRows => {
+        const counts = new Map();
+        for (const r of ownRows) if (r.municipality) counts.set(r.municipality, (counts.get(r.municipality) || 0) + 1);
+        return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      };
+      const commune = normalizeForCompare(communeOf(result.rows) || city);
+      result = await pool.query(`
+        SELECT * FROM landmark_index
+        WHERE (${TOWN_MATCHES_SQL} OR ${NORM_SQL('coalesce(municipality, nearest_city)')} = $3)
+          AND ${NEVER_A_SETTING_SQL}
+          AND ${JUDGED_USABLE_SQL}
+          AND ${HAS_PHOTO_SQL}
+        ORDER BY ${LOCALITY_FIRST_SQL}, ${LANDMARK_RANK_SQL}, name ASC
+        LIMIT $2
+      `, [normalizedCity, limit, commune]);
+      if (result.rows.length > 0) {
+        log.info(`[LANDMARK-INDEX] Municipality-wide match: "${city}" has ${own} own landmarks (< ${MIN_OWN_LOCALITY_ROWS}), widened to ${result.rows.length} via "${commune}"`);
+      }
+    }
 
     // Fallback: comma-normalized exact match (e.g. "Bremgarten Aargau" matches "Bremgarten, Aargau")
     if (result.rows.length === 0) {
