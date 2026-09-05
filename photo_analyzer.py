@@ -501,6 +501,12 @@ def session_reset():
     with _request_lock:
         _active_sessions = 0
     kill_workers('session reset (Node boot)')
+    # Same reasoning as the idle reap: the workers are gone, so their library
+    # mappings are gone and the page cache is droppable. This path matters MORE,
+    # not less — it is the recovery route for a session that leaked (a crashed
+    # job, a killed generation), which is exactly the case where the idle reaper
+    # never fired and the cache has been sitting billed since.
+    _drop_file_cache_async('session reset (Node boot)')
     return jsonify({"success": True, "active": 0})
 
 
@@ -1775,17 +1781,52 @@ def _release_memory():
 # IS on the critical path (character photo upload calls /remove-bg), so a
 # restart window means a failed upload for whoever is mid-signup. This reaches
 # the same end state with no availability gap.
-_CACHE_DROP_ROOTS = [
-    '/usr/local/lib/python3.11/dist-packages',
-    '/usr/lib/python3/dist-packages',
-    '/app',
-]
+def _cache_drop_roots():
+    """Where the resident bytes actually are, resolved rather than hardcoded.
+
+    A literal '/usr/local/lib/python3.11/dist-packages' silently stops matching
+    the day the base image moves to 3.12 — and it would fail OPEN: the sweep
+    would report success having advised nothing, and the cache would quietly
+    come back. site.getsitepackages() asks the interpreter that is actually
+    running.
+    """
+    roots = []
+    try:
+        import site
+        roots.extend(site.getsitepackages() or [])
+    except Exception:
+        pass
+    try:
+        import sysconfig
+        for key in ('purelib', 'platlib'):
+            p = sysconfig.get_paths().get(key)
+            if p:
+                roots.append(p)
+    except Exception:
+        pass
+    roots.append(os.path.dirname(os.path.abspath(__file__)))  # /app
+    # De-duplicate while keeping order, and drop anything nested in an earlier
+    # root so os.walk does not cover the same tree twice.
+    out = []
+    for r in roots:
+        if not r or not os.path.isdir(r):
+            continue
+        if any(r == k or r.startswith(k.rstrip('/') + '/') for k in out):
+            continue
+        out.append(r)
+    return out
+
+
+# One sweep at a time. Two overlapping walks of ~74k inodes would double the
+# work to reach the same end state, and the reap path can fire from several
+# request teardowns at once.
+_cache_drop_lock = threading.Lock()
 
 
 def drop_file_cache(roots=None):
     """Hand back the page cache of files nothing is using. Returns (files, ms)."""
     started = time.time()
-    roots = roots or _CACHE_DROP_ROOTS
+    roots = roots or _cache_drop_roots()
     touched = 0
     for root in roots:
         if not os.path.isdir(root):
@@ -1810,13 +1851,37 @@ def drop_file_cache(roots=None):
     return touched, int((time.time() - started) * 1000)
 
 
+def _cgroup_file_mb():
+    """Cgroup page cache in MB, or None off-Linux. This is the number billed."""
+    for path in ('/sys/fs/cgroup/memory.stat', '/sys/fs/cgroup/memory/memory.stat'):
+        try:
+            with open(path) as fh:
+                for line in fh:
+                    key, _, value = line.partition(' ')
+                    if key in ('file', 'cache'):
+                        return int(value) / 1048576.0
+        except OSError:
+            continue
+    return None
+
+
 def _drop_file_cache_async(reason):
     """Run the sweep off the request path — it walks a few thousand inodes."""
     def _run():
-        before = _rss_mb()
-        touched, ms = drop_file_cache()
-        print(f"[CACHE-DROP] {reason}: advised {touched} file(s) in {ms}ms "
-              f"(process rss {before:.1f}MB — the win is cgroup file cache, not rss)")
+        if not _cache_drop_lock.acquire(blocking=False):
+            print(f"[CACHE-DROP] {reason}: skipped, a sweep is already running")
+            return
+        try:
+            before = _cgroup_file_mb()
+            touched, ms = drop_file_cache()
+            after = _cgroup_file_mb()
+            # Report the cgroup delta, not RSS: RSS is this process's anonymous
+            # memory and does not move here. Reporting RSS would make a working
+            # sweep look like a no-op.
+            delta = ('%.0f → %.0f MB' % (before, after)) if before is not None and after is not None else 'cgroup unreadable'
+            print(f"[CACHE-DROP] {reason}: advised {touched} file(s) in {ms}ms — page cache {delta}")
+        finally:
+            _cache_drop_lock.release()
     threading.Thread(target=_run, daemon=True, name='cache-drop').start()
 
 

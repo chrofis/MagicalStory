@@ -26118,3 +26118,43 @@ tagged Böbikon), so it falls to proximity — a tagging gap, not a serving one.
 **Touched:** `server/lib/landmarkPhotos.js` (`MIN_OWN_LOCALITY_ROWS`,
 `OWN_LOCALITY_SQL`, `getIndexedLandmarks`), `docs/landmark-database.md` §7.
 **Status:** ✅ active
+
+---
+
+## 2026-09-05 — Cache-drop hardening: reset path, derived roots, one sweep at a time
+
+Three defects in the cache-drop shipped hours earlier (entry above), found by
+testing the automatic path rather than the mechanism:
+
+1. **`/session/reset` killed workers without dropping the cache.** That is the
+   RECOVERY path for a leaked session — a crashed job, a killed generation —
+   which is precisely the case where the idle reaper never fired and the cache
+   has been sitting billed ever since. It mattered more than the happy path, and
+   it was the one route without the hook.
+2. **The package directory was hardcoded to `python3.11`.** It would fail OPEN
+   the day the base image moves to 3.12: the sweep reports success having
+   advised nothing, and the cache quietly returns. Now resolved from
+   `site.getsitepackages()` + `sysconfig`, de-duplicated, with nested roots
+   dropped so `os.walk` cannot cover a tree twice.
+3. **Concurrent sweeps were possible** — the reap fires from request teardown,
+   which can happen on several threads at once. Now a non-blocking lock; a
+   second sweep logs and returns instead of duplicating a 74k-inode walk.
+
+Also: the log line reported process RSS, which does not move during a cache drop
+— a working sweep looked like a no-op. It now reports the cgroup `file` delta,
+which is the number Railway bills.
+
+**Verified on staging** (deployed code, automatic path, session count driven to
+zero exactly as a finishing story does):
+
+```
+  before session/end   file 2,337 MB   anon 2,297 MB   sessions=1
+  after  session/end   file   168 MB   anon    49 MB   sessions=0
+```
+
+~4.4 GB returned with no restart: 2,169 MB of page cache by the new hook, 2,248
+MB of anon by the pre-existing worker reap.
+
+**Touched files:** `photo_analyzer.py`
+
+**Status:** ✅ active on staging
