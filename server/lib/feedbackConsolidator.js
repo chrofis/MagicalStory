@@ -33,6 +33,8 @@ function buildFeedbackInput({
   readerFindings = [],
   bboxFigures = [],
   characterDescriptions = {},
+  // Era-aware landmark protection for this page (computeLandmarkProtection).
+  landmarkProtection = null,
 }) {
   const parts = [];
 
@@ -50,6 +52,12 @@ function buildFeedbackInput({
     }
   }
   parts.push('');
+
+  if (landmarkProtection?.protect) {
+    parts.push('## Landmark elements — PRESENT BY DESIGN (never remove)');
+    parts.push(`This page was rendered from a reference photo of ${landmarkProtection.names.join(', ')}, and the story is set in the present day. The terrain, skyline, towers, masts, antennas, buildings and other built structures of that real place belong on this page. Never write a fix that removes them, replaces the background, or "restores" a historical look — list them under scene_fix.preserve instead.`);
+    parts.push('');
+  }
 
   parts.push('## Detected figures in the image (from bbox detector)');
   if (bboxFigures.length === 0) {
@@ -251,6 +259,12 @@ async function consolidateFeedback({
   // inspect any past call later without reconstructing from partial state.
   storyId = null,
   round = null,
+  // Era-aware landmark protection inputs (2026-09-05). When this page was
+  // rendered from a real landmark photo AND the story is not historical, the
+  // landmark's structures are protected: removal findings are dropped and the
+  // names are seeded into scene_fix.preserve. See server/lib/landmarkProtection.js.
+  landmarkPhotos = null,
+  era = null,
   // Model override — defaults to the configured eval model (resolveEvalModel,
   // key-guarded). The A/B replay passes an explicit model to compare.
   modelOverride = null,
@@ -270,16 +284,22 @@ async function consolidateFeedback({
     // each evaluator's findings appear under its own section (and the
     // consolidator's `sources` attribution is accurate). threeStageResult is
     // the single source for compliance; the tagged copies are display-only.
+    const {
+      computeLandmarkProtection, filterProtectedRemovals, seedPreserveWithLandmarks,
+    } = require('./landmarkProtection');
+    const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
+    const guard = (list, label) => filterProtectedRemovals(list, landmarkProtection, { pageNumber, label }).kept;
+
     const rawFixable = evaluation.fixableIssues || [];
-    const fixableIssues = rawFixable.filter(i => i?.source !== 'three-stage');
-    const complianceIssues =
+    const fixableIssues = guard(rawFixable.filter(i => i?.source !== 'three-stage'), '[CONSOLIDATOR quality]');
+    const complianceIssues = guard(
       evaluation.threeStageResult?.fixableIssues ||
       evaluation.threeStageResult?.issues ||
-      rawFixable.filter(i => i?.source === 'three-stage');
-    const semanticIssues =
+      rawFixable.filter(i => i?.source === 'three-stage'), '[CONSOLIDATOR compliance]');
+    const semanticIssues = guard(
       evaluation.semanticResult?.semanticIssues ||
       evaluation.semanticResult?.issues ||
-      [];
+      [], '[CONSOLIDATOR semantic]');
     const bboxFigures = evaluation.bboxDetection?.figures || evaluation.bboxDetection?.detectionHistory?.figures || [];
 
     // Entity issues: pre-flattened list wins; else flatten the report and
@@ -342,6 +362,7 @@ async function consolidateFeedback({
       readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
       bboxFigures,
       characterDescriptions,
+      landmarkProtection,
     });
 
     // Text-only — no image passed. The consolidator's job is to dedupe / sort /
@@ -384,6 +405,15 @@ async function consolidateFeedback({
     // honor. Coerce to a strict boolean so decideRepairMethod can gate on it
     // without truthiness surprises from a stray string.
     plan.scene_fix.requires_regeneration = plan.scene_fix.requires_regeneration === true;
+    // Seed the preserve list with the landmark names, unconditionally, on a
+    // protected page. The consolidator writes preserve from the scene prose and
+    // never names the landmark (job_1788614817116 p2: six prose items, no
+    // landmark), so the fixer had nothing telling it the towers on the ridge
+    // were the point of the page.
+    const seeded = seedPreserveWithLandmarks(plan, landmarkProtection);
+    if (seeded.length) {
+      log.info(`🏛️  [LANDMARK-GUARD] ${pageNumber != null ? `P${pageNumber}` : 'page'}: seeded scene_fix.preserve with ${seeded.join(', ')}`);
+    }
     if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
 
     // Final score (0-100) — the consolidator's deduplicated, tolerant judgment.
@@ -596,6 +626,9 @@ async function consolidateEvaluation({
   storyId = null,
   pageNumber = null,
   round = null,
+  // Era-aware landmark protection — forwarded to consolidateFeedback.
+  landmarkPhotos = null,
+  era = null,
   // Forwarded to consolidateFeedback so the Test Lab can A/B the consolidator's
   // model and rules without touching the shipped pipeline.
   modelOverride = null,
@@ -605,13 +638,20 @@ async function consolidateEvaluation({
     return { plan: null, dedupedIssues: null, usage: null, error: 'no evalResult', skipped: true };
   }
 
+  // Count what SURVIVES the landmark guard — otherwise a page whose only
+  // finding is a protected landmark removal still pays for a consolidator call
+  // that can only produce an empty plan.
+  const { computeLandmarkProtection, filterProtectedRemovals } = require('./landmarkProtection');
+  const countProtection = computeLandmarkProtection({ landmarkPhotos, era });
+  const surviving = (list) => filterProtectedRemovals(list, countProtection, { pageNumber, quiet: true }).kept.length;
+
   const rawFixable = evalResult.fixableIssues || [];
-  const qualityCount = rawFixable.filter(i => i?.source !== 'three-stage').length;
-  const complianceCount = (evalResult.threeStageResult?.fixableIssues
+  const qualityCount = surviving(rawFixable.filter(i => i?.source !== 'three-stage'));
+  const complianceCount = surviving(evalResult.threeStageResult?.fixableIssues
     || evalResult.threeStageResult?.issues
-    || rawFixable.filter(i => i?.source === 'three-stage')).length;
-  const semanticCount = (evalResult.semanticResult?.semanticIssues
-    || evalResult.semanticResult?.issues || []).length;
+    || rawFixable.filter(i => i?.source === 'three-stage'));
+  const semanticCount = surviving(evalResult.semanticResult?.semanticIssues
+    || evalResult.semanticResult?.issues || []);
   const entityCount = Array.isArray(entityIssues) ? entityIssues.length : 0;
   // A page the evaluators like but the READER flagged must still reach the
   // model — skipping on the evaluator counts alone would discard the audit.
@@ -640,6 +680,8 @@ async function consolidateEvaluation({
     sceneClothing,
     storyId,
     round,
+    landmarkPhotos,
+    era,
     modelOverride,
     promptOverride,
   });

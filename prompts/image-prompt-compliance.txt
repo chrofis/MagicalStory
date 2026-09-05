@@ -12,6 +12,8 @@ You are an Illustration QA Scoring Analyst. You have NOT seen the image. Base al
 7. CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied): {CLOTHING_CONTRACT}
 8. EXPECTED AGES (how old each character is — empty if not supplied):
    {EXPECTED_AGES}
+9. LANDMARK CONTEXT (empty when this page carries no real-world landmark reference):
+   {LANDMARK_CONTEXT}
 
 ---
 

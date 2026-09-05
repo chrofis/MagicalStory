@@ -79,6 +79,10 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
         storyId: ctx.storyId || null,
         pageNumber: ctx.pageNumber ?? null,
         round: ctx.round ?? null,
+        // Era-aware landmark protection (2026-09-05) — callers that know the
+        // page's landmark refs + era pass them on the consolidation context.
+        landmarkPhotos: ctx.landmarkPhotos || null,
+        era: ctx.era || null,
       });
       if (res.plan) consolidatedPlan = res.plan;
       else if (res.error) log.warn(`🧠 [EVAL-CONSOLIDATION] ${ctx.pageNumber != null ? `P${ctx.pageNumber}` : 'version'}: failed (${res.error}) — scoring falls back to raw issues`);
@@ -779,7 +783,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     try {
       regenQuality = await evaluateImageQuality(
         genResult.imageData, imagePrompt, referencePhotos, 'scene', null,
-        `PAGE ${pageNumber}`, null, null, sceneCharacters, {}
+        `PAGE ${pageNumber}`, null, null, sceneCharacters,
+        // Era-aware landmark protection — the refs this regen rendered from.
+        { landmarkPhotos: pageLandmarkPhotos || null, era: sceneMetadata?.era || null }
       );
     } catch (evalErr) {
       log.warn(`⚠️ [REGEN] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored version`);

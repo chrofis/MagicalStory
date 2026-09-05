@@ -574,7 +574,11 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       const evalRes = await evaluateImageQuality(
         result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), 'scene',
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
+        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+        {
+          landmarkPhotos: ctx.scene.landmarkPhotos || null,
+          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+        }
       );
       if (evalRes) {
         scores = {
@@ -707,6 +711,9 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
       // template to test the over-strict-CRITICAL problem.
       complianceModelOverride: params.complianceModel || null,
       compliancePromptOverride: params.compliancePrompt || null,
+      // Era-aware landmark protection (2026-09-05) — Lab parity with production.
+      landmarkPhotos: ctx.scene.landmarkPhotos || null,
+      era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
     }
   );
   const elapsedMs = Date.now() - t0;
@@ -816,7 +823,11 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
         imageData, sceneDescription, referencePhotos, 'scene',
         null, `testlab-var${experimentId}-P${ctx.pageNumber}-r${i}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        { artStyle }
+        {
+          artStyle,
+          landmarkPhotos: ctx.scene.landmarkPhotos || null,
+          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+        }
       );
     } catch (err) { error = err.message; }
     const elapsedMs = Date.now() - t0;
@@ -861,6 +872,8 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
           evalResult, entityIssues: [],
           sceneDescription, characters: ctx.characters || [],
           storyId: ctx.storyId, pageNumber: ctx.pageNumber, round: i,
+          landmarkPhotos: ctx.scene?.landmarkPhotos || null,
+          era: require('./landmarkProtection').resolveSceneEra(ctx.scene?.sceneMetadata),
         });
         plan = res.plan || null;
         if (res.error) consolidateError = res.error;
@@ -4181,6 +4194,10 @@ async function runConsolidateStage(ctx, { promptOverride, experimentId, params =
     storyId: ctx.storyId,
     pageNumber: ctx.pageNumber,
     round: 0,
+    // Era-aware landmark protection (2026-09-05) — the page's stored landmark
+    // refs + its scene era, so Lab repair stages reproduce production.
+    landmarkPhotos: ctx.scene.landmarkPhotos || null,
+    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
     // A/B knobs: `promptOverride` swaps the consolidator's rules (severity
     // policy, dedupe, MINOR definition); `params.model` swaps the model that
     // applies them (shipped default is the configured eval model).
@@ -4233,6 +4250,10 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     clothingRequirements: storyData.clothingRequirements || null,
     storyId: ctx.storyId,
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+    // Era-aware landmark protection (2026-09-05) — the page's stored landmark
+    // refs + its scene era, so Lab repair stages reproduce production.
+    landmarkPhotos: ctx.scene.landmarkPhotos || null,
+    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
@@ -4399,7 +4420,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
         img.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}-composite`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        { artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null) },
+        {
+          artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
+          landmarkPhotos: ctx.scene.landmarkPhotos || null,
+          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+        },
       );
       if (!ev) throw new Error('evalRepair: the evaluator returned nothing');
       const RANK = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1 };
@@ -4662,6 +4687,8 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
         storyId: ctx.storyId,
         pageNumber: ctx.pageNumber,
         round: 0,
+        landmarkPhotos: ctx.scene.landmarkPhotos || null,
+        era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
       });
       if (cons?.plan) fresh.consolidatedPlan = cons.plan;
     } catch (cErr) {

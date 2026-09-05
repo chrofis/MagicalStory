@@ -2296,6 +2296,10 @@ async function evaluateImageBatch(images, options = {}) {
           // (expectedText / textMode) — see evaluateImageQuality's cover branch.
           expectedText: img.expectedText ?? null,
           textMode: img.textMode ?? null,
+          // Era-aware landmark protection: set by buildEvalInputs in the repair
+          // pipeline (landmark refs + scene era). Absent → no protection.
+          landmarkPhotos: img.landmarkPhotos || null,
+          era: img.era || null,
           storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
@@ -2634,6 +2638,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // path uses. Without this, inpaint can paint a face/hat into the calm
     // zone when the bbox happens to overlap it.
     textPosition = null,
+    // Era-aware landmark protection (2026-09-05): the real-landmark refs this
+    // page was rendered from + the story era. Forwarded to the consolidator so
+    // a present-day landmark's own structures are never removed by an unmasked
+    // whole-frame edit. See server/lib/landmarkProtection.js.
+    landmarkPhotos = null,
+    era = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -2761,6 +2771,8 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     sceneClothing,
     storyId,
     round,
+    landmarkPhotos,
+    era,
   });
 
   // Decide the instruction to send Grok.
@@ -3995,7 +4007,12 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       try {
         iterQuality = await evaluateImageQuality(
           genResult.imageData, imagePrompt, refApplied.characterPhotos, 'scene', null,
-          iterLabel, null, null, sceneCharacters, {}
+          iterLabel, null, null, sceneCharacters, {
+            // Era-aware landmark protection — iterate uses the same refs it
+            // just rendered from and the era it resolved above.
+            landmarkPhotos: refApplied.landmarkPhotos || null,
+            era: iterateSceneMetadata?.era || null,
+          }
         );
         if (usageTracker && iterQuality?.usage) {
           usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);

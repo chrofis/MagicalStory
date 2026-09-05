@@ -544,7 +544,15 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     compliancePromptOverride = null,  // Stage-2 template A/B
     artStyle = null,                  // resolved style — same value the quality eval gets
     clothingContract = null,          // per-character outfit block — same value the quality eval gets
+    // Era-aware landmark protection (2026-09-05). A page rendered from a real
+    // landmark photo in a present-day story must not have that landmark's
+    // structures classified as unrequested/modern; a historical page keeps the
+    // era guard's semantics so modern infrastructure stays a finding.
+    landmarkPhotos = null,
+    era = null,
   } = options;
+  const { computeLandmarkProtection, buildLandmarkComplianceBlock, filterProtectedRemovals } = require('./landmarkProtection');
+  const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   // No vision template here any more: Stage 1 is the shared blind inventory,
@@ -639,7 +647,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       VISUAL_INVENTORY: visionText,
       QUALITY_FIGURES: qualityFiguresBlock,
       INTERACTIONS_BLOCK: interactionsBlock,
-      STORY_TEXT: (storyText || '(not provided)').substring(0, 2000)
+      STORY_TEXT: (storyText || '(not provided)').substring(0, 2000),
+      LANDMARK_CONTEXT: buildLandmarkComplianceBlock(landmarkProtection) || '(none)'
     });
 
     const { callTextModel } = require('./textModels');
@@ -706,6 +715,13 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Never-CRITICAL gate on identity-absence findings (see helper above):
     // presence is an INPUT to this blind judge, never its judgment.
     capComplianceIdentitySeverity(fixableIssues);
+    // Era-aware landmark guard: on a present-day page carrying a real landmark
+    // photo, an `object_presence` removal finding would drive an unmasked
+    // whole-frame edit that erases the real place. Dropped here so the penalty
+    // never reaches the score either (v0 of job_1788614817116 p2 scored 55
+    // against a repaired-and-wrong v1's 83 precisely because of this finding).
+    const guarded = filterProtectedRemovals(fixableIssues, landmarkProtection, { pageNumber: pageContext || null, label: '[THREE-STAGE]' });
+    fixableIssues = guarded.kept;
   }
 
   // THE SCORE IS THE DEFECTS (owner, 2026-08-08). Same 0-10 rubric as the
@@ -964,6 +980,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         compliancePromptOverride: evalOptions.compliancePromptOverride || null,
         artStyle: artStyleForEval,
         clothingContract: clothingContractBlock,
+        // Era-aware landmark protection inputs (2026-09-05). Callers that know
+        // the page's landmark refs + era pass them; everything else defaults to
+        // no protection, i.e. unchanged behaviour.
+        landmarkPhotos: evalOptions.landmarkPhotos || null,
+        era: evalOptions.era || null,
       });
       log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
     }

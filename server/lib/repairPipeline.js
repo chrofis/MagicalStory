@@ -301,6 +301,9 @@ async function collectStyleRefSheets(page, rawImages, characters, artStyle) {
 }
 
 async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
+  // Era-aware landmark protection (owner ruling 2026-09-05) — see
+  // server/lib/landmarkProtection.js for the full evidence trail.
+  const { resolveSceneEra, computeLandmarkProtection, filterProtectedRemovals } = require('./landmarkProtection');
   const {
     characters = [],
     modelOverrides = {},
@@ -404,6 +407,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneCharacters: entry.sceneCharacters || orig.sceneCharacters,
       sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
       pageText: orig.text,
+      // Era-aware landmark protection (2026-09-05): the real-landmark refs this
+      // page was rendered from + the story era. The compliance judge uses them
+      // to keep a present-day landmark's own structures out of `object_presence`.
+      landmarkPhotos: orig.landmarkPhotos || null,
+      era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
       // SCENE_HINT = what the image was MADE from (2026-08-31). Pages were
       // judged against the beats SCENE (scene.sceneHint) while the render
       // obeyed the Art Director brief — job_1788123310558 p6 got a CRITICAL
@@ -594,6 +602,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       pageText: img.text,
+      landmarkPhotos: img.landmarkPhotos || null,
+      era: resolveSceneEra(img.sceneMetadata),
       // Same SCENE_HINT rule as buildEvalInputs above: the AD brief for
       // pages, the cover brief (scene.outlineExtract) for covers.
       sceneHint: img.scene?.outlineExtract || img.sceneDescription || img.scene?.sceneHint || null,
@@ -733,6 +743,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         storyId: consolidatorStoryId,
         pageNumber,
         round,
+        // Era-aware landmark protection: drops `object_presence` removal
+        // findings on a present-day page carrying a real landmark, and seeds
+        // scene_fix.preserve with the landmark names.
+        landmarkPhotos: orig?.landmarkPhotos || null,
+        era: resolveSceneEra(orig?.sceneMetadata),
       });
       if (res.usage && usageTracker) {
         usageTracker('anthropic', res.usage, 'eval_consolidation', 'claude-sonnet');
@@ -1088,7 +1103,44 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       } catch (e) { /* fall back: inpaint the served image, no restamp */ }
     }
-    const result = await images().inpaintPage(inputImage, latestEval || {}, {
+    // ---------------------------------------------------------------------
+    // HARD GUARD (owner ruling 2026-09-05). An `object_presence` removal on a
+    // page carrying real landmark photos in a NON-HISTORICAL era must never
+    // execute — inpaint dispatches it as an UNMASKED whole-frame edit
+    // (targetBbox null) that repaints the whole background and erases the real
+    // place. job_1788614817116_vxnu60yjg p2: "Remove red-white transmission
+    // tower and grey-red tower from background" wiped the Uetliberg Fernsehturm
+    // and Uto Kulm spire off the ridge, and the erased version scored HIGHER.
+    // The finding is dropped with a WARN naming the page and the landmark —
+    // loudly, never silently. Belt-and-braces: the compliance eval and the
+    // consolidator already drop it upstream; this is the last gate before Grok.
+    // ---------------------------------------------------------------------
+    let inpaintEval = latestEval || {};
+    {
+      const prot = computeLandmarkProtection({
+        landmarkPhotos: img.landmarkPhotos || null,
+        era: resolveSceneEra(img.sceneMetadata),
+      });
+      if (prot.protect && inpaintEval && typeof inpaintEval === 'object') {
+        const ctx = { pageNumber: img.pageNumber, label: '[INPAINT dispatch]' };
+        const fx = filterProtectedRemovals(inpaintEval.fixableIssues || [], prot, ctx);
+        const sem = filterProtectedRemovals(
+          inpaintEval.semanticResult?.semanticIssues || inpaintEval.semanticResult?.issues || [], prot, ctx);
+        const cmp = filterProtectedRemovals(inpaintEval.threeStageResult?.fixableIssues || [], prot, ctx);
+        if (fx.dropped.length || sem.dropped.length || cmp.dropped.length) {
+          inpaintEval = { ...inpaintEval, fixableIssues: fx.kept };
+          if (inpaintEval.semanticResult) {
+            inpaintEval.semanticResult = { ...inpaintEval.semanticResult };
+            if (Array.isArray(inpaintEval.semanticResult.semanticIssues)) inpaintEval.semanticResult.semanticIssues = sem.kept;
+            if (Array.isArray(inpaintEval.semanticResult.issues)) inpaintEval.semanticResult.issues = sem.kept;
+          }
+          if (inpaintEval.threeStageResult) {
+            inpaintEval.threeStageResult = { ...inpaintEval.threeStageResult, fixableIssues: cmp.kept };
+          }
+        }
+      }
+    }
+    const result = await images().inpaintPage(inputImage, inpaintEval, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
       entityReport: currentEntityReport,
@@ -1102,6 +1154,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       round: roundNum,
       aspectRatio: sceneAspect,
       textPosition: pageTextPosition,
+      // Era-aware landmark protection for inpaint's own consolidator call.
+      landmarkPhotos: img.landmarkPhotos || null,
+      era: resolveSceneEra(img.sceneMetadata),
     });
     // Re-composite the cover text onto the repainted textless art (reuses
     // composeCover). The served image keeps its title; artImageData is the new
