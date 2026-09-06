@@ -29616,3 +29616,20 @@ on rung 1a; Turgi still 1b with its own rows first.
 rungs; `TOWN_SQL` removed), `client/src/pages/wizard/WizardStep3BookSettings.tsx`,
 `docs/landmark-database.md` §7.
 **Status:** ✅ active.
+
+## 2026-09-06 — Page and cover render tier is Imagine 2.0 in production too
+
+**Context:** `pageRenderModel` / `coverRenderModel` were `perEnvironment({ staging: 'grok-imagine-2',
+default: 'grok-imagine' })` since 2026-08-29: staging carried the $0.04 tier while production
+stayed on the $0.02 tier, pending scored evidence that never came (Lab 959/963/965 ran
+without eval). The owner compared production trial `job_1788724538469_n6ylqxq7w` p4 (Standard:
+child seated on the table, secondary rendered as a clone of the main character) with the day's
+staging trials on 2.0 and ruled: "switch production to grok 2".
+
+**Decision (owner):** both keys are the constant `'grok-imagine-2'`; the tier applies to every
+page render, redo, repair regeneration and cover, in trials and full stories. Per-image cost
+doubles (2 → 4 cents), about CHF 0.60 more per full story. Char-repair stays pinned to
+Imagine 1.x (2026-09-01 G5), unchanged.
+
+**Touched:** `server/config/runtime.js`.
+**Status:** ✅ active — reaches production with the next master push.

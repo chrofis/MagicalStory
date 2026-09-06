@@ -75,17 +75,15 @@ const SETTINGS = {
 
   // ── Page + cover render tier ───────────────────────────────────────────
   // IMAGE_MODELS key for the FINAL page render, every page redo/repair
-  // regeneration, and the cover render. Staging renders on Imagine 2.0
-  // ($0.04/image), production stays on Standard ($0.02) — a straight 2× on the
-  // dominant per-story image cost.
-  //
-  // Staging-only ON PURPOSE: there is NO scored evidence for the upgrade yet.
-  // Lab experiments 959/963/965 all ran with autoEval:false, so their score
-  // arrays are empty; the basis is an eyeballed sample of those runs. Staging
-  // carries the cost and the risk until a scored A/B says production should
-  // follow. Redos read the same key so a page cannot change tier mid-repair.
-  pageRenderModel: perEnvironment({ staging: 'grok-imagine-2', default: 'grok-imagine' }),
-  coverRenderModel: perEnvironment({ staging: 'grok-imagine-2', default: 'grok-imagine' }),
+  // regeneration, and the cover render — trials and full stories alike.
+  // Imagine 2.0 ($0.04/image) everywhere since 2026-09-06 (owner: "switch
+  // production to grok 2", after the production trial job_1788724538469 p4 on
+  // Standard vs the day's staging trials on 2.0). Was staging-only from
+  // 2026-08-29 while the evidence was an eyeballed sample; the promotion is
+  // the owner's judgement on rendered pages, not a scored A/B. Redos read the
+  // same key so a page cannot change tier mid-repair.
+  pageRenderModel: 'grok-imagine-2',
+  coverRenderModel: 'grok-imagine-2',
 
   // Styles GDINO is allowed on. It grounds on clothed-figure shape + clothing
   // colour, so any style rendering a recognisable human works (measured
