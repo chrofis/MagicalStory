@@ -105,34 +105,35 @@ describe('recurring creature — Grok slot assembly (4 characters)', () => {
     expect(slots).toHaveLength(5);
   }, 30000);
 
-  it('floors the creature cell to the character card width when slots are full', async () => {
+  it('gives the creature a full-height column cell when slots are full', async () => {
+    // Layout changed 2026-09-06: VB elements form a COLUMN beside the cards,
+    // not a strip below them, so a lone recurring creature gets the whole
+    // column height rather than a card-width square.
     const charBuf = await solidPng(512, 1024, { r: 40, g: 80, b: 200 });
     const elBuf = await solidPng(512, 512, { r: 220, g: 160, b: 40 });
     const el = (recurring: boolean) => ({ id: 'ANI001', name: 'Fünkli', type: 'animal', recurring, imageData: `data:image/jpeg;base64,${elBuf.toString('base64')}` });
-    const before: any = await grok.composeCharWithVbRow(charBuf, [el(false)], '3:4', { charsInSlot: 2 });
-    const after: any = await grok.composeCharWithVbRow(charBuf, [el(true)], '3:4', { charsInSlot: 2 });
-    const cardW = Math.floor(512 / 2);
-    expect(after.cellW).toBe(cardW);
-    expect(after.cellH).toBe(cardW);
-    expect(after.floored).toBe(true);
-    expect(before.floored).toBe(false);
-    // The unfloored cell `contain`s a square reference into a wide, short cell,
-    // so its usable edge is the height — strictly smaller than the floor.
-    expect(before.cellH).toBeLessThan(after.cellH);
+    const res: any = await grok.composeCharWithVbRow(charBuf, [el(true)], '3:4', { charsInSlot: 2 });
+    expect(res.cellCount).toBe(1);
+    expect(res.cellW).toBe(256);
+    expect(res.cellH).toBe(1024);
+    expect(res.floored).toBe(false);
+    // Its usable edge is the column width — comfortably past the floor, and
+    // the old bottom-strip layout gave it 0.32*W at best.
+    expect(Math.min(res.cellW, res.cellH)).toBeGreaterThanOrEqual(grok.VB_CELL_FLOOR_PX);
   }, 30000);
 
-  it('drops lower-priority cells rather than shrinking the creature', async () => {
+  it('drops lower-priority cells rather than shrinking the creature past the floor', async () => {
     const charBuf = await solidPng(512, 1024, { r: 40, g: 80, b: 200 });
     const elBuf = await solidPng(512, 512, { r: 220, g: 160, b: 40 });
-    const mk = (id: string, recurring: boolean) => ({ id, name: id, type: 'artifact', recurring, imageData: `data:image/jpeg;base64,${elBuf.toString('base64')}` });
+    const mk = (id: string, recurring: boolean, type = 'artifact') => ({ id, name: id, type, recurring, imageData: `data:image/jpeg;base64,${elBuf.toString('base64')}` });
+    // A 16:9 slot is 576 tall: four stacked cells would be 144px, under the floor.
     const res: any = await grok.composeCharWithVbRow(
       charBuf,
-      [{ ...mk('ANI001', true), type: 'animal' }, mk('ART002', false), mk('ART005', false), mk('VEH001', false)],
-      '3:4',
+      [mk('ANI001', true, 'animal'), mk('ART002', false), mk('ART005', false), mk('VEH001', false)],
+      '16:9',
       { charsInSlot: 2 },
     );
-    // 512 wide / 256 floor edge = 2 cells fit; the other two are dropped.
-    expect(res.cellCount).toBe(2);
-    expect(res.cellW).toBe(256);
+    expect(res.cellCount).toBe(3);
+    expect(res.cellH).toBe(192);
   }, 30000);
 });

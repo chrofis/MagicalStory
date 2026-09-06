@@ -624,6 +624,70 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 // that Grok sometimes copied into the scene — the "fills the entire blank with
 // a colour" bug. The frame borders, not the fill, separate the avatars.
 const CHAR_BG = { r: 255, g: 255, b: 255 };
+
+// ---------------------------------------------------------------------------
+// VB ELEMENT PACKING BUDGET (owner, 2026-09-06 — staging job_1788641639919_mpjwlzkf1)
+//
+// Visual Bible elements that have to share a slot with the character cards get
+// a CAP and a FLOOR, both expressed in the finished slot's pixels (every slot
+// is normalised to a 1024px long side before it reaches Grok):
+//
+//   VB_SLOT_MAX_ELEMENTS  the ceiling — 4, matching the cap-4 element budget in
+//                         buildPageCompositeRefs (owner, 2026-08-29). Anything
+//                         past it is DROPPED, never squeezed in; the element
+//                         list is already priority-sorted (visualBible.js), so
+//                         "keep the first k" is "drop the least important".
+//   VB_SLOT_MIN_ELEMENTS  the ceiling drops to 3 when 4 cells would fall below
+//                         the floor. Never below 3 — that is the owner's range.
+//   VB_CELL_FLOOR_PX      the smallest square a VB reference may render at.
+//                         Below ~200px a secondary character's face is a smear
+//                         and the model substitutes a prior: on p14 of that
+//                         story the rescued girl (CHR002, black bob) rode in a
+//                         136x136 two-panel cell beside a 493px-wide character
+//                         card and rendered with the lead child's auburn curls.
+//   VB_COLUMN_MAX_FRACTION  the VB column never eats more than a third of the
+//                         slot's width — the character cards stay the subject.
+const VB_SLOT_MAX_ELEMENTS = 4;
+const VB_SLOT_MIN_ELEMENTS = 3;
+const VB_CELL_FLOOR_PX = 200;
+const VB_COLUMN_MAX_FRACTION = 1 / 3;
+
+/**
+ * Apply VB_SLOT_MAX_ELEMENTS to a VB element list, logging what was dropped.
+ * Used by BOTH slot paths (bundled column and own slot) so no caller can widen
+ * the budget by passing a longer list — `getElementReferenceImagesForPage` is
+ * called with maxRefs 4 by page gen but with 6 by the iterate/repair and cover
+ * paths.
+ */
+const VB_TYPE_PRIORITY = { character: 1, animal: 2, artifact: 3, vehicle: 4, location: 5 };
+
+/**
+ * Re-establish the Visual Bible's own priority order on a grid's rawElements.
+ *
+ * `getElementReferenceImagesForPage` sorts by priority (recurring creature 0,
+ * then character/animal/artifact/vehicle/location), but `buildVisualBibleGrid`
+ * loads each cell's bytes through `Promise.all(map(async ...))` and pushes on
+ * COMPLETION, so rawElements arrive in whatever order R2 answered. That is
+ * invisible while every element is kept — and wrong the moment a cap drops the
+ * tail: staging job_1788641639919_mpjwlzkf1 p3 came out [CHR002, ART001,
+ * ART008, CHR001] on one rebuild and [ART001, ART008, CHR002, CHR001] on the
+ * next. Sorting here makes "keep the first k" mean "drop the least important"
+ * again, for every consumer of the packed slot.
+ */
+function sortVbElements(elements = []) {
+  return (elements || []).filter(Boolean)
+    .map((e, i) => ({ e, i, p: e.recurring ? 0 : (VB_TYPE_PRIORITY[e.type] ?? 9) }))
+    .sort((a, b) => (a.p - b.p) || (a.i - b.i))
+    .map(x => x.e);
+}
+
+function capVbElements(elements = [], tag = '[GROK]', where = 'slot') {
+  const list = sortVbElements(elements);
+  if (list.length <= VB_SLOT_MAX_ELEMENTS) return list;
+  const dropped = list.slice(VB_SLOT_MAX_ELEMENTS).map(e => `${e.name || '?'} (${e.type || '?'})`).join(', ');
+  log.info(`🎨 ${tag} VB ${where}: cap ${VB_SLOT_MAX_ELEMENTS} — dropped ${list.length - VB_SLOT_MAX_ELEMENTS} lower-priority element(s): ${dropped}`);
+  return list.slice(0, VB_SLOT_MAX_ELEMENTS);
+}
 const CHAR_GAP = 4;
 
 /**
@@ -1402,11 +1466,12 @@ async function packReferences(refs = {}, options = {}) {
       // Re-flow the cells to fill the slot at the target aspect. Sending
       // buildVisualBibleGrid's 512-wide single column through a height cap
       // left the grid as a ~25%-width sliver in a white-padded slot.
-      const composed = await composeVbSlot(vbSlotElements, aspectRatio);
+      const cappedVb = capVbElements(vbSlotElements, tag, 'own slot');
+      const composed = await composeVbSlot(cappedVb, aspectRatio);
       if (!composed) throw new Error('no cells composed');
       const cm = await sharp(composed).metadata();
       slots.push(`data:image/jpeg;base64,${composed.toString('base64')}`);
-      log.info(`🎨 ${tag} Slot ${slots.length}: ${vbSlotElements.length} VB element(s) (own slot, ${cm.width}x${cm.height})`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: ${cappedVb.length} VB element(s) (own slot, ${cm.width}x${cm.height})`);
     } catch (e) {
       log.warn(`⚠️ ${tag} VB own-slot compose failed (${e.message}) — elements not sent this render`);
     }
@@ -1617,118 +1682,134 @@ async function packReferences(refs = {}, options = {}) {
  * @returns {Promise<Buffer>} JPEG buffer of the composited 1280x1280 image
  */
 /**
- * Append a row of VB element cells below a character composite.
- * Keeps the char composite at natural size and adds 1-6 labeled cells as a
- * bottom strip, so VB references travel with the avatars rather than polluting
- * the scene background.
+ * Compose a character slot: the character card(s) on the LEFT at full slot
+ * height, the page's Visual Bible elements as a vertical COLUMN to their RIGHT.
  *
- * @param {Object} options - { charsInSlot: how many character cards share this
- *   slot (drives the recurring-creature cell floor), tag: log prefix }
+ * Previous layout (until 2026-09-06) appended the VB elements as a thin strip
+ * BELOW the cards. The strip's cell size was driven by the composite's width
+ * divided by the cells per row, and its height capped at 0.32*W - so on a page
+ * whose cast filled the character slots, every VB element landed at roughly a
+ * seventh of a character card's linear size. Staging job_1788641639919_mpjwlzkf1
+ * p14 is the worked example: three characters, so slot 2 = Lily+James and slot 3
+ * = Rachel + a 4-cell VB strip. The rescued girl CHR002 ("the small girl in the
+ * red duffel coat", a secondaryCharacter with a two-panel reference) got a
+ * 136x136 cell - ~68px of actual girl - beside a 493px-wide character card, and
+ * rendered with auburn curls instead of her black bob, i.e. the lead child's
+ * hair. On p3 and p12 the same reference had the VB OWN slot (one character on
+ * the page, so a slot was free) at ~512x300 and she rendered correctly.
+ *
+ * The single-character slot had the width to fix this all along: the card is a
+ * portrait sliver and the aspect-pad filled the rest of the slot with white
+ * bars. The column layout spends that width on the elements instead.
+ *
+ * Layout (target aspect, long side 1024):
+ *
+ *   +---------------+-------+
+ *   |               |  VB1  |
+ *   |   character   +-------+
+ *   |   card(s)     |  VB2  |
+ *   |   full height +-------+
+ *   |               |  VB3  |
+ *   +---------------+-------+
+ *
+ * Budget: at most VB_SLOT_MAX_ELEMENTS cells, dropping to VB_SLOT_MIN_ELEMENTS
+ * when 4 would fall below VB_CELL_FLOOR_PX. Elements are DROPPED before cells
+ * are allowed to shrink past the floor (owner, 2026-09-06) - the list is
+ * priority-sorted, and a recurring creature is pinned to its front
+ * (visualBible.js), so the floor protects it without a special case. Its
+ * own-slot path (packReferences, commit 7e1125ebe) is unchanged and still wins
+ * whenever a slot is free.
+ *
+ * Output is exactly at the target aspect, so packReferences' aspect-pad and the
+ * height-1024 resize that precede it are both no-ops on this slot.
+ *
+ * @param {Buffer} charBuffer - Character card composite (buildCharacterGroupSlot)
+ * @param {Array<{imageData: string, name: string, type: string}>} vbElements
+ * @param {string} aspectRatio - Target slot aspect, e.g. '1:1' / '3:4'
+ * @param {Object} [options] - { charsInSlot, tag }
  * @returns {Promise<{buffer: Buffer, cellCount: number, cellW: number,
- *   cellH: number, floored: boolean}>}
+ *   cellH: number, cardsW: number, floored: boolean}>}
  */
 async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '1:1', options = {}) {
-  const { charsInSlot = 1, tag = '[GROK]' } = options;
-  const elements = vbElements.slice(0, 6);
+  const { tag = '[GROK]' } = options;
+  const elements = capVbElements(vbElements, tag, 'column').filter(e => e && e.imageData);
   if (elements.length === 0) return { buffer: charBuffer, cellCount: 0 };
 
   const meta = await sharp(charBuffer).metadata();
-  const W = meta.width;
-  const charHOrig = meta.height;
+  if (!meta.width || !meta.height) return { buffer: charBuffer, cellCount: 0 };
 
-  // Layout: keep the character at its natural size and append VB cells
-  // directly underneath. No internal padding — the final aspect-pad step in
-  // packReferences adds any outer bars needed. VB cell size is driven by the
-  // canvas WIDTH so cells stay large regardless of target aspect.
-  //
-  // Cells are laid out over as many ROWS as it takes to keep each one big
-  // enough to read. A single row of N cells is W/N wide, so a five-entity page
-  // gave each entity a fifth of the width — at that size an animal's breed and
-  // markings are unreadable and the model falls back to a generic prior (a
-  // story's tan mixed-breed dog rendered as a golden retriever on every page
-  // whose cast filled the slot, and correctly only on the one page where the
-  // VB grid had a slot to itself). Capping cells per row keeps each cell at
-  // worst half the width; the strip grows downward instead of squeezing.
-  //
-  // Bounded at TWO rows on purpose: packReferences normalises the finished
-  // slot to 1024px tall, so every pixel the strip gains is a pixel the
-  // character avatars lose. Two rows roughly doubles cell width while costing
-  // the avatars about a tenth of their size; deeper strips start trading away
-  // face identity, which matters more than prop identity.
-  //
-  // MINIMUM CELL SIZE for a recurring creature (owner, 2026-09-05 — staging
-  // story job_1788614817116_vxnu60yjg). The rules above optimise the strip for
-  // props, and for props they are right. They are wrong for a named animal
-  // that appears on nearly every page: on p16 of that story (4 children, so
-  // two character slots and no free slot for the VB grid) the juvenile dragon
-  // ANI001 rode in as ONE full-width cell — and a full-width, 0.32·W-tall cell
-  // `contain`s a square reference down to 0.32·W of actual pixels, ~1/7 the
-  // linear size of the character cards beside it. It rendered as a stiff gold
-  // figurine. On p9 (1 child) the same creature had the VB own slot and
-  // rendered on-model. Fix: when the strip carries a recurring creature, every
-  // cell becomes a SQUARE whose edge is the character card's width — the
-  // creature is never smaller than a cast member's card — and the row keeps
-  // only the cells that fit at that size. Lower-priority elements are DROPPED
-  // rather than allowed to shrink the creature. Element order is already
-  // priority-sorted (visualBible.js pins recurring creatures to the front), so
-  // "keep the first k" is "drop the least important".
-  const floorCount = elements.filter(e => e && e.recurring).length;
-  let perRow;
-  let cellW;
-  let cellH;
-  let cells = elements;
-  if (floorCount > 0) {
-    const cardW = Math.max(1, Math.floor(W / Math.max(1, charsInSlot)));
-    const floorEdge = Math.max(1, Math.min(cardW, charHOrig));
-    perRow = Math.max(1, Math.floor(W / floorEdge));
-    cellW = floorEdge;
-    cellH = floorEdge;
-    if (elements.length > perRow) {
-      const dropped = elements.slice(perRow).map(e => `${e.name} (${e.type})`).join(', ');
-      cells = elements.slice(0, perRow);
-      log.info(`🎨 ${tag} VB strip: floor ${floorEdge}px for recurring creature — dropped ${elements.length - perRow} lower-priority cell(s): ${dropped}`);
-    }
-    log.info(`🎨 ${tag} VB strip: recurring-creature floor active (${cells.length} cell(s) @ ${cellW}x${cellH}, character card ${cardW}px wide)`);
-  } else {
-    perRow = elements.length <= 3 ? elements.length : Math.ceil(elements.length / 2);
-    cellW = Math.floor(W / perRow);
-    cellH = Math.min(cellW, Math.round(W * 0.32));
+  // Slot canvas at the target aspect, long side 1024 - the same normalisation
+  // composeVbSlot uses, so both VB paths measure in the same pixels.
+  const [aspW, aspH] = String(aspectRatio || '1:1').split(':').map(Number);
+  const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  const LONG_SIDE = 1024;
+  const W = targetRatio >= 1 ? LONG_SIDE : Math.round(LONG_SIDE * targetRatio);
+  const H = targetRatio >= 1 ? Math.round(LONG_SIDE / targetRatio) : LONG_SIDE;
+
+  // Cards keep their full height and their natural aspect; whatever width is
+  // left over beside them is the column. On a one-character page that leftover
+  // is large (the card is a portrait sliver). On a crowded slot the cards fill
+  // the width, so we take VB_CELL_FLOOR_PX back from them rather than shipping
+  // sliver cells - the column never exceeds VB_COLUMN_MAX_FRACTION of the slot.
+  const naturalCardsW = Math.max(1, Math.round(H * (meta.width / meta.height)));
+  const maxColW = Math.max(1, Math.floor(W * VB_COLUMN_MAX_FRACTION));
+  let colW = Math.min(maxColW, Math.max(0, W - naturalCardsW));
+  if (colW < Math.min(VB_CELL_FLOOR_PX, maxColW)) colW = Math.min(VB_CELL_FLOOR_PX, maxColW);
+  const cardsW = Math.max(1, W - colW);
+
+  // Cap ladder: 4 cells, dropping to 3 if 4 would breach the floor. A cell's
+  // effective size is its SHORTER side - a wide, short cell `contain`s a
+  // square reference down to its height.
+  const effective = (n) => Math.min(colW, Math.floor(H / n));
+  let cellCount = Math.min(elements.length, VB_SLOT_MAX_ELEMENTS);
+  while (cellCount > VB_SLOT_MIN_ELEMENTS && effective(cellCount) < VB_CELL_FLOOR_PX) {
+    cellCount -= 1;
   }
-  const rowCount = Math.ceil(cells.length / perRow);
-  const finalH = charHOrig + cellH * rowCount;
+  if (cellCount < elements.length) {
+    const dropped = elements.slice(cellCount).map(e => `${e.name || '?'} (${e.type || '?'})`).join(', ');
+    log.info(`\u{1f3a8} ${tag} VB column: ${effective(cellCount)}px cells (floor ${VB_CELL_FLOOR_PX}) - dropped ${elements.length - cellCount} lower-priority element(s): ${dropped}`);
+  }
+  const cells = elements.slice(0, cellCount);
+  const cellW = colW;
+  const cellH = Math.floor(H / cells.length);
+  const floored = effective(cells.length) < VB_CELL_FLOOR_PX;
+  if (floored) {
+    log.warn(`\u26a0\ufe0f ${tag} VB column: ${cells.length} cell(s) at ${effective(cells.length)}px - below the ${VB_CELL_FLOOR_PX}px floor even at the minimum count`);
+  }
 
-  const composites = [{ input: charBuffer, left: 0, top: 0 }];
+  const cardsResized = await sharp(charBuffer)
+    .resize(cardsW, H, { fit: 'contain', background: CHAR_BG })
+    .toBuffer();
+  const composites = [{ input: cardsResized, left: 0, top: 0 }];
   for (let i = 0; i < cells.length; i++) {
     const el = cells[i];
-    if (!el.imageData) continue;
     try {
       const base64 = r2.stripDataUriPrefix(el.imageData);
       const elBuf = Buffer.from(base64, 'base64');
+      const thisH = (i === cells.length - 1) ? (H - cellH * i) : cellH;
       const cell = await sharp(elBuf)
-        .resize(cellW, cellH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
+        .resize(cellW, thisH, { fit: 'contain', background: CHAR_BG })
         .toBuffer();
-      const cellLeft = (i % perRow) * cellW;
-      const cellTop = charHOrig + Math.floor(i / perRow) * cellH;
-      composites.push({ input: cell, left: cellLeft, top: cellTop });
+      composites.push({ input: cell, left: cardsW, top: cellH * i });
 
-      // VB cell labels intentionally dropped — Grok knows what a bench /
+      // VB cell labels intentionally dropped - Grok knows what a bench /
       // coin / sundial / bridge looks like; the caption only ever serves to
       // leak into the rendered scene (e.g. "Holzbank am Stadtturm" baked
       // into page 7 V2 of job_1780564110486_g4gn4vzvu). Same policy as
       // buildVisualBibleGrid's labelMode='all' default (commit ac4ee3bc).
-      // Character cells above carry a coloured FRAME (frameCharacterImage)
-      // for card↔face binding — a frame doesn't leak the way a name caption did.
+      // Character cells carry a coloured FRAME (frameCharacterImage) for
+      // card-face binding - a frame doesn't leak the way a name caption did.
     } catch (err) {
-      log.warn(`⚠️ [GROK] composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
+      log.warn(`\u26a0\ufe0f ${tag} composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
     }
   }
 
-  log.debug(`🎨 [GROK] char+VB: ${W}x${finalH} (char ${W}x${charHOrig} + VB ${cells.length} cells in ${rowCount} row(s) @ ${cellW}x${cellH}), target ${aspectRatio}`);
-  const buffer = await sharp({ create: { width: W, height: finalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+  log.debug(`\u{1f3a8} ${tag} char+VB column: ${W}x${H} (cards ${cardsW}x${H} + ${cells.length} VB cell(s) @ ${cellW}x${cellH}), target ${aspectRatio}`);
+  const buffer = await sharp({ create: { width: W, height: H, channels: 3, background: CHAR_BG } })
     .composite(composites)
     .jpeg({ quality: 88 })
     .toBuffer();
-  return { buffer, cellCount: cells.length, cellW, cellH, floored: floorCount > 0 };
+  return { buffer, cellCount: cells.length, cellW, cellH, cardsW, floored };
 }
 
 /**
@@ -1972,6 +2053,11 @@ module.exports = {
   editWithGrok,
   isGrokConfigured,
   packReferences,
+  capVbElements,
+  sortVbElements,
+  VB_SLOT_MAX_ELEMENTS,
+  VB_SLOT_MIN_ELEMENTS,
+  VB_CELL_FLOOR_PX,
   composeVbSlot,
   // Exported for its unit test: the recurring-creature cell floor is pure
   // layout arithmetic, and reaching it through packReferences means composing

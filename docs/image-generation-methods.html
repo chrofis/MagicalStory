@@ -367,6 +367,22 @@
 </tr>
 
 <tr>
+  <td>VB element reference SHEET &rarr; per-element cutouts</td>
+  <td><code>server/lib/referenceSheets.js</code> &rarr; <code>generateReferenceSheet</code> / <code>splitGridIntoReferences</code>, grid measured by <code>server/lib/sheetGrid.js</code> &rarr; <code>detectSheetGrid</code></td>
+  <td>Gemini image (sheet) + gemini-2.5-flash-lite (identification, mismatch only)</td>
+  <td>
+    <p>Elements needing a reference are batched (max 4) into ONE multi-cell sheet per call, then cut back apart into one image per element. The prompt asks for a fixed layout &mdash; 2&times;2 for exactly four elements, a single vertical column otherwise &mdash; but <strong>the model does not reliably draw the requested number of cells</strong>, and the requested count was never verified against the pixels.</p>
+    <p><strong>Since 2026-09-06 the grid is measured, not assumed.</strong> <code>detectSheetGrid</code> is count-free: it finds the gutter bands (thin near-uniform full-span lines, black or white) with an adaptive uniformity threshold, rejects wide uniform fields (a pale margin, a flat sky) and edge-touching runs (the outer frame), and derives cols&times;rows from what is actually drawn. Then:</p>
+    <ul>
+      <li><strong>Detected count == requested</strong> &rarr; fast path. Cells taken row-major on the detected boundaries, no extra call.</li>
+      <li><strong>Detected count != requested</strong> &rarr; each cell gets an A/B/C&hellip; label drawn on it (<code>labelCells</code>) and ONE <code>gemini-2.5-flash-lite</code> call (<code>prompts/sheet-cell-identification.txt</code>) says which label holds which element. Unmatched elements get a <code>null</code> reference and are logged loudly (<code>vb_sheet_element_missing</code>); no new paid retry loop is added.</li>
+    </ul>
+    <p>Failure this fixes &mdash; staging <code>job_1788641639919_mpjwlzkf1</code>: a 3-element character batch was drawn as a 2&times;2 sheet of four figures and cut into three horizontal bands. The three references became two boys side by side, a band straddling the mid-row divider (two different girls), and a strip of legs and shoes; the last fed page 14. See <code>docs/decisions.md</code> &rarr; "Reference sheet cell boundaries are detected, not assumed".</p>
+    <p><strong>Not applied to</strong> the 2&times;4 character sheet (<code>character2x4Sheet.js</code>) or <code>coverComposite.extractQuadrant</code>: those sheets are <em>composited by the app</em> from two separately generated 1&times;4 rows, so the geometry is ours, cells mean poses rather than elements (a label cannot disambiguate them), and a bad layout is already caught by <code>quickLayoutCheck</code>'s gutter-uniformity test plus the per-row structure eval.</p>
+  </td>
+</tr>
+
+<tr>
   <td>2×4 character sheet (composite pre-render)</td>
   <td><code>server/lib/character2x4Sheet.js</code> → <code>editWithGrok</code></td>
   <td>Grok edit</td>
@@ -423,8 +439,8 @@ from 3 to 5"). Test Lab can override with <code>params.maxRefSlots</code>.</p>
 <thead><tr><th>Characters on the page</th><th>Slot 1</th><th>Slot 2</th><th>Slot 3</th></tr></thead>
 <tbody>
 <tr><td>1–2</td><td>scene plate / landmark photo</td><td>all characters</td><td>VB elements, <strong>own slot, full size</strong></td></tr>
-<tr><td>3</td><td>scene plate</td><td>A+B</td><td>C + VB elements as a thumbnail strip</td></tr>
-<tr><td>4+</td><td>scene plate</td><td>A+B</td><td>C+D + VB elements as a thumbnail strip</td></tr>
+<tr><td>3</td><td>scene plate</td><td>A+B</td><td>C + VB elements as a <strong>column beside the card</strong></td></tr>
+<tr><td>4+</td><td>scene plate</td><td>A+B</td><td>C+D + VB elements as a <strong>column beside the cards</strong></td></tr>
 </tbody>
 </table>
 
@@ -432,6 +448,82 @@ from 3 to 5"). Test Lab can override with <code>params.maxRefSlots</code>.</p>
 (<code>buildPageCompositeRefs</code>, owner 2026-08-29) because the whole grid shares
 ONE slot and cell size scales as 1/n. The empty-scene grid is a different grid with
 its own cap of 9.</p>
+
+<h3>VB elements ride in a COLUMN beside the cards, never a strip below (owner, 2026-09-06)</h3>
+
+<p>When no slot is free, the VB elements share the last character slot. Until
+2026-09-06 they were appended as a thin strip BELOW the character cards, sized as
+<code>W / cellsPerRow</code> wide and capped at <code>0.32&middot;W</code> tall.
+On any page whose cast filled the character slots that put every element at roughly a
+seventh of a card's linear size &mdash; small enough that the model stops reading the
+reference and substitutes a prior.</p>
+
+<p><strong>Evidence</strong> &mdash; staging <code>job_1788641639919_mpjwlzkf1</code>
+("Lily and Ethan and the Count of Twenty"). CHR002, "the small girl in the red duffel
+coat", is a <code>secondaryCharacter</code> with a two-panel reference (black bob,
+red duffel coat) and appears on pages 3, 10, 12, 13, 14:</p>
+
+<table>
+<thead><tr><th>Page</th><th>Chars</th><th>VB path</th><th>Her reference, in final slot px</th><th>Rendered</th></tr></thead>
+<tbody>
+<tr><td>3</td><td>1</td><td>own slot</td><td>512&times;512 (4 cells, 2&times;2)</td><td>on-model</td></tr>
+<tr><td>12</td><td>1</td><td>own slot</td><td>512&times;512 (3 cells, 2&times;2)</td><td>on-model</td></tr>
+<tr><td>14</td><td>3</td><td>bundled strip</td><td><strong>134&times;86</strong> in a 739px slot (&asymp;186&times;119 normalised) &mdash; and her two-panel reference halves that again</td><td><strong>auburn curls, i.e. the lead child's hair</strong></td></tr>
+</tbody>
+</table>
+
+<p>The one-character slot had the width to fix this all along: the card is a portrait
+sliver and the aspect-pad filled the rest of the slot with white bars. The column
+layout spends that width on the elements.</p>
+
+<pre>
+  +---------------+-------+
+  |               |  VB1  |
+  |   character   +-------+
+  |   card(s)     |  VB2  |
+  |   full height +-------+
+  |               |  VB3  |
+  +---------------+-------+
+</pre>
+
+<p>Rules, all in <code>composeCharWithVbRow</code> (<code>server/lib/grok.js</code>),
+measured in the finished slot's pixels (every slot normalises to a 1024px long side):</p>
+
+<ul>
+<li><strong>Cap 4</strong> (<code>VB_SLOT_MAX_ELEMENTS</code>), matching the cap-4
+element budget above. Overflow is DROPPED with an INFO log naming what went &mdash;
+<code>capVbElements</code> enforces it on BOTH VB paths, so the iterate/repair and
+cover callers that ask <code>getElementReferenceImagesForPage</code> for 6 can no
+longer widen the budget.</li>
+<li><strong>Floor 200px</strong> (<code>VB_CELL_FLOOR_PX</code>) on a cell's shorter
+side. When four cells would breach it the count drops to <strong>3</strong>
+(<code>VB_SLOT_MIN_ELEMENTS</code>) &mdash; elements are dropped before cells shrink.
+Never below 3; a slot still under the floor at 3 logs a WARN.</li>
+<li>The column takes at most a <strong>third of the slot width</strong>
+(<code>VB_COLUMN_MAX_FRACTION</code>). When the cards fill the width (a crowded slot)
+the column takes the floor back from them rather than shipping sliver cells.</li>
+<li>Output is exactly at the target aspect, so the height-1024 resize and the
+aspect-pad that follow are both no-ops on this slot.</li>
+<li><code>sortVbElements</code> re-establishes the VB priority order (recurring
+creature, character, animal, artifact, vehicle, location) before the cap slices.
+<code>buildVisualBibleGrid</code> builds <code>rawElements</code> with
+<code>Promise.all(map(async ...))</code> and pushes on COMPLETION, so their order is
+whatever R2 answered &mdash; harmless while everything is kept, wrong the moment a cap
+drops the tail.</li>
+</ul>
+
+<p><strong>Measured, same three pages plus the dragon-story regression</strong>
+(offline rebuild through the real <code>packReferences</code>, no API calls):</p>
+
+<table>
+<thead><tr><th>Page</th><th>Before (cell, final px)</th><th>After</th><th>Gain</th></tr></thead>
+<tbody>
+<tr><td><code>…mpjwlzkf1</code> p14 (3 chars, 4 elements)</td><td>134&times;86 in a 739px slot &rarr; 86px usable</td><td>341&times;256 in a 1024px slot &rarr; 256px usable</td><td>~2.2&times; linear, ~4.6&times; area</td></tr>
+<tr><td><code>…mpjwlzkf1</code> p3 / p12 (1 char)</td><td colspan="2">own slot, unchanged (1024&times;1024)</td><td>&mdash;</td></tr>
+<tr><td><code>…vxnu60yjg</code> p16 (4 chars, recurring dragon)</td><td>281&times;281 in a 1329px composite &rarr; 216px after the height-1024 resize</td><td>341&times;1024 &rarr; 341px usable</td><td>~1.6&times; linear</td></tr>
+<tr><td><code>…vxnu60yjg</code> p9 (1 char)</td><td colspan="2">own slot, unchanged</td><td>&mdash;</td></tr>
+</tbody>
+</table>
 
 <h3>Recurring creature — minimum cell size (owner, 2026-09-05)</h3>
 
@@ -447,16 +539,17 @@ so a cast-heavy page cannot slice it off under the cap-4 element budget. Every c
 of that function inherits this — page gen, iterate/repair, covers, Test Lab.</li>
 <li><strong>Own slot when one is free</strong> under the cap (1–2 characters already
 had this; with 3+ characters it only happens when the cap is raised), otherwise a
-<strong>cell-size floor</strong> in <code>composeCharWithVbRow</code>: every cell in
-the thumbnail strip becomes a square whose edge equals the character card's width, and
-lower-priority cells are <em>dropped</em> from the strip rather than allowed to shrink
-the creature.</li>
+the <strong>column layout above</strong>, whose 200px floor and drop-before-shrink
+rule now protect it without a special case (its own-slot path is unchanged). Its
+priority-0 pin puts it at the head of the column, so a cap drop can never reach it.
+The 2026-09-05 card-width square floor in <code>composeCharWithVbRow</code> was
+superseded by the general floor on 2026-09-06.</li>
 </ul>
 
 <p>The cap is never raised to make room. Both paths log at INFO
 (<code>🔲 [VB-REFS] … recurring creature pinned</code>,
 <code>🎨 [GROK Pn] Recurring creature present — VB takes an own slot</code>,
-<code>🎨 [GROK Pn] VB strip: recurring-creature floor active …</code>), so which path a
+<code>🎨 [GROK Pn] VB column: …px cells (floor 200) - dropped …</code>), so which path a
 page took is auditable from the run log.</p>
 
 <h2 id="dispatch">6. Dispatch &amp; override layers</h2>

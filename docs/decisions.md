@@ -27066,3 +27066,86 @@ trade — the redundancy appeared when the repair-phase force-warm was added.
 
 **Touched:** `server/routes/photos.js`.
 **Status:** ✅ active
+
+## 2026-09-06 — Visual Bible elements ride in a COLUMN beside the character cards, capped at 4 with a 200px cell floor
+
+**Context:** Staging `job_1788641639919_mpjwlzkf1` ("Lily and Ethan and the Count
+of Twenty"), page 14. CHR002 — "the small girl in the red duffel coat", a
+`visualBible.secondaryCharacters` entry with a reference image showing a black
+bob and a red duffel coat — was passed to Grok as a reference and rendered as a
+different child: auburn curls, i.e. the lead child Lily's hair. She rendered
+correctly on p3 and p12.
+
+The stored slots explain it. p14 has three characters, so `packReferences` used
+slot 2 for Lily+James and slot 3 for Rachel **plus the VB elements bundled as a
+thumbnail strip below her card**. That strip sized its cells as
+`compositeWidth / cellsPerRow`, height capped at `0.32·W`: four elements →
+`perRow = 2` → **134×86 px** each, inside a 739×739 slot, beside a character card
+that was 269 px wide and 567 px tall. CHR002's reference is a two-panel image, so
+her actual figure occupied roughly 67×86 px — about a seventh of a cast card's
+linear size. At that scale the model stops reading the reference and substitutes
+a prior; the nearest prior in the same call was the auburn-haired lead. On p3 and
+p12 only one character was on the page, so a slot was free and the VB elements
+took their **own slot** at 512×512 per cell — 6× the linear size, and she rendered
+on-model both times.
+
+The 2026-09-05 recurring-creature floor (`7e1125ebe`) does not cover this: it is
+gated on `visualBible.animals` entries that pass `isRecurringCreature`. CHR002 is
+a secondary character, not an animal, so `hasRecurringCreature` was false, no
+floor applied, and the strip sized her by the generic prop rule. That fix was
+right for what it addressed and too narrow — the strip was the defect, not the
+creature's exemption from it.
+
+**Decision:** the bundled VB elements become a **vertical column to the RIGHT of
+the character cards**, never a strip below them. The cards keep the full slot
+height on the left; the elements stack in the leftover width, each cell as large
+as the column allows. On the common one-character page that leftover width was
+previously white aspect-pad bars. Three rules, all in `composeCharWithVbRow`,
+measured in the finished slot's pixels (every slot normalises to a 1024px long
+side):
+
+1. **Cap 4** (`VB_SLOT_MAX_ELEMENTS`, matching the 2026-08-29 cap-4 element
+   budget). Overflow is dropped with an INFO log naming what went. `capVbElements`
+   enforces it on **both** VB paths — bundled column and own slot — so the
+   iterate/repair and cover callers that ask `getElementReferenceImagesForPage`
+   for 6 can no longer widen it.
+2. **Floor 200px** (`VB_CELL_FLOOR_PX`) on a cell's shorter side. When four cells
+   would breach it the count drops to **3** (`VB_SLOT_MIN_ELEMENTS`) — elements are
+   dropped before cells are allowed to shrink. Never below 3; still-under-floor at
+   3 logs a WARN rather than dropping further.
+3. The column never exceeds a **third of the slot width**
+   (`VB_COLUMN_MAX_FRACTION`); on a crowded slot it takes the floor back from the
+   cards rather than shipping sliver cells.
+
+The recurring-creature **own-slot** path from `7e1125ebe` is unchanged and still
+wins whenever a slot is free. Its card-width square floor in the strip is
+superseded by the general floor above — a recurring creature is pinned to
+priority 0, so it sits at the head of the column and a cap drop can never reach
+it. Slot count (3) and the Grok API cap are unchanged.
+
+**Also fixed, found while measuring:** `buildVisualBibleGrid` builds
+`rawElements` with `Promise.all(map(async ...))` and pushes on **completion**, so
+their order is whatever R2 answered — two rebuilds of p3 produced
+`[CHR002, ART001, ART008, CHR001]` and `[ART001, ART008, CHR002, CHR001]`.
+Invisible while every element is kept, wrong the moment a cap drops the tail.
+`sortVbElements` re-establishes the VB priority order (recurring, character,
+animal, artifact, vehicle, location) before the cap slices, so "keep the first k"
+means "drop the least important" again.
+
+**Measured** — offline rebuild of the real slots through `packReferences`, no API
+calls (`scratchpad/packing/`, before-*.jpg vs after-*.jpg):
+
+| Page | Before (cell, final px) | After | Gain |
+|---|---|---|---|
+| `…mpjwlzkf1` p14 — 3 chars, 4 elements | 134×86 in a 739px slot → 86px usable | 341×256 in a 1024px slot → 256px usable | ~2.2× linear, ~4.6× area |
+| `…mpjwlzkf1` p3, p12 — 1 char | own slot 512×512 per cell | unchanged | — |
+| `…vxnu60yjg` p16 — 4 chars, recurring dragon | 281×281 in a 1329px composite → 216px after the height-1024 resize | 341×1024 → 341px usable | ~1.6× linear |
+| `…vxnu60yjg` p9 — 1 char | own slot | unchanged | — |
+
+**Touched files:** `server/lib/grok.js` (`VB_SLOT_MAX_ELEMENTS` /
+`VB_SLOT_MIN_ELEMENTS` / `VB_CELL_FLOOR_PX` / `VB_COLUMN_MAX_FRACTION`,
+`sortVbElements`, `capVbElements`, `composeCharWithVbRow` rewritten, own-slot call
+capped), `tests/unit/vb-slot-packing.test.ts` (new),
+`tests/unit/recurring-creature-slot.test.ts` (two strip-era assertions updated to
+the column contract), `docs/image-generation-methods.html` §5b.
+**Status:** ✅ active
