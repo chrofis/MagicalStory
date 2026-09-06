@@ -105,17 +105,95 @@ function nameCandidates(text) {
 }
 
 /**
- * The named PLACES this story already knows about, from the authoritative data
- * the job carries into the beats stage — never a word list and never a guess.
+ * Weekday and month names for a locale, from Intl — never a hard-coded word
+ * list. Both `long` and `short` forms, plus a capitalised form of each, because
+ * a locale like French renders them lowercase ("lundi") while a plan line
+ * writes them capitalised at a sentence head.
  *
- * Three sources, all resolved before `generateStoryViaBeats` runs and all the
- * same names the planner was handed in its own prompt:
+ * A locale Intl cannot resolve degrades to nothing rather than throwing: losing
+ * one language's calendar nouns costs an occasional false invented-cast entry,
+ * which is what this whole exclusion exists to reduce — it must never be able
+ * to kill a run.
+ *
+ * @param {string} locale a BCP-47 tag ('en-gb', 'de', 'fr-ch', …)
+ * @returns {string[]} unique names, long and short, original and capitalised
+ */
+function calendarNamesForLocale(locale) {
+  const out = [];
+  const push = (v) => {
+    const s = String(v || '').trim();
+    if (!s) return;
+    for (const form of [s, s.charAt(0).toUpperCase() + s.slice(1)]) {
+      if (!out.includes(form)) out.push(form);
+    }
+  };
+  try {
+    for (const style of ['long', 'short']) {
+      const wd = new Intl.DateTimeFormat(locale, { weekday: style, timeZone: 'UTC' });
+      // 2024-01-01 is a Monday, so seven consecutive days cover every weekday.
+      for (let d = 1; d <= 7; d++) push(wd.format(new Date(Date.UTC(2024, 0, d))));
+      const mo = new Intl.DateTimeFormat(locale, { month: style, timeZone: 'UTC' });
+      for (let m = 0; m < 12; m++) push(mo.format(new Date(Date.UTC(2024, m, 15))));
+    }
+  } catch {
+    return [];
+  }
+  // Intl's `short` month form is numeric in some locales ("1", "01"). A digit
+  // string can never be a name candidate, and letting it through would make the
+  // whole-word containment test below match arbitrary tokens.
+  return out.filter(n => /[a-zA-ZÀ-ɏ]/.test(n));
+}
+
+/**
+ * Calendar nouns that can never be a character in this story.
+ *
+ * ALWAYS includes English, whatever the book's language: the PAGE PLAN is
+ * written in English by contract (prompts/story-beats.txt), and the plan line
+ * is the only corpus `resolveCast` scans. The story's own language is added on
+ * top so a plan line that carries a localised date word is covered too.
+ *
+ * @param {string} [language] `inputData.language` ('en-gb', 'de-ch', 'fr', …)
+ * @returns {string[]} unique calendar nouns
+ */
+function collectCalendarNames(language) {
+  const locales = ['en'];
+  const lang = String(language || '').trim();
+  if (lang && !/^en/i.test(lang)) {
+    locales.push(lang);
+    // The bare language subtag too: 'de-ch' and 'de' can differ in short forms.
+    const base = lang.split(/[-_]/)[0];
+    if (base && base !== lang) locales.push(base);
+  }
+  const out = [];
+  for (const loc of locales) {
+    for (const n of calendarNamesForLocale(loc)) if (!out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+/**
+ * The named things this story already knows can never be CAST — places, and
+ * the calendar nouns of its own language.
+ *
+ * Places come from the authoritative data the job carries into the beats stage
+ * — never a word list and never a guess. Three sources, all resolved before
+ * `generateStoryViaBeats` runs and all the same names the planner was handed in
+ * its own prompt:
  *   - `inputData.availableLandmarks[].name` — the landmark index entries
  *     resolved for the family's town (storyJobPipeline, before the beats call).
  *   - `inputData.userLocation.city` / `.country` — the town itself.
  *   - `extraNames` — the caller's canonical named things for this story
  *     (historical locations and period objects, which are places and props by
  *     definition and are looked up by name the same way).
+ *
+ * Calendar nouns join the same list because they fail the cast test the same
+ * way and for the same reason: "Monday" is capitalised, is followed by a verb
+ * somewhere in the book ("Monday came"), and so passes the acts-like-a-person
+ * heuristic and burns an invented-cast slot (measured on
+ * job_1788641639919_mpjwlzkf1). They are derived from Intl for the story
+ * language rather than listed, so no language is privileged and no word list
+ * has to be maintained. A commissioned character is resolved BEFORE this list
+ * is consulted, so a child actually named April or June stays a character.
  *
  * @param {Object} inputData
  * @param {string[]} [extraNames]
@@ -128,6 +206,7 @@ function collectPlaceNames(inputData = {}, extraNames = []) {
     inputData.userLocation?.region,
     inputData.userLocation?.country,
     ...extraNames,
+    ...collectCalendarNames(inputData.language),
   ].map(n => String(n || '').trim()).filter(Boolean);
   return [...new Set(names)];
 }
@@ -243,8 +322,9 @@ function consecutiveRuns(sorted) {
  * @param {Object} args
  * @param {Array}  args.pages  [{pageNumber, beat, planLine}]
  * @param {string[]} [args.commissionedNames] the characters the book was commissioned for
- * @param {string[]} [args.placeNames] named places/things this story already knows about
- *   (collectPlaceNames): they can never be cast, whatever the plan grammar looks like
+ * @param {string[]} [args.placeNames] named things this story already knows can never be
+ *   cast (collectPlaceNames: places, plus the calendar nouns of its language),
+ *   whatever the plan grammar looks like
  * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one whole-cast page
  * @param {number} [args.highActionPages] the high-action page budget the planner was given
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object}}
@@ -417,6 +497,8 @@ module.exports = {
   highActionPageBudget,
   highActionPagesPhrase,
   collectPlaceNames,
+  collectCalendarNames,
+  calendarNamesForLocale,
   planSegments,
   classifyShot,
   nameCandidates,

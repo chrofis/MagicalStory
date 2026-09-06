@@ -27325,3 +27325,262 @@ re-tells against the new panel output, so "does it help" is answerable end to en
 `client/src/services/testlabService.ts`
 
 **Status:** ✅ active
+
+## 2026-09-06 — Repair inpaint and style repair follow the STORY's page tier; char repair stays pinned to 1.x
+
+**Context:** A routing audit of the four repair methods (`decideRepairMethod`:
+`char-fix`, `inpaint`, `iterate`, `style-repair`) found only ONE of them on
+Imagine 2.0, and only on staging. `iterate` reads `runtime('pageRenderModel')`
+so a full page redo matched the page tier, but `inpaint` read the flat edit key
+`MODEL_DEFAULTS.pageImage` and `style-repair` read a hardcoded `'grok-imagine'`
+in `styleRepair.js`'s own lookup table — a third source of image-model truth
+beside `MODEL_DEFAULTS` and `REPAIR_DEFAULTS`. On a staging page rendered by
+2.0, a repair was therefore painted by a different model than the pixels it was
+patching.
+
+**Decision (owner, 2026-09-06):**
+- `inpaint` passes `MODEL_DEFAULTS.pageRenderImage` explicitly to
+  `editImageWithPrompt` — 2.0 on staging, Standard in production, and it moves
+  with the page tier automatically from here on.
+- `style-repair`'s `grok` selector resolves to `pageRenderImage` through a lazy
+  getter instead of a hardcoded key. A style repaint replaces the whole page's
+  rendering, so it must be painted by the model that rendered the page it is
+  matching. Not user-triggerable — pipeline-only, gated on
+  `styleRepairProduction`.
+- `char-fix` **stays on Imagine 1.x**, unchanged. The 2026-09-01 (G5) pin in
+  `REPAIR_DEFAULTS.charRepairModel` holds: 1.x measured 0/82 structural anatomy
+  defects vs 2.0's 2/29, and it is half the price.
+- `MODEL_DEFAULTS.pageImage` keeps its Standard value and its meaning narrows to
+  the EDIT tier: user prompt edits and the title paint-in. Those are cheap
+  one-shot ops and should not double when a page tier moves.
+
+**Rationale:** A repair paints into pixels the page render produced. Mixing
+brushes across a single page is the defect the tier split was supposed to
+prevent, and it was invisible because each path resolved its model from a
+different place. Superseding the old `pageImage` comment ("stays on Standard in
+every environment: doubling it would double every inpaint") — the cost argument
+was real but it applied to user edits, not to repairs of a 2.0 page.
+
+**Cost effect:** none in production (everything is Standard, $0.02). On staging,
+inpaint and style repair go $0.02 → $0.04 per call. `repairMaxPasses` is 1 on
+staging, so the worst case is bounded.
+
+**Verified before wiring:** 2.0 on the edit endpoint is already exercised —
+staging page renders call `editWithGrok` with reference images — and both tiers
+carry identical `maxPromptLength` (7900) and `maxCharactersPerScene` (5), so no
+prompt-fitting or cast-cap behaviour changes. Resolution checked in both
+environments: `resolveStyleRepairModelId('grok')` → `grok-imagine` locally,
+`grok-imagine-2` with `RAILWAY_ENVIRONMENT_NAME=staging`.
+
+**Known follow-ons (not changed here):**
+- `promptBuilders.js:2882,3148,4072,4734,6065` and `beatsPipeline.js:729` still
+  read `pageImage` for prompt budgets and cast caps. Harmless today (both tiers
+  are 7900 / 5); it becomes a real mismatch if the tiers ever diverge.
+- `STYLE_REPAIR_MODEL` / `STYLE_REPAIR_PRODUCTION` are still env vars, against
+  the "behaviour is code, only secrets are env vars" rule, and neither is
+  reported by `GET /api/health/config` — so the deployed style-repair backend
+  cannot be confirmed from outside.
+- `repairCharacterMismatch` defaults to Gemini and relies on an explicit
+  `imageBackend:'grok'` literal in the request builder — correct today, but
+  fail-open rather than fail-loud.
+
+**Touched:**
+- `server/lib/images.js` (`inpaintPage` → `CONFIG_DEFAULTS.pageRenderImage`)
+- `server/lib/styleRepair.js` (`STYLE_REPAIR_MODEL_IDS.grok` → lazy page-tier getter)
+- `server/config/models.js` (`pageImage` comment narrowed; `grok-imagine-2` registry comment corrected — it said "Test Lab A/B only, no default routes here" while staging had routed pages and covers there since 1a253d866)
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-06 — Calendar nouns join the plan-counter place exclusion, derived from Intl for the story language
+
+**Context:** `beatsReviewReport.cast.invented` on `job_1788641639919_mpjwlzkf1`
+(Baden, en-gb, 14 pages) read `["Monday"]`. `resolveCast` in
+`server/lib/planCounters.js` decides a capitalised token is a PERSON when it is
+followed somewhere in the book by a lowercase verb ("Monday came", "the Monday
+deadline is spoken"). A weekday satisfies that test exactly as a person does, so
+it burned an invented-cast slot and fed every downstream invented-cast counter
+(`INVENTED_DOMINANT_EXCESS`, `NO_COMMISSIONED_ON_PAGE`) a phantom character.
+Commit 27c5900c5 had already built the exclusion mechanism for PLACES, from the
+job's own landmark/town data.
+
+**Decision:** `collectPlaceNames` also returns the weekday and month names of the
+story's language, from `Intl.DateTimeFormat` (`long` and `short`, plus a
+capitalised form of each), and they flow into `resolveCast` through the existing
+`placeNames` argument — no new parameter, no call-site change. English is
+ALWAYS included whatever the book's language, because the PAGE PLAN is written
+in English by contract (`prompts/story-beats.txt`) and the plan line is the only
+corpus `resolveCast` scans; the book's own language is added on top. Commissioned
+names are resolved BEFORE the exclusion list is consulted, so a child actually
+named April or June stays a character.
+
+**Rationale:** No hard-coded word list — a list would privilege one language and
+rot. Intl is the authoritative source and covers every locale the product can
+sell into. Merging into the place list rather than adding a fourth concept keeps
+the wiring at zero: the same "named thing that can never be cast" test, with the
+same whole-word containment, which is safe here because calendar nouns are
+single words. The cost is that `cast.places` now reads as "names excluded from
+the cast" rather than strictly places; the JSDoc says so.
+
+**Touched:**
+- `server/lib/planCounters.js` (`calendarNamesForLocale`, `collectCalendarNames`, `collectPlaceNames`)
+- `tests/unit/plan-counters.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-06 — The style audit measures SEASON, on the same grid pass as time-of-day, with guideline semantics
+
+**Context:** The season block (e920e1d4f, `buildSeasonNote`) STATES that foliage,
+ground cover and daylight are "identical from page to page for the same place".
+Nothing measured it. On `job_1788641639919_mpjwlzkf1` pages 3, 5 and 6 all stand
+in `LOC003` (the Stadtturm square) and page 6 renders visibly different foliage
+from its two siblings. The style audit had a declared-vs-rendered axis already —
+time-of-day — and season was simply not one of its fields.
+
+**Decision:** A season axis rides on the existing grid call. The judge returns
+`renderedSeason` per cell from a closed five-word vocabulary
+(`spring|summer|autumn|winter|indeterminate`); code compares fields and never
+reads prose. Two findings come out: `SEASON_DECLARED_MISMATCH` (a cell
+contradicts the commissioned season, resolved with `resolveSeason` — the same
+resolver the story brief used, never the raw field) and
+`SEASON_LOCATION_CONFLICT` (cells sharing a base VB location id render different
+seasons). Location ids come from the brief's METADATA `objects` array; vantage
+variants (`LOC001.1`) collapse onto their base place. `indeterminate` and an
+unreadable verdict contradict nothing. GUIDELINE semantics, mirroring timeFlow
+EXACTLY: reported on the result and stored, never an outlier, never a score
+change, no repaint — the existing repaint path fires on `outliers` only, and
+timeFlow contributes nothing to it either.
+
+**Rationale:** Classification stays in the prompt and code only compares fields,
+per `docs/SETTLED.md`. Zero added cost — one more field on a call that already
+runs. The place-vs-place finding is the one that matters and holds even when
+neither cell contradicts the commission.
+
+**Known gap (measured, not theoretical):** the observed p3/p5/p6 defect is a
+WITHIN-autumn hue drift — copper maple leaves on p3/p5, pale yellow on p6. Both
+read `autumn` at this vocabulary, so the axis as specified returns zero findings
+on this book (replayed offline over the real briefs). It catches a genuinely
+wrong season (the green-vs-orange shape of `job_1788614817116_vxnu60yjg`), not a
+palette drift within one season. Resolving that needs a separate observation
+(a foliage-palette field, or routing it to the style-outlier axis) and is an
+owner decision, not an implementation detail — not built.
+
+**Touched:**
+- `server/lib/styleConsistency.js` (`SEASON_BUCKETS`, `extractSceneLocationIds`, `compareSeasons`, cell `declaredSeason`/`locationIds`, judge prompt observation + schema, parser, `seasonFlow`/`seasonFindings`/`declaredSeason` on the result, `buildStyleAuditInput` carries `season`/`createdAt`)
+- `tests/unit/season-and-visual-flow.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-06 — An invented child cast as a peer is bound to the commissioned children's age band (computation landed, wiring blocked)
+
+**Context:** `job_1788641639919_mpjwlzkf1` was commissioned for Lily (6) and
+Ethan (9). The bible invented `CHR001` "The boy in the striped scarf" with
+`age: "a boy of about ten"` and nothing anywhere tied that number to the
+commissioned children; on p5 he renders as an 11-12-year-old beside a
+6-year-old. Three gaps, all verified: the bible prompt states no band; there is
+no post-bible check of a secondary's age; and the image prompt's
+`AGE & PROPORTIONS` block is built from `sceneCharacters` — which is
+`getCharactersInScene(sceneDescription, inputData.characters)`, the COMMISSIONED
+cast only — so an invented child has never had a head-count proportion cue on
+any page. Its only size signal is the prose word "boy".
+
+**Decision:** The mechanical half is `server/lib/inventedAgeBand.js`, pure and
+fully tested: `commissionedChildBand` computes [min, max] over cast members aged
+12 or under and a tolerance band of [min-1, max+2]; `buildChildAgeBandNote`
+renders the number as the terse line the bible prompt injects;
+`checkSecondaryAges` is the deterministic post-check; `clampAgeToBand` is the
+fallback (the bible stage is fail-soft and has NO retry loop, so a violation
+that cannot be re-asked is clamped and flagged rather than shipped);
+`secondaryAgeCues` turns a bible entry into the `{name, age}` shape the image
+prompt's block already consumes. Peerhood is the BIBLE's declaration (`peer` /
+`peerChild`), read as a field — code never infers it from prose, per
+`docs/SETTLED.md`. An undeclared entry is reported `unchecked`, never guessed at.
+
+**Rationale:** Owner doctrine 2026-09-05 — the number is computed in code from
+the commission and injected into the generator, and the SAME number drives a
+deterministic post-check. Nothing here is an AI call.
+
+**Not wired — blocked on files carrying another agent's uncommitted work:**
+`buildStoryBibleFromBeatsPrompt` and the `AGE & PROPORTIONS` block are both in
+`server/lib/promptBuilders.js`, and the bible stage is in
+`server/lib/beatsPipeline.js`. `prompts/story-bible-from-beats.txt` was left
+untouched deliberately — an injected placeholder with no code to fill it would
+leak the literal token into every bible call.
+
+**Measured caveat:** with band [6, 9] the tolerance is [5, 11], so CHR001's
+stated "about ten" sits INSIDE it and the post-check does not flag this book.
+The lever that would have moved this story is (a) the band injected into the
+bible prompt, which the bible never saw, and (c) the missing proportions cue on
+the page — not the post-check.
+
+**Touched:**
+- `server/lib/inventedAgeBand.js` (new)
+- `tests/unit/invented-age-band.test.ts` (new)
+
+**Status:** 🟡 conditional — computation active and tested, no call site yet
+
+---
+
+## 2026-09-06 — The text writer may write the connective business the arc skips, and its analysis checks the seam between pages
+
+**Context:** In `job_1788641639919_mpjwlzkf1`, page 2 ends with the younger sibling
+announcing she is going down to the square; page 3 opens with both children
+already hidden and mid-round in a neighbourhood game. The approach — crossing to
+the group, asking to join, names exchanged — never happens on any page. Three
+pages later a rival calls the older sibling by a name he was never told.
+
+`story-text-from-beats.txt` already required the bridge:
+
+> "a page tells the stretch of the story that leads to its picture's instant, the
+> move that gets them there included"
+> "The moves between the story's states … are told plainly as they happen, never
+> already finished when a page opens."
+
+It broke that rule because a stricter one pulled the other way: "Nothing else is
+added: no fact, object, character or event the story and pictures do not carry",
+under a section headed "THE STORY (final — this arc IS the story)". The arc had no
+arrival, so writing one was adding an event the story did not carry. The only
+licence to exceed the arc covered feelings and dialogue. Faced with the
+contradiction the writer took the prohibition — the safer of the two, since
+hallucinated plot is what that prohibition exists to prevent.
+
+The writer's Step-1 analysis could not catch it either. It asked three questions:
+which stretch each page tells, which page risks repeating the one before, and
+which arc facts have not found a page. Repetition across a seam is checked;
+coverage is measured against the arc; **a gap between two pages is invisible to
+all three**, because the arc itself had the hole.
+
+**Decision:**
+1. The licence to exceed the arc extends from feelings and dialogue to the
+   connective business the story skips — crossing to a place, walking up to
+   strangers, asking to join, a greeting, names given and heard. Where the story
+   arrives somewhere without saying how, the text writes the arriving.
+2. The addition ban is re-scoped from "no fact, object, character or event the
+   story and pictures do not carry" to "no fact, object, character or event that
+   changes what happens, to whom, or what it costs" — connective movement is no
+   longer caught by it, invented plot still is.
+3. The Step-1 analysis gains a fourth question: name any page that opens in a
+   place, or among people, the page before it never reached.
+4. The same licence and the same re-scoped ban go into `text-refine.txt`, which
+   carried the rule in its own wording and would otherwise cut what the writer now
+   adds.
+
+**Rationale:** A gap in the arc was previously guaranteed to reach the page — the
+text stage was structurally forbidden from repairing one. The arc-side fix (the
+panel's ENTRANCE question, same date) prevents the gap being created; this is the
+second net for arcs where it is created anyway, and it is what a reader actually
+notices. Scoping the licence to movement and greeting rather than to events keeps
+the arc the single source of what happens.
+
+Known gap, not addressed here: the writer's Step-1 analysis is not persisted —
+`writerText` stores only the pages and `storyTextPrompts` was an empty array — so
+what the analysis concluded about a page cannot be recovered afterwards.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`
+
+**Status:** ✅ active

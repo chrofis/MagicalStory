@@ -67,7 +67,11 @@ describe('place names are never cast (story job_1788614817116_vxnu60yjg)', () =>
   it('collects the landmark, town and region names the job already carries', () => {
     expect(PLACES).toContain('Aussichtsturm Uetliberg');
     expect(PLACES).toContain('Zurich');
-    expect(collectPlaceNames({}, ['Marktplatz Altdorf'])).toEqual(['Marktplatz Altdorf']);
+    // The list also carries the story language's calendar nouns (I10) — English
+    // always, because the PAGE PLAN is written in English by contract.
+    const extraOnly = collectPlaceNames({}, ['Marktplatz Altdorf']);
+    expect(extraOnly).toContain('Marktplatz Altdorf');
+    expect(extraOnly).toContain('Monday');
   });
 
   it('keeps places out of the invented cast, and keeps a real invented character in', () => {
@@ -219,5 +223,93 @@ describe('runPlanCounters', () => {
     const r = runPlanCounters({ pages: [page(1, 'wide — Ana')], commissionedNames: CAST });
     expect(r.lines.length).toBe(r.findings.length);
     for (const l of r.lines) expect(l).toMatch(/^PLAN\[[A-Z_0-9]+\]/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// I10 — calendar nouns must never burn an invented-cast slot.
+//
+// Measured on job_1788641639919_mpjwlzkf1 (Baden, en-gb, 14 pages): the plan
+// line "…they must find one friend before Monday — the Monday deadline is
+// spoken aloud…" made `beatsReviewReport.cast.invented` = ["Monday"]. "Monday"
+// is capitalised and is followed by a lowercase verb somewhere in the book, so
+// it passes the acts-like-a-person heuristic exactly as a person would.
+// ────────────────────────────────────────────────────────────────
+describe('calendar nouns are excluded from the cast (I10)', () => {
+  const { collectCalendarNames, calendarNamesForLocale } = planCounters as any;
+
+  // The two plan lines from that story that actually carry the word.
+  const BADEN = [
+    {
+      pageNumber: 2,
+      planLine: 'close-up — Ethan at the flat window, forehead against the glass, the Stadtturm visible in the distance beyond the square where children play below — Ethan turning to Lily beside him and saying they must find one friend before Monday — the Monday deadline is spoken aloud; the tower and the square are established',
+      beat: '',
+    },
+    {
+      pageNumber: 3,
+      planLine: 'ultra-wide — the square below the Stadtturm, Lily springing out from behind a bin into the open while the boy in the striped scarf still counts at the wall — Monday presses closer as Lily bursts out before the count ends — the first round is spoiled',
+      beat: '',
+    },
+  ];
+  const COMMISSIONED = ['Lily', 'Ethan'];
+
+  it('derives weekday and month names from Intl, never a hard-coded list', () => {
+    const en = calendarNamesForLocale('en-gb');
+    expect(en).toContain('Monday');
+    expect(en).toContain('September');
+    expect(calendarNamesForLocale('de-ch')).toContain('Montag');
+    expect(calendarNamesForLocale('fr')).toContain('lundi');
+    // French renders them lowercase; a plan line writes them capitalised.
+    expect(calendarNamesForLocale('fr')).toContain('Lundi');
+    // A locale Intl cannot resolve degrades to nothing instead of throwing.
+    expect(() => calendarNamesForLocale('not-a-locale-!!')).not.toThrow();
+  });
+
+  it('always includes English, because the PAGE PLAN is English by contract', () => {
+    const de = collectCalendarNames('de-ch');
+    expect(de).toContain('Monday');   // the language the plan line is written in
+    expect(de).toContain('Montag');   // the language the book is written in
+    expect(collectCalendarNames('fr-ch')).toContain('Monday');
+  });
+
+  it('reproduces the bug without the fix, and clears it with the fix', () => {
+    // BEFORE — the place list as commit 27c5900c5 built it.
+    const before = resolveCast(BADEN, COMMISSIONED, ['Baden', 'Switzerland', 'Stadtturm']);
+    expect(before.invented).toContain('Monday');
+
+    // AFTER — collectPlaceNames now carries the story language's calendar nouns.
+    const places = collectPlaceNames(
+      { userLocation: { city: 'Baden', country: 'Switzerland' }, language: 'en-gb' },
+      ['Stadtturm'],
+    );
+    const after = resolveCast(BADEN, COMMISSIONED, places);
+    expect(after.invented).not.toContain('Monday');
+    expect(after.invented).toEqual([]);
+    expect(after.places).toContain('Monday');
+  });
+
+  it('a real invented person on the same lines is still found', () => {
+    const pages = [
+      ...BADEN,
+      { pageNumber: 4, planLine: 'medium — Fünkli beside Lily at the wall — Fünkli tugs her sleeve before Monday comes — the pair have a plan', beat: '' },
+    ];
+    const places = collectPlaceNames({ userLocation: { city: 'Baden' }, language: 'en-gb' }, ['Stadtturm']);
+    const cast = resolveCast(pages, COMMISSIONED, places);
+    expect(cast.invented).toEqual(['Fünkli']);
+  });
+
+  it('a commissioned character named for a month stays a character', () => {
+    // Commissioned names are resolved BEFORE the exclusion list is consulted.
+    const pages = [{ pageNumber: 1, planLine: 'wide — April runs across the square — April jumps — she is across', beat: '' }];
+    const places = collectPlaceNames({ language: 'en-gb' }, []);
+    expect(places).toContain('April');
+    expect(resolveCast(pages, ['April'], places).commissioned).toContain('April');
+    expect(resolveCast(pages, ['April'], places).invented).toEqual([]);
+  });
+
+  it('the numeric short-month forms some locales emit are dropped', () => {
+    for (const loc of ['en-gb', 'de-ch', 'fr', 'ja']) {
+      for (const n of calendarNamesForLocale(loc)) expect(n).toMatch(/[a-zA-ZÀ-ɏ]/);
+    }
   });
 });
