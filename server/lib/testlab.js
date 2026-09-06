@@ -7573,28 +7573,44 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   // creator and temperature as production, so only the panel input differs.
   let retell = null;
   if (params.retell === true || params.retell === 'true') {
-    const panel = runs.filter(r => r.ok);
-    if (!panel.length) throw new Error('every panelist failed — nothing to re-tell against');
-    panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
-    const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
-    const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
-    const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, committed, solutionsText);
-    if (!retellPrompt) throw new Error('arc-retell template unavailable');
-    const retellModel = String(params.retellModel || report.creatorModel || MODEL_DEFAULTS.arcCreatorModel);
-    if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
-    const t = Date.now();
-    const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
-      usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
-    });
-    const parsed = H.parseArcRetell(res.text || '');
-    retell = {
-      model: retellModel, modelId: res.modelId,
-      elapsedMs: Date.now() - t,
-      cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
-      fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
-      finalArc: parsed.finalArc, critique: parsed.critique,
-      maxSeverity: H.critiqueMaxSeverity(parsed.critique),
-    };
+    // THE PANEL IS ALREADY PAID FOR. A re-telling that cannot start must not
+    // discard three completed panel calls — run 989 threw on the model lookup
+    // and lost $0.12 of good panel output that was already in `runs`.
+    try {
+      const panel = runs.filter(r => r.ok);
+      if (!panel.length) throw new Error('every panelist failed — nothing to re-tell against');
+      panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
+      const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
+      const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
+      const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, committed, solutionsText);
+      if (!retellPrompt) throw new Error('arc-retell template unavailable');
+      // `arcReviewReport.creatorModel` is the RESOLVED model id the provider
+      // returned ("claude-opus-5"), not the TEXT_MODELS config key the caller
+      // needs ("claude-opus"). Only honour it when it is also a valid key.
+      const retellModel = String(
+        params.retellModel
+        || (TEXT_MODELS[report.creatorModel] ? report.creatorModel : null)
+        || MODEL_DEFAULTS.arcCreatorModel
+      );
+      if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
+      const t = Date.now();
+      const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
+        usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
+      });
+      const parsed = H.parseArcRetell(res.text || '');
+      retell = {
+        ok: true,
+        model: retellModel, modelId: res.modelId,
+        elapsedMs: Date.now() - t,
+        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+        fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
+        finalArc: parsed.finalArc, critique: parsed.critique,
+        maxSeverity: H.critiqueMaxSeverity(parsed.critique),
+      };
+    } catch (err) {
+      log.warn(`⚠️ [arc panel replay] re-tell failed: ${err.message} — panel output stands`);
+      retell = { ok: false, error: err.message };
+    }
   }
 
   return {
