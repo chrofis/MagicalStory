@@ -1586,6 +1586,28 @@ different scene.
 **Status:** ✅ active.
 
 
+### The blended repair templates name the scene's medium from the story (2026-09-06)
+**Context:** Verifying the style-guard fix in Lab exp **#996** (Rachel, back cover
+of `job_1788681313413_xqmtk2gcs`, `artStyle: realistic`). The run succeeded —
+`ok: true`, no gate rejection, a photographic Rachel seamless against the four
+untouched figures — and the new photographic guard was present in the stored
+`promptUsed`. Reading that prompt showed the same wrong claim surviving one line
+higher: `character-repair-blended.txt` and `character-repair-body-blended.txt`
+both opened with *"IMAGE 2 = THE SCENE TO EDIT. This is a children's book
+illustration…"*, describing a photograph to the model as an illustration.
+**Decision:** both templates take a `{sceneMediumLine}` token, filled by
+`faceRepair.js` from the story's medium ("This is a photograph" /
+"This is a children's book illustration").
+**Rationale:** The guard fix addressed one of two hardcoded medium claims in the
+same prompt; leaving the other is leaving the bug half-fixed. Wording stays
+archetypal — no story-specific text enters a template.
+**Touched:** `prompts/character-repair-blended.txt`,
+`prompts/character-repair-body-blended.txt`, `server/lib/faceRepair.js`.
+**Status:** ✅ active. Verified end to end: exp #996 (face, `grok:box:blur:body`)
+and exp **#998** (figure, `grok:box:crosshatch:body`) both return `ok: true` on
+the page whose repair was refused three times before these fixes.
+
+
 ---
 
 ## Cross-cuts already documented elsewhere
