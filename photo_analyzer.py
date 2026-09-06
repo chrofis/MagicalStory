@@ -519,82 +519,93 @@ def _terminate_wedged(role):
 def ensure_worker(role, wait_ready=True, _retried=False):
     """Spawn (or adopt) the worker for `role`; return its base URL.
 
-    Adoption: if something already answers /health on the role's port — an
-    orphan from a previous parent that hasn't noticed the PID change yet — use
-    it rather than colliding with the port.
+    ALIVE IS NOT READY. `_worker_alive` only tests `poll() is None`, which a
+    process that has started but not yet bound its port passes. Returning early
+    on it handed callers a URL that answers `[Errno 111] Connection refused` —
+    the 502 a user got on the first photo upload after a deploy. A live-but-
+    unproven worker therefore falls through to the readiness poll; once a worker
+    has answered, `_worker_ready` short-circuits it and the poll costs nothing.
 
-    ALIVE IS NOT READY (2026-09-05). `_worker_alive` only tests `poll() is
-    None`, which a process that has started but not yet bound its port passes.
-    Returning early on it handed callers a URL that answers `[Errno 111]
-    Connection refused` — the 502 a user got on the first photo upload after a
-    deploy. So a live-but-unproven worker falls through to the readiness poll
-    below instead of short-circuiting; once it is serving, the poll costs one
-    loopback /health call.
+    THE LOCK IS NOT HELD ACROSS BLOCKING WORK. `kill_workers`' docstring rejects
+    holding a lock across `terminate() + wait(5)`; the same applies to a 2s
+    loopback /health probe and a `Popen` on a per-request path, which this used
+    to do. The `_bringing_up` claim taken under the lock IS the spawn mutex, so
+    the blocking parts happen outside it: a second thread sees a non-zero claim
+    and waits rather than spawning a duplicate.
 
-    The role is held in `_bringing_up` for the whole wait so the idle reaper
-    cannot terminate a worker that is still starting. Without that, warmup
-    could never work at all: /warmup returns immediately and spawns on a
-    background thread, so its own request teardown fires `_maybe_reap_workers`
-    with sessions=0 and nothing in flight, and killed the worker it had just
+    The claim also makes the role un-reapable while it starts. Without that,
+    /warmup — which brings workers up on a background thread — had its own
+    request teardown fire `_maybe_reap_workers` and kill the worker it had just
     asked for.
     """
     url = f"http://127.0.0.1:{WORKER_PORTS[role]}"
-    spawned = False
     with _workers_lock:
-        # Proven-ready and still alive: the overwhelmingly common case. Skip the
-        # probe — this is a per-request path.
         if role in _worker_ready and _worker_alive(role):
             return url
-        if role in _adopted:
-            # An adopted role has no Popen, so `_worker_alive` is permanently
-            # False for it and cannot be used as the liveness test. Probe it
-            # instead — cheap, and the alternative was worse: treating adoption
-            # itself as "alive" made a DEAD adopted worker sticky, returning its
-            # URL forever so every call 502'd with ECONNREFUSED and the role
-            # could never fall through to a respawn. That is the likely case,
-            # not a corner: _parent_watchdog makes every orphan exit within 5s
-            # of its parent disappearing, and an adopted worker is by definition
-            # an orphan.
+        probe_adopted = role in _adopted
+        alive = _worker_alive(role)
+        # Only one thread brings a role up; the rest wait on its claim.
+        i_bring_up = not alive and _bringing_up.get(role, 0) == 0
+        if not alive and not probe_adopted:
+            # INVARIANT: _worker_ready never outlives the process it describes.
+            # Every not-alive route passes through here, kill_workers clears the
+            # whole set, and _terminate_wedged discards its own role.
+            _worker_ready.discard(role)
+        if not wait_ready and not i_bring_up:
+            return url
+        _bringing_up[role] = _bringing_up.get(role, 0) + 1
+
+    # ── everything below runs WITHOUT the lock; one exit releases the claim ──
+    spawned = False
+    wedged = False
+    try:
+        if probe_adopted:
+            # An adopted role has no Popen of ours, so `_worker_alive` is
+            # permanently False for it and cannot be the liveness test. Treating
+            # adoption itself as "alive" made a DEAD adopted worker sticky:
+            # its URL was returned forever, every call 502'd, and the role could
+            # never fall through to a respawn — the likely case, since
+            # _parent_watchdog makes every orphan exit within 5s of losing its
+            # parent.
             if _worker_health_ok(role):
                 return url
             print(f"[WORKERS] adopted {role} worker has gone — dropping it")
-            _adopted.discard(role)
-            _worker_ready.discard(role)
-        if not _worker_alive(role):
-            # INVARIANT: _worker_ready never outlives the process it describes.
-            # Every not-alive route passes through here, kill_workers clears the
-            # whole set, and _terminate_wedged discards its own role — so no
-            # reader can see a ready role with a dead process (F12).
-            _worker_ready.discard(role)
+            with _workers_lock:
+                _adopted.discard(role)
+                _worker_ready.discard(role)
+            i_bring_up = not _worker_alive(role)
+
+        if i_bring_up and not _worker_alive(role):
             if _worker_health_ok(role):
                 print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
-                _worker_ready.add(role)
-                _adopted.add(role)
+                with _workers_lock:
+                    _worker_ready.add(role)
+                    _adopted.add(role)
                 return url
             env = dict(os.environ)
             env['ANALYZER_ROLE'] = role
             env['PHOTO_ANALYZER_PORT'] = str(WORKER_PORTS[role])
             env['ANALYZER_PARENT_PID'] = str(os.getpid())
             print(f"[WORKERS] spawning {role} worker on :{WORKER_PORTS[role]}")
-            _workers[role] = subprocess.Popen(
+            proc = subprocess.Popen(
                 [sys.executable, '-u', os.path.abspath(__file__)], env=env)
-            _spawned_at[role] = time.time()
+            with _workers_lock:
+                _workers[role] = proc
+                _spawned_at[role] = time.time()
             spawned = True
-        # Someone else is already waiting on this role's startup, so the long
-        # budget is the right one even though WE did not spawn it.
-        # A worker nobody is CURRENTLY waiting on is otherwise indistinguishable
-        # from a wedged one: the first waiter's 120s could expire, its
-        # _bringing_up claim drop, and the next arrival 1s later would apply the
-        # 15s budget to a process still legitimately importing models — then
-        # kill it and start again, forever. Its own age settles it.
-        age = time.time() - _spawned_at.get(role, 0)
-        starting = (spawned or _bringing_up.get(role, 0) > 0
-                    or age < WORKER_START_TIMEOUT_S)
+
         if not wait_ready:
             return url
-        _bringing_up[role] = _bringing_up.get(role, 0) + 1
-    wedged = False
-    try:
+
+        with _workers_lock:
+            # Another waiter means the long budget is right even though WE did
+            # not spawn. And a worker nobody is CURRENTLY waiting on is
+            # otherwise indistinguishable from a wedged one — its own age
+            # settles that, or a slow boot gets killed and restarted forever.
+            age = time.time() - _spawned_at.get(role, 0)
+            starting = (spawned or _bringing_up.get(role, 0) > 1
+                        or age < WORKER_START_TIMEOUT_S)
+
         # Model imports gate readiness (mediapipe ~5s, TF ~15s). Poll rather
         # than sleep so the fast workers don't pay the slow ones' budget.
         budget = WORKER_START_TIMEOUT_S if starting else WEDGED_WORKER_TIMEOUT_S
@@ -618,9 +629,10 @@ def ensure_worker(role, wait_ready=True, _retried=False):
                 _bringing_up[role] -= 1
             else:
                 _bringing_up.pop(role, None)
+
     if wedged:
-        # Outside the finally so the bring-up guard is already released — the
-        # respawn below has to be able to register its own.
+        # Outside the finally so the claim is released — the respawn below has
+        # to be able to take its own.
         _terminate_wedged(role)
         if _retried:
             raise RuntimeError(f"{role} worker wedged and did not recover after a respawn")
@@ -727,6 +739,9 @@ _SESSION_LEAK_TIMEOUT_S = int(os.environ.get('SESSION_LEAK_TIMEOUT_S', '5400'))
 # the rest of the process is — the global-silence rule above can be held off
 # indefinitely by OTHER users' traffic, which is not evidence about THIS session.
 _SESSION_MAX_AGE_S = int(os.environ.get('SESSION_MAX_AGE_S', str(3 * 3600)))
+
+# Upper bound on concurrently tracked sessions (ids are caller-supplied).
+_MAX_SESSIONS = int(os.environ.get('MAX_ANALYZER_SESSIONS', '200'))
 
 
 def _maybe_reap_workers():
@@ -841,6 +856,14 @@ def session_begin():
     sid = str(body.get('id') or f"anon-{uuid.uuid4().hex[:12]}")
     label = str(body.get('label') or 'unlabelled')[:80]
     with _request_lock:
+        # Bounded, like presenceSessions' MAX_TOKENS on the Node side. Ids are
+        # caller-supplied, and an unbounded table is one buggy loop away from
+        # pinning the worker fleet forever.
+        if sid not in _sessions and len(_sessions) >= _MAX_SESSIONS:
+            print(f"[SESSION] refusing {sid} ({label}) — {_MAX_SESSIONS} already open")
+            _recount_sessions_locked()
+            return jsonify({"success": False, "error": "too many sessions",
+                            "active": _active_sessions}), 429
         if sid in _sessions:
             print(f"[SESSION] begin {sid} ({label}) — already open, ignoring")
         else:
@@ -3286,9 +3309,21 @@ def health_check():
         # `python_total_rss_mb` is the number to compare against the cgroup.
         workers = {}
         worker_rss = 0.0
+        # Snapshot under the lock; three other paths mutate these.
+        with _workers_lock:
+            procs = dict(_workers)
+            adopted = set(_adopted)
         for role in WORKER_PORTS:
-            entry = {"port": WORKER_PORTS[role], "up": _worker_alive(role)}
-            proc = _workers.get(role)
+            proc = procs.get(role)
+            alive = proc is not None and proc.poll() is None
+            # An ADOPTED worker has no Popen of ours, so `_worker_alive` is False
+            # for it and it used to be reported down with no RSS — understating
+            # exactly the case `_adopted` exists to keep visible. Probe it.
+            is_adopted = role in adopted and not alive
+            entry = {"port": WORKER_PORTS[role],
+                     "up": alive or (is_adopted and _worker_health_ok(role))}
+            if is_adopted:
+                entry["adopted"] = True
             if proc is not None and proc.poll() is None:
                 rss = _proc_rss_mb(proc.pid)
                 if rss is not None:

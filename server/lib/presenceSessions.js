@@ -24,6 +24,10 @@ const { sessionBegin, sessionEnd, analyzerFetch } = require('./analyzerClient');
 // Owner's spec: "inactive for 5 min or so".
 const PRESENCE_TTL_MS = Number(process.env.PRESENCE_TTL_MS || 5 * 60 * 1000);
 const SWEEP_INTERVAL_MS = 30 * 1000;
+// How often a still-present tab re-asserts its analyzer session, so an analyzer
+// restart cannot strand it sessionless. Well under the analyzer's own leak
+// timeout, and far above the beat rate so it adds negligible traffic.
+const REASSERT_INTERVAL_MS = 10 * 60 * 1000;
 
 // token -> { lastBeat, surface }
 const tokens = new Map();
@@ -41,13 +45,22 @@ function beat(token, surface = 'unknown') {
   const existing = tokens.get(token);
   if (existing) {
     existing.lastBeat = Date.now();
+    // Re-assert the session periodically. sessionReset covers a NODE restart;
+    // nothing covered an ANALYZER restart, which empties its session table while
+    // this map still holds the token — so a present user silently lost their
+    // warm workers for the life of the tab. /session/begin is idempotent on the
+    // id, so a re-assert costs nothing when the session is already open.
+    if (Date.now() - (existing.lastAssert || 0) > REASSERT_INTERVAL_MS) {
+      existing.lastAssert = Date.now();
+      sessionBegin(`presence:${existing.surface}`, { id: token });
+    }
     return { ok: true, active: tokens.size, new: false };
   }
   if (tokens.size >= MAX_TOKENS) {
     log.warn(`[PRESENCE] token cap (${MAX_TOKENS}) reached — beat accepted without a new session`);
     return { ok: true, active: tokens.size, new: false, capped: true };
   }
-  tokens.set(token, { lastBeat: Date.now(), surface });
+  tokens.set(token, { lastBeat: Date.now(), lastAssert: Date.now(), surface });
   log.debug(`[PRESENCE] ${surface} arrived (${tokens.size} present) — opening analyzer session + warm`);
   // Keyed on the TAB TOKEN: two tabs share a surface, so `presence:trial`
   // would collide — the second begin would be ignored and the first leave

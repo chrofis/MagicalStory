@@ -61,7 +61,11 @@ async function analyzerFetch(path, options = {}, { retries = 3, retryDelayMs = 4
 // Debounce: "user is active" fires on lots of requests, but warming is only
 // worth doing occasionally. The analyzer's own get_*() are idempotent, so the
 // only cost of a redundant call is noise.
-let lastWarmMs = 0;
+// Keyed by role set (2026-09-06). A single shared timestamp meant a
+// `workers:['face']` warm suppressed every non-forced warm for five minutes —
+// including one asking for a DIFFERENT role that nothing had loaded. Harmless
+// only while both non-forced callers happened to ask for the same thing.
+const lastWarmMsByKey = new Map();
 const WARM_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
@@ -74,8 +78,11 @@ function ensureWarm(reason = 'user-active', { force = false, workers = null } = 
   // phase is about to run detection after a long text/image phase that let the
   // models idle-unload). The debounce is shared across stories, so without
   // force a concurrent story's recent warm could skip the one that matters.
-  if (!force && now - lastWarmMs < WARM_INTERVAL_MS) return;
-  lastWarmMs = now;
+  const warmKey = Array.isArray(workers) && workers.length
+    ? [...workers].sort().join(',')
+    : 'default';
+  if (!force && now - (lastWarmMsByKey.get(warmKey) || 0) < WARM_INTERVAL_MS) return;
+  lastWarmMsByKey.set(warmKey, now);
   // WHICH models to preload is the CALLER's answer, not the analyzer's guess
   // (owner, 2026-08-17). The analyzer used to decide from its own
   // FIGURE_DETECTION_BACKEND env var, which meant two places had to agree; when
