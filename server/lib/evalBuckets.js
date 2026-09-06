@@ -112,6 +112,15 @@ const BUCKETS = {
   // composition_textzone / iterate_placement, which repositions art — it cannot
   // rebuild an undersized structure. Only a full redo can.
   structure_scale:      { owner: 'quality',  kind: 'graded', repair: 'regen' },
+  // One named prop rendered twice when the scene has one of it
+  // (image-evaluation D-32) — the eval-side check for the worn-item dedupe the
+  // creation side now does. Its own bucket, NOT an alias of `object_presence`:
+  // that bucket is PAGE_SCOPED in scoring.js ("we deduct only once for missing
+  // elements"), so aliasing would make a duplicated prop free on any page that
+  // already carries a missing element, and would hide the count the owner asked
+  // for ("check if it is double"). Repair is an inpaint — painting the stray
+  // copy out is the targeted fix; a full regen is the expensive wrong answer.
+  duplicate_object:     { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
   character_marking:    { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   anachronism:          { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
@@ -159,6 +168,8 @@ const TYPE_TO_BUCKET = {
   composition: 'composition_textzone', position_and_scale: 'composition_textzone',
   scale: 'composition_textzone', position: 'composition_textzone', textzone: 'composition_textzone',
   structure_scale: 'structure_scale', undersized_structure: 'structure_scale',
+  duplicate_object: 'duplicate_object', duplicated_object: 'duplicate_object',
+  duplicate_prop: 'duplicate_object', object_duplication: 'duplicate_object',
   rendered_text: 'rendered_text', text: 'rendered_text',
   character_marking: 'character_marking', marking: 'character_marking',
   anachronism: 'anachronism',

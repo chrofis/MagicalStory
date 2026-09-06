@@ -168,6 +168,14 @@ const MAX_SEVERITY_TYPES = {
   // does — an evaluator escalating one to CRITICAL must not let a scale defect
   // outrank a missing or wrong character.
   structure_scale: 'major',
+  // duplicate_object capped at MAJOR (owner-approved addition, 2026-09-06):
+  // image-evaluation D-32 defines a named prop rendered twice as MAJOR — the
+  // owner's footing, "on the level of a missing key object" (D-19, also MAJOR).
+  // The cap holds that line the way `structure_scale`'s does: an evaluator
+  // escalating a stray second copy to CRITICAL must not let it outrank a
+  // missing or wrong character, and must not reach the severity that routes a
+  // page to character repair (settled critical-only routing, 2026-09-04).
+  duplicate_object: 'major',
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever

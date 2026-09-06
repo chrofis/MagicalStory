@@ -27907,3 +27907,62 @@ and usage; `meta.storyTextCall`), `client/src/components/generation/StoryDisplay
 (type widened to `ReviewDiffReport`, a third briefsIn label for the text panel in
 the SHARED helper, writer-analysis block in the existing story-text panel).
 **Status:** ✅ active
+
+## 2026-09-06 — The quality evaluator gets `duplicate_object`: one named prop rendered twice is a MAJOR, capped in code
+
+**Context:** The creation side now de-duplicates worn items so a prop the scene
+has one of is not specified twice. Nothing checked the RESULT. Evidence:
+staging story `job_1788641639919_mpjwlzkf1`, page 3 — the girl wears the red hat
+AND a second identical red hat lies on the cobbles in the foreground. The
+quality evaluator returned `verdict: "PASS"`, `issues_summary: ""` and
+`fixable_issues: []` on that page: 100/100, no finding. The page's stored
+finalScore of 70 came entirely from two unrelated three-stage MAJORs (a hooded
+jacket, a wrong expression). No existing code covered the defect: D-01's
+duplicate clause is specifically a reference-image miniature sitting in its own
+box on a plain background at the frame edge, and D-22 `object_count` is an
+exact named count being off by one or two.
+
+**Decision:** One new rule in the quality evaluator, `D-32 duplicate_object →
+MAJOR`, plus a MAJOR ceiling on that type in `scoring.js`. The rule is
+archetypal (a named prop the scene has ONE of appears twice or more — one worn
+or held and a second copy elsewhere, or two identical copies in different
+places), explicitly disjoint from D-01, and skips a prompt-named count or
+plural and generic set dressing. `duplicate_object` is a bucket of its own in
+`evalBuckets.js`, owner `quality`, repair `inpaint`, and it is listed in the
+consolidator's closed type vocabulary with a keep-your-own-type line.
+
+**Rationale:**
+- MAJOR is the owner's footing — a duplicated story prop sits on the level of a
+  missing key object, which is D-19, also MAJOR.
+- The ceiling is code because that is all code may do (owner's severity rule:
+  classification belongs to the prompt, code may only bound a severity — no
+  pattern matching over a finding's description). It exists so an evaluator
+  escalating a stray second copy to CRITICAL cannot let it outrank a missing or
+  wrong character, and cannot reach the severity that routes a page to
+  character repair under the settled critical-only routing (2026-09-04).
+- Its own BUCKET, not an alias of `object_presence`: that bucket is in
+  `PAGE_SCOPED_BUCKETS` ("we deduct only once for missing elements"), so
+  aliasing would make a duplicate cost nothing on any page that already carries
+  a missing element, and would erase the count the owner asked for ("check if
+  it is double"). Repair is `inpaint` — painting the stray copy out is the
+  targeted fix; a full regen is the expensive wrong answer. Same reasoning that
+  gave `structure_scale` its own bucket rather than folding it into `scale`.
+- Effect on the redo gate: a MAJOR is 15 points, so p3 would move 70 → 55. The
+  redo threshold is `< 50` (`REPAIR_DEFAULTS.scoreThreshold`) and the issue
+  threshold is 5, so a duplicate alone does not force a redo on an otherwise
+  healthy page — deliberately. It bills, it ranks the page lower for pick-best,
+  and it tips a page that already carries one more MAJOR below the gate. It is
+  not CRITICAL, so it never takes `findBadPages`' critical-carrying branch and
+  never selects a character repair task.
+- The client mirror (`useRepairWorkflow.ts` `MAX_SEVERITY_TYPES`) is
+  deliberately NOT updated, exactly as for `structure_scale`: it mirrors only
+  the sub-MAJOR entity ceilings, and `duplicate_object` is a quality-evaluator
+  type that never reaches `entityIssuePoints`.
+
+**Touched:** `prompts/image-evaluation.txt` (D-32),
+`prompts/feedback-consolidator.txt` (closed type list + keep-own-type line),
+`server/lib/evalBuckets.js` (`BUCKETS`, `TYPE_TO_BUCKET` + aliases),
+`server/lib/scoring.js` (`MAX_SEVERITY_TYPES`),
+`tests/unit/duplicate-object-type.test.ts`.
+
+**Status:** ✅ active
