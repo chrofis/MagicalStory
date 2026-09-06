@@ -29681,3 +29681,52 @@ into the artwork with no font fallback; the evaluator's rendered-text check rema
 
 **Touched:** `server/config/runtime.js`, `tests/unit/cover-title-mode.test.ts`, `docs/SETTLED.md`.
 **Status:** ✅ active — reaches production with the next master push.
+
+## 2026-09-06 — Admin-script OAuth lives in its own Google Cloud project, never the customer one
+
+**Context:** customers hit *"Google hasn't verified this app — the app is requesting
+access to sensitive info"* on the Google sign-in at the trial email step
+(reproduced on production, client `69965481554-cl8hv6p5…`, `scope=openid+email+profile`).
+Both sign-in paths request only non-sensitive scopes
+(`server/routes/auth.js:460`, `client/src/services/googleAuth.ts:184`), so the
+warning did not come from what the login asks for. Project `magical-story-3b745`
+(number `69965481554`) also held **MagicalStory Ads CLI**, which requested
+`.../auth/adwords` — a sensitive scope — and had burned the project's
+`1 user / 100` unverified-sensitive-scope cap. The project's Data Access table
+was additionally **empty**: the three login scopes were never declared, so
+Google treated them as unapproved (its own Audience-page note: *"it is because
+your OAuth request includes additional scopes that haven't been approved"*).
+Google-registration events stopped after `pascale.niggli@gmail.com`
+on 2026-08-16, with six in the ten weeks before — consistent with the console's
+migration to the Auth Platform dropping the scope declarations.
+
+**Decision:** the customer project `magical-story-3b745` carries **only**
+non-sensitive scopes (`openid`, `userinfo.email`, `userinfo.profile`), declared
+explicitly on Data Access, publishing status *In production*, External. Every
+admin script that needs a sensitive scope authorizes against a **separate**
+Cloud project, `magicalstory-admin-tools` (number `69638796140`, client
+`69638796140-mvt49e…`, Desktop type, External/published-unverified). Ads
+(`.../auth/adwords`) and Search Console (`.../auth/webmasters.readonly`) live
+there and nowhere else. The old `MagicalStory Ads CLI` client was deleted from
+the customer project.
+
+**Rationale:** a sensitive scope requested by *any* client in a project puts the
+whole project into unverified-sensitive-scope state, and that state is what the
+consent screen shows customers — a red warning at the exact moment a parent is
+asked for their email, plus a hard 100-user lifetime cap. Verifying the project
+instead would need a privacy-policy review, domain verification and a demo video
+per scope, days-to-weeks of Google review, with the warning live throughout —
+for scopes only the owner ever authorizes. Internal user type would have avoided
+it entirely but requires Workspace; the accounts here are consumer, so External
+is the only option. The admin project is published (not left in Testing) so its
+refresh tokens do not expire every 7 days.
+
+**Touched:** `scripts/ads/config.json` + `scripts/seo/config.json` (gitignored,
+local only — `client_id`/`client_secret`/`refresh_token` now point at
+`69638796140-…`; `developer_token`, `customer_id`, `login_customer_id` unchanged,
+they belong to the Ads manager account not the Cloud project). No application
+code changed. Verified after migration: `node scripts/ads/whoami.js` → both
+customer accounts, `node scripts/seo/report.js` → live Search Console data.
+
+**Status:** ✅ active. Do NOT consolidate the two Cloud projects back into one,
+and never add a sensitive scope to `magical-story-3b745`.
