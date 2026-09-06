@@ -53,6 +53,12 @@ function beat(token, surface = 'unknown') {
     if (Date.now() - (existing.lastAssert || 0) > REASSERT_INTERVAL_MS) {
       existing.lastAssert = Date.now();
       sessionBegin(`presence:${existing.surface}`, { id: token });
+      // Re-WARM as well, not just re-register. After an analyzer restart the
+      // session is being re-created on a parent that has no workers at all, so
+      // registering alone left the next upload paying the exact cold start
+      // presence exists to prevent. Idempotent, and deliberately not via
+      // ensureWarm — that debounce is shared and would swallow this.
+      warmPhotoPath();
     }
     return { ok: true, active: tokens.size, new: false };
   }
@@ -66,9 +72,14 @@ function beat(token, surface = 'unknown') {
   // would collide — the second begin would be ignored and the first leave
   // would close both.
   sessionBegin(`presence:${surface}`, { id: token });
-  // Warm the photo-upload path only: face (mediapipe) + rembg. The story
-  // pipeline warms torch at story start, which is 20+ minutes before the repair
-  // phase needs it.
+  warmPhotoPath();
+  return { ok: true, active: tokens.size, new: true };
+}
+
+/** Warm the photo path (face worker only). Fire-and-forget, idempotent. */
+function warmPhotoPath() {
+  // face (mediapipe) + rembg only. The story pipeline warms torch at story
+  // start, which is 20+ minutes before the repair phase needs it.
   //
   // `workers: ['face']` is what actually enforces that (2026-09-05). Sending
   // `dino: false` alone did NOT: it only stops GroundingDINO loading INSIDE the
@@ -81,7 +92,6 @@ function beat(token, surface = 'unknown') {
     body: JSON.stringify({ dino: false, workers: ['face'] }),
     signal: AbortSignal.timeout(8000),
   }, { retries: 1, retryDelayMs: 3000 }).catch(() => {});
-  return { ok: true, active: tokens.size, new: true };
 }
 
 /** Explicit goodbye (pagehide). Best-effort — the sweeper is the guarantee. */

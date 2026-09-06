@@ -878,9 +878,10 @@ def _maybe_reap_workers():
     # /session/begin returned 429 forever, recoverable only by a Node restart.
     if sessions > 0 and not busy and not have_workers:
         now = time.time()
-        stale_only = [sid for sid, meta in list(_sessions.items())
-                      if now - meta['started'] > _SESSION_MAX_AGE_S
-                      and not str(meta.get('label', '')).startswith('presence:')]
+        with _request_lock:
+            stale_only = [sid for sid, meta in _sessions.items()
+                          if now - meta['started'] > _SESSION_MAX_AGE_S
+                          and not str(meta.get('label', '')).startswith('presence:')]
         if stale_only:
             with _request_lock:
                 for sid in stale_only:
@@ -911,9 +912,14 @@ def _maybe_reap_workers():
         # for the life of the tab. They have their own guard: Node's 5-minute
         # presence TTL sends the end, and a Node restart clears them all via
         # /session/reset.
-        stale = [sid for sid, meta in list(_sessions.items())
-                 if now - meta['started'] > _SESSION_MAX_AGE_S
-                 and not str(meta.get('label', '')).startswith('presence:')]
+        # Under the lock: /session/begin and /session/end mutate this dict, and
+        # iterating it unlocked can raise "dictionary changed size during
+        # iteration" — which the teardown's except would swallow, silently
+        # skipping that reap cycle. Same reasoning as the worker read above.
+        with _request_lock:
+            stale = [sid for sid, meta in _sessions.items()
+                     if now - meta['started'] > _SESSION_MAX_AGE_S
+                     and not str(meta.get('label', '')).startswith('presence:')]
         leaked_globally = idle_for > _SESSION_LEAK_TIMEOUT_S
 
         if not stale and not leaked_globally:
@@ -3053,6 +3059,18 @@ def _warm_roles(roles, body):
     finally:
         _release_warm_hold(roles)
     print(f"[WARMUP] workers up in {time.time() - t0:.1f}s ({', '.join(roles)})")
+    # Re-check for a reap we blocked. The ONLY reap trigger in this process is
+    # request teardown, and a warm dispatched from a sessionless request (a photo
+    # upload, story creation) routinely outlives the request that started it: the
+    # teardown fires, the kill is refused because we hold the warm, and then
+    # nothing ever looks again. The workers stayed resident until the next
+    # analyzer request — which for a user who uploads once and leaves never
+    # comes. Safe off-thread: _maybe_reap_workers touches only globals and needs
+    # no Flask request context.
+    try:
+        _maybe_reap_workers()
+    except Exception as e:
+        print(f"[WARMUP] post-warm reap check failed: {e}")
 
 
 _warmup_thread = None
@@ -3195,10 +3213,14 @@ def warmup_endpoint():
             # thread's first instruction — killing the very fleet the warm was
             # about to build.
             _take_warm_hold(outstanding)
-            thread = threading.Thread(target=_warm_roles,
-                                      args=(list(outstanding), dict(body)),
-                                      daemon=True)
             try:
+                # Construction is INSIDE the try: if Thread() itself raises, the
+                # hold and the role claim would otherwise be left with no thread
+                # to clear them — and a permanently non-empty _warm_hold blocks
+                # every non-forced kill_workers forever.
+                thread = threading.Thread(target=_warm_roles,
+                                          args=(list(outstanding), dict(body)),
+                                          daemon=True)
                 thread.start()
             except Exception as e:
                 _release_warm_hold(outstanding)

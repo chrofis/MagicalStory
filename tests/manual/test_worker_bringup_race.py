@@ -329,6 +329,11 @@ def test_warm_actually_spawns_the_worker():
     pa._urlreq.urlopen = lambda *a, **k: type('R', (), {'read': lambda self: b'{}'})()
 
     client = pa.app.test_client()
+    # Presence opens a SESSION and then warms — that is the real flow. Without a
+    # session the post-warm reap correctly kills the worker again (sessionless
+    # work lives only as long as the request), so a session is what makes "the
+    # warm survives" a meaningful assertion.
+    client.post('/session/begin', json={'id': 'tab-1', 'label': 'presence:trial'})
     r = client.post('/warmup', json={'dino': False, 'workers': ['face']})
     check('warm dispatched', r.get_json().get('warming') == ['face'], str(r.get_json()))
 
@@ -344,6 +349,16 @@ def test_warm_actually_spawns_the_worker():
           f'_warm_hold={pa._warm_hold}')
     check('the spawn mutex is released', not pa._bringing_up,
           f'_bringing_up={pa._bringing_up}')
+
+    # And the post-warm reap must actually reclaim it once the session closes —
+    # the warm hold blocks the reap that fires while warming, and nothing used to
+    # look again afterwards.
+    client.post('/session/end', json={'id': 'tab-1'})
+    deadline = time.time() + 5
+    while time.time() < deadline and pa._workers:
+        time.sleep(0.1)
+    check('reaped once the session closed', not pa._workers,
+          f'_workers={list(pa._workers)}')
 
 
 if __name__ == '__main__':
