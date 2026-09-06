@@ -456,6 +456,11 @@ _adopted = set()
 # When each role's process was started, so a legitimately slow boot is not
 # mistaken for a wedge (see ensure_worker).
 _spawned_at = {}
+# Bumped by every kill. A spawn that started before a kill and finishes after it
+# belongs to the era the kill was clearing, so it must not be registered:
+# /session/reset promises a clean slate, and a worker from the previous era
+# surviving it is exactly what that promise excludes.
+_kill_generation = 0
 # Roles that have answered /health since they were spawned. Lets the common path
 # (worker already serving) skip the readiness probe entirely — without it every
 # proxied request paid a loopback round trip. Cleared on spawn and on kill.
@@ -482,6 +487,23 @@ def _worker_alive(role):
     return proc is not None and proc.poll() is None
 
 
+def _adopted_worker_rss(role, timeout=2):
+    """RSS of a worker we did not spawn, read from its own /health.
+
+    An adopted process has no Popen here, so `_proc_rss_mb` cannot reach it.
+    Returns None when it does not answer — which also serves as the liveness
+    test for adopted roles.
+    """
+    try:
+        with _urlreq.urlopen(
+                f"http://127.0.0.1:{WORKER_PORTS[role]}/health", timeout=timeout) as r:
+            if r.status != 200:
+                return None
+            return (json.loads(r.read() or b'{}') or {}).get('rss_mb')
+    except Exception:
+        return None
+
+
 def _worker_health_ok(role, timeout=2):
     try:
         with _urlreq.urlopen(f"http://127.0.0.1:{WORKER_PORTS[role]}/health", timeout=timeout) as r:
@@ -490,7 +512,7 @@ def _worker_health_ok(role, timeout=2):
         return False
 
 
-def _terminate_wedged(role):
+def _terminate_wedged(role, expect_proc=None):
     """Kill a worker that is alive but will not answer, so it can be respawned.
 
     Without this the wedged state is ABSORBING: `_worker_alive` is True so
@@ -500,9 +522,17 @@ def _terminate_wedged(role):
     its full RSS.
     """
     with _workers_lock:
+        current = _workers.get(role)
+        if expect_proc is not None and current is not expect_proc:
+            # Another thread replaced it between our claim release and here.
+            # Terminating what we find would kill a healthy brand-new worker and
+            # fail that thread's poll with "exited during startup".
+            print(f"[WORKERS] {role} was replaced while wedged — leaving the new one alone")
+            return
         proc = _workers.pop(role, None)
         _worker_ready.discard(role)
         _adopted.discard(role)
+        _spawned_at.pop(role, None)
     if proc is None or proc.poll() is not None:
         return
     print(f"[WORKERS] {role} worker is wedged (alive, not answering) — terminating")
@@ -540,6 +570,7 @@ def ensure_worker(role, wait_ready=True, _retried=False):
     """
     url = f"http://127.0.0.1:{WORKER_PORTS[role]}"
     with _workers_lock:
+        gen = _kill_generation
         if role in _worker_ready and _worker_alive(role):
             return url
         probe_adopted = role in _adopted
@@ -573,7 +604,12 @@ def ensure_worker(role, wait_ready=True, _retried=False):
             with _workers_lock:
                 _adopted.discard(role)
                 _worker_ready.discard(role)
-            i_bring_up = not _worker_alive(role)
+            # `and i_bring_up`: only the thread that WON the claim may go on to
+            # spawn. Recomputing this from scratch let every thread in this
+            # branch decide it was the spawner — `_worker_alive` is False for an
+            # adopted role by definition — so two Popens raced for one port and
+            # the loser's death was reported as "exited during startup".
+            i_bring_up = i_bring_up and not _worker_alive(role)
 
         if i_bring_up and not _worker_alive(role):
             if _worker_health_ok(role):
@@ -590,8 +626,21 @@ def ensure_worker(role, wait_ready=True, _retried=False):
             proc = subprocess.Popen(
                 [sys.executable, '-u', os.path.abspath(__file__)], env=env)
             with _workers_lock:
-                _workers[role] = proc
-                _spawned_at[role] = time.time()
+                if _kill_generation != gen:
+                    # A kill landed while we were spawning. Registering now would
+                    # smuggle a worker past a reset that was meant to clear it.
+                    print(f"[WORKERS] discarding {role} spawn — a kill landed mid-spawn")
+                    stale = proc
+                else:
+                    _workers[role] = proc
+                    _spawned_at[role] = time.time()
+                    stale = None
+            if stale is not None:
+                try:
+                    stale.terminate()
+                except Exception:
+                    pass
+                raise RuntimeError(f"{role} worker spawn cancelled by a concurrent kill")
             spawned = True
 
         if not wait_ready:
@@ -616,7 +665,18 @@ def ensure_worker(role, wait_ready=True, _retried=False):
                     _worker_ready.add(role)
                 break
             if not _worker_alive(role):
-                raise RuntimeError(f"{role} worker exited during startup")
+                # "No live process" means different things to different threads.
+                # The spawner: its own child died — fatal. A WAITER: the spawner
+                # may simply not have reached Popen yet (its pre-spawn adopt
+                # probe alone can take 2s), so treating this as fatal made an
+                # ordinary concurrent cold start fail ~2s in, with the 120s
+                # budget it had just computed left unused.
+                if spawned:
+                    raise RuntimeError(f"{role} worker exited during startup")
+                with _workers_lock:
+                    someone_starting = _bringing_up.get(role, 0) > 1
+                if not someone_starting:
+                    raise RuntimeError(f"{role} worker exited during startup")
             time.sleep(0.5)
         else:
             if starting:
@@ -633,7 +693,9 @@ def ensure_worker(role, wait_ready=True, _retried=False):
     if wedged:
         # Outside the finally so the claim is released — the respawn below has
         # to be able to take its own.
-        _terminate_wedged(role)
+        with _workers_lock:
+            observed = _workers.get(role)
+        _terminate_wedged(role, expect_proc=observed)
         if _retried:
             raise RuntimeError(f"{role} worker wedged and did not recover after a respawn")
         print(f"[WORKERS] respawning {role} after a wedge")
@@ -679,11 +741,14 @@ def kill_workers(reason, expect_epoch=None, force=False):
         # ensure_worker needs it, so three workers could block a spawn for 15s,
         # and the request that waited then found the worker gone and paid a
         # cold start (2026-09-06).
+        global _kill_generation
+        _kill_generation += 1
         doomed = list(_workers.items())
         orphans = list(_adopted)
         _workers.clear()
         _worker_ready.clear()
         _adopted.clear()
+        _spawned_at.clear()
     # An adopted worker has no Popen to terminate, so ask it to exit. Without
     # this it survived every kill path and kept its full RSS billed.
     for role in orphans:
@@ -792,6 +857,25 @@ def _maybe_reap_workers():
     # end cleanly. Reclaim it. The guard is REQUEST activity, not wall-clock —
     # a genuinely long story is issuing analyzer calls throughout, and any
     # in-flight request blocks this.
+    # The age prune runs whether or not workers exist. Gating the whole block on
+    # `have_workers` meant that once the workers were gone, nothing ever pruned
+    # `_sessions` again — so leaked ids accumulated to the cap and every later
+    # /session/begin returned 429 forever, recoverable only by a Node restart.
+    if sessions > 0 and not busy and not have_workers:
+        now = time.time()
+        stale_only = [sid for sid, meta in list(_sessions.items())
+                      if now - meta['started'] > _SESSION_MAX_AGE_S
+                      and not str(meta.get('label', '')).startswith('presence:')]
+        if stale_only:
+            with _request_lock:
+                for sid in stale_only:
+                    meta = _sessions.pop(sid, None)
+                    if meta:
+                        print(f"[SESSIONS] {sid} ({meta['label']}) past the max age "
+                              f"with no workers — reclaiming")
+                _recount_sessions_locked()
+        return
+
     if sessions > 0 and not busy and have_workers:
         now = time.time()
         idle_for = now - _last_request_ts
@@ -2918,17 +3002,32 @@ def _warm_roles(roles, body):
     roles get the identical treatment rather than being dropped.
     """
     t0 = time.time()
-    for role in roles:
-        try:
-            base = ensure_worker(role)
-            req = _urlreq.Request(f"{base}/warmup", data=json.dumps(body).encode(),
-                                  headers={'Content-Type': 'application/json'}, method='POST')
-            _urlreq.urlopen(req, timeout=10).read()
-        except Exception as e:
-            print(f"[WARMUP] {role} worker warm failed: {e}")
-        finally:
-            with _warmup_lock:
-                _warming_roles.discard(role)
+    # Hold a bring-up claim over the WHOLE warm, not one role at a time. Warming
+    # is sequential, so once `face` finished its claim dropped, and any unrelated
+    # request teardown could reap the worker we had just warmed before `torch`
+    # was even started — silently defeating the warm the caller asked for.
+    with _workers_lock:
+        for role in roles:
+            _bringing_up[role] = _bringing_up.get(role, 0) + 1
+    try:
+        for role in roles:
+            try:
+                base = ensure_worker(role)
+                req = _urlreq.Request(f"{base}/warmup", data=json.dumps(body).encode(),
+                                      headers={'Content-Type': 'application/json'}, method='POST')
+                _urlreq.urlopen(req, timeout=10).read()
+            except Exception as e:
+                print(f"[WARMUP] {role} worker warm failed: {e}")
+            finally:
+                with _warmup_lock:
+                    _warming_roles.discard(role)
+    finally:
+        with _workers_lock:
+            for role in roles:
+                if _bringing_up.get(role, 0) > 1:
+                    _bringing_up[role] -= 1
+                else:
+                    _bringing_up.pop(role, None)
     print(f"[WARMUP] workers up in {time.time() - t0:.1f}s ({', '.join(roles)})")
 
 
@@ -3320,10 +3419,19 @@ def health_check():
             # for it and it used to be reported down with no RSS — understating
             # exactly the case `_adopted` exists to keep visible. Probe it.
             is_adopted = role in adopted and not alive
-            entry = {"port": WORKER_PORTS[role],
-                     "up": alive or (is_adopted and _worker_health_ok(role))}
+            entry = {"port": WORKER_PORTS[role], "up": alive}
             if is_adopted:
                 entry["adopted"] = True
+                # Ask the worker itself: we hold no Popen for an adopted process,
+                # so _proc_rss_mb cannot see it, and reporting it up with no
+                # rss_mb understated the container by the full size of a
+                # torch/mediapipe worker (~1.4GB) — the exact understatement this
+                # block exists to remove.
+                adopted_rss = _adopted_worker_rss(role)
+                entry["up"] = adopted_rss is not None
+                if adopted_rss is not None:
+                    entry["rss_mb"] = adopted_rss
+                    worker_rss += adopted_rss
             if proc is not None and proc.poll() is None:
                 rss = _proc_rss_mb(proc.pid)
                 if rss is not None:
