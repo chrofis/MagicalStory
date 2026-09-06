@@ -461,6 +461,63 @@ agents restoring rules on the same day could not install the same rule at two si
 
 ---
 
+### A trial is only told about a costume when it HAS one — and a page may not wear an outfit the story never declared
+**Context:** Prod `job_1788698812047_q5b1vuds7` (trial, theme `mothers-day`) put
+a one-year-old in a straw costume that reads as a prop stuck on him rather than
+worn. Stored evidence: `clothingRequirements` = `{ Amian: { costumed: { used:
+false }, standard: { used: true } } }`, while `pageClothing` said `costumed` on
+4 of 6 pages; `costumedAvatarGeneration` is `[]` and only a `styled-standard`
+sheet exists. The costume lived instead as Visual Bible artifact `ART002`,
+`type: "costume"`, and reached page 2's prompt through REQUIRED OBJECTS —
+`Objects: hat: on Amian's head; costume: worn by Amian` — with the cast line
+carrying no clothing description at all, because `resolveClothingForPage` finds
+no description for a category whose `used` is false and returns null.
+Root cause is `prompts/story-trial.txt` + `buildTrialStoryPrompt`: a trial's
+clothing contract does NOT come from the writer (unlike every full-story
+prompt), it comes from the static `getTrialCostume(theme)` table, and
+`mothers-day` has no entry. Only the `AVATAR_SELECTION` block was gated on a
+costume existing — the scene-hint enum `[standard | costumed]`, the rule "a
+character with a `costumed` variant wears it in every scene except the very
+first", and a front cover fixed at `"clothing": "costumed"` were stated
+unconditionally. The writer obeyed (p1 standard, p2-5 costumed), invented the
+garment the premise mentioned, and — this template having no
+`clothingRequirements` section to declare clothing in — filed it in the only
+slot left, an artifact. The same missing fact makes the trial prewarm's
+`if (costume && …)` seed of the standard avatar from `previewAvatar` skip, so a
+full standard sheet is generated instead.
+**Decision:** Two changes, both code-side; no eval or classification rule moved.
+(1) Every costume instruction in `story-trial.txt` is a placeholder
+(`{CLOTHING_ENUM}`, `{CLOTHING_RULE}`, `{COVER_CLOTHING_NOTE}`,
+`{COVER_CLOTHING}`) filled from the same `costume` lookup that already gates
+`AVATAR_SELECTION`. With no costume the enum is `standard`, the cover says
+nothing about costumes, and the rule states that nobody wears one and a costume
+named in the story idea stays scenery. With a costume the rendered prompt is
+byte-identical to before.
+(2) `reconcilePageClothingWithRequirements()` — the page-side sibling of the
+existing `reconcileCoverClothingWithRequirements()` — replaces a per-page
+category the character never marked `used` with their first used category and
+logs it at **ERROR**. Wired at the three sites that read `page.characterClothing`
+before it can be used: the streaming scene-expansion path, the streaming trial
+page render, and the post-parse `storyPages` loop (which also fixes what gets
+stored as `pageClothing`).
+**Rationale:** `clothingRequirements` and `pageClothing` are written by
+different owners and had no arbiter on the page side, only on covers; a
+contradiction resolved silently into "no clothing description + garment as
+prop", which is exactly the render the owner complained about. Classification
+was never the model's to get wrong here — it was instructed to costume a story
+that has no costume, so the fix belongs where the instruction is emitted. An
+artifact with `type: "costume"` stays legitimate for a costume that is NOT worn
+(on a rack, in a display case, carried); `story-bible-from-beats.txt` already
+codifies that split via `wornAs`, and `story-trial.txt` does not (backlog).
+Corpus check over the 58 most recent prod stories (597 pages with clothing): the
+guard fires on exactly the 4 defective pages of this story and nowhere else.
+**Touched:** `prompts/story-trial.txt`, `server/lib/promptBuilders.js`
+(`buildTrialStoryPrompt`), `server/lib/clothingCategories.js`,
+`storyJobPipeline.js`, `tests/unit/page-clothing-reconcile.test.ts` (new).
+**Status:** ✅ active.
+
+---
+
 ---
 
 ## Email

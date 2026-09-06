@@ -57,7 +57,7 @@ It must be detailed enough to illustrate without additional context.
         "position": "[left/right/center]",
         "action": "[what they're doing]",
         "expression": "[facial expression — one instant, never a transition such as changing from one expression to another]",
-        "clothing": "[standard | costumed]",
+        "clothing": "{CLOTHING_ENUM}",
         "depth": "[foreground|midground|background]",
         "perspective": "[front|side|back view|over-the-shoulder]"
       }
@@ -73,7 +73,7 @@ It must be detailed enough to illustrate without additional context.
 - MAX 3 characters per scene — the main character plus at most two others — and keep the cast minimal: add a secondary character only when the story needs one. Use character names, not descriptions.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
 - Every person named in `imageSummary` also appears in that scene's `characters`: with their visual bible `CHR` id, or — when the visual bible has no entry for them — with a `description` field giving age, build, hair, face and clothing.
-- `characters.clothing`: a character with a `costumed` variant wears it in every scene except the very first, which is set before the adventure starts. Never `standard` on every page.
+{CLOTHING_RULE}
 - `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures.
 - `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"` for the default photo. When the landmark in the LANDMARKS section lists PHOTO ANGLES, use `"Name [LOC001.N]"` where N is the variant whose description fits the scene framing (interior shots for "on/in the landmark" scenes, exterior shots for distant/establishing views).
@@ -150,7 +150,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 Every entry costs a reference image generation pass. A 5-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.
 
 ---COVER SCENE---
-Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Wide shot, balanced composition. Characters in costumed clothing.
+Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Wide shot, balanced composition.{COVER_CLOTHING_NOTE}
 
 **LOCATION REQUIREMENT (STRICT):** The front cover's `setting.location` MUST reference a Visual Bible location with `isRealLandmark: true`. If you wrote multiple locations in the VB and any are real landmarks, pick one of those for the cover — never a fictional indoor/underground/imagined location, even if it's the dramatic climax setting. The cover is the marketing image; it must show a recognisable real place. If your VB has NO real landmarks, fall back to the first location and accept the limitation.
 
@@ -175,7 +175,7 @@ Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no seco
         "position": "center",
         "action": "[heroic or characteristic pose/action]",
         "expression": "[confident/happy/determined]",
-        "clothing": "costumed"
+        "clothing": "{COVER_CLOTHING}"
       }
     ],
     "objects": [

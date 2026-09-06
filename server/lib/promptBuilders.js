@@ -6497,6 +6497,23 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
 
     const costume = getTrialCostume(topic, category, gender);
 
+    // Every costume instruction in the template is conditional on a costume
+    // actually existing. The template used to state them unconditionally — the
+    // `[standard | costumed]` enum, "wears it in every scene except the very
+    // first", and a cover fixed at `costumed` — while only this AVATAR_SELECTION
+    // block was gated. A story whose theme has no configured costume therefore
+    // got told to dress its cast in one it does not have: the writer complied,
+    // invented the garment, and (there being no clothingRequirements section in
+    // this template to declare it in) registered it as a Visual Bible artifact,
+    // which reaches the page as a PROP painted onto the standard outfit rather
+    // than worn (prod job_1788698812047_q5b1vuds7).
+    const clothingEnum = costume ? '[standard | costumed]' : 'standard';
+    const clothingRule = costume
+      ? '- `characters.clothing`: a character with a `costumed` variant wears it in every scene except the very first, which is set before the adventure starts. Never `standard` on every page.'
+      : '- `characters.clothing`: always `standard` — this story has no costume variant. Nobody puts on or wears a costume; a costume named in the story idea stays something in the scene, never a garment on a character.';
+    const coverClothingNote = costume ? ' Characters in costumed clothing.' : '';
+    const coverClothing = costume ? 'costumed' : 'standard';
+
     // Build avatar selection section (only if costume available)
     let avatarSelection = '';
     if (costume) {
@@ -6569,6 +6586,10 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       CATEGORY_GUIDELINES: categoryGuidelines,
       AGE_MODE: buildAgeModeSection(inputData),
       AVATAR_SELECTION: avatarSelection,
+      CLOTHING_ENUM: clothingEnum,
+      CLOTHING_RULE: clothingRule,
+      COVER_CLOTHING_NOTE: coverClothingNote,
+      COVER_CLOTHING: coverClothing,
       LANDMARKS: landmarksInstruction,
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
     });

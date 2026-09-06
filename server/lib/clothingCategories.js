@@ -175,6 +175,64 @@ function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements
 }
 
 /**
+ * Reconcile ONE PAGE's per-character clothing against the story's
+ * clothingRequirements — the page-side sibling of
+ * `reconcileCoverClothingWithRequirements`.
+ *
+ * The two fields are written by different owners and could disagree silently:
+ * `clothingRequirements` is the story's clothing CONTRACT (which outfits exist
+ * and were generated as styled avatars), while the per-page category comes from
+ * the writer's scene hint. When a page asks for a category the character never
+ * marked `used`, that outfit does not exist: `resolveClothingForPage` finds no
+ * description and returns null, so the page renders the standard avatar with no
+ * clothing guidance at all — and any garment the writer put in the Visual Bible
+ * instead arrives through REQUIRED OBJECTS as a prop, painted onto the standard
+ * outfit rather than worn (prod job_1788698812047_q5b1vuds7, pages 2-5: a straw
+ * costume declared on four pages against `costumed.used: false`).
+ *
+ * Resolution is the cover reconciler's: fall back to the first category the
+ * character actually marked used. The contradiction is logged at ERROR — it
+ * means an upstream stage produced an impossible request, and the render that
+ * follows is a salvage, not the intent.
+ *
+ * Does NOT mutate the input; returns the reconciled map.
+ *
+ * @param {Object|null} perCharClothing - { [charName]: category } for this page
+ * @param {Object|null} clothingRequirements - story clothing contract
+ * @param {{pageNumber?: number|string, logger?: Object, label?: string}} [options]
+ * @returns {{ clothing: Object, overrides: Array<{pageNumber, character, requested, replacedWith}> }}
+ */
+function reconcilePageClothingWithRequirements(perCharClothing, clothingRequirements, options = {}) {
+  const { pageNumber = null, logger = null, label = 'PAGE CLOTHING' } = options;
+  const clothing = { ...(perCharClothing || {}) };
+  const overrides = [];
+  if (!perCharClothing || !clothingRequirements) return { clothing, overrides };
+
+  for (const [charName, requested] of Object.entries(perCharClothing)) {
+    const usedCategories = getUsedClothingCategories(clothingRequirements, charName);
+    if (usedCategories.length === 0) continue; // no contract for this character — leave as-is
+    const requestedCanonical = normalizeClothingCategory(requested);
+    const isUsed = usedCategories.some(
+      (cat) => normalizeClothingCategory(cat) === requestedCanonical
+    );
+    if (isUsed) continue;
+
+    const replacement = usedCategories[0];
+    clothing[charName] = replacement;
+    overrides.push({ pageNumber, character: charName, requested, replacedWith: replacement });
+    if (logger?.error) {
+      logger.error(
+        `❌ [${label}] page ${pageNumber ?? '?'}: ${charName} declared "${requested}" but ` +
+        `clothingRequirements marks only [${usedCategories.join(', ')}] used — that outfit does not ` +
+        `exist in this story; rendering "${replacement}"`
+      );
+    }
+  }
+
+  return { clothing, overrides };
+}
+
+/**
  * Resolve a character's entry in the story's clothingRequirements blob.
  * The blob is keyed by the character name as the outline model wrote it,
  * which can drift from character.name in case/whitespace — an exact-key
@@ -242,6 +300,7 @@ module.exports = {
   normalizeClothingCategory,
   getUsedClothingCategories,
   reconcileCoverClothingWithRequirements,
+  reconcilePageClothingWithRequirements,
   resolveCharacterReqs,
   resolvePageClothingCategory,
 };

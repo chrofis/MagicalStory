@@ -31,7 +31,7 @@ const {
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
-const { reconcileCoverClothingWithRequirements } = require('./server/lib/clothingCategories');
+const { reconcileCoverClothingWithRequirements, reconcilePageClothingWithRequirements } = require('./server/lib/clothingCategories');
 const {
   getCostumedAvatarGenerationLog,
   clearCostumedAvatarGenerationLog
@@ -930,7 +930,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // straight through to streamingClothingRequirements[charName] and
           // leak that per-page value into every future page.
           const pageClothingReqs = { ...streamingClothingRequirements };
+          // Same contract check the post-parse pages get — this path runs
+          // BEFORE the full parse, so it cannot inherit that reconciliation.
+          const streamingContract = inputData.trialMode
+            ? inputData._trialClothingRequirements
+            : streamingClothingRequirements;
+          const reconciledPageClothing = reconcilePageClothingWithRequirements(
+            page.characterClothing,
+            streamingContract,
+            { pageNumber: page.pageNumber, logger: log, label: 'PAGE CLOTHING/STREAM' }
+          ).clothing;
           if (page.characterClothing) {
+            page.characterClothing = reconciledPageClothing;
             for (const [charName, clothingCat] of Object.entries(page.characterClothing)) {
               pageClothingReqs[charName] = {
                 ...(pageClothingReqs[charName] || {}),
@@ -1121,7 +1132,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // pre-override: only if Claude emits no clothing at all do we
           // default the main character to 'costumed' so the page has
           // something to render.
-          const perCharClothing = page.characterClothing || {};
+          const perCharClothing = reconcilePageClothingWithRequirements(
+            page.characterClothing || {},
+            inputData._trialClothingRequirements,
+            { pageNumber: page.pageNumber, logger: log, label: 'PAGE CLOTHING/TRIAL' }
+          ).clothing;
+          page.characterClothing = perCharClothing;
           if (inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
             const mainCharIds = inputData.mainCharacters || [];
             for (const char of (inputData.characters || [])) {
@@ -2758,6 +2774,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Beats mode assembled its own pages (text + beat scene line); the parser
     // has no ---STORY PAGES--- draft/patch structure to merge in that path.
     const storyPages = beatsMode ? beatsResult.pages : parser.extractPages();
+
+    // Page-side sibling of the cover reconciliation above: a page may not ask
+    // for an outfit the story's clothing contract says does not exist. Left
+    // alone, the request resolves to no clothing description at all and the
+    // garment reaches the render as a prop (see the helper's comment).
+    for (const page of (storyPages || [])) {
+      if (!page?.characterClothing || Object.keys(page.characterClothing).length === 0) continue;
+      const { clothing } = reconcilePageClothingWithRequirements(
+        page.characterClothing,
+        clothingRequirements,
+        { pageNumber: page.pageNumber, logger: log }
+      );
+      page.characterClothing = clothing;
+    }
 
     // Deterministic scene metadata ↔ scene design consistency check on the
     // FINAL pages (draft + reviewer patches merged). Mechanical string/set
