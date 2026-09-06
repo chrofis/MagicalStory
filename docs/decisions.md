@@ -28831,3 +28831,18 @@ change a severity", so it needs owner sign-off and is not in this change.
 `prompts/image-semantic.txt`, `prompts/feedback-consolidator.txt`, `server/lib/evalBuckets.js`,
 `server/lib/scoring.js`
 **Status:** ✅ active
+
+## 2026-09-06 — Trial idea prompt carries the topic's full guide; the sharing partner is a person
+
+**Context:** After the previous entry, the validation trial (sharing + pirate) put a real stake
+in the story but shared the biscuits with a duck. The idea prompt received only the guide's
+lead line, so the "not an animal" rule in the `[sharing]` guide reached the writer but never the
+idea generator, which had already chosen the counterpart.
+
+**Decision (owner):** the trial idea prompt appends the topic's complete teaching guide, and the
+`[sharing]` guide states the thing is shared with another person — a friend, sibling or
+playmate — never an animal.
+
+**Touched:** `server/routes/trial.js` (life-challenge categoryContext),
+`prompts/life-challenge-guides.txt` `[sharing]`.
+**Status:** ✅ active — one validation run pending.
