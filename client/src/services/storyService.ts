@@ -39,6 +39,17 @@ function normalizeCoverImages(covers: { frontCover?: unknown; initialPage?: unkn
  */
 // Snapshot of inputs sent to every model in a Test Models run. Returned from
 // /test-models so the panel can display "what was sent" alongside each result.
+// The story's home location — IP path (/api/user/location), hand-typed path
+// (WizardStep3 save after verify-location) and the trial server fallback all
+// produce this shape. latitude/longitude feed the landmark proximity rungs.
+export interface UserLocation {
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 export interface TestModelsInputSnapshot {
   promptLength: number;
   promptPreview: string;
@@ -152,7 +163,7 @@ interface StoryDetailsServer {
   pages: number;
   dedication?: string;
   season?: string;  // Season when story takes place
-  userLocation?: { city: string | null; region: string | null; country: string | null } | null;
+  userLocation?: UserLocation | null;
   characters: Character[];
   mainCharacters: number[];
   relationships: RelationshipMap;
@@ -1623,7 +1634,7 @@ export const storyService = {
     // Developer model override (admin only)
     ideaModel?: string | null;
     // User's location for personalized story settings
-    userLocation?: { city: string | null; region: string | null; country: string | null };
+    userLocation?: UserLocation;
     // Season for story setting
     season?: string;
   }): Promise<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }> {
@@ -1657,7 +1668,7 @@ export const storyService = {
       }>;
       ideaModel?: string | null;
       // User's location for personalized story settings
-      userLocation?: { city: string | null; region: string | null; country: string | null };
+      userLocation?: UserLocation;
       // Season for story setting
       season?: string;
       // Steer which world the two ideas play in (auto = 1 location + 1 fantasy)
@@ -1835,7 +1846,7 @@ export const storyService = {
       singlePassScene?: boolean | null;
     };
     // User location for landmark discovery
-    userLocation?: { city: string | null; region: string | null; country: string | null };
+    userLocation?: UserLocation;
     // Season for story setting
     season?: string;
     // Idea generation data (for analysis)
@@ -1849,7 +1860,7 @@ export const storyService = {
         language: string;
         languageLevel: string;
         pages: number;
-        userLocation?: { city: string | null; region: string | null; country: string | null };
+        userLocation?: UserLocation;
         season?: string;
       };
       output: string[];  // Both generated ideas (final only)
@@ -2521,9 +2532,9 @@ export const storyService = {
   },
 
   // Get user's location from IP for story personalization
-  async getUserLocation(): Promise<{ city: string | null; region: string | null; country: string | null }> {
+  async getUserLocation(): Promise<UserLocation> {
     try {
-      const response = await api.get<{ city: string | null; region: string | null; country: string | null }>('/api/user/location');
+      const response = await api.get<UserLocation>('/api/user/location');
       return response;
     } catch {
       return { city: null, region: null, country: null };

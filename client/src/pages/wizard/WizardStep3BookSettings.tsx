@@ -141,7 +141,11 @@ export function WizardStep3BookSettings({
   const [editPlz, setEditPlz] = useState('');
   // Verification state for the in-edit location: 'idle' | 'checking' | 'ok' | 'fail'
   const [verifyState, setVerifyState] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle');
-  const [verifyResult, setVerifyResult] = useState<{ city?: string | null; plz?: string | null; displayName?: string | null } | null>(null);
+  // `forInput` is the exact text the verification answered for; the save only
+  // attaches lat/lon when the fields still read the same, so text edited after
+  // a verification (or saved mid-check) never carries stale coordinates.
+  const [verifyResult, setVerifyResult] = useState<{ city?: string | null; plz?: string | null; displayName?: string | null; lat?: number | null; lon?: number | null; forInput: string } | null>(null);
+  const verifyInputKey = (city: string, plz: string, country: string) => `${city.trim()}|${plz.trim()}|${country.trim() || defaultCountryFor(language)}`;
   const verifyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
@@ -188,14 +192,15 @@ export function WizardStep3BookSettings({
     if (verifyDebounceRef.current) clearTimeout(verifyDebounceRef.current);
     setVerifyState('checking');
     verifyDebounceRef.current = setTimeout(async () => {
-      const res = await storyService.verifyLocation({
+      const input = {
         city: editCity.trim(),
         plz: editPlz.trim(),
         country: editCountry.trim() || defaultCountryFor(language),
-      });
+      };
+      const res = await storyService.verifyLocation(input);
       if (res.verified) {
         setVerifyState('ok');
-        setVerifyResult({ city: res.city, plz: res.plz, displayName: res.displayName });
+        setVerifyResult({ city: res.city, plz: res.plz, displayName: res.displayName, lat: res.lat, lon: res.lon, forInput: verifyInputKey(input.city, input.plz, input.country) });
         // PLZ-only lookup → backfill the city input from the result
         if (!editCity.trim() && res.city) setEditCity(res.city);
       } else {
@@ -209,10 +214,14 @@ export function WizardStep3BookSettings({
   }, [editCity, editPlz, editCountry, isEditingLocation, language]);
 
   const handleSaveLocation = () => {
+    const verified = verifyState === 'ok' && verifyResult?.forInput === verifyInputKey(editCity, editPlz, editCountry)
+      ? verifyResult : null;
     onLocationChange({
       city: editCity.trim() || null,
       region: null,
       country: editCountry || null,
+      latitude: typeof verified?.lat === 'number' ? verified.lat : null,
+      longitude: typeof verified?.lon === 'number' ? verified.lon : null,
     });
     setIsEditingLocation(false);
   };

@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
+const { lookupIpLocation } = require('../lib/ipLocation');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
 // failure it alarms and lets the write proceed (see its JSDoc).
@@ -1393,20 +1394,8 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     // Server-side location fallback if client didn't provide it
     let resolvedLocation = userLocation || null;
     if (!resolvedLocation?.city) {
-      try {
-        const forwardedFor = req.headers['x-forwarded-for'];
-        const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : req.ip;
-        if (ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
-          const geoResp = await fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,country`);
-          const geoData = await geoResp.json();
-          if (geoData.status !== 'fail' && geoData.city) {
-            resolvedLocation = { city: geoData.city, region: geoData.regionName, country: geoData.country };
-            log.info(`[TRIAL] 📍 Server-side location fallback: ${geoData.city}, ${geoData.country} (IP: ${ip})`);
-          }
-        }
-      } catch (e) {
-        log.debug(`[TRIAL] Location fallback failed: ${e.message}`);
-      }
+      resolvedLocation = await lookupIpLocation(req, 'TRIAL');
+      if (resolvedLocation) log.info(`[TRIAL] 📍 Server-side location fallback: ${resolvedLocation.city}, ${resolvedLocation.country} (${resolvedLocation.latitude},${resolvedLocation.longitude})`);
     } else {
       log.debug(`[TRIAL] Client provided location: ${resolvedLocation.city}, ${resolvedLocation.country || ''}`);
     }
@@ -2034,20 +2023,8 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Server-side location fallback if client didn't provide it
     let userLocation = clientLocation || null;
     if (!userLocation?.city) {
-      try {
-        const forwardedFor = req.headers['x-forwarded-for'];
-        const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : req.ip;
-        if (ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
-          const geoResp = await fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,country`);
-          const geoData = await geoResp.json();
-          if (geoData.status !== 'fail' && geoData.city) {
-            userLocation = { city: geoData.city, region: geoData.regionName, country: geoData.country };
-            log.info(`[TRIAL] 📍 Ideas: server-side location fallback: ${geoData.city} (IP: ${ip})`);
-          }
-        }
-      } catch (e) {
-        log.debug(`[TRIAL] Ideas location fallback failed: ${e.message}`);
-      }
+      userLocation = await lookupIpLocation(req, 'TRIAL');
+      if (userLocation) log.info(`[TRIAL] 📍 Ideas: server-side location fallback: ${userLocation.city} (${userLocation.latitude},${userLocation.longitude})`);
     }
 
     // Build a simple character description

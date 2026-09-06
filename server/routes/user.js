@@ -10,50 +10,13 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
+const { lookupIpLocation } = require('../lib/ipLocation');
 
 // GET /api/user/location - Get user's location from IP (no auth required)
-// Uses ip-api.com free service for geolocation
+// One shared lookup (server/lib/ipLocation.js) — the trial routes use the same.
+const NO_LOCATION = { city: null, region: null, country: null, latitude: null, longitude: null };
 router.get('/location', async (req, res) => {
-  try {
-    // Get client IP — try multiple sources for robustness behind proxies
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const cfConnectingIp = req.headers['cf-connecting-ip'];  // Cloudflare
-    const realIp = req.headers['x-real-ip'];
-    // Use the FIRST public IP from x-forwarded-for (leftmost = original client)
-    const forwardedIps = typeof forwardedFor === 'string' ? forwardedFor.split(',').map(s => s.trim()) : [];
-    const firstPublicForwardedIp = forwardedIps.find(ip =>
-      ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.') && !ip.startsWith('172.')
-    );
-    const ip = cfConnectingIp || firstPublicForwardedIp || realIp || req.ip;
-
-    log.debug(`📍 [LOCATION] IP resolution: req.ip=${req.ip}, x-forwarded-for=${forwardedFor || 'none'}, cf-connecting-ip=${cfConnectingIp || 'none'}, chosen=${ip}`);
-
-    // Skip for localhost/private IPs
-    if (!ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
-      return res.json({ city: null, region: null, country: null, latitude: null, longitude: null });
-    }
-
-    // Call ip-api.com (free, no API key needed, 45 req/min limit)
-    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,country,lat,lon`);
-    const data = await response.json();
-
-    if (data.status === 'fail') {
-      log.debug(`📍 [LOCATION] IP lookup failed for ${ip}`);
-      return res.json({ city: null, region: null, country: null, latitude: null, longitude: null });
-    }
-
-    log.debug(`📍 [LOCATION] Detected: ${data.city}, ${data.regionName}, ${data.country} (${data.lat},${data.lon}) (IP: ${ip})`);
-    res.json({
-      city: data.city || null,
-      region: data.regionName || null,
-      country: data.country || null,
-      latitude: typeof data.lat === 'number' ? data.lat : null,
-      longitude: typeof data.lon === 'number' ? data.lon : null
-    });
-  } catch (error) {
-    log.error(`📍 [LOCATION] Error: ${error.message}`);
-    res.json({ city: null, region: null, country: null, latitude: null, longitude: null });
-  }
+  res.json(await lookupIpLocation(req) || NO_LOCATION);
 });
 
 // POST /api/user/verify-location - Verify a user-entered location via Nominatim (OSM)
