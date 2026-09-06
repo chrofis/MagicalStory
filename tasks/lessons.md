@@ -649,3 +649,10 @@ their staged index swept into a foreign commit: commit promptly after staging, a
 - Never leave a stopped agent's partial hunks in shared files: another session swept `require('./vbElementBudget')` to staging while the module was untracked → deployed code that would crash page generation. After every push, verify every new `require` target is tracked.
 - Dirty shared file → commit your hunk only via `git show HEAD:` copy + `git hash-object -w` + `git update-index --cacheinfo`; verify with `git show HEAD -- file`. Never `git add -A`, never stash on the shared tree.
 - Showcase spec: Playwright `hasText` is a contains-match; "Realistic" matched the category header, not the card. Assertions must accept the wizard's auto-advance.
+
+## 2026-09-06 — `showcase.js --help` launches a real PRODUCTION run
+`scripts/admin/showcase.js` ignores unknown flags and defaults to production. Probing it
+with `--help` (2026-09-06) started a real Dubois showcase on prod; it died only because the
+output pipe closed. Never execute the orchestrator to learn its options — read the header
+comment (`sed -n 1,60p`) and `parseArgs()` instead. Same rule for every script under
+`scripts/admin/` that talks to a backend: read, don't run.
