@@ -402,6 +402,26 @@ test.describe('Trial → full-account end-to-end', () => {
     }
     console.log(`✅ [P3] Idea ${ideaIndex + 1} textarea has content`);
 
+    // E2E_CITY: correct the geolocated town on the ideas step (pencil next to
+    // the city), which re-generates both ideas for that town.
+    if (process.env.E2E_CITY) {
+      const pencil = page.getByRole('button', { name: /change city|ort ändern|modifier la ville|cambia città/i }).first();
+      await expect(pencil).toBeVisible({ timeout: 15000 });
+      await pencil.click();
+      const cityInput = page.locator('input[type=text]').last();
+      await cityInput.fill(process.env.E2E_CITY);
+      await cityInput.press('Enter');
+      console.log(`✅ [P3] City changed to ${process.env.E2E_CITY} — waiting for ideas to regenerate`);
+      await page.waitForTimeout(3000);
+      await expect(chosenIdea.locator('textarea')).toBeVisible({ timeout: 3 * 60 * 1000 });
+      for (let i = 0; i < 90; i++) {
+        const val = await chosenIdea.locator('textarea').inputValue();
+        if (val.length > 20 && new RegExp(process.env.E2E_CITY, 'i').test(val)) break;
+        await page.waitForTimeout(1000);
+      }
+      console.log('✅ [P3] Ideas regenerated after city change');
+    }
+
     // Each idea card has an explicit "Klicke zum Auswählen" / "Click to
     // select" / "Cliquer pour choisir" button. Click it — clicking the card
     // div itself can hit the textarea (stopPropagation) or get rejected

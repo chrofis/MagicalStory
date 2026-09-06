@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Loader2, MapPin, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, MapPin, Pencil, RefreshCw, Sparkles, X } from 'lucide-react';
 import { storyTypes } from '@/constants/storyTypes';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
 import { trackTrialStep } from '@/utils/trialFunnel';
@@ -17,7 +17,10 @@ interface Props {
   onCreate: () => void;
   sessionToken?: string | null;
   onTitlePageReady?: (data: { costumeType: string | null; avatarSlides?: string[] }) => void;
-  userLocation?: { city: string | null; region: string | null; country: string | null } | null;
+  userLocation?: { city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null;
+  // The trial's city comes from IP geolocation, which is often a city away
+  // (a Baden reader resolves to Zurich). Editing it re-generates the ideas.
+  onLocationChange?: (location: { city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null }) => void;
 }
 
 interface StreamingIdea {
@@ -38,6 +41,8 @@ const strings: Record<string, {
   selected: string;
   worldLocation: string;
   worldFantasy: string;
+  changeCity: string;
+  cityNotFound: string;
   createStory: string;
   regenerate: string;
   back: string;
@@ -54,6 +59,8 @@ const strings: Record<string, {
     selected: 'Selected',
     worldLocation: 'Your city',
     worldFantasy: 'Fantasy world',
+    changeCity: 'Change city',
+    cityNotFound: 'City not found. Please check the spelling.',
     createStory: 'Create My Story',
     regenerate: 'Generate New Ideas',
     back: 'Back',
@@ -70,6 +77,8 @@ const strings: Record<string, {
     selected: 'Ausgewählt',
     worldLocation: 'Deine Stadt',
     worldFantasy: 'Fantasiewelt',
+    changeCity: 'Ort ändern',
+    cityNotFound: 'Ort nicht gefunden. Bitte Schreibweise prüfen.',
     createStory: 'Meine Geschichte erstellen',
     regenerate: 'Neue Ideen erstellen',
     back: 'Zurück',
@@ -86,6 +95,8 @@ const strings: Record<string, {
     selected: 'Sélectionnée',
     worldLocation: 'Ta ville',
     worldFantasy: 'Monde fantastique',
+    changeCity: 'Modifier la ville',
+    cityNotFound: "Ville introuvable. Vérifie l'orthographe.",
     createStory: 'Créer mon histoire',
     regenerate: 'Générer de nouvelles idées',
     back: 'Retour',
@@ -108,6 +119,7 @@ export default function TrialIdeasStep({
   sessionToken,
   onTitlePageReady,
   userLocation,
+  onLocationChange,
 }: Props) {
   const lang = storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en';
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
@@ -307,6 +319,39 @@ export default function TrialIdeasStep({
     : streamingIdeas;
 
   const canCreate = selectedIdeaIndex !== null && !isGenerating;
+
+  // City editor: verify through the same Nominatim endpoint the full wizard
+  // uses, hand the result up, and re-generate the ideas for the new town.
+  const [editingCity, setEditingCity] = useState(false);
+  const [cityDraft, setCityDraft] = useState('');
+  const [cityState, setCityState] = useState<'idle' | 'checking' | 'fail'>('idle');
+  const regenAfterCityRef = useRef(false);
+  const startCityEdit = () => { setCityDraft(userLocation?.city || ''); setCityState('idle'); setEditingCity(true); };
+  const saveCity = async () => {
+    const draft = cityDraft.trim();
+    if (!draft || !onLocationChange) { setEditingCity(false); return; }
+    setCityState('checking');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/user/verify-location`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ city: draft }),
+      });
+      const data = await res.json();
+      if (!data?.verified) { setCityState('fail'); return; }
+      regenAfterCityRef.current = true;
+      onLocationChange({ city: data.city || draft, region: null, country: data.country || null, latitude: data.lat ?? null, longitude: data.lon ?? null });
+      setEditingCity(false);
+      setCityState('idle');
+    } catch {
+      setCityState('fail');
+    }
+  };
+  useEffect(() => {
+    if (!regenAfterCityRef.current) return;
+    regenAfterCityRef.current = false;
+    generateIdeas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLocation?.city]);
   const themeEntry = storyTypes.find((st) => st.id === storyInput.storyTheme);
   const themeName = themeEntry ? (themeEntry.name[lang] || themeEntry.name.en) : '';
   const worldLocationLabel = userLocation?.city ? `${t.worldLocation}: ${userLocation.city}` : t.worldLocation;
@@ -318,7 +363,43 @@ export default function TrialIdeasStep({
     <div className="max-w-5xl mx-auto pt-4">
       <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
       <p className="text-gray-500 text-center mb-1">{t.subtitle}</p>
-      <p className="text-xs text-gray-400 text-center mb-6">{t.editHint}</p>
+      <p className="text-xs text-gray-400 text-center mb-3">{t.editHint}</p>
+
+      {/* City row — the geolocated town the first idea plays in, editable */}
+      {onLocationChange && (
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-6 text-sm">
+          <MapPin size={14} className="text-sky-600" />
+          {editingCity ? (
+            <>
+              <input
+                type="text"
+                value={cityDraft}
+                onChange={(e) => { setCityDraft(e.target.value); setCityState('idle'); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveCity(); if (e.key === 'Escape') setEditingCity(false); }}
+                className="px-2 py-1 rounded-md border border-gray-300 text-sm w-44"
+                autoFocus
+              />
+              <button type="button" onClick={saveCity} disabled={cityState === 'checking'}
+                className="p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-indigo-200">
+                {cityState === 'checking' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              </button>
+              <button type="button" onClick={() => setEditingCity(false)}
+                className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200">
+                <X size={14} />
+              </button>
+              {cityState === 'fail' && <span className="basis-full text-center text-xs text-red-600">{t.cityNotFound}</span>}
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-gray-800">{worldLocationLabel}</span>
+              <button type="button" onClick={startCityEdit} title={t.changeCity} aria-label={t.changeCity}
+                className="p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-indigo-200">
+                <Pencil size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Error state */}
       {error && (

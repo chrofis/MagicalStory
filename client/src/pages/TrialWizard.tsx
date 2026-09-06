@@ -625,6 +625,7 @@ export default function TrialWizard() {
                 sessionToken={sessionToken}
                 onTitlePageReady={setTitlePageData}
                 userLocation={userLocation}
+                onLocationChange={setUserLocation}
               />
             )}
           </div>
