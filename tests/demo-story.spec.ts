@@ -1239,12 +1239,28 @@ test.describe('Demo Story Generation', () => {
     }
     // The selected card gets border-indigo-500 (ArtStyleSelector). Assert it,
     // so a mis-click can never again ship a showcase in the default style.
+    // Two valid proofs, because the wizard may auto-advance past Step 4 the
+    // moment a card is clicked (see isAlreadyOnStep5 below). Checking only the
+    // Step-4 card turned a SUCCESSFUL selection into a hard abort on 2026-09-06
+    // — the card no longer exists once Step 5 renders.
+    //   (a) Step 4 still shown: the selected card carries border-indigo-500.
+    //   (b) Step 5 summary: the "Art Style:" row shows the expected label.
+    // Neither found still throws — a mis-click must never ship the default style.
     async function assertArtStyleSelected() {
       const card = page.locator('button.border-indigo-500').filter({ has: page.locator(`img[alt="${artStyleLabel}"]`) }).first();
-      await card.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
-        throw new Error(`Art style "${artStyleLabel}" (${artStyleId}) was clicked but is NOT the selected card — the wizard would generate in its default style.`);
-      });
-      console.log(`  Art style confirmed selected: ${artStyleLabel}`);
+      if (await card.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.log(`  Art style confirmed selected (Step 4 card): ${artStyleLabel}`);
+        return;
+      }
+      const labelRe = artStyleLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const summaryRow = page.locator('div, li, p').filter({
+        hasText: new RegExp(`(Art Style|Kunststil|Style artistique)\\s*:?\\s*${labelRe}`, 'i'),
+      }).first();
+      if (await summaryRow.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.log(`  Art style confirmed selected (Step 5 summary): ${artStyleLabel}`);
+        return;
+      }
+      throw new Error(`Art style "${artStyleLabel}" (${artStyleId}) was clicked but is NOT the selected card, and the Step 5 summary does not show it — the wizard would generate in its default style.`);
     }
 
     // Check if the wizard is currently on Step 5 (Übersicht) — meaning Step 4
