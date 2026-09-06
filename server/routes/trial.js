@@ -15,6 +15,10 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
+// Every full-blob characters.data write in this file goes through this —
+// image bytes belong in R2, the row holds URLs. Never throws; on an R2
+// failure it alarms and lets the write proceed (see its JSDoc).
+const { offloadCharacterImages } = require('../services/database');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -950,6 +954,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
                 if (extractedTraits.detailedHairAnalysis) physical.detailedHairAnalysis = extractedTraits.detailedHairAnalysis;
                 charData.characters[0].physical = physical;
               }
+              await offloadCharacterImages(req.body.characterId, decoded.userId, charData);
               await pool.query(
                 'UPDATE characters SET data = $1 WHERE id = $2',
                 [JSON.stringify(charData), req.body.characterId]
@@ -1076,6 +1081,7 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
             ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
           if (charData.characters?.[0]) {
             charData.characters[0].previewAvatar = previewAvatar;
+            await offloadCharacterImages(characterId, userId, charData);
             await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
           }
         }
@@ -1108,6 +1114,9 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
         if (t.apparentAge) physical.apparentAge = t.apparentAge;
         if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
         charData.characters[0].physical = physical;
+        // Whole-blob rewrite: without the sweep this re-persists any bytes an
+        // earlier path left inline. No-op when the row is already clean.
+        await offloadCharacterImages(characterId, userId, charData);
         await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
         log.debug(`[TRIAL] Background traits saved for ${characterId}: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
       } catch (err) {
@@ -1186,6 +1195,9 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     c.traits = structuredTraits;
     if (customTraits != null) c.customTraits = customTraits;
 
+    // Text-only edit, but it rewrites the WHOLE blob — so any bytes a prior
+    // path left inline would be re-persisted here. Cheap no-op when clean.
+    await offloadCharacterImages(characterId, userId, charData);
     await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
     log.debug(`[TRIAL] Character details updated for ${userId}: ${c.name}`);
     res.json({ success: true, characterId, charId: c.id });
@@ -2405,6 +2417,9 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         charData.characters[0].preGeneratedCostumeType = costumeType;
         charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
         if (avatarSlides.length > 0) charData.characters[0].preGeneratedAvatarSlides = avatarSlides;
+        // The sheets and the sliced slides above are built as data: URIs in
+        // memory; nothing uploaded them. Sweep before the write.
+        await offloadCharacterImages(characterId, userId, charData);
         await pool.query(
           'UPDATE characters SET data = $1 WHERE id = $2',
           [JSON.stringify(charData), characterId]
@@ -2465,16 +2480,26 @@ async function saveTrialCharacter(pool, userId, characterData) {
     role: 'main',
     isMainCharacter: true,
     photos: characterData.photos || {},
-    // Photos stored as top-level fields too (used by story pipeline)
-    photoUrl: characterData.photos?.face || null,
-    bodyPhotoUrl: characterData.photos?.body || null,
-    bodyNoBgUrl: characterData.photos?.bodyNoBg || null,
   };
 
   const data = {
     characters: [character],
     relationships: {},
   };
+
+  // The trial client posts raw base64 for face / body / bodyNoBg, so this
+  // INSERT is the biggest single source of image bytes in characters.data
+  // (measured on staging 2026-09-06: a 3.4 MB row created after the cleanup
+  // migration). Offload BEFORE mirroring into the top-level *Url fields:
+  // mirroring first would hand the sweep two copies of the same string and
+  // cost two uploads for one photo.
+  await offloadCharacterImages(characterId, userId, data);
+
+  // Photos stored as top-level fields too (used by story pipeline). Post-
+  // offload these are R2 URLs, which is what the names have always claimed.
+  character.photoUrl = character.photos?.face || null;
+  character.bodyPhotoUrl = character.photos?.body || null;
+  character.bodyNoBgUrl = character.photos?.bodyNoBg || null;
 
   // Lightweight metadata for list queries (strip heavy base64 photos)
   const metadata = {

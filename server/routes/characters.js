@@ -7,7 +7,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPhotosToR2 } = require('../services/database');
+const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
@@ -300,6 +300,11 @@ router.put('/roles', authenticateToken, async (req, res) => {
       };
     });
     const metadata = Array.isArray(data) ? metadataCharacters : { ...data, characters: metadataCharacters };
+
+    // Role flags are tiny, but this rewrites the WHOLE blob — so any bytes an
+    // earlier path left inline would be written back. No-op when clean.
+    await offloadCharacterImages(rowId, req.user.id, updatedData);
+    await offloadCharacterImages(rowId, req.user.id, metadata);
 
     // Save both data and metadata
     await dbQuery(
@@ -733,6 +738,13 @@ router.post('/', authenticateToken, async (req, res) => {
         console.log(`[Characters] POST - Final ${char.name}: avatarKeys=[${avatarKeys.join(',')}], photos=${hasPhotos} [${photoKeys.join(',')}]`);
       }
 
+      // uploadCharacterPhotosToR2 above only covers photos.{original,face,
+      // body,bodyNoBg}. Styled-avatar bytes written by the story pipeline live
+      // elsewhere in the blob and were re-persisted on every wizard save; the
+      // generic sweep is what makes that impossible to reintroduce.
+      await offloadCharacterImages(characterId, req.user.id, characterData);
+      await offloadCharacterImages(characterId, req.user.id, metadataObj);
+
       const jsonData = JSON.stringify(characterData);
       const metadataJson = JSON.stringify(metadataObj);
       const jsonSizeMB = (jsonData.length / 1024 / 1024).toFixed(2);
@@ -850,7 +862,10 @@ router.delete('/avatars/styled', authenticateToken, async (req, res) => {
       }
     }
 
-    // Save updated data
+    // Save updated data. The delete above removes the styled/costumed
+    // subtrees, but the rest of the blob is written back verbatim — sweep it
+    // so this endpoint can never re-persist bytes it did not clear.
+    await offloadCharacterImages(rowId, req.user.id, data);
     await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
 
     const sizeMB = (totalSizeCleared / 1024 / 1024).toFixed(2);

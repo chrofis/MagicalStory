@@ -12,7 +12,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, extractCharacterInlineImagesToR2 } = require('../services/database');
+const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS, resolveGrokImageModel } = require('../config/models');
@@ -51,6 +51,27 @@ const styleSampleCache = new Map();
 // returned no URL — readers expect URL field. Hoisted from two identical
 // definitions inside avatar persistence handlers.
 const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
+
+/**
+ * Alarm when an avatar slot falls back to inline bytes.
+ *
+ * The fallback itself is deliberate — R2 failing must not cost the user their
+ * avatar (owner's ruling 2026-09-06) — but it was SILENT, and a silent
+ * byte-write into characters.data is exactly how megabytes accumulated
+ * unnoticed. Log the row, the slot and the size so the leak is visible in the
+ * logs the moment it happens, not weeks later via a housekeeping sweep.
+ */
+function alarmInlineAvatarFallback(context, characterId, results) {
+  for (const slot of ['standard', 'winter', 'summer']) {
+    if (!onlyIfNoUrl(results?.[slot], results?.[`${slot}Url`])) continue;
+    const mb = (String(results[slot]).length / 1024 / 1024).toFixed(2);
+    log.error(
+      `[R2-offload] ${context}: no R2 URL for avatar slot "${slot}" on character ${characterId} — `
+      + `writing ~${mb} MB INLINE into characters.data. The daily housekeeping sweep will move it; `
+      + `the missing upload is the defect.`
+    );
+  }
+}
 const onlyMissingThumbs = (inline, urls) => {
   if (!inline) return undefined;
   if (!urls) return inline;
@@ -1437,10 +1458,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         // Image bytes never enter characters.data. This is the last point
         // before the write, so anything the avatar pipeline left inline —
         // styledAvatars, preGeneratedAvatarSlides, photos.bodyNoBg — goes to
-        // R2 here and the blob keeps only URLs. Throws if R2 is unavailable
-        // rather than silently storing base64, which is how 73 MB accumulated.
-        await extractCharacterInlineImagesToR2(rowId, req.user.id, charData);
-        await extractCharacterInlineImagesToR2(rowId, req.user.id, metadataObj);
+        // R2 here and the blob keeps only URLs. On an R2 failure it alarms at
+        // ERROR and still writes (owner's ruling 2026-09-06) — losing the
+        // user's character to an outage is worse than a row swept later.
+        await offloadCharacterImages(rowId, req.user.id, charData);
+        await offloadCharacterImages(rowId, req.user.id, metadataObj);
 
         // Upsert the characters row
         await txClient.query(`
@@ -2461,6 +2483,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               }
             }
 
+            alarmInlineAvatarFallback(`avatar job ${jobId}`, characterId, results);
             const newAvatarData = {
               status: 'complete',
               generatedAt: new Date().toISOString(),
@@ -3547,6 +3570,7 @@ These corrections OVERRIDE what is visible in the reference photo.
             // onlyIfNoUrl / onlyMissingThumbs are hoisted to module scope.
             const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
             const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
+            alarmInlineAvatarFallback('avatar sync path', characterId, results);
             const newAvatarData = {
               status: 'complete',
               generatedAt: new Date().toISOString(),

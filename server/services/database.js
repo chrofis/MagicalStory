@@ -987,6 +987,92 @@ async function extractCharacterInlineImagesToR2(characterId, userId, data) {
   return moved;
 }
 
+/**
+ * Byte-string test shared by the character offload path — the five prefixes
+ * cover the shapes that actually reach characters.data: data: URIs from the
+ * client, and raw base64 whose magic bytes are JPEG (/9j/), PNG (iVBORw0),
+ * GIF (R0lGOD) or WebP (UklGR).
+ */
+const looksLikeInlineImage = (s) =>
+  typeof s === 'string'
+  && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0')
+      || s.startsWith('R0lGOD') || s.startsWith('UklGR'))
+  && s.length > 1024;
+
+/**
+ * Approximate inline image bytes in a character payload, without touching R2.
+ *
+ * This is the cheap pre-check that lets offloadCharacterImages sit on EVERY
+ * characters.data write: a payload that is already all-URLs costs one object
+ * walk and returns 0, so no R2 client is ever constructed. It doubles as the
+ * number we report in the alarm, so the log line says how many megabytes are
+ * sitting in Postgres rather than just "some".
+ */
+function measureInlineImageBytes(data) {
+  if (!data || typeof data !== 'object') return 0;
+  let total = 0;
+  const seen = new WeakSet();
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (seen.has(node)) return;           // cycles and shared sub-objects
+    seen.add(node);
+    for (const k of Object.keys(node)) {
+      const child = node[k];
+      if (typeof child === 'string') {
+        if (looksLikeInlineImage(child)) total += child.length;
+      } else if (child && typeof child === 'object') {
+        walk(child);
+      }
+    }
+  };
+  walk(data);
+  return total;
+}
+
+/**
+ * The single guard every full-blob `characters.data` write goes through.
+ *
+ * Why a wrapper rather than calling extractCharacterInlineImagesToR2 directly:
+ * that function THROWS when R2 is unconfigured or an upload fails, which is
+ * the right shape for a cleanup script but the wrong shape for a user-facing
+ * write path — it would turn an R2 outage into "your character could not be
+ * saved". The owner's ruling (2026-09-06) is: persist the row, but alarm hard.
+ * So the failure path here logs at ERROR with the row id and the megabytes
+ * involved and returns the payload anyway; the daily housekeeping sweep is the
+ * backstop that moves those bytes to R2 afterwards.
+ *
+ * Never throws. Mutates `data` in place on success and also returns it, so
+ * callers can write either `await offloadCharacterImages(...)` before their
+ * JSON.stringify or use the return value directly.
+ *
+ * @param {string} rowId    characters.id (used in the R2 key and in the alarm)
+ * @param {string} userId   owner id (used in the R2 key)
+ * @param {Object} data     characters.data blob — mutated in place
+ * @param {Object} [logger] logger with .error (defaults to the app logger)
+ * @returns {Promise<Object>} the payload to persist
+ */
+async function offloadCharacterImages(rowId, userId, data, logger = log) {
+  if (!data || typeof data !== 'object') return data;
+
+  // Cheap path first: nothing inline means nothing to do, and crucially no R2
+  // call — this runs on every save, including the ~99% that are already clean.
+  const inlineBytes = measureInlineImageBytes(data);
+  if (inlineBytes === 0) return data;
+
+  try {
+    await extractCharacterInlineImagesToR2(rowId, userId, data);
+    return data;
+  } catch (err) {
+    const mb = (inlineBytes / 1024 / 1024).toFixed(2);
+    (logger || log).error(
+      `[R2-offload] characters row ${rowId}: R2 offload FAILED (${err.message}). `
+      + `Persisting ~${mb} MB of image bytes INLINE in characters.data so the user's work is not lost. `
+      + `The daily housekeeping sweep will move them to R2 — this write path is the defect, not the sweep.`
+    );
+    return data;
+  }
+}
+
 async function extractInlineImagesToR2(storyId, data) {
   if (!data || typeof data !== 'object') return;
   if (!r2.isConfigured()) return;  // graceful no-op; strip will still drop bytes
@@ -2571,6 +2657,20 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   const url = await saveStyledAvatarToR2(userId, characterId, r2KeySuffix, imageData);
 
   // R2-stored avatars: { imageUrl, generatedAt }. Inline fallback: raw data URI.
+  //
+  // The fallback persists the avatar rather than losing it (owner's ruling,
+  // 2026-09-06: an R2 outage must not cost the user their work), but it used
+  // to be SILENT — this is one of the two paths that quietly wrote megabytes
+  // into characters.data. Alarm at ERROR so the leak is visible the moment it
+  // happens instead of being discovered by a housekeeping sweep weeks later.
+  if (!url) {
+    const mb = (String(imageData).length / 1024 / 1024).toFixed(2);
+    log.error(
+      `[R2-offload] persistStyledAvatar: R2 gave no URL for characters_${userId} `
+      + `character ${characterId} (${artStyle}/${clothingCategory}). Writing ~${mb} MB `
+      + `of avatar bytes INLINE into characters.data; the daily housekeeping sweep will move them.`
+    );
+  }
   const value = url
     ? { imageUrl: url, generatedAt: new Date().toISOString() }
     : imageData;
@@ -3715,6 +3815,8 @@ module.exports = {
   stripInlineImagesFromStoryData,
   extractInlineImagesToR2,
   extractCharacterInlineImagesToR2,
+  offloadCharacterImages,
+  measureInlineImageBytes,
   upsertStory,
   ensureStoryRow,
   // Image functions

@@ -29019,3 +29019,67 @@ the hand or body holding it." The description stays out of the block.
 `server/lib/promptBuilders.js` (REQUIRED OBJECTS), `prompts/image-generation.txt`,
 `tests/unit/required-objects-label.test.ts`.
 **Status:** ✅ active — validation run pending.
+
+## 2026-09-06 — An R2 offload failure persists the character row and alarms; the write path is the fix, not the sweep
+
+**Context:** Images belong in R2; `characters.data` / `stories.data` hold URLs
+only. `stories.data` has been clean since June because the story path has one
+chokepoint. Characters did not: `extractCharacterInlineImagesToR2` (added
+2026-09-01 after 40 of 59 production rows were found carrying 73 MB of base64)
+was wired into exactly ONE call site, `server/routes/avatars.js`. Every other
+full-blob `characters.data` write went around it, so the leak stayed live —
+a staging character row created at 14:39 on 2026-09-06 held 3.4 MB of base64,
+created AFTER the cleanup migration had run. The trial path was the worst of
+them: the client posts raw base64 for face / body / bodyNoBg, and
+`saveTrialCharacter` mirrored those same strings into `photoUrl` /
+`bodyPhotoUrl` / `bodyNoBgUrl`, storing every photo TWICE under field names
+that claim to be URLs. Two further paths wrote bytes SILENTLY on an R2 miss:
+`persistStyledAvatar`'s `url ? {...} : imageData` fallback, and the avatar
+job's `onlyIfNoUrl(...)` spreads.
+
+**Decision:** Every full-blob `characters.data` write goes through one new
+guard, `offloadCharacterImages(rowId, userId, data, log)` in
+`server/services/database.js`. It wraps the existing generic sweep and defines
+the failure behaviour the owner ruled on: **persist the row, but alarm hard.**
+On any R2 failure it does NOT throw and does NOT drop the payload — it logs at
+ERROR naming the row id and the approximate megabytes going inline, states that
+the daily housekeeping sweep will move them, and returns the payload so the
+caller writes anyway. A cheap pre-walk (`measureInlineImageBytes`) makes it a
+near no-op on already-clean payloads, so it is affordable on every save. The
+two silent byte-fallbacks keep their behaviour but now alarm at ERROR.
+`saveTrialCharacter` additionally offloads BEFORE mirroring into the `*Url`
+fields, so one photo costs one upload instead of two.
+
+This deliberately CHANGES `extractCharacterInlineImagesToR2`'s contract at the
+user-facing call sites: it still throws (right for a cleanup script), but no
+request path calls it directly any more.
+
+**Rationale:** The product must survive an R2 outage. Refusing the write turns
+a storage blip into "your character could not be saved" and loses work the user
+already did — strictly worse than a row that is temporarily fat and gets swept
+tonight. The cost of the softer failure is that a leak can go unnoticed, which
+is exactly how 73 MB accumulated, so the ERROR log is the price of it: the
+alarm names the row and the size, so the leak is visible the moment it happens.
+**The daily housekeeping sweep is the backstop and its WARN is the detector —
+cleanup is not compliance.** If housekeeping is moving bytes, a write path is
+broken and the fix belongs there. An enumerated field list was rejected for the
+same reason it was rejected on 2026-09-01: the leaking shapes included two
+fields literally NAMED `*Url` that held data URIs, and any list is one avatar
+feature away from leaking again. The sweep is generic, so it cannot be outrun.
+
+**Touched:**
+- `server/services/database.js` — `offloadCharacterImages`,
+  `measureInlineImageBytes`; ERROR alarm on `persistStyledAvatar`'s inline
+  fallback
+- `server/routes/trial.js` — `saveTrialCharacter` (INSERT … ON CONFLICT, plus
+  offload-before-mirror), prewarm styled-avatar UPDATE, both `previewAvatar`
+  UPDATEs, the background trait save, `update-character-details`
+- `storyJobPipeline.js` — the "also save to characters table" styled-avatar
+  UPDATE (the authenticated-user twin of the trial prewarm leak)
+- `server/routes/characters.js` — POST upsert, PUT `/roles`,
+  DELETE `/avatars/styled`
+- `server/routes/avatars.js` — photo-upload upsert now uses the guard;
+  `alarmInlineAvatarFallback` on the async and sync avatar-job write paths
+- `tests/unit/character-image-offload.test.ts`
+
+**Status:** ✅ active

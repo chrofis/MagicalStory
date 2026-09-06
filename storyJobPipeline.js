@@ -6480,6 +6480,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
             if (updatedCount > 0) {
               charData.characters = chars;
+              // styledAvatars come off the in-memory pipeline as data: URIs —
+              // this is the authenticated-user twin of the trial prewarm leak
+              // and the likeliest source of the base64 rows seen in prod.
+              const { offloadCharacterImages } = require('./server/services/database');
+              await offloadCharacterImages(characterId, userId, charData);
               await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
               log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
             }
