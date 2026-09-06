@@ -166,6 +166,8 @@ function extractJsonFromText(text) {
  * `object` may be a plain noun (rope, ladder, stairs) — we only drop it when
  * it looks like a bare proper name not in the scene's character list.
  */
+const { parseWornItems } = require('./wornItems');
+
 function sanitizeInteractions(rawInteractions) {
   if (!Array.isArray(rawInteractions)) return [];
   // Composite-character syntax: "Manuel + Roger" means both characters jointly
@@ -838,6 +840,11 @@ function extractSceneMetadata(sceneDescription) {
     // sceneBriefCheck rather than deleted here.
     const interactions = sanitizeInteractions(metadata.interactions);
 
+    // Removable worn items: per-page state for every VB entry that is also part
+    // of a character's outfit (`wornAs`). Structured on purpose — no downstream
+    // reader may infer "worn or not" from prose (server/lib/wornItems.js).
+    const wornItems = parseWornItems(metadata.wornItems);
+
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
@@ -846,6 +853,7 @@ function extractSceneMetadata(sceneDescription) {
       clothing: null,
       objects: objectIds,
       interactions: interactions.length > 0 ? interactions : null,
+      wornItems,
       // fullData carries the metadata fields downstream consumers expect.
       // shot / setting / time / weather are added explicitly because the
       // empty-scene SHOT prefix in server.js reads `fullData.shot` and was
@@ -854,6 +862,7 @@ function extractSceneMetadata(sceneDescription) {
         characters: metadata.characters,
         objects: metadata.objects,
         interactions,
+        wornItems,
         imageSummary: prose,
         shot: metadata.shot || null,
         setting: metadata.setting || null,
@@ -1006,6 +1015,8 @@ function extractSceneMetadata(sceneDescription) {
     // sceneBriefCheck rather than deleted here.
     const interactionsJson = sanitizeInteractions(parsedData.interactions);
     parsedData.interactions = interactionsJson; // mirror into fullData so downstream readers see the sanitized list
+    const wornItemsJson = parseWornItems(parsedData.wornItems);
+    parsedData.wornItems = wornItemsJson;       // same mirror for the worn-item states
 
     return {
       characters: characterNames,
@@ -1015,6 +1026,7 @@ function extractSceneMetadata(sceneDescription) {
       clothing: null, // Per-character now, no single value
       objects: objectIds,
       interactions: interactionsJson.length > 0 ? interactionsJson : null,
+      wornItems: wornItemsJson,
       // Store full parsed data for buildTextFromJson
       fullData: parsedData,
       thinking: parsed.thinking || null,

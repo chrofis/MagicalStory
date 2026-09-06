@@ -3145,6 +3145,33 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   const styleDescription = options.customStyleDescription || resolveArtStyle(artStyleId, effectiveBackend) || resolveArtStyle('pixar');
   const language = (inputData.language || 'en').toLowerCase();
 
+  // REMOVABLE WORN ITEMS (owner ruling 2026-09-06). A Visual Bible element that
+  // is also part of a character's outfit (`wornAs`) carries a per-page state
+  // the Art Director declared in `wornItems[]`: worn, or off with the place it
+  // now lies. Read structurally — nothing here infers a state from prose.
+  const {
+    resolveWornItemsForPage, wornStateById, stripOffItemsFromOutfit, buildWornStateBlock,
+  } = require('./wornItems');
+  const wornResolved = (visualBible && metadata)
+    ? resolveWornItemsForPage(visualBible, metadata.characters || [], metadata)
+    : [];
+  const wornById = wornStateById(wornResolved);
+  // The owner's outfit text must not still list an item this page takes off.
+  // The item is identified by its `wornAs` SLOT, and exactly that one clause is
+  // dropped — this is not the rejected 2026-08-08 filterWornClothingAgainstScene,
+  // which sieved every clause of every outfit against prose.
+  let effectiveReferencePhotos = referencePhotos;
+  if (wornResolved.some(w => w.state === 'off') && Array.isArray(referencePhotos)) {
+    effectiveReferencePhotos = referencePhotos.map((photo) => {
+      if (!photo || !photo.clothingDescription) return photo;
+      const { text, removals } = stripOffItemsFromOutfit(photo.clothingDescription, wornResolved, photo.name);
+      for (const r of removals) {
+        log.info(`[WORN] Page ${pageNumber}: ${photo.name}'s ${r.slot} (${r.id}) is OFF this page — outfit text ${r.removed ? 'phrase removed' : `left intact (${r.reason})`}`);
+      }
+      return text === photo.clothingDescription ? photo : { ...photo, clothingDescription: text };
+    });
+  }
+
   // Build character reference list (Option B: explicit labeling in prompt)
   let characterReferenceList = '';
   if (sceneCharacters && sceneCharacters.length > 0) {
@@ -3182,7 +3209,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // treat a partial omission as normal (a close-up need not mention
         // shoes) — right for nagging a reviewer, wrong for the image prompt.
         const pageLabel = pageNumber != null ? `page ${pageNumber}` : 'page';
-        for (const photo of referencePhotos) {
+        for (const photo of effectiveReferencePhotos) {
           if (!photo?.name || !photo?.clothingDescription) continue;
           const missing = missingGarments(photo.clothingDescription, cleanSceneDescription || '', undefined, photo.name);
           if (missing.length > 0) {
@@ -3240,6 +3267,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       characterReferenceList += frameLegend;
       log.debug('[IMAGE PROMPT] Added colour-frame mapping');
     }
+  }
+
+  // The reference image is NOT authoritative for a removable item, and it can
+  // be wrong in either direction: the avatar may lack a hat the page needs, or
+  // wear one the page takes off (owner, 2026-09-06). Say which way in words.
+  const wornStateBlock = buildWornStateBlock(wornResolved);
+  if (wornStateBlock) {
+    characterReferenceList += wornStateBlock;
+    log.info(`[WORN] Page ${pageNumber}: ${wornResolved.map(w => `${w.id}=${w.state}${w.defaulted ? '(defaulted)' : ''}`).join(', ')}`);
   }
 
   // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
@@ -3373,13 +3409,23 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       );
       const gridRefNames = [];
       for (const obj of promptObjects) {
+        // A worn removable item is not a prop on this page — it is on the
+        // character, and the avatar reference already carries it. Listing it
+        // here as an object is half of what made p3 of
+        // job_1788641639919_mpjwlzkf1 render a second, free-standing hat.
+        const wornState = wornById.get(String(obj.id || '').toUpperCase());
+        if (wornState && wornState.state === 'worn') {
+          log.info(`[WORN] Page ${pageNumber}: ${obj.id} omitted from REQUIRED OBJECTS — ${wornState.owner} is wearing it`);
+          continue;
+        }
         // Note: obj.id exists for Visual Bible tracking but is not included in image prompts
         // as image models don't use these identifiers.
         // State-aware description: when the scene places the object off-body
         // (held, draped over furniture, lying on the ground), the emitted
         // description must not contradict it — attachment clauses like "tied
         // at the neck" and the clothing "(worn by X)" suffix are dropped.
-        const placedElsewhere = sceneDeclaresNonWornState(obj.entry, cleanSceneDescription, metadata?.interactions);
+        const placedElsewhere = (wornState && wornState.state === 'off')
+          || sceneDeclaresNonWornState(obj.entry, cleanSceneDescription, metadata?.interactions);
         const description = placedElsewhere ? stripWornStateFromDescription(obj.description) : obj.description;
         const wornSuffix = (obj.type === 'clothing' && obj.wornBy && !placedElsewhere)
           ? ` (worn by ${obj.wornBy})`
@@ -3462,7 +3508,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // for an element the shot only shows part of — a vessel the camera
         // stands ON was painted as a complete vessel in the background, at
         // whatever size the model chose, with its stern lettering.
-        requiredObjectsSection += `* ${lead}${wornSuffix}\n`;
+        // An off item is listed WITH the place the page put it, so the
+        // checklist and the WORN ITEMS block cannot disagree.
+        const offWhere = (wornState && wornState.state === 'off' && wornState.location)
+          ? ` — ${wornState.location}`
+          : '';
+        requiredObjectsSection += `* ${lead}${wornSuffix}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry

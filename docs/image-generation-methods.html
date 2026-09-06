@@ -449,6 +449,21 @@ from 3 to 5"). Test Lab can override with <code>params.maxRefSlots</code>.</p>
 ONE slot and cell size scales as 1/n. The empty-scene grid is a different grid with
 its own cap of 9.</p>
 
+<p><strong>Worn-item dedupe (owner, 2026-09-06).</strong> A Visual Bible element that is
+also part of a character&rsquo;s outfit (<code>wornAs: "Name.slot"</code>) is
+<strong>skipped</strong> by <code>getElementReferenceImagesForPage</code> when its owner is
+on the page and the brief declares its state <code>worn</code>: the avatar reference already
+carries it, so a second plate plus the &ldquo;match its look&rdquo; line describes one object
+twice &mdash; that is how p3 of staging <code>job_1788641639919_mpjwlzkf1</code> rendered two red
+hats. The cell is <strong>kept</strong> when the state is <code>off</code>, because the plate is
+then the only description of what lies on the ground. The state comes from the brief&rsquo;s
+METADATA <code>wornItems[]</code> (<code>server/lib/wornItems.js</code>); a caller that passes no
+scene metadata does not dedupe. One INFO line per page names the path taken. Every packing
+path funnels through that one function, so first generation, iterate/repair, the Test Lab
+image stage and the regeneration routes all inherit it; covers pass no page metadata and are
+unchanged. Full rationale: <code>docs/decisions.md</code> &rarr; &ldquo;A removable worn item
+carries a STRUCTURED per-page state&rdquo;.</p>
+
 <h3>VB elements ride in a COLUMN beside the cards, never a strip below (owner, 2026-09-06)</h3>
 
 <p>When no slot is free, the VB elements share the last character slot. Until

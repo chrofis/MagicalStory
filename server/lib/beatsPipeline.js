@@ -1187,6 +1187,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let clothingFindings = '';
   let clothingByPage = null;
   let clothingUnfixedList = [];
+  // Worn-item states the fed-back round could not get declared. The pages ship
+  // flagged; wornItems.js then defaults them to "worn" (decisions.md 2026-09-06).
+  let wornUnresolved = [];
+  let wornUnresolvedPages = [];
+  let wornRound = null;
   let briefUnfixedList = [];
   let briefIntroducedList = [];
   let briefSecondRound = null;
@@ -1199,9 +1204,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         prose: String(x.brief || '').split('---METADATA---')[0],
         cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
         perCharClothing: meta.characterClothing || {},
+        // Structured worn-item states (server/lib/wornItems.js) — removal_unstated
+        // is a MISSING-FIELD fault since 2026-09-06, not a prose search.
+        wornItems: meta.wornItems || [],
       };
     });
-    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts });
+    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
     clothingByPage = res.byPage;
     clothingFindings = renderFindingsBlock(res.byPage);
     if (clothingFindings) {
@@ -1358,8 +1366,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
               prose: String(x.brief || '').split('---METADATA---')[0],
               cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
               perCharClothing: m2.characterClothing || {},
+              wornItems: m2.wornItems || [],
             };
-          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts });
+          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
           const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
           const left = after.findings.filter(f => REVIEWABLE.has(f.type));
           clothingUnfixedList = left;
@@ -1371,6 +1380,89 @@ async function generateStoryViaBeats(inputData, opts = {}) {
               `Clothing faults survived the scene review on page(s) ${pages}: ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
           } else {
             log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
+          }
+
+          // FED-BACK WORN-STATE ROUND (owner ruling 2026-09-06). The old prose
+          // finding was handed to the review on 9 pages of
+          // job_1788641639919_mpjwlzkf1 and fixed on 0 of them. It is now a
+          // missing FIELD, so the retry can name exactly what to add and the
+          // re-check can verify it — the same shape as the brief second round
+          // below and the landmark minimum-2 retry (cadd4ee72).
+          //
+          // Exactly ONE extra round. Strike two SHIPS: a WARN, a stored
+          // `wornStateUnresolved` flag on the page, and the state defaults to
+          // "worn" because the avatar reference wears the full outfit. A
+          // guideline never kills a paid run.
+          const wornLeft = left.filter(f => f.type === 'removal_unstated');
+          if (wornLeft.length > 0) {
+            const wornPages = new Set(wornLeft.map(f => f.pageNumber));
+            const subset = expansions.filter(x => wornPages.has(x.pageNumber));
+            const subsetByPage = new Map();
+            for (const [pn, list] of after.byPage) {
+              const rows = list.filter(f => f.type === 'removal_unstated');
+              if (rows.length > 0 && wornPages.has(pn)) subsetByPage.set(pn, rows);
+            }
+            const { renderFindingsBlock: renderClothing2 } = require('./clothingCheck');
+            const wrPrompt = buildSceneReviewPrompt(
+              inputData,
+              subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+              { clothingFindings: renderClothing2(subsetByPage), beats },
+            );
+            const label = [...wornPages].sort((a, b) => a - b).join(', ');
+            if (!wrPrompt) {
+              log.warn(`⚠️ [BEATS] worn-state round skipped (no review template) — page(s) ${label} ship flagged`);
+              wornUnresolved = wornLeft;
+            } else {
+              try {
+                log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
+                const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
+                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
+                const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
+                for (const x of subset) {
+                  const fixed = wrByPage.get(x.pageNumber);
+                  if (fixed && fixed.trim() && fixed !== x.brief) {
+                    sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 'worn' });
+                    x.brief = fixed;
+                    x.reviewRewrote = true;
+                  }
+                }
+                const after3 = checkScenes(expansions.map(x => {
+                  const m3 = extractSceneMetadata(x.brief) || {};
+                  return {
+                    pageNumber: x.pageNumber,
+                    prose: String(x.brief || '').split('---METADATA---')[0],
+                    cast: (m3.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+                    perCharClothing: m3.characterClothing || {},
+                    wornItems: m3.wornItems || [],
+                  };
+                }), clothingRequirements, { artifacts: (visualBible || {}).artifacts, visualBible });
+                wornUnresolved = after3.findings.filter(f => f.type === 'removal_unstated');
+                clothingUnfixedList = after3.findings.filter(f => REVIEWABLE.has(f.type));
+                wornRound = {
+                  pages: [...wornPages].sort((a, b) => a - b),
+                  before: wornLeft.length,
+                  after: wornUnresolved.length,
+                  usage: wrRes.usage || null,
+                };
+              } catch (wrErr) {
+                log.warn(`⚠️ [BEATS] worn-state round failed (${wrErr.message}) — page(s) ${label} ship flagged`);
+                wornUnresolved = wornLeft;
+              }
+            }
+            if (wornUnresolved.length === 0) {
+              log.info(`🎩 [BEATS] worn-state round resolved all ${wornLeft.length} fault(s)`);
+              gl.info('beats_worn_state_round', `Worn-state round on page(s) ${label} resolved all ${wornLeft.length} fault(s)`);
+            } else {
+              const d = wornUnresolved.map(f => `p${f.pageNumber} ${f.artifactId || ''} (${f.character})`).join('; ');
+              wornUnresolvedPages = [...new Set(wornUnresolved.map(f => f.pageNumber))].sort((a, b) => a - b);
+              log.warn(`⚠️ [BEATS] worn state STILL undeclared on page(s) ${wornUnresolvedPages.join(', ')} — shipping flagged, state defaults to worn: ${d}`);
+              gl.warn('beats_worn_state_unresolved',
+                `Worn-item state undeclared after the fed-back round on page(s) ${wornUnresolvedPages.join(', ')} — pages ship with wornStateUnresolved and the item defaults to worn: ${d}`,
+                null, { findings: wornUnresolved });
+              for (const x of expansions) {
+                if (wornUnresolvedPages.includes(x.pageNumber)) x.wornStateUnresolved = true;
+              }
+            }
           }
         } catch (rcErr) {
           log.warn(`⚠️ [BEATS] clothing re-check failed (${rcErr.message})`);
@@ -1518,6 +1610,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         clothingFindings: clothingFindings || null,
         briefFindings: briefFindings || null,
         clothingUnfixed: clothingUnfixedList,
+        wornUnresolved,
+        wornUnresolvedPages,
+        wornRound,
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
         briefSecondRound,
@@ -1698,6 +1793,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       sceneDescriptionModelId: exp?.modelId || sceneModel,
       characterClothing,
       characters,
+      // Set when the fed-back worn-state round left an item undeclared: the
+      // render used the "worn" default, so the page is worth a human look.
+      wornStateUnresolved: exp?.wornStateUnresolved || false,
       outlineCharacters: characters,
       // Marker kept as a sniffable "PLAN:" prefix: storyScorecard, textRefine
       // and the Lab's stored-beats recovery all decide beats-vs-unified mode

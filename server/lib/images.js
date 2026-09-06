@@ -3886,6 +3886,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         // Same aboard rule as the plate and the pipeline page grid: the vessel
         // the camera stands on never rides in as an exterior render.
         aboardId: iterateSceneMetadata?.aboard || null,
+        // Same worn-item dedupe as the first-generation grid — a repair must
+        // not reintroduce the duplicate plate the page render dropped.
+        sceneMetadata: iterateSceneMetadata || null,
       })
     : { visualBibleGrid: null, landmarkPhotos: pageLandmarkPhotos };
   const visualBibleGrid = pageRefs.visualBibleGrid;

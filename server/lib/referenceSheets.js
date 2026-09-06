@@ -779,7 +779,7 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
  * Returns { visualBibleGrid, landmarkPhotos } — landmarkPhotos is what the
  * caller should pass to image generation (emptied when the plate covers it).
  */
-async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null, aboardId = null } = {}) {
+async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS', sceneObjectIds = null, aboardId = null, sceneMetadata = null } = {}) {
   const { getElementReferenceImagesForPage } = require('./visualBible');
   // Cap 4, not 6 (owner, 2026-08-29). The whole grid shares ONE of Grok's three
   // reference slots, so cell size scales as 1/n — a 6-cell grid renders each
@@ -789,7 +789,7 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
   // painted. The empty-scene grid keeps its own cap of 9
   // (buildEmptySceneVbGrid) — it is a different grid, sent to a call with no
   // character slots competing for space.
-  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 4, sceneObjectIds);
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 4, sceneObjectIds, sceneMetadata);
   // Landmarks never ride in the grid — a real photograph composited among
   // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
   // landmark reaches the image only as its own reference photo, and when a

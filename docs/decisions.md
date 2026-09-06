@@ -27966,3 +27966,95 @@ consolidator's closed type vocabulary with a keep-your-own-type line.
 `tests/unit/duplicate-object-type.test.ts`.
 
 **Status:** ✅ active
+
+## 2026-09-06 — A removable worn item carries a STRUCTURED per-page state (`wornItems`), not a sentence of prose
+
+**Context:** A Visual Bible element can also be part of a character's outfit —
+the `wornAs: "Name.slot"` link (2026-08-15). Hats, scarves, mittens and jackets
+come off mid-story, and nothing in the pipeline knew which pages they were on
+and which they were off. Evidence, staging `job_1788641639919_mpjwlzkf1`
+("Lily and Ethan and the Count of Twenty", en-gb): ART001 "Lily's red woollen
+hat", `wornAs: "Lily.headwear"`, worn p1–5 and p14, off p6–13 (on the ground
+p8, held by another child p12–13).
+
+Three failures, all from the same missing fact:
+
+1. **p3 rendered two hats.** The avatar reference wore it, and ART001 ALSO won a
+   cell in the element grid with `match its look` in the prompt — two
+   descriptions of one object in one call.
+2. **p8 contradicted itself.** The brief prose said the hat lies on the damp
+   cobbles; the avatar reference and the canonical outfit text still wore it.
+3. **The review fixed 0 of 9.** `clothingCheck`'s `removal_unstated` fired on
+   nine pages with "Say explicitly whether Lily is wearing it or is WITHOUT it
+   and where it lies". `sceneReviewReport.clothingUnfixed` shows nine survivors.
+   A finding phrased as a request for PROSE, which no downstream code could
+   read, is a finding that ships.
+
+**Decision:**
+
+- **The state is a FIELD.** `scene-expansion.txt` / `scene-expansion-all.txt`
+  ask for `wornItems: [{id, owner, state: "worn"|"off", location}]` in the
+  brief's METADATA — one row for every `wornAs` element whose owner is on the
+  page, `location` required when `off`. `server/lib/wornItems.js` is the only
+  reader; `sceneMetadata.js` parses it in both metadata branches.
+- **`removal_unstated` is a missing-FIELD fault.** It fires when a `wornAs`
+  item whose owner is in the page cast has no `wornItems` row, or an `off` row
+  with no location. Computed in code, verifiable after a rewrite.
+- **Fed back, then shipped.** The surviving findings drive ONE targeted review
+  round on just those pages with the finding text attached (the same mechanism
+  as the brief second round, and the landmark minimum-2 retry, `cadd4ee72`).
+  Strike two SHIPS: a loud WARN, `wornStateUnresolved: true` stored on the page,
+  and the state **defaults to `worn`** — because the avatar reference wears the
+  full outfit, so "worn" is the state the render produces anyway. A guideline
+  never kills a paid run.
+- **Cell dedupe.** `getElementReferenceImagesForPage` drops a `wornAs` element
+  whose owner is on the page when its state is `worn` (the avatar carries it)
+  and keeps it when `off` (the plate is then the only description of what lies
+  on the ground). One INFO line per page names the path taken. Every packing
+  path — first generation, iterate/repair, Test Lab, the regeneration routes —
+  goes through that one function and inherits it; covers pass no page metadata
+  and are unchanged.
+- **The prompt says it in both directions.** For each row the image prompt gets
+  a WORN ITEMS block: worn → "…IS wearing this on this page: <item>. Draw it on
+  <Name> even if the attached reference shows <Name> without it."; off → "…is
+  NOT wearing this on this page: <item>. Leave it off <Name> even if the
+  attached reference shows it worn — <location>." The avatar is never changed;
+  the reference is simply not authoritative for a removable item, and it can be
+  wrong either way (owner, 2026-09-06). REQUIRED OBJECTS lists the item only
+  when it is `off`, with its location, and never when it is worn.
+- **The owner's canonical outfit text loses exactly that item when it is off**,
+  addressed by the `wornAs` SLOT: a slot-labelled contract loses the labelled
+  part; a plain-sentence contract loses the ONE clause carrying a noun from that
+  slot's closed vocabulary. Zero or ambiguous matches remove NOTHING and log the
+  reason.
+
+**Rationale:** This is deliberately **not** the rejected
+`filterWornClothingAgainstScene` (removed 2026-08-08, rationale 2026-07-31).
+That guard **inferred** the state by sieving prose for phrases that sounded
+off-body, and deleted whatever clause tripped it — measured over 30 stories /
+457 clothing lines, 34% of outfits were GUTTED, a whole pirate costume reduced
+to "no brim, mid-thigh length, belt/waist: none". Here nothing is inferred: the
+state is DECLARED by the Art Director, the item is identified by its VB id, the
+clause is identified by the `wornAs` slot, and at most ONE clause is ever
+removed — with a fail-safe that removes none when the slot is not
+unambiguously located. Same reason the check stays classification-in-the-prompt
+(SETTLED): code reads a structured field and never pattern-matches meaning out
+of prose.
+
+Defaulting to `worn` rather than `off` follows the physical fact: the avatar
+reference wears the whole outfit, so "worn" is what an unguided render produces.
+Defaulting to `off` would introduce a contradiction on every undeclared page.
+
+**Touched:** `server/lib/wornItems.js` (new), `server/lib/sceneMetadata.js`
+(`wornItems` in both metadata branches), `server/lib/clothingCheck.js`
+(`removal_unstated`), `server/lib/visualBible.js`
+(`getElementReferenceImagesForPage` dedupe + `sceneMetadata` param),
+`server/lib/promptBuilders.js` (WORN ITEMS block, REQUIRED OBJECTS gating,
+outfit-text strip), `server/lib/beatsPipeline.js` (fed-back worn-state round,
+`wornStateUnresolved`), `server/lib/referenceSheets.js`, `server/lib/images.js`,
+`server/lib/testlab.js`, `server/routes/regeneration.js`, `storyJobPipeline.js`
+(metadata threaded to the packer), `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-review.txt`,
+`tests/unit/worn-items.test.ts`.
+
+**Status:** ✅ active

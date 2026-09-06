@@ -2153,7 +2153,12 @@ function getRecurringCreatureIds(visualBible) {
     .filter(Boolean);
 }
 
-function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, sceneObjectIds = null) {
+/**
+ * @param {Object} sceneMetadata - This page's parsed scene metadata. Read ONLY
+ *   for the removable-worn-item dedupe below; a caller without it keeps the
+ *   previous behaviour (no dedupe).
+ */
+function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, sceneObjectIds = null, sceneMetadata = null) {
   if (!visualBible) return [];
 
   const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
@@ -2222,6 +2227,46 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       referenceImageUrl: entry.referenceImageUrl,
       priority: 5 // Lower priority than objects/characters
     });
+  }
+
+  // WORN-ITEM DEDUPE (owner ruling 2026-09-06). An element that is also part of
+  // a character's outfit (`wornAs`) and whose owner is on this page is ALREADY
+  // in the call: the avatar reference wears it. Sending its standalone plate as
+  // well gave the prompt a second copy plus a "match its look" line, and Grok
+  // painted the item twice — staging job_1788641639919_mpjwlzkf1 p3 rendered
+  // two red hats, one on Lily and one hanging in the scene.
+  //
+  // Kept when the page declares the item `off`: then the avatar is NOT carrying
+  // it, and the plate is the only description of what lies on the ground.
+  const wornDropped = [];
+  const wornKeptOff = [];
+  if (sceneMetadata) {
+    try {
+      const { resolveWornItemsForPage, wornStateById } = require('./wornItems');
+      const castNames = (sceneMetadata.characters || [])
+        .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
+      const byId = wornStateById(resolveWornItemsForPage(visualBible, castNames, sceneMetadata));
+      if (byId.size > 0) {
+        for (let i = relevantRefs.length - 1; i >= 0; i--) {
+          const r = byId.get(String(relevantRefs[i].id || '').toUpperCase());
+          if (!r) continue;
+          if (r.state === 'worn') {
+            wornDropped.push(`${r.name} (${r.id}, on ${r.owner})`);
+            relevantRefs.splice(i, 1);
+          } else {
+            wornKeptOff.push(`${r.name} (${r.id}, ${r.location || 'off-body'})`);
+          }
+        }
+      }
+    } catch (err) {
+      log.warn(`[VB-REFS] Page ${pageNumber}: worn-item dedupe skipped (${err.message})`);
+    }
+  }
+  if (wornDropped.length > 0) {
+    log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe DROPPED ${wornDropped.join(', ')} — the avatar reference already carries it`);
+  }
+  if (wornKeptOff.length > 0) {
+    log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — declared off-body, the plate is its only reference`);
   }
 
   // Sort by priority and limit

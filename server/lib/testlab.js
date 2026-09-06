@@ -538,6 +538,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
         // stored metadata predates the field; honour it here too so a Lab page
         // render matches production's grid exactly.
         aboardId: params.aboardOverride ?? ctx.scene?.sceneMetadata?.aboard ?? null,
+        sceneMetadata: ctx.scene?.sceneMetadata ?? null,
       });
       visualBibleGrid = refs.visualBibleGrid;
       genLandmarkPhotos = refs.landmarkPhotos;

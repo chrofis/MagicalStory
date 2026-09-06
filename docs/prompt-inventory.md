@@ -63,7 +63,7 @@ Three loading mechanisms feed these templates:
 
 | Template | Consumer | Stage |
 |---|---|---|
-| scene-expansion.txt | storyHelpers.js `buildSceneExpansionPrompt` | Art Director: outline hint → illustration brief |
+| scene-expansion.txt | storyHelpers.js `buildSceneExpansionPrompt` | Art Director: outline hint → illustration brief. METADATA carries `wornItems[]` (per-page worn/off state for `wornAs` elements) |
 | scene-iteration.txt | storyHelpers.js `buildSceneDescriptionPrompt` (via `sceneDescriptions` alias) | Scene re-description on iterate |
 | scene-iteration-free.txt | storyHelpers.js `buildSceneDescriptionPrompt` | Free-form scene iteration |
 | scene-repair.txt | sceneValidator.js `repairScene` | Scene-description repair |

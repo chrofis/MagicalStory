@@ -18,8 +18,8 @@
  * Three findings, in the order they matter:
  *   outfit_missing       the prose never names this character's outfit
  *   outfit_misattributed a garment of character A appears on character B
- *   removal_unstated     the scene puts a garment off-body without saying the
- *                        wearer is WITHOUT it (story-unified.txt's own rule)
+ *   removal_unstated     a wornAs item whose owner is on the page has no
+ *                        `wornItems` state (or an "off" state with no place)
  *
  * Deliberately NOT a fixer. It reports; the review rewrites; the caller re-runs
  * it afterwards and logs whatever survived rather than shipping it silently.
@@ -27,6 +27,7 @@
 
 const { log } = require('../utils/logger');
 const { resolveCharacterReqs } = require('./clothingCategories');
+const { resolveWornItemsForPage } = require('./wornItems');
 
 // Slot labels the writer emits. A slot the character does not wear is OMITTED
 // (owner decision 2026-08-08) — `none` values are legacy and skipped below.
@@ -295,27 +296,36 @@ function checkPage(page, clothingRequirements, opts = {}) {
     }
   }
 
-  // 3. removal_unstated — a prop that is also a costume slot (`wornAs`) is
-  // named in the prose while the wearer is still described wearing it, with no
-  // statement that they are WITHOUT it. story-unified.txt requires that
-  // statement; nothing enforced it, and the worn-vs-held filter silently
-  // deleted the garment instead.
-  for (const art of (opts.artifacts || [])) {
-    const wornAs = String(art?.wornAs || '').trim();
-    if (!wornAs.includes('.')) continue;
-    const [ownerRaw, slotRaw] = wornAs.split('.');
-    const owner = (ownerRaw || '').trim();
-    if (!owner || !cast.some(n => n.toLowerCase() === owner.toLowerCase())) continue;
-    const artTokens = [...tokens(art.name)].concat([...tokens(art.extractedDescription || art.description)]);
-    const named = artTokens.filter(w => proseTokens.has(w)).length >= 2;
-    if (!named) continue;
-    const withoutStated = new RegExp(`\\bwithout\\b[^.]{0,60}|\\bnot wearing\\b|\\bno longer wear`, 'i').test(prose);
-    if (!withoutStated) {
-      findings.push({
-        pageNumber: page.pageNumber, type: 'removal_unstated', character: owner, slot: (slotRaw || '').trim() || null,
-        detail: `"${art.name}" is both ${owner}'s ${(slotRaw || 'costume').trim()} and a prop in this scene. Say explicitly whether ${owner} is wearing it or is WITHOUT it and where it lies — never leave both possible.`,
-      });
-    }
+  // 3. removal_unstated — STRUCTURED since 2026-09-06 (owner ruling). A VB
+  // entry that is also part of a character's outfit (`wornAs: "Name.slot"`)
+  // must carry an explicit per-page state in the brief's METADATA
+  // `wornItems[]` whenever its owner is on the page: `worn`, or `off` WITH the
+  // place it now lies. Nothing here reads prose.
+  //
+  // The prose version of this check (2026-08-08 → 2026-09-06) asked the review
+  // to write a sentence and then looked for the words "without" / "not
+  // wearing" / "no longer wear" anywhere on the page. On staging
+  // job_1788641639919_mpjwlzkf1 it faulted 9 pages and the review fixed 0 of
+  // them — a finding no downstream code could act on, phrased as a request for
+  // prose, is a finding that ships. The state is now a field, and the packing,
+  // REQUIRED OBJECTS, clothing-text and prompt paths all branch on it.
+  for (const r of resolveWornItemsForPage(
+    opts.visualBible || { artifacts: opts.artifacts || [], clothing: opts.clothing || [] },
+    cast,
+    { wornItems: page.wornItems || [] },
+  )) {
+    if (!r.missing) continue;
+    const what = r.declared
+      ? `declares it "off" but names no place for it`
+      : `has no wornItems entry for it`;
+    findings.push({
+      pageNumber: page.pageNumber, type: 'removal_unstated', character: r.owner, slot: r.slot || null,
+      artifactId: r.id,
+      detail: `"${r.name}" is ${r.owner}'s ${r.slot || 'costume'} AND a Visual Bible element; this page ${what}. `
+        + `Add to this page's METADATA \`wornItems\`: {"id": "${r.id}", "owner": "${r.owner}", "state": "worn"} `
+        + `if ${r.owner} wears it here, or {"id": "${r.id}", "owner": "${r.owner}", "state": "off", "location": "<where it lies or who holds it>"} if not. `
+        + `The prose must agree with whichever you choose.`,
+    });
   }
 
   return findings;
@@ -347,7 +357,9 @@ function checkScenes(pages, clothingRequirements, opts = {}) {
 //   outfit_misattributed — fires on the two worst stories (avg 11 and 17) and
 //     is silent on every story scoring ≥60. Real signal. SENT.
 //   removal_unstated     — rare and unambiguous by construction (it needs a
-//     `wornAs` link, which only exists where the writer declared the duality). SENT.
+//     `wornAs` link, which only exists where the writer declared the duality).
+//     Since 2026-09-06 it is a MISSING-FIELD fault, so it is also mechanically
+//     verifiable after the rewrite and drives a targeted second round. SENT.
 //   outfit_missing       — 24% of pages in stories scoring <40 versus 21% in
 //     stories scoring ≥60. NO discriminating power: prose omitting the outfit is
 //     normal and harmless while the canonical `wears:` line still carries it.

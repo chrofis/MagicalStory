@@ -3773,7 +3773,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Cap = the owner's brief-side VB element budget (2026-09-06): three, the
         // same number the Art Director is given and the pipeline truncates to.
         const { VB_ELEMENT_BUDGET } = require('./server/lib/vbElementBudget');
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_ELEMENT_BUDGET, sceneMetadata?.objects || null);
+        // sceneMetadata rides along for the removable-worn-item dedupe: an item
+        // the page declares WORN is already on the avatar reference, so its
+        // standalone plate is dropped from the grid (server/lib/wornItems.js).
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_ELEMENT_BUDGET, sceneMetadata?.objects || null, sceneMetadata);
         // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
         // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
         // this pageData map (they iterate the pageDataArray it produces), so at

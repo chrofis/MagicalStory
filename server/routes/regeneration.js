@@ -1161,7 +1161,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       sceneMetadata = extractSceneMetadata(desc);
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, null, sceneMetadata);
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
@@ -2027,7 +2027,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, null, sceneMetadata);
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
