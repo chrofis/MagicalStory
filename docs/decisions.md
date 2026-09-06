@@ -29083,3 +29083,41 @@ feature away from leaking again. The sweep is generic, so it cannot be outrun.
 - `tests/unit/character-image-offload.test.ts`
 
 **Status:** ✅ active
+
+## 2026-09-06 — The landmark auto-index trigger stays unbounded; foreign rows are kept
+**Context:** `landmark_index` holds 7,245 rows on prod, of which **1,143 (15.8%)
+are non-Swiss** — Frankfurt, Singapore MRT stations, Tokyo, Kabul, Buenos Aires,
+Council Bluffs and ~30 other cities. Two separate mechanisms produce them, and
+they are not the same thing:
+1. **The user-reachable auto-index trigger.** `discoverLandmarksForLocation`
+   (`server/lib/landmarkPhotos.js:2306`) spawns `indexLandmarksForCity(city,
+   country, { maxLandmarks: 30 })` with the caller's city/country passed straight
+   through and **no geographic bound** on that path or in `townAlreadyIndexed()`.
+   `storyIdeas.js` passes `discoverOnMiss: true`, so any visitor whose IP or
+   entered location resolves to an unindexed town seeds their own city. The
+   signature in the data is unmistakable: ~20 foreign cities each hold **exactly
+   30 rows created on a single day**, across 35 distinct days Jan–Sep 2026 — a
+   per-visitor trickle, not an import. `maxLandmarks: 30` is literally the 30.
+2. **Border spill from Swiss geosearch** (benign, keep). The one genuine bulk day
+   (2026-08-26, 161 rows / 64 cities) is anchored on Riehen, Rafz, Bad Zurzach,
+   Brusio, Augst, Diepoldsau — Swiss border towns whose 10 km radius crossed into
+   DE/AT/IT/LI. `nearest_city` is a search anchor, not a location, so the row is
+   tagged foreign while genuinely belonging to a Swiss town's neighbourhood.
+**Decision:** Leave both alone. No country gate on the trigger, no pruning of
+existing foreign rows.
+**Rationale:** Measured, not assumed. Indexing cost is `~$0.00012/photo`
+(`landmarkPhotos.js:854`) ≈ **$1 total across all 1,143 rows over eight months**;
+the expensive judging pass never ran on them (**0** rows in
+`landmark_photo_scores`). Storage is ~2,219 R2 objects (~14% of the bucket).
+They are inert at serve time: `resolveAvailableLandmarks` is town-name scoped
+with a 100 km proximity fallback, so Tokyo/Singapore/Frankfurt are unreachable
+from any Swiss story. A country gate would also hard-code a CH assumption into a
+path that currently has none (undone by any expansion) and would not stop
+mechanism 2, which we want. This is a tidiness question, not a cost question.
+**Do not "fix" this without new evidence** — the trigger firing for a foreign
+visitor is known and accepted behaviour, not a leak.
+**Touched:**
+- `server/lib/landmarkPhotos.js` (`discoverLandmarksForLocation` ~:2306, `townAlreadyIndexed`)
+- `server/routes/storyIdeas.js` (`discoverOnMiss: true`)
+- `docs/landmark-database.md` §8 (documents the trigger; the count was unmeasured until now)
+**Status:** ✅ active
