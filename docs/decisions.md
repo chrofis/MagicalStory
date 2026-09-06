@@ -28846,3 +28846,55 @@ playmate — never an animal.
 **Touched:** `server/routes/trial.js` (life-challenge categoryContext),
 `prompts/life-challenge-guides.txt` `[sharing]`.
 **Status:** ✅ active — one validation run pending.
+
+## 2026-09-06 — Database housekeeping runs inside Railway, because each service already holds its own DATABASE_URL
+
+**Context:** Two Anthropic-cloud routines — daily housekeeping and a weekly
+reclaim — were created on 2026-09-01 and have never run once. They need
+`DATABASE_URL` / `STAGING_DATABASE_URL` inside a third-party sandbox, and the
+owner will not put production database credentials there. Meanwhile the work is
+not optional: measured on staging 2026-09-06, `characters` held 9 rows with
+base64 images inside JSONB (character write paths bypass the story-only
+`extractInlineImagesToR2`), the table was 259 MB for 41 MB of live data (84%
+dead), and the database 676 MB. After the offload plus `VACUUM FULL` it was
+422 MB, and after a Postgres restart the container went 1,093 MB → 695 MB —
+Railway bills cgroup memory, which counts the OS page cache, and page cache is
+only evicted under memory pressure or a teardown.
+
+**Decision:** The app schedules its own housekeeping. `server/lib/dbHousekeeping.js`
+ticks every 5 minutes and runs a daily pass at 03:30 CH (offload inline images to
+R2 → `VACUUM (ANALYZE)` → bloat report) and a weekly reclaim on Sundays
+(`busyReport()` gate → `VACUUM (FULL, ANALYZE)` → busy re-check → restart this
+environment's Postgres via the Railway API). Wired in `server.js` next to the
+trial-reminder and stale-job schedulers, gated on
+`STORAGE_MODE === 'database' && dbPool && process.env.RAILWAY_ENVIRONMENT`.
+Last-run markers (`db_housekeeping_last_daily` / `db_housekeeping_last_weekly`,
+ISO timestamps) live in the `config` table so a redeploy cannot double-run.
+The Postgres service id is discovered from the injected `RAILWAY_PROJECT_ID` /
+`RAILWAY_ENVIRONMENT_ID`, never hardcoded; a missing `RAILWAY_API_TOKEN`
+(staging today) logs that the disk was reclaimed but the memory will not drop
+until someone restarts Postgres, and returns — it never throws.
+
+**Rationale:** Each Railway service already has `DATABASE_URL` for its OWN
+database. Staging's web container maintains staging, production's maintains
+production. No credential leaves the owner's infrastructure, nothing new is
+stored anywhere, and there is no cross-environment access — which is exactly the
+objection that killed the cloud routines. Running in-process also means the
+weekly reclaim can call `busyReport()` directly instead of trusting an HTTP
+round-trip, and a busy environment simply skipping is correct behaviour, not an
+error. `shouldRun()` is a pure exported function so the Zurich/UTC boundary and
+the once-per-Swiss-day rule are unit-tested rather than discovered in
+production.
+
+**Touched:**
+- `server/lib/dbHousekeeping.js` (new — the single source of truth)
+- `server.js` (scheduler wiring, ~line 2680)
+- `scripts/admin/db-housekeeping.js` (now requires the module; manual entry point)
+- `scripts/admin/migrate-inline-images-to-r2.js` (walker + upload loop moved into the module)
+- `tests/unit/db-housekeeping-schedule.test.ts`
+
+**Status:** ✅ active. **Follow-up:** disable the two Anthropic-cloud routines
+once this is verified running on staging, so there is exactly one owner of the
+job — two schedulers racing for the same `VACUUM FULL` lock is the failure mode
+to avoid. Staging has no `RAILWAY_API_TOKEN`, so the Postgres restart half is
+inert there until one is added.

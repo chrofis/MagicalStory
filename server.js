@@ -2677,6 +2677,17 @@ initialize().then(() => {
     };
     setTimeout(checkStripeRetryBuffer, 30 * 1000);          // first check 30s after boot
     setInterval(checkStripeRetryBuffer, 5 * 60 * 1000);     // then every 5 min
+
+    // Database housekeeping — daily 03:30 CH, weekly reclaim Sundays 03:30 CH.
+    // Each Railway service already has DATABASE_URL for ITS OWN database, so
+    // staging maintains staging and production maintains production with no new
+    // secret and nothing crossing environments. That is why this runs in-process
+    // rather than as an external routine — see server/lib/dbHousekeeping.js.
+    // RAILWAY_ENVIRONMENT gates it off developer machines, where a `npm run dev`
+    // pointed at a real database would otherwise VACUUM FULL it.
+    if (process.env.RAILWAY_ENVIRONMENT) {
+      require('./server/lib/dbHousekeeping').startDbHousekeeping({ pool: dbPool, log });
+    }
   }
 
   // Configure server timeouts to prevent premature connection closures
