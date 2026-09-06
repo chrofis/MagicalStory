@@ -5811,6 +5811,20 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 includeDebug: req.user.role === 'admin',
                 photoType: avatarPhotoType,
                 artStyle,
+                // LAB/BUTTON PARITY (2026-09-06). The automatic pipeline
+                // (repairPipeline.js) and the Test Lab stage both send this;
+                // the manual "Figur reparieren" button did NOT, so the one
+                // repair a user can trigger by hand shipped with an empty
+                // appearance slot and rested identity on the avatar alone —
+                // exactly the gap repairPipeline.js:1369 recorded closing for
+                // the pipeline. Resolved the same way it is there, so the three
+                // callers now build an identical prompt.
+                characterDescription: (() => {
+                  const d = sceneImage.bboxDetection?.characterDescriptions?.[characterName]
+                    ?? freshDetection?.characterDescriptions?.[characterName];
+                  const txt = (typeof d === 'string' ? d : d?.richDescription) || '';
+                  return txt || (character?.description || '');
+                })(),
                 textPosition: sceneImage.textPosition || null,
               }),
               // Mode flags are not part of the canonical request — they pick the

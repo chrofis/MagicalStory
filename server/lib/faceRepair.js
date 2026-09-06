@@ -601,7 +601,7 @@ function buildTextPositionContext(textPosition, sceneDescription) {
 }
 
 async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
-  const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  const { PROMPT_TEMPLATES, fillTemplate, repairStyleGuard, isPhotographicArtStyle } = require('../services/prompts');
   // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
   // name the person we WANT (opts.promptName), while scene-state lookups stay keyed
   // on the character who is actually IN the scene (charName). Without this an
@@ -662,6 +662,12 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
   // as the target region it leans entirely on the avatar and repaints a
   // photographic face into a painted scene, which the style gate then
   // (correctly) rejects as drift.
+  // The guard follows the BOOK's medium. On a photographic story the illustrated
+  // wording ("same illustration style", "line work", "do not render it more
+  // photographically") contradicted the artStyleContext block directly below it
+  // and drove every repaint to cartoon, which the style gate then correctly
+  // refused — see docs/decisions.md, 2026-09-06.
+  const styleGuard = repairStyleGuard(opts.artStyle);
   const artStyleContext = (() => {
     if (!opts.artStyle) return '';
     try {
@@ -674,7 +680,7 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
   })();
   if (treatment === 'blur') {
     const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext });
+    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard });
   }
   if (treatment === 'crosshatch') {
     // Box mode sends the FULL SCENE, so it needs the scene template: the cutout
@@ -687,9 +693,16 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
     const tpl = (regionSource === 'box' && PROMPT_TEMPLATES.characterRepairInpaint)
       ? PROMPT_TEMPLATES.characterRepairInpaint
       : PROMPT_TEMPLATES.characterRepairCutout;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext });
+    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard });
   }
-  return `This is a children's book illustration. Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
+  // Medium named from the story, not assumed. "This is a children's book
+  // illustration" was hardcoded here, so the template-less fallback told the
+  // model to draw an illustration onto a photographic page — the same bug as the
+  // baked style guard, one line further down the same function.
+  const mediumLine = isPhotographicArtStyle(opts.artStyle)
+    ? 'This is a photograph.'
+    : "This is a children's book illustration.";
+  return `${mediumLine} Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged. ${styleGuard}${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 }
 
 // ===========================================================================

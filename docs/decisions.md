@@ -1472,6 +1472,95 @@ by construction rather than by eye.
 **Status:** ✅ active.
 
 
+### The character-repair style guard follows the book's medium (2026-09-06)
+**Context:** Owner: *"I did a face repair on the backpage but it did not change
+anything."* Staging `job_1788681313413_xqmtk2gcs`, back cover, character Rachel.
+The repair ran, called Grok three times, and wrote nothing: `backCover.retryHistory[0]`
+= `char_repair_failed / style_drift / "painterly/watercolor vs photo"`, attempts 3,
+exhausted; `failure_log` id 29, `char_repair_rejected`, severity customer, page -3.
+`imageVersions` still holds only the two versions generation produced. The three
+stored Grok outputs are storybook illustrations of an entirely different scene,
+while the page itself is correctly photographic — the book's `artStyle` is
+`realistic` and the page's own `style_gate` reads `observed: photographic,
+matches_style: true`. **The gate was right 3/3.** The prompt was wrong.
+
+`REPAIR_STYLE_GUARD` was ONE constant, substituted at LOAD time into all four
+character-repair templates. Its text names the target medium "illustration",
+asks for "line work", and forbids rendering "more realistically or more
+photographically than the surrounding artwork" — sitting one line above the
+`{artStyleContext}` block which, on this book, reads *"match this medium exactly:
+A photograph."* Two opposed instructions; the model resolved them toward
+illustration every time. `style_drift` is in `RETRYABLE_REJECTIONS`, so the same
+contradictory prompt was redrawn three times and exhausted. **Character repair
+could never succeed on a `realistic` story** — a deterministic dead end that
+still charged for three Grok edits.
+
+**Decision:** `repairStyleGuard(artStyle)` returns a photographic guard for a
+book whose commissioned medium is a photograph, and the **verbatim unchanged**
+illustrated guard for every painted/drawn style. The four style-scoped templates
+keep their `{REPAIR_STYLE_GUARD}` token past load; `faceRepair.js` fills it per
+story. `fillTemplate` fills any token that still reaches it with the illustrated
+default, so no path can ship a hole. The hardcoded `"This is a children's book
+illustration."` opener in `buildPrompt`'s template-less fallback is now named
+from the story too. **The style gate is untouched** — it was the only component
+that behaved correctly.
+
+**Rationale:** The medium is decided by the DESCRIPTOR, not a hardcoded
+`['realistic']` id list, because a stale id list is exactly how the guard came to
+be wrong. The first draft of the predicate matched "captured by a camera"
+anywhere in the text and classified watercolour, oil and concept art as
+photographic — they share a `NOT_A_PHOTOGRAPH` line reading "never captured by a
+camera… is still a photograph". Caught by the offline check across all 15 styles
+before anything was spent; the predicate now negates first and otherwise requires
+the descriptor to OPEN with "A photograph".
+
+**Same class as "A style map that is missing keys answers confidently and
+wrongly" (2026-08-15)** in this file, where `BLEND_STYLE_LINES` lacked `realistic`
+and appended "soft watercolor children's storybook illustration style" to every
+photoreal blend prompt. A style-blind constant answering for a style it was never
+told about; found the same way, by printing the prompt that was actually sent.
+
+**Touched:** `server/services/prompts.js`, `server/lib/faceRepair.js`.
+**Status:** ✅ active.
+
+### The manual "Figur reparieren" button sends what the pipeline and the Lab send (2026-09-06)
+**Context:** Auditing whether the Test Lab `char_repair` stage is code-identical
+to the production button. It very nearly is — both build through
+`charRepairRequest.js` and both call `images.repairCharacterMismatch`, and the
+Lab's declared deviations are indexed in `docs/lab-divergences.md`. One field
+diverged, and in the opposite direction to the suspicion: `characterDescription`
+is sent by `repairPipeline.js` (which records closing that gap for itself) and by
+the Lab stage, but **not** by the manual endpoint. The one repair a user can
+trigger by hand shipped with an empty appearance slot, resting identity on the
+avatar alone.
+**Decision:** `server/routes/regeneration.js` resolves `characterDescription` the
+same way `repairPipeline.js` does — stored `bboxDetection.characterDescriptions`,
+then the fresh detection, then the character's own description — so all three
+callers assemble an identical prompt.
+**Rationale:** The whole point of `charRepairRequest.js` is that a Lab result is
+evidence about production. A field only two of three callers send breaks that for
+the third.
+**Touched:** `server/routes/regeneration.js`.
+**Status:** ✅ active.
+
+### Cover figure masks are persisted by the generation path, not only by refresh-bbox (2026-09-06)
+**Context:** `job_1788681313413_xqmtk2gcs` has 51 `figure_mask` rows covering
+pages 1-14 and none for -1/-2/-3, though all three covers carry figure
+detections. `resolveFigureMask` therefore returned null for every cover repair,
+and `faceRepair.js` logged the reuse MISS and re-segmented on a crop — the call
+its own comment names as the one that returns background instead of the figure.
+**Decision:** the full-story save loop calls `persistFigureMasks` for each cover,
+keyed on `COVER_PAGE_NUMBERS[coverType]` (-1/-2/-3), reading the **original**
+`storyData` cover object rather than `dataForStorage`.
+**Rationale:** `saveCoverData` (the atomic refresh-bbox path) has always done
+this; the generation path never did. It reads the clone, and `_gdinoMasks` is
+deliberately non-enumerable so a clone cannot carry it — the identical trap the
+scene loop twenty lines above already documents. Existing stories keep
+re-segmenting until their covers are re-detected.
+**Touched:** `server/services/database.js`.
+**Status:** ✅ active.
+
+
 ---
 
 ## Cross-cuts already documented elsewhere

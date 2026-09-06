@@ -66,14 +66,73 @@ function withTemplates(overrides, fn) {
 }
 
 // Single source of truth for the character-repair style-match guard. Every
-// repair template includes the `{REPAIR_STYLE_GUARD}` token; it is substituted
-// with this text at LOAD time (before fillTemplate runs, so it never trips the
-// unfilled-placeholder warning). Prevents the guard from drifting across the
-// parallel repair templates — the exact bug where the grok_inpaint, grok
-// blackout, and gemini repair paths each shipped without it and returned
-// photoreal faces in an illustrated scene. Also applied to the LOCAL_PROMPTS
-// repair templates read directly in images.js (imported from here).
-const REPAIR_STYLE_GUARD = 'Render the repainted area in the same illustration style as the rest of the scene — same line work, shading, and level of detail as the other figures. Do not render it more realistically or more photographically than the surrounding artwork.';
+// repair template includes the `{REPAIR_STYLE_GUARD}` token. Prevents the guard
+// from drifting across the parallel repair templates — the exact bug where the
+// grok_inpaint, grok blackout, and gemini repair paths each shipped without it
+// and returned photoreal faces in an illustrated scene. Also applied to the
+// LOCAL_PROMPTS repair templates read directly in images.js (imported here).
+//
+// THE GUARD HAS TWO MEDIUMS (2026-09-06). The wording below is the original and
+// is unchanged — it is simply no longer sent to a book whose commissioned medium
+// IS a photograph. On `artStyle: 'realistic'` this text named the target medium
+// "illustration", asked for "line work", and explicitly forbade rendering *more
+// photographically* — on a page that is correctly, deliberately photoreal. It
+// sat one line above the `{artStyleContext}` block saying "match this medium
+// exactly: A photograph.", so the model was handed two opposed instructions and
+// resolved them toward illustration every time. `checkStyleMatch` then refused
+// the cartoon it produced, correctly, on all three attempts, and the repair
+// could never write a pixel — a deterministic dead end for every realistic
+// story. Same class as the 2026-08-15 `BLEND_STYLE_LINES` entry in
+// docs/decisions.md: a style-blind constant answering confidently and wrongly
+// for a style it was never told about.
+const REPAIR_STYLE_GUARD_ILLUSTRATED = 'Render the repainted area in the same illustration style as the rest of the scene — same line work, shading, and level of detail as the other figures. Do not render it more realistically or more photographically than the surrounding artwork.';
+const REPAIR_STYLE_GUARD_PHOTOGRAPHIC = 'Render the repainted area in the same photographic style as the rest of the image — same camera realism, skin texture, depth of field, grain and lighting as the other people in the frame. Do not render it as an illustration, cartoon, painting or 3D render, and do not make it smoother, flatter or more stylised than the surrounding photograph.';
+// Back-compat export + the default for every caller that has no art style to
+// hand (images.js / bboxDetection.js / imageInpainting.js read their templates
+// at module load, long before a story is known). Unchanged text, unchanged
+// behaviour for those paths.
+const REPAIR_STYLE_GUARD = REPAIR_STYLE_GUARD_ILLUSTRATED;
+
+/**
+ * Is this book's commissioned medium a photograph?
+ *
+ * Derived from the style DESCRIPTOR, not from an id list: a hardcoded
+ * `['realistic']` silently mis-answers the day a second photoreal style is
+ * added, which is precisely how the guard came to be wrong in the first place.
+ * Every painted/drawn descriptor in ART_STYLES carries an explicit "Never
+ * photographic" / "not a photograph" disclaimer; the photographic one opens
+ * with "A photograph.". Anything unrecognised falls back to the illustrated
+ * guard — the historical behaviour.
+ */
+function isPhotographicArtStyle(artStyle) {
+  if (!artStyle) return false;
+  let text = String(artStyle);
+  if (!/\s/.test(text)) {
+    // An id, not a descriptor — resolve it. Lazy require: promptBuilders pulls
+    // this module in, so a top-level require would close a cycle.
+    try {
+      const { ART_STYLES } = require('../lib/promptBuilders');
+      const raw = ART_STYLES[text];
+      const resolved = typeof raw === 'string' ? raw : (raw && raw.default) || '';
+      if (!resolved) return false;
+      text = resolved;
+    } catch { return false; }
+  }
+  const lower = text.toLowerCase().trim();
+  // Negations first. The painted styles share a NOT_A_PHOTOGRAPH line reading
+  // "never captured by a camera" and "a photograph with a painterly filter is
+  // still a photograph" — matching either phrase anywhere in the text classified
+  // watercolour, oil and concept art as PHOTOGRAPHIC. Caught by the unit check
+  // before it shipped. The opening clause is the precise signal: every
+  // descriptor names its medium in its first words.
+  if (/never photographic|never captured by a camera|painted by hand|not a photograph/.test(lower)) return false;
+  return /^a photograph[.,: ]/.test(lower);
+}
+
+/** The style guard for this book's medium. */
+function repairStyleGuard(artStyle) {
+  return isPhotographicArtStyle(artStyle) ? REPAIR_STYLE_GUARD_PHOTOGRAPHIC : REPAIR_STYLE_GUARD_ILLUSTRATED;
+}
 
 // Single source of truth for the no-lettering guard on REPAIR and EDIT prompts.
 // The base page template forbids painted text, but every prompt that repaints
@@ -85,13 +144,33 @@ const REPAIR_STYLE_GUARD = 'Render the repainted area in the same illustration s
 // six parallel templates cannot be kept in sync by hand.
 const REPAIR_TEXT_GUARD = 'Add no text of any kind: no caption, watermark, label, signature, or letters, numbers and symbols on any surface in the repainted area. Object names in this prompt say what to draw — never paint a name as lettering. Lettering already present in the untouched part of the image stays exactly as it is.';
 
-/** Substitute the shared repair guards into a template string (load-time). */
-function applyRepairStyleGuard(text) {
+/**
+ * Substitute the shared repair guards into a template string (load-time).
+ *
+ * `keepStyleToken` leaves `{REPAIR_STYLE_GUARD}` standing so a per-story medium
+ * can be filled in later (faceRepair.js, which is the sole consumer of the four
+ * character-repair templates). Every other caller reads its templates at module
+ * load with no story in hand and keeps the baked illustrated default, exactly as
+ * before. `fillTemplate` fills any token that reaches it unfilled with the same
+ * default, so no path can ship the literal placeholder.
+ */
+function applyRepairStyleGuard(text, { keepStyleToken = false } = {}) {
   if (typeof text !== 'string') return text;
-  return text
-    .replace(/\{REPAIR_STYLE_GUARD\}/g, REPAIR_STYLE_GUARD)
-    .replace(/\{REPAIR_TEXT_GUARD\}/g, REPAIR_TEXT_GUARD);
+  const withText = text.replace(/\{REPAIR_TEXT_GUARD\}/g, REPAIR_TEXT_GUARD);
+  return keepStyleToken ? withText : withText.replace(/\{REPAIR_STYLE_GUARD\}/g, REPAIR_STYLE_GUARD);
 }
+
+/**
+ * The four templates whose guard must follow the BOOK's medium rather than a
+ * baked constant. Only faceRepair.js reads these, and it always passes the
+ * story's artStyle through fillTemplate.
+ */
+const STYLE_SCOPED_REPAIR_TEMPLATES = new Set([
+  'characterRepairBlended',
+  'characterRepairBodyBlended',
+  'characterRepairCutout',
+  'characterRepairInpaint',
+]);
 
 async function loadPromptTemplates() {
   const promptsDir = path.join(__dirname, '../../prompts');
@@ -308,7 +387,9 @@ async function loadPromptTemplates() {
   // One-source-of-truth repair guard: fill {REPAIR_STYLE_GUARD} in every
   // template that carries it (all character-repair templates).
   for (const k of Object.keys(PROMPT_TEMPLATES)) {
-    PROMPT_TEMPLATES[k] = applyRepairStyleGuard(PROMPT_TEMPLATES[k]);
+    PROMPT_TEMPLATES[k] = applyRepairStyleGuard(PROMPT_TEMPLATES[k], {
+      keepStyleToken: STYLE_SCOPED_REPAIR_TEMPLATES.has(k),
+    });
   }
 
   if (failures.length > 0) {
@@ -335,6 +416,12 @@ function fillTemplate(template, replacements) {
     // `{KEY}` placeholders in the output, which get shipped to image models.
     const safeValue = String(value ?? '').replace(/\$/g, '$$$$');
     result = result.replace(new RegExp(`\\{${escapedKey}\\}`, 'g'), safeValue);
+  }
+  // The style guard is never stripped. It is the one placeholder whose absence
+  // silently removes a rule rather than leaving a hole, so a caller that forgot
+  // it gets the historical illustrated default instead of no guard at all.
+  if (result.includes('{REPAIR_STYLE_GUARD}')) {
+    result = result.replace(/\{REPAIR_STYLE_GUARD\}/g, REPAIR_STYLE_GUARD);
   }
   // Warn (then strip) any placeholders the caller didn't provide. The strip
   // alone hides typos and missing fills — a misspelled key vanishes silently
@@ -595,5 +682,9 @@ module.exports = {
   extractArtStyle,
   resolveEvalArtStyle,
   REPAIR_STYLE_GUARD,
+  REPAIR_STYLE_GUARD_ILLUSTRATED,
+  REPAIR_STYLE_GUARD_PHOTOGRAPHIC,
+  isPhotographicArtStyle,
+  repairStyleGuard,
   applyRepairStyleGuard,
 };

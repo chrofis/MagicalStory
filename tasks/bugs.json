@@ -579,6 +579,15 @@
       "status": "fixed",
       "fixedIn": "staging 5c4f3b941 (2026-09-06)",
       "note": "The 2026-08-24 name-for-type substitution is correct for prose and wrong for the title, which is authored text the model must letter verbatim. Fix inside the single chokepoint: the sanitiser matches the shared title-line shape, masks the quoted title, substitutes around it, restores it. Regression test tests/unit/cover-title-not-sanitised.test.ts; decisions.md entry 2026-09-06."
+    },
+    {
+      "id": "repair-style-guard-forces-illustration-on-photographic-stories",
+      "title": "REPAIR_STYLE_GUARD is style-blind: on artStyle 'realistic' it orders an illustration onto a photographic page, so every character repair is refused by the style gate and writes nothing",
+      "reportedAt": "2026-09-06",
+      "source": "Owner report (\"I did a face repair on the backpage but it did not change anything\") reproduced from stored evidence on staging job_1788681313413_xqmtk2gcs. stories.data.artStyle='realistic'; coverImages.backCover.imageVersions has 2 entries, both from generation, no post-repair version; story_images has 2 backCover rows, both created at generation time; image_version_meta.backCover.activeVersion=1 (the pre-repair pick-best winner). backCover.retryHistory[0] = {type char_repair_failed, character Rachel, attempts 3, exhausted true, rejectedReason style_drift, gateMessage 'painterly/watercolor vs photo'}, attemptFrames gateMessages 'flat vector cartoon vs photo' x2. failure_log id=29 kind char_repair_rejected severity customer fingerprint style_drift page_number -3. The three stored Grok raw outputs are storybook illustrations of a different scene; the page itself is correctly photographic (its own style_gate records observed 'photographic', matches_style true), so the gate was right 3/3.",
+      "status": "fixed",
+      "fixedIn": "staging (2026-09-06)",
+      "note": "Root cause: server/services/prompts.js REPAIR_STYLE_GUARD was one constant substituted at LOAD time into all four character-repair templates. Its text names the target medium 'illustration', asks for 'line work' and forbids rendering 'more realistically or more photographically' - directly contradicting the {artStyleContext} block one line below it, which on a realistic story reads 'match this medium exactly: A photograph.'. style_drift is in RETRYABLE_REJECTIONS so the same contradictory prompt was redrawn 3x and exhausted. Deterministic: character repair could never succeed on a realistic story. Fix: repairStyleGuard(artStyle) picks a photographic or the verbatim-unchanged illustrated guard; the four style-scoped templates keep the token at load and faceRepair.js fills it per story; fillTemplate defaults any unfilled token to the illustrated text so no path can ship a hole. Also fixed the hardcoded \"This is a children's book illustration\" fallback at faceRepair.js buildPrompt. Style gate NOT weakened - it was correct. Same class as the 2026-08-15 BLEND_STYLE_LINES entry in docs/decisions.md."
     }
   ]
 }
