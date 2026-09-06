@@ -2,6 +2,8 @@
 
 const { runPlanCounters, collectPlaceNames, highActionPageBudget } = require('./planCounters');
 const { textZoneRulesActive } = require('../config/runtime');
+const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
+const { buildCharacterDescription } = require('./visualBible');
 
 // The beats layer no longer audits the STORY (owner, 2026-09-01). Its only
 // check is arithmetic over the page division (./planCounters) plus one cheap
@@ -896,6 +898,30 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (missing.length > 0) {
           log.warn(`⚠️ [BEATS] Bible missing section(s): ${missing.join(', ')}`);
           gl.warn('beats_story_bible_partial', `Bible missing ${missing.map(m => m.replace(/-/g, '')).join(', ')}`);
+        }
+        // An invented child the bible declares a PEER of the commissioned
+        // children must state an age inside their band. The band went into the
+        // bible prompt above; this is the deterministic post-check over what
+        // came back — no model call, no classification, it reads the bible's
+        // own `peer` field and compares a number. Fail-soft like the rest of
+        // this stage: clamp to the nearest tolerated edge, flag the entry,
+        // warn. No retry loop and never a kill — an age constraint must not be
+        // able to end a paid run.
+        // Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy in the striped
+        // scarf" stated ten next to a commissioned 6-year-old, rendered 11-12
+        // on p5.
+        const childBand = visualBible?.secondaryCharacters?.length
+          ? commissionedChildBand(inputData.characters || [])
+          : null;
+        if (childBand) {
+          const band = childBand;
+          const applied = applySecondaryAgeBand(visualBible.secondaryCharacters, band, buildCharacterDescription);
+          for (const a of applied) {
+            log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
+            gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${band.min}-${band.max}; clamped to ${a.clampedTo}`, null, {
+              id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: band.low, bandHigh: band.high,
+            });
+          }
         }
         const vbCount = visualBible
           ? Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)

@@ -215,6 +215,35 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
 }
 
 /**
+ * The age a secondary-character CELL states, in the same words a commissioned
+ * character's sheet uses.
+ *
+ * The bible now states an invented character's age as a number (see
+ * prompts/story-bible-from-beats.txt). A bare number renders nothing: the
+ * proportions phrasing is what an image model actually obeys, and it is the
+ * same getAgeCategory → getAgeMarkers table the commissioned avatars' sheets
+ * are built from — mirrored here, not reinvented. Without it CHR001 of
+ * job_1788641639919_mpjwlzkf1 ("a boy of about ten") rendered as an 11-12
+ * year old on a page beside a commissioned 6-year-old.
+ *
+ * Returns '' for a non-character element and for an entry whose age cannot be
+ * read, so the cell line is unchanged in every case this does not cover.
+ *
+ * @param {Object} el element from getElementsNeedingReferenceImages
+ * @returns {string} '' or a leading-space sentence
+ */
+function characterAgeCue(el) {
+  if (!el || el.type !== 'character') return '';
+  const { parseStatedAge } = require('./inventedAgeBand');
+  const age = parseStatedAge(el.age) ?? parseStatedAge(el.description);
+  if (age == null) return '';
+  // Lazy require: promptBuilders pulls in services/prompts at load.
+  const { getAgeCategory, getAgeMarkers } = require('./promptBuilders');
+  const markers = getAgeMarkers(getAgeCategory(age));
+  return markers ? ` Age ${age}: ${markers}.` : ` Age ${age}.`;
+}
+
+/**
  * Build reference sheet prompt for a batch of elements
  *
  * @param {Array} elements - Elements to include (from getElementsNeedingReferenceImages)
@@ -241,7 +270,7 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   const positions2x2 = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
   const gridLayoutLines = elements.map((el, i) => {
     const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
-    const desc = el.extractedDescription || el.description;
+    const desc = (el.extractedDescription || el.description) + characterAgeCue(el);
     // A reference image carries POSE, not just appearance: reference-conditioned
     // models reproduce a referenced object's exact appearance AND pose whatever
     // the instruction says (OminiControl arXiv:2411.15098; leakage/shortcut in
@@ -1030,6 +1059,7 @@ module.exports = {
   checkCharacterCellRender,
   splitGridIntoReferences,
   buildReferenceSheetPrompt,
+  characterAgeCue,
   buildReferenceSheetBatches,
   generateReferenceSheet,
   buildEmptySceneVbGrid,

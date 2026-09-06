@@ -28381,3 +28381,47 @@ Tracked in `tasks/BACKLOG.md`.
 **Touched:**   `server/lib/repairLogic.js` (gate 2b + step 3 reason), `server/lib/feedbackConsolidator.js`
 (`applyRule7SceneFixGuard`), `tests/unit/repair-method.test.js`
 **Status:**    ✅ active
+
+## An invented child's age is bound to the commissioned children's band — in the BIBLE prompt, never in the page prompt (2026-09-06)
+**Context:** `job_1788641639919_mpjwlzkf1` (Baden, en-gb, 14 pages) was
+commissioned for Lily (6) and Ethan (9). The bible invented CHR001 "The boy in
+the striped scarf" with `age: "a boy of about ten"` — nothing in the pipeline
+tied that number to the children the book was actually commissioned for — and on
+p5 he renders as an 11-12-year-old standing beside the 6-year-old. The
+AGE & PROPORTIONS block of a page prompt is built from `sceneCharacters`, the
+COMMISSIONED cast only, so an invented child never had a size cue on any page.
+**Decision:** The commissioned children's band is computed in code
+(`commissionedChildBand`, min-max over commissioned characters aged ≤12) and
+injected into the Visual Bible prompt as one archetypal sentence
+(`{CHILD_AGE_BAND}`): a peer of the commissioned children states an exact age
+inside that band and marks itself `peer: yes`; a child the story places outside
+that group carries its own age and `peer: no`. `age` became a NUMBER in that
+template (it was prose), and the sex statement moved to the opening of `build`.
+The number then reaches the illustrator two ways and no third:
+(1) `buildCharacterDescription` renders it as words ("a 10-year-old"), which is
+what every prompt copying the entry sees; (2) the secondary character's
+REFERENCE SHEET cell appends `Age N: <getAgeMarkers(getAgeCategory(N))>` — the
+same head-height phrasing the commissioned characters' sheets use, mirrored, not
+reinvented. After the bible is extracted, `applySecondaryAgeBand` runs a
+deterministic post-check over the bible's own `peer` field: a declared peer
+outside the tolerated band (`[min-1, max+2]`) is clamped to the nearest edge,
+flagged `secondaryAgeClamped` on the entry, and WARNed. No retry loop, no kill —
+the bible stage is fail-soft and an age constraint must never end a paid run.
+**Rationale:** The rejected alternative was a proportions cue for invented
+characters in the PAGE image prompt (`secondaryAgeCues`, already written in
+`server/lib/inventedAgeBand.js` and left unused). The owner rejected it
+(2026-09-06): *"We already generate the secondary character and use it. Why plug
+it into the image prompt? Tell the VB to add an age."* The character is already
+generated as a reference image and that reference is what the page inherits, so
+the age has to be right where the character is authored and rendered — in the
+bible and on its sheet — not repeated as a per-page instruction that would fight
+the reference. Nothing here classifies: the code only computes a number and
+compares it; whether an invented child is a peer is the bible's own declaration.
+**Touched:** `prompts/story-bible-from-beats.txt` (numeric `age`, `peer`,
+`{CHILD_AGE_BAND}`), `server/lib/promptBuilders.js` (`buildStoryBibleFromBeatsPrompt`),
+`server/lib/inventedAgeBand.js` (`applySecondaryAgeBand`),
+`server/lib/beatsPipeline.js` (post-check after bible extraction),
+`server/lib/referenceSheets.js` (`characterAgeCue`),
+`server/lib/visualBible.js` (`buildCharacterDescription`, now exported),
+`tests/unit/invented-age-band-wiring.test.ts`, `tests/unit/vb-authoring-contract.test.ts`.
+**Status:** ✅ active

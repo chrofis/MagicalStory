@@ -197,10 +197,16 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
   });
 
-  it('requires sex and apparent age in a character entry', () => {
+  it('requires sex and a NUMERIC age in a character entry', () => {
+    // Beats states the age as a number, not prose, so the band computed from
+    // the commissioned children is comparable (I11, 2026-09-06 — the other
+    // three emitters keep the prose form, asserted below). The sex requirement
+    // is unchanged; it moved from `age` to the opening of `build`.
     const t = templates['storyBibleFromBeats'];
     expect(t).toBeTruthy();
-    expect(t).toMatch(/sex and apparent age/i);
+    expect(t).toMatch(/`age` as a NUMBER of years/);
+    expect(t).toMatch(/opens `build` with the character's sex/);
+    expect(t).toMatch(/"age": \[age in years as a number\]/);
   });
 
   it('requires an earned appearsInPages range', () => {
@@ -221,7 +227,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // Every emitter of a VB character entry has to carry the sex+age rule, or a
   // story routed down the other pipeline ships the same defect. The four
   // template emitters, plus the phantom-patch prompt built in JS.
-  it.each(['storyBibleFromBeats', 'storyUnified', 'storyUnifiedImageFirst', 'storyTrial'])(
+  it.each(['storyUnified', 'storyUnifiedImageFirst', 'storyTrial'])(
     '%s states sex and apparent age in the character scaffold',
     (key) => {
       expect(templates[key], `template ${key} not loaded`).toBeTruthy();

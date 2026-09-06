@@ -11,6 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
+const { commissionedChildBand, buildChildAgeBandNote } = require('./inventedAgeBand');
 const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef } = require('./visualBible');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -5914,6 +5915,13 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
       .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
       .join('\n\n') || '(no character appearance available)',
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    // The band an invented child who is a PEER of the commissioned children
+    // must state its age inside. Computed in code from the commission — the
+    // bible had no tie to it at all, so a rival cast as the peer of a
+    // 6-year-old came out at ten and rendered 11-12 beside her
+    // (job_1788641639919_mpjwlzkf1, CHR001, p5). Empty for an all-adult
+    // commission: there is no band to state.
+    CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
     PLAN_LINES: planBlocks(beats),
   });
 }

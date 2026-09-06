@@ -214,6 +214,44 @@ function secondaryAgeCues(secondaryCharacters = [], pageNumber = null) {
   return out;
 }
 
+/**
+ * Apply the band to what the bible returned: clamp, flag, and hand the caller
+ * the list to log.
+ *
+ * The bible stage is fail-soft and has no retry loop, so a peer outside the
+ * tolerated band is corrected in place rather than re-asked or shipped as-is.
+ * Mutates the entries — the caller stores the same array — and rebuilds the
+ * `description` through the INJECTED builder (the one the parser used), never
+ * by string surgery on the old prose.
+ *
+ * Pure apart from that mutation: no logging, no I/O, no model call. The caller
+ * owns every log line so this stays testable.
+ *
+ * @param {Array<Object>} secondaryCharacters visualBible.secondaryCharacters
+ * @param {Object|null} band from commissionedChildBand
+ * @param {(entry:Object)=>string} [buildDescription] rebuilds entry.description
+ * @returns {Array<{id,name,statedAge,clampedTo,low,high,detail}>} applied clamps
+ */
+function applySecondaryAgeBand(secondaryCharacters, band, buildDescription = null) {
+  const applied = [];
+  const { findings } = checkSecondaryAges(secondaryCharacters, band);
+  for (const f of findings) {
+    const entry = (secondaryCharacters || []).find(e => e && (e.id || e.name) === f.id);
+    if (!entry) continue;
+    const clampedTo = clampAgeToBand(f.statedAge, band);
+    entry.age = clampedTo;
+    entry.secondaryAgeClamped = { statedAge: f.statedAge, clampedTo, band: [band.low, band.high] };
+    if (typeof buildDescription === 'function') {
+      try {
+        const rebuilt = buildDescription(entry);
+        if (rebuilt) entry.description = rebuilt;
+      } catch { /* a description rebuild must never cost the story its bible */ }
+    }
+    applied.push({ ...f, clampedTo });
+  }
+  return applied;
+}
+
 module.exports = {
   CHILD_MAX_AGE,
   BAND_TOLERANCE,
@@ -222,5 +260,6 @@ module.exports = {
   buildChildAgeBandNote,
   checkSecondaryAges,
   clampAgeToBand,
+  applySecondaryAgeBand,
   secondaryAgeCues,
 };
