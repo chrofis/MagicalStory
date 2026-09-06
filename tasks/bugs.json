@@ -6,8 +6,9 @@
       "title": "firstQuoted() closed a lector finding's quoted span on the NEXT apostrophe, truncating any span containing one and silently discarding the finding",
       "reportedAt": "2026-09-06",
       "source": "Reproduced from stored evidence on staging story job_1788681313413_xqmtk2gcs. parseLectorFindings (server/lib/textRefine.js) read each side of 'PAGE n: <quote> -> <correction>' with firstQuoted(), which took the text between the opening quote character and the NEXT one. On \"'the boy's pole lantern went dark like the rest.'\" the closing quote was read as the apostrophe inside boy's, so quote became 'the boy' and correction likewise truncated; the quote===correction guard then dropped the whole finding at the PARSE step, before locate ever ran. A second finding, 'everyone's' -> 'everyone else's', hit the same trap and applied correctly only because its two truncations happened to differ. Every possessive and every contraction in English, and every apostrophe in French, was affected.",
-      "status": "open",
-      "note": "Fixed by reading first-to-LAST quote character per side (quotedSpan), after stripping a trailing parenthetical alternative; an unbalanced quote now rejects the line instead of half-parsing it. Unit tests: tests/unit/lector-quote-parse.test.ts."
+      "status": "fixed",
+      "note": "Fixed by reading first-to-LAST quote character per side (quotedSpan), after stripping a trailing parenthetical alternative; an unbalanced quote now rejects the line instead of half-parsing it. Unit tests: tests/unit/lector-quote-parse.test.ts.",
+      "fixedIn": "5a60c0bf6"
     },
     {
       "id": "model-pricing-missing-gemini-3-1-pro",
