@@ -29144,3 +29144,91 @@ same inline-or-URL check.
 
 **Touched:** `server/lib/styledAvatars.js`.
 **Status:** ✅ active — validation trial pending.
+
+## 2026-09-06 — The lector's reasoning budget cannot be disabled: `reasoning: { enabled: false }` is rejected at the OpenRouter boundary
+
+**Context:** The lector (the final proofread pass, `server/lib/textRefine.js:631-700`)
+was measured on staging story `job_1788681313413_xqmtk2gcs` (en-gb, 14 pages) at
+**$0.26-0.27 and ~165s**, and returned a SINGLE 12-word finding out of ~22,000
+output tokens. The spend is not the answer — it is reasoning. A one-word probe to
+`google/gemini-3.1-pro-preview` (prompt: reply "OK") came back with
+`usage: {"completion_tokens":109,"completion_tokens_details":{"reasoning_tokens":108}}`
+— **99% of the completion tokens were spent thinking in order to say "OK"** — plus a
+`reasoning_details` signature blob. The model always thinks; there is no
+zero-reasoning path on this endpoint.
+
+The obvious fix looked free: the codebase already carries the machinery to switch
+reasoning off (`server/lib/textModels.js:965`, proven in use at
+`server/lib/images.js:835`), so passing `reasoning: { enabled: false }` in the
+lector call at `textRefine.js:657` would have been a one-line change.
+
+**Decision:** **Do not add the reasoning option to this call.** It is not a
+tunable on this endpoint. OpenRouter rejects the request before the model sees it:
+
+```
+HTTP 400 {"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400}}
+```
+
+Reproduced 3x, failing in 151-325ms (i.e. at the provider boundary, never
+reaching the model). Omitting the key returns HTTP 200 normally.
+
+**Rationale — and the reason this entry exists at all:** the failure would have
+been **SILENT in production**. The lector block is wrapped in a non-blocking
+`try/catch` (deliberately: a proofread failure must never kill a paid story).
+Shipping the flag would therefore have thrown a 400 on **every story**, logged one
+`warn` line, and quietly dropped the proofread pass from every book — no error, no
+failed job, no eval signal. A cost optimisation that cannot work would have looked
+exactly like a cost optimisation that works.
+
+Also measured, and worth recording so the $0.26 figure is not read as fixed
+overhead: the stored 2026-09-03 A/B control (German story, findings format) cost
+**$0.0994 / 61.6s** for 4/4 core faults, against **$0.26-0.27 / 165s** for the
+14-page English story. **The lector's cost scales with text volume.** The lever, if
+one is wanted later, is the output CONTRACT and the input size — not a reasoning
+switch that does not exist.
+
+This does **not** overturn the model choice logged in "The lector:
+gemini-3.1-pro grammar pass runs LAST…" (2026-09-03, commit `81f1c0798`) — that
+entry stands unchanged. gemini-3.1-pro is still the lector; the price of its
+accuracy is simply mandatory reasoning tokens.
+
+**Touched:** nothing — the code is deliberately unchanged.
+`server/lib/textRefine.js:631-700` is the call this entry describes.
+**Status:** ✅ active — a closed door, recorded so it is not re-opened.
+
+## 2026-09-06 — `MODEL_PRICING` had no entry for `google/gemini-3.1-pro-preview`, so the two most expensive text calls reported $0.00
+
+**Context:** `MODEL_PRICING` in `server/config/models.js` carried no key for
+`google/gemini-3.1-pro-preview`, and none of `calculateTextCost`'s fallbacks
+(`models.js:1091-1095`) reach it: the exact lookup misses, the bare-after-slash
+match misses (`gemini-3.1-pro-preview` is not a key), and the normalizing loop
+misses too. So the function hit its `console.warn('[COST] No token pricing found
+for model: …')` branch and **returned 0**. Every cost path that does not receive
+OpenRouter's `direct_cost` therefore reported **$0.00** for this model — and this
+model is the **lector and the reviewer**, the two most expensive text calls in the
+pipeline.
+
+**Decision:** Add the real entry, sourced from OpenRouter's own public model
+catalogue (`GET https://openrouter.ai/api/v1/models`, read 2026-09-06):
+`pricing.prompt = 0.000002` and `pricing.completion = pricing.internal_reasoning
+= 0.000012` per token, i.e. **$2.00 input / $12.00 output per 1M tokens**, which
+is the unit the surrounding entries use. `thinking` is set equal to `output`
+because reasoning bills at the completion rate and OpenRouter already counts
+reasoning tokens inside `completion_tokens`.
+
+Reconciled against the measured run before committing: `job_1788681313413_xqmtk2gcs`
+used **2,404 in / 21,387 out** and OpenRouter's `direct_cost` was **$0.2615**. The
+new entry predicts **$0.2615**. Exact.
+
+**Rationale:** `direct_cost` stays the **authoritative** source and the code
+already prefers it (`lr.usage?.direct_cost ?? calculateTextCost(...)` at the
+lector call site). This entry is the **fallback safety net** for every path that
+does not get one — including the `JOB_SPEND_CAP_USD` accumulator, which was
+counting these calls as free. Prices were read from the provider, never inferred
+from a neighbouring model. Not modelled: OpenRouter's long-context override
+($4/$18 per 1M above 200k prompt tokens), noted in the code comment — our prompts
+are nowhere near that.
+
+**Touched:** `server/config/models.js` (`MODEL_PRICING`), `tasks/bugs.json`
+(`model-pricing-missing-gemini-3-1-pro`).
+**Status:** ✅ active

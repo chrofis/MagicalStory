@@ -1037,6 +1037,16 @@ const MODEL_PRICING = {
   'deepseek/deepseek-chat': { input: 0.2574, output: 1.0287 },
   'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
   'deepseek/deepseek-v4-flash': { input: 0.14, output: 0.28 },
+  // Lector + reviewer model. Prices read from OpenRouter's own model catalogue
+  // (GET /api/v1/models, 2026-09-06): pricing.prompt 0.000002 and
+  // pricing.completion / pricing.internal_reasoning 0.000012 per token → $2.00
+  // and $12.00 per 1M. `thinking` matches `output` because reasoning bills at
+  // the completion rate and OpenRouter already counts reasoning tokens inside
+  // completion_tokens. NOTE: OpenRouter's `direct_cost` remains the
+  // AUTHORITATIVE figure wherever it is returned; this entry is the fallback so
+  // the call no longer reports $0.00. Prompts over 200k tokens bill at the
+  // higher $4/$18 long-context tier, which this flat entry does not model.
+  'google/gemini-3.1-pro-preview': { input: 2.00, output: 12.00, thinking: 12.00 },
 
   // Grok Imagine models (fixed cost per image)
   'grok-imagine-image': { perImage: 0.02 },
