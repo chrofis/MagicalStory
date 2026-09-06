@@ -12,6 +12,76 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
 const { stripDataUriPrefix } = require('./r2');
+const { baseVbId, vbIdFacet } = require('./vbIdGuard');
+
+/**
+ * OBJECT STATES. One physical thing is ONE artifact entry however the story
+ * alters it — lit, broken, mended, opened, filled. `description` carries what
+ * is true of it on every page; each altered look is a short `delta` in
+ * `states[]` with its own dotted id (`ART001.2`) and its own `pages[]`, and a
+ * page cites the state through that dotted id in `objects[]`.
+ *
+ * This is the artifact-side twin of a location's `vantages[]` — one entry,
+ * several referenced facets — and it exists because the alternative (two
+ * entries for one object) produces two canonical descriptions and two
+ * reference renders that disagree on how the thing is BUILT. Staging
+ * `job_1788681313413_xqmtk2gcs` shipped exactly that: one prop written twice,
+ * three visually distinct forms across one book, two of them with no handle
+ * for the character holding it.
+ *
+ * The cap is 3. Base + 3 states = 4 cells, which is the reference grid's own
+ * `maxPerBatch` — so a whole object always fits in ONE render call.
+ */
+const MAX_OBJECT_STATES = 3;
+
+/**
+ * Normalise an authored `states[]` array. Drops anything without a delta,
+ * renumbers ids onto the parent so a mis-numbered `ART007.2` under ART001 can
+ * never become a foreign lookup key, and caps the list.
+ *
+ * Never throws: a bible with no states, a non-array, or junk rows yields [].
+ *
+ * @param {*} raw       the authored value
+ * @param {string} parentId
+ * @returns {Array<{id,name,delta,pages,referenceImageData,referenceImageUrl}>}
+ */
+function normaliseObjectStates(raw, parentId) {
+  const base = baseVbId(parentId);
+  if (!base || !Array.isArray(raw)) return [];
+  const out = [];
+  for (const s of raw) {
+    if (!s || typeof s !== 'object') continue;
+    const delta = String(s.delta || '').trim();
+    if (!delta) continue;
+    const n = out.length + 1;
+    out.push({
+      id: `${base}.${n}`,
+      name: String(s.name || `state ${n}`).trim(),
+      delta,
+      pages: Array.isArray(s.pages) ? s.pages.filter(p => Number.isFinite(Number(p))).map(Number) : [],
+      referenceImageData: null,
+      referenceImageUrl: null,
+    });
+    if (out.length >= MAX_OBJECT_STATES) break;
+  }
+  return out;
+}
+
+/** The states of a bible entry, always an array. Old entries have none. */
+function objectStates(entry) {
+  return Array.isArray(entry?.states) ? entry.states : [];
+}
+
+/**
+ * The state row a handle names, or null.
+ * `ART001.2` → states[1]; `ART001` → null; an out-of-range facet → null.
+ */
+function objectStateFor(entry, handle) {
+  const facet = vbIdFacet(handle);
+  if (!facet) return null;
+  if (baseVbId(handle) !== baseVbId(entry?.id)) return null;
+  return objectStates(entry)[facet - 1] || null;
+}
 
 // Lazy-load storyHelpers to break circular dependency
 // (storyHelpers.js imports buildVisualBiblePrompt from this file at top level —
@@ -139,8 +209,10 @@ function tryParseVisualBibleJSON(outline) {
 
     // Artifacts
     if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
-      visualBible.artifacts = jsonData.artifacts.map(artifact => ({
-        id: artifact.id || generateId('ART', visualBible.artifacts.length),
+      visualBible.artifacts = jsonData.artifacts.map(artifact => {
+        const id = artifact.id || generateId('ART', visualBible.artifacts.length);
+        return {
+        id,
         name: artifact.name,
         // A name the STORY gives the object. Kept for the text side only;
         // image prompts carry the descriptive `name`, never this.
@@ -155,12 +227,22 @@ function tryParseVisualBibleJSON(outline) {
         // silently. A `referenceView` field lived here briefly (2026-08-24/26);
         // a face-prop now gets two entries instead, one per side, so the side
         // rides in each entry's own description and needs no extra field.
+        //
+        // `states` IS on the whitelist: an object the story alters is one
+        // entry with short per-state deltas (see normaliseObjectStates).
+        states: normaliseObjectStates(artifact.states, id),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
         source: 'outline',
         referenceImageData: null,
         referenceImageGenerated: false
-      }));
+        };
+      });
+      const stated = visualBible.artifacts.filter(a => a.states.length > 0);
+      if (stated.length > 0) {
+        log.info(`[VISUAL BIBLE] ${stated.length} artifact(s) carry states: `
+          + stated.map(a => `${a.id} (${a.states.map(s => s.name).join(' / ')})`).join(', '));
+      }
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.artifacts.length} artifacts from JSON`);
     }
 
@@ -2031,9 +2113,30 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
 function updateElementReferenceImage(visualBible, elementId, referenceImageData, referenceImageUrl = null) {
   if (!visualBible || !elementId || !referenceImageData) return;
 
+  // A dotted handle addresses one STATE of an object, and its cell is written
+  // onto the state row, not onto the entry. The entry keeps the base cell, so
+  // an old story (no states) and a stated one write through the same call.
+  const stateId = vbIdFacet(elementId) ? String(elementId).trim().toUpperCase() : null;
+  const targetId = stateId ? baseVbId(elementId) : elementId;
+
   const findAndUpdate = (entries) => {
     for (const entry of entries || []) {
-      if (entry.id === elementId) {
+      if (stateId && baseVbId(entry.id) === targetId) {
+        const state = objectStateFor(entry, stateId);
+        if (!state) {
+          log.warn(`[VISUAL BIBLE] ${elementId} names a state that "${entry.name}" does not declare — reference cell dropped`);
+          return true;
+        }
+        if (referenceImageUrl) {
+          state.referenceImageUrl = referenceImageUrl;
+          state.referenceImageData = null;
+        } else {
+          state.referenceImageData = referenceImageData;
+        }
+        log.info(`[VISUAL BIBLE] 🖼️ Set state cell for "${entry.name}" — ${state.name} [${elementId}]${referenceImageUrl ? ' (R2)' : ' (inline fallback — R2 unavailable)'}`);
+        return true;
+      }
+      if (!stateId && entry.id === elementId) {
         // URL-only writer (Phase 5). Inline base64 only persists when R2
         // upload returned no URL — readers expect referenceImageUrl.
         if (referenceImageUrl) {
@@ -2272,11 +2375,22 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   // was filtered out, and the model invents its look: a signpost specified as a
   // white-painted board rendered brown on the page that described it without a
   // reference, and correctly white on the page that had one.
-  const askedFor = new Set(
-    (Array.isArray(sceneObjectIds) ? sceneObjectIds : [])
-      .map(id => String(id || '').trim().toUpperCase())
-      .filter(Boolean),
-  );
+  //
+  // Keyed by PARENT id, because a facet handle (`ART001.2` — an object state,
+  // `LOC005.1` — a camera vantage) names a facet of one entry, never a second
+  // entry. Comparing the raw handle against `entry.id` matched nothing and the
+  // page's own prop lost its reference image without a word in the log. The
+  // handle itself is kept as the value so the state's own cell can be picked
+  // below.
+  const askedFor = new Map();
+  for (const raw of (Array.isArray(sceneObjectIds) ? sceneObjectIds : [])) {
+    const handle = String(raw || '').trim().toUpperCase();
+    if (!handle) continue;
+    const parent = baseVbId(handle) || handle;
+    // A bare id never overwrites a dotted one: a brief that names both takes
+    // the state (the more specific answer).
+    if (!askedFor.has(parent) || vbIdFacet(handle)) askedFor.set(parent, handle);
+  }
 
   const relevantRefs = [];
   const recurringIds = new Set(getRecurringCreatureIds(visualBible).map(id => String(id).toUpperCase()));
@@ -2284,18 +2398,39 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
       if (!hasRef(entry)) continue;
+      const parentId = baseVbId(entry.id) || String(entry.id || '').trim().toUpperCase();
       const onPage = entry.appearsInPages && entry.appearsInPages.includes(pageNumber);
-      const named = entry.id && askedFor.has(String(entry.id).toUpperCase());
+      const handle = entry.id ? askedFor.get(parentId) : undefined;
+      const named = !!handle;
       if (!onPage && !named) continue;
 
-      const recurring = recurringIds.has(String(entry.id || '').toUpperCase());
+      // OBJECT STATE. When the brief cites a state (`ART001.2`), hand the page
+      // that state's CELL out of the object's one reference grid — the same
+      // one-element-one-cell contract every other element follows, so a state
+      // costs no extra slot. The state's cells and the base cell come from a
+      // single render call (referenceSheets.buildReferenceSheetBatches), so
+      // they cannot disagree about how the object is built. A state with no
+      // cell of its own falls back to the base render rather than shipping
+      // none: the object's identity is right either way.
+      const state = handle ? objectStateFor(entry, handle) : null;
+      const cell = (state && (state.referenceImageData || state.referenceImageUrl)) ? state : entry;
+      if (state && cell === entry) {
+        log.warn(`[VB-REF] Page ${pageNumber}: ${handle} ("${state.name}") has no state cell — using ${parentId}'s base render`);
+      }
+
+      const recurring = recurringIds.has(parentId);
       relevantRefs.push({
+        // The PARENT id: the element budget, the grid packer and the
+        // entity-consistency key all track one object, whatever state a page
+        // shows it in.
         id: entry.id,
+        stateId: state ? state.id : null,
+        stateName: state ? state.name : null,
         name: entry.name,
         type,
         description: entry.extractedDescription || entry.description,
-        referenceImageData: entry.referenceImageData,
-        referenceImageUrl: entry.referenceImageUrl,
+        referenceImageData: cell.referenceImageData,
+        referenceImageUrl: cell.referenceImageUrl,
         recurring,
         // A recurring creature outranks every other element type, including
         // secondary characters. Without this pin a page with enough cast to
@@ -2583,6 +2718,10 @@ module.exports = {
   updateElementReferenceImage,
   buildCharacterDescription,
   getElementReferenceImagesForPage,
+  MAX_OBJECT_STATES,
+  normaliseObjectStates,
+  objectStates,
+  objectStateFor,
   getEmptySceneElementReferences,
   isRecurringCreature,
   getRecurringCreatureIds,

@@ -436,6 +436,83 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  * @param {number} maxPerBatch - Maximum elements per grid
  * @returns {Array<Array>} Batches, in generation order (batched groups, then solo cells)
  */
+/**
+ * ONE OBJECT, ONE RENDER CALL. An artifact the story alters carries `states[]`
+ * (visualBible.normaliseObjectStates); this expands it into the CELLS of its
+ * own grid — the base look first, then one cell per state, each described as
+ * the base description plus that state's short delta.
+ *
+ * This is the whole point of the state model. Two entries for one object gave
+ * it two independent renders that disagreed on how it was BUILT — a lid, a
+ * carved face and a carrying loop present in one render and absent in the
+ * other, so the book alternated between two different-looking things and a
+ * character was drawn holding one that had no handle. States that share a
+ * single grid image cannot diverge that way: the model draws them side by side
+ * off one prompt, from one base description.
+ *
+ * The cell ids are dotted (`ART001.2`), which is what makes them addressable —
+ * `updateElementReferenceImage` writes each cell onto its state row, and a page
+ * that cites the state gets that cell.
+ *
+ * This function is the ONLY place a per-state cell element is minted, and
+ * `assertStateCellsCoLocated` below refuses any batching that would split one
+ * object's cells across calls. Together those two facts are the guarantee: a
+ * state render cannot be produced by a separate call, because no other code
+ * path can produce a state cell at all.
+ *
+ * @param {Object} el - a bible entry from getElementsNeedingReferenceImages
+ * @returns {Array<Object>} 1 cell for an ordinary element, 1+states.length otherwise
+ */
+function expandElementStateCells(el) {
+  const { objectStates } = require('./visualBible');
+  const states = objectStates(el);
+  if (states.length === 0) return [el];
+  const baseDesc = String(el.extractedDescription || el.description || '').trim().replace(/[.;\s]+$/, '');
+  return [
+    el,
+    ...states.map(s => ({
+      ...el,
+      id: s.id,
+      // Identification-only: `identifySheetCells` maps cells back to elements
+      // by name when the model draws a different grid than asked for, and
+      // every cell of one object would otherwise carry the same name.
+      name: `${el.name} — ${s.name}`,
+      description: `${baseDesc}, ${s.delta}`,
+      extractedDescription: null,
+      states: [],
+    })),
+  ];
+}
+
+/**
+ * The structural lock behind the one-call guarantee: every cell of one object
+ * lives in exactly one batch, and that batch holds ALL of them.
+ *
+ * Throws — deliberately, and BEFORE any image call, so the failure costs
+ * nothing and cannot ship a half-rendered object. A gate that lets a paid run
+ * continue is the right default (docs/decisions.md, "gates are guidelines");
+ * this one runs at batch-construction time where there is no run to kill.
+ *
+ * @param {Array<Array>} batches
+ */
+function assertStateCellsCoLocated(batches) {
+  const { baseVbId } = require('./vbIdGuard');
+  const seen = new Map(); // parent id -> batch index
+  for (let b = 0; b < batches.length; b++) {
+    for (const cell of batches[b]) {
+      const parent = baseVbId(cell?.id);
+      if (!parent) continue;
+      if (seen.has(parent) && seen.get(parent) !== b) {
+        throw new Error(
+          `Reference-sheet batching split ${parent} across batches ${seen.get(parent) + 1} and ${b + 1} — `
+          + `every state of one object must render in a single call`
+        );
+      }
+      seen.set(parent, b);
+    }
+  }
+}
+
 function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4) {
   const { vbDeclaredLetteringNames } = require('./promptBuilders');
   const letteringNames = vbDeclaredLetteringNames(visualBible);
@@ -450,7 +527,12 @@ function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4
   const batchableOther = [];
   for (const el of needsReference) {
     const name = String((el && el.name) || '').trim().toLowerCase();
-    if (name && letteringNames.has(name)) { solo.push(el); continue; }
+    const cells = expandElementStateCells(el);
+    // A multi-state object takes a whole call to itself — that call IS its
+    // grid, base plus every state, so the states cannot disagree. It also
+    // keeps the object to one element in every downstream budget, because
+    // every cell resolves to the same parent id.
+    if (cells.length > 1 || (name && letteringNames.has(name))) { solo.push(cells); continue; }
     (el.type === 'character' ? batchableChars : batchableOther).push(el);
   }
 
@@ -471,8 +553,9 @@ function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4
   };
 
   const batches = [...chunk(batchableChars), ...chunk(batchableOther)];
-  for (const el of solo) batches.push([el]);
+  for (const cells of solo) batches.push(cells);
 
+  assertStateCellsCoLocated(batches);
   return batches;
 }
 
@@ -1061,6 +1144,8 @@ module.exports = {
   buildReferenceSheetPrompt,
   characterAgeCue,
   buildReferenceSheetBatches,
+  expandElementStateCells,
+  assertStateCellsCoLocated,
   generateReferenceSheet,
   buildEmptySceneVbGrid,
   buildPageCompositeRefs,

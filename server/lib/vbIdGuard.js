@@ -34,6 +34,42 @@ const VB_ID_POOLS = 'CHR|ANI|ART|LOC|VEH|CLO';
  */
 const VB_ID_PATTERN = new RegExp(`(?:${VB_ID_POOLS})\\d+(?:\\.\\d+)?`, 'g');
 
+/** A whole VB handle, anchored — `ART001`, `ART001.2`, `LOC005.1`. */
+const VB_ID_ANCHORED = new RegExp(`^(${VB_ID_POOLS})(\\d+)(?:\\.(\\d+))?$`, 'i');
+
+/**
+ * The PARENT id of a VB handle: `ART001.2` → `ART001`, `ART001` → `ART001`,
+ * anything that is not a handle → null.
+ *
+ * ONE definition, next to the grammar it strips, because a dotted handle is
+ * used as a LOOKUP KEY at four sites that all compared it raw and all failed
+ * silently: `matchesEntry` (the object vanishes from REQUIRED OBJECTS),
+ * its `[ART004]` bracket form, `getElementReferenceImagesForPage`'s `askedFor`
+ * set (the prop loses its reference image), and the cover `propIds` filter.
+ * A dotted form is a FACET of one entry — a location's camera vantage, an
+ * artifact's state — never a different entry, so every key derived from it is
+ * the parent's.
+ *
+ * @param {*} value
+ * @returns {string|null} upper-cased parent id, or null
+ */
+function baseVbId(value) {
+  const m = VB_ID_ANCHORED.exec(String(value ?? '').trim());
+  return m ? (m[1] + m[2]).toUpperCase() : null;
+}
+
+/**
+ * The facet index of a dotted handle: `ART001.2` → 2; a bare id → null;
+ * a non-handle → null.
+ *
+ * @param {*} value
+ * @returns {number|null}
+ */
+function vbIdFacet(value) {
+  const m = VB_ID_ANCHORED.exec(String(value ?? '').trim());
+  return (m && m[3]) ? Number(m[3]) : null;
+}
+
 /**
  * Every VB id occurring in `text`, de-duplicated, in first-seen order.
  * @param {string} text
@@ -181,6 +217,8 @@ function formatInteractionsBlock(interactions, visualBible = null) {
 module.exports = {
   VB_ID_POOLS,
   VB_ID_PATTERN,
+  baseVbId,
+  vbIdFacet,
   findVbIds,
   assertNoVbIds,
   warnIfVbIds,

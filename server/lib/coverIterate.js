@@ -7,6 +7,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
@@ -65,9 +66,12 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
       }
     }
   }
-  for (const id of (coverHint?.objects || [])) {
-    if (!/^ART\d+/.test(String(id))) continue;
-    const art = (visualBible?.artifacts || []).find(a => a?.id === id);
+  for (const raw of (coverHint?.objects || [])) {
+    // Base state: a cover never shows the object mid-transformation, and the
+    // id is a lookup key - a dotted state handle matched no artifact at all.
+    const id = baseVbId(raw);
+    if (!id || !/^ART\d+$/.test(id)) continue;
+    const art = (visualBible?.artifacts || []).find(a => baseVbId(a?.id) === id);
     if (!art) continue;
     const src = art.referenceImageUrl || art.referenceImageData;
     if (src) enriched._artifactImages[id] = src;
@@ -89,6 +93,9 @@ const { englishEntityRef, englishLocationRef, significantEntityTokens } = requir
 function collectCoverHintElementIds(coverHint) {
   const ids = [];
   for (const id of (coverHint?.objects || [])) {
+    // Facet handles (an object state, a location vantage) are kept whole here:
+    // this list feeds `buildRecurringElementsText`'s filter, which resolves
+    // both the handle and its parent.
     if (typeof id === 'string' && /^(?:LOC|ART|ANI|VEH|CHR|CLO)\d+/i.test(id.trim())) {
       ids.push(id.trim().toUpperCase());
     }

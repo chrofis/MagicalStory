@@ -165,7 +165,10 @@ function keyForCharacterThumb(userId, characterId, kind, slot, version) {
 }
 
 function keyForVbReference(storyId, entryId) {
-  return `stories/${storyId}/vb/${entryId}.jpg`;
+  // An object-state cell is addressed by a dotted handle (`ART001.2`). The dot
+  // would read as a second extension in the key, so it becomes `_`. Bare ids
+  // carry no dot, so every existing key is unchanged.
+  return `stories/${storyId}/vb/${String(entryId).replace(/\./g, '_')}.jpg`;
 }
 
 // ─── Debug-image keys ───────────────────────────────────────────────────────

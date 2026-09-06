@@ -12,7 +12,8 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote } = require('./inventedAgeBand');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef } = require('./visualBible');
+const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, objectStateFor } = require('./visualBible');
+const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
@@ -2208,8 +2209,12 @@ function buildBasePrompt(inputData, textPageCount = null) {
 function buildRecurringElementsText(visualBible, filterIds = new Set()) {
   let recurringElements = '';
   const isRelevant = (entry) => {
-    if (!filterIds || filterIds.size === 0) return true; // No filter — pass everything
-    return entry.id && filterIds.has(entry.id.toUpperCase());
+    if (!filterIds || filterIds.size === 0) return true; // No filter, pass everything
+    // Parent id: a caller filtering on a facet handle (an object state
+    // `ART001.2`, a location vantage `LOC005.1`) is asking for the entry that
+    // owns it.
+    const id = baseVbId(entry.id) || String(entry.id || '').toUpperCase();
+    return !!entry.id && (filterIds.has(id) || filterIds.has(String(entry.id).toUpperCase()));
   };
   if (visualBible) {
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
@@ -2244,6 +2249,14 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(artifact)) continue;
         const description = artifact.extractedDescription || artifact.description;
         recurringElements += `* **${artifact.name}** [${artifact.id}] (object): ${description}\n`;
+        // OBJECT STATES, listed the way a location's photo variants are
+        // (buildVbLocationLines): the Art Director needs the dotted handles to
+        // be able to cite one. The base description above stays true of every
+        // state; each line is only what changed.
+        const states = objectStates(artifact);
+        if (states.length > 0) {
+          recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+        }
       }
     }
     if (visualBible.clothing && visualBible.clothing.length > 0) {
@@ -3088,6 +3101,31 @@ function stripWornStateFromDescription(description) {
  * REQUIRED OBJECTS path still uses them to describe an object's own state.
  */
 
+/**
+ * The hard cap on an object-state clause. The REQUIRED OBJECTS block is a
+ * name-only presence checklist (decisions.md 2026-09-02): emitting the Visual
+ * Bible DESCRIPTION there handed the image model a full exterior spec for an
+ * element the shot only shows part of. A state clause is allowed on that line
+ * as a fourth rider alongside `size`, `(worn by X)` and a two-sided prop's
+ * orientation - but only as a DELTA, and only this short.
+ *
+ * The cap is what keeps the extension from becoming a reversal. It is applied
+ * in code rather than trusted to the authoring prompt because the prompt is
+ * where the 2026-09-02 failure came from in the first place.
+ */
+const STATE_CLAUSE_MAX_WORDS = 12;
+
+/**
+ * @param {string} delta - the authored state delta
+ * @returns {string} the delta, cut to STATE_CLAUSE_MAX_WORDS words
+ */
+function trimStateClause(delta) {
+  const words = String(delta || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  if (words.length <= STATE_CLAUSE_MAX_WORDS) return words.join(' ');
+  log.info(`[IMAGE PROMPT] State clause cut from ${words.length} to ${STATE_CLAUSE_MAX_WORDS} words - the line is a delta, not a description`);
+  return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
+}
+
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, visualBible = null, pageNumber = null, referencePhotos = null, options = {}) {
   // Build image generation prompt. The unified pipeline is the only generation
   // mode; legacy pictureBook / outlineAndText / sequential / language-variant
@@ -3337,17 +3375,29 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
 
     // Helper function to match by name OR ID
     // NOTE: For character names, we use STRICT matching to avoid "Luis" matching "Luis' Mama"
+    // A brief cites a FACET of an entry with a dotted handle — a location's
+    // camera vantage (`LOC005.1`) or an object's state (`ART001.2`). Both
+    // resolve to the parent entry: they are one thing seen differently, never
+    // a second entry. Matching the raw handle against `entry.id` found nothing
+    // and the substring fallbacks below could not save it either, so the
+    // object dropped out of REQUIRED OBJECTS with no log line at all.
     const matchesEntry = (entry, searchTerm, strictMode = false) => {
       const searchLower = searchTerm.toLowerCase().trim();
       const nameLower = (entry.name || '').toLowerCase().trim();
       const idLower = (entry.id || '').toLowerCase().trim();
+      const entryBase = baseVbId(entry.id);
 
       // Match by ID (exact match, e.g., "CLO001", "CHR002")
       if (idLower && idLower === searchLower) return true;
 
-      // Extract ID from search term if present (e.g., "Der weise Ritter [CHR002]" -> "CHR002")
-      const idMatch = searchTerm.match(/\[([A-Z]{3}\d{3})\]/);
-      if (idMatch && idLower === idMatch[1].toLowerCase()) return true;
+      // Match by the handle's PARENT id ("ART001.2" -> ART001).
+      const searchBase = baseVbId(searchTerm);
+      if (entryBase && searchBase && entryBase === searchBase) return true;
+
+      // Extract ID from search term if present (e.g., "Der weise Ritter [CHR002]" -> "CHR002").
+      // The dotted suffix is part of the bracket form too — "Signpost [ART004.2]".
+      const idMatch = searchTerm.match(/\[([A-Z]{3}\d+(?:\.\d+)?)\]/);
+      if (idMatch && entryBase && baseVbId(idMatch[1]) === entryBase) return true;
 
       // Exact name match (always allowed)
       if (nameLower === searchLower) return true;
@@ -3384,7 +3434,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const artifact = (visualBible.artifacts || []).find(a => matchesEntry(a, objName));
       if (artifact) {
         const description = artifact.extractedDescription || artifact.description;
-        requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact });
+        // The handle the brief actually wrote, so an object STATE ("ART001.2")
+        // can put its short delta on the REQUIRED OBJECTS line below. A bare
+        // id, or a match on the name, resolves to no state and the object's
+        // unaltered look stands.
+        const handle = typeof objName === 'string' ? objName : (objName && objName.id);
+        requiredObjects.push({
+          name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact,
+          state: objectStateFor(artifact, handle),
+        });
         continue;
       }
 
@@ -3536,7 +3594,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // states for a held or carried prop (a shoebox-sized chest rendered
         // torso-sized on every page of staging trial job_1788712851192).
         const sizeNote = (obj.type !== 'animal' && obj.entry?.size) ? ` — ${String(obj.entry.size).trim()}` : '';
-        requiredObjectsSection += `* ${lead}${sizeNote}${wornSuffix}${offWhere}\n`;
+        // OBJECT STATE - the fourth rider on this line, beside `size`, the
+        // clothing `(worn by X)` suffix and a two-sided prop's orientation
+        // parenthetical. It says WHICH variant of the object this page shows;
+        // it is a delta, never the description the 2026-09-02 name-only ruling
+        // took out of this block. Hard-capped by `trimStateClause` so it
+        // cannot regrow into one.
+        //
+        // It sits AFTER the type, never inside the bold name:
+        // `bboxDetection.parseVisualBibleObjects` captures what is between the
+        // asterisks, so a state in the name would become the GroundingDINO
+        // grounding label and the entity-consistency key - one object would
+        // read as several across the book, which is the defect this whole
+        // model exists to remove.
+        const stateNote = obj.state ? ` — ${trimStateClause(obj.state.delta)}` : '';
+        requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry

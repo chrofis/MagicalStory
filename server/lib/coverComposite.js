@@ -45,6 +45,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { stripDataUriPrefix } = require('./r2');
@@ -614,7 +615,14 @@ async function generateCoverViaComposite({
   if (figures.length === 0) throw new Error('No figures could be assembled for composite cover');
 
   // 3. Pull and bg-remove the cover prop (first ART* in coverHint.objects)
-  const propIds = (coverHint?.objects || []).filter(id => /^ART\d+/.test(String(id)));
+  // BASE STATE ON COVERS. A cover shows the object as the book's canonical
+  // thing, never mid-transformation, so a dotted state handle ("ART001.2") is
+  // normalised to its parent here: the id is used as a lookup key into
+  // `_artifactImages` and the VB name map, and a raw handle missed both,
+  // silently dropping the cover's prop image and its name.
+  const propIds = (coverHint?.objects || [])
+    .map(id => baseVbId(id) || (/^ART\d+/.test(String(id)) ? String(id).trim().toUpperCase() : null))
+    .filter(id => id && /^ART\d+$/.test(id));
   let propBuf = null;
   if (propIds.length > 0) {
     // Caller must supply propUrl/propData via coverHint.artifacts (passed in by the wrapper)

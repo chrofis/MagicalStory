@@ -194,6 +194,7 @@ Then a single-line JSON object:
 - Secondary characters visible in the scene go here by CHR id. Write their full appearance and their COMPLETE outfit into the prose on every page they appear on, copied from their Visual Bible entry — that entry is what their reference image is drawn from, so prose that disagrees with it fights the reference.
 - Include every recurring visual element visible in the scene.
 - At most {VB_ELEMENT_BUDGET} Visual Bible elements per page — secondary characters, animals, artifacts, vehicles and invented locations all count; a real landmark LOC does not. Keep the ones the page is about and leave the rest out of `objects[]` and out of the prose.
+- An object listed with `States:` is cited with the dotted form `ART###.N` — the state whose `pages` include this page. An object with no states, or a page before its first change, keeps the bare `ART###`. Never two states of one object on one page.
 - Real-landmark LOCs are cited by their bare id (`LOC003`); the page's `landmarkView` decides which reference photo is attached.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001`, or the dotted form `LOC001.2` when the Visual Bible gives that location `vantages[]` — cite the vantage whose `pages` list contains this page.
 

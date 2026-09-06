@@ -65,11 +65,12 @@ const ELEMENT_COLLECTIONS = [
   { key: 'locations', type: 'location', priority: 5, viaObjects: false },
 ];
 
-/** `ART002.2` → `ART002`; anything that is not an id shape → null. */
-function baseId(value) {
-  const m = /^([A-Z]{3})(\d{3})(?:\.\d+)?$/.exec(String(value || '').trim().toUpperCase());
-  return m ? m[1] + m[2] : null;
-}
+/**
+ * `ART002.2` → `ART002`; anything that is not an id shape → null.
+ * Delegates to the ONE grammar in vbIdGuard so the budget and the sanitiser
+ * can never disagree about what a dotted handle's parent is.
+ */
+const { baseVbId: baseId } = require('./vbIdGuard');
 
 /** Base ids named in a brief's `objects[]` (strings or {id} rows). */
 function objectIds(objects = []) {
