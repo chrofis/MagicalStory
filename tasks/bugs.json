@@ -7,7 +7,7 @@
       "reportedAt": "2026-09-06",
       "source": "Reproduced from server/config/models.js: MODEL_PRICING (~lines 999-1053) has no key for 'google/gemini-3.1-pro-preview' and none of calculateTextCost's three fallbacks (models.js:1091-1095) match it, so it hits the '[COST] No token pricing found' warn branch and returns 0. Measured staging run job_1788681313413_xqmtk2gcs (lector, 2404 in / 21387 out) really cost $0.2615 per OpenRouter direct_cost. Every cost path without direct_cost - including the JOB_SPEND_CAP_USD accumulator - counted the lector and the reviewer, the two most expensive text calls in the pipeline, as free.",
       "status": "fixed",
-      "fixedIn": "",
+      "fixedIn": "e478313708abc38cd9e3bdc5abf99c23bcb39b58",
       "note": "MODEL_PRICING entry added with prices read from OpenRouter's public catalogue (GET /api/v1/models, 2026-09-06): $2.00 input / $12.00 output per 1M tokens, thinking = output (reasoning bills at the completion rate and is already inside completion_tokens). Reconciled exactly against the measurement: 2404 in / 21387 out predicts $0.2615 vs direct_cost $0.2615. direct_cost remains authoritative; this is the fallback. The >200k-prompt long-context tier ($4/$18) is not modelled - documented in the code comment. See docs/decisions.md 2026-09-06."
     },
     {
