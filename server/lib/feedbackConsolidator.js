@@ -520,6 +520,14 @@ async function consolidateFeedback({
           // no type, 1201 points) and routed to `other`/regen — the category work
           // on the four evaluator prompts never reached the score.
           type: i.type || i.category || null,
+          // The subject the deduction bills against (scoring.js
+          // deductionClassKey: `category|subject`). Dropping it here collapsed
+          // every same-category defect on a page into ONE charge — two MAJOR
+          // character_identity defects billed 15 points, not 30. Carried
+          // through, never inferred from the description.
+          character: (typeof i.character === 'string' && i.character.trim())
+            ? i.character.trim()
+            : null,
           sources: Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [],
           // Raw per-evaluator votes, recorded not acted on. `severity` above is
           // still whatever the consolidator chose; this is the evidence needed to
