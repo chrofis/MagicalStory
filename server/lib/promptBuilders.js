@@ -3401,8 +3401,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // dimension words, function words) until the ref ends on a content
         // word.
         const DANGLING_TAIL = /^(?:roughly|about|approximately|around|nearly|almost|over|under|x|×|by|per|of|with|and|or|the|a|an|in|on|at|for|to|its|his|her|their|cm|mm|m|km|meters?|metres?|ft|feet|inch(?:es)?|long|wide|tall|high|deep|thick|across|diameter)$|^[\d(]/i;
+        // A word cap must never end on a MODIFIER: a label that stops on a
+        // colour or material adjective has lost the head noun it qualified.
+        // Staging job_1788641639919_mpjwlzkf1 p3, ART001 ("A small hat knitted
+        // from chunky red wool, dome-shaped at the crown…"): the flat six-word
+        // cap emitted "small hat knitted from chunky red" — "wool" chopped
+        // off, leaving a colour with nothing to colour. Extend past a trailing
+        // modifier to the word it qualifies (hard stop at 10 words), then trim
+        // dangling tokens as before.
+        const TRAILING_MODIFIER = /^(?:red|orange|yellow|green|blue|indigo|violet|purple|pink|brown|black|white|grey|gray|silver|gold|golden|copper|bronze|crimson|scarlet|amber|teal|turquoise|maroon|beige|cream|tan|ochre|navy|dark|light|pale|deep|bright|chunky|coarse|fine|smooth|rough|soft|thick|thin|woollen|woolen|wooden|woven|knitted|plaited|braided|polished|painted|plain|striped|spotted|checked)$/i;
         const shortRef = (r) => {
-          let words = r.split(',')[0].trim().split(/\s+/).slice(0, 6);
+          const all = r.split(',')[0].trim().split(/\s+/);
+          let words = all.slice(0, 6);
+          while (words.length < all.length && words.length < 10
+                 && TRAILING_MODIFIER.test(words[words.length - 1])) {
+            words.push(all[words.length]);
+          }
           while (words.length > 1 && DANGLING_TAIL.test(words[words.length - 1])) words.pop();
           return words.join(' ');
         };
@@ -3412,9 +3426,28 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // the copied description; with the description gone it rides the lead
         // instead, so the pair mechanism keeps its text channel.
         const qualifier = (obj.name && obj.name.match(/\(([^)]+)\)\s*$/)) ? ` (${obj.name.match(/\(([^)]+)\)\s*$/)[1]})` : '';
+        // An ENGLISH story's VB names are English BY CONSTRUCTION —
+        // story-unified.txt mandates English `name` + `description` for
+        // artifacts/vehicles/clothing — so for those stories the NAME is the
+        // better label: it is the term the Art Director's own prose uses, and
+        // it is whole, where any description chop is a guess at where the noun
+        // phrase ends. Non-English stories keep the description-derived ref:
+        // the settled English-only direction (decisions.md 2026-07-31) exists
+        // because a story-language token degrades compliance and gets painted
+        // onto the prop as lettering, and the code-side ref is the backstop
+        // for exactly those stories. Same story-language gate the cover hint's
+        // free-text `Mood:` field uses.
+        const storyIsEnglish = /^en(?:[-_]|$)/.test(language);
+        // The orientation parenthetical rides `qualifier` below — strip it
+        // here so it is not emitted twice.
+        const nameLabel = String(obj.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+        const nameIsUsable = storyIsEnglish && nameLabel
+          && !/^(?:ART|VEH|CLO|LOC|CHR|ANI)\d+$/i.test(nameLabel);
         const refName = (obj.type === 'animal' && obj.name)
           ? obj.name
-          : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object'));
+          : (nameIsUsable
+            ? nameLabel
+            : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object')));
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
           : `**${refName}${qualifier}** (${obj.type})`;
@@ -3708,8 +3741,20 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
       // "Fiona's Schatzkarte" also appears as bare "Schatzkarte". Register the
       // possessive-stripped tail too — but only once: if two entries reduce to
       // the same tail it is ambiguous and neither alias is safe.
+      // Only a SINGLE-TOKEN tail is registered. The alias exists for a proper
+      // noun that also appears bare ("Fiona's Schatzkarte" → "Schatzkarte").
+      // A MULTI-WORD tail is descriptive prose, not a name, and matching it
+      // inside the Art Director's own phrasing destroys that phrasing:
+      // staging job_1788641639919_mpjwlzkf1 p8, ART001 ("Lily's red woollen
+      // hat", type "children's knitted hat") registered the tail "red woollen
+      // hat", which matched INSIDE the brief's "Lily's chunky red woollen hat
+      // lies on the damp cobbles" and emitted "Lily's chunky children's
+      // knitted hat" — the colour deleted and "chunky" orphaned onto a noun it
+      // was never written for. A descriptive phrase is never at risk of being
+      // painted as lettering, which is the only thing this substitution exists
+      // to prevent.
       const bare = name.replace(/^\S+['’]s?\s+/u, '').trim();
-      if (bare.length >= 4 && bare !== name) {
+      if (bare.length >= 4 && bare !== name && !/\s/.test(bare)) {
         seenAlias.set(bare.toLowerCase(), (seenAlias.get(bare.toLowerCase()) || 0) + 1);
         aliases.push(bare);
       }
@@ -3721,10 +3766,22 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   const activeSubs = nameSubs
     .filter(s => !(seenAlias.get(s.alias.toLowerCase()) > 1))
     .sort((a, b) => b.alias.length - a.alias.length);
+  // A colour the PROSE stated must survive the substitution. The replacement
+  // is the entry's generic `type` ("children's knitted hat"), so swapping it
+  // over a phrase that named a colour silently changes what gets painted.
+  // Carry the colour across when the ref does not already state one.
+  const COLOUR_WORD = /\b(red|orange|yellow|green|blue|indigo|violet|purple|pink|brown|black|white|grey|gray|silver|golden|gold|copper|bronze|crimson|scarlet|amber|teal|turquoise|maroon|beige|cream|tan|ochre|navy)\b/i;
   const replaceNames = (line) => {
     let out = line;
     for (const { alias, ref } of activeSubs) {
-      out = out.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(alias)}(?![\\p{L}\\p{N}])`, 'giu'), `$1${ref}`);
+      out = out.replace(
+        new RegExp(`(^|[^\\p{L}\\p{N}])(${escapeRe(alias)})(?![\\p{L}\\p{N}])`, 'giu'),
+        (_m, pre, hit) => {
+          const c = hit.match(COLOUR_WORD);
+          const keep = (c && !COLOUR_WORD.test(ref)) ? `${c[1].toLowerCase()} ` : '';
+          return `${pre}${keep}${ref}`;
+        }
+      );
     }
     return out;
   };

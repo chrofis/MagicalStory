@@ -27584,3 +27584,73 @@ what the analysis concluded about a page cannot be recovered afterwards.
 **Touched:** `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`
 
 **Status:** ✅ active
+
+## REQUIRED OBJECTS labels come from the entry NAME; a VB `type` never overwrites Art Director prose (2026-09-06)
+
+**Context:** Staging `job_1788641639919_mpjwlzkf1` (en-gb), two symptoms on one
+Visual Bible entry — ART001, `name` "Lily's red woollen hat", `type`
+"children's knitted hat", `description` "A small hat knitted from chunky red
+wool, dome-shaped at the crown…".
+
+*p3.* The REQUIRED OBJECTS lead was built by `shortRef()` — a flat six-word chop
+of `englishEntityRef(entry)`, i.e. of the DESCRIPTION. It emitted
+`* **small hat knitted from chunky red** (object)`: the head noun "wool" cut
+off, leaving a colour qualifying nothing. ART008 ("Copper-coloured fallen
+leaves", description "Fallen horse chestnut and plane tree leaves in deep
+copper…") became "Fallen horse chestnut and plane tree" — two TREE species and
+no leaves — and the same string went into the reference-image line ("The
+attached reference images include rough images of: …"). The entry's own `name`,
+which is exactly the short clean noun phrase the block wants, was never
+consulted. The six-word cap came from b3954d095 (prompt-size reduction); its
+`DANGLING_TAIL` guard trims trailing approximators/units so a cap cannot land
+mid-measurement ("…sailing ship roughly 25"), but nothing stopped it landing on
+a bare adjective.
+
+*p8.* `sanitizeVbIdsInPrompt` substitutes prop NAMES with the entry's `type` so
+a name cannot be painted onto the prop as lettering (2026-08-24). It also
+registers a possessive-stripped alias so "Fiona's Schatzkarte" is caught as bare
+"Schatzkarte". For ART001 that tail was the descriptive phrase "red woollen
+hat", which matched INSIDE the Art Director's own sentence — "Lily's chunky red
+woollen hat lies on the damp cobbles" — and rewrote it to "Lily's chunky
+children's knitted hat": the colour deleted, "chunky" orphaned onto a noun it
+was never written for.
+
+**Decision:**
+- **The label is the entry's `name`** when the story language is English —
+  whole, never chopped. Non-English stories keep the description-derived
+  `englishEntityRef` path unchanged: the settled English-only direction
+  (2026-07-31) exists because a story-language token degrades image-model
+  compliance and gets painted as lettering, and the code-side ref is the
+  backstop for exactly those stories. This is the same story-language gate the
+  cover hint's free-text `Mood:` field already uses. The name still passes
+  through `sanitizeVbIdsInPrompt`, so what reaches the model is the sanitised
+  form ("red children's knitted hat"), not the raw name — the anti-lettering
+  protection is unchanged.
+- **`shortRef()` never ends on a modifier.** When the six-word cap lands on a
+  colour or material adjective it extends to the word that adjective qualifies
+  (hard stop at 10 words), then trims dangling tokens as before. This still
+  governs non-English stories and entries with no usable name.
+- **The block stays NAME ONLY** — the VB description is still NOT emitted here.
+  That remains deliberate (a full exterior spec for an element the shot only
+  partly shows got a vessel painted whole in the background); the element's look
+  belongs in the Art Director's prose.
+- **A multi-word possessive tail is no longer registered as an alias.** Only a
+  SINGLE-TOKEN tail is ("Schatzkarte"). A multi-word tail is descriptive prose,
+  not a proper name, and is never at risk of being lettered onto the prop —
+  which is the only thing the substitution exists to prevent.
+- **A colour stated in the prose survives substitution.** When the replacement
+  `type` does not itself state a colour, the colour from the matched span is
+  carried across.
+
+**Rationale:** the `name` is authored as the checklist term and is whole, where
+any description chop is a guess at where the noun phrase ends — and a guess that
+drops a colour's noun, or a leaf's noun, changes what the model paints. The
+anti-lettering substitution is right for proper names and wrong for prose: it
+was never meant to reach inside a sentence the Art Director wrote.
+
+**Touched:** `server/lib/promptBuilders.js` (REQUIRED OBJECTS lead +
+`shortRef` modifier extension + `sanitizeVbIdsInPrompt` alias/colour guards),
+`tests/unit/required-objects-label.test.ts` (new, 8 assertions on ART001/ART008
+verbatim).
+
+**Status:** ✅ active.
