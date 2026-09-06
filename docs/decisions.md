@@ -28233,3 +28233,89 @@ but does not cause it. Tracked in `tasks/BACKLOG.md`.
 `storyJobPipeline.js`, `tests/unit/vb-id-leak.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## Beat sequence compression: a page's two-step text collapses into one impossible instant (2026-09-06)
+
+**Context:** Staging story `job_1788641639919_mpjwlzkf1`, page 2. The page text is a
+two-step sequence — one character presses a forehead against a pane, *then* turns to
+another character. The beats PLAN line joined both into a single instant with a trailing
+clause ("… forehead against the glass … <name> turning to <name> beside him and saying…").
+Scene expansion copied that conjunction and hardened it into "look directly into the eyes
+of" the second character while placing her "right beside him" — a pose that cannot be
+drawn: the head is fixed against a surface while the eyes must meet someone off to the
+side. The renderer resolved the contradiction by dropping the surface contact (the page's
+only declared `interactions[]` entry, `priority: essential`) and keeping the mutual gaze;
+in a `close-up` frame the two children ended up nose-to-nose, reading as about to kiss.
+
+A corpus scan over the 200 most recent staging stories carrying beats plan lines found
+this is a class, not one page: **4 of 82 plan pages across 3 stories (4.9%)** state a
+second action inside the instant field — including a second page of the same story with
+the identical contact-plus-turn shape, and two pure "then" sequences ("…, then plants
+herself and stays", "turns her head sharply left, then right, then left again"). The
+`story-beats.txt` "One moment" bullet already forbade the latter form and was ignored.
+
+**Decision:** Three prompt-side rules, generator and critique, no code:
+1. `prompts/story-beats.txt` — a new plan bullet: two consecutive actions by one character
+   give the picture one of them; plan the dominant moment and leave the other out rather
+   than joining both with "and then" / "before turning to" / a trailing clause. This makes
+   the failing *form* explicit next to the general "One moment" bullet it slipped past.
+2. `prompts/scene-expansion.txt` + `prompts/scene-expansion-all.txt` — new rule `7e`, in
+   the existing "Physically possible" 7-block: two body actions that cannot co-occur must
+   not both appear in a brief; the one the page's declared interaction names is kept.
+3. `prompts/scene-review.txt` check 7 `[drawability]` — the critique side gets the same
+   test, and rewrites an incompatible pair down to the declared interaction.
+
+**Rationale:** The rule goes in the prompt on both sides, never in code. Detecting "a
+forehead on a pane cannot coexist with eye contact to the side" from brief prose is exactly
+the description-text pattern-matching `docs/SETTLED.md` forbids ("Classification is the
+PROMPT's job; code may only change a severity") — the left/right regex mirror-guard built
+and removed on 2026-08-09 is the precedent. So `server/lib/sceneBriefCheck.js` was
+deliberately **not** extended: its checks are deterministic prose↔metadata comparisons, and
+physical co-occurrence is semantic. Per `feedback_mechanical_rules_and_fed_back_retries`,
+a rule given to the generator is also given to its reviewer, which is why the same test
+lands in both `scene-expansion*.txt` and `scene-review.txt`. The declared `interactions[]`
+entry is named as the tie-breaker because it is the one machine-readable statement of what
+the page is *for*, and it was the half the render dropped here.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-review.txt`.
+
+**Status:** ✅ active
+
+## Cover hint casts are validated against the real cast, phantoms dropped and slots refilled (2026-09-06)
+**Context:**   Staging beats run `job_1788641639919_mpjwlzkf1` (cast Lily, Ethan,
+James, Rachel, Margaret; mains Lily + Ethan) produced a back-cover hint listing five
+characters, one of which — "The smallest girl (centre front, facing viewer)" — is in no
+cast list. Margaret, a real primary, was dropped to make room. The phantom key
+propagated into `characterDetails`, `characterClothing` and `characterPerspectives`,
+so the cover prompt never mentioned Margaret, only four references were packed, the
+render had four figures, and the eval raised an unrepairable `missing_character` for a
+person who does not exist. Nothing compared the cover cast against
+`stories.data.characters`.
+**Decision:**  Two layers. (1) Prompt: `prompts/story-bible-from-beats.txt` states that
+cover casts may only name characters from the supplied cast lists — no invented,
+descriptive or unnamed figures. (2) Code: `validateCoverHintCast()` runs on the parsed
+cover hints in `processUnifiedStoryJob`, immediately before the clothing reconciliation.
+It resolves every declared name against `inputData.characters` using the phantom
+detector's whole-word matcher (`isKnownName`, so "Grossvater Felix" still resolves to
+"Felix"), deletes unresolved entries from all four hint containers, then refills the
+freed slots — up to `MAX_COVER_CHARACTERS` (5), title page from mains only — from cast
+members not yet present, mains first then the remaining characters in input order. A
+backfilled character's clothing is seeded from the first `used: true` category so the
+later reconciliation and the avatar lookup both hit a pre-generated category. Drops and
+backfills are logged as one `⚠️ [COVER-CAST]` warning.
+**Rationale:** The prompt rule alone is unverifiable at runtime — the beats pipeline has
+no reviewer that sees cover hints. The mutation happens once, at the single point where
+the hints are parsed and before they are persisted to `stories.data.coverHints`, so every
+downstream consumer (prompt building, reference packing, the composite cast builder, the
+cover eval's synthetic `characterPositions`, and the iterate/regenerate paths that read
+the stored blob) sees the validated cast without any further change. Because the declared
+cast is now guaranteed real, the existing `missing_character` machinery covers
+completeness rather than firing on a name that can never be rendered.
+**Touched:**   `prompts/story-bible-from-beats.txt`, `server/lib/coverIterate.js`
+(`validateCoverHintCast`, module-level `MAX_COVER_CHARACTERS`),
+`server/lib/phantomCharacters.js` (exports `normalizeName` / `isKnownName`),
+`storyJobPipeline.js`, `tests/unit/cover-hint-cast.test.ts`
+**Status:**    ✅ active

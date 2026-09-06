@@ -36,6 +36,7 @@ A complicated page — much action, many characters at once — is a fault: simp
 
 The plan line's instant is a single drawable moment:
 - One moment — no montage, no before-and-after, no "then", no passage of time inside one picture, no sequence of actions by one character; when a beat contains a change, pick the single moment that shows it.
+- Two consecutive actions by one character give the picture one of them: plan the dominant moment and leave the other out, rather than joining both into one instant with "and then", "before turning to", or a trailing clause carrying the second action.
 - One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
 - At most three named characters in frame, and two carry a page better than three. The book has at most one whole-cast page, holding up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant, all sharing one simple action or seen from behind moving off — never a row of figures facing the viewer. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
