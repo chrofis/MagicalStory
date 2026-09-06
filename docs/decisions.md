@@ -29232,3 +29232,47 @@ are nowhere near that.
 **Touched:** `server/config/models.js` (`MODEL_PRICING`), `tasks/bugs.json`
 (`model-pricing-missing-gemini-3-1-pro`).
 **Status:** ✅ active
+
+---
+
+## 2026-09-06 — Repair-budget exhaustion is recorded on the page, not silent
+
+**Context:** Staging story `job_1788681313413_xqmtk2gcs` shipped pages 9 and 10
+each carrying a CRITICAL finding. Nothing was wrong with the routing:
+`findBadPages` selected both (severity outranks score — p9 scored 75 and was
+still picked), both got their one repair attempt, both attempts failed to fix
+the defect, and the round loop then simply ran out of rounds
+(`repairMaxPasses: 1` on staging, 3 on prod). The one existing
+ship-with-warning path — `repairPipeline.js`, inside the round loop — is gated
+on `bothStrategiesTriedAndRegressed(versions)`, which needs at least **two**
+prior repair attempts on the page. On a 1-pass environment it can never fire,
+and on any environment it says nothing about the last round. So budget
+exhaustion produced no log line, no flag, and nothing in `stories.data`: a
+shipped CRITICAL was indistinguishable from a clean page.
+
+**Decision:** After the round loop and after pick-best, every page's **shipping**
+version is re-read for CRITICAL/CATASTROPHIC findings. Findings are stamped on
+the scene record as `unrepairedCritical: [{ type, severity, description,
+finalScore }]` (`null` when clean, so "no criticals" is distinguishable from
+"never checked"), and the repair stage ends with a `log.warn` naming the pages
+and each finding. Observability only: no threshold, no budget, and no routing
+decision changed.
+
+**Rationale:** The gap is the *loop's exit*, not the give-up branch, so it
+cannot be closed by relaxing `bothStrategiesTriedAndRegressed` — that predicate
+is about a page whose two strategies both regressed, a different (and real)
+condition. Reading the **picked** version rather than the round's original
+matters: pick-best, the rescue eval, the calm-zone recovery and style repair can
+all change which bytes ship, and a report built on round 1 would name the wrong
+defects. Severity is read through the same matcher `findBadPages` uses —
+`collectCriticalFindings` in `repairLogic.js`, with `hasCriticalSeverityFinding`
+now defined as "that list is non-empty" — so a page can never be CRITICAL for
+the repair gate and clean for the end-of-stage report. Replayed against the
+stored versions of that job: p9 (2 findings) and p10 (5) are flagged, p12
+(MAJOR only, score 65) is not.
+
+**Touched:** `server/lib/repairLogic.js` (`collectCriticalFindings`,
+`hasCriticalSeverityFinding`), `server/lib/repairPipeline.js` (per-page stamp +
+end-of-stage warn), `storyJobPipeline.js` (the sceneImages persist whitelist —
+the single gate on what reaches `stories.data`).
+**Status:** ✅ active

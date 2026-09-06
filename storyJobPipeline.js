@@ -5615,6 +5615,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // dropped it — every stored scene had finalScore undefined while
           // qualityScore carried legacy junk.
           finalScore: img.finalScore ?? null,
+          // CRITICAL findings still on the shipped version after the repair
+          // budget ran out. This whitelist is the single gate on what reaches
+          // stories.data — without this line the marker exists only in logs.
+          unrepairedCritical: img.unrepairedCritical || null,
           qualityReasoning: img.qualityReasoning,
           thinkingText: img.thinkingText || null,
           wasRegenerated: img.wasRegenerated,

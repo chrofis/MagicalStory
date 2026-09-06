@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
@@ -3213,6 +3213,35 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     finalImageData = best?.imageData || img.imageData;
     finalEval = best?.evaluation;
 
+    // ── BUDGET EXHAUSTION IS RECORDED, NOT SILENT ───────────────────────────
+    // The round loop can simply run out of rounds (`maxRegenAttempts`) with a
+    // page's CRITICAL still present — its one attempt was made and failed. The
+    // ship-with-warning path inside the loop is gated on
+    // bothStrategiesTriedAndRegressed(), which needs at least two prior
+    // attempts, so on a 1-pass environment it can never fire and nothing at all
+    // records that a CRITICAL shipped. This reads the version that ACTUALLY
+    // SHIPS (the pick, not round 1's original) through the same severity
+    // matcher findBadPages used to select the page in the first place.
+    const pageFinalScore = best ? require('./scoring').computeFinalScore(best) : null;
+    const criticalFindings = collectCriticalFindings({
+      ...(finalEval || {}),
+      consolidatedPlan: best?.consolidatedPlan || finalEval?.consolidatedPlan || null,
+    });
+    // The same defect is reported by more than one evaluator pool (raw +
+    // consolidated); one entry per distinct finding.
+    const seenCritical = new Set();
+    const unrepairedCritical = criticalFindings.filter(f => {
+      const key = `${String(f.type || '').toLowerCase()}|${f.description.toLowerCase()}`;
+      if (seenCritical.has(key)) return false;
+      seenCritical.add(key);
+      return true;
+    }).map(f => ({
+      type: f.type,
+      severity: f.severity,
+      description: f.description,
+      finalScore: pageFinalScore,
+    }));
+
     const buildVersionEntry = (v) => {
       return {
       imageData: v.imageData,
@@ -3380,7 +3409,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // scale — which wrote junk like qualityScore:0 next to a picked
       // version scoring 50.
       qualityScore: best?.evalScore ?? finalEval?.qualityScore ?? null,
-      finalScore: best ? require('./scoring').computeFinalScore(best) : null,
+      finalScore: pageFinalScore,
+      // CRITICAL findings still present on the version that ships, after the
+      // repair budget was spent. Null (not []) when the page is clean, so a
+      // consumer can tell "no criticals" from "never evaluated for this".
+      unrepairedCritical: unrepairedCritical.length > 0 ? unrepairedCritical : null,
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticResult?.score ?? finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,
@@ -3427,6 +3460,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   const charFixedCount = results.filter(r => r.wasCharacterFixed).length;
   log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${finalUpgradedCount} upgraded, ${charFixedCount} character-fixed`);
+
+  // The repair budget is spent. Anything CRITICAL still on a shipping page is
+  // said out loud, once, naming the page and the finding — the loop itself has
+  // no line for "ran out of rounds" (see the per-page block above).
+  const shippedCritical = results.filter(r => r.unrepairedCritical);
+  if (shippedCritical.length > 0) {
+    log.warn(`⚠️  [UNIFIED PIPELINE] Repair budget exhausted (${maxRegenAttempts} round${maxRegenAttempts === 1 ? '' : 's'}) with ${shippedCritical.length} page(s) still carrying a CRITICAL: ${shippedCritical.map(r => `p${r.pageNumber}`).join(', ')}`);
+    for (const r of shippedCritical) {
+      for (const f of r.unrepairedCritical) {
+        log.warn(`  ⚠️  [UNIFIED PIPELINE] p${r.pageNumber} (score ${f.finalScore ?? '?'}) ships with [${f.severity}] ${f.type || 'untyped'}: ${String(f.description).substring(0, 160)}`);
+      }
+    }
+  }
 
   // Convert charFixDetails Map to plain object for serialization.
   // Image fields can arrive in three shapes after R2 migration:

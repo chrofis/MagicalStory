@@ -778,6 +778,17 @@ export interface SceneImage {
   qualityScore?: number;
   /** Single score the UI displays = qualityScore − entityPenalty. Set by the backend. */
   finalScore?: number | null;
+  /**
+   * CRITICAL/CATASTROPHIC findings still present on the version that shipped,
+   * after the repair budget (repairMaxPasses) ran out. `null` when the page is
+   * clean — distinguishable from "never checked" (field absent).
+   */
+  unrepairedCritical?: Array<{
+    type: string | null;
+    severity: string;
+    description: string;
+    finalScore: number | null;
+  }> | null;
   qualityReasoning?: string;
   qualityModelId?: string;  // Model used for quality evaluation
   semanticScore?: number | null;  // Semantic fidelity score (0-100)

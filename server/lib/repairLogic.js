@@ -11,7 +11,7 @@
  */
 
 const { REPAIR_DEFAULTS } = require('../config/models');
-const { computeFinalScore, SCORE_THRESHOLDS } = require('./scoring');
+const { computeFinalScore, SCORE_THRESHOLDS, findingText } = require('./scoring');
 const { log } = require('../utils/logger');
 
 /**
@@ -75,13 +75,37 @@ function findBadPages(evalPages, options = {}) {
  * semantic issues, consolidated deduped_issues) — never the prose.
  */
 function hasCriticalSeverityFinding(result) {
+  return collectCriticalFindings(result).length > 0;
+}
+
+/**
+ * The CRITICAL/CATASTROPHIC findings on an eval, normalized. Single severity
+ * matcher for the whole repair stage — `hasCriticalSeverityFinding` is this
+ * function asked whether the list is empty, so a page can never be "critical"
+ * for the bad-page gate and "clean" for the end-of-stage report.
+ *
+ * @returns {Array<{type: string|null, severity: string, description: string, pool: string}>}
+ */
+function collectCriticalFindings(result) {
   const pools = [
-    result?.fixableIssues,
-    result?.semanticResult?.semanticIssues || result?.semanticResult?.issues,
-    result?.consolidatedPlan?.deduped_issues,
+    ['quality', result?.fixableIssues],
+    ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+    ['consolidated', result?.consolidatedPlan?.deduped_issues],
   ];
-  return pools.some(list => Array.isArray(list)
-    && list.some(i => /^(critical|catastrophic)$/i.test(String(i?.severity || ''))));
+  const out = [];
+  for (const [pool, list] of pools) {
+    if (!Array.isArray(list)) continue;
+    for (const i of list) {
+      if (!/^(critical|catastrophic)$/i.test(String(i?.severity || ''))) continue;
+      out.push({
+        type: i.type || i.category || null,
+        severity: String(i.severity),
+        description: findingText(i),
+        pool,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -512,4 +536,4 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'scale',
 ]);
 
-module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES };
+module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
