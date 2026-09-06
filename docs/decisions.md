@@ -26375,7 +26375,7 @@ Owner rulings on the dragon salvage (`job_1788551692337_bc479p945`); per-item de
 **Context:** page 1 was a pure place-still of a fountain with no story content (the planning question "which pages show only a thing or a place" licensed it); page-level plants were dropped. **Decision:** a peopleless page is allowed only when its subject is something the story has been driving toward — a discovery, an arrival, a payoff; a place with no story weight never gets its own page (both licences in story-beats.txt rewritten; plan-check Q6 audits). Plan-check Q7 audits page-level plant/payoff both directions. **Touched:** prompts/story-beats.txt, plan-check.txt (5d4ef1fb7).
 
 ### Per-page word budget is counted in code and fed to the text-review chain
-**Context:** 1st-grade budget 25-50 words/page; the run shipped avg 71, 14/18 over, finale 149 — neither AI auditor flags length. **Decision:** deterministic counter (`buildWordBudgetFindings`, textRefine.js) measures each page against `LANGUAGE_LEVELS` (same table the writer prompt renders — single source of truth) and injects `FAULT[LENGTH]` findings into `mergeAuditFindings` as third source 'counter'; the existing single repair pass shortens. No AI call for counting, no extra round. Dry-run reproduced exactly the 14 violations. **Touched:** server/lib/textRefine.js (cf10d7cd9).
+**Context:** 1st-grade budget 25-50 words/page; the run shipped avg 71, 14/18 over, finale 149 — neither AI auditor flags length. **Decision:** deterministic counter (`buildWordBudgetFindings`, textRefine.js) measures each page against `LANGUAGE_LEVELS` (same table the writer prompt renders — single source of truth) and injects `FAULT[LENGTH]` findings into `mergeAuditFindings` as third source 'counter'; the existing single repair pass shortens. No AI call for counting, no extra round. Dry-run reproduced exactly the 14 violations. **Touched:** server/lib/textRefine.js (cf10d7cd9). 🗄 **Partly superseded 2026-09-06** — the counter now tolerates 20% outside the band; see "The word-budget counter gets a 20% grace band" at the end of this file.
 
 ### Style audit: >20% flagged cells triggers one confirmation re-audit (intersection wins)
 **Context:** false `fragmented` rulings (08-25, 08-31, 09-04): one Gemini call stamping a shared "lacks brushstrokes" verdict across its whole 9-cell batch — 0/9 confirmed by eye; Lab experiments 985-987 re-audited identical bytes 3x → 0 outliers each. The queued 9 repaints were pure waste and likely pushed the job past the (also false) 64-min kill. **Decision:** `CONFIRMATION_FLAG_RATIO = 0.2` in styleConsistency.js — when flagged cells exceed 20% of the story's audited cells, one full re-audit runs and only the intersection survives; verdict recomputes after. Rationale: grok-imagine-2 output is reliably consistent; >20% signals a collapsed call, and only an independent second sample kills a collapse (the per-cell JSON shape does not). The 08-31 pirate `fragmented` ruling is considered voided by this evidence. **Touched:** server/lib/styleConsistency.js (d0ba0e7d5).
@@ -28898,3 +28898,58 @@ once this is verified running on staging, so there is exactly one owner of the
 job — two schedulers racing for the same `VACUUM FULL` lock is the failure mode
 to avoid. Staging has no `RAILWAY_API_TOKEN`, so the Postgres restart half is
 inert there until one is added.
+
+---
+
+## 2026-09-06 — The word-budget counter gets a 20% grace band; the lector names non-idiomatic phrasing
+
+**Context:** `job_1788681313413_xqmtk2gcs` shipped "That was how she always
+learned a bridge" on page 4. The writer had written *remembered*. Page 4 was 157
+words against the `standard` ceiling of 150 — a **4.7% overage** — so
+`buildWordBudgetFindings` emitted a `FAULT[LENGTH]`, and the repair pass
+(claude-opus-5), closing that finding together with a `FAULT[ENTRANCE]` under
+the resulting squeeze, "compressed the bridge-counting to one sentence" and
+destroyed the verb's collocation in the process. The post-repair lector read the
+rewritten sentence and returned `NONE`: its remit line already says "idiom,
+wrong word", but nothing in the prompt made a well-formed-yet-unsayable phrase a
+nameable fault.
+
+The entry this supersedes — **"Per-page word budget is counted in code and fed
+to the text-review chain"** (`cf10d7cd9`, 2026-09-05, ~line 26377 of this file)
+— was motivated by `job_1788551692337_bc479p945`: a 1st-grade run averaging 71
+words against a 25-50 budget, a **42% overage** on 14 of 18 pages. That is the
+size of miss the counter exists to catch. A 4.7% one is not; it bought nothing
+and cost a correct sentence.
+
+**Decision:**
+1. `WORD_BUDGET_TOLERANCE = 0.2` in `textRefine.js`: a `FAULT[LENGTH]` is
+   emitted only above `max * 1.2` or below `min * 0.8`, symmetrically. The
+   finding text still names the **true** budget (`min-max`), never the tolerated
+   bound — a page that does trip the band is rewritten toward the real target.
+2. `prompts/story-text-proofread.txt` gains one line making the idiom check
+   concrete and language-neutral: a phrase that breaks no rule of grammar but
+   that no fluent speaker of `{LANGUAGE}` would say is a fault — a verb given an
+   object it does not take, a combination of words the language does not have.
+   The judgement is made against `{LANGUAGE}`, which
+   `buildTextProofreadPrompt` already fills from `languages.js`, so the rule
+   holds for de / de-ch / fr / en-gb alike. No English example, no
+   instance-specific wording. It sits in the prompt's tail, next to the quoting
+   rule, and asks for the phrase to be quoted — so what it produces is
+   applicable by `applyLectorFindings`, which drops unquotable findings.
+
+**Rationale:** a rewrite is a paid model call with a real corruption risk; it is
+never worth taking for a handful of words. The band keeps the counter aimed at
+the class of miss it was built for while removing the trigger that fired here.
+Fixing only the counter would have left the lector still blind to the corruption
+class, and fixing only the lector would have left the pointless rewrites — so
+both. Verified against the real numbers: 157/150 silent, 166/150 silent, 180/150
+silent, 181/150 fires; the original 71-vs-50 motivating case still fires
+(71 > 60); under-min side symmetric (31 vs min 40 fires, 33 does not).
+
+**Touched:**
+- `server/lib/textRefine.js` (`WORD_BUDGET_TOLERANCE`, `buildWordBudgetFindings`)
+- `prompts/story-text-proofread.txt`
+
+**Status:** ✅ active. Supersedes the tolerance-free half of `cf10d7cd9`
+(2026-09-05); the counter itself, its `LANGUAGE_LEVELS` single source of truth
+and its 'counter' merge source are unchanged.

@@ -8,4 +8,6 @@ One line per fault, nothing else:
 
 PAGE <n>: '<the faulty words, copied exactly as they stand on the page>' → '<the corrected words>'
 
+A phrase that breaks no rule of grammar but that no fluent speaker of {LANGUAGE} would say is a fault — a verb given an object it does not take, a combination of words the language does not have; quote it and give the wording a native speaker uses.
+
 Quote the shortest span that contains the fault, character for character as it stands on that page. Give one correction, never alternatives. Correct only the faulty words, plus what agreement forces inside the span you quote: article, case, word order. A page with no fault gets no line. Write NONE when the text has no faults.

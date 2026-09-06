@@ -160,6 +160,13 @@ function mergeAuditFindings(lists = []) {
 
 // ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
 
+/**
+ * Grace band around the reading level's word budget, applied to both bounds.
+ * A rewrite is never worth its risk for a few words: only a page more than this
+ * far outside the band is reported as a fault.
+ */
+const WORD_BUDGET_TOLERANCE = 0.2;
+
 /** Whitespace-token word count — deterministic, no model involved. */
 function countPageWords(text) {
   return String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -178,6 +185,13 @@ function countPageWords(text) {
  * averaged 71 words/page, 14/18 pages over budget, finale at 149 — and neither
  * AI auditor flagged length.
  *
+ * A page only counts as a violation when it is more than WORD_BUDGET_TOLERANCE
+ * outside the band (2026-09-06): job_1788681313413_xqmtk2gcs was 157 words
+ * against a 150 ceiling — a 4.7% overage — and the forced rewrite corrupted a
+ * verb collocation. The finding text still names the TRUE budget, so a page
+ * that does trip the band is rewritten toward the real target, not the
+ * tolerated one.
+ *
  * @param {Array<{pageNumber:number,text:string}>} pages
  * @param {string} languageLevel
  * @returns {string} newline-joined FAULT[LENGTH] lines ('' when all pages fit)
@@ -187,12 +201,14 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
   const level = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   const min = level.wordsPerPageMin;
   const max = level.wordsPerPageMax;
+  const hi = max * (1 + WORD_BUDGET_TOLERANCE);
+  const lo = min * (1 - WORD_BUDGET_TOLERANCE);
   const lines = [];
   for (const p of pages) {
     const n = countPageWords(p.text);
-    if (n > max) {
+    if (n > hi) {
       lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — shorten without losing content`);
-    } else if (n < min) {
+    } else if (n < lo) {
       lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — expand without padding`);
     }
   }
