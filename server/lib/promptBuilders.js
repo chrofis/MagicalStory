@@ -5499,6 +5499,32 @@ function buildTextProofreadPrompt(inputData, pages = []) {
 }
 
 /**
+ * The post-repair DIFF review (2026-09-06). Same quoted-span output contract as
+ * buildTextProofreadPrompt above — parseLectorFindings/applyLectorFindings read
+ * it unchanged — but the unit of judgement is a CHANGE, not a page: each
+ * repaired page is rendered as its BEFORE and its AFTER, and only pages the
+ * repair pass actually rewrote are passed in.
+ *
+ * @param {Object} inputData story record fields (language)
+ * @param {Array<{pageNumber:number,before:string,after:string}>} pairs
+ */
+function buildTextDiffPrompt(inputData, pairs = []) {
+  const template = PROMPT_TEMPLATES.storyTextDiff;
+  if (!template) {
+    log.error('[PROMPT] storyTextDiff template not loaded — diff review unavailable');
+    return null;
+  }
+  if (!pairs.length) return null;
+  const lang = inputData?.language
+    ? getLanguageNameEnglish(inputData.language)
+    : 'the language of the pages';
+  const body = pairs
+    .map(p => `--- Page ${p.pageNumber} ---\nBEFORE:\n${String(p.before || '').trim()}\n\nAFTER:\n${String(p.after || '').trim()}`)
+    .join('\n\n');
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body });
+}
+
+/**
  * The BLIND text audit (owner ruling 2026-09-03) — the second of the two
  * audits that now run in PARALLEL on the writer's text.
  *
@@ -6642,6 +6668,7 @@ module.exports = {
   buildTextAuditPrompt,
   buildTextAuditBlindPrompt,
   buildTextProofreadPrompt,
+  buildTextDiffPrompt,
   countFaults,
   faultsByCategory,
   buildStoryShapeSection,

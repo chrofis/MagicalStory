@@ -29235,6 +29235,107 @@ are nowhere near that.
 
 ---
 
+## 2026-09-06 — An object the story alters is ONE Visual Bible entry with `states[]`, and every state of it renders in a SINGLE reference call
+
+**Context:** staging `job_1788681313413_xqmtk2gcs` wrote one physical prop as TWO artifact
+entries. ART001 carried a lid, a carved face and a twine carrying loop; ART005 was an open bowl
+with none of them. Each entry earned its own reference render, the two renders disagreed on how
+the thing was BUILT, and the per-page `objects[]` alternated between them — three visually
+distinct forms across one book, and two pages where a character held a prop that had no handle to
+be held by. The Art Director's prose was already correct on the pages that came out right; what
+fought it was the reference IMAGE.
+
+The architecture for "one entry, several referenced facets" already existed on the location side:
+a vantage is one camera viewpoint of a location, cited as `LOC005.1`, and that dotted form was
+already legal in `vbIdGuard.VB_ID_PATTERN`, already resolved by `sanitizeVbIdsInPrompt`, already
+normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of it.
+
+**Decision (owner, three calls, built as one change):**
+
+1. **The state model.** An artifact entry may carry `states[]` — up to 3 rows of
+   `{id: "ART###.N", name, delta, pages[]}`. `description` holds what is true of the object on
+   every page; `delta` is only what changed (one clause, ≤15 words, never material/colour/size).
+   A page cites a state with the dotted handle in `objects[]`. Not `ART001:lit`: the id guard
+   would not match a colon form, so it would survive into the prompt and be lettered onto the prop.
+
+2. **The writer rule and the duplicate guard are PROMPT-side, not code.** The rule extends the
+   existing one-item-one-category rule — the same failure one level down — in `story-unified.txt`,
+   `story-trial.txt` and `story-bible-from-beats.txt`. No code pattern-matches description prose
+   to decide that two entries are "the same object in different words"; that is the banned
+   approach. The boundary test is stated archetypally: a part added to an object is a state of it
+   unless BOTH hold — some page stages that part on its own, away from the thing it belongs to,
+   AND it has a look worth specifying that survives the separation.
+
+3. **A short state clause rides the REQUIRED OBJECTS line.** After the type, beside `size`, as the
+   fourth rider alongside the clothing `(worn by X)` suffix and a two-sided prop's orientation
+   parenthetical. This is an EXTENSION of the 2026-09-02 name-only ruling, not a reversal: that
+   ruling forbids emitting the Visual Bible DESCRIPTION (a full exterior spec for an element the
+   shot shows part of), and a delta is not a description. What keeps the extension from becoming a
+   reversal is a cap in CODE — `trimStateClause`, 12 words — rather than a request in the prompt,
+   because the prompt is where the 2026-09-02 failure came from. Nothing about REQUIRED OBJECTS
+   appears on `docs/SETTLED.md`; this entry is the record.
+   The clause sits AFTER the type and never inside the bold name: `parseVisualBibleObjects`
+   captures what is between the asterisks, so a state in the name would become the GroundingDINO
+   grounding label and the entity-consistency key, and one object would read as several across the
+   book — the exact defect being removed.
+
+4. **THE KEYSTONE — one object, one render call.** All states of an object are generated in a
+   SINGLE reference call: one grid, base look plus every state side by side, so they cannot look
+   like different things. This is guaranteed structurally, not requested:
+   `referenceSheets.expandElementStateCells` is the ONLY code that mints a per-state cell, it
+   always returns the whole set, `buildReferenceSheetBatches` routes a multi-state object into a
+   batch of its own, and `assertStateCellsCoLocated` THROWS if any batching would split one
+   object's cells across calls. That assertion runs at batch-construction time, before any image
+   call, so it costs nothing and can never kill a paid run (it is not an exception to "gates are
+   guidelines" — there is no run to kill yet).
+   Base + 3 states = 4 cells, which is the grid's own `maxPerBatch`, so a whole object always
+   fits one call. A multi-state object therefore consumes ONE element slot, not one per state, and
+   `VB_ELEMENT_BUDGET = 3` (shipped the same day) stops being a constraint on the design.
+
+5. **Per-page attachment hands over the right CELL, not the whole grid.** That is the precedent
+   every other multi-cell reference already follows — the 2×4 character sheet is cropped to the
+   page's pose cell, and the VB grid gives each element one cell.
+   `getElementReferenceImagesForPage` returns the state's cell under the PARENT id, so the budget,
+   the packer and the entity-consistency key all still see one object. A state with no cell of its
+   own falls back to the base render with a WARN rather than shipping none.
+
+6. **Covers pin to the base state.** A cover shows the book's canonical object, never one
+   mid-transformation, so `coverComposite` and `coverIterate` normalise a dotted handle to its
+   parent before using it as a lookup key.
+
+**The silent-failure class this fixes.** Four sites used a dotted handle as a raw lookup key and
+failed with no log line: `matchesEntry`'s exact-equality id match (the object vanished from
+REQUIRED OBJECTS entirely — the same shape as the original defect), its `[ART004]` bracket regex,
+`getElementReferenceImagesForPage`'s `askedFor` set (the prop lost its reference image), and the
+cover `propIds` filter. All four are fixed by ONE shared `baseVbId()` placed next to
+`VB_ID_PATTERN`, so the grammar and the key derived from it can never disagree.
+`vbElementBudget.baseId` now delegates to it.
+
+**Entity consistency improves**, and that was verified rather than assumed: appearances are keyed
+by NAME, one entry is one tracked entity across the book where the split produced two, and the
+state stays out of the name by construction (point 3).
+
+**Backward compatibility:** `states` is an optional field read through `objectStates()`, which
+returns `[]` for every stored bible. A bare id resolves exactly as before at every site; a
+state-less element expands to itself in the reference sheet; `updateElementReferenceImage` writes
+the entry itself for a bare id and drops (with a WARN, never a throw) a state an entry does not
+declare. R2 keys for bare ids are byte-identical — only a dotted handle's dot is rewritten, so it
+cannot read as a second file extension. No migration, no backfill.
+
+**Touched:** `server/lib/vbIdGuard.js` (`baseVbId`, `vbIdFacet`), `server/lib/vbElementBudget.js`,
+`server/lib/visualBible.js` (`normaliseObjectStates`, `objectStates`, `objectStateFor`, artifact
+parse, `getElementReferenceImagesForPage`, `updateElementReferenceImage`),
+`server/lib/promptBuilders.js` (`matchesEntry`, `trimStateClause`, REQUIRED OBJECTS,
+`buildRecurringElementsText`), `server/lib/referenceSheets.js` (`expandElementStateCells`,
+`assertStateCellsCoLocated`, `buildReferenceSheetBatches`), `server/lib/coverComposite.js`,
+`server/lib/coverIterate.js`, `server/lib/r2.js`, `prompts/story-unified.txt`,
+`prompts/story-trial.txt`, `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `tests/unit/vb-object-states.test.ts`.
+**Status:** ✅ active — 30 unit tests green (dotted id end to end: `matchesEntry` → REQUIRED
+OBJECTS → reference resolution → element budget, plus the old un-stated shape at every one of
+them). No story generation was run: validating the authoring half needs a paid run, which was not
+mandated.
+
 ## 2026-09-06 — Repair-budget exhaustion is recorded on the page, not silent
 
 **Context:** Staging story `job_1788681313413_xqmtk2gcs` shipped pages 9 and 10
@@ -29297,3 +29398,78 @@ two-kinds split itself is unchanged.
 **Touched:** `server/routes/trial.js` (generate-ideas-stream, create-story, createTrialStoryJob),
 `server/lib/promptBuilders.js` (`buildTrialStoryPrompt`), `client/src/pages/TrialWizard.tsx`.
 **Status:** ✅ active — validation trial pending.
+
+---
+
+## 2026-09-06 — A quoted span is read first-to-LAST, and a DIFF pass reads what the repair rewrote
+
+**Context:** Two problems on the same staging story, `job_1788681313413_xqmtk2gcs`.
+
+1. `parseLectorFindings` (`server/lib/textRefine.js`) read each side of a
+   `PAGE n: '<quote>' -> '<correction>'` line with `firstQuoted()`, which closed
+   on the NEXT quote character. Every span containing an apostrophe was
+   truncated: `'the boy's pole lantern went dark like the rest.'` became
+   `the boy`, both sides truncated the same way, and the `quote === correction`
+   guard then discarded the finding at the PARSE step — before the locate step
+   that logs a drop reason. A valid lector correction vanished with no trace. A
+   second finding, `'everyone's' -> 'everyone else's'`, hit the same trap and
+   applied correctly only because its two truncations happened to differ. Every
+   English possessive and contraction and every French apostrophe was exposed.
+
+2. The repair pass is the only step that rewrites whole pages, and nothing read
+   its output for damage. The lector does read the final text, but COLD: it
+   cannot know what a page said before, so a rewrite that swaps a fact for a
+   plausible other fact reads as ordinary prose. On this story the
+   gemini-3.1-pro cold read MISSED two rewrite-introduced corruptions across two
+   runs, $0.26 / 165s each.
+
+**Decision:**
+1. `quotedSpan()` replaces `firstQuoted()`: the span of one side is the text
+   between its first quote character and the LAST matching close on that side,
+   after stripping a trailing parenthetical alternative (`… (oder '…')`). A side
+   that opens a quote and never closes it now REJECTS the line instead of
+   half-parsing it into an unlocatable quote. An explicitly empty correction
+   (`''`) is still dropped — this applier substitutes, it does not delete spans.
+   Covered by `tests/unit/lector-quote-parse.test.ts`.
+2. A DIFF PASS runs between the repair and the lector. It sees only the pages
+   the repair changed, each as BEFORE and AFTER, and reports only what the
+   rewrite damaged. It emits the SAME quoted-span contract as the lector and is
+   parsed and applied by the SAME code — `parseLectorFindings` /
+   `applyLectorFindings` — so there is no parallel apply path and no new
+   conflict logic: an overlap inside one pass is already resolved there (first
+   finding wins, second dropped as `overlap`), and across passes the lector
+   prompt is built from the already-corrected text, so it cannot quote a span
+   the diff pass replaced. Template `prompts/story-text-diff.txt`, builder
+   `buildTextDiffPrompt`, model key `MODEL_DEFAULTS.textDiffModel`.
+   **This ADDS to the lector; it does not replace it.**
+
+**Rationale:**
+- **Model choice is measured, and the ranking INVERTS between the two tasks.**
+  On the diff task, `gpt-5.6-luna-pro` scored 2/2 real catches with 1 soft false
+  positive, located every span character-for-character and produced zero
+  `quote-absent` drops; `gemini-3.1-pro` on the SAME diff scored 0/2 with about
+  six false positives. On the German COLD READ the order is the other way round
+  — gemini 4/4, luna 1/4. So neither model is "better": cold read and diff are
+  different tasks. The expensive cold read stays exactly as it is, deliberately,
+  and the diff slot never goes to gemini.
+- **Cost.** The diff pass is $0.019 / 69s against $0.26 / 165s for a cold read
+  that missed both corruptions — it reads only the changed pages, not the book.
+- **Order.** The diff must run BEFORE the lector: its findings quote the repair
+  pass's AFTER text, and the lector rewrites that text, so running it second
+  would invalidate its own quotes and drop every finding as `quote-absent`.
+- **Failure is loud.** The diff pass is non-blocking like every step of the
+  chain, but logs at `log.error`, not `warn`: a total outage of a pass whose
+  whole job is catching what nothing else catches would otherwise be invisible.
+  (The lector's own catch still logs at `warn` — left as it is, noted here.)
+- `MODEL_PRICING` gained `openai/gpt-5.6-luna-pro` (and `-luna`), read from
+  OpenRouter's public catalogue on 2026-09-06: $0.20 input / $1.20 output per
+  1M, `thinking` = `output`. The TEXT_MODELS description string still carries a
+  stale ~$0.10/$0.60 — the pricing table is the accurate figure.
+
+**Touched:** `server/lib/textRefine.js` (`quotedSpan`, `parseLectorFindings`, the
+diff pass), `server/lib/promptBuilders.js` + `server/lib/storyHelpers.js`
+(`buildTextDiffPrompt`), `prompts/story-text-diff.txt`,
+`server/services/prompts.js` (`storyTextDiff`), `server/config/models.js`
+(`textDiffModel`, `MODEL_PRICING`), `tests/unit/lector-quote-parse.test.ts`,
+`tests/unit/text-lector.test.ts`, `scripts/analysis/dry-run-text-diff.js`.
+**Status:** ✅ active — staging.

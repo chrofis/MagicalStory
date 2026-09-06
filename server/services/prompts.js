@@ -310,6 +310,11 @@ async function loadPromptTemplates() {
     // The LECTOR: objective language faults in the FINAL text. It returns the
     // corrected pages itself — there is no separate application pass.
     ['storyTextProofread', 'story-text-proofread.txt'],
+    // The DIFF pass (2026-09-06): the same quoted-span finding contract as the
+    // lector, but it sees each repaired page as BEFORE/AFTER and judges only
+    // what the rewrite damaged. Cold-read and diff are different tasks — see
+    // docs/decisions.md, "post-repair diff pass".
+    ['storyTextDiff', 'story-text-diff.txt'],
     // Final-book audit: the reader's-eye pass. A vision judge receives every
     // page's TEXT followed by that page's SHIPPED IMAGE, in reading order, and
     // routes each fault to the artefact that would fix it (IMG or TEXT).

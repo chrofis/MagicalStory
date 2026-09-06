@@ -2,6 +2,14 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "lector-quote-truncated-at-apostrophe",
+      "title": "firstQuoted() closed a lector finding's quoted span on the NEXT apostrophe, truncating any span containing one and silently discarding the finding",
+      "reportedAt": "2026-09-06",
+      "source": "Reproduced from stored evidence on staging story job_1788681313413_xqmtk2gcs. parseLectorFindings (server/lib/textRefine.js) read each side of 'PAGE n: <quote> -> <correction>' with firstQuoted(), which took the text between the opening quote character and the NEXT one. On \"'the boy's pole lantern went dark like the rest.'\" the closing quote was read as the apostrophe inside boy's, so quote became 'the boy' and correction likewise truncated; the quote===correction guard then dropped the whole finding at the PARSE step, before locate ever ran. A second finding, 'everyone's' -> 'everyone else's', hit the same trap and applied correctly only because its two truncations happened to differ. Every possessive and every contraction in English, and every apostrophe in French, was affected.",
+      "status": "open",
+      "note": "Fixed by reading first-to-LAST quote character per side (quotedSpan), after stripping a trailing parenthetical alternative; an unbalanced quote now rejects the line instead of half-parsing it. Unit tests: tests/unit/lector-quote-parse.test.ts."
+    },
+    {
       "id": "model-pricing-missing-gemini-3-1-pro",
       "title": "calculateTextCost returns $0 for google/gemini-3.1-pro-preview: MODEL_PRICING has no entry and no fallback match reaches it",
       "reportedAt": "2026-09-06",

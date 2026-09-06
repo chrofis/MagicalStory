@@ -19,8 +19,16 @@
  *           nothing else)
  *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
  *   3. ONE REPAIR PASS over the merged findings (textRefineModel)
- *   4. ONE LECTOR PASS emitting quoted-span findings, applied by
+ *   4. ONE DIFF PASS over the pages the repair rewrote — BEFORE/AFTER, judging
+ *      only what the rewrite damaged (textDiffModel, 2026-09-06)
+ *   5. ONE LECTOR PASS emitting quoted-span findings, applied by
  *      code-side substitution of its quoted spans (applyLectorFindings)
+ *
+ * Steps 4 and 5 share ONE output contract and ONE applier; they differ only in
+ * what they see. The diff pass exists because "a fault the repair pass
+ * introduces has nothing reading its output" (below) turned out to be a real,
+ * measured cost, not a theoretical one — the cold-read lector missed two
+ * rewrite-introduced corruptions that the diff caught for a tenth of the price.
  *
  * What this replaced: audit → fix → re-audit → corrective fix → lector →
  * separate apply pass. The multi-round convergence loop, the re-audit and the
@@ -237,13 +245,34 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
 const LECTOR_LINE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s*[:.–—-]\s*(.+?)\s*(?:→|->|=>)\s*(.+)$/i;
 const QUOTE_PAIRS = { "'": "'", '"': '"', '«': '»', '‹': '›', '„': '“', '“': '”', '‘': '’', '`': '`' };
 
-/** The first quoted run of a fragment, or null when it does not open with a quote. */
-function firstQuoted(s) {
+/**
+ * The quoted span of ONE SIDE of a finding line — the text between the first
+ * quote character and the LAST matching close on that side.
+ *
+ * FIRST-TO-LAST, not first-to-next (fixed 2026-09-06). A side is one span by
+ * construction: the line format is `PAGE n: '<a>' -> '<b>'` and the arrow has
+ * already split the two halves, so the last close character on a half IS that
+ * half's closing quote. First-to-next silently truncated every span containing
+ * an apostrophe — the closing `'` of `'the boy's pole lantern'` was read as the
+ * one inside `boy's`, the quote became `the boy`, and the
+ * `quote === correction` guard in parseLectorFindings then DISCARDED the whole
+ * finding. Measured on job_1788681313413_xqmtk2gcs: a valid lector correction
+ * was dropped at the PARSE step, and `'everyone's' -> 'everyone else's'`
+ * survived only because its truncations happened to differ.
+ *
+ * Three outcomes, all meaningful to the caller:
+ *   string  the span (may be empty for `''`)
+ *   null    the side is not quoted at all — fall back to bareSpan
+ *   false   the side OPENS a quote it never closes — malformed, reject the line
+ *           rather than half-parse it into an unlocatable quote
+ */
+function quotedSpan(s) {
   const t = String(s || '').trim();
   const close = QUOTE_PAIRS[t[0]];
   if (!close) return null;
-  const end = t.indexOf(close, 1);
-  return end > 1 ? t.slice(1, end) : null;
+  const end = t.lastIndexOf(close);
+  if (end <= 0) return false;
+  return t.slice(1, end);
 }
 
 /**
@@ -261,8 +290,20 @@ function parseLectorFindings(text) {
     const m = raw.trim().match(LECTOR_LINE_RE);
     if (!m) continue;
     const pageNumber = parseInt(m[1], 10);
-    const quote = firstQuoted(m[2]) ?? bareSpan(m[2]);
-    const correction = firstQuoted(m[3]) ?? bareSpan(m[3]);
+    // Strip a trailing parenthetical alternative BEFORE reading the span: the
+    // measured output writes `'x' → 'y' (oder 'z')`, and a first-to-last read
+    // would otherwise swallow `y' (oder 'z`.
+    const lhs = bareSpan(m[2]);
+    const rhs = bareSpan(m[3]);
+    const qs = quotedSpan(lhs);
+    const cs = quotedSpan(rhs);
+    // An unbalanced quote on either side is a malformed line, not a finding.
+    if (qs === false || cs === false) continue;
+    const quote = qs ?? lhs;
+    const correction = cs ?? rhs;
+    // An explicitly EMPTY correction (`''`) falls to the guard below and is
+    // dropped: this apply path substitutes text, it does not delete spans, and
+    // a deletion would leave the surrounding spacing and punctuation broken.
     if (!Number.isFinite(pageNumber) || !quote || !correction || quote === correction) continue;
     out.push({ pageNumber, quote, correction, raw: raw.trim() });
   }
@@ -379,7 +420,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
   await loadPromptTemplates();
   const {
     buildTextRefinePrompt, parseRefinedText, buildTextAuditPrompt,
-    buildTextAuditBlindPrompt, buildTextProofreadPrompt, countFaults, faultsByCategory,
+    buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt,
+    countFaults, faultsByCategory,
   } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
@@ -395,6 +437,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   const auditModel = opts.auditModel || MODEL_DEFAULTS.textAuditModel;
   const blindAuditModel = opts.blindAuditModel || MODEL_DEFAULTS.textAuditBlindModel;
   const lectorModel = opts.proofreadModel || MODEL_DEFAULTS.textProofreadModel;
+  const diffModel = opts.diffModel || MODEL_DEFAULTS.textDiffModel;
   if (!TEXT_MODELS[repairModel]) throw new Error(`Unknown model "${repairModel}"`);
   const usageLabel = opts.usageLabel || 'text_refine';
   // The whole story, read-only (owner redesign 2026-08-31): the audits and the
@@ -415,6 +458,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let lectorFindings = [];
   let lectorApplied = [];
   let lectorDropped = [];
+  let diffReview = '';
+  let diffFindings = [];
+  let diffApplied = [];
+  let diffDropped = [];
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -437,6 +484,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
     lectorFindings: lectorFindings.slice(),
     lectorApplied: lectorApplied.slice(),
     lectorDropped: lectorDropped.slice(),
+    diffReview,
+    diffFindings: diffFindings.slice(),
+    diffApplied: diffApplied.slice(),
+    diffDropped: diffDropped.slice(),
     partial: true,
   });
   const publish = () => {
@@ -616,9 +667,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
     };
   };
 
+  let repairEntry = null;
   try {
     const { next, entry } = await runRepairPass(merged.text, current);
     rounds.push(entry);
+    repairEntry = entry;
     current = next;
     publish();
     log.info(`✍️  [TEXT-REPAIR] ${repairModel} closed ${entry.findingsCount} finding(s), rewrote page(s) ${entry.changedPages.join(', ') || 'none'}`);
@@ -626,6 +679,110 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // Non-blocking like every step: the lector still reads the writer's text.
     rounds.push({ round: rounds.length + 1, kind: 'repair', ok: false, modelKey: repairModel, error: err.message });
     log.warn(`⚠️ [TEXT-REPAIR] failed (${err.message}) — the audits' findings are unclosed`);
+    publish();
+  }
+
+  // ── THE DIFF PASS — between the repair and the lector (2026-09-06) ──────────
+  //
+  // WHAT IT IS: the repair pass is the only step that rewrites whole pages, and
+  // nothing read its output for damage. The lector does read the final text, but
+  // it reads it COLD — it cannot know what the page said before, so a rewrite
+  // that swapped a fact for a plausible other fact reads as ordinary prose. This
+  // pass sees exactly the pages the repair changed, each as BEFORE and AFTER,
+  // and judges only the change.
+  //
+  // MEASURED (job_1788681313413_xqmtk2gcs, 2026-09-06): the gemini-3.1-pro cold
+  // read missed two rewrite-introduced corruptions across two runs, $0.26/165s
+  // each. This pass caught BOTH for $0.019/69s — 2/2 real catches, 1 soft false
+  // positive, every span located character-for-character, zero quote-absent
+  // drops. gemini on the SAME diff task caught 0/2 with ~6 false positives, the
+  // reverse of its 4/4 on the German cold read: cold read and diff are different
+  // tasks and rank models differently. Hence two passes, not one — this ADDS to
+  // the lector and does not replace it (models.js textDiffModel).
+  //
+  // ORDER — BEFORE the lector, and it must be. Its findings quote the repair
+  // pass's AFTER text; the lector rewrites that text, so running it second would
+  // invalidate its own quotes and every finding would drop as `quote-absent`.
+  // Running it first also gives the lector the corrected text to proof.
+  //
+  // NO CONFLICT LOGIC IS ADDED. Each pass applies its own findings in its own
+  // applyLectorFindings call, so an overlap can only happen INSIDE one pass, and
+  // that path already answers it: first finding wins, second dropped as
+  // `overlap`. Across passes the lector prompt is built from the already-
+  // corrected text, so it cannot quote a span this pass has replaced.
+  //
+  // Non-blocking like every step — but LOUD. log.error, not warn: a total
+  // outage of this pass would otherwise be invisible, which is exactly the trap
+  // the session found. (The lector's own catch below logs at warn only; left as
+  // it is rather than changed unasked — noted in the report.)
+  try {
+    const changedPages = repairEntry?.changedPages || [];
+    const pairs = (repairEntry?.pages || [])
+      .filter(p => changedPages.includes(p.pageNumber))
+      .map(p => ({ pageNumber: p.pageNumber, before: p.before, after: p.after }));
+    const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
+    if (diffPrompt && TEXT_MODELS[diffModel]) {
+      const t0 = Date.now();
+      // The model's own limit (owner rule: no output caps).
+      const MAX_OUT = TEXT_MODELS[diffModel].maxOutputTokens || 16000;
+      // temperature 0, same reason as the lector: it must quote, not paraphrase.
+      let dr = await callTextModelStreaming(diffPrompt, MAX_OUT, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
+      if (!String(dr.text || '').trim()) {
+        log.warn(`⚠️ [TEXT-DIFF] ${diffModel} returned empty output — retrying once`);
+        dr = await callTextModelStreaming(diffPrompt, MAX_OUT, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
+      }
+      diffReview = String(dr.text || '').trim();
+      // The SAME parser and the SAME applier as the lector — the output contract
+      // is identical by design, so there is no parallel apply path.
+      diffFindings = parseLectorFindings(diffReview);
+      const result = applyLectorFindings(current, diffFindings);
+      diffApplied = result.applied;
+      diffDropped = result.dropped;
+      for (const d of diffDropped) {
+        const why = d.reason === 'quote-absent'
+          ? `the quoted words are not on page ${d.pageNumber}`
+          : d.reason === 'overlap'
+            ? `its span overlaps a correction already applied to page ${d.pageNumber}`
+            : `page ${d.pageNumber} is not in this story`;
+        log.warn(`⚠️ [TEXT-DIFF] dropped "${d.quote}" — ${why}`);
+      }
+      const next = result.pages;
+      const diffChanged = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
+      rounds.push({
+        round: rounds.length + 1,
+        kind: 'diff',
+        ok: true,
+        modelKey: diffModel,
+        modelId: dr.modelId || TEXT_MODELS[diffModel].modelId,
+        elapsedMs: Date.now() - t0,
+        reviewedPages: pairs.map(p => p.pageNumber),
+        usage: { input_tokens: dr.usage?.input_tokens || 0, output_tokens: dr.usage?.output_tokens || 0 },
+        cost: dr.usage?.direct_cost ?? calculateTextCost(dr.modelId || TEXT_MODELS[diffModel].modelId, dr.usage || {}),
+        rawResponse: diffReview.slice(0, 40000),
+        findings: diffFindings.map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+        appliedCount: diffApplied.length,
+        droppedCount: diffDropped.length,
+        droppedFindings: diffDropped.map(d => ({ pageNumber: d.pageNumber, quote: d.quote, reason: d.reason })),
+        changedPages: diffChanged,
+        pages: next.map((p, idx) => ({
+          pageNumber: p.pageNumber,
+          before: current[idx].text,
+          after: p.text,
+          original: original[idx].text,
+          sceneIntent: p.sceneIntent,
+        })),
+      });
+      current = next;
+      publish();
+      log.info(`🔬 [TEXT-DIFF] ${diffModel}: ${pairs.length} rewritten page(s) reviewed, ${diffFindings.length} finding(s), ${diffApplied.length} applied to page(s) ${diffChanged.join(', ') || 'none'}, ${diffDropped.length} dropped, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    } else if (!pairs.length) {
+      log.info('🔬 [TEXT-DIFF] the repair pass rewrote nothing — no diff to review');
+    } else {
+      log.error(`❌ [TEXT-DIFF] not run: ${diffPrompt ? `unknown model "${diffModel}"` : 'template unavailable'} — rewrite damage is unchecked`);
+    }
+  } catch (de) {
+    log.error(`❌ [TEXT-DIFF] failed (${de.message}) — rewrite damage is unchecked, text kept as the repair pass left it`);
+    rounds.push({ round: rounds.length + 1, kind: 'diff', ok: false, modelKey: diffModel, error: de.message });
     publish();
   }
 
@@ -716,6 +873,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     pages: current, original, rounds, changed,
     audits, mergedFindings, mergeStats,
     proofread, lectorFindings, lectorApplied, lectorDropped,
+    diffReview, diffFindings, diffApplied, diffDropped,
     partial: false,
   };
 }
@@ -794,6 +952,7 @@ module.exports = {
   countPageWords,
   buildWordBudgetFindings,
   parseLectorFindings,
+  quotedSpan,
   applyLectorFindings,
   locateQuote,
   DUPLICATE_OVERLAP,

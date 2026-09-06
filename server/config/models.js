@@ -358,6 +358,16 @@ const MODEL_DEFAULTS = {
   // 0/4 with 2 hallucinations. Never the refiner (deepseek must not proof its
   // own prose — it invented 4 typos when asked to find faults).
   textProofreadModel: process.env.TEXT_PROOFREAD_MODEL || 'gemini-3.1-pro',
+  // The DIFF pass that runs between the repair and the lector: it reads only
+  // the repaired pages as BEFORE/AFTER and reports what the rewrite damaged.
+  // luna-pro is a MEASURED choice for THIS task and the ranking is INVERTED
+  // against the cold read above (2026-09-06, job_1788681313413_xqmtk2gcs): on
+  // the diff, luna-pro caught 2/2 real corruptions with 1 soft false positive
+  // and located every span character-for-character, while gemini-3.1-pro caught
+  // 0/2 with ~6 false positives — the reverse of the German cold read, where
+  // gemini scored 4/4 and luna 1/4. $0.019/69s here against $0.26/165s for a
+  // cold read that missed both. Never gemini on this slot.
+  textDiffModel: process.env.TEXT_DIFF_MODEL || 'gpt-5.6-luna-pro',
   // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
   // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
   scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',
@@ -1047,6 +1057,16 @@ const MODEL_PRICING = {
   // the call no longer reports $0.00. Prompts over 200k tokens bill at the
   // higher $4/$18 long-context tier, which this flat entry does not model.
   'google/gemini-3.1-pro-preview': { input: 2.00, output: 12.00, thinking: 12.00 },
+  // Diff-pass model. Read from OpenRouter's own catalogue (GET /api/v1/models,
+  // 2026-09-06): pricing.prompt 0.0000002 and pricing.completion 0.0000012 per
+  // token → $0.20 / $1.20 per 1M. A reasoning model whose thinking bills at the
+  // completion rate, hence `thinking` = `output`. (The TEXT_MODELS description
+  // string still says ~$0.10/$0.60 — that is the stale figure, not this one.)
+  // Prompts over 272k tokens bill at $0.40/$1.80, which this flat entry does
+  // not model. OpenRouter's `direct_cost` stays authoritative where returned;
+  // this is the fallback so the call is not reported as $0.00.
+  'openai/gpt-5.6-luna-pro': { input: 0.20, output: 1.20, thinking: 1.20 },
+  'openai/gpt-5.6-luna': { input: 0.20, output: 1.20, thinking: 1.20 },
 
   // Grok Imagine models (fixed cost per image)
   'grok-imagine-image': { perImage: 0.02 },

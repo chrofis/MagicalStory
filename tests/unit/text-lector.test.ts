@@ -419,7 +419,8 @@ describe('refineStoryText - a stalled audit is abandoned, the chain continues', 
     // the counter never stalls, so it contributes even when an auditor does.
     expect(res.mergedFindings).toHaveLength(2);
     expect(res.mergedFindings.map((f: any) => f.sources)).toEqual([['arc-informed'], ['counter']]);
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'lector']);
+    // The repair rewrote a page, so the diff pass reviews that pair (2026-09-06).
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'diff', 'lector']);
     expect(res.changed).toEqual([1]);
     expect(labels).toContain('text_lector');
   });
