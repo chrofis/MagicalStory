@@ -570,6 +570,15 @@
       "status": "fixed",
       "fixedIn": "staging ff6735f2b (2026-09-06)",
       "note": "Root cause: /api/trial/create-story waits at most 60 s for an in-flight prepare-title, a 2x4 sheet takes ~100 s, and both the prewarm and the job end with clearStyledAvatarCache() on the same trial-<userId> scope. Fix: runInCacheScope refcounts active runners per scope and clearStyledAvatarCache() skips (logged) while another runner is inside; the last one out clears. Regression test tests/unit/styled-avatar-scope-guard.test.ts. decisions.md entry 2026-09-06."
+    },
+    {
+      "id": "cover-title-rewritten-by-prop-name-sanitiser",
+      "title": "sanitizeVbIdsInPrompt rewrites the baked cover title: a prop name inside the title is replaced by the Visual Bible type (\"Crackers\" -> \"food prop\")",
+      "reportedAt": "2026-09-06",
+      "source": "Confirmed from stored evidence: staging trial job_1788684429841_0flr66gs8. stories.data.title = \"Noah and the Crackers at the Zoo\"; visualBible.artifacts[1] = {id ART002, name \"Crackers\", type \"food prop\"}; coverImages.frontCover.prompt contains `Paint \"Noah and the food prop at the Zoo\" in the upper third of the canvas`; the rendered front cover (story_images frontCover v0) letters \"Noah and the food prop at the Zoo\".",
+      "status": "fixed",
+      "fixedIn": "staging (commit: fix(cover): the baked title is masked from the prop-name sanitiser, 2026-09-06)",
+      "note": "The 2026-08-24 name-for-type substitution is correct for prose and wrong for the title, which is authored text the model must letter verbatim. Fix inside the single chokepoint: the sanitiser matches the shared title-line shape, masks the quoted title, substitutes around it, restores it. Regression test tests/unit/cover-title-not-sanitised.test.ts; decisions.md entry 2026-09-06."
     }
   ]
 }

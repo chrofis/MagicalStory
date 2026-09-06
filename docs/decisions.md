@@ -28503,3 +28503,26 @@ special-casing the trial order of events. Raising the 60 s wait would only narro
 **Touched:** `server/lib/styledAvatars.js` (`runInCacheScope`, `clearStyledAvatarCache`),
 `tests/unit/styled-avatar-scope-guard.test.ts`, `tasks/bugs.json`.
 **Status:** ✅ active
+
+## 2026-09-06 — The baked cover title is masked from the prop-name sanitiser
+
+**Context:** `sanitizeVbIdsInPrompt` replaces every artifact/vehicle/clothing NAME with the
+entry's `type` so the model cannot letter a prop's name onto the prop (2026-08-24). The baked
+cover title travels in the same prompt (`Paint "<title>" in the upper third…`, placed at the
+protected tail since the dragon run). Staging trial `job_1788684429841_0flr66gs8`: story title
+"Noah and the Crackers at the Zoo", Visual Bible ART002 named "Crackers" with type "food prop",
+stored cover prompt reads `Paint "Noah and the food prop at the Zoo"`, and the rendered cover
+letters exactly that.
+
+**Decision:** The sanitiser recognises the title line (one shared shape, `bakedTitleLine` /
+`BAKED_TITLE_LINE_RE` in `promptBuilders.js`), masks the quoted title, runs the id and name
+passes on everything around it, and restores the title verbatim. Prose substitution is unchanged.
+
+**Rationale:** The title is the one string on a cover the model MUST reproduce as written; it is
+authored text, not a prop label, so the 2026-08-24 protection has nothing to protect there.
+Masking inside the single chokepoint keeps every cover path (iterate, composite, repair) covered
+without per-caller ordering rules.
+
+**Touched:** `server/lib/promptBuilders.js` (`bakedTitleLine`, `BAKED_TITLE_LINE_RE`,
+`sanitizeVbIdsInPrompt`), `tests/unit/cover-title-not-sanitised.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active

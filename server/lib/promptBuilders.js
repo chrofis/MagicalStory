@@ -2021,8 +2021,20 @@ function buildCoverPrompt(coverType, {
   // which needs no carve-out code.
   return prompt + '\n\n' + [
     '**TITLE:**',
-    `Paint "${bakedTitle}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`,
+    bakedTitleLine(bakedTitle),
   ].join('\n');
+}
+
+// The painted-title instruction of a baked cover. ONE shape, shared with
+// sanitizeVbIdsInPrompt: the title is the one string on a cover that must reach
+// the model verbatim, so the sanitiser masks the quoted part before its prop-
+// name substitution. Staging trial job_1788684429841_0flr66gs8: the story is
+// "Noah and the Crackers at the Zoo", the bible names ART002 "Crackers" with
+// type "food prop", and the cover came back lettered "Noah and the food prop at
+// the Zoo".
+const BAKED_TITLE_LINE_RE = /^(Paint ")(.*)(" in the upper third of the canvas\b)/u;
+function bakedTitleLine(title) {
+  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`;
 }
 
 function buildReferenceCardColours(chars, referencePhotos) {
@@ -3855,7 +3867,12 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   const lines = prompt.split('\n');
   const out = [];
   const orphans = [];
-  for (const line of lines) {
+  // A baked cover title is lettering the model MUST reproduce as written; the
+  // id and name passes run on everything around it, never inside the quotes.
+  const TITLE_MASK = ' BAKED-TITLE ';
+  for (const rawLine of lines) {
+    const titleHit = rawLine.match(BAKED_TITLE_LINE_RE);
+    const line = titleHit ? rawLine.replace(BAKED_TITLE_LINE_RE, `$1${TITLE_MASK}$3`) : rawLine;
     const lineOrphans = [];
     const resolved = line.replace(ID_PATTERN, (id) => {
       const upper = id.toUpperCase();
@@ -3871,7 +3888,8 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     if (lineOrphans.length > 0) orphans.push({ line: line.trim(), ids: lineOrphans });
     // Names after ids: the id pass inserts refs, never names, so this cannot
     // re-process its own output.
-    out.push(replaceNames(resolved));
+    const substituted = replaceNames(resolved);
+    out.push(titleHit ? substituted.replace(TITLE_MASK, () => titleHit[2]) : substituted);
   }
 
   if (orphans.length > 0) {
