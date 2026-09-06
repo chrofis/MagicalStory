@@ -622,7 +622,7 @@
       "reportedAt": "2026-09-06",
       "source": "Confirmed from stored evidence: staging trial job_1788719728575_78bsxj6pu (Léa, 6, telling-truth + mermaid), run at 20:35 CH (naive created_at column reads 16:35Z; the trial user email carries 183452Z), after 2244b4a14 deployed with 66b5d86f at 20:25 CH (the row photos.face/bodyNoBg are https://images-staging.../inline/... URLs). Web log: \"Léa: no styled standard avatar → using bodyNoBg/face cutout as body ref for costumed:mermaid\" then \"no base avatar for costumed:mermaid, skipping\" twice (prewarm and avatars stage); styledAvatarGeneration[0] = \"no styled avatar generated — raw bg-removed body photo seeded\"; preGeneratedStyledAvatars.Léa.standard is byte-identical to photos.bodyNoBg (436100 bytes); sceneImages[0].referencePhotos[0].photoUrl is a 7 KB sliver of the polka-dot dress; pages render a different child, page 4 a boy. The previous trial job_1788715081819 (before the deploy, photos inline) generated both sheets.",
       "status": "fixed",
-      "fixedIn": "staging (commit: fix(avatars): sheet inputs resolve inline-or-R2 photos, 2026-09-06)",
+      "fixedIn": "staging f266e524c (2026-09-06)",
       "note": "styledAvatars.js: new photoAsDataUri(value) (inline passthrough, R2 fetch otherwise) used for the fallback body photo AND the face photo on both the standard and the costumed sheet paths; resolveAvatarBytes shares it. Secondary, backlogged: the cell cropper slices any \"standard\" entry as a 2x4 sheet, including a guarantee-seeded raw photo."
     }
   ]
