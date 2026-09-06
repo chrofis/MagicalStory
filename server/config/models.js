@@ -403,6 +403,12 @@ const MODEL_DEFAULTS = {
   // dispatch (imageInpainting.js), plus the prompt-budget lookups in
   // promptBuilders. It stays on Standard in every environment: doubling it
   // would double every inpaint. The final page render reads pageRenderImage.
+  //
+  // Routing repair inpaint to follow pageRenderImage was tried and REVERTED by
+  // the owner on 2026-09-06 (docs/decisions.md). Repairs stay on the cheap edit
+  // tier in every environment; only the page/cover RENDER follows the tier
+  // split. Don't re-propose the "a repair should be painted by the model that
+  // rendered the page" consistency argument — it has been heard and declined.
   pageImage: 'grok-imagine',                 // Edit/inpaint tier ($0.02/image)
   // The tier a final page render — and every redo/repair regeneration of a
   // page — uses. Per-environment (see runtime.js): Imagine 2.0 on staging,
@@ -850,8 +856,10 @@ const IMAGE_MODELS = {
   // API 2026-08-07 as `grok-imagine-image-2.0` ($0.04/image). Typography-aware,
   // which is the reason to test it: the cover today costs $0.04 ANYWAY as two
   // calls (textless art + the title paint-in), so a single call that renders
-  // legible lettering is cost-neutral, not a 2x. Registered for Test Lab A/B
-  // only — no default routes here until an experiment says it should.
+  // legible lettering is cost-neutral, not a 2x. Staging routes page and cover
+  // RENDERS here via runtime('pageRenderModel'); production stays on Standard
+  // until a scored A/B promotes it. No repair path routes here — char repair,
+  // inpaint, style repair and empty-scene plates are all pinned to Standard.
   'grok-imagine-2': {
     modelId: 'grok-imagine-image-2.0',
     description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',

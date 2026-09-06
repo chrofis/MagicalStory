@@ -44,29 +44,31 @@
 <p>Stories are paid in credits. Configured in <code>server/config/credits.js</code> → <code>CREDIT_PACKAGES</code>.</p>
 
 <table>
-<thead><tr><th>Package</th><th>Credits</th><th>Price (CHF)</th><th>Effective per credit</th></tr></thead>
+<thead><tr><th>Package</th><th>Credits</th><th>Price (CHF)</th><th>Effective per credit</th><th>Per page</th></tr></thead>
 <tbody>
-<tr><td>Starter</td><td>350</td><td>10</td><td>~2.9 ¢</td></tr>
-<tr><td>Standard</td><td>1000</td><td>25</td><td>~2.5 ¢</td></tr>
-<tr><td>Family</td><td>2500</td><td>50</td><td>~2.0 ¢</td></tr>
+<tr><td>Starter</td><td>150</td><td>5</td><td>3.33 Rp</td><td>33.3 Rp</td></tr>
+<tr><td>Popular</td><td>350</td><td>10</td><td>2.86 Rp</td><td>28.6 Rp</td></tr>
+<tr><td>Best Value</td><td>750</td><td>20</td><td>2.67 Rp</td><td>26.7 Rp</td></tr>
+<tr><td>Pro</td><td>2000</td><td>50</td><td>2.50 Rp</td><td>25.0 Rp</td></tr>
 </tbody>
 </table>
 
-<p>New users get a one-time <code>INITIAL_USER_CREDITS</code> grant on signup (see <code>client/src/constants/credits.ts</code>).</p>
+<p>New users get a one-time <code>INITIAL_USER_CREDITS</code> grant of <strong>200 credits</strong> on signup — every path (direct signup, trial conversion, Google). Server value: <code>CREDIT_CONFIG.LIMITS.INITIAL_USER</code>; frontend mirror: <code>client/src/constants/credits.ts</code>.</p>
 
 <h2 id="operations">3. Per-operation cost</h2>
 
-<p>Configured in <code>server/config/credits.js</code>:</p>
+<p>Configured in <code>server/config/credits.js</code> &rarr; <code>CREDIT_CONFIG.COSTS</code>, mirrored for the UI in
+<code>client/src/constants/credits.ts</code>. <strong>Never hardcode a credit count in UI copy or in a doc sentence &mdash;
+import the constant.</strong> Revenue per operation spans the cheapest to the most expensive credit pack.</p>
 
 <table>
-<thead><tr><th>Operation</th><th>Credits</th></tr></thead>
+<thead><tr><th>Operation</th><th>Constant</th><th>Credits</th><th>Revenue (CHF)</th></tr></thead>
 <tbody>
-<tr><td>Story page (generation + eval + repair)</td><td><code>CREDITS_PER_PAGE</code> = 25</td></tr>
-<tr><td>Cover (front / initial / back, each)</td><td>~25</td></tr>
-<tr><td>Avatar regeneration</td><td>~10</td></tr>
-<tr><td>Style transfer (per image)</td><td>~10</td></tr>
-<tr><td>Iterate page (full re-gen)</td><td>~25</td></tr>
-<tr><td>Character repair (Grok cutout / blended)</td><td>~3</td></tr>
+<tr><td>Story page (generation + eval + repair)</td><td><code>PER_PAGE</code></td><td>10</td><td>0.25 &ndash; 0.33</td></tr>
+<tr><td>Regenerate / iterate a page image</td><td><code>IMAGE_REGENERATION</code></td><td>2</td><td>0.050 &ndash; 0.067</td></tr>
+<tr><td>Regenerate a cover (front / initial / back, each)</td><td><code>COVER_REGENERATION</code></td><td>2</td><td>0.050 &ndash; 0.067</td></tr>
+<tr><td>Repaint the cover title in the artwork's medium</td><td><code>TITLE_PAINT</code></td><td>2</td><td>0.050 &ndash; 0.067</td></tr>
+<tr><td>Character repair on one page (Grok cutout / blended)</td><td><code>CHARACTER_REPAIR</code></td><td>2</td><td>0.050 &ndash; 0.067</td></tr>
 </tbody>
 </table>
 
@@ -81,7 +83,8 @@
 <tr><td>Anthropic Claude Sonnet</td><td>1M output tokens</td><td>~$15.00</td></tr>
 <tr><td>Gemini 2.5 Flash</td><td>per image generation</td><td>~$0.039</td></tr>
 <tr><td>Gemini 2.5 Flash</td><td>per vision eval (~1 MP)</td><td>~$0.0008</td></tr>
-<tr><td>Grok Imagine standard</td><td>per image edit / generate</td><td>~$0.02</td></tr>
+<tr><td>Grok Imagine (<code>grok-imagine</code>, edit / inpaint tier)</td><td>per image edit</td><td>$0.02</td></tr>
+<tr><td>Grok Imagine 2.0 (<code>grok-imagine-image-2.0</code>, render tier)</td><td>per image generation</td><td>$0.04</td></tr>
 <tr><td>Grok Imagine pro</td><td>per image edit / generate</td><td>~$0.07</td></tr>
 <tr><td>Runware FLUX SDXL</td><td>per image</td><td>~$0.002</td></tr>
 <tr><td>Runware ACE++</td><td>per image</td><td>~$0.005</td></tr>
@@ -89,6 +92,18 @@
 <tr><td>Postgres (Railway)</td><td>per GB stored / month</td><td>~$25</td></tr>
 </tbody>
 </table>
+
+<p><strong>What one page really costs (Grok 2, current).</strong> A page is normally two provider
+renders, not one: the empty-scene background at <strong>$0.02</strong> plus the page image at
+<strong>$0.04</strong>. <strong>Assume $0.06 per finished page</strong> before evals, repairs and text.
+A single user-triggered image operation (regenerate, prompt-edit, cover edit, character repair,
+title paint) is one call: $0.02 for an edit, $0.04 for a full render.</p>
+
+<p><strong>Margin on the 2-credit operations is thinner than it looks.</strong> 2 credits is
+CHF 0.050 &ndash; 0.067 of package value against ~$0.04 (&asymp; CHF 0.032 at ~0.80 CHF/USD) for a
+render &mdash; roughly <strong>1.6&ndash;2.1&times;</strong>, and closer to break-even on the composite
+cover path that fires two calls. The old "3&ndash;4&times; margin" note in
+<code>server/config/credits.js</code> dated from the $0.018 Grok 1.x era and has been corrected.</p>
 
 <h2 id="story-cost">5. Worked story cost</h2>
 
@@ -108,7 +123,12 @@
 </tbody>
 </table>
 
-<p>At 25 credits / page × 12 pages = 300 credits, the customer paid ~CHF 8.5 in package value. Margin covers Stripe fees, R2 storage, infra, and labour.</p>
+<p>At 10 credits / page &times; 12 pages = 120 credits, the customer paid CHF 3.00 &ndash; 4.00 in package value.</p>
+
+<p><strong>&#9888; The itemised table above is a 2026-05 calibration and is stale.</strong> Measured cost of a full
+story today is <strong>~USD 4.2 &ndash; 4.9</strong>, i.e. roughly the credit price &mdash; margin on story generation is
+close to zero and printed books are the revenue line. Per-image operations (regenerate / repair / title paint) are the
+profitable ones: 2 credits = CHF 0.05 &ndash; 0.067 against ~CHF 0.018 for a single Grok call.</p>
 
 <h2 id="referral">6. Referral economics</h2>
 

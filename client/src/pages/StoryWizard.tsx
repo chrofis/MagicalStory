@@ -22,7 +22,7 @@ const WizardStep6Summary = lazy(() => import('./wizard/WizardStep6Summary').then
 import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
-import { INITIAL_USER_CREDITS } from '@/constants/credits';
+import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST } from '@/constants/credits';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
@@ -1535,10 +1535,13 @@ export default function StoryWizard() {
           de: 'Credits hinzugefuegt!',
           fr: 'Credits ajoutes!',
         };
+        // No pack size here — the checkout return carries no package info, and every
+        // pack (150/350/750/2000) landed on a hardcoded "100 credits" before. The
+        // refreshed balance in the header is the truth.
         const messages = {
-          en: '100 credits have been added to your account.',
-          de: '100 Credits wurden Ihrem Konto gutgeschrieben.',
-          fr: '100 credits ont ete ajoutes a votre compte.',
+          en: 'Your credits have been added to your account.',
+          de: 'Deine Credits wurden deinem Konto gutgeschrieben.',
+          fr: 'Vos credits ont ete ajoutes a votre compte.',
         };
         showSuccess(
           messages[language as keyof typeof messages] || messages.en,
@@ -6333,7 +6336,7 @@ export default function StoryWizard() {
                 disabled={!editPromptText.trim()}
                 className="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="text-xs opacity-80">(5 {language === 'de' ? 'Credits' : 'credits'})</span>
+                {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'} <span className="text-xs opacity-80">({editTarget.type === 'image' ? IMAGE_REGENERATION_COST : COVER_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})</span>
               </button>
             </div>
           </div>

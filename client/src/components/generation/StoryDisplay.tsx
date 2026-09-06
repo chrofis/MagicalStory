@@ -13,7 +13,7 @@ import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
 import { EntityConsistencyView } from './EntityConsistencyView';
-import { IMAGE_REGENERATION_COST } from '@/constants/credits';
+import { IMAGE_REGENERATION_COST, COVER_REGENERATION_COST, TITLE_PAINT_COST, CHARACTER_REPAIR_COST } from '@/constants/credits';
 
 interface StoryTextPrompt {
   batch: number;
@@ -21,6 +21,9 @@ interface StoryTextPrompt {
   endPage: number;
   prompt: string;
   rawResponse?: string;  // Unfiltered API response for dev mode
+  /** Step 1 of the writer's reply: its page-by-page continuity reasoning,
+      split off the raw response by parseRefinedText. */
+  analysis?: string;
   modelId?: string;
   usage?: { input_tokens: number; output_tokens: number };
 }
@@ -198,7 +201,7 @@ interface StoryDisplayProps {
       the review didn't run (trial, disabled, or reviewer failed). */
   outlineReview?: { model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null;
   /** Per-page before/after from the parallel text-refine pass (dev mode). */
-  textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
+  textRefineReport?: (ReviewDiffReport & { rounds?: number }) | null;
   /** Per-page before/after from the beats review (beats pipeline, dev mode). */
   arcReviewReport?: import('../../types/story').ArcReviewReport | null;
   beatsReviewReport?: ReviewDiffReport | null;
@@ -486,7 +489,7 @@ export function StoryDisplay({
   // Repaint the cover title in the artwork's medium (server: one model call,
   // OCR-gated, falls back to the flat title and charges nothing on failure).
   // ONE place to change the title: save the text if it changed (free, deterministic
-  // restamp), then repaint it in the artwork's medium (2 credits). Title design
+  // restamp), then repaint it in the artwork's medium (TITLE_PAINT_COST credits). Title design
   // lives inside the same modal and is admin-only.
   const handleTitleSave = async () => {
     if (repaintingTitle) return;
@@ -1740,7 +1743,7 @@ export function StoryDisplay({
           ) : isDetecting ? (
             <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : 'Detecting...'}</span>
           ) : (
-            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({CHARACTER_REPAIR_COST} Credits)</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -1863,7 +1866,7 @@ export function StoryDisplay({
                   disabled={!charRepairSelected}
                   className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                 >
-                  {language === 'de' ? 'Reparieren' : 'Repair'} ({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})
+                  {language === 'de' ? 'Reparieren' : 'Repair'} ({CHARACTER_REPAIR_COST} {language === 'de' ? 'Credits' : 'credits'})
                 </button>
               </div>
             </div>
@@ -2249,7 +2252,7 @@ export function StoryDisplay({
 
       {/* CHANGE TITLE — the single place the title is edited. Text for everyone,
           design (font / effect / colour) for admins only. Saving applies the text
-          (free restamp) and then repaints it in the artwork's medium (2 credits). */}
+          (free restamp) and then repaints it in the artwork's medium (TITLE_PAINT_COST credits). */}
       {titleModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => !repaintingTitle && setTitleModalOpen(false)}>
           <div className="bg-white rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -2289,7 +2292,7 @@ export function StoryDisplay({
                 {repaintingTitle ? <Loader className="animate-spin" size={16} /> : <Palette size={16} />}
                 {repaintingTitle
                   ? (language === 'de' ? 'Wird gemalt…' : language === 'fr' ? 'En cours…' : 'Working…')
-                  : (language === 'de' ? 'Titel ändern (2 Credits)' : language === 'fr' ? 'Modifier le titre (2 crédits)' : 'Change title (2 credits)')}
+                  : (language === 'de' ? `Titel ändern (${TITLE_PAINT_COST} Credits)` : language === 'fr' ? `Modifier le titre (${TITLE_PAINT_COST} crédits)` : `Change title (${TITLE_PAINT_COST} credits)`)}
               </button>
             </div>
             <div className="text-[11px] text-gray-400 mt-2">
@@ -2697,7 +2700,9 @@ export function StoryDisplay({
                       <summary className={c.sub}>
                         {panelKey === 'beats-review'
                           ? (language === 'de' ? 'Alle Original-Beats (wie gesendet)' : 'All original beats (as sent)')
-                          : (language === 'de' ? 'Alle Original-Szenen (wie gesendet)' : 'All original scenes (as sent)')}
+                          : panelKey === 'text-refine'
+                            ? (language === 'de' ? 'Aller Original-Text (wie gesendet)' : 'All original text (as sent)')
+                            : (language === 'de' ? 'Alle Original-Szenen (wie gesendet)' : 'All original scenes (as sent)')}
                         <span className="ml-2 text-gray-500">({briefsIn.length})</span>
                       </summary>
                       <div className="mt-2 space-y-2">
@@ -3116,6 +3121,18 @@ export function StoryDisplay({
                     {storyTextPrompts[0]?.prompt || 'No prompt available'}
                   </pre>
                 </div>
+                {/* Step 1 of the reply: the writer's own continuity reasoning.
+                    It is inside rawResponse too, but buried above every page. */}
+                {storyTextPrompts[0]?.analysis && (
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-700 mb-2">
+                      {language === 'de' ? '🧭 Analyse des Autors' : language === 'fr' ? "🧭 Analyse de l'auteur" : '🧭 Writer analysis'}
+                    </h4>
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-sans bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                      {storyTextPrompts[0].analysis}
+                    </pre>
+                  </div>
+                )}
                 {/* Output: The raw unfiltered API response */}
                 <div>
                   <h4 className="text-sm font-bold text-amber-700 mb-2">
@@ -5012,7 +5029,7 @@ export function StoryDisplay({
                     {editingPages.has(-1) ? (
                       <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5042,7 +5059,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                    <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
+                    <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
                 {renderCharRepairButton(-1, bboxOverrides[bboxKey('cover:front', frontCoverObj)] ?? frontCoverObj?.bboxDetection, bboxKey('cover:front', frontCoverObj))}
@@ -5259,7 +5276,7 @@ export function StoryDisplay({
                     {editingPages.has(-2) ? (
                       <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5289,7 +5306,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                    <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
+                    <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
                 {renderCharRepairButton(-2, bboxOverrides[bboxKey('cover:initial', initialPageObj)] ?? initialPageObj?.bboxDetection, bboxKey('cover:initial', initialPageObj))}
@@ -6727,7 +6744,7 @@ export function StoryDisplay({
                     {editingPages.has(-3) ? (
                       <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -6757,7 +6774,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                    <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
+                    <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
                 {renderCharRepairButton(-3, bboxOverrides[bboxKey('cover:back', backCoverObj)] ?? backCoverObj?.bboxDetection, bboxKey('cover:back', backCoverObj))}
@@ -7195,7 +7212,7 @@ export function StoryDisplay({
                   <RefreshCw size={16} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
                   <span className="text-xs opacity-80">
-                    ({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})
+                    ({COVER_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
               </div>

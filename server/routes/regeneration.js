@@ -2979,7 +2979,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       return res.status(404).json({ error: 'User not found' });
     }
     const userCredits = userResult.rows[0].credits || 0;
-    const requiredCredits = CREDIT_COSTS.IMAGE_REGENERATION;
+    const requiredCredits = CREDIT_COSTS.COVER_REGENERATION;
     const hasInfiniteCredits = userCredits === -1 || isImpersonating;
 
     if (!hasInfiniteCredits && userCredits < requiredCredits) {
@@ -3342,7 +3342,21 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       return res.status(400).json({ error: 'editPrompt is required' });
     }
 
-    log.debug(`✏️ Editing image for story ${id}, page ${pageNumber}`);
+    // Prompt edits cost the same as any other single-image operation (decided 2026-09-06;
+    // they were uncharged until then while the button claimed 5 credits).
+    const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
+    const isImpersonating = req.user.impersonating === true;
+    const userResult = await getDbPool().query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userCredits = userResult.rows[0].credits || 0;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
+    if (!hasInfiniteCredits && userCredits < creditCost) {
+      return res.status(402).json({ error: 'Insufficient credits', required: creditCost, available: userCredits });
+    }
+
+    log.debug(`✏️ Editing image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)`);
     log.debug(`✏️ Edit instruction: "${editPrompt}"`);
 
     // Get the story
@@ -3472,11 +3486,32 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       }
     }
 
-    log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
+    // Deduct after a successful edit only — same atomic-with-floor pattern as
+    // the regenerate route (BILL-1): the pre-check ran before a long AI call.
+    let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
+    if (!hasInfiniteCredits) {
+      const deduct = await getDbPool().query(
+        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
+        [creditCost, req.user.id]
+      );
+      if (deduct.rows.length === 0) {
+        log.warn(`⚠️ [BILL-1] Image edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
+      } else {
+        newCredits = deduct.rows[0].credits;
+        await getDbPool().query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
+          [req.user.id, -creditCost, newCredits, `Edit image for page ${pageNumber}`]
+        );
+      }
+    }
+
+    log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore}, cost: ${creditCost} credits)`);
 
     res.json({
       success: true,
       pageNumber,
+      creditsRemaining: newCredits,
       imageData: editResult.imageData,
       qualityScore,
       qualityReasoning,
@@ -5163,9 +5198,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
     storyData = await rehydrateStoryImages(id, storyData);
 
-    // Credit check — 5 credits per page to repair
+    // Credit check — CREDIT_COSTS.CHARACTER_REPAIR per page to repair
     const { CREDIT_COSTS } = require('../config/credits');
-    const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
+    const creditCost = CREDIT_COSTS.CHARACTER_REPAIR;
     const userCreditsResult = await getDbPool().query('SELECT credits, role FROM users WHERE id = $1', [req.user.id]);
     const userCredits = userCreditsResult.rows[0]?.credits || 0;
     const userRole = userCreditsResult.rows[0]?.role;
@@ -6300,7 +6335,20 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       return res.status(400).json({ error: 'editPrompt is required' });
     }
 
-    log.debug(`✏️ Editing ${normalizedCoverType} cover for story ${id}`);
+    // Same charge as any other cover operation (decided 2026-09-06; uncharged until then).
+    const creditCost = CREDIT_COSTS.COVER_REGENERATION;
+    const isImpersonating = req.user.impersonating === true;
+    const userResult = await getDbPool().query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userCredits = userResult.rows[0].credits || 0;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
+    if (!hasInfiniteCredits && userCredits < creditCost) {
+      return res.status(402).json({ error: 'Insufficient credits', required: creditCost, available: userCredits });
+    }
+
+    log.debug(`✏️ Editing ${normalizedCoverType} cover for story ${id} (cost: ${creditCost} credits)`);
     log.debug(`✏️ Edit instruction: "${editPrompt}"`);
 
     // Get the story
@@ -6478,7 +6526,25 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     // pinned: any later save's recompute would otherwise revert to pickBest.
     await setActiveVersion(id, coverKey, newVersionIndex, { pinned: true });
 
-    log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
+    let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
+    if (!hasInfiniteCredits) {
+      const deduct = await getDbPool().query(
+        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
+        [creditCost, req.user.id]
+      );
+      if (deduct.rows.length === 0) {
+        log.warn(`⚠️ [BILL-1] Cover edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
+      } else {
+        newCredits = deduct.rows[0].credits;
+        await getDbPool().query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
+          [req.user.id, -creditCost, newCredits, `Edit ${normalizedCoverType} cover`]
+        );
+      }
+    }
+
+    log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore}, cost: ${creditCost} credits)`);
 
     res.json({
       success: true,

@@ -18,6 +18,15 @@ export const CREDITS_PER_PAGE = 10;
 /** Credits charged to regenerate a single page image. Mirrors CREDIT_COSTS.IMAGE_REGENERATION on the server. */
 export const IMAGE_REGENERATION_COST = 2;
 
+/** Credits charged to regenerate a cover (front / initial / back). Mirrors CREDIT_COSTS.COVER_REGENERATION. */
+export const COVER_REGENERATION_COST = 2;
+
+/** Credits charged to repaint the cover title in the artwork's medium. Mirrors CREDIT_COSTS.TITLE_PAINT. */
+export const TITLE_PAINT_COST = 2;
+
+/** Credits charged to repair a character on one page. Mirrors CREDIT_COSTS.CHARACTER_REPAIR. */
+export const CHARACTER_REPAIR_COST = 2;
+
 /**
  * Example story length used in marketing copy like
  * "a 20-page story uses 200 credits". Keep in sync with EXAMPLE_STORY_CREDITS.

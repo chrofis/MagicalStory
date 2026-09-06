@@ -25,6 +25,36 @@
  *     path's OWN output so a repaint that did not actually land in the target
  *     style class is flagged/rejected.
  *
+ * ============================================================================
+ * READ THIS BEFORE FILING A BUG ABOUT STYLE-REPAIR SCORES
+ * ============================================================================
+ * Style repair does NOT win on finalScore, and it is NOT supposed to.
+ *
+ * Selection happens in this module's OWN comparative gate (see the `passedGate`
+ * block in repairPageStyle below): `compareStyleProximity(before, after)` shows
+ * a judge the ORIGINAL and the REPAINT side by side and asks which is closer to
+ * the target style and whether anything else changed. The repaint ships only on
+ * `better === 'after' && changed.length === 0`. That before/after comparison is
+ * the whole point — a style repaint changes the MEDIUM, not the content, so the
+ * ordinary per-image quality score cannot see the thing being repaired. Two
+ * images can be equally "good" while only one is in the right style.
+ *
+ * Consequence that repeatedly gets mis-reported as a defect: on versions
+ * written BEFORE 0a3049bce (2026-09-05) the stored `finalScore` of a
+ * style-repair version equals the pre-repair score exactly, because it was
+ * inherited from prevBest rather than measured. An audit that queries
+ * `imageVersions[].finalScore` therefore sees "0 improvements in N firings,
+ * every score identical" and concludes the path is broken or can never ship.
+ * IT IS NOT A DEFECT — it is a path whose verdict lives in
+ * `styleRepair.passedGate` / `styleRepair.styleComparison` on the version, not
+ * in the score column. Read those fields, not finalScore. (Owner ruling
+ * 2026-09-06, after exactly this false positive was raised from stored data.)
+ *
+ * Since 0a3049bce the repaint is additionally scored on its own bytes, so new
+ * versions carry a real independent finalScore too — but the GATE is still what
+ * decides whether the repaint ships.
+ * ============================================================================
+ *
  * PRODUCTION WIRING: live since 2026-07-31 (owner directive) — the Step-5
  * style audit in runUnifiedRepairPipeline (images.js) calls
  * planStyleRepair → repairPageStyle for pages AND covers, gated by
@@ -45,6 +75,9 @@ const { log } = require('../utils/logger');
  */
 const STYLE_REPAIR_MODEL_IDS = {
   gemini: 'gemini-2.5-flash-image',
+  // Pinned to the edit tier, NOT the page-render tier. Routing style repair to
+  // follow the story's page model was tried and reverted by the owner on
+  // 2026-09-06 — see docs/decisions.md. Don't re-propose it as a consistency fix.
   grok: 'grok-imagine',
 };
 
@@ -353,6 +386,10 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     // costume is a regression, not a fix: staging job_1787514666616_yw9qsv1vf
     // p1 turned a green tricorn into a red headscarf. Clothing is contracted
     // per story (clothingRequirements) — a style pass may not renegotiate it.
+    // THE selection decision for this path. Not finalScore, not the version
+    // tie-break in selectBestVersion — this comparative before/after verdict.
+    // Don't "fix" a style-repair version that shares its score with the page's
+    // previous best; see the header block.
     passedGate = styleComparison.better === 'after' && changed.length === 0;
     if (passedGate) {
       log.info(`🎨 [STYLE-REPAIR] gate PASS: repaint is closer to the target style and changed nothing else — ${styleComparison.reason}`);

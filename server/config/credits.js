@@ -7,9 +7,18 @@
 const CREDIT_CONFIG = {
   // Credit costs per operation
   COSTS: {
-    IMAGE_REGENERATION: 2,    // Cost to regenerate a single scene image (~CHF 0.05–0.07 vs ~CHF 0.018 provider cost = ~3–4× margin)
-    COVER_REGENERATION: 2,    // Cost to regenerate a cover image (composite path is 2 provider calls = ~CHF 0.035 cost, still positive margin)
-    TITLE_PAINT: 2,           // Repaint the cover title in the artwork's medium (one Grok call ~CHF 0.018)
+    // 2 credits = CHF 0.050–0.067 of package value, depending on which pack the
+    // user bought (Pro is the floor at 2.50 Rp/credit).
+    //
+    // Provider cost per image is PER ENVIRONMENT — check /api/health/config, don't
+    // assume. Production renders everything on Imagine 1.x ($0.02); staging renders
+    // pages, covers, repair inpaint and style repair on Imagine 2.0 ($0.04). Char
+    // repair and the edit tier are $0.02 in both. So the same operation is ~3–4×
+    // margin in production and ~1.6–2.1× if the 2.0 rollout is promoted to master.
+    IMAGE_REGENERATION: 2,    // Regenerate/iterate/prompt-edit one scene image ($0.02 prod / $0.04 staging)
+    COVER_REGENERATION: 2,    // Regenerate or prompt-edit a cover (composite path is 2 calls)
+    TITLE_PAINT: 2,           // Repaint the cover title in the artwork's medium (one edit-tier call, $0.02)
+    CHARACTER_REPAIR: 2,      // Cutout/blended character fix on one page (1–3 edit-tier calls, $0.02 each — pinned 1.x)
     PER_PAGE: 10,             // Credits per story page (e.g., 20-page story = 200 credits)
   },
 
