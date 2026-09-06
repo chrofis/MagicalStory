@@ -31,6 +31,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 7b. **Inpaint cannot move the camera or restage a figure into a different medium.** Set `scene_fix.requires_regeneration: true` only for a change to the camera angle, viewpoint, or shot distance (overhead vs eye-level, close-up vs wide), or for a fix that relocates a figure onto or into a different supporting medium or surface than the one painted (on the shore when the scene requires wading, on deck when the scene requires swimming, on the ground when the scene requires riding). Changing a pose, gesture, or body orientation in place on the same surface, and adding, removing, or repositioning an object, are neither — leave it `false` so inpaint handles them. When `true`, write the target framing or staging in `instruction`.
 
+7c. **`scene_fix` carries `types`** — the declared types of the deduped issues it merges, copied from `deduped_issues`. A `scene_fix` whose types are all identity, age, hair, skin or clothing belongs in `dropped_issues` under rule 7.
+
 ## Drop policy
 
 - Never drop a CRITICAL or MAJOR severity issue except for these reasons: capped at 3 (rule 8), profile says trait is correct (rule 2), requires char-fix not inpaint (rule 7), or duplicated across evaluators (rule 1).
@@ -158,6 +160,7 @@ Final: `"Open the eyes wide."`
   ],
   "scene_fix": {
     "severity": "MODERATE",
+    "types": ["object_presence"],
     "fix_draft": "Add blue-golden glow to the stone in the boy's hands, casting light on his face and chest.",
     "fix_critique": "Two actions (add glow, cast light). The glow alone implies the lit face/chest — keep only the source.",
     "instruction": "Add blue-golden glow to the stone in the boy's hands.",
@@ -181,6 +184,6 @@ Final: `"Open the eyes wide."`
 The downstream pipeline reads only `fix_instruction` (per-character) and `instruction` (scene_fix). The `fix_draft` and `fix_critique` fields exist purely to FORCE you to do the trimming on the page. If you skip them or leave `fix_instruction` identical to `fix_draft`, you have not done your job.
 
 Return `per_character_fixes: []` if no character-specific issues.
-Return `scene_fix: {"severity": "NONE", "instruction": "", "requires_regeneration": false, "preserve": []}` if no scene issues.
+Return `scene_fix: {"severity": "NONE", "types": [], "instruction": "", "requires_regeneration": false, "preserve": []}` if no scene issues.
 
 Output ONLY the JSON object. No markdown fences, no commentary.

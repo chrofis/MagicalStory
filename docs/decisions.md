@@ -28374,12 +28374,16 @@ is never inpainted; only its turn in the queue moves when something worse is on 
 entity-sourced findings can never claim the precedence). Routing is on declared `type` / `severity`
 fields only — no prose matching (docs/SETTLED.md:29). Severity precedence is the same principle
 `findBadPages` already applies when ordering bad pages; this extends it to the method choice.
-**Known gap:** the consolidator prompt's JSON schema requires `types` on `per_character_fixes[]`
-(rule 7a) but not on `scene_fix`, so guard 2 is inert until a `scene_fix.types` field is specified —
-deliberately, since inferring the type from the instruction prose is exactly what SETTLED forbids.
-Tracked in `tasks/BACKLOG.md`.
+**Known gap — RESOLVED 2026-09-06 (same day):** the guard shipped inert because the consolidator
+prompt required `types` on `per_character_fixes[]` (rule 7a) but not on `scene_fix`. Rule 7c now
+mirrors 7a — `scene_fix` carries the declared types of the deduped issues it merges — and the field
+is in the JSON output schema and the empty-`scene_fix` default. The parser normalises
+`scene_fix.types` to lowercase strings (dropping a non-array to `[]`), and the guard reads it.
+A `scene_fix` with no `types` (older model output, stored replays) is still left alone: inferring
+the type from the instruction prose is what SETTLED forbids.
 **Touched:**   `server/lib/repairLogic.js` (gate 2b + step 3 reason), `server/lib/feedbackConsolidator.js`
-(`applyRule7SceneFixGuard`), `tests/unit/repair-method.test.js`
+(`applyRule7SceneFixGuard` + `scene_fix.types` normalisation), `prompts/feedback-consolidator.txt`
+(rule 7c + schema), `tests/unit/repair-method.test.js`
 **Status:**    ✅ active
 
 ## An invented child's age is bound to the commissioned children's band — in the BIBLE prompt, never in the page prompt (2026-09-06)

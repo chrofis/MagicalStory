@@ -435,6 +435,15 @@ async function consolidateFeedback({
     // honor. Coerce to a strict boolean so decideRepairMethod can gate on it
     // without truthiness surprises from a stray string.
     plan.scene_fix.requires_regeneration = plan.scene_fix.requires_regeneration === true;
+    // Rule 7c: the declared types of the deduped issues the scene_fix merges.
+    // Normalised to lowercase strings, the same shape images.js reads off
+    // per_character_fixes[].types. Dropped when it is not an array — the rule 7
+    // guard then skips rather than guessing a type from the prose.
+    if (plan.scene_fix.types !== undefined) {
+      plan.scene_fix.types = Array.isArray(plan.scene_fix.types)
+        ? plan.scene_fix.types.map(t => String(t || '').trim().toLowerCase()).filter(Boolean)
+        : [];
+    }
     // Seed the preserve list with the landmark names, unconditionally, on a
     // protected page. The consolidator writes preserve from the scene prose and
     // never names the landmark (job_1788614817116 p2: six prose items, no

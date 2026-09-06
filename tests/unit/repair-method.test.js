@@ -227,5 +227,24 @@ test('a scene_fix with no declared types is never guessed at from prose', () => 
   assert.strictEqual(plan.dropped_issues.length, 0);
 });
 
+test('scene_fix types are matched case-insensitively', () => {
+  const plan = {
+    scene_fix: { severity: 'MAJOR', types: ['Clothing', 'HAIR'], instruction: 'Replace the coat.' },
+    dropped_issues: [],
+  };
+  applyRule7SceneFixGuard(plan, 5);
+  assert.strictEqual(plan.scene_fix.instruction, '');
+  assert.strictEqual(plan.dropped_issues[0].reason, 'requires_char_fix_not_inpaint');
+});
+test('a non-array scene_fix.types is ignored, not crashed on', () => {
+  const plan = {
+    scene_fix: { severity: 'MAJOR', types: 'clothing', instruction: 'Replace the coat.' },
+    dropped_issues: [],
+  };
+  applyRule7SceneFixGuard(plan, 5);
+  assert.strictEqual(plan.scene_fix.instruction, 'Replace the coat.');
+  assert.strictEqual(plan.dropped_issues.length, 0);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);
