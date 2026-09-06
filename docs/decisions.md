@@ -29783,3 +29783,65 @@ shape but are cleared only by the job's finalizer, so the prewarm's entries alre
 `clearStyledAvatarCache`, `rememberStyledAvatarOnCharacter`), `server/routes/trial.js`
 (`prepare-title` handler), `tests/unit/styled-avatar-scope-guard.test.ts`.
 **Status:** ✅ active
+
+### Bible-invented cast carries its appearance into the page image prompt (JSON briefs only)
+**Context:** A Visual Bible secondary character has no uploaded photo, no
+reference card and no `clothingRequirements` entry — this prompt is the only
+channel by which its look can reach the image model. The beats scene brief is
+structured JSON whose character records hold position / action / expression /
+depth / perspective and have **no appearance field**, so an invented adult
+arrived as a bare name. Prod `job_1788698812047_q5b1vuds7` p2 (2026-09-06):
+`- Mama:, right, bending down toward Amian, …`, with an AGE & PROPORTIONS block
+naming only the commissioned 1-year-old. The model invented the mother from
+nothing on every page and drifted her between pages; she also read far too
+young for a parent of a one-year-old, because nothing stated her age.
+**Decision:** `buildImagePrompt` emits one `CAST WITHOUT A REFERENCE IMAGE`
+line per bible secondary that is in THIS page's cast and has no reference photo
+of its own — the entry's own `description` string, verbatim. Cast membership is
+read structurally (the brief's `fullData.characters` records by id, then by
+exact name; `appearsInPages` only as the fallback for a brief with no cast
+list). The same entries are fed through the already-written but never-wired
+`secondaryAgeCues()`, so an invented CHILD whose age is readable as a number
+joins the existing AGE & PROPORTIONS block instead of getting a second header.
+**Emitted only for the structured brief** (`isProseFormat === false`).
+**Rationale:** This is not a reinstatement of the SECONDARY CHARACTERS block
+removed 2026-06-09. That block was a THIRD copy of a description the *prose*
+format already embeds inline — verified still true: `job_1787689073034_1v6ew0y1kae`
+p11 spells out the park keeper's hat, shirt, trousers and boots in the sentence
+itself. A JSON brief has no such sentence, so the same reasoning gives the
+opposite answer, and the format gate keeps both. No clothing heuristic is
+re-introduced: one bible string is copied whole, nothing is inferred, filtered
+or assembled, and the "prose owns clothing" no-backstop ruling (2026-08-09)
+still governs every character the prose does dress. VB ids cannot leak — the
+block goes through the `sanitizeVbIdsInPrompt` chokepoint like every other
+builder. Cost measured over 6 stories (de-ch + fr-ch, JSON and prose briefs):
+~250 chars on the pages that fire, max page prompt 6.7k against the 8k Grok cap.
+The block sits in the compressible HEAD, where `shrinkPromptForModel`'s
+instruction already names "every character with their age band and body
+proportions … what each one wears" as must-keep — the same protection the age
+cues have had.
+**Touched:** `server/lib/promptBuilders.js` (`collectSecondaryCastForPage`,
+`buildImagePrompt`), `server/lib/inventedAgeBand.js` (`secondaryAgeCues`, now
+wired), `tests/unit/secondary-cast-appearance.test.ts`,
+`tests/manual/rebuild-page-prompt.js`
+**Status:** ✅ active
+
+### REQUIRED OBJECTS labels the whole list by one rule
+**Context:** Same page. Two artifacts, two different labels:
+`**hat** (object)` (the entry's English `type`) beside
+`**child-sized tunic made of woven straw** (object)` (a chop of the
+description). The state-aware branch rebuilt the ref source as a bare
+`{ description }`, dropping `type`, so `englishEntityRef`'s non-English-story
+branch could not fire and it silently fell back to a description chop.
+**Decision:** the state-aware rebuild spreads the entry —
+`{ ...obj.entry, description }` — restating only the description.
+**Rationale:** the label is a presence checklist and a GroundingDINO grounding
+key (`parseVisualBibleObjects` reads what is between the asterisks); one rule
+per list keeps the key stable across pages. Note: the older, worse form of this
+defect — `**small** (object)`, an adjective as the label, still visible in the
+stored prod prompt — was already fixed by `02e667497` (clause extension in
+`clauseRef` + `language` threaded into `englishEntityRef`); production simply
+had not deployed it when that story ran.
+**Touched:** `server/lib/promptBuilders.js`,
+`tests/unit/secondary-cast-appearance.test.ts`
+**Status:** ✅ active

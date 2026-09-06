@@ -11,7 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
-const { commissionedChildBand, buildChildAgeBandNote } = require('./inventedAgeBand');
+const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
 const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, objectStateFor } = require('./visualBible');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -2990,6 +2990,70 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 }
 
 /**
+ * The Visual Bible secondaries that appear in ONE page's cast and have no
+ * reference image of their own.
+ *
+ * Membership is read structurally, never guessed from prose: the scene brief's
+ * own character records (id first, then exact name) say who is on the page,
+ * and the entry's `appearsInPages` / `pages` array is the fallback for a brief
+ * that carries no cast list. A name that matches a commissioned character or a
+ * reference card is dropped — that character already has a photo, a frame
+ * colour and an outfit, and a second textual description of them is the
+ * duplicate the 2026-06-09 removal was right about.
+ *
+ * @param {Object|null} visualBible
+ * @param {Object|null} metadata      parsed scene metadata for this page
+ * @param {Array|null} sceneCharacters commissioned cast on this page
+ * @param {Array|null} referencePhotos reference cards travelling with the call
+ * @param {number|null} pageNumber
+ * @returns {Array<Object>} bible entries, in cast order
+ */
+function collectSecondaryCastForPage(visualBible, metadata, sceneCharacters, referencePhotos, pageNumber) {
+  const pool = Array.isArray(visualBible?.secondaryCharacters) ? visualBible.secondaryCharacters : [];
+  if (pool.length === 0) return [];
+
+  const norm = (v) => String(v == null ? '' : v).trim().toLowerCase();
+  const covered = new Set([
+    ...(Array.isArray(sceneCharacters) ? sceneCharacters : []).map(c => norm(c?.name)),
+    ...(Array.isArray(referencePhotos) ? referencePhotos : []).map(p => norm(p?.name)),
+  ].filter(Boolean));
+
+  // Two shapes reach here: `fullData.characters` keeps the brief's own
+  // records (id + name), while the flattened `metadata.characters` is a plain
+  // name list. Prefer the records — an id survives a renamed entry.
+  const rich = metadata?.fullData?.characters;
+  const castRecords = (Array.isArray(rich) && rich.length > 0)
+    ? rich
+    : (Array.isArray(metadata?.characters) ? metadata.characters : []);
+  const out = [];
+  const seen = new Set();
+  const take = (entry) => {
+    if (!entry || seen.has(entry)) return;
+    if (!entry.description || covered.has(norm(entry.name))) return;
+    seen.add(entry);
+    out.push(entry);
+  };
+
+  if (castRecords.length > 0) {
+    for (const rec of castRecords) {
+      const id = typeof rec === 'string' ? '' : norm(rec?.id);
+      const name = typeof rec === 'string' ? norm(rec) : norm(rec?.name);
+      if (!id && !name) continue;
+      take(pool.find(e => (id && norm(e?.id) === id) || (name && norm(e?.name) === name)));
+    }
+    return out;
+  }
+
+  if (pageNumber != null) {
+    for (const entry of pool) {
+      const pages = entry?.appearsInPages || entry?.pages;
+      if (Array.isArray(pages) && pages.includes(pageNumber)) take(entry);
+    }
+  }
+  return out;
+}
+
+/**
  * Build image generation prompt
  */
 // ============================================================================
@@ -3263,10 +3327,39 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     });
   }
 
+  // CAST THE BIBLE INVENTED. A Visual Bible secondary has no uploaded photo,
+  // no reference card and no clothingRequirements entry — the ONLY channel by
+  // which its look can reach the image model is this prompt. The beats scene
+  // brief is structured JSON whose character records carry position, action,
+  // expression and depth and have no field for appearance, so an invented
+  // adult arrived with a bare name: prod job_1788698812047_q5b1vuds7 p2 read
+  // "- Mama:, right, bending down toward Amian, …" with an AGE & PROPORTIONS
+  // block naming only the commissioned child. The model invented her from
+  // nothing on every page, at whatever age it liked.
+  //
+  // This is NOT a reinstatement of the SECONDARY CHARACTERS block removed
+  // 2026-06-09: that one was a THIRD copy of a description the prose format
+  // (story-unified.txt: "name each character, THEN weave the physical
+  // description in") already embedded inline. The JSON brief has no such
+  // sentence to trust. Emitted only for entries in THIS page's cast that have
+  // no reference photo of their own, so a commissioned character is never
+  // doubled, and the entry's own single `description` string is used verbatim
+  // — no clause is inferred, filtered or assembled here (the no-backstop
+  // ruling below governs the characters the prose DOES dress).
+  //
+  // Scoped to the STRUCTURED brief. A prose brief really does weave the
+  // description into the sentence — job_1787689073034_1v6ew0y1kae p11 spells
+  // out the park keeper's hat, shirt, trousers and boots inline — so emitting
+  // there would be the duplicate 2026-06-09 removed. Only the JSON brief,
+  // which has no appearance field at all, gets the block.
+  const secondaryCast = isProseFormat ? [] : collectSecondaryCastForPage(
+    visualBible, metadata, sceneCharacters, referencePhotos, pageNumber
+  );
+
   // Build character reference list (Option B: explicit labeling in prompt)
   let characterReferenceList = '';
-  if (sceneCharacters && sceneCharacters.length > 0) {
-    log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
+  if ((sceneCharacters && sceneCharacters.length > 0) || secondaryCast.length > 0) {
+    log.debug(`[IMAGE PROMPT] Scene characters: ${(sceneCharacters || []).map(c => c.name).join(', ')}`);
 
     // Per-character clothing reaches the image model through the scene prose
     // (SCENE_DESCRIPTION), written from each character's "Wearing:" input. That
@@ -3329,8 +3422,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // one merged line ("- Emma, Noah: kindergarten-age …") instead of a
     // verbatim copy per child (~230 chars saved per duplicate on prompts
     // that fight an 8k model cap).
+    // Invented cast rides the SAME block: `secondaryAgeCues` turns a bible
+    // entry whose age is readable as a number ("a boy of about ten") into the
+    // {name, age} shape this loop already consumes. An entry whose age is
+    // prose only ("a woman in her early thirties") yields no cue here — its
+    // age still reaches the model through the appearance line below.
     const ageCueGroups = new Map(); // markers text -> [names]
-    for (const c of sceneCharacters) {
+    for (const c of [...(sceneCharacters || []), ...secondaryAgeCues(secondaryCast)]) {
       const ageMarkers = extractCharacterVisualProfile(c).ageMarkers;
       if (!ageMarkers) continue;
       if (!ageCueGroups.has(ageMarkers)) ageCueGroups.set(ageMarkers, []);
@@ -3367,6 +3465,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   if (wornStateBlock) {
     characterReferenceList += wornStateBlock;
     log.info(`[WORN] Page ${pageNumber}: ${wornResolved.map(w => `${w.id}=${w.state}${w.defaulted ? '(defaulted)' : ''}`).join(', ')}`);
+  }
+
+  // The appearance line for the invented cast collected above. One line per
+  // character, the bible's own `description` verbatim — the only description
+  // of them that exists anywhere in the pipeline.
+  if (secondaryCast.length > 0) {
+    const lines = secondaryCast.map(e => `- ${e.name}: ${String(e.description).trim()}`);
+    characterReferenceList += `\nCAST WITHOUT A REFERENCE IMAGE (draw each from this description, identically on every page):\n${lines.join('\n')}\n`;
+    log.info(`[IMAGE PROMPT] Page ${pageNumber}: described ${secondaryCast.length} bible-invented cast member(s): ${secondaryCast.map(e => e.name).join(', ')}`);
   }
 
   // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
@@ -3549,7 +3656,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // ref. Animals keep their proper name (identity anchor). The ref is
         // built from the STATE-AWARE description so a stripped attachment
         // clause can't sneak back in via the lead.
-        const refEntry = placedElsewhere ? { description } : obj.entry;
+        // Spread, not a bare {description}: the ref is chosen from the entry's
+        // English `type` for a non-English story, and a state-aware rebuild
+        // that dropped `type` silently fell back to a description chop — so
+        // two artifacts in the SAME list were labelled by two different rules
+        // ("hat" beside "child-sized tunic made of woven straw", prod
+        // job_1788698812047_q5b1vuds7 p2). Only the description is restated.
+        const refEntry = placedElsewhere ? { ...obj.entry, description } : obj.entry;
         // The lead is a checklist NAME — one clean short noun phrase, trimmed
         // clause-aware so it never stops on a modifier or a half-stated
         // measurement. Both rules now live in ONE place: visualBible's
