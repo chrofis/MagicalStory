@@ -86,6 +86,49 @@ function objectStateFor(entry, handle) {
   return objectStates(entry)[facet - 1] || null;
 }
 
+/**
+ * The DEFAULT state of an object: the FIRST row of `states[]`.
+ *
+ * The states ARE the rendered pictures (there is no separate base cell), so a
+ * page that cites the bare parent id still needs one of them. The authoring
+ * templates require `states[]` to be the complete set of looks the story
+ * reaches, listed in the order the story reaches them, with the unaltered look
+ * first — so the first row IS the default look, by construction.
+ *
+ * @returns {Object|null} the first state, or null for a state-less entry
+ */
+function defaultObjectState(entry) {
+  return objectStates(entry)[0] || null;
+}
+
+const hasRefImage = (o) => !!(o?.referenceImageData || o?.referenceImageUrl);
+
+/**
+ * Does this entry have a reference render anywhere?
+ *
+ * A stated object has NO base cell — its states ARE the cells — so its render
+ * lives on a state row. Without this an object the story alters is dropped
+ * from every page's references in silence.
+ */
+function hasElementReference(entry) {
+  return hasRefImage(entry) || objectStates(entry).some(hasRefImage);
+}
+
+/**
+ * The reference CELL an entry hands a page.
+ *
+ * A cited state (`ART001.2`) takes that state's cell; a bare citation, or none
+ * at all, takes the DEFAULT state's. A state with no cell of its own falls
+ * back to the entry itself (an old stored bible, where the entry IS the cell).
+ *
+ * @returns {{cell: Object, state: Object|null, cited: Object|null}}
+ */
+function elementRefCell(entry, handle = null) {
+  const cited = handle ? objectStateFor(entry, handle) : null;
+  const state = cited || defaultObjectState(entry);
+  return { cell: (state && hasRefImage(state)) ? state : entry, state, cited };
+}
+
 // Lazy-load storyHelpers to break circular dependency
 // (storyHelpers.js imports buildVisualBiblePrompt from this file at top level —
 // both top-level imports would race; whichever loads second sees an empty
@@ -2136,6 +2179,10 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
         } else {
           state.referenceImageData = referenceImageData;
         }
+        // The parent entry is what the needs-a-reference pass tracks, and a
+        // stated object never receives a base cell — mark it generated here
+        // or it is re-requested on every pass.
+        entry.referenceImageGenerated = true;
         log.info(`[VISUAL BIBLE] 🖼️ Set state cell for "${entry.name}" — ${state.name} [${elementId}]${referenceImageUrl ? ' (R2)' : ' (inline fallback — R2 unavailable)'}`);
         return true;
       }
@@ -2230,7 +2277,7 @@ function sceneObjectsNameEntry(sceneObjects, entry) {
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null, sceneObjects = null) {
   if (!visualBible) return [];
 
-  const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+  const hasRef = hasElementReference;
 
   // The element the camera stands on or inside never rides as a reference on
   // its own plate. Its render is an exterior three-quarter view, and an
@@ -2369,7 +2416,7 @@ function getRecurringCreatureIds(visualBible) {
 function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, sceneObjectIds = null, sceneMetadata = null) {
   if (!visualBible) return [];
 
-  const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+  const hasRef = hasElementReference;
 
   // Ids the scene brief itself names. The page PROMPT is built from the Art
   // Director's objects[], while these reference images were selected from the
@@ -2415,9 +2462,10 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       // they cannot disagree about how the object is built. A state with no
       // cell of its own falls back to the base render rather than shipping
       // none: the object's identity is right either way.
-      const state = handle ? objectStateFor(entry, handle) : null;
-      const cell = (state && (state.referenceImageData || state.referenceImageUrl)) ? state : entry;
-      if (state && cell === entry) {
+      // A BARE citation (or none at all) resolves to the DEFAULT state — the
+      // first row — because a stated object has no base cell to hand over.
+      const { cell, state, cited } = elementRefCell(entry, handle);
+      if (cited && cell === entry) {
         log.warn(`[VB-REF] Page ${pageNumber}: ${handle} ("${state.name}") has no state cell — using ${parentId}'s base render`);
       }
 
@@ -2529,7 +2577,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
 function getElementReferenceImagesByIds(visualBible, elementIds) {
   if (!visualBible || !elementIds || elementIds.length === 0) return [];
 
-  const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+  const hasRef = hasElementReference;
 
   const results = [];
   const idSet = new Set(elementIds.map(id => id.toUpperCase()));
@@ -2546,13 +2594,15 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
     for (const entry of entries || []) {
       if (!hasRef(entry)) continue;
       if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
+      // A stated object's render lives on its default state's cell.
+      const { cell } = elementRefCell(entry);
       results.push({
         id: entry.id,
         name: entry.name,
         type,
         description: entry.extractedDescription || entry.description,
-        referenceImageData: entry.referenceImageData,
-        referenceImageUrl: entry.referenceImageUrl,
+        referenceImageData: cell.referenceImageData,
+        referenceImageUrl: cell.referenceImageUrl,
         priority: priorities[type]
       });
     }
@@ -2725,6 +2775,9 @@ module.exports = {
   normaliseObjectStates,
   objectStates,
   objectStateFor,
+  defaultObjectState,
+  hasElementReference,
+  elementRefCell,
   getEmptySceneElementReferences,
   isRecurringCreature,
   getRecurringCreatureIds,

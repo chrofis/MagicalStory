@@ -468,8 +468,11 @@ function expandElementStateCells(el) {
   const states = objectStates(el);
   if (states.length === 0) return [el];
   const baseDesc = String(el.extractedDescription || el.description || '').trim().replace(/[.;\s]+$/, '');
+  // The STATES ARE THE PICTURES. No separate base cell: the unaltered look is
+  // itself one of the states (the first), so minting a base cell would render
+  // the default twice and push a 4-state object to 5 cells — and 5 cells lay
+  // out as a 1x5 column of narrow, low-detail references instead of a 2x2.
   return [
-    el,
     ...states.map(s => ({
       ...el,
       id: s.id,

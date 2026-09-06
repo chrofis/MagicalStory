@@ -60,6 +60,13 @@ const PLAIN = {
   referenceImageUrl: 'https://r2/plain.jpg',
 };
 
+// The ceiling: 4 states, the unaltered look first (the authoring templates
+// require that order, and the default-state rule reads it).
+const MAXED_STATES = [
+  { id: 'ART001.1', name: 'whole', delta: 'intact, the lid seated and the side wall unbroken', pages: [4] },
+  ...STATED.states.map((st, i) => ({ ...st, id: `ART001.${i + 2}` })),
+];
+
 const bible = () => ({
   mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
   secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
@@ -260,9 +267,19 @@ describe('getElementReferenceImagesForPage — dotted handles resolve', () => {
     expect(refs.find((r: any) => r.id === 'ART001').referenceImageUrl).toBe('https://r2/base.jpg');
   });
 
-  it('a bare id takes the base render', () => {
+  it('a bare id resolves to the DEFAULT state cell — the first state', () => {
     const refs = getElementReferenceImagesForPage(withCells(), 7, 4, ['ART001']);
-    expect(refs.find((r: any) => r.id === 'ART001').referenceImageUrl).toBe('https://r2/base.jpg');
+    const row = refs.find((r: any) => r.id === 'ART001');
+    expect(row.referenceImageUrl).toBe('https://r2/state1.jpg');
+    expect(row.stateId).toBe('ART001.1');
+  });
+
+  it('a stated object with NO base render still ships its state cell', () => {
+    // there is no base cell any more, so this is the real stored shape
+    const vb = withCells();
+    vb.artifacts[0].referenceImageUrl = null;
+    const refs = getElementReferenceImagesForPage(vb, 7, 4, ['ART001.3']);
+    expect(refs.find((r: any) => r.id === 'ART001').referenceImageUrl).toBe('https://r2/state3.jpg');
   });
 
   it('BACKWARD COMPAT — a state-less entry resolves exactly as before', () => {
@@ -287,15 +304,23 @@ describe('reference sheet — every state of one object renders in ONE call', ()
   const el = (id: string, type: string, extra: any = {}) =>
     ({ id, name: `thing ${id}`, type, description: `a ${id} thing`, appearsInPages: [1, 2], ...extra });
 
-  it('expands a stated object into base + one cell per state, with dotted ids', () => {
+  it('expands a stated object into ONE cell per state — no separate base cell', () => {
     const cells = expandElementStateCells({ ...STATED, type: 'artifact' });
-    expect(cells.map((c: any) => c.id)).toEqual(['ART001', 'ART001.1', 'ART001.2', 'ART001.3']);
-    // each state cell describes the BASE plus only its delta, so the four
-    // cells cannot disagree about how the object is built
-    expect(cells[3].description).toContain('a separate lid that sits back on top');
-    expect(cells[3].description).toContain('light source burns inside');
+    expect(cells.map((c: any) => c.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3']);
+    // each state cell describes the BASE plus only its delta, so the cells
+    // cannot disagree about how the object is built
+    expect(cells[2].description).toContain('a separate lid that sits back on top');
+    expect(cells[2].description).toContain('light source burns inside');
     // distinguishable names for the cell-identification fallback
-    expect(new Set(cells.map((c: any) => c.name)).size).toBe(4);
+    expect(new Set(cells.map((c: any) => c.name)).size).toBe(3);
+  });
+
+  it('4 states expand to exactly 4 cells — a 2x2 grid, never a 5-cell column', () => {
+    const cells = expandElementStateCells({ ...STATED, type: 'artifact', states: MAXED_STATES });
+    expect(cells).toHaveLength(4);
+    expect(cells.map((c: any) => c.id))
+      .toEqual(['ART001.1', 'ART001.2', 'ART001.3', 'ART001.4']);
+    expect(cells.some((c: any) => c.id === 'ART001')).toBe(false);
   });
 
   it('BACKWARD COMPAT — a state-less element expands to itself, untouched', () => {
@@ -312,20 +337,13 @@ describe('reference sheet — every state of one object renders in ONE call', ()
     );
     const owning = batches.filter((b: any[]) => b.some(c => baseVbId(c.id) === 'ART001'));
     expect(owning).toHaveLength(1);
-    expect(owning[0].map((c: any) => c.id)).toEqual(['ART001', 'ART001.1', 'ART001.2', 'ART001.3']);
+    expect(owning[0].map((c: any) => c.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3']);
     // one call per batch, so the whole object is one call
-    expect(owning[0].length).toBe(4);
+    expect(owning[0].length).toBe(3);
   });
 
-  it('the CEILING still renders in ONE call - base + 4 states = 5 cells, one batch', () => {
-    const maxed = {
-      ...STATED,
-      type: 'artifact',
-      states: [
-        ...STATED.states,
-        { id: 'ART001.4', name: 'emptied', delta: 'the inner cavity is bare, the openings dark', pages: [9] },
-      ],
-    };
+  it('the CEILING renders in ONE call - 4 states = 4 cells = one batch', () => {
+    const maxed = { ...STATED, type: 'artifact', states: MAXED_STATES };
     // A multi-state object is routed to a batch of its OWN: `maxPerBatch`
     // chunks only the ordinary elements, so the ceiling is not bounded by it.
     const batches = buildReferenceSheetBatches(
@@ -334,9 +352,9 @@ describe('reference sheet — every state of one object renders in ONE call', ()
     const owning = batches.filter((b: any[]) => b.some(c => baseVbId(c.id) === 'ART001'));
     expect(owning).toHaveLength(1);
     expect(owning[0].map((c: any) => c.id))
-      .toEqual(['ART001', 'ART001.1', 'ART001.2', 'ART001.3', 'ART001.4']);
+      .toEqual(['ART001.1', 'ART001.2', 'ART001.3', 'ART001.4']);
     // and nothing else shares that call
-    expect(owning[0]).toHaveLength(5);
+    expect(owning[0]).toHaveLength(4);
   });
 
   it('normaliseObjectStates admits 4 states, and a 5th is dropped', () => {

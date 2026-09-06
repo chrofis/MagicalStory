@@ -99,7 +99,7 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
     { "id": "ANI001", "name": "[Name]", "pages": [1, 2], "species": "[type and breed]", "coloring": "[exact colours and full pattern]", "size": "[relative size]", "features": "[collar, markings, accessories]" }
   ],
   "artifacts": [
-    { "id": "ART001", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "type": "[what kind of object]", "size": "[against a person: 'fits in one hand', 'carried in both arms', 'as tall as the child']", "description": "[appearance: shape, color, material, size, distinctive features]", "states": "[OMIT unless the story alters this object. Otherwise up to 4: {\"name\": \"[one or two words]\", \"delta\": \"[only what changed, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
+    { "id": "ART001", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "type": "[what kind of object]", "size": "[against a person: 'fits in one hand', 'carried in both arms', 'as tall as the child']", "description": "[appearance: shape, color, material, size, distinctive features]", "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
   ],
   "locations": [
     { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
@@ -142,7 +142,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 
 **Keep it MINIMAL for a 5-scene story:**
 - max **2 locations**
-- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled. `description` holds what is always true of it; `states[]` holds each altered look as a short delta. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
+- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta, because each state is drawn as its own reference cell. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
 - max **2 secondary characters** (only if they appear on 2+ pages — single-scene helpers can stay nameless in prose)
 - 3-5 backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
