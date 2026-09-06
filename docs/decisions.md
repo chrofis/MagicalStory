@@ -29000,3 +29000,22 @@ simple bands — the band supplies the single problem itself.
 
 **Touched:** `prompts/age-band-tries.txt`, `prompts/story-trial.txt`, `server/routes/trial.js`.
 **Status:** ✅ active — one validation trial pending.
+
+## 2026-09-06 — A prop's `size` is a Visual Bible field and rides the REQUIRED OBJECTS line
+
+**Context:** The bible description said "about the size of a shoebox"; the page prompt never
+carried it. The REQUIRED OBJECTS block is a name-only checklist by design (2026-08-26), the object
+line names only the position, the reference sheet draws the prop alone with nothing for scale, and
+the image prompt's scale rule anchors only vessels, buildings and vehicles. Staging trial
+`job_1788712851192_4v8tm4juw` rendered the chest torso-sized on every page.
+
+**Decision (owner):** the artifact schema in both story templates gains `size`, stated against a
+person ("fits in one hand", "carried in both arms", "as tall as the child"); the parser keeps it;
+the REQUIRED OBJECTS line appends it after the label (`* **toy treasure chest** — fits in one hand`);
+the image prompt's scale rule adds "A held or carried object keeps the size stated for it against
+the hand or body holding it." The description stays out of the block.
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-trial.txt`, `server/lib/visualBible.js`,
+`server/lib/promptBuilders.js` (REQUIRED OBJECTS), `prompts/image-generation.txt`,
+`tests/unit/required-objects-label.test.ts`.
+**Status:** ✅ active — validation run pending.

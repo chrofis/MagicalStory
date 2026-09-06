@@ -141,3 +141,21 @@ describe("a VB type never replaces prose the Art Director wrote (p8)", () => {
     expect(out).toMatch(/\bred\b/);
   });
 });
+
+describe('the bible `size` rides the REQUIRED OBJECTS line as a scale anchor', () => {
+  it('appends the size after the label when the entry states one', () => {
+    const vb = { ...visualBible, artifacts: [{ ...ART001, size: 'fits in one hand' }, ART008] };
+    const prompt = buildImagePrompt(
+      scene('Lily holds her hat.', ['ART001']),
+      { language: 'en-gb', artStyle: 'pixar', layout: { textInImage: true } },
+      null, vb, 3, null, {}
+    ) as string;
+    const line = requiredObjectsBlock(prompt).split('\n').find((l) => /hat/.test(l))!;
+    expect(line).toContain('— fits in one hand');
+  });
+
+  it('emits no dangling dash when the entry has no size', () => {
+    const line = requiredObjectsBlock(build('Lily holds her hat.', ['ART001'])).split('\n').find((l) => /hat/.test(l))!;
+    expect(line).not.toMatch(/—\s*$/);
+  });
+});

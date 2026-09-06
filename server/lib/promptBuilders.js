@@ -3531,7 +3531,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const offWhere = (wornState && wornState.state === 'off' && wornState.location)
           ? ` — ${wornState.location}`
           : '';
-        requiredObjectsSection += `* ${lead}${wornSuffix}${offWhere}\n`;
+        // The bible's `size` is the one look-field that rides along: it is the
+        // scale anchor against the figure, which nothing else in the prompt
+        // states for a held or carried prop (a shoebox-sized chest rendered
+        // torso-sized on every page of staging trial job_1788712851192).
+        const sizeNote = (obj.type !== 'animal' && obj.entry?.size) ? ` — ${String(obj.entry.size).trim()}` : '';
+        requiredObjectsSection += `* ${lead}${sizeNote}${wornSuffix}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry

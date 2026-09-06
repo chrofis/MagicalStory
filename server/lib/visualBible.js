@@ -145,6 +145,9 @@ function tryParseVisualBibleJSON(outline) {
         // A name the STORY gives the object. Kept for the text side only;
         // image prompts carry the descriptive `name`, never this.
         properName: artifact.properName || null,
+        // Scale anchor against a person ("fits in one hand", "carried in both
+        // arms"); the REQUIRED OBJECTS line carries it verbatim.
+        size: artifact.size || null,
         appearsInPages: artifact.pages || [],
         description: artifact.description || `${artifact.type}: ${artifact.description}`,
         type: artifact.type,
