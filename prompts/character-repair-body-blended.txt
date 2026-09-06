@@ -1,6 +1,6 @@
 TWO IMAGES ATTACHED.
 - IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, eye color, body build, and clothing. NEVER return this image. NEVER reproduce its background, framing, or composition.
-- IMAGE 2 = THE SCENE TO EDIT. This is a children's book illustration with {charName}'s entire figure blurred (face, hair, body, clothing). Other characters' faces or full bodies may also be blurred to prevent trait bleed. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same background, same other characters, same composition, same art style. Only the blurred regions inside IMAGE 2 are repainted.
+- IMAGE 2 = THE SCENE TO EDIT. {sceneMediumLine} with {charName}'s entire figure blurred (face, hair, body, clothing). Other characters' faces or full bodies may also be blurred to prevent trait bleed. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same background, same other characters, same composition, same art style. Only the blurred regions inside IMAGE 2 are repainted.
 
 If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the blurred areas repainted instead.
 

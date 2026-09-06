@@ -690,6 +690,13 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
   // and drove every repaint to cartoon, which the style gate then correctly
   // refused — see docs/decisions.md, 2026-09-06.
   const styleGuard = repairStyleGuard(opts.artStyle);
+  // The blended templates opened with a hardcoded "This is a children's book
+  // illustration", which is the same wrong claim the style guard used to make,
+  // one line higher up the same prompt. Named from the story instead. Kept
+  // archetypal — no story-specific wording ever enters a template.
+  const sceneMediumLine = isPhotographicArtStyle(opts.artStyle)
+    ? 'This is a photograph'
+    : "This is a children's book illustration";
   const artStyleContext = (() => {
     if (!opts.artStyle) return '';
     try {
@@ -702,7 +709,7 @@ async function buildPrompt({ treatment, regionSource, faceOnly, charName, opts, 
   })();
   if (treatment === 'blur') {
     const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard });
+    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, sceneMediumLine, REPAIR_STYLE_GUARD: styleGuard });
   }
   if (treatment === 'crosshatch') {
     // Box mode sends the FULL SCENE, so it needs the scene template: the cutout
