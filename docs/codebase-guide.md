@@ -498,3 +498,51 @@ styles, any scene requiring consistent style across multiple pages.
 - Add physical anchors ("feet on cobblestones") to prevent floating characters
 - Avoid generic superlatives ("stunning", "ultra-detailed") — wasted tokens
 - Keep prompts to 1-3 sentences + structured parameters (max ~1000 chars effective)
+
+## Visual Bible ids must never reach a model in free text — checklist for a new prompt path
+
+Raw VB ids (`CHR###` / `ANI###` / `ART###` / `LOC###` / `VEH###` / `CLO###`,
+optionally a `.N` **vantage** suffix such as `LOC005.1`) are an internal
+addressing scheme. An image model letters an unresolved id onto the page; a text
+judge quotes it into a finding, which the consolidator turns into an instruction,
+which reaches Grok. This leaked five times because each fix protected one more
+*generation* prompt while everything that *reads* a scene brief stayed open —
+see `docs/decisions.md` 2026-09-06 for the full map.
+
+**Where the ids come from.** A scene description is prose **plus** an
+`---METADATA---` JSON block. That block's `objects[]` is a literal array of ids
+and its `interactions[].object` is an id. Anything that passes `sceneDescription`
+/ `sceneHint` / `img.sceneDescription` to a model is passing ids.
+
+Adding or touching a prompt path? Answer these:
+
+1. **Does a model see this text?** Both kinds count — an image prompt (ids get
+   painted) and a text prompt (ids get echoed into output that reaches an image
+   model one hop later).
+2. **Do you have the Visual Bible in scope?**
+   - Yes → run `sanitizeVbIdsInPrompt(text, visualBible, pageNumber)`
+     (`server/lib/promptBuilders.js`). Ids resolve to English names/refs.
+   - No → run `scrubVbIds(text, null)` (`server/lib/vbIdGuard.js`). Ids become a
+     pool-generic noun. Never ship the raw id because the bible was unavailable.
+   - Better still: thread the bible in. Most call sites already hold one.
+3. **Is the text an INTERACTIONS block?** Use
+   `formatInteractionsBlock(interactions, visualBible)` — do not hand-roll
+   ``- ${i.character} + ${i.object}: ${i.where}``. Three evaluators each wrote
+   that line themselves and all three leaked.
+4. **Does a model WRITE fields that come back and reach Grok?** Sanitise the
+   output too. The consolidator does this for every `instruction` / `fix_draft` /
+   `fix_critique` / `visual_identifier` / `preserve` it produces.
+5. **Sanitise once, at assembly** — over the whole joined text, not per section.
+   A per-section pass is what let a newly added section slip through.
+6. **Never enumerate a noun list in a prompt** you don't want echoed back.
+   The landmark block listed "terrain, skyline, towers, masts, antennas,
+   buildings" and the model copied all six into `scene_fix.preserve`.
+7. **Give the call a `usageLabel`.** `callTextModel` runs `warnIfVbIds` and logs
+   `[VB-ID-LEAK] text call "<label>" carries raw Visual Bible id(s) …` for any
+   label not on the allow-list in `server/lib/vbIdGuard.js`. Stages whose
+   contract IS the id vocabulary (writer, Art Director, scene reviewer, and their
+   `testlab_` mirrors) are allow-listed; add a genuinely new one there, with a
+   reason.
+8. **Assert it in a test.** `assertNoVbIds(text, label)` from
+   `server/lib/vbIdGuard.js`; see `tests/unit/vb-id-leak.test.ts` for the
+   pattern of rebuilding a real story's prompt and asserting over it.

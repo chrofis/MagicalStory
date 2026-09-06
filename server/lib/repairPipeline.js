@@ -743,6 +743,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         storyId: consolidatorStoryId,
         pageNumber,
         round,
+        // Resolves raw VB ids out of the consolidator's input AND out of the
+        // instruction fields it writes back (which reach Grok).
+        visualBible,
         // Era-aware landmark protection: drops `object_presence` removal
         // findings on a present-day page carrying a real landmark, and seeds
         // scene_fix.preserve with the landmark names.
@@ -2714,6 +2717,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           languageLevel: langLevel,
           textAreaMask: img.textAreaMask,
           sceneDescription: img.sceneDescription || '',
+          // img.sceneDescription still carries the ---METADATA--- block and its
+          // VB ids, and this prompt goes to an image model.
+          visualBible,
           generateImage,
           onUsage,
           label: 'POST-REPAIR-TEXT',

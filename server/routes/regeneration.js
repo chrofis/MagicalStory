@@ -83,6 +83,9 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
         // page's landmark refs + era pass them on the consolidation context.
         landmarkPhotos: ctx.landmarkPhotos || null,
         era: ctx.era || null,
+        // Resolves raw VB ids out of the consolidator input and out of the
+        // instruction fields it writes (which reach Grok).
+        visualBible: ctx.visualBible || null,
       });
       if (res.plan) consolidatedPlan = res.plan;
       else if (res.error) log.warn(`🧠 [EVAL-CONSOLIDATION] ${ctx.pageNumber != null ? `P${ctx.pageNumber}` : 'version'}: failed (${res.error}) — scoring falls back to raw issues`);

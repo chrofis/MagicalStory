@@ -873,6 +873,7 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
           evalResult, entityIssues: [],
           sceneDescription, characters: ctx.characters || [],
           storyId: ctx.storyId, pageNumber: ctx.pageNumber, round: i,
+          visualBible: ctx.visualBible || null,
           landmarkPhotos: ctx.scene?.landmarkPhotos || null,
           era: require('./landmarkProtection').resolveSceneEra(ctx.scene?.sceneMetadata),
         });
@@ -4197,6 +4198,7 @@ async function runConsolidateStage(ctx, { promptOverride, experimentId, params =
     round: 0,
     // Era-aware landmark protection (2026-09-05) — the page's stored landmark
     // refs + its scene era, so Lab repair stages reproduce production.
+    visualBible: ctx.visualBible || null,
     landmarkPhotos: ctx.scene.landmarkPhotos || null,
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
     // A/B knobs: `promptOverride` swaps the consolidator's rules (severity
@@ -4688,6 +4690,7 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
         storyId: ctx.storyId,
         pageNumber: ctx.pageNumber,
         round: 0,
+        visualBible: ctx.visualBible || null,
         landmarkPhotos: ctx.scene.landmarkPhotos || null,
         era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
       });

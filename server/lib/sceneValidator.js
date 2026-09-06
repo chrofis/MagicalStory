@@ -792,18 +792,18 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     return null;
   }
 
-  // Extract declared interactions (before sanitization — no age/gender terms here)
+  // Extract declared interactions. "Before sanitization" used to be literal:
+  // STORY_TEXT / SCENE_HINT / IMAGE_PROMPT all go through stripEntityIds below,
+  // and this block — which is the ONE place `i.object` (a raw VB id) is
+  // rendered — was the exception. Shared builder now (vbIdGuard.js).
   let interactionsBlock = '(none declared)';
   try {
     const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
     const sceneMeta = getSceneMetadata(imagePrompt || sceneHint || '');
     const interactions = sceneMeta?.interactions
       || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
-    if (interactions && interactions.length > 0) {
-      interactionsBlock = interactions
-        .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
-        .join('\n');
-    }
+    interactionsBlock = require('./vbIdGuard')
+      .formatInteractionsBlock(interactions, evalContext.visualBible || null);
   } catch { /* silent fallback */ }
 
   // Convert image to base64 if needed

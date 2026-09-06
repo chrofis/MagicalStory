@@ -550,6 +550,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // era guard's semantics so modern infrastructure stays a finding.
     landmarkPhotos = null,
     era = null,
+    // Resolves raw VB ids out of the INTERACTIONS_BLOCK below. Optional: a
+    // caller without a bible still gets the ids replaced by generic nouns.
+    visualBible = null,
   } = options;
   const { computeLandmarkProtection, buildLandmarkComplianceBlock, filterProtectedRemovals } = require('./landmarkProtection');
   const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
@@ -564,18 +567,19 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     return null;
   }
 
-  // Extract interactions from sceneHint for Stage 2
+  // Extract interactions from sceneHint for Stage 2.
+  // `i.object` is a raw Visual Bible id. Built inline here, it put "ART001" in
+  // front of the compliance judge, which quotes it back in its own finding
+  // prose — and those findings are what the consolidator reads and turns into
+  // a Grok instruction. formatInteractionsBlock is the one builder for this
+  // line across all three evaluators (vbIdGuard.js).
   let interactionsBlock = '(none declared)';
   try {
     const { extractSceneMetadata } = getStoryHelpers();
     const meta = extractSceneMetadata(sceneHint || imagePrompt);
     const interactions = meta?.interactions
       || (Array.isArray(meta?.fullData?.interactions) ? meta.fullData.interactions : null);
-    if (interactions && interactions.length > 0) {
-      interactionsBlock = interactions
-        .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
-        .join('\n');
-    }
+    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible);
   } catch { /* silent */ }
 
   // --- Stage 1: the SHARED blind inventory ---
@@ -837,7 +841,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Strip scene description to relevant parts (remove Art Director checks, corrections, preview mismatches)
     // This reduces prompt size significantly and focuses the model on actual scene content
-    if (originalPrompt && (originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"'))) {
+    // GATE ON THE DELIMITER, not on two field names that happen to appear in
+    // one metadata dialect. A brief whose METADATA block carried neither
+    // "previewMismatches" nor "checks" skipped the strip entirely and shipped
+    // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
+    // evaluator prompt.
+    if (originalPrompt && (originalPrompt.includes('---METADATA---')
+        || originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"'))) {
       const { stripSceneMetadata } = getStoryHelpers();
       const stripped = stripSceneMetadata(originalPrompt);
       if (stripped && stripped !== originalPrompt) {
@@ -865,7 +875,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // not defects. Tell the fidelity evaluators so they don't penalize those,
     // while still catching placement / text / identity problems.
     const coverEvalNote = '\n\nCOVER: a book-cover portrait. Characters facing or looking at the viewer is intended — do not deduct for gaze direction or for facing the camera. A flat 2D title is acceptable — do not deduct for the title not being three-dimensional. Still flag implausible placement (a figure on a surface that cannot support it), wrong or garbled text on objects, and missing, extra, or mismatched characters.';
-    const fidelityRef = storyText || (isCover && sceneHint ? sceneHint + coverEvalNote : null);
+    // A cover has no story prose, so its fidelity reference is the raw cover
+    // brief — metadata block, VB ids and all. Pages get theirs stripped above;
+    // this branch never did.
+    const fidelityRef = storyText || (isCover && sceneHint
+      ? require('./vbIdGuard').scrubVbIds(
+          getStoryHelpers().stripSceneMetadata(sceneHint) || sceneHint,
+          evalOptions.visualBible || null) + coverEvalNote
+      : null);
     const runFidelity = !!fidelityRef && (evaluationType === 'scene' || isCover);
 
     // Art style + clothing contract are inputs to EVERY evaluator (quality,
@@ -980,6 +997,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         compliancePromptOverride: evalOptions.compliancePromptOverride || null,
         artStyle: artStyleForEval,
         clothingContract: clothingContractBlock,
+        // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
+        // caller has a bible; without one they still become generic nouns.
+        visualBible: evalOptions.visualBible || null,
         // Era-aware landmark protection inputs (2026-09-05). Callers that know
         // the page's landmark refs + era pass them; everything else defaults to
         // no protection, i.e. unchanged behaviour.
@@ -1061,6 +1081,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Extract declared character interactions from the scene metadata.
     // Use sceneHint (original scene description with metadata block) rather than
     // originalPrompt (image prompt where metadata was already stripped).
+    // Same shared builder as the compliance stage — `i.object` is a raw VB id.
     let interactionsBlock = '(none declared)';
     let sceneIntentBlock = '(none declared)';
     try {
@@ -1068,11 +1089,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const sceneMeta = getStoryHelpers().extractSceneMetadata(interactionSource);
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
-      if (interactions && interactions.length > 0) {
-        interactionsBlock = interactions
-          .map(i => `- ${i.character || '?'} + ${i.object || '?'}: ${i.where || '(no placement given)'}`)
-          .join('\n');
-      }
+      interactionsBlock = require('./vbIdGuard')
+        .formatInteractionsBlock(interactions, evalOptions.visualBible || null);
       const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
       if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }

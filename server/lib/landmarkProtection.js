@@ -112,8 +112,15 @@ function buildLandmarkComplianceBlock(protection) {
   if (!protection || !protection.landmarkPresent) return '';
   const names = protection.names.join(', ');
   if (protection.protect) {
+    // NO ENUMERATED WORD LIST. The sibling copy of this wording in
+    // feedbackConsolidator.js listed "terrain, skyline, towers, masts,
+    // antennas, buildings" and the model copied those six nouns straight into
+    // scene_fix.preserve as six standalone entries (staging
+    // job_1788641639919_mpjwlzkf1 p8) — a generic list describing nothing this
+    // page contains. A list a model is shown is a list a model will echo, so
+    // both copies now name the landmark and refer to what belongs to it.
     return `LANDMARK ELEMENTS — PRESENT BY DESIGN: ${names}.
-This page was rendered from a reference photo of that real place, and the story is set in the present day. Everything that belongs to it — its terrain, skyline, towers, masts, antennas, buildings, roads, signage and other built structures — is there because the real place has it. Never report any of it as unrequested, unauthorized, extra, added, modern, out of period, anachronistic, or as a setting mismatch, at any severity, on any axis. Never ask for it to be removed or for the background to be replaced. Judge only whether the landmark is rendered well; do not infer a historical period from words in the prose.`;
+This page was rendered from a reference photo of that real place, and the story is set in the present day. Everything that belongs to that place — its geography and every structure standing on it — is there because the real place has it. Never report any of it as unrequested, unauthorized, extra, added, modern, out of period, anachronistic, or as a setting mismatch, at any severity, on any axis. Never ask for it to be removed or for the background to be replaced. Judge only whether the landmark is rendered well; do not infer a historical period from words in the prose.`;
   }
   return `LANDMARK ELEMENTS: ${names}. This page was rendered from a reference photo of that real place, but the story is NOT set in the present day:
 ${protection.eraGuard}

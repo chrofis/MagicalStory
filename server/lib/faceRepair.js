@@ -547,7 +547,7 @@ async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, 
 // ---------------------------------------------------------------------------
 // Action context (expression / pose / gaze / holding) from scene metadata,
 // falling back to interaction text. FAITHFULNESS-CHECK: images.js:11639-11667.
-function buildActionContext(sceneDescription, charName) {
+function buildActionContext(sceneDescription, charName, visualBible = null) {
   if (!sceneDescription) return '';
   try {
     const { extractSceneMetadata } = require('./storyHelpers');
@@ -565,12 +565,17 @@ function buildActionContext(sceneDescription, charName) {
         if (charData.holding.rightHand && charData.holding.rightHand !== 'empty') holding.push(`right hand: ${charData.holding.rightHand}`);
         if (holding.length) parts.push(`Holding: ${holding.join(', ')}`);
       }
-      if (parts.length) return `\n\n${charName}'s state in this scene (MUST be preserved in the redrawn face):\n- ${parts.join('\n- ')}`;
+      // `holding.leftHand` / `.rightHand` routinely hold a raw VB id, and this
+      // string is part of a face/character REPAIR prompt for an image model.
+      if (parts.length) {
+        const body = require('./vbIdGuard').scrubVbIds(parts.join(`\n- `), visualBible);
+        return `\n\n${charName}'s state in this scene (MUST be preserved in the redrawn face):\n- ${body}`;
+      }
     }
   } catch { /* fall through */ }
   try {
     const { buildCharActionContextFromInteractions } = require('./imageCompositing');
-    return buildCharActionContextFromInteractions(sceneDescription, charName) || '';
+    return buildCharActionContextFromInteractions(sceneDescription, charName, visualBible) || '';
   } catch { return ''; }
 }
 

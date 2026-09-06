@@ -103,6 +103,7 @@ async function ensureCalmZone(opts) {
     languageLevel,                  // 'standard' / '1st-grade' / 'advanced'
     textAreaMask,                   // pre-built B/W mask PNG (caller-supplied)
     sceneDescription = '',          // for the textSpaceRepair prompt
+    visualBible = null,             // resolves VB ids out of that description
     generateImage,                  // async (repairPrompt, options) => result
     onUsage,                        // optional usage tracker callback
     label = 'TEXT-SPACE',           // log prefix label
@@ -139,8 +140,16 @@ async function ensureCalmZone(opts) {
     log.info(`🩹 [${label}] P${pageNumber}: BELOW THRESHOLD → repairing (max ${REPAIR.maxRetries} attempts)`);
     for (let attempt = 1; attempt <= REPAIR.maxRetries; attempt++) {
       try {
+        // The caller hands us `img.sceneDescription` — the Art Director's
+        // prose PLUS its `---METADATA---` JSON block, which lists the page's
+        // Visual Bible ids verbatim. This prompt goes straight to an image
+        // model, so both the block and any id in the prose are dropped first.
+        const { scrubVbIds } = require('./vbIdGuard');
+        const { stripSceneMetadata } = require('./sceneMetadata');
+        const cleanScene = scrubVbIds(
+          stripSceneMetadata(sceneDescription) || sceneDescription, visualBible, pageNumber);
         const repairPrompt = fillTemplate(PROMPT_TEMPLATES.textSpaceRepair, {
-          SCENE_DESCRIPTION: sceneDescription.substring(0, 1200),
+          SCENE_DESCRIPTION: cleanScene.substring(0, 1200),
         });
         // Caller's previous-best is candidates[0].imageData (the original) —
         // the mask + the unchanged scene give the model a clean retry.

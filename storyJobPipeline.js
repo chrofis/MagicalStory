@@ -5237,6 +5237,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               languageLevel: inputData?.languageLevel || 'standard',
               textAreaMask: img.textAreaMask,
               sceneDescription: img.sceneDescription || '',
+              // img.sceneDescription still carries the ---METADATA--- block and
+              // its VB ids, and this prompt goes to an image model.
+              visualBible,
               generateImage,
               onUsage,
               label: 'TEXT-SPACE',

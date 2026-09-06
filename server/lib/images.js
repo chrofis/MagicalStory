@@ -2291,6 +2291,10 @@ async function evaluateImageBatch(images, options = {}) {
         // evalOptions: story-level context so the eval records per-style/genre
         // stats to eval_findings (best-effort; no behaviour change).
         {
+          // The bible the batch caller already holds. Reaches the evaluators'
+          // INTERACTIONS_BLOCK and the cover fidelity reference, both of which
+          // used to render raw VB ids into a judge's prompt.
+          visualBible,
           artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
           // Structured cover text contract from the pseudo-page record
           // (expectedText / textMode) — see evaluateImageQuality's cover branch.
@@ -2773,6 +2777,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     round,
     landmarkPhotos,
     era,
+    // The consolidator's INPUT carries the scene brief's ---METADATA--- block
+    // (raw VB ids) and the evaluators' findings; its OUTPUT instruction fields
+    // are merged into the Grok edit instruction below. Both sides need the
+    // bible to resolve those ids -- see feedbackConsolidator.buildFeedbackInput.
+    visualBible,
   });
 
   // Decide the instruction to send Grok.

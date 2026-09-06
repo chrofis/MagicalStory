@@ -35,6 +35,18 @@ function buildFeedbackInput({
   characterDescriptions = {},
   // Era-aware landmark protection for this page (computeLandmarkProtection).
   landmarkProtection = null,
+  // THE VB-ID LEAK CLOSES HERE (2026-09-06). Every earlier fix for raw Visual
+  // Bible ids reaching a model added `sanitizeVbIdsInPrompt` to one more
+  // GENERATION prompt (page prompts, covers, reference sheets, empty scenes,
+  // the inpaint edit instruction). This input is neither -- it is what a text
+  // model READS -- and it was never sanitised, so the whole thing leaked:
+  // `sceneDescription` still carries the Art Director's `---METADATA---` block
+  // with `"objects": ["LOC006","ART001","ART007","LOC005.1"]` verbatim, and the
+  // evaluator findings rendered below quote ids back in their own prose.
+  // Measured on staging job_1788641639919_mpjwlzkf1 p8 round 1: the consolidator
+  // copied that exact array into `scene_fix.preserve`, and its instruction
+  // fields are the text that reaches Grok.
+  visualBible = null,
 }) {
   const parts = [];
 
@@ -55,7 +67,13 @@ function buildFeedbackInput({
 
   if (landmarkProtection?.protect) {
     parts.push('## Landmark elements — PRESENT BY DESIGN (never remove)');
-    parts.push(`This page was rendered from a reference photo of ${landmarkProtection.names.join(', ')}, and the story is set in the present day. The terrain, skyline, towers, masts, antennas, buildings and other built structures of that real place belong on this page. Never write a fix that removes them, replaces the background, or "restores" a historical look — list them under scene_fix.preserve instead.`);
+    // NO WORD LIST HERE. The previous wording enumerated "terrain, skyline,
+    // towers, masts, antennas, buildings" and the model copied those six nouns
+    // verbatim into scene_fix.preserve as six separate entries (staging
+    // job_1788641639919_mpjwlzkf1 p8) — a generic list naming nothing this page
+    // actually contains. Name the landmark and refer to what belongs to it;
+    // seedPreserveWithLandmarks already writes the authoritative entry.
+    parts.push(`This page was rendered from a reference photo of ${landmarkProtection.names.join(', ')}, and the story is set in the present day. Everything that belongs to that real place is on this page because the real place has it. Never write a fix that removes any of it, replaces the background, or "restores" a historical look — name the landmark itself under scene_fix.preserve instead.`);
     parts.push('');
   }
 
@@ -151,7 +169,13 @@ function buildFeedbackInput({
   parts.push('---');
   parts.push('Produce the JSON repair plan per the system instructions. Output ONLY the JSON object.');
 
-  return parts.join('\n');
+  // ONE sanitise, at the point of assembly, over the WHOLE input -- not per
+  // section. A per-section pass is the shape that keeps failing: the next
+  // section someone adds (readerFindings was the last one) misses it silently.
+  const assembled = parts.join('\n');
+  if (!visualBible) return assembled;
+  const { sanitizeVbIdsInPrompt } = require('./promptBuilders');
+  return sanitizeVbIdsInPrompt(assembled, visualBible, null);
 }
 
 /**
@@ -265,6 +289,11 @@ async function consolidateFeedback({
   // names are seeded into scene_fix.preserve. See server/lib/landmarkProtection.js.
   landmarkPhotos = null,
   era = null,
+  // Visual Bible — resolves raw VB ids out of the input and out of the plan's
+  // instruction fields (which reach Grok). Null degrades to the old behaviour
+  // and the runtime guard in callTextModel WARNs, so a caller that forgets to
+  // pass it surfaces in the logs instead of leaking silently.
+  visualBible = null,
   // Model override — defaults to the configured eval model (resolveEvalModel,
   // key-guarded). The A/B replay passes an explicit model to compare.
   modelOverride = null,
@@ -363,6 +392,7 @@ async function consolidateFeedback({
       bboxFigures,
       characterDescriptions,
       landmarkProtection,
+      visualBible,
     });
 
     // Text-only — no image passed. The consolidator's job is to dedupe / sort /
@@ -415,6 +445,38 @@ async function consolidateFeedback({
       log.info(`🏛️  [LANDMARK-GUARD] ${pageNumber != null ? `P${pageNumber}` : 'page'}: seeded scene_fix.preserve with ${seeded.join(', ')}`);
     }
     if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
+
+    // OUTPUT SIDE. Sanitising the input stops the model being SHOWN an id; it
+    // does not stop it echoing one it invented or read from a stale field, and
+    // every field below is text that reaches Grok -- images.js merges
+    // scene_fix.instruction and each per_character_fixes[].fix_instruction into
+    // the edit instruction. The inpaint leg sanitises that merged string, but
+    // the iterate/redo leg and the Test Lab replays read these fields directly,
+    // so they are cleaned once, here, where the plan is produced. `preserve` is
+    // cleaned too: nothing reads it back today, and an id sitting in a stored
+    // plan is the seed of the next leak.
+    if (visualBible) {
+      const { sanitizeVbIdsInPrompt } = require('./promptBuilders');
+      const clean = (s) => (typeof s === 'string' && s
+        ? sanitizeVbIdsInPrompt(s, visualBible, pageNumber)
+        : s);
+      for (const field of ['instruction', 'fix_draft', 'fix_critique']) {
+        plan.scene_fix[field] = clean(plan.scene_fix[field]);
+      }
+      if (Array.isArray(plan.scene_fix.preserve)) {
+        plan.scene_fix.preserve = plan.scene_fix.preserve.map(clean);
+      }
+      for (const pcf of plan.per_character_fixes) {
+        if (!pcf || typeof pcf !== 'object') continue;
+        for (const field of ['fix_instruction', 'fix_draft', 'fix_critique', 'visual_identifier']) {
+          pcf[field] = clean(pcf[field]);
+        }
+        if (Array.isArray(pcf.issues)) pcf.issues = pcf.issues.map(clean);
+      }
+      for (const d of (Array.isArray(plan.deduped_issues) ? plan.deduped_issues : [])) {
+        if (d && typeof d === 'object') d.description = clean(d.description);
+      }
+    }
 
     // Final score (0-100) — the consolidator's deduplicated, tolerant judgment.
     // Authoritative for redo decisions; replaces the old practice of summing
@@ -629,6 +691,9 @@ async function consolidateEvaluation({
   // Era-aware landmark protection — forwarded to consolidateFeedback.
   landmarkPhotos = null,
   era = null,
+  // Visual Bible — forwarded so the consolidator's INPUT and its instruction
+  // OUTPUT are free of raw VB ids. Every caller that has one must pass it.
+  visualBible = null,
   // Forwarded to consolidateFeedback so the Test Lab can A/B the consolidator's
   // model and rules without touching the shipped pipeline.
   modelOverride = null,
@@ -682,6 +747,7 @@ async function consolidateEvaluation({
     round,
     landmarkPhotos,
     era,
+    visualBible,
     modelOverride,
     promptOverride,
   });

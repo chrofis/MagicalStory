@@ -1,0 +1,151 @@
+{
+  "storyId": "job_1788641639919_mpjwlzkf1",
+  "note": "Real staging data. p8Brief is the exact text the feedback consolidator was shown under \"## Intended scene description\" in round 1; p3Brief is the stored scene description for page 3. visualBible is the story bible trimmed to the pools these tests exercise (entries verbatim).",
+  "visualBible": {
+    "mainCharacters": [
+      {
+        "id": 1786995461551,
+        "name": "Lily"
+      },
+      {
+        "id": 1786995508021,
+        "name": "Ethan"
+      },
+      {
+        "id": 1786995529732,
+        "name": "James"
+      },
+      {
+        "id": 1786995553761,
+        "name": "Rachel"
+      },
+      {
+        "id": 1786995579793,
+        "name": "Margaret"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "ART001",
+        "name": "Lily's red woollen hat",
+        "type": "children's knitted hat",
+        "description": "A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths, roughly ten centimetres tall when the brim is turned up, the knit stitches visible as raised ridges across the surface, slightly misshapen from wear"
+      },
+      {
+        "id": "ART002",
+        "name": "Moving boxes",
+        "type": "cardboard packing boxes",
+        "description": "A stack of large plain brown cardboard boxes of varying sizes, the largest roughly sixty centimetres on each side, folded-flap tops either tucked shut or left open, sides creased and slightly bowed from contents, smudged illegible marks on several faces"
+      },
+      {
+        "id": "ART003",
+        "name": "Fallen chestnut",
+        "type": "horse chestnut seed",
+        "description": "A single horse chestnut roughly four centimetres across, its outer shell split open and peeled away, revealing the smooth mahogany-brown seed inside with a broad pale cream patch on one side where it was attached to the husk"
+      },
+      {
+        "id": "ART004",
+        "name": "Kettle",
+        "type": "electric kettle",
+        "description": "A compact white plastic electric kettle roughly twenty-five centimetres tall, a broad cylindrical body narrowing slightly at the base, a short spout projecting forward at the upper third, a hinged lid at the top, and a loop handle at the rear, sitting on a circular white plastic base unit"
+      },
+      {
+        "id": "ART005",
+        "name": "Mug of tea",
+        "type": "ceramic mug",
+        "description": "A wide cylindrical ceramic mug roughly nine centimetres tall and eight centimetres across, plain white with a single loop handle on one side, filled with a warm amber-brown liquid to within two centimetres of the rim"
+      },
+      {
+        "id": "ART006",
+        "name": "Mislabelled box",
+        "type": "cardboard packing box",
+        "description": "A medium brown cardboard box roughly forty centimetres on each side, open at the top with flaps folded back, the text on one side crossed out in heavy strokes and rewritten beside it in smudged illegible marker"
+      },
+      {
+        "id": "ART007",
+        "name": "Log pile",
+        "type": "stacked firewood",
+        "description": "A stack of split logs roughly a metre and a half tall and two metres wide, the logs cut to lengths of about thirty centimetres and stacked in horizontal rows, pale cream and tan at the cut ends with grey-brown bark on the outer faces, the pile slightly uneven at the top row, a gap of roughly fifty centimetres wide and sixty centimetres tall at one end near ground level where fewer logs have been placed"
+      },
+      {
+        "id": "ART008",
+        "name": "Copper-coloured fallen leaves",
+        "type": "autumn leaves",
+        "description": "Fallen horse chestnut and plane tree leaves in deep copper, burnt orange, and dull gold tones, roughly palm-sized, lying flat or curled at the edges on the ground, scattered unevenly across stone paving and earth"
+      }
+    ],
+    "locations": [
+      {
+        "id": "LOC001",
+        "name": "The family flat — kitchen and sitting area",
+        "isRealLandmark": false,
+        "vantages": [],
+        "description": "indoor, ground-floor flat interior. Colors: warm cream walls, pale grey stone floor, honey-toned wooden window frames, brown cardboard boxes, soft amber light. a wide window with a stone sill looking toward the lane, a small kitchen counter with a pale worktop along one wall, stacked moving boxes filling the corners and most of the floor space, a plain wooden table with two chairs visible. Signature: the cluster of stacked moving boxes occupying most of the usable floor space, leaving only narrow paths between them"
+      },
+      {
+        "id": "LOC002",
+        "name": "The flat window overlooking the square",
+        "isRealLandmark": false,
+        "vantages": [],
+        "description": "indoor, looking outward from a first-floor flat window. Colors: pale grey stone window surround, cool blue-grey glass, warm amber interior reflected at the edges, the square and tower visible as muted ochres and greys beyond. a deep stone window sill wide enough to lean against, the glass pane running from sill to lintel, the square and tower visible in the distance through the glass, the lane and rooftops of the Altstadt forming the middle ground. Signature: the Stadtturm visible as a distinct vertical shape rising above the roofline in the far distance beyond the glass"
+      },
+      {
+        "id": "LOC003",
+        "name": "The Stadtturm square",
+        "isRealLandmark": true,
+        "vantages": [
+          {
+            "id": "LOC003.1",
+            "name": "Square wide view with tower",
+            "shot": "wide"
+          },
+          {
+            "id": "LOC003.2",
+            "name": "Square medium at counting wall",
+            "shot": "medium"
+          }
+        ],
+        "description": "outdoor, stone-paved public square at the base of the Stadtturm. Colors: grey and buff stone paving, warm ochre tower stonework, copper and gold fallen leaves, overcast pale grey sky. broad flat stone paving stretching across the foreground, a large stone rubbish bin near one edge, low stone kerbs bordering the square, fallen chestnut and plane leaves scattered across the ground, the Stadtturm rising at the rear of the square. Signature: the Stadtturm — a tall rectangular stone gate-tower from the mid-fifteenth century with a pointed roof and a vaulted arch passage at its base forming the northern gate of the Altstadt — rising directly above the square"
+      },
+      {
+        "id": "LOC004",
+        "name": "The flat landing",
+        "isRealLandmark": false,
+        "vantages": [],
+        "description": "indoor, interior stairwell landing of a stone Altstadt building. Colors: pale grey stone steps, warm cream plaster walls, soft diffused natural light from a small high window. a wide stone step serving as a seat, a plain plaster wall behind, the edge of a wooden handrail visible at one side, the corridor continuing in shadow beyond. Signature: the wide stone step used as a low seat against the pale plaster wall"
+      },
+      {
+        "id": "LOC005",
+        "name": "The chestnut path to the Holzbrücke",
+        "isRealLandmark": true,
+        "vantages": [
+          {
+            "id": "LOC005.1",
+            "name": "Chestnut path ultra-wide at dusk",
+            "shot": "wide"
+          },
+          {
+            "id": "LOC005.2",
+            "name": "Bridge mouth close at log pile",
+            "shot": "medium"
+          },
+          {
+            "id": "LOC005.3",
+            "name": "Chestnut path wide arrival scene",
+            "shot": "wide"
+          }
+        ],
+        "description": "outdoor, tree-lined cobbled path along the Limmat leading to the covered wooden bridge. Colors: deep copper and burnt orange fallen leaves, grey cobblestones, dark brown tree trunks, pale dusk sky in greys and soft orange at the horizon, the bridge mouth a dark warm brown. a row of large horse chestnut trees lining both sides of the path with heavy spreading canopies, fallen leaves covering most of the cobbled surface, the covered wooden bridge visible at the far end of the path, the river Limmat glimpsed dark and grey to one side. Signature: the covered wooden bridge — the Holzbrücke — visible at the path's end: a roofed timber structure spanning the narrowest point of the river gorge, its bridge mouth a dark rectangular opening framed by heavy timbers, the log pile stacked to one side of the entrance"
+      },
+      {
+        "id": "LOC006",
+        "name": "Inside the log pile gap",
+        "isRealLandmark": false,
+        "vantages": [],
+        "description": "outdoor, enclosed nook between the log pile and the bridge mouth timbers. Colors: dark warm brown of timber and bark, dim amber light filtering through gaps between logs, grey stone cobbles at the base. rough-hewn log ends forming the left and right walls of the gap, the heavy timber frame of the bridge entrance forming the back wall, the logs overhead cutting the light to a narrow strip, the cobbled ground level and damp. Signature: the ceiling formed by the overhanging logs just above head height for a small child, making the space feel like a low cave open only at one end"
+      }
+    ]
+  },
+  "p8Brief": "Lily — a preschooler, little girl of average build with auburn wavy chin-length loose hair uncovered, wearing a yellow top under a green quilted gilet, dark blue corduroy trousers, and orange boots — sits on the damp cobbles inside the dark timber nook, her back to the log pile, both feet flat on the ground, arms braced behind her, head tilted back slightly as she blinks up at Ethan. Ethan — a young school-age boy of average build with dark brown curly short hair, brown eyes, and a rounded jawline, wearing a blue anorak, white top, dark grey jeans, and brown boots — kneels in front of her, gripping her left wrist with his right hand, leaning forward with knees planted, eyes narrowed, teeth gritted, his left hand resting on the cobbles beside her hip for balance. Lily’s chunky red woollen hat lies on the cobbles just in front of her right foot, fully visible, the only vivid colour in the gloom. Behind them, the narrow gap of the log pile is visible, a top log tipped diagonally across the opening, its bark rough and grey-brown. The fading dusk light outlines the log pile and the timber frame of the Holzbrücke bridge mouth. Medium shot.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Ethan kneels and grips Lily's wrist while pulling her clear of the log pile gap, her red hat lying abandoned on the cobbles inside the dark timber nook.\",\n  \"diagnosis\": [\"Evaluator: Lily was leaning against logs instead of being hauled *out* of the gap. Cause: prose said 'hauls her backward out of the gap' but preview staged her *against* logs — misread spatial relationship between gap, logs, and nook. Root: 'inside the dark timber nook' was not anchored to cobbles + gap + bridge frame in prose.\", \"Evaluator: Ethan held both of Lily's hands. Cause: prose said 'grips Lily's wrist' (singular) but model defaulted to symmetrical two-hand grip — violates SPEC CONFLICT rule and physical plausibility for hauling from confined space.\"],\n  \"previewMismatches\": [\"Intent: Lily is being hauled *out of the gap*, seated on cobbles *inside* the nook, hat on ground *in front of her*. Preview: Lily leaned *against* logs, hat placed center-left on ground with no spatial relation to her body.\", \"Intent: Ethan grips *one* wrist, uses one hand for balance on cobbles. Preview: Ethan held both of Lily's hands, no contact with ground.\"],\n  \"issues\": [\"Lily mispositioned — not braced *against* logs but seated *inside* the nook on cobbles, facing Ethan, not the logs\", \"Ethan’s grip violated SPEC CONFLICT — two hands used for one action\", \"Hat placement lacked relational anchor to Lily’s body or the gap\", \"Log pile gap not visually distinct from background stack — needed explicit framing by bridge timbers\"],\n  \"corrections\": [\"Repositioned Lily sitting on cobbles *inside* the nook, back to logs, feet flat, arms braced — active resistance posture, not passive brace\", \"Specified Ethan kneels, grips *left wrist* with *right hand*, left hand on cobbles for balance — single-purpose limbs\", \"Placed hat *just in front of Lily’s right foot* — direct relational anchor\", \"Named 'timber frame of the Holzbrücke bridge mouth' as rear boundary to define nook geometry\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"Lily sits, arms braced, head tilted — all actions physically possible; Ethan kneels, one hand gripping wrist, one on ground — no limb conflict; both faces directed at each other, not camera\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"replaced 'leans back against the pull' with seated, braced posture\", \"replaced 'hauls her backward' with kneeling pull from inside nook\", \"anchored hat position to Lily's foot\", \"named bridge timbers as rear wall to clarify nook\"]\n  },\n  \"characters\": [\n    {\"name\": \"Lily\", \"clothing\": \"standard\", \"position\": \"on the damp cobbles inside the dark timber nook\", \"expression\": \"wide-eyed, mouth open breathlessly, brows lifted\"},\n    {\"name\": \"Ethan\", \"clothing\": \"standard\", \"position\": \"kneeling in front of Lily\", \"expression\": \"eyes narrowed with effort, teeth gritted\"}\n  ],\n  \"objects\": [\"LOC006\", \"ART001\", \"ART007\", \"LOC005.1\"],\n  \"interactions\": [\n    {\"character\": \"Ethan\", \"object\": \"Lily\", \"where\": \"grips Lily's left wrist with his right hand\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Lily\", \"object\": \"ART001\", \"where\": \"sits with her red woollen hat lying just in front of her right foot\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": false,\n  \"emptyScenePrompt\": \"Inside the log pile gap — a low enclosed nook formed by rough-hewn logs on left and right, the heavy timber frame of the Holzbrücke bridge mouth forming the back wall, damp grey stone cobbles at ground level, dim amber dusk light filtering through gaps above, a top log tipped diagonally across the narrow opening. Medium shot, eye-level, shallow depth.\",\n  \"translatedSummary\": \"Ethan knelt in front of Lily inside the dark timber nook and gripped her wrist as he pulled her clear of the gap, while her red woollen hat lay abandoned on the cobbles just in front of her foot.\"\n}",
+  "p3Brief": "Lily — a preschooler, little girl of average build with auburn wavy chin-length loose hair parted on the left, brown eyes, a soft jawline, and freckles, wearing her red chunky-knit woollen hat, a yellow top under a green quilted gilet, dark blue corduroy trousers, and orange rubber-soled boots — springs forward out from behind a large stone rubbish bin in the left foreground of the open stone-paved square, her eyes wide, mouth open in a shriek of excitement, her legs bent mid-leap. A few paces away in the right midground, caught fully in the open, a girl of about five — small and slight with black fringed hair, dark brown eyes wide with shock, mouth slightly open, wearing a red duffel coat with wooden toggles, dark navy tights, and black velcro-strap shoes — stands completely frozen, her arms pinned rigidly to her sides. In the far distance on the right, roughly a sixth their size, a boy of about ten — slightly tall and lean, light brown short hair, pale grey eyes, wearing a dark charcoal puffer jacket, a striped red-and-white scarf wound twice around his neck, dark green trousers, and black trainers — stands in side profile, his brow furrowed in concentration, eyes closed as he counts aloud, his back partially turned to the tower wall. Copper-coloured fallen chestnut leaves scatter across the grey cobbles under a pale grey overcast sky. Ultra-wide shot.\n\n---METADATA---\n{\"sceneIntent\": \"Lily leaps into the open from behind a stone bin, leaving the smallest girl frozen and exposed beside her. In the distance, the boy in the striped scarf counts with his eyes closed, brow furrowed. Pale overcast daylight over scattered copper leaves.\", \"characters\": [{\"name\": \"Lily\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"depth\": \"foreground\", \"expression\": \"eyes wide, mouth open in a shriek\"}, {\"name\": \"young girl\", \"clothing\": \"red duffel coat, dark navy tights, black shoes\", \"position\": \"right midground\", \"depth\": \"midground\", \"expression\": \"eyes wide with shock, mouth slightly open\"}, {\"name\": \"boy in striped scarf\", \"clothing\": \"dark charcoal puffer jacket, red-and-white scarf, dark green trousers, black trainers\", \"position\": \"far distance right\", \"depth\": \"background\", \"expression\": \"brow furrowed, eyes closed\"}], \"shot\": \"wide\", \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC003\", \"ART001\", \"ART008\"], \"interactions\": [{\"character\": \"Lily\", \"object\": \"young girl\", \"where\": \"leaps away from the tiny girl\", \"action\": \"leaping\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}], \"emptyScenePrompt\": \"A large stone rubbish bin sits in the left foreground of a broad stone-paved public square. In the right background, the flat stone wall of a tall ochre gate-tower rises up from the paving. Palm-sized copper-coloured fallen leaves are scattered unevenly across the grey cobbles under a pale grey overcast sky.\"}"
+}

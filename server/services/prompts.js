@@ -490,7 +490,12 @@ function buildEmptyScenePrompt(opts = {}) {
   // requires this module at load, so a top-level import would close a cycle.
   if (!opts.visualBible) return filled;
   const { sanitizeVbIdsInPrompt } = require('../lib/promptBuilders');
-  return sanitizeVbIdsInPrompt(filled, opts.visualBible, opts.pageNumber ?? null);
+  const sanitised = sanitizeVbIdsInPrompt(filled, opts.visualBible, opts.pageNumber ?? null);
+  // The early return above means "no bible, no protection" — which is silent.
+  // A caller that forgets to pass the bible now says so in the log instead of
+  // shipping an id to the image model.
+  require('../lib/vbIdGuard').warnIfVbIds(sanitised, 'empty-scene/plate prompt', { kind: 'image' });
+  return sanitised;
 }
 
 /**

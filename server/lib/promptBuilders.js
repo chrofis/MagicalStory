@@ -3753,7 +3753,20 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     const ref = entry.isRealLandmark
       ? (entry.name || englishLocationRef(entry))
       : (englishLocationRef(entry) || englishEntityRef(entry, 'place'));
-    if (ref) idToName.set(String(entry.id).toUpperCase(), ref);
+    if (!ref) continue;
+    idToName.set(String(entry.id).toUpperCase(), ref);
+    // VANTAGE HANDLES. A location shown from more than one viewpoint carries
+    // `vantages[]`, and the Art Director cites one as the dotted form
+    // `LOC005.1` (prompts/story-unified.txt "vantages"). The old id pattern
+    // matched only the `LOC005` half and left a dangling ".1" glued to the
+    // substituted text -- "The chestnut path to the Holzbruecke.1" -- which an
+    // image model letters onto the page exactly as readily as the raw id did.
+    // A vantage is a CAMERA ANGLE on the same place, not a different place, so
+    // it resolves to the parent's ref; the vantage's own shot and description
+    // reach the prompt through the scene brief, not through this substitution.
+    for (const v of (Array.isArray(entry.vantages) ? entry.vantages : [])) {
+      if (v?.id) idToName.set(String(v.id).toUpperCase(), ref);
+    }
   }
 
   // PROPER NAMES of props, resolved the same way their ids are.
@@ -3844,7 +3857,10 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     return out;
   };
 
-  const ID_PATTERN = /(CHR|ANI|ART|LOC|VEH|CLO)\d+/g;
+  // ONE grammar for "this is a VB id", shared with the runtime alarm
+  // (vbIdGuard.js) so the sanitiser and the guard can never disagree about what
+  // an id looks like -- the dotted vantage suffix included.
+  const ID_PATTERN = new RegExp(require('./vbIdGuard').VB_ID_PATTERN.source, 'g');
   // Orphan ids (no VB entry) are replaced with a pool-generic noun instead of
   // dropping the containing line. Dropping was catastrophic for single-line
   // prose: the whole cover scene description lived on ONE line, so one orphan
@@ -3859,7 +3875,12 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   for (const line of lines) {
     const lineOrphans = [];
     const resolved = line.replace(ID_PATTERN, (id) => {
-      const name = idToName.get(id.toUpperCase());
+      const upper = id.toUpperCase();
+      let name = idToName.get(upper);
+      // A dotted handle whose vantage the bible does not list falls back to the
+      // parent entry: the place is known, only the viewpoint index is stale.
+      // Emitting a generic "place" there would delete a real landmark name.
+      if (!name && upper.includes('.')) name = idToName.get(upper.split('.')[0]);
       if (name) return name;
       lineOrphans.push(id);
       return GENERIC_NOUN[id.slice(0, 3).toUpperCase()] || 'object';

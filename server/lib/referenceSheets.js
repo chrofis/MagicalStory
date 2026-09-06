@@ -323,9 +323,17 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   // reaching an image model gets painted as lettering — the same setup on the
   // empty-scene path lettered "ART008" onto a stone in a shipped story. Lazy
   // require: promptBuilders pulls in services/prompts at load.
-  if (!visualBible) return prompt;
+  // The alarm runs on BOTH branches: "no bible" used to mean "no protection",
+  // silently, and a silent gap is how this class of leak survives five fixes.
+  const { warnIfVbIds } = require('./vbIdGuard');
+  if (!visualBible) {
+    warnIfVbIds(prompt, 'reference-sheet prompt (no visualBible)', { kind: 'image' });
+    return prompt;
+  }
   const { sanitizeVbIdsInPrompt } = require('./promptBuilders');
-  return sanitizeVbIdsInPrompt(prompt, visualBible, null);
+  const sanitised = sanitizeVbIdsInPrompt(prompt, visualBible, null);
+  warnIfVbIds(sanitised, 'reference-sheet prompt', { kind: 'image' });
+  return sanitised;
 }
 
 // ── Character-cell render gate ──────────────────────────────────────────────

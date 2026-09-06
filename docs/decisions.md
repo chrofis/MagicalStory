@@ -28116,3 +28116,120 @@ scene-expansion builders), `server/lib/referenceSheets.js` +
 `tests/unit/vb-element-budget.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-06 — The VB-id leak was never a prompt-path problem: the sanitiser was on the GENERATION side only, and everything that READS a brief leaked
+
+**Context:** Raw Visual Bible ids (`LOC006`, `ART001`, `LOC005.1`) have been
+"fixed" five times — `5da568617` (buildImagePrompt chokepoint), `b75fb34d6`
+(covers), `f85e92efa` (reference sheets), `8dbf6de0a` (empty scenes),
+`eacbdbaec` (inpaint edit instruction). Each fix added
+`sanitizeVbIdsInPrompt` to one more **generation** prompt. Staging
+`job_1788641639919_mpjwlzkf1` leaked anyway: on p8 round 1 the feedback
+consolidator returned
+
+```
+scene_fix.preserve = ["LOC006","ART001","ART007","LOC005.1",
+                      "terrain","skyline","towers","masts","antennas","buildings", …]
+```
+
+Pulling that call's `full_prompt` from `consolidator_calls` showed exactly why:
+`buildFeedbackInput` renders `sceneDescription` verbatim, and a scene
+description is prose PLUS the Art Director's `---METADATA---` JSON block, whose
+`objects` field is a literal array of ids. 19 of the story's 23 consolidator
+calls carried ids the same way. The six generic nouns beside them came from the
+landmark-protection block, which enumerated "terrain, skyline, towers, masts,
+antennas, buildings" — a list shown to a model is a list a model echoes.
+
+Two structural facts made this invisible:
+
+1. **The sanitiser only ever ran on text a model WRITES PIXELS from.** Every
+   text a model *reads* — the three evaluators, the consolidator, the character
+   repair context, the text-space repair prompt — was outside it. An id in an
+   eval input is not directly painted, but the judge quotes it back in its
+   finding prose, the consolidator reads that finding, and the consolidator's
+   instruction is what reaches Grok. The leak had a second hop.
+2. **`ID_PATTERN` was `/(CHR|ANI|ART|LOC|VEH|CLO)\d+/`, with no suffix
+   support**, while the sibling `VB_HANDLE` regex 200 lines below already had
+   `(?:\.\d+)?`. A location shown from two viewpoints carries `vantages[]` and
+   is cited as `LOC005.1`; the sanitiser matched the `LOC005` half and emitted
+   `The chestnut path to the Holzbrücke.1` — a dangling token an image model
+   letters onto the page as readily as the raw id.
+
+**Decision:**
+
+1. `sanitizeVbIdsInPrompt` is suffix-aware. Vantage ids are registered from
+   `locations[].vantages[]` and resolve to the parent location's ref (a vantage
+   is a camera angle, not a place); an unlisted `.N` falls back to the parent
+   rather than to a generic noun. The id grammar now has ONE definition,
+   `VB_ID_PATTERN` in the new `server/lib/vbIdGuard.js`, shared by the sanitiser
+   and the runtime guard so they cannot drift apart again.
+2. The consolidator sanitises **both sides**: its whole assembled input in
+   `buildFeedbackInput` (one pass over the joined parts, not per section — a
+   per-section pass is what let `readerFindings` be added unprotected), and the
+   plan fields that reach Grok (`scene_fix.instruction` / `fix_draft` /
+   `fix_critique` / `preserve`, every `per_character_fixes[]` instruction and
+   `visual_identifier`, and `deduped_issues[].description`). `visualBible` is
+   threaded from every caller that has one.
+3. Texts that legitimately have no bible (the evaluators take a hint and an
+   image, never the bible) go through `scrubVbIds`, which resolves via the
+   sanitiser when a bible is present and otherwise substitutes a pool-generic
+   noun. An id is meaningless to a vision judge either way, and the generic noun
+   cannot be echoed into a finding. The `INTERACTIONS_BLOCK` that three
+   evaluators each built inline — all three emitting `i.object`, a raw id — is
+   now one builder, `formatInteractionsBlock`.
+4. A runtime alarm, not a gate: `warnIfVbIds` runs in `callTextModel` /
+   `callTextModelStreaming` beside the existing usage and prompt-capture
+   chokepoints, and logs `[VB-ID-LEAK]` with the call's `usageLabel` when a
+   prompt still carries an id. Stages whose contract IS the id vocabulary (the
+   writer, the Art Director, the scene reviewer, their Test Lab mirrors) are
+   allow-listed by label; an **unknown** label warns by design, so the next new
+   prompt path announces itself on day one. It never throws and never edits the
+   prompt — a paid generation must not die over a log line
+   (`feedback_gates_are_guidelines`).
+5. The landmark-protection wording lost its noun list in **both** copies
+   (`landmarkProtection.js` `buildLandmarkComplianceBlock`,
+   `feedbackConsolidator.js` `buildFeedbackInput`). Both now name the landmark
+   and refer to what belongs to it. `seedPreserveWithLandmarks` already writes
+   the authoritative `preserve` entry, so the list was pure echo bait.
+6. `evaluateImageQuality`'s metadata strip gated on the substrings
+   `"previewMismatches"` / `"checks"`; it now also gates on the `---METADATA---`
+   delimiter, so a brief in any metadata dialect gets stripped. The cover
+   fidelity reference (`storyText || sceneHint`) never went through any strip at
+   all and now does.
+
+**Rationale:** The recurring shape here is the one `docs/decisions.md`
+2026-08-23 already named — "the rule exists but is not enforced at every
+consumer". Adding a seventh call site would have been the sixth version of the
+same fix. What was missing was (a) a definition of the invariant that a test can
+assert, (b) coverage of the READ side, and (c) something that speaks up when a
+new path appears. `assertNoVbIds` is (a), the consolidator/evaluator/repair work
+is (b), `warnIfVbIds` is (c).
+
+**Verified:** `tests/unit/vb-id-leak.test.ts` — 16 tests over the real fixture
+from this story (`tests/unit/fixtures/vb-id-leak-job_1788641639919.json`,
+p8's exact consolidator brief + the story bible). It asserts the pre-fix leak
+still reproduces when the bible is withheld, then that the rebuilt p8
+consolidator input, the p8 inpaint instruction and the p3 image prompt all pass
+`assertNoVbIds`. Replay of p8's `objects` line:
+`["LOC006","ART001","ART007","LOC005.1"]` → four English descriptions, zero ids.
+Full suite 651/651.
+
+**Known, NOT fixed here:** `englishEntityRef` (`visualBible.js:657`) caps a
+description at 12 words with no clause awareness, so a substitution can end on a
+dangling conjunction ("…dome-shaped at the crown with"). Pre-existing at every
+sanitiser call site since `5da568617`; this change widens where it is visible
+but does not cause it. Tracked in `tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/vbIdGuard.js` (new), `server/lib/promptBuilders.js`
+(`sanitizeVbIdsInPrompt`), `server/lib/feedbackConsolidator.js`,
+`server/lib/landmarkProtection.js`, `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/faceRepair.js`,
+`server/lib/imageCompositing.js`, `server/lib/textSpaceRepair.js`,
+`server/lib/textModels.js`, `server/lib/images.js`,
+`server/lib/repairPipeline.js`, `server/lib/testlab.js`,
+`server/services/prompts.js`, `server/routes/regeneration.js`,
+`storyJobPipeline.js`, `tests/unit/vb-id-leak.test.ts`.
+
+**Status:** ✅ active

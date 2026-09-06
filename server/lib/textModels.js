@@ -1138,6 +1138,14 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
   // no stage has to remember to stash it (see promptCapture.js). No-op outside
   // a Test Lab experiment.
   require('./promptCapture').recordPrompt(options.usageLabel || 'text', model.modelId, prompt, { kind: 'text' });
+  // RUNTIME ALARM for the VB-id leak. Every prompt this process sends to a text
+  // model passes through here, beside the usage and prompt-capture chokepoints,
+  // so a NEW prompt path cannot leak quietly the way the feedback consolidator's
+  // input did for five fixes running. WARN only - never throws, never edits the
+  // prompt. Stages whose contract IS the id vocabulary (the writer, the Art
+  // Director, the scene reviewer) are allow-listed by label in vbIdGuard.js; an
+  // unknown label warns by design.
+  require('./vbIdGuard').warnIfVbIds(prompt, options.usageLabel || 'text', { kind: 'text' });
   return { ...result, modelId: model.modelId };
 }
 
@@ -1201,6 +1209,14 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
   if (result.usage && typeof result.usage === 'object') result.usage.elapsed_ms = Date.now() - streamStartedAt;
   recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
   require('./promptCapture').recordPrompt(options.usageLabel || 'text', model.modelId, prompt, { kind: 'text' });
+  // RUNTIME ALARM for the VB-id leak. Every prompt this process sends to a text
+  // model passes through here, beside the usage and prompt-capture chokepoints,
+  // so a NEW prompt path cannot leak quietly the way the feedback consolidator's
+  // input did for five fixes running. WARN only - never throws, never edits the
+  // prompt. Stages whose contract IS the id vocabulary (the writer, the Art
+  // Director, the scene reviewer) are allow-listed by label in vbIdGuard.js; an
+  // unknown label warns by design.
+  require('./vbIdGuard').warnIfVbIds(prompt, options.usageLabel || 'text', { kind: 'text' });
   return { ...result, modelId: model.modelId };
 }
 
