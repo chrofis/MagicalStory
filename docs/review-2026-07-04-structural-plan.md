@@ -21,7 +21,8 @@ before promotion to master. Plans below are concrete enough to execute directly.
 
 ## STR-1 — Split `processUnifiedStoryJob` (server.js, ~4,600-line function)
 
-**Problem:** one 4,600-line function; ~30 shared mutables; mode passed as 5
+**Problem:** one 4,600-line function (**re-measured 2026-09-06: now ~6,559 lines at
+`storyJobPipeline.js:378-6937`, file total 7,570 — it grew ~40%**); ~30 shared mutables; mode passed as 5
 positional booleans; `trialMode` re-checked 19×. A missed `trialMode` branch
 silently gives trial users full behavior.
 

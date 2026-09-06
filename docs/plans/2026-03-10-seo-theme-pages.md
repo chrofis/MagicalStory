@@ -474,6 +474,11 @@ feat: link landing page to themes
 
 ## Testing Checklist
 
+**Status 2026-09-06: the FEATURE SHIPPED** — `/themes`, `/themes/:category` and
+`/themes/:category/:themeId` are routed at `client/src/App.tsx:109-111` and the metadata lives in
+`server/lib/seoMeta.js:363`. Only the VERIFICATION below is outstanding (Rich Results, hreflang,
+sitemap). Do not read the unchecked boxes as an unbuilt feature.
+
 After implementation, verify:
 
 - [ ] `curl -s https://magicalstory.ch/ | grep '<title>'` → shows page-specific title

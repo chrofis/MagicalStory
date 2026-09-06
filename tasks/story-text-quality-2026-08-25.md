@@ -42,6 +42,8 @@ Measured on this story:
 
 ## T1 — Prop bookkeeping is written into the child-facing prose
 
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b). Additionally SUPERSEDED: 824fb02d9 deleted beat prose, 75fc965e9 replaced SCENE with the PAGE PLAN line.
+
 **Symptom.** "Julian hält die Folie" appears on seven pages (6, 7, 8, 10, 14, 17, 18); Max's
 Velo is inventoried on 5, 6, 8, 10, 14, 17, 18. p8 ends "Julian hält die Folie fest. Max hält
 sein Velo neben sich, die Räder sind nass." A child hearing this read aloud hears a props list.
@@ -67,6 +69,8 @@ prop already established, with no verb of change.
 ---
 
 ## T2 — The text-refine stage deletes emotion to pay for logistics
+
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
 
 **Symptom.** Almost no interiority in 18 pages. One emotional beat survives ("Sein Mund
 bleibt offen", p7).
@@ -105,6 +109,8 @@ and the cheapest sentence to cut is always the one carrying no plot.
 
 ## T3 — The refiner invents plot to close an audit fault, creating a logic hole
 
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
+
 **Symptom.** p4 establishes the stream as the obstacle (stones too far apart for Julian's
 legs). p8 says *"Max hat sein Velo dabei durch das seichte Wasser geschoben."* If it was
 shallow enough to wade with a bicycle, there was never an obstacle. The whole of challenge 1
@@ -129,6 +135,8 @@ established obstacle easier."*
 ---
 
 ## T4 — Time-of-day stamps injected as prose
+
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
 
 **Symptom.** "Der Waldweg führt **am Nachmittag** zu einem breiten Bach" (p4). "**Es ist
 später Nachmittag geworden.**" (p9). "Sie fängt **das Nachmittagslicht** ein" (p7). Reads
@@ -155,6 +163,8 @@ continuity fault; show it in light, shadow or what the characters do."*
 
 ## T5 — Travelogue connectives injected as page openers
 
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
+
 **Symptom.** p14 opens *"Nach der Ruine steigen die vier Buben den letzten Hang hinauf."*
 p18 opens *"Nach dem Flug steigen die vier Buben den Hügel hinunter bis zur Limmat."* Neither
 opener exists in the writer's text; both are refiner-added.
@@ -176,6 +186,8 @@ audit so a settled question is not reopened.
 ---
 
 ## T6 — The arc reviewer closes an orphan prop by dragging it through the whole story
+
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
 
 **Symptom.** Max's Velo is pushed up a steep forest path, past a ruin, onto a ridge, and stands
 in the grass on p14. On p12 he sprints and it vanishes; on p14 it is back. It never does
@@ -234,6 +246,8 @@ owner's decision before implementing.**
 
 ## T8 — Max's build-up pays off in nothing
 
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
+
 **Symptom.** p5: *"Sein Kinn ist oben, sein Blick ist klar. Max weiss schon, was zu tun ist."*
 p6: he parks the bike, and **Julian** spots the log. The hero shot resolves to nothing.
 
@@ -252,6 +266,8 @@ the action."*
 ---
 
 ## T9 — Reading level is enforced on the writer, then not re-checked
+
+**T9(a) CLOSED 2026-09-06 (4b346fb0d)** — the reading-level re-check shipped. **T9(b) (should `textQualityJudge` run in the unified pipeline?) stays OPEN — owner decision.**
 
 **Symptom.** p9: *"Die Tafel zeigt, dass solche Tiere dem warmen Leuchten dieser Feuer folgen,
 um nach Hause zu ihrer Familie zu finden."* — 20 words, nested subordinate clause, and
@@ -279,6 +295,8 @@ unified pipeline — **owner decision, it is a cost/latency question.**
 
 ## T10 — The hatching happens between pages
 
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
+
 **Symptom.** p2 ends on «Es schlüpft!». p3 opens with the dragon already sitting on the
 ground. The most magical image in the book is in the gutter.
 
@@ -296,6 +314,8 @@ moves to p3 where it already is.
 ---
 
 ## T11 — The climax obstacle is unseeded
+
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
 
 **Symptom.** The mist arrives on p14 with no prior mention. Nothing on p3, p10 or anywhere
 hints at weather.
@@ -333,6 +353,8 @@ this changes story convention, not just prose.**
 ---
 
 ## T13 — The ending is cold; the anti-moral rules have no floor
+
+**CLOSED 2026-09-06 (4b346fb0d)** — "fix(story-text): stop the review stages trading feeling for logistics"; rule verified still live in `prompts/text-refine.txt` / `story-arc-review.txt` / `story-arc-audit.txt` after the later restructures (75fc965e9, 824fb02d9, c6c5c83c2, fc4985b8b).
 
 **Symptom.** *"Levin geht vorneweg und schaut nicht zurück. Niemand sagt viel."* A six-year-old
 who has just given away a baby dragon gets no comfort and no arrival home.
@@ -416,8 +438,9 @@ a "delete the detail" option, so every fix is paid for out of the prose.
 
 ## Proposed order of work
 
-Prompt-only, no code, cheapest-first. **None of these is implemented — T7, T9(b), T12(b) and
-T14 need an owner decision first (see each section).**
+Prompt-only, no code, cheapest-first. **Items 1-7 below SHIPPED 2026-08-25 in 4b346fb0d
+(closed 2026-09-06). T14 was answered in code (`buildTitleRule()`, b3acb951c). T7, T9(b)
+and T12(b) still need an owner decision first (see each section).**
 
 1. **T3 + T5** — `text-refine.txt` gains a "remove the detail" disposition; `story-text-audit.txt`
    exempts page-turn travel. Kills the worst logic hole and the travelogue openers. Two clauses.

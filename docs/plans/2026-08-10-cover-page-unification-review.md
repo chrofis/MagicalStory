@@ -192,6 +192,16 @@ Test Lab cover stage exercised.
 
 ## (E) Risks / open questions
 
+**RE-SCOPED 2026-09-06.** The unification itself SHIPPED (`docs/decisions.md:8998`, 2026-08-10,
+"covers are pages with flags"), and the `coverTitleMode` resolver plus `iterateCover` precedence
+are settled (`docs/SETTLED.md`, wiring 2026-09-03). Of the eight risks listed below, only two
+still survive with no `decisions.md` entry covering them:
+
+- **keeping trial covers cheap**
+- **the entity check on negative pages**
+
+Treat the rest as historical context, not open work.
+
 - **Checkpoint UX**: `partial_cover` currently carries a gen-time score (server.js:3968). Removing
   gen-time eval delays "cover looks bad" detection to the pipeline — acceptable (pages already work
   this way), but the progressive UI must tolerate score-less covers.

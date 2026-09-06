@@ -229,6 +229,7 @@ fits on the scene"*. That does not solve the separation problem — it removes i
 ## Still open
 
 - Not verified inside a full generation (only via the Lab and the repaint endpoint).
-- No restamp route for the back cover, so branding cannot be repaired without regenerating.
+- ~~No restamp route for the back cover~~ — **DONE 2026-09-06:** `coverTypography.js:787,820`
+  `restampCover` / `restampServedCover` map `backCover` to `'back'` and throw on unknown keys.
 - The cover prompt asks for a naturalistic lighting phrase AND the cyber style at once, so the
   evaluator penalises style elements as a setting mismatch — a prompt conflict, not an eval gap.

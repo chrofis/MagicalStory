@@ -49,7 +49,14 @@ descriptor with a medium. `ART_STYLES.steampunk` already leads with "steampunk
 graphic novel illustration", so the descriptor is not obviously at fault — the
 break is per-page, not per-story. Unresolved.
 
-### 2. Character repair runs, produces nothing, logs nothing
+### 2. Verify char-repair fires on a CRITICAL page
+
+**RE-SCOPED 2026-09-06.** Critical-only char-fix is settled BY DESIGN (8eb622229 makes CRITICAL
+findings mark a page bad and rank first; memory `project_repair_routing_settled`, 2026-09-04 —
+MAJOR entity findings are deliberately unrepaired), so `wasCharacterFixed` false across 14
+non-critical pages is expected behaviour, not the defect this was filed as. The "logs nothing"
+half was fixed by 3a597b6c7 (one failure log). What remains is a run-level check that char-repair
+does fire on a page carrying a CRITICAL finding. Original finding follows.
 
 Railway stdout shows char-fix firing:
 
@@ -72,10 +79,15 @@ p14: `original` scored 30, `garment-recolour-round-1` scored **−80**. The
 version picker correctly kept the original, so nothing shipped broken, but the
 method cost a paid call to produce something 110 points worse.
 
-### 4. Fake handwriting on a prop (p13)
+### 4. Fake handwriting on a prop (p13) — CLOSED 2026-09-06 (e4ca42a25)
 
 The parchment carries scribbled pseudo-text. `image-generation.txt` requires
 letters and maps to show pictorial marks only — no handwriting, no captions.
+
+**CLOSED 2026-09-06:** e4ca42a25 restored the blanket no-lettering guard
+(`image-generation.txt:3`); the eval side gained D-23 `rendered_text` at
+CATASTROPHIC (`image-evaluation.txt:162`); 34e46855a quarantines declared
+lettering into solo reference calls.
 
 ## Still unproven
 

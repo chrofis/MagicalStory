@@ -11,12 +11,18 @@ finding was that the score carries roughly 26 points of run-to-run noise.
 **Verified against the tree 2026-08-20: B3, B4 and B5 shipped after this list was written.**
 Only B1/B2 remain.
 
+**Re-scoped 2026-09-06: the CONSUMER plumbing already landed** — 2bee3632c (the jury merges per
+`(bucket, subject)`) and `evalBuckets.js:265-353` carries `subject` through and warns that scoring
+bills per `(class, subject)`. What remains for both B1 and B2 is the PROMPT-side emission: neither
+`prompts/image-evaluation.txt` nor `prompts/image-semantic.txt` instructs the evaluator to emit a
+subject. Do not read these as unbuilt.
+
 - [ ] **B1. Clothing findings carry no `subject`.** Clothing is the largest producer of
       deductions, so per-character billing degrades to per-page: two characters' clothing
-      problems collapse into one charge.
+      problems collapse into one charge. Remaining work: the evaluator prompt must emit it.
 - [ ] **B2. Objects have no subject either.** Only 11% of `object_presence` and 3% of
       `setting` findings carry one, so distinct objects merge. Owner accepted this merge for
-      now (2026-08-19); a `subject` field closes it properly.
+      now (2026-08-19); a `subject` field closes it properly. Remaining work: prompt-side emission.
 - [x] **B3. `viewer_address` has its own type** — `evalBuckets.js:101` + `:188`.
       Done 2026-08-20, `docs/decisions.md` "emotion and viewer_address become their own types".
 - [x] **B4. `emotion` has its own type** — `evalBuckets.js:91` + `:179`. Same entry. The
@@ -55,7 +61,9 @@ Only B1/B2 remain.
 
 - [ ] Approve the B1–B2 prompt change (a `subject` field on clothing and object findings).
       B3/B4 already shipped.
-- [ ] C1 targeted confirmation eval — yes/no, given A1's caveat.
+- [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
+      `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every
+      100 with a second eval was offered and declined" (restated `:14904`).
 - [ ] Whether any of this goes to master.
 
 ## Done (the session that produced this backlog)

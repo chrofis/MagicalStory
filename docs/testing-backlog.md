@@ -16,7 +16,13 @@ for the offline eval path.**
 
 ---
 
-## 1. Rewrite the self-critique into per-page failure-mode verdicts
+## 1. ~~Rewrite the self-critique into per-page failure-mode verdicts~~ — SUPERSEDED 2026-09-06
+
+**SUPERSEDED, retire.** This targets the `prompts/story-unified.txt` draft → self-critique →
+patch chain, which no longer exists: 2026-09-03 replaced it with two parallel audits, a merge,
+one repair and one lector (`docs/decisions.md:24967`, `:25539`). The named questions shipped as
+plan-check Q5–Q7 items.
+
 
 **Hypothesis:** The current self-critique (in `prompts/story-unified.txt`,
 draft → self-critique → patch) asks a soft "is this good?" question. Replacing
@@ -39,7 +45,13 @@ changing the reviewer.
 
 ---
 
-## 2. Cross-model review A/B — Sonnet writes, Opus reviews
+## 2. Cross-model review A/B — Sonnet writes, Opus reviews — CLOSED 2026-09-06
+
+**CLOSED 2026-09-06: this ran, repeatedly.** Beats-reviewer bake-off of 8 candidates 2026-08-15
+(`server/config/models.js:146,231`), repair bake-off to `claude-opus` 2026-09-03
+(`docs/decisions.md:25244`), arc-auditor bake-off (`models.js:370`). The reviewer is now
+DeepSeek V4 Pro **by measurement**, not by the hypothesis below.
+
 
 **Hypothesis:** Same-model self-critique mostly produces agreement (the current
 setup is Sonnet critiquing Sonnet). A *different* model reviewing catches
@@ -157,6 +169,8 @@ Full evidence + sources in the analysis doc; each is a Test Lab experiment, not 
    pre-filter + per-entity consistency KPI.
 9. **Typographic art direction** (auto font pairing, drop caps, palette-tinted panels).
 10. **Production text-quality judge gate** (currently Test Lab only) + market the machinery.
+    **DEDUPED 2026-09-06 — this is the same open question as T9(b)
+    (`tasks/story-text-quality-2026-08-25.md:T9`); tracked there, not here.**
 
 ## 8. Scene-prose length A/B: 250-350 words vs ~150-word cap (owner: "the scene still seems super complicated")
 
@@ -202,6 +216,6 @@ simpler-shot fallback and #1's "one picturable moment" check).
 
 ## Unverified claims — confirm before acting
 
-- External review asserted **Sonnet 5 pricing moves $2/$10 → $3/$15 on Sep 1**.
-  Treat as unconfirmed; verify against Anthropic's current pricing before using
-  it in any budget model. Recorded here only as a flag, not as fact.
+- ~~External review asserted **Sonnet 5 pricing moves $2/$10 → $3/$15 on Sep 1**.~~
+  **CONFIRMED TRUE 2026-09-06:** `server/config/models.js:1003-1006` — `claude-sonnet-4-6`
+  and `claude-sonnet` are both `{ input: 3.00, output: 15.00 }`.

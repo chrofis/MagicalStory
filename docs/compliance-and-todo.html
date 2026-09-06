@@ -78,7 +78,7 @@
 
 <h3>P0 — blocking next release</h3>
 <ul>
-  <li>Verify on staging (and then ask) before the 29-commit master promotion.</li>
+  <li>Verify on staging (and then ask) before the master promotion &mdash; <strong>36 commits ahead as of 2026-09-06</strong> (<code>origin/master..origin/staging</code>; compare ORIGIN refs, the local master ref is stale).</li>
   <li>Confirm location-verify + landing #418 fix work end-to-end with a fresh showcase run.</li>
 </ul>
 
@@ -86,7 +86,7 @@
 <ul>
   <li>Sentry integration for error alerting (see <a href="research-log.html#monitoring">research §monitoring</a>).</li>
   <li>Plausible / Umami for page analytics.</li>
-  <li>Activate the referral programme on the marketing site (code is shipped, surface still hidden).</li>
+  <li>Promote the referral programme on the marketing site. <strong>(2026-09-06: the in-app surface is NOT hidden &mdash; <code>AccountPage.tsx:12-18</code> renders code, balance and referral count, and <code>BookBuilder.tsx</code> + <code>MyOrders.tsx</code> consume it. Only the marketing-site promotion is outstanding.)</strong></li>
   <li>R2 Phase 2 — rewire all readers to prefer URL field; Phase 3 — drop inline base64 from existing rows.</li>
   <li>Audio narration prototype (TTS for the story text on the shared viewer).</li>
 </ul>
@@ -111,11 +111,11 @@
 <h2 id="cleanup">6. Tech debt &amp; cleanup</h2>
 
 <ul>
-  <li>Migration drift between prod and staging — <code>scripts/admin/compare-schemas.js</code> exists; integrate into CI.</li>
-  <li>Numerous <code>scripts/_tmp_*.js</code> investigation scripts in tracked git status — periodically prune.</li>
+  <li>Migration drift between prod and staging — <code>scripts/admin/compare-schemas.js</code> exists; integrate into CI. <strong>(2026-09-06: nothing wired — there is no <code>.github/</code> directory at all.)</strong></li>
+  <li>Numerous <code>scripts/_tmp_*.js</code> investigation scripts in tracked git status — periodically prune. <strong>(2026-09-06: 12 files still present.)</strong></li>
   <li>40+ <code>scripts/admin/refine-tell-vN.js</code> versioned refine scripts — collapse to one parametrised script.</li>
   <li>Replace remaining inline base64 in old <code>characters.data</code> / <code>stories.data</code> rows with R2 URLs (Phase 3 migration).</li>
-  <li>Drop legacy <code>pictureBook</code> / <code>outlineAndText</code> mode code paths once we confirm no story still uses them.</li>
+  <li><s>Drop legacy <code>pictureBook</code> / <code>outlineAndText</code> mode code paths.</s> <strong>DONE 2026-09-06</strong> — only surviving mentions are comments at <code>storyJobPipeline.js:7365</code> and <code>promptBuilders.js:3064</code> stating unified is the only pipeline.</li>
   <li>Consolidate "test image generation" panels — Test Models, Style Transfer, Iterative Placement all overlap.</li>
 </ul>
 

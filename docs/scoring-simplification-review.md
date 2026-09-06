@@ -176,7 +176,9 @@ round, not forgotten.
 
 ### A. Core loop and the god-file (biggest payoff)
 
-1. **Hoist the ten closures in `runUnifiedRepairPipeline`** into named step
+1. **Hoist the ten closures in `runUnifiedRepairPipeline`** (re-measured 2026-09-06:
+   ~3,161 lines at `server/lib/repairPipeline.js:303-3464`, closures still inline)
+   into named step
    functions taking an explicit context (evaluate, consolidate, iterate,
    inpaint, charFix, selectBest, rescue, textSpace, styleAudit, finalize).
    The move made the loop findable; this makes it readable. Deferred so a
@@ -185,15 +187,18 @@ round, not forgotten.
    `evaluateImageQuality` internally (2 sites). Generation should generate and
    return; the CALLER evaluates. This cycle is the reason all five lazy-require
    accessors exist — remove the cycle and they all become plain imports.
-3. **`evaluateImageQuality` (1,058 lines, 10 positional params).** Split into
+3. **`evaluateImageQuality` (~1,210 lines as of 2026-09-06 — it GREW; and it MOVED to
+   `server/lib/evalPipeline.js:822-2032`; 10 positional params).** Split into
    evaluator dispatch / parse / record; replace the parameter list with one
    options object. The clothing contract had to be built INSIDE it precisely
    because threading an 11th parameter was untenable.
-4. **`generateImageWithQualityRetry` (761 lines)** — same treatment; the
-   second-widest fan-out in the file.
+4. ~~**`generateImageWithQualityRetry` (761 lines)** — same treatment; the
+   second-widest fan-out in the file.~~ **DONE 2026-09-06: the function was DELETED
+   outright by the 2026-08 pipeline unification — zero occurrences remain in `server/`,
+   `client/src` or `storyJobPipeline.js`.**
 5. After 2–4, the remaining `images.js` clusters (dispatch, evaluation, bbox)
    separate cleanly; the file should land well under 4k lines.
-6. **`inpaintPage` (461 lines)** has one caller (the pipeline). Move next to
+6. **`inpaintPage` (461 lines, still un-moved at `server/lib/images.js:2617`)** has one caller (the pipeline). Move next to
    its caller or into `imageInpainting.js` once the cycle is broken.
 
 ### B. Scoring residue

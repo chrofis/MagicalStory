@@ -90,12 +90,16 @@ No real cost difference. The 2×4 prompt is shorter than the 2×2 prompt
 in token count (the test version is more compact), which slightly reduces
 input tokens.
 
-### 6. Sarah-specific moderation
+### 6. The Gemini FALLBACK refuses on this photo — accepted, Grok is primary
 
-Sarah's photo (`tests/fixtures/demo-photos/berger/Sarah.jpg`) triggers
+**CORRECTED 2026-09-06.** The original framing below is superseded: 21a6ce41b and 7dbb45de4
+established this is a **broad safety refusal**, not face-specific and not "Gemini blocks adults",
+and both avatar passes now default to **Grok** (`AVATAR_STYLE_BACKEND`) — so Gemini is only the
+fallback. This is accepted, not a live production defect.
+
+Original finding: Sarah's photo (`tests/fixtures/demo-photos/berger/Sarah.jpg`) triggers
 `finishReason: IMAGE_OTHER` on every Gemini call regardless of layout,
-style, or costume. This affects the production pipeline today —
-investigated separately. Not a 2×4 issue.
+style, or costume.
 
 ## Next steps before promoting 2×4 to production
 
