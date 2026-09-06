@@ -29360,6 +29360,20 @@ OBJECTS → reference resolution → element budget, plus the old un-stated shap
 them). No story generation was run: validating the authoring half needs a paid run, which was not
 mandated.
 
+**Implementing commits** (recorded because three sessions shared this working tree on 2026-09-06 and
+several commits carry another session's diff under their own message — the `Claude-Session` trailer
+names the COMMITTER, not the author of the content, so it asserts the wrong author on a swept commit
+rather than being absent):
+- `8c29b38d9` — the state model itself (dotted ids, `states[]`, single-call render guarantee).
+- `a8a6b5566` — ceiling 3→4, delta cap aligned to 15 words with a loud warn instead of a silent
+  truncate. Committed under another session's "attribution note" message; the diff is
+  session `011AX1wq2gs3BPfes9cnvWXQ`.
+- `d473434ed` — the states ARE the cells, no base cell: 4 states → 4 cells → one 2×2 grid → one call.
+  `defaultObjectState` / `hasElementReference` / `elementRefCell` added here. **762/762 unit tests.**
+  Without `hasElementReference` a stated object has no reference of its own and all three `hasRef`
+  gates drop it from every page SILENTLY — the object simply never reaches the illustrator. That
+  near-miss was created by this fix, not found by it, and is the reason the three gates are listed.
+
 ## 2026-09-06 — Repair-budget exhaustion is recorded on the page, not silent
 
 **Context:** Staging story `job_1788681313413_xqmtk2gcs` shipped pages 9 and 10
