@@ -2049,7 +2049,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       // story prompt gets).
       const { getTeachingGuide } = require('../lib/promptBuilders');
       const guide = getTeachingGuide('life-challenge', storyTopic);
-      categoryContext = `This is a life skills story about "${storyTopic}". The child's struggle with this skill is the story's conflict, and what it costs them is shown.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+      categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something lost, broken, blocked, run out or wanted by two at once — and what it costs them.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
     } else if (storyCategory === 'historical') {
       categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
     } else if (storyCategory === 'swiss-stories') {

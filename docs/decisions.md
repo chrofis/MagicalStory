@@ -28953,3 +28953,50 @@ silent, 181/150 fires; the original 71-vs-50 motivating case still fires
 **Status:** ✅ active. Supersedes the tolerance-free half of `cf10d7cd9`
 (2026-09-05); the counter itself, its `LANGUAGE_LEVELS` single source of truth
 and its 'counter' merge source are unchanged.
+
+## 2026-09-06 — Prop names are descriptive at the source; the prop-name substitution is removed (supersedes 2026-08-24 "A prop's NAME is the thing that gets painted on it", its 2026-09-02 lettering exception, and today's title mask)
+
+**Context:** Since 2026-08-24 `sanitizeVbIdsInPrompt` replaced every artifact/vehicle/clothing NAME in
+a prompt with the entry's `type`, to stop a proper noun ("Goldene Möwe", "Fiona's Schatzkarte") being
+lettered onto the prop. Nine decisions since then patched its output: orphan nouns, the lettering
+exemption, solo reference cells, the possessive alias, the colour carry-over, the baked-title mask.
+The Visual Bible template asks for `"type": "[what kind of object]"`, so writers answer with a
+category word, and the substitution then deletes the object. Evidence, four stories: staging trial
+`job_1788682208484` (rice crackers → "food", element sheet drew raw rice), `job_1788684429841`
+(title lettered "Noah and the food prop at the Zoo"), `job_1788712851192` p1 ("Toy Treasure Chest"
+→ "toy", Grok drew a toy boat), and the 2026-09-05 knitted-hat case in the 2026-09-06 alias entry.
+
+**Decision (owner):** The rule moves to the writer. Both story templates state that a prop's,
+vehicle's or garment's `name` is a plain English description of the thing, never a proper noun,
+and that a name the story gives an object goes in a new `properName` field, which the parser keeps
+and no image prompt reads. `sanitizeVbIdsInPrompt` resolves ids only; the name pass, its aliases,
+colour carry-over and the title mask are deleted. `vbDeclaredLetteringNames` stays for the
+reference-sheet quarantine. The nets that remain: the blanket no-lettering guard in the image prompt
+and the evaluator's rendered-text deduction (2026-08-23).
+
+**Rationale:** A rule that rewrites prose after the fact fights every phrasing the writer can
+produce; a rule the writer reads produces the right name once. The cost is that a writer who still
+emits a proper noun sends it to the model and the eval catches it afterwards.
+
+**Touched:** `server/lib/promptBuilders.js` (`sanitizeVbIdsInPrompt`, `bakedTitleLine`),
+`prompts/story-unified.txt`, `prompts/story-trial.txt` (artifact schema + naming rule),
+`server/lib/visualBible.js` (`properName`), tests `vb-lettering-exception`, `required-objects-label`,
+`cover-title-not-sanitised`. SETTLED.md line added.
+**Status:** ✅ active
+
+## 2026-09-06 — A trial life-skill story turns on an outside event, at every age
+
+**Context:** Trial `job_1788712851192_4v8tm4juw` (age 3, sharing + pirate) had no event: the
+friend asked three times and the child gave in by degrees. The age-3 band ("three tries") asks
+for one concrete problem but names physical ones and "an animal friend who cannot manage", and the
+catalogue draw is skipped below age 4 by design (2026-09-04), so the writer had only the child's
+reluctance to work with.
+
+**Decision (owner: "we need an action or a loss even for toddlers"):** the three-tries band says
+that for a life-skill topic the problem is the outside event that makes the skill necessary, never a
+feeling on its own and never the same request three times; the trial writer's conflict rule says the
+same; the trial idea prompt names that event in the idea. The catalogue draw stays off for the
+simple bands — the band supplies the single problem itself.
+
+**Touched:** `prompts/age-band-tries.txt`, `prompts/story-trial.txt`, `server/routes/trial.js`.
+**Status:** ✅ active — one validation trial pending.

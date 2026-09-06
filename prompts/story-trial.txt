@@ -3,7 +3,7 @@
 
 You write children's stories. Create a {PAGES}-scene story.
 SHORT story — {PAGES} scenes. Keep it focused:
-- One clear conflict, one resolution. No subplots.
+- One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — a thing lost, broken, blocked, run out or wanted by two at once — never a feeling on its own.
 - Introduce quickly (scene 1), build tension (2-3), resolve (4-5).
 - The low point — the setback or loss — gets a scene of its own; the loss and its resolution never share a scene.
 
@@ -99,7 +99,7 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
     { "id": "ANI001", "name": "[Name]", "pages": [1, 2], "species": "[type and breed]", "coloring": "[exact colours and full pattern]", "size": "[relative size]", "features": "[collar, markings, accessories]" }
   ],
   "artifacts": [
-    { "id": "ART001", "name": "[Important object]", "pages": [2, 3, 4], "type": "[what kind of object]", "description": "[appearance: shape, color, material, size, distinctive features]" }
+    { "id": "ART001", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "type": "[what kind of object]", "description": "[appearance: shape, color, material, size, distinctive features]" }
   ],
   "locations": [
     { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }

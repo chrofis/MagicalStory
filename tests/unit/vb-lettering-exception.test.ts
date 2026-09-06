@@ -81,53 +81,20 @@ describe('vbDeclaredLetteringNames', () => {
   });
 });
 
-describe('sanitizeVbIdsInPrompt — VB-lettering exception', () => {
-  it('(a) keeps a declared-lettering name intact', () => {
+describe('sanitizeVbIdsInPrompt — prop names are never rewritten (2026-09-06)', () => {
+  // The name-for-type substitution was removed: prop names are descriptive by
+  // the Visual Bible rule, and a story-given name lives in properName, which
+  // never reaches an image prompt. Only ids are resolved.
+  it('leaves every prop name in the prose untouched and still resolves ids', () => {
     const out = sanitizeVbIdsInPrompt(
-      'Nora stands at the rail of the Nordwind as the harbour slides past.',
-      visualBible,
-      1
-    );
-    expect(out).toContain('Nordwind');
-    expect(out).not.toContain('brigantine-style');
-  });
-
-  it('(b) still substitutes a name the VB never declared as lettering', () => {
-    const out = sanitizeVbIdsInPrompt(
-      'The Sturmklinge closes from windward while Nora unrolls the Alte Seekarte.',
+      `A wide stern view of VEH001. The Sturmklinge closes from windward while Nora unrolls the Alte Seekarte.`,
       visualBible,
       2
     );
-    expect(out).not.toContain('Sturmklinge');
-    expect(out).toContain('topsail schooner-style');
-    expect(out).not.toContain('Alte Seekarte');
-    expect(out).toContain('hand-drawn chart on aged parchment');
-    // Character names are identity anchors and are never touched.
+    expect(out).toContain('Sturmklinge');
+    expect(out).toContain('Alte Seekarte');
     expect(out).toContain('Nora');
-  });
-
-  it('(c) round-trips the stern-lettering clause without corrupting it', () => {
-    const sternClause =
-      "the ship's name 'Nordwind' painted in faded gold letters on the stern transom";
-    const out = sanitizeVbIdsInPrompt(
-      `A wide stern view of VEH001. ${sternClause}.`,
-      visualBible,
-      1
-    );
-    expect(out).toContain(sternClause);
-    // The VB id itself is still resolved away — only the NAME is exempt.
     expect(out).not.toContain('VEH001');
-  });
-
-  it('leaves the 2026-08-24 protection in place when no entry declares lettering', () => {
-    const plainBible = { ...visualBible, vehicles: [visualBible.vehicles[1]] };
-    const out = sanitizeVbIdsInPrompt(
-      'Nora hides the Alte Seekarte aboard the Sturmklinge.',
-      plainBible,
-      4
-    );
-    expect(out).not.toContain('Alte Seekarte');
-    expect(out).not.toContain('Sturmklinge');
   });
 });
 

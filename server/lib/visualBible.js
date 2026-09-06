@@ -142,6 +142,9 @@ function tryParseVisualBibleJSON(outline) {
       visualBible.artifacts = jsonData.artifacts.map(artifact => ({
         id: artifact.id || generateId('ART', visualBible.artifacts.length),
         name: artifact.name,
+        // A name the STORY gives the object. Kept for the text side only;
+        // image prompts carry the descriptive `name`, never this.
+        properName: artifact.properName || null,
         appearsInPages: artifact.pages || [],
         description: artifact.description || `${artifact.type}: ${artifact.description}`,
         type: artifact.type,

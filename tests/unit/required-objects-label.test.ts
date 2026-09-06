@@ -140,28 +140,4 @@ describe("a VB type never replaces prose the Art Director wrote (p8)", () => {
     expect(out).not.toContain("chunky children's knitted hat");
     expect(out).toMatch(/\bred\b/);
   });
-
-  it('still substitutes a single-token proper-noun tail (2026-08-24 protection intact)', () => {
-    const vb = {
-      ...visualBible,
-      artifacts: [
-        {
-          id: 'ART001',
-          name: "Fiona's Schatzkarte",
-          type: 'hand-drawn treasure map on aged parchment',
-          description: 'a single sheet of aged parchment with illegible weathered script',
-        },
-      ],
-    };
-    const out = sanitizeVbIdsInPrompt('The Schatzkarte lies open on the table.', vb, 5);
-    expect(out).not.toContain('Schatzkarte');
-    expect(out).toContain('hand-drawn treasure map');
-  });
-
-  it('carries a stated colour across a full-name substitution', () => {
-    const out = sanitizeVbIdsInPrompt("Lily's red woollen hat lies on the cobbles.", visualBible, 8);
-    expect(out).not.toContain("Lily's red woollen hat");
-    expect(out).toMatch(/\bred\b/);
-    expect(out).toContain("knitted hat");
-  });
 });

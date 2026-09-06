@@ -26,7 +26,7 @@ const visualBible = {
 const TITLE_LINE = 'Paint "Noah and the Crackers at the Zoo" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene.';
 
 describe('sanitizeVbIdsInPrompt: baked cover title is never rewritten', () => {
-  it('keeps the quoted title verbatim while still substituting prop names in the prose', () => {
+  it('keeps the quoted title and the prose verbatim', () => {
     const prompt = [
       'Noah holds a sleeve of Crackers, his Pirate hat tipped forward.',
       '**TITLE:**',
@@ -34,7 +34,7 @@ describe('sanitizeVbIdsInPrompt: baked cover title is never rewritten', () => {
     ].join('\n');
     const out = sanitizeVbIdsInPrompt(prompt, visualBible, -1);
     const lines = out.split('\n');
-    expect(lines[0]).toBe('Noah holds a sleeve of food prop, his costume hat tipped forward.');
+    expect(lines[0]).toBe('Noah holds a sleeve of Crackers, his Pirate hat tipped forward.');
     expect(lines[2]).toBe(TITLE_LINE);
     expect(out).not.toContain('BAKED-TITLE');
   });

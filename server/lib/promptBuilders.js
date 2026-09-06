@@ -2048,14 +2048,7 @@ function buildCoverPrompt(coverType, {
   ].join('\n');
 }
 
-// The painted-title instruction of a baked cover. ONE shape, shared with
-// sanitizeVbIdsInPrompt: the title is the one string on a cover that must reach
-// the model verbatim, so the sanitiser masks the quoted part before its prop-
-// name substitution. Staging trial job_1788684429841_0flr66gs8: the story is
-// "Noah and the Crackers at the Zoo", the bible names ART002 "Crackers" with
-// type "food prop", and the cover came back lettered "Noah and the food prop at
-// the Zoo".
-const BAKED_TITLE_LINE_RE = /^(Paint ")(.*)(" in the upper third of the canvas\b)/u;
+// The painted-title instruction of a baked cover.
 function bakedTitleLine(title) {
   return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`;
 }
@@ -3787,94 +3780,6 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     }
   }
 
-  // PROPER NAMES of props, resolved the same way their ids are.
-  //
-  // Resolving the ids was only half the job. The Art Director does not write
-  // "ART001" in prose — it writes the entity's NAME, and that name reaches the
-  // model by four routes the id pass never sees: the prose itself, sceneIntent,
-  // the object appended to an EXACT POSES line, and cross-references inside
-  // another entry's description ("a narrower hull than the Goldene Möwe").
-  // The model then letters the name onto the prop: measured on staging
-  // job_1787514666616_yw9qsv1vf, p5 rendered "Fiona's Schatzkarte" painted
-  // across the map and p4 "Goldene Möwe" across the hull. Nothing had quoted a
-  // string, so rule 12c — which forbids quoting text to render — had nothing
-  // to say about it.
-  //
-  // The substitution is the entry's own `type`, which is already English and
-  // is a description rather than a label ("hand-drawn treasure map on aged
-  // parchment"), falling back to the same englishEntityRef the id path uses.
-  // Only the REF pools: character and animal names are identity anchors and
-  // stay, exactly as they do above.
-  const nameSubs = [];
-  const protectedNames = new Set();
-  for (const pool of NAME_POOLS) {
-    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
-      if (entry?.name) protectedNames.add(String(entry.name).trim().toLowerCase());
-    }
-  }
-  const seenAlias = new Map();
-  // VB-lettering exception: a name the bible itself draws onto the element is
-  // the one string the model is SUPPOSED to render there (see
-  // vbDeclaredLetteringNames). Substituting it produced gibberish gold letters
-  // on a stern transom. Every other prop name keeps being substituted.
-  const letteringNames = vbDeclaredLetteringNames(visualBible);
-  for (const [pool, genericNoun] of Object.entries(REF_POOLS)) {
-    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
-      const name = String((entry && entry.name) || '').trim();
-      if (name.length < 4) continue;
-      if (protectedNames.has(name.toLowerCase())) continue;   // also a person or animal
-      if (letteringNames.has(name.toLowerCase())) continue;   // VB declares it as lettering on the thing
-      const ref = String(entry.type || '').trim() || englishEntityRef(entry, genericNoun);
-      if (!ref) continue;
-      const aliases = [name];
-      // "Fiona's Schatzkarte" also appears as bare "Schatzkarte". Register the
-      // possessive-stripped tail too — but only once: if two entries reduce to
-      // the same tail it is ambiguous and neither alias is safe.
-      // Only a SINGLE-TOKEN tail is registered. The alias exists for a proper
-      // noun that also appears bare ("Fiona's Schatzkarte" → "Schatzkarte").
-      // A MULTI-WORD tail is descriptive prose, not a name, and matching it
-      // inside the Art Director's own phrasing destroys that phrasing:
-      // staging job_1788641639919_mpjwlzkf1 p8, ART001 ("Lily's red woollen
-      // hat", type "children's knitted hat") registered the tail "red woollen
-      // hat", which matched INSIDE the brief's "Lily's chunky red woollen hat
-      // lies on the damp cobbles" and emitted "Lily's chunky children's
-      // knitted hat" — the colour deleted and "chunky" orphaned onto a noun it
-      // was never written for. A descriptive phrase is never at risk of being
-      // painted as lettering, which is the only thing this substitution exists
-      // to prevent.
-      const bare = name.replace(/^\S+['’]s?\s+/u, '').trim();
-      if (bare.length >= 4 && bare !== name && !/\s/.test(bare)) {
-        seenAlias.set(bare.toLowerCase(), (seenAlias.get(bare.toLowerCase()) || 0) + 1);
-        aliases.push(bare);
-      }
-      for (const alias of aliases) nameSubs.push({ alias, ref });
-    }
-  }
-  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Longest first, so "Fiona's Schatzkarte" is consumed before "Schatzkarte".
-  const activeSubs = nameSubs
-    .filter(s => !(seenAlias.get(s.alias.toLowerCase()) > 1))
-    .sort((a, b) => b.alias.length - a.alias.length);
-  // A colour the PROSE stated must survive the substitution. The replacement
-  // is the entry's generic `type` ("children's knitted hat"), so swapping it
-  // over a phrase that named a colour silently changes what gets painted.
-  // Carry the colour across when the ref does not already state one.
-  const COLOUR_WORD = /\b(red|orange|yellow|green|blue|indigo|violet|purple|pink|brown|black|white|grey|gray|silver|golden|gold|copper|bronze|crimson|scarlet|amber|teal|turquoise|maroon|beige|cream|tan|ochre|navy)\b/i;
-  const replaceNames = (line) => {
-    let out = line;
-    for (const { alias, ref } of activeSubs) {
-      out = out.replace(
-        new RegExp(`(^|[^\\p{L}\\p{N}])(${escapeRe(alias)})(?![\\p{L}\\p{N}])`, 'giu'),
-        (_m, pre, hit) => {
-          const c = hit.match(COLOUR_WORD);
-          const keep = (c && !COLOUR_WORD.test(ref)) ? `${c[1].toLowerCase()} ` : '';
-          return `${pre}${keep}${ref}`;
-        }
-      );
-    }
-    return out;
-  };
-
   // ONE grammar for "this is a VB id", shared with the runtime alarm
   // (vbIdGuard.js) so the sanitiser and the guard can never disagree about what
   // an id looks like -- the dotted vantage suffix included.
@@ -3890,12 +3795,7 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   const lines = prompt.split('\n');
   const out = [];
   const orphans = [];
-  // A baked cover title is lettering the model MUST reproduce as written; the
-  // id and name passes run on everything around it, never inside the quotes.
-  const TITLE_MASK = ' BAKED-TITLE ';
-  for (const rawLine of lines) {
-    const titleHit = rawLine.match(BAKED_TITLE_LINE_RE);
-    const line = titleHit ? rawLine.replace(BAKED_TITLE_LINE_RE, `$1${TITLE_MASK}$3`) : rawLine;
+  for (const line of lines) {
     const lineOrphans = [];
     const resolved = line.replace(ID_PATTERN, (id) => {
       const upper = id.toUpperCase();
@@ -3909,10 +3809,7 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
       return GENERIC_NOUN[id.slice(0, 3).toUpperCase()] || 'object';
     });
     if (lineOrphans.length > 0) orphans.push({ line: line.trim(), ids: lineOrphans });
-    // Names after ids: the id pass inserts refs, never names, so this cannot
-    // re-process its own output.
-    const substituted = replaceNames(resolved);
-    out.push(titleHit ? substituted.replace(TITLE_MASK, () => titleHit[2]) : substituted);
+    out.push(resolved);
   }
 
   if (orphans.length > 0) {
