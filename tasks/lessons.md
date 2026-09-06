@@ -643,3 +643,9 @@ uncommitted tracked file from all concurrent sessions (recovered except possibly
 tests/unit/inpaint-routing.test.ts edits). Rule: to stage only your own hunks, build a filtered patch and
 `git apply --cached` it — never a checkout/restore with a repo-wide pathspec. Same day, two agents also had
 their staged index swept into a foreign commit: commit promptly after staging, and name what you commit.
+
+## 2026-09-06 — parallel agents in one worktree
+- A finding list from an eval is a menu: present it, let the owner triage, dispatch only chosen items. Fanning out agents first got "stop your agents".
+- Never leave a stopped agent's partial hunks in shared files: another session swept `require('./vbElementBudget')` to staging while the module was untracked → deployed code that would crash page generation. After every push, verify every new `require` target is tracked.
+- Dirty shared file → commit your hunk only via `git show HEAD:` copy + `git hash-object -w` + `git update-index --cacheinfo`; verify with `git show HEAD -- file`. Never `git add -A`, never stash on the shared tree.
+- Showcase spec: Playwright `hasText` is a contains-match; "Realistic" matched the category header, not the card. Assertions must accept the wizard's auto-advance.
