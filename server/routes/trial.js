@@ -2298,7 +2298,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     }
 
     // Lazy require the styled avatar module
-    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
+    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, retainCacheScopeForHandoff, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
 
     // Run avatar styling inside the trial user's cache scope. Same scope key
     // the trial story job uses (see processStoryJob → `trial-${userId}`) so:
@@ -2336,7 +2336,18 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         styledAvatarsData[charName] = avatars;
       }
 
-      // Clear this scoped cache to free memory
+      // Hand the scope over to the story job instead of wiping it. The job
+      // enters `trial-${userId}` a moment after this handler's generation
+      // finishes (prod job_1788698812047_q5b1vuds7: 220 ms), and the refcount
+      // guard inside clearStyledAvatarCache only covers an OVERLAP - with no
+      // overlap the clear below ran and the job regenerated the identical sheet
+      // (a second Grok 2x4 + style transfer, ~58 s and real money). The DB
+      // handoff below cannot be relied on either: /start waits at most 60 s for
+      // this handler and the character row is written AFTER this point.
+      // The retention expires on its own if no job ever arrives (abandoned
+      // trial), so nothing leaks; clearStyledAvatarCache is still called so the
+      // scope IS freed here whenever there is no pending consumer.
+      retainCacheScopeForHandoff(`trial-${userId}`);
       clearStyledAvatarCache();
 
       // Split styled avatars into individual full-body images for the

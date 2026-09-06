@@ -29731,3 +29731,55 @@ customer accounts, `node scripts/seo/report.js` → live Search Console data.
 **Status:** ✅ active — verified on production 2026-09-06: the trial sign-in shows a
 plain consent card, no warning screen. Do NOT consolidate the two Cloud projects
 back into one, and never add a sensitive scope to `magical-story-3b745`.
+
+---
+
+## 2026-09-06 — A prewarmed avatar cache scope is RETAINED for the story job, not wiped
+
+**Context:** Refcounting the shared `trial-<userId>` scope (entry above) only protects an
+OVERLAP — two runners inside the scope at once. The normal trial ordering has no overlap:
+`/api/trial/prepare-title` finishes its 2×4 sheet, is the only runner in the scope, so its
+`clearStyledAvatarCache()` runs, and the story job enters the same scope a moment later to
+find it empty. Production trial `job_1788698812047_q5b1vuds7` (Amian, watercolor, no costume,
+so the prewarm generated a full `standard` sheet instead of seeding it from the preview
+avatar): `data.styledAvatarGeneration` holds TWO records for Amian/watercolor/standard with
+BYTE-IDENTICAL 4097-char prompts — the prewarm's (77.3 s, full quality eval) and the job's
+(57.9 s, `no-eval-requested`, i.e. `skipQualityEval: !!trialMode`), starting 220 ms apart.
+One wasted Grok 2×4 + style transfer and ~58 s of latency on every such trial. The DB handoff
+(`preGeneratedStyledAvatars`) does not save it: `/api/trial/create-story` waits at most 60 s
+for an in-flight prewarm (the sheet alone takes ~77 s), and the prewarm writes the character
+row AFTER it clears the cache — the story's stored `characters[0].preGeneratedStyledAvatars`
+is `null`, so the job seeded nothing.
+
+**Decision:** `retainCacheScopeForHandoff(scopeId, ttlMs = 180000)` marks a scope as having a
+pending consumer. `clearStyledAvatarCache()` is a no-op (logged) while a retention is live;
+the next `runInCacheScope(scopeId)` CLAIMS the retention (cancels its TTL) and its own clear
+frees the scope for real. If no consumer ever enters — abandoned trial — the TTL frees the
+entries; at most `MAX_PENDING_HANDOFFS = 20` scopes may be retained at once, oldest evicted.
+Retaining is skipped when another runner is already inside the scope (the refcount guard
+already covers that, and a retention would only park the bytes until the TTL).
+`prepare-title` retains before clearing. Also: a cache HIT in `prepareStyledAvatars` now
+writes the sheet onto `char.avatars.styledAvatars[artStyle]` via
+`rememberStyledAvatarOnCharacter()` — the skip path previously left that object empty, which
+is how a seeded trial character once shipped the whole 2×4 sheet as every page's reference
+(`job_1787647410717_5dvfqu8jg` p2); the handoff makes that skip path the normal one.
+
+**Rationale:** Refcount-with-pending-consumer is the smallest lifecycle that states the real
+invariant: the cache lives until the run that will consume it has finished, and is freed
+anyway if that run never arrives. TTL alone would be an unbounded retention policy; deleting
+the prewarm's clear would leak every abandoned trial's image bytes. Raising the 60 s wait in
+`/create-story` was rejected — it serialises the trial (the prewarm's whole point is to run
+under the outline window) and only narrows the race instead of removing it.
+
+**Sibling paths checked:** `clearStyledAvatarCache()` has exactly three call sites —
+`prepare-title` and `storyJobPipeline.js` (job end + job error). Only the trial shares a scope
+between two runners; a full story's scope is its unique `jobId`, and the cover path runs
+inside that same job scope, so neither can hit this. `ensureStyledAvatarCoverage()` only reads
+the cache and never clears. The per-scope avatar LOG buckets have the same shared-scope
+shape but are cleared only by the job's finalizer, so the prewarm's entries already survive.
+
+**Touched:** `server/lib/styledAvatars.js` (`retainCacheScopeForHandoff`,
+`releasePendingScopeHandoff`, `clearScopeEntries`, `runInCacheScope`,
+`clearStyledAvatarCache`, `rememberStyledAvatarOnCharacter`), `server/routes/trial.js`
+(`prepare-title` handler), `tests/unit/styled-avatar-scope-guard.test.ts`.
+**Status:** ✅ active

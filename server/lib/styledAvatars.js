@@ -525,6 +525,31 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
  * @param {Array<{pageNumber, clothingCategory, characterNames}>} pageRequirements - What's needed for each page
  * @returns {Promise<Map>} Map of cacheKey -> styledAvatar
  */
+/**
+ * Write a styled avatar onto the character object, in the shape every consumer
+ * (projectStoryCharacterAvatars, cover cell extraction) reads. Same shape as the
+ * post-generation write-back below — one source of truth for it.
+ * @param {Object} character
+ * @param {string} artStyle
+ * @param {string} clothingCategory - 'standard' | 'winter' | ... | 'costumed[:type]'
+ * @param {string} styledAvatar
+ */
+function rememberStyledAvatarOnCharacter(character, artStyle, clothingCategory, styledAvatar) {
+  if (!character || !styledAvatar) return;
+  if (!character.avatars) character.avatars = {};
+  if (!character.avatars.styledAvatars) character.avatars.styledAvatars = {};
+  if (!character.avatars.styledAvatars[artStyle]) character.avatars.styledAvatars[artStyle] = {};
+  if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
+    const costumeType = clothingCategory.startsWith('costumed:')
+      ? (clothingCategory.split(':')[1] || 'default')
+      : 'default';
+    if (!character.avatars.styledAvatars[artStyle].costumed) character.avatars.styledAvatars[artStyle].costumed = {};
+    character.avatars.styledAvatars[artStyle].costumed[costumeType] = styledAvatar;
+  } else {
+    character.avatars.styledAvatars[artStyle][clothingCategory] = styledAvatar;
+  }
+}
+
 async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
@@ -558,8 +583,17 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       const cacheKey = getAvatarCacheKey(charName, clothingCategory, artStyle);
 
       // Skip if already cached (a guarantee-seeded raw reference doesn't
-      // count — the real conversion must still be retried)
-      if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) continue;
+      // count — the real conversion must still be retried). The character
+      // object must still learn about the sheet: projectStoryCharacterAvatars
+      // reads ONLY char.avatars.styledAvatars, so a cache hit that skipped the
+      // write-back left the story-avatar map empty and every page shipped the
+      // WHOLE 2×4 sheet as its reference instead of the matching pose cell
+      // (prod job_1787647410717_5dvfqu8jg p2). Only reachable via a seeded or
+      // handed-over cache; harmless when the object already has the entry.
+      if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) {
+        rememberStyledAvatarOnCharacter(char, artStyle, clothingCategory, styledAvatarCache.get(cacheKey));
+        continue;
+      }
 
       // Skip if already in our list to convert
       if (neededAvatars.has(cacheKey)) continue;
@@ -1207,8 +1241,98 @@ function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
 // because their prompt spells the outfit out in words).
 const activeScopeRunners = new Map();
 
+// scopeId -> { timer, expiresAt }. A retained scope has a consumer that has not
+// entered it YET. The refcount above only protects an OVERLAP; the normal trial
+// ordering has no overlap at all: the prewarm finishes, clears (count 1, so the
+// clear runs), and the story job enters the same scope a fraction of a second
+// later to find it empty — so it pays for the identical 2x4 sheet + style
+// transfer a second time (prod job_1788698812047_q5b1vuds7: two records for
+// Amian/watercolor/standard with byte-identical prompts, 77 s and 58 s, starting
+// 220 ms apart). The DB handoff (preGeneratedStyledAvatars) does not cover this:
+// /api/trial/create-story waits at most 60 s for an in-flight prewarm, and the
+// prewarm persists the avatars AFTER it clears the cache. A retention makes the
+// scope survive the prewarm's exit until the job claims it, with a TTL so an
+// abandoned trial (no job ever arrives) still frees the bytes.
+const pendingScopeHandoffs = new Map();
+// Retained scopes hold image bytes. Bound both dimensions: how long one may live
+// and how many may live at once (oldest evicted first).
+const HANDOFF_TTL_MS = 180000;
+const MAX_PENDING_HANDOFFS = 20;
+
+/**
+ * Keep a scope's cache alive past the current runner's exit, for a consumer that
+ * has not entered the scope yet. Consumed by the next runInCacheScope on the same
+ * scopeId; otherwise the entries are freed after ttlMs.
+ * @param {string} scopeId
+ * @param {number} [ttlMs]
+ */
+function retainCacheScopeForHandoff(scopeId, ttlMs = HANDOFF_TTL_MS) {
+  if (!scopeId) return;
+  // The consumer is already inside the scope (overlapping order). The refcount
+  // guard covers that case and the last runner out clears properly - retaining
+  // on top of it would only park the entries until the TTL.
+  const others = (activeScopeRunners.get(scopeId) || 0) - (cacheContext.getStore() === scopeId ? 1 : 0);
+  if (others > 0) {
+    log.info(`[STYLED AVATARS] Not retaining scope ${scopeId} - ${others} runner(s) already inside it`);
+    return;
+  }
+  const existing = pendingScopeHandoffs.get(scopeId);
+  if (existing) {
+    clearTimeout(existing.timer);
+  } else if (pendingScopeHandoffs.size >= MAX_PENDING_HANDOFFS) {
+    // Evict the oldest retention rather than growing without bound.
+    const oldest = [...pendingScopeHandoffs.entries()]
+      .sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0];
+    log.warn(`[STYLED AVATARS] ${MAX_PENDING_HANDOFFS} scopes already retained - evicting ${oldest[0]}`);
+    releasePendingScopeHandoff(oldest[0], 'evicted');
+  }
+  const timer = setTimeout(() => {
+    log.info(`[STYLED AVATARS] Handoff for scope ${scopeId} expired after ${ttlMs}ms - no consumer arrived, freeing entries`);
+    releasePendingScopeHandoff(scopeId, 'expired');
+  }, ttlMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  pendingScopeHandoffs.set(scopeId, { timer, expiresAt: Date.now() + ttlMs });
+  log.info(`[STYLED AVATARS] Retaining cache scope ${scopeId} for handoff (ttl ${ttlMs}ms)`);
+}
+
+// Drop a retention and free its entries. Used by the TTL timer and by eviction -
+// never by the consumer, which wants the entries.
+function releasePendingScopeHandoff(scopeId, reason) {
+  const entry = pendingScopeHandoffs.get(scopeId);
+  if (!entry) return;
+  clearTimeout(entry.timer);
+  pendingScopeHandoffs.delete(scopeId);
+  clearScopeEntries(scopeId, reason);
+}
+
+// Delete every cache entry belonging to one scope, without having to be inside it
+// (the TTL timer runs outside any AsyncLocalStorage context).
+function clearScopeEntries(scopeId, reason = 'clear') {
+  const prefix = `${scopeId}::`;
+  let cleared = 0;
+  for (const key of [...styledAvatarCache.keys()]) {
+    if (key.startsWith(prefix)) { styledAvatarCache.delete(key); cleared++; }
+  }
+  for (const key of [...conversionInProgress.keys()]) {
+    if (key.startsWith(prefix)) conversionInProgress.delete(key);
+  }
+  for (const key of [...guaranteeSeededKeys]) {
+    if (key.startsWith(prefix)) guaranteeSeededKeys.delete(key);
+  }
+  log.debug(`[STYLED AVATARS] Cleared ${cleared} entries for scope ${scopeId} (${reason}) (${styledAvatarCache.size} remain)`);
+  return cleared;
+}
+
 async function runInCacheScope(scopeId, fn) {
   log.debug(`🔒 [STYLED AVATARS] Running in cache scope: ${scopeId}`);
+  // Entering a retained scope IS the handoff: cancel the TTL and keep the
+  // entries - this runner is the consumer they were held for.
+  const handoff = pendingScopeHandoffs.get(scopeId);
+  if (handoff) {
+    clearTimeout(handoff.timer);
+    pendingScopeHandoffs.delete(scopeId);
+    log.info(`[STYLED AVATARS] Claimed retained cache scope ${scopeId} - prewarmed avatars reused`);
+  }
   activeScopeRunners.set(scopeId, (activeScopeRunners.get(scopeId) || 0) + 1);
   try {
     return await cacheContext.run(scopeId, fn);
@@ -1232,24 +1356,17 @@ function clearStyledAvatarCache() {
     log.info(`⏭️ [STYLED AVATARS] Not clearing scope ${scopeId} — ${activeScopeRunners.get(scopeId) - 1} other runner(s) still active in it`);
     return;
   }
+  if (scopeId && pendingScopeHandoffs.has(scopeId)) {
+    // A consumer is expected but has not entered the scope yet (the normal trial
+    // order: the prewarm ends before the story job starts). Keep the entries; the
+    // consumer frees them on its own way out, and the TTL frees them if it never
+    // arrives.
+    log.info(`[STYLED AVATARS] Not clearing scope ${scopeId} - retained for a pending consumer`);
+    return;
+  }
   if (scope) {
     // Only clear entries belonging to the current scope
-    let cleared = 0;
-    for (const key of [...styledAvatarCache.keys()]) {
-      if (key.startsWith(scope)) {
-        styledAvatarCache.delete(key);
-        cleared++;
-      }
-    }
-    for (const key of [...conversionInProgress.keys()]) {
-      if (key.startsWith(scope)) {
-        conversionInProgress.delete(key);
-      }
-    }
-    for (const key of [...guaranteeSeededKeys]) {
-      if (key.startsWith(scope)) guaranteeSeededKeys.delete(key);
-    }
-    log.debug(`🗑️ [STYLED AVATARS] Cleared ${cleared} entries for scope ${scope} (${styledAvatarCache.size} remain)`);
+    clearScopeEntries(scopeId);
   } else {
     // No scope set — clear everything (backward compat)
     const size = styledAvatarCache.size;
@@ -1766,6 +1883,7 @@ module.exports = {
 
   // Cache access
   runInCacheScope,
+  retainCacheScopeForHandoff,
   getStyledAvatar,
   setStyledAvatar,
   hasStyledAvatar,
