@@ -1,0 +1,14 @@
+A reference sheet for an illustrated children's book. Each cell carries a white letter on a black square in its top-left corner. The letter is an overlay for this question only — ignore it when judging what the cell shows.
+
+Match each element below to the ONE cell that shows it.
+
+{ELEMENT_LIST}
+
+Rules:
+- One cell per element, one element per cell.
+- A cell that shows none of the elements — empty background, a colour field, a duplicate of a cell you already matched — is matched to nothing.
+- An element with no cell of its own gets label null. Never force a match onto a cell that shows something else.
+- A cell showing only part of a figure, or two figures at once, is not a match.
+
+Reply as JSON:
+{"assignments": [{"element": 1, "label": "A"}, {"element": 2, "label": null}], "empty": ["C"]}

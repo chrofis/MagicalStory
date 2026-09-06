@@ -274,6 +274,7 @@ async function loadPromptTemplates() {
     ['boundingBoxDetection', 'bounding-box-detection.txt'],
     ['repairVerification', 'repair-verification.txt'],
     ['referenceSheet', 'reference-sheet.txt'],
+    ['sheetCellIdentification', 'sheet-cell-identification.txt'],
     ['sceneRepair', 'scene-repair.txt'],
     ['entityConsistencyCheck', 'entity-consistency-check.txt'],
     ['entitySinglePageRepair', 'entity-single-page-repair.txt'],

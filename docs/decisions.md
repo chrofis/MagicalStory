@@ -27149,3 +27149,60 @@ capped), `tests/unit/vb-slot-packing.test.ts` (new),
 `tests/unit/recurring-creature-slot.test.ts` (two strip-era assertions updated to
 the column contract), `docs/image-generation-methods.html` §5b.
 **Status:** ✅ active
+
+## Reference sheet cell boundaries are detected from pixels, not assumed from the requested count (2026-09-06)
+
+**Context:** VB element references are generated in batches: N elements are described in ONE
+prompt that asks for a fixed layout (2×2 for exactly four elements, a single vertical column
+otherwise), and the returned sheet is cut back into N per-element images. Both splitters took
+the requested N as fact — the analyzer's `/split-reference-sheet` asks `_detect_separators` for
+exactly `rows-1` horizontal lines and `cols-1` vertical ones, and the sharp fallback divides
+the image by those same numbers. Neither ever checked whether the model drew that grid.
+
+Staging story `job_1788641639919_mpjwlzkf1`: a 3-character batch was prompted as a 1×3 column;
+the model returned a **2×2 sheet with four figures** (the fourth a half-body duplicate of the
+first). It was cut into three full-width horizontal bands. Confirmed against the stored sheet
+(`ref_sheet_source/p0/v0.jpg`) and the stored cutouts (`vb/CHR00*.jpg`): CHR001 came out as two
+boys side by side, CHR002 as a band straddling the mid-row divider showing two different girls,
+CHR003 as a strip of legs and shoes. CHR002 is the girl in the red duffel coat used on page 14.
+Two of the other three sheets in the same story also disagreed with their request — batch 3
+asked for 3 and the model drew a 3×3 lattice with only the middle column painted.
+
+**Decision:** Measure the grid before cutting. `server/lib/sheetGrid.js` → `detectSheetGrid` is
+count-free: it locates gutter bands (thin near-uniform full-span lines, black or white) using an
+**adaptive** uniformity threshold (a fraction of the sheet's median line-std), rejects wide
+uniform fields (a pale margin, a flat sky) and edge-touching runs (the outer frame), requires
+tone contrast against the flanking paint, and derives cols×rows from what is drawn.
+
+- Detected count **==** requested → fast path, cells row-major on the detected boundaries, no
+  extra model call. This is the overwhelmingly common case.
+- Detected count **!=** requested → each cell gets an A/B/C… label drawn on it and **one**
+  `gemini-2.5-flash-lite` call (`prompts/sheet-cell-identification.txt`, the model the VB
+  character-cell render gate already uses) maps elements to labels. Unmatched elements get a
+  `null` reference and are logged loudly (`vb_sheet_layout_mismatch`, `vb_sheet_element_missing`).
+  **No new paid retry loop** — an element with no cell simply has no reference, same as before.
+
+Verified offline on the real sheet: detector reported 2×2=4 with the separators at y=640 / x=360;
+the one identification call (856 tokens, ~CHF 0.0001) returned A=boy, C=red-duffel girl,
+D=big sister, B=none, and the re-sliced crops are clean single figures.
+
+**Rationale:** Prompting harder for a fixed grid was already tried — the template says "equal-sized
+cells separated by thick straight black gridlines" three times over and the model still drew 2×2
+for a 3-cell request. The failure is also silent: a misaligned crop is a valid image, so nothing
+downstream rejects it, and a two-figure "reference" then teaches every page what that character
+looks like. Detection is free and runs on every sheet; the paid call fires only on the mismatch
+path, where cell order genuinely cannot be inferred.
+
+**Not applied to** `character2x4Sheet.js` and `coverComposite.extractQuadrant`. Those sheets are
+composited by the app (`stackRowsInto2x4`) from two separately generated 1×4 rows, so the geometry
+is ours and not the model's; their cells mean *poses*, which a label cannot disambiguate; and a
+broken layout is already caught by `quickLayoutCheck`'s gutter-uniformity test plus the per-row
+structure eval. The analyzer's `_detect_separators` is likewise left alone — it answers a
+different question (a KNOWN number of dividers, e.g. the single head/body divider of a 2×4 sheet).
+
+**Touched:** `server/lib/sheetGrid.js` (new), `server/lib/referenceSheets.js`
+(`splitGridIntoReferences`, `identifySheetCells`), `prompts/sheet-cell-identification.txt` (new),
+`server/services/prompts.js`, `tests/unit/sheet-grid-detection.test.ts` (new),
+`docs/image-generation-methods.html`, `docs/prompt-inventory.md`
+
+**Status:** ✅ active

@@ -18,11 +18,75 @@ const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { loadVbReferenceBytes } = require('./characterPhotos');
 const { escapeXml } = require('./repairGrid');
+const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentification } = require('./sheetGrid');
 
 const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForImage(...args);
 
-async function splitGridIntoReferences(gridImage, count) {
-  // Convert input to BOTH a Buffer (for sharp fallback) and a base64 string
+/**
+ * Ask the eval model which detected cell holds which requested element.
+ *
+ * ONE call, only on the mismatch path. The sheet arrives with a letter drawn
+ * on each detected cell; the reply maps 1-based element positions to letters.
+ *
+ * @returns {Promise<{ map: Array<number|null>, missing: number[], unused: number[] }>}
+ */
+async function identifySheetCells(buffer, cells, elements) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
+  const { TEXT_MODELS } = require('../config/models');
+  // Same model as the VB character-cell render gate above.
+  const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
+
+  const elementList = elements
+    .map((e, i) => `${i + 1}. ${e.description || e.appearance || e.name || `element ${i + 1}`}`)
+    .join('\n');
+  const prompt = fillTemplate(PROMPT_TEMPLATES.sheetCellIdentification, { ELEMENT_LIST: elementList });
+
+  const labelled = await labelCells(buffer, cells);
+  const body = {
+    contents: [{ parts: [
+      { inlineData: { mimeType: 'image/png', data: labelled.toString('base64') } },
+      { text: prompt },
+    ] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json' },
+  };
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) }
+  );
+  if (!resp.ok) throw new Error(`sheet cell identification HTTP ${resp.status}`);
+  const j = await resp.json();
+  const usage = j?.usageMetadata;
+  if (usage) {
+    const { recordTextUsage } = require('./usageContext');
+    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'vb_sheet_cell_id', cfg.modelId);
+  }
+  const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+  return parseCellIdentification(raw, elements.length, cells.length);
+}
+
+/**
+ * Cut a generated reference sheet into one image per requested element.
+ *
+ * The grid is measured from the PIXELS first (detectSheetGrid). When the
+ * detected cell count matches what the prompt asked for, the cells are taken
+ * in row-major order — the fast path, no extra model call. When it does not,
+ * the sheet is labelled A/B/C… and one cheap vision call says which cell
+ * holds which element; unmatched elements come back null and are logged.
+ *
+ * Before this, both splitters trusted the requested count and cut blind. On
+ * staging story job_1788641639919_mpjwlzkf1 a 3-element character batch came
+ * back as a 2x2 sheet of four figures and was cut into three horizontal
+ * bands, so all three references were misaligned crops.
+ *
+ * @param {Buffer|string} gridImage the generated sheet
+ * @param {number} count elements requested
+ * @param {Array} [elements] the requested elements, in prompt order — required
+ *                for the identification call; without them a mismatch can only
+ *                fall back to row-major order.
+ */
+async function splitGridIntoReferences(gridImage, count, elements = null) {
+  // Convert input to BOTH a Buffer (for sharp) and a base64 string
   // (for the Python call) so we don't pay the conversion twice.
   let buffer;
   let base64;
@@ -32,6 +96,49 @@ async function splitGridIntoReferences(gridImage, count) {
   } else {
     buffer = gridImage;
     base64 = buffer.toString('base64');
+  }
+
+  // ── Measure the real grid before trusting the requested count ──────────
+  let grid = null;
+  try {
+    grid = await detectSheetGrid(buffer);
+    log.info(`[REF-SHEET] Grid detected from pixels: ${grid.cols}x${grid.rows} = ${grid.count} cell(s) (requested ${count}) — separators h=[${grid.separators.horizontal.join(',')}] v=[${grid.separators.vertical.join(',')}]`);
+  } catch (err) {
+    log.warn(`[REF-SHEET] Grid detection failed (${err.message}) — falling back to the requested-count split`);
+  }
+
+  if (grid && grid.count !== count) {
+    log.warn(`⚠️ [REF-SHEET] Sheet layout mismatch: asked for ${count} cell(s), the model drew ${grid.count} (${grid.cols}x${grid.rows}). Cell order cannot be assumed — running one identification call.`);
+    const genLog = require('./generationLogger').getCurrentLogger();
+    genLog?.warn('vb_sheet_layout_mismatch', `Reference sheet drew ${grid.count} cells (${grid.cols}x${grid.rows}) for ${count} requested element(s)`);
+
+    if (Array.isArray(elements) && elements.length === count) {
+      try {
+        const { map, missing, unused } = await identifySheetCells(buffer, grid.cells, elements);
+        const crops = await cropCells(buffer, grid.cells);
+        for (const i of missing) {
+          log.error(`❌ [REF-SHEET] Element "${elements[i]?.name || i + 1}" has no cell on the sheet — no reference image for it`);
+          genLog?.warn('vb_sheet_element_missing', `No cell on the reference sheet shows this element`, elements[i]?.name || `element ${i + 1}`);
+        }
+        if (unused.length > 0) {
+          log.info(`[REF-SHEET] Cells showing no requested element: ${unused.map(cellLabel).join(', ')}`);
+        }
+        log.info(`[REF-SHEET] Cell mapping: ${elements.map((e, i) => `${e.name} → ${map[i] === null ? 'NONE' : cellLabel(map[i])}`).join(', ')}`);
+        return map.map(idx => (idx === null ? null : crops[idx]));
+      } catch (err) {
+        log.error(`❌ [REF-SHEET] Cell identification failed (${err.message}) — no reference images for this batch`);
+        genLog?.warn('vb_sheet_identification_failed', `Cell identification failed: ${err.message}`);
+        return new Array(count).fill(null);
+      }
+    }
+    log.error(`❌ [REF-SHEET] No element list available for identification — cannot map ${grid.count} cells onto ${count} element(s); no reference images for this batch`);
+    return new Array(count).fill(null);
+  }
+
+  if (grid && grid.count === count) {
+    // Fast path: the model drew exactly what was asked for, so row-major
+    // order is the prompt's order. Cut on the detected boundaries.
+    return cropCells(buffer, grid.cells);
   }
 
   // Try Python service first — variance-based separator detection that
@@ -497,7 +604,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       });
 
       // Split grid into individual references
-      const references = await splitGridIntoReferences(gridImageData, batch.length);
+      const references = await splitGridIntoReferences(gridImageData, batch.length, batch);
 
       // Gate CHARACTER cells only (not artifacts/locations/animals) — see
       // checkCharacterCellRender above. One check, one re-render on NO, one
@@ -520,7 +627,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
           const rePrompt = buildReferenceSheetPrompt([element], styleDescription, visualBible);
           const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, imageModelOverride, null, '');
           if (!reResult?.imageData) throw new Error('re-render returned no image');
-          const reCell = (await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), 1))[0];
+          const reCell = (await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), 1, [element]))[0];
           if (!reCell) throw new Error('re-rendered cell extraction failed');
           references[i] = reCell;
           try {
