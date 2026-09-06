@@ -101,9 +101,13 @@ ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
 # container: the first /remove-bg spent 27.6s because rembg fetched u2net.onnx
 # from GitHub at request time, versus 0.9s once it was on disk — and it put an
 # external host in the user's photo-upload path. Every other model here is
-# pre-fetched; this one was the exception. rembg looks in $U2NET_HOME.
-ENV U2NET_HOME=/app/.u2net
-RUN mkdir -p /app/.u2net && curl -fL -o /app/.u2net/u2net.onnx     https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx     || echo "WARN: U2-Net pre-fetch failed — rembg will download it lazily at runtime"
+# pre-fetched; this one was the exception.
+#
+# The path is $HOME/.u2net, NOT $U2NET_HOME: this rembg version ignores that
+# variable. Baking into /app/.u2net and setting U2NET_HOME looked right, built
+# clean, and changed nothing — the container still logged 'Downloading ... to
+# /root/.u2net/u2net.onnx' on its first upload. Verified from that log line.
+RUN mkdir -p /root/.u2net && curl -fL -o /root/.u2net/u2net.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx || echo "WARN: U2-Net pre-fetch failed — rembg will download it lazily at runtime"
 
 # GroundingDINO-base weights pre-fetched into the image (~900MB) so the
 # /detect-figures-text cold start doesn't download from HuggingFace at runtime.
