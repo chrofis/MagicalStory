@@ -1312,7 +1312,7 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
 router.post('/create-story', verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
-    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation } = req.body;
+    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind } = req.body;
 
     if (!storyCategory && !storyTopic) {
       return res.status(400).json({ error: 'Story topic is required' });
@@ -1385,6 +1385,9 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       storyTheme: storyTheme || '',
       storyDetails: storyDetails || '',
       language: language || 'en',
+      // 'fantasy' = the make-believe-world idea (second card); anything else
+      // is the own-town idea and keeps the landmark mandate.
+      ideaKind: ideaKind === 'fantasy' ? 'fantasy' : 'local',
     };
 
     // Server-side location fallback if client didn't provide it
@@ -2105,7 +2108,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       CHARACTER: charDesc,
       CATEGORY_CONTEXT: categoryContext,
       TITLE: trialTitle || '',
-      LANDMARKS: landmarksText,
+      LANDMARKS: '',
       LANG_INSTRUCTION: langInstruction,
       AGE_MODE: buildAgeModeSection({ characters }),
     });
@@ -2114,8 +2117,10 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // at its real landmarks, one in a make-believe world entered from home.
     // Both ideas coming back as the same fantasy is what left the landmark
     // mandate nothing to attach to, and the writer bolted one onto the last page.
-    const localIdea = '\nSet this idea in the child\'s own town, at the real local places named above. A costume or theme shows in what they wear and how they play — the play is the story, never a trip somewhere else.';
-    const fantasyIdea = '\nGenerate a DIFFERENT idea than the first one, set in a make-believe world. It opens where the child really is — dressing up, or starting to play — and the make-believe follows from that.';
+    // The landmark mandate belongs to the own-town idea only; in the shared
+    // base it dragged the make-believe idea to the real lake as well.
+    const localIdea = `\n${landmarksText}\nSet this idea in the child's own town, at the real local places named above. A costume or theme shows in what they wear and how they play — the play is the story, never a trip somewhere else.`;
+    const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — dressing up, or starting to play — and the make-believe follows from that; the world it enters has no real place names.`;
     const prompt1Local = prompt1 + localIdea;
     const prompt2 = prompt1 + fantasyIdea;
 
@@ -2583,6 +2588,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     storyTopic: storyInput.storyTopic || '',
     storyTheme: storyInput.storyTheme || '',
     storyDetails: storyInput.storyDetails || '',
+    ideaKind: storyInput.ideaKind || 'local',
     characterId,
     characters: [trialCharacter],
     mainCharacters: [trialCharacter.id],

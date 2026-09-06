@@ -38,6 +38,10 @@ export interface StoryInput {
   storyTheme: string;
   storyDetails: string;
   language: string;
+  // Which of the two generated ideas was chosen: the own-town one (first
+  // card) or the make-believe-world one (second card). The story prompt
+  // pins the story to the real town only for `local`.
+  ideaKind?: 'local' | 'fantasy';
 }
 
 export interface GeneratedIdea {
@@ -372,6 +376,7 @@ export default function TrialWizard() {
       storyDetails: selectedIdea
         ? selectedIdea.title + '\n' + selectedIdea.summary
         : storyInput.storyDetails,
+      ideaKind: selectedIdeaIndex === 1 ? 'fantasy' as const : 'local' as const,
       ...(userLocation?.city ? { userLocation } : {}),
     };
     navigate('/trial-generation', {

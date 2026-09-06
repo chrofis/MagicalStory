@@ -6291,7 +6291,15 @@ The main character has two avatar styles available:
     // — e.g. Holzbrücke (Baden) has 2 interior shots (variants 4 & 5)
     // perfect for "on the bridge" scenes, but they never get chosen.
     let landmarksInstruction = '';
-    if (inputData.availableLandmarks?.length > 0) {
+    if (inputData.ideaKind === 'fantasy') {
+      // The make-believe idea: the real town frames the story, the pages
+      // between are the invented world. No landmark mandate — with it, every
+      // "mermaid world" trial was written at the local lake.
+      const city = inputData.userLocation?.city || '';
+      const theme = inputData.storyTheme && inputData.storyTheme !== 'realistic' ? `${inputData.storyTheme} ` : '';
+      landmarksInstruction = `# World
+A make-believe ${theme}world. The first scene shows the child where they really are${city ? ` (${city})` : ''}, dressing up or starting to play, and the last scene brings them back there; every scene between is inside the make-believe world, with its own invented places and no real place names.`;
+    } else if (inputData.availableLandmarks?.length > 0) {
       const top3 = inputData.availableLandmarks.slice(0, 3);
       const cityName = inputData.userLocation?.city || '';
       const landmarkBlock = top3.map(l => {
