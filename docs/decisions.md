@@ -28526,3 +28526,30 @@ without per-caller ordering rules.
 **Touched:** `server/lib/promptBuilders.js` (`bakedTitleLine`, `BAKED_TITLE_LINE_RE`,
 `sanitizeVbIdsInPrompt`), `tests/unit/cover-title-not-sanitised.test.ts`, `tasks/bugs.json`.
 **Status:** ✅ active
+
+## 2026-09-06 — Trial stories carry the life-skill block and the theme, not just the idea sentence
+
+**Context:** A life-challenge trial (topic "sharing", theme "pirate") produced three stories in a
+row where the child hands food to a zoo animal while wearing a pirate hat. Traced through the
+stored prompts: `prompts/trial-idea.txt` received the topic as a bare id and the theme as one
+clause; the Playwright run always chose idea 1, which by the 2026-08-25 two-kinds rule is the
+own-town idea with the costume as dress-up (the pirate-world story was idea 2 every time); and
+`prompts/story-trial.txt` had no placeholder for topic, theme, guidelines or teaching guide, so
+the writer saw only the 2-3 sentence idea. The `[sharing]` guide itself never required a stake.
+
+**Decision (owner, three questions):** (1) keep the two idea kinds, sharpen the wording: the idea
+prompt now states the topic with its guide lead, that the child's struggle with the skill is the
+conflict and its cost is shown, and that the theme is what the child plays at; the local variant
+says the play is the story. (2) `story-trial.txt` gains `{CATEGORY_GUIDELINES}`, filled by the
+same `buildLifeSkillGuidelines` the full story prompt uses (one builder, no duplicate); empty for
+adventure trials. (3) the `[sharing]` guide states that what is shared is something the child
+wants to keep, and that feeding an animal or giving away something unwanted is not sharing.
+
+**Rationale:** The topic and the theme are the two things the user chose; they must reach the
+writer with at least the weight the full pipeline gives them. Not reversed: the 2026-08-25 idea
+split stays.
+
+**Touched:** `server/routes/trial.js` (idea categoryContext, localIdea), `server/lib/promptBuilders.js`
+(`buildLifeSkillGuidelines`, `buildTrialStoryPrompt`), `prompts/story-trial.txt`,
+`prompts/life-challenge-guides.txt` `[sharing]`.
+**Status:** ✅ active — validated on one trial rerun so far; more runs at the owner's call.

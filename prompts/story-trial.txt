@@ -24,6 +24,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - **Characters** (appearance is illustration context for the scene hints, never for the story text): {CHARACTERS}
 - **Story Idea**: {STORY_DETAILS}
 
+{CATEGORY_GUIDELINES}
+
 {AGE_MODE}
 
 {AVATAR_SELECTION}

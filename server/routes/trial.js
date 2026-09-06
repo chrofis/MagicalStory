@@ -2044,7 +2044,13 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Determine category context
     let categoryContext = '';
     if (storyCategory === 'life-challenge') {
-      categoryContext = `This is a life skills story about "${storyTopic}". The story should help children understand and cope with this topic.${storyTheme && storyTheme !== 'realistic' ? ` Set in a ${storyTheme} adventure context.` : ''}`;
+      // The topic and the theme are the two things the user chose; the idea
+      // carries both, with the topic's own guide behind it (same guide the
+      // story prompt gets).
+      const { getTeachingGuide } = require('../lib/promptBuilders');
+      const guide = getTeachingGuide('life-challenge', storyTopic);
+      const guideLead = guide ? String(guide).split('\n')[0].trim() : '';
+      categoryContext = `This is a life skills story about "${storyTopic}"${guideLead ? ` — ${guideLead}` : ''} The child's struggle with this skill is the story's conflict, and what it costs them is shown.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}`;
     } else if (storyCategory === 'historical') {
       categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
     } else if (storyCategory === 'swiss-stories') {
@@ -2097,7 +2103,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // at its real landmarks, one in a make-believe world entered from home.
     // Both ideas coming back as the same fantasy is what left the landmark
     // mandate nothing to attach to, and the writer bolted one onto the last page.
-    const localIdea = '\nSet this idea in the child\'s own town, at the real local places named above. A costume or theme shows in what they wear and play, never in travelling somewhere else.';
+    const localIdea = '\nSet this idea in the child\'s own town, at the real local places named above. A costume or theme shows in what they wear and how they play — the play is the story, never a trip somewhere else.';
     const fantasyIdea = '\nGenerate a DIFFERENT idea than the first one, set in a make-believe world. It opens where the child really is — dressing up, or starting to play — and the make-believe follows from that.';
     const prompt1Local = prompt1 + localIdea;
     const prompt2 = prompt1 + fantasyIdea;

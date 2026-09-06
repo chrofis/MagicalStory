@@ -954,6 +954,29 @@ const SWISS_SAGEN_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'swiss-
  * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training', 'pirate', 'moon-landing', 'sage-wilhelm-tell')
  * @returns {string|null} The teaching guide content or null if not found
  */
+/**
+ * The life-skill guideline block of a story prompt: topic, how the lesson is
+ * told, the theme wrap, and the topic's teaching guide. ONE builder for the
+ * full story prompt and the trial prompt — the trial used to receive only the
+ * chosen idea sentence, so the topic and the theme reached the writer with
+ * whatever weight that one sentence gave them.
+ */
+function buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide) {
+  return `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
+
+**IMPORTANT GUIDELINES for Life Skills Stories:**
+- The story should help children understand and cope with the topic: <user_input>${storyTopic}</user_input>
+- Show the main character(s) facing this challenge naturally within the story
+- Provide positive, age-appropriate messages about handling this situation
+- Include practical tips or coping strategies woven into the narrative
+- End with a hopeful, empowering message
+- Avoid being preachy - let the lesson emerge naturally from the story
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}
+
+${teachingGuide ? `**SPECIFIC GUIDANCE for "<user_input>${storyTopic}</user_input>":**
+${teachingGuide}` : ''}`;
+}
+
 function getTeachingGuide(category, topicId) {
   if (!topicId) return null;
 
@@ -6021,19 +6044,7 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
 
   let categoryGuidelines = '';
   if (storyCategory === 'life-challenge') {
-    categoryGuidelines = `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
-
-**IMPORTANT GUIDELINES for Life Skills Stories:**
-- The story should help children understand and cope with the topic: <user_input>${storyTopic}</user_input>
-- Show the main character(s) facing this challenge naturally within the story
-- Provide positive, age-appropriate messages about handling this situation
-- Include practical tips or coping strategies woven into the narrative
-- End with a hopeful, empowering message
-- Avoid being preachy - let the lesson emerge naturally from the story
-${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}
-
-${teachingGuide ? `**SPECIFIC GUIDANCE for "<user_input>${storyTopic}</user_input>":**
-${teachingGuide}` : ''}`;
+    categoryGuidelines = buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide);
   } else if (storyCategory === 'educational') {
     categoryGuidelines = `This is an EDUCATIONAL story teaching about "<user_input>${storyTopic}</user_input>".
 
@@ -6405,6 +6416,11 @@ Reference the landmark by its LOC ID in the relevant scene hints.${variantHint}`
 The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;
     }
 
+    // Same life-skill block the full story prompt carries; empty for adventure.
+    const categoryGuidelines = category === 'life-challenge' && inputData.storyTopic
+      ? buildLifeSkillGuidelines(inputData.storyTopic, inputData.storyTheme, getTeachingGuide('life-challenge', inputData.storyTopic))
+      : '';
+
     return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
@@ -6412,6 +6428,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       LANGUAGE_NOTE: getLanguageNote(language),
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
+      CATEGORY_GUIDELINES: categoryGuidelines,
       AGE_MODE: buildAgeModeSection(inputData),
       AVATAR_SELECTION: avatarSelection,
       LANDMARKS: landmarksInstruction,
