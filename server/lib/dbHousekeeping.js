@@ -254,16 +254,49 @@ function logBloatReport(report, log) {
 
 const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
 
+/**
+ * Railway has two token families and they use DIFFERENT headers:
+ *
+ *   account / workspace tokens -> Authorization: Bearer
+ *   PROJECT tokens             -> Project-Access-Token
+ *
+ * Both environments here hold a PROJECT token — verified against the live API
+ * on 2026-09-06: production's authenticates only as Project-Access-Token, and
+ * `Bearer` is rejected. Sending Bearer meant the reclaim would run its VACUUM
+ * FULL and then fail the restart, freeing disk but never the memory that is the
+ * entire point of the job — and it would have failed QUIETLY, because
+ * restartOwnPostgres swallows its errors by design.
+ *
+ * Project tokens are UUIDs, so the shape picks the header; if that is rejected
+ * we retry with the other one, so a future token format cannot silently break
+ * this again.
+ */
+function railwayHeaders(token, useProjectHeader) {
+  return useProjectHeader
+    ? { 'Content-Type': 'application/json', 'Project-Access-Token': token }
+    : { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
+const LOOKS_LIKE_PROJECT_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function railwayGql(query, variables, token) {
-  const res = await fetch(RAILWAY_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(30000),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (body.errors) throw new Error(body.errors.map(e => e.message).join('; ').slice(0, 300));
-  return body.data;
+  const preferProject = LOOKS_LIKE_PROJECT_TOKEN.test(token || '');
+  let lastErr;
+  for (const useProjectHeader of [preferProject, !preferProject]) {
+    const res = await fetch(RAILWAY_API, {
+      method: 'POST',
+      headers: railwayHeaders(token, useProjectHeader),
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!body.errors) return body.data;
+    lastErr = body.errors.map(e => e.message).join('; ').slice(0, 300);
+    // Only an auth rejection is worth retrying with the other header; a real
+    // query error would just fail twice and muddy the log.
+    if (!/not authorized|unauthorized|authentication/i.test(lastErr)) break;
+  }
+  throw new Error(lastErr || 'Railway API call failed');
 }
 
 /**

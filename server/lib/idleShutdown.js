@@ -155,9 +155,15 @@ async function firstBusyProbe() {
 }
 
 async function stopOwnDeployment(deploymentId, token) {
+  // Project tokens (UUIDs) use Project-Access-Token, not Bearer — both of this
+  // project's environments hold one, so Bearer alone never authenticated here.
+  // See server/lib/dbHousekeeping.js railwayGql for the full note.
+  const isProjectToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token || '');
   const res = await fetch(RAILWAY_API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: isProjectToken
+      ? { 'Content-Type': 'application/json', 'Project-Access-Token': token }
+      : { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       query: 'mutation Stop($id: String!) { deploymentStop(id: $id) }',
       variables: { id: deploymentId },
