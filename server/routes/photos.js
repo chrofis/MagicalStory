@@ -41,9 +41,16 @@ router.get('/status', async (req, res) => {
 // POST /api/photos/remove-bg
 router.post('/remove-bg', authenticateToken, async (req, res) => {
   // A user is here and working with photos — make sure the analyzer's models
-  // are loading now rather than on the first mask call inside character repair.
-  // Debounced and fire-and-forget; never blocks this request.
-  require('../lib/analyzerClient').ensureWarm('photo-upload');
+  // are loading now rather than on the first upload. Debounced and
+  // fire-and-forget; never blocks this request.
+  //
+  // face ONLY (2026-09-05). This used to take the default (face + torch) to get
+  // ahead of "the first mask call inside character repair" — but that warm is
+  // redundant now: jobs.js warms at story start and storyJobPipeline force-warms
+  // at the repair phase, which is where masking actually happens, 20+ minutes
+  // later. All the torch worker did here was hold ~430MB from the moment
+  // somebody uploaded a photo.
+  require('../lib/analyzerClient').ensureWarm('photo-upload', { workers: ['face'] });
 
   const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
   const { image, max_size } = req.body;

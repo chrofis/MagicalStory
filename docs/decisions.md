@@ -27020,3 +27020,49 @@ suggests it may be unnecessary there too. Open question, not a silent change.
 **Touched:** `photo_analyzer.py` (`warmup_endpoint`), `server/lib/analyzerClient.js`
 (`ensureWarm({ workers })`), `server/lib/presenceSessions.js`.
 **Status:** ✅ active
+
+## 2026-09-05 — Worker readiness is cached, and a wedged worker fails fast
+
+**Context:** Fixing the cold-start 502 earlier the same day made `ensure_worker`
+stop returning on `_worker_alive()` alone (alive is not listening). That was
+correct but bought two costs: every proxied request now paid a loopback /health
+round trip, and — worse — a worker that was ALIVE but wedged no longer failed
+fast. It sat in the readiness poll for the full 120s startup budget before
+raising, turning an instant error into a two-minute hang on a user request.
+
+**Decision:** Cache proven readiness in `_worker_ready` (populated when a worker
+answers /health, cleared on spawn and on kill), so the hot path — worker already
+serving — skips the probe entirely. And split the wait budget by situation: the
+full 120s only when we just spawned the worker or another thread is bringing it
+up, otherwise `WEDGED_WORKER_TIMEOUT_S` (15s). A worker that is alive with
+nobody starting it should answer in milliseconds; if it does not, the caller
+wants a 503 it can act on.
+
+**Rationale:** The 120s budget exists for model imports. Applying it to a worker
+nobody is starting confuses "slow to boot" with "broken", and the caller pays.
+15s is not a tuning knob — it is "far longer than a healthy loopback /health,
+far shorter than a user's patience".
+
+**Touched:** `photo_analyzer.py` (`_worker_ready`, `WEDGED_WORKER_TIMEOUT_S`,
+`ensure_worker`, `kill_workers`), `tests/manual/test_worker_bringup_race.py`
+(cases D and E), `.githooks/pre-push` (gate 6c runs the suite; skips with a
+warning when the machine has no cv2).
+**Status:** ✅ active
+
+## 2026-09-05 — /remove-bg warms the face worker only
+
+**Context:** The photo-upload warm took the default (face + torch) to get ahead
+of "the first mask call inside character repair". That comment predates the
+repair-phase warm: `jobs.js` warms at story start and `storyJobPipeline.js`
+force-warms at the repair phase, which is where masking happens — 20+ minutes
+after a wizard photo upload.
+
+**Decision:** `/remove-bg` sends `workers: ['face']`. Masking is warmed where it
+is used.
+
+**Rationale:** The torch worker held ~430MB from the moment anybody uploaded a
+photo, for models re-warmed later anyway. Superseded reasoning, not a deliberate
+trade — the redundancy appeared when the repair-phase force-warm was added.
+
+**Touched:** `server/routes/photos.js`.
+**Status:** ✅ active

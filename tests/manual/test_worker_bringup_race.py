@@ -80,6 +80,7 @@ def install_fakes(ready_after_s):
 def reset_state():
     pa._workers.clear()
     pa._bringing_up.clear()
+    pa._worker_ready.clear()
     pa._active_sessions = 0
     pa._inflight_requests = 0
 
@@ -158,10 +159,63 @@ def test_force_still_kills():
     t.join(timeout=10)
 
 
+def test_ready_worker_skips_the_probe():
+    """A proven-ready worker must not pay a health round trip per request."""
+    print('\n[D] ready cache')
+    reset_state()
+    install_fakes(ready_after_s=0)
+
+    pa.ensure_worker('face')  # proves readiness, populates the cache
+    probes = {'n': 0}
+    inner = pa._worker_health_ok
+
+    def counting(role, timeout=2):
+        probes['n'] += 1
+        return inner(role, timeout)
+
+    pa._worker_health_ok = counting
+    for _ in range(5):
+        pa.ensure_worker('face')
+    check('no health probe on the hot path', probes['n'] == 0,
+          f'{probes["n"]} probe(s) across 5 calls')
+
+    # Killing the worker must invalidate the cache, not strand it.
+    pa.kill_workers('test', force=True)
+    check('kill clears the ready cache', 'face' not in pa._worker_ready,
+          f'_worker_ready={pa._worker_ready}')
+
+
+def test_wedged_worker_fails_fast():
+    """Alive but not answering, nobody starting it -> fast 503, not a 120s hang."""
+    print('\n[E] wedged worker')
+    reset_state()
+    install_fakes(ready_after_s=10**6)  # never becomes healthy
+
+    # Shorten the budget so this runs on every push; the code reads the module
+    # global at call time. What is under test is that the SHORT budget is chosen
+    # at all, not its exact value.
+    original = pa.WEDGED_WORKER_TIMEOUT_S
+    pa.WEDGED_WORKER_TIMEOUT_S = 2
+    try:
+        pa._workers['face'] = FakeProc()  # alive, unproven, no bring-up in flight
+        t0 = time.time()
+        try:
+            pa.ensure_worker('face')
+            check('raised for a wedged worker', False, 'returned normally')
+        except RuntimeError as e:
+            waited = time.time() - t0
+            check('failed fast rather than hanging 120s', waited < 60,
+                  f'raised after {waited:.1f}s: {e}')
+    finally:
+        pa.WEDGED_WORKER_TIMEOUT_S = original
+
+
 if __name__ == '__main__':
     print('worker bring-up race — regression test')
     test_reaper_cannot_kill_a_starting_worker()
     test_alive_but_not_listening_is_not_ready()
     test_force_still_kills()
+    test_ready_worker_skips_the_probe()
+    test_wedged_worker_fails_fast()
     print('\n' + ('FAILED: ' + ', '.join(FAILURES) if FAILURES else 'ALL PASSED'))
     sys.exit(1 if FAILURES else 0)

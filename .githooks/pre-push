@@ -64,6 +64,28 @@ node "$HOOK_DIR/../tests/manual/test-char-repair-parity.js" >/dev/null || {
   exit 1
 }
 
+# Gate 6c: the analyzer's worker lifecycle. Two defects shipped together on
+# 2026-09-05 and cost a production 502 on the first photo upload after a deploy:
+# the idle reaper killed a worker mid-startup (a warmup brought it up off a
+# request, so the reaper's request-epoch guard could not see it), and
+# ensure_worker handed out a process that was alive but not yet listening.
+# Both live in bookkeeping no story run exercises deterministically, so they get
+# a test rather than a hope. ~6s, loads no ML model.
+#
+# SKIPS (with a warning) when the Python deps are absent: a hook that blocks a
+# push because a machine has no cv2 is a hook people disable. Only a real test
+# failure is a gate.
+if python -c "import cv2" >/dev/null 2>&1; then
+  python "$HOOK_DIR/../tests/manual/test_worker_bringup_race.py" >/dev/null 2>&1 || {
+    echo ""
+    echo "check-worker-lifecycle: the analyzer worker bring-up guarantees are broken"
+    python "$HOOK_DIR/../tests/manual/test_worker_bringup_race.py"
+    exit 1
+  }
+else
+  echo "check-worker-lifecycle: SKIPPED (no python cv2 on this machine)"
+fi
+
 # Gate 7: no Gemini 3.x model on Google's NATIVE api may carry sampling params —
 # they are silently ignored there, so a repointed eval call site loses its
 # temperature:0 determinism with no error. See check-gemini-sampling.js.

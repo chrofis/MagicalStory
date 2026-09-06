@@ -392,6 +392,17 @@ _active_sessions = 0
 # be waiting on the same role, and whichever finished first would otherwise drop
 # the protection while the other was still waiting.
 _bringing_up = {}
+# Roles that have answered /health since they were spawned. Lets the common path
+# (worker already serving) skip the readiness probe entirely — without it every
+# proxied request paid a loopback round trip. Cleared on spawn and on kill.
+_worker_ready = set()
+
+# How long to wait for a worker that is ALIVE but not answering, when nobody is
+# bringing it up. Such a worker should reply in milliseconds; if it does not it
+# is wedged, and the caller wants a fast 503 rather than a two-minute hang. The
+# full 120s budget still applies to a worker we just spawned or that another
+# thread is starting, because model imports legitimately take that long.
+WEDGED_WORKER_TIMEOUT_S = 15
 
 def _note_arcface_used():
     """Stub kept for the embed paths; lifecycle is session-driven now."""
@@ -434,10 +445,17 @@ def ensure_worker(role, wait_ready=True):
     asked for.
     """
     url = f"http://127.0.0.1:{WORKER_PORTS[role]}"
+    spawned = False
     with _workers_lock:
+        # Proven-ready and still alive: the overwhelmingly common case. Skip the
+        # probe — this is a per-request path.
+        if role in _worker_ready and _worker_alive(role):
+            return url
         if not _worker_alive(role):
+            _worker_ready.discard(role)
             if _worker_health_ok(role):
                 print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
+                _worker_ready.add(role)
                 return url
             env = dict(os.environ)
             env['ANALYZER_ROLE'] = role
@@ -446,21 +464,28 @@ def ensure_worker(role, wait_ready=True):
             print(f"[WORKERS] spawning {role} worker on :{WORKER_PORTS[role]}")
             _workers[role] = subprocess.Popen(
                 [sys.executable, '-u', os.path.abspath(__file__)], env=env)
+            spawned = True
+        # Someone else is already waiting on this role's startup, so the long
+        # budget is the right one even though WE did not spawn it.
+        starting = spawned or _bringing_up.get(role, 0) > 0
         if not wait_ready:
             return url
         _bringing_up[role] = _bringing_up.get(role, 0) + 1
     try:
         # Model imports gate readiness (mediapipe ~5s, TF ~15s). Poll rather
         # than sleep so the fast workers don't pay the slow ones' budget.
-        deadline = time.time() + 120
+        budget = 120 if starting else WEDGED_WORKER_TIMEOUT_S
+        deadline = time.time() + budget
         while time.time() < deadline:
             if _worker_health_ok(role):
+                with _workers_lock:
+                    _worker_ready.add(role)
                 break
             if not _worker_alive(role):
                 raise RuntimeError(f"{role} worker exited during startup")
             time.sleep(0.5)
         else:
-            raise RuntimeError(f"{role} worker not ready within 120s")
+            raise RuntimeError(f"{role} worker not ready within {budget}s")
     finally:
         with _workers_lock:
             if _bringing_up.get(role, 0) > 1:
@@ -514,6 +539,7 @@ def kill_workers(reason, expect_epoch=None, force=False):
                 except Exception as e:
                     print(f"[WORKERS] kill {role} failed: {e}")
             _workers.pop(role, None)
+            _worker_ready.discard(role)
     return True
 
 
