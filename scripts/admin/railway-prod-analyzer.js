@@ -361,8 +361,47 @@ async function printLogs(filter, envId) {
   console.log(`(${logs.length} lines fetched)`);
 }
 
+/**
+ * Billed memory per service. Railway returns GB-MINUTES, not GB-hours — divide
+ * by the window's minutes to get the average GB actually held. Misreading this
+ * unit once turned a $24 week into a reported $1,344.
+ */
+async function printMemory(minutes) {
+  const end = new Date();
+  const start = new Date(end.getTime() - minutes * 60000);
+  const NAMES = {
+    '8a281ffe-bb3a-47a2-8318-710afd5acbb7': 'web',
+    '3ac947b5-def9-4027-bbe6-34da77d4babf': 'analyzer',
+    '3611b39d-d532-47ac-b06a-aa338d3688d9': 'Postgres',
+  };
+  for (const [label, envId] of [['production', ENV_PROD], ['staging', ENV_STAGING]]) {
+    const d = await gql(
+      `query($w:String!,$s:DateTime!,$e:DateTime!){
+         usage(workspaceId:$w, measurements:[MEMORY_USAGE_GB], startDate:$s, endDate:$e,
+               groupBy:[SERVICE_ID, ENVIRONMENT_ID]){
+           measurement value tags{ serviceId environmentId } } }`,
+      { w: '2f4391c0-7561-41c6-b571-cd432ca1ee27', s: start.toISOString(), e: end.toISOString() }
+    );
+    console.log(`
+=== ${label} — average memory over the last ${minutes} min ===`);
+    let total = 0;
+    (d.usage || []).filter((u) => u.tags.environmentId === envId).forEach((u) => {
+      const avgGb = u.value / minutes; // GB-MINUTES -> average GB
+      total += avgGb;
+      const name = NAMES[u.tags.serviceId] || u.tags.serviceId.slice(0, 8);
+      console.log(`  ${name.padEnd(10)} ${(avgGb * 1000).toFixed(0).padStart(6)} MB   ($${(avgGb * 10).toFixed(2)}/mo)`);
+    });
+    console.log(`  ${'TOTAL'.padEnd(10)} ${(total * 1000).toFixed(0).padStart(6)} MB   ($${(total * 10).toFixed(2)}/mo)`);
+  }
+  console.log('');
+}
+
 (async () => {
   try {
+    if (has('memory')) {
+      await printMemory(parseInt(arg('minutes', '30'), 10));
+      return;
+    }
     if (has('logs')) {
       await printLogs(arg('grep', null), arg('env', '') === 'staging' ? ENV_STAGING : ENV_PROD);
       return;
