@@ -32,7 +32,13 @@ const r2 = require('./r2');
 const TABLES = ['characters', 'stories'];
 const TZ = 'Europe/Zurich';
 const DAILY_AFTER_MINUTES = 3 * 60 + 30; // 03:30 CH
-const SUNDAY = 0;
+// Tuesday, not Sunday (owner, 2026-09-06). Saturday and Sunday are the busiest
+// days — families make stories at the weekend, and Sunday is the modal day even
+// in the small production sample (4 of 9 jobs). A reclaim takes an ACCESS
+// EXCLUSIVE lock and then drops every database connection, so it belongs as far
+// from the weekend as possible in both directions. 03:30 CH holds: no story job
+// has ever been created between 01:00 and 07:00 Swiss local.
+const RECLAIM_WEEKDAY = 2; // Tuesday
 
 const MB = (n) => Number(n) / 1024 / 1024;
 
@@ -398,12 +404,12 @@ async function runWeeklyReclaim({ pool, log }) {
 
   const busy = await busyReport();
   if (busy.busy) {
-    log.info(`[db-housekeeping] weekly reclaim skipped — work in flight (${busy.reasons.join('; ')})`);
+    log.info(`[db-housekeeping] reclaim skipped — work in flight (${busy.reasons.join('; ')})`);
     return { skipped: 'busy', reasons: busy.reasons };
   }
 
   const before = await databaseSize(pool);
-  log.info(`[db-housekeeping] weekly reclaim — database ${before.pretty}, locking tables`);
+  log.info(`[db-housekeeping] reclaim — database ${before.pretty}, locking tables`);
 
   const locked = [];
   for (const t of TABLES) {
@@ -469,8 +475,8 @@ function startDbHousekeeping({ pool, log }) {
   // nothing there. Anything that is not explicitly staging keeps the weekly
   // cadence, so an unknown environment errs toward the safer schedule.
   const isStaging = process.env.RAILWAY_ENVIRONMENT_NAME === 'staging';
-  const reclaimOpts = isStaging ? {} : { weekday: SUNDAY };
-  const reclaimCadence = isStaging ? 'daily' : 'Sundays';
+  const reclaimOpts = isStaging ? {} : { weekday: RECLAIM_WEEKDAY };
+  const reclaimCadence = isStaging ? 'daily' : 'Tuesdays';
 
   const tick = async () => {
     try {
