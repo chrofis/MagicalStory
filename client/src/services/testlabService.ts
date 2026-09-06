@@ -553,6 +553,11 @@ export const TESTLAB_STAGES = [
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.
   { id: 'score_rejudge', label: 'Re-judge stored scores with another judge (params.scoreIds, judgeModel)', producesImage: false, overridable: false, storyLevel: true },
+  // Replays the arc panel over a story's STORED committed arc block, so a
+  // panel-prompt change is measurable: the arc the panel reads is frozen, so the
+  // only variable is the prompt (or the models). params.retell also re-tells
+  // against the new panel output, answering "does it help" end to end.
+  { id: 'arc_panel_replay', label: 'Arc panel replay (frozen arc → what does the panel catch?)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

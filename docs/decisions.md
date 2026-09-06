@@ -27150,6 +27150,57 @@ capped), `tests/unit/vb-slot-packing.test.ts` (new),
 the column contract), `docs/image-generation-methods.html` §5b.
 **Status:** ✅ active
 
+## 2026-09-06 — Prompt edits cost credits like every other image op, and the "5 credits" label was the last survivor of the 5→2 change
+
+**Context:** The prompt-edit modal in `StoryWizard.tsx` (the popup with the
+textarea, "Bild bearbeiten" → "Bearbeiten (5 Credits)") advertised 5 credits.
+Every other image button in the app said 2, and the two routes behind it —
+`POST /:id/edit/image/:pageNum` and `POST /:id/edit/cover/:coverType` — charged
+**nothing at all**: no credit check, no deduction, no ledger row, only a rate
+limiter. So the label said 5, the neighbours said 2, and reality was 0. The 5
+was left behind by `c2b8eed36` (2026-05-25, "regen 5→2"), which missed this
+modal because it lives in the wizard, not in `StoryDisplay`. The uncharged
+routes were flagged as an open question in the 2026-07-25 review (P3, "decision
+or oversight?") and never resolved.
+
+**Decision:** Prompt edits are charged like any other single-image operation.
+`/edit/image` charges `CREDIT_COSTS.IMAGE_REGENERATION`, `/edit/cover` charges
+`CREDIT_COSTS.COVER_REGENERATION` — both 2 — using the same pattern as the
+regenerate route: pre-check before the AI call, atomic deduct with a balance
+floor after success only (`AND credits >= $1 RETURNING`, the BILL-1 pattern), a
+`credit_transactions` row, and impersonating admins / `credits = -1` exempt. A
+failed edit charges nothing. The button label now interpolates the constant and
+switches on target type (page vs cover).
+
+Two routes were also reading the wrong constant: cover regeneration used
+`IMAGE_REGENERATION`, and character repair had no constant of its own. Added
+`CHARACTER_REPAIR` and pointed each route at the cost that names it. All four
+are 2 today, so nothing changes for users — but a future price change is now a
+per-operation edit instead of a code change.
+
+**Rationale:** An unmetered paid provider call reachable by any registered user
+is a standing cost leak, and three different numbers for one operation is worse
+than any of them being wrong. Charging matches what the button already claimed
+(directionally) and what every sibling operation costs.
+
+**Provider cost note (Grok 2, current):** a page render is
+`grok-imagine-image-2.0` at **$0.04**, an edit/inpaint is `grok-imagine` at
+**$0.02**. A finished page is normally *both* — empty scene $0.02 + image $0.04
+— so **assume $0.06 per page**. The old "~CHF 0.018 provider cost, 3–4× margin"
+comment in `credits.js` was Grok 1.x era; real margin on a 2-credit operation is
+~1.6–2.1× (CHF 0.050–0.067 revenue vs ≈CHF 0.032), and ≈break-even on the
+two-call composite cover path.
+
+**Touched:**
+- `server/config/credits.js` (`CHARACTER_REPAIR` added; cost comments corrected to Grok 2)
+- `server/routes/regeneration.js` (`/edit/image` + `/edit/cover` now charge; cover regen → `COVER_REGENERATION`; character repair → `CHARACTER_REPAIR`)
+- `client/src/constants/credits.ts` (`COVER_REGENERATION_COST`, `TITLE_PAINT_COST`, `CHARACTER_REPAIR_COST`)
+- `client/src/pages/StoryWizard.tsx` (edit-modal label from the constant; post-checkout toast no longer claims a fixed "100 credits")
+- `client/src/components/generation/StoryDisplay.tsx` (last hardcoded "2 credits" strings → constants)
+- `docs/PRICING.html` (packages, per-op table, Grok 2 unit costs, margin math)
+
+**Status:** ✅ active
+
 ## Reference sheet cell boundaries are detected from pixels, not assumed from the requested count (2026-09-06)
 
 **Context:** VB element references are generated in batches: N elements are described in ONE
@@ -27204,5 +27255,73 @@ different question (a KNOWN number of dividers, e.g. the single head/body divide
 (`splitGridIntoReferences`, `identifySheetCells`), `prompts/sheet-cell-identification.txt` (new),
 `server/services/prompts.js`, `tests/unit/sheet-grid-detection.test.ts` (new),
 `docs/image-generation-methods.html`, `docs/prompt-inventory.md`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-06 — The arc panel gets a forced checklist and may name a premise-level fault; the hostile arc audit stays a Lab tool
+
+**Context:** Story `job_1788641639919_mpjwlzkf1` shipped an arc with four faults a
+reader trips over immediately: children join a neighbourhood game with no arrival
+on the page; a rival calls the boy protagonist by a name never exchanged; the
+game's invented rule ("nobody answers when their name is called") is not a game a
+child could play; and the youngest bursting out of hiding is said to expose a
+second hider the seeker cannot see.
+
+The arc machine (`create-panel-retell`, 2026-08-30) ran normally. Its stored
+`arcReviewReport` shows the loop working *and* missing:
+
+- All three panelists — grok-4.6, deepseek-v4-pro, gpt-5.6-luna-pro — independently
+  attacked the invented rule. The panel converged on the real defect unprompted.
+- None of the four models (creator + three panelists) mentioned the missing
+  arrival or the unexchanged name. `arc-panel.txt` gave the panel no question
+  list, only "anything that breaks the story's consistency" — so it found what was
+  salient. An absence is never salient.
+- The panel could not act on what it found. `arc-panel.txt` said a solution "never
+  re-architects" and "stays inside the existing structure", so no panelist could
+  say *cut the invented rule*; all three patched around it. The re-telling took the
+  patch ("the girl's silence comes from fright, not from a rule"), which deleted
+  the rule's one payoff — the draft arc had the rule making the search harder,
+  because shouting a hider's name is useless — while keeping the plant. The
+  re-telling's own critique then reported "No orphans."
+
+**Decision:** Two prompt changes, no architectural change.
+
+1. `arc-panel.txt` gains six forced questions the panel walks turn by turn:
+   ENTRANCE (what stated cause puts each figure here; figures who do not know each
+   other meet on the page before acting together), ASSUMED (a name never
+   exchanged, knowledge nobody present could hold), DEVICE (a rule, custom, game
+   or mechanism doing work whose meaning was never stated, or that exists only to
+   make a turn possible), CAUSE, CLAIM (does an action accomplish what its
+   sentence claims, by the world's own physics and sight lines), ORPHAN (counting
+   what the arc's own fixes removed).
+2. The structural restraint gains one exception, in `arc-panel.txt` and its
+   sibling clause in `arc-retell.txt`: where an invented rule, custom, game or
+   mechanism is *itself* the fault, a solution may cut it outright and replace it
+   with a reason from character, motive or situation. A fault carried by the
+   premise is named as the premise, never patched around.
+
+`story-arc-audit.txt` and `story-arc-judge.txt` stay Lab-only, as they have been
+since the arc machine replaced the audit/review chain. The three-panelist machine
+is the production checker; it needed a checklist and permission, not a fourth
+reviewer. The audit is kept in the Lab in case the panel proves insufficient.
+
+**Rationale:** The panel already finds real defects — adding a fourth independent
+pass would have paid for a capability it has. What it lacked was a list forcing it
+past the salient fault to the absent one, and the authority to remove a broken
+premise instead of patching it. Both are prompt-side, which is where
+classification belongs.
+
+Measurability: production runs the panel once, inside a generation, over an arc
+the creator has just written — so a panel-prompt change could not be A/B'd without
+the arc changing underneath it. New Lab stage `arc_panel_replay` replays the panel
+against a story's stored `arcReviewReport.committed` block (byte-identical to what
+production sent), making the prompt the only variable; `params.retell` also
+re-tells against the new panel output, so "does it help" is answerable end to end.
+
+**Touched:** `prompts/arc-panel.txt`, `prompts/arc-retell.txt`,
+`server/lib/testlab.js` (`runArcPanelReplayStage`, `STORY_STAGES`),
+`client/src/services/testlabService.ts`
 
 **Status:** ✅ active

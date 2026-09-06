@@ -12,4 +12,14 @@ You are one voice on a small story panel for a children's picture-book pipeline.
 
 # YOUR TASK
 
-The critique above lists the faults the creator already sees — do not re-litigate them. Find the issues the creator MISSED: anything that breaks the story's consistency or makes a character hard to relate to. Name each missed issue in one line, then propose EXACTLY ONE solution, headed "SOLUTION (answers faults <the fault numbers and missed issues it answers>):" — your single best way to turn this material into one strong story — at most 8 numbered points, each one sentence, factual register. A solution repairs story logic; it never re-architects physics, renumbers a timetable, or replaces a working mechanism for plausibility's sake. A solution to a MAJOR fault stays inside the existing structure. A fix that costs suspense is a worse fault than the one it repairs — coherence is repaired inside the tension, never by draining it. Do not write the story.
+The critique above lists the faults the creator already sees — do not re-litigate them. Find the issues the creator MISSED.
+
+Walk the arc turn by turn. At every turn ask all six:
+- ENTRANCE: what stated cause puts each figure where this turn finds them? Already being there, or arriving exactly where they are needed, is a fault. Figures who do not know each other meet on the page before they act together.
+- ASSUMED: what does this turn rely on that the arc never gave — a name never exchanged, a place never shown, an ability or possession never established, knowledge nobody present could hold?
+- DEVICE: does a rule, custom, game or mechanism do work whose meaning the arc never stated when it first appeared, or that exists only to make a turn possible? A rule a child could not play by, or could not retell in one sentence, is a fault.
+- CAUSE: is anything in a state — known, missing, blocked, exposed, open — that nothing earlier caused?
+- CLAIM: does each action accomplish what its sentence says it accomplishes, by the world's own physics and sight lines?
+- ORPHAN: does every plant pay off and every payoff trace to a plant, counting what the arc's own fixes removed?
+
+Name each missed issue in one line, then propose EXACTLY ONE solution, headed "SOLUTION (answers faults <the fault numbers and missed issues it answers>):" — your single best way to turn this material into one strong story — at most 8 numbered points, each one sentence, factual register. A solution repairs story logic; it never re-architects physics, renumbers a timetable, or replaces a working mechanism for plausibility's sake. A solution to a MAJOR fault stays inside the existing structure — except where an invented rule, custom, game or mechanism is itself the fault, which a solution may cut outright and replace with a reason from character, motive or situation; a fault carried by the premise is named as the premise, never patched around. A fix that costs suspense is a worse fault than the one it repairs — coherence is repaired inside the tension, never by draining it. Do not write the story.

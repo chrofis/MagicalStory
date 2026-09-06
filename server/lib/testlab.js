@@ -7486,6 +7486,133 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
   };
 }
 
+/**
+ * ARC PANEL REPLAY — the panel, and only the panel, on a frozen committed arc.
+ *
+ * Production runs the panel once inside a generation, over an arc the creator
+ * has only just written. That makes a panel-prompt change unmeasurable: rerun
+ * the pipeline and the arc differs, so any change in what the panel finds could
+ * be the new arc rather than the new prompt.
+ *
+ * This replays the panel against a story's STORED committed arc block
+ * (arcReviewReport.committed = the committed arc plus the creator's own
+ * critique — byte-identical to what production sent). The only variable is the
+ * prompt, or the models.
+ *
+ * params.panelModels — comma-separated override of the panel (default: the
+ *                      production arcPanelModels)
+ * params.retell      — also run the re-telling on the new panel output, so the
+ *                      question is answered end to end and not just at the panel
+ * promptOverride     — full replacement arc-panel template, the usual Lab lever
+ */
+async function runArcPanelReplayStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const H = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const report = storyData.arcReviewReport || {};
+  // The committed block is what production handed the panel, verbatim. Without
+  // it there is nothing to replay against and a reconstruction would not be the
+  // same input, so this fails rather than approximating.
+  const committed = String(report.committed || '').trim();
+  if (!committed) throw new Error('story has no stored arcReviewReport.committed block to replay');
+
+  const orig = PROMPT_TEMPLATES.arcPanel;
+  if (promptOverride) PROMPT_TEMPLATES.arcPanel = promptOverride;
+  let prompt;
+  try {
+    prompt = H.buildArcPanelPrompt(storyData, committed);
+  } finally {
+    PROMPT_TEMPLATES.arcPanel = orig;
+  }
+  if (!prompt) throw new Error('arc-panel template unavailable');
+
+  const models = String(params.panelModels || params.models || (MODEL_DEFAULTS.arcPanelModels || []).join(','))
+    .split(',').map(x => x.trim()).filter(Boolean);
+  if (!models.length) throw new Error('no panel models resolved');
+  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  const tempFor = (model, temp) =>
+    (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
+
+  const runs = [];
+  for (const model of models) {
+    // One arm's failure must not destroy the others — a fan-out is a comparison.
+    try {
+      const t = Date.now();
+      const res = await callTextModelStreaming(prompt, null, null, model, {
+        usageLabel: 'testlab_arc_panel_replay', ...tempFor(model, MODEL_DEFAULTS.arcPanelTemperature),
+      });
+      const text = String(res.text || '').trim();
+      const outTok = res.usage?.output_tokens ?? null;
+      // An empty response is a failed call, not a panel that found nothing.
+      if (!text || outTok === 0) {
+        throw new Error(`panelist ${model} returned an empty response (${outTok} output tokens) — provider failure, not a review`);
+      }
+      const solutionIdx = text.search(/^\s*[*#]*\s*SOLUTION/im);
+      runs.push({
+        model, modelId: res.modelId, ok: true,
+        elapsedMs: Date.now() - t,
+        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+        usage: res.usage,
+        text,
+        // The half that matters for a checklist change: what the panel FOUND,
+        // before its single solution. Split, never truncated — both halves ship.
+        issues: solutionIdx > 0 ? text.slice(0, solutionIdx).trim() : text,
+        solution: solutionIdx > 0 ? text.slice(solutionIdx).trim() : null,
+      });
+    } catch (err) {
+      log.warn(`⚠️ [arc panel replay] arm ${model} failed: ${err.message}`);
+      runs.push({ model, ok: false, error: err.message });
+    }
+  }
+
+  // Optional second half: does the new panel output change the re-telling? Same
+  // creator and temperature as production, so only the panel input differs.
+  let retell = null;
+  if (params.retell === true || params.retell === 'true') {
+    const panel = runs.filter(r => r.ok);
+    if (!panel.length) throw new Error('every panelist failed — nothing to re-tell against');
+    panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
+    const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
+    const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
+    const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, committed, solutionsText);
+    if (!retellPrompt) throw new Error('arc-retell template unavailable');
+    const retellModel = String(params.retellModel || report.creatorModel || MODEL_DEFAULTS.arcCreatorModel);
+    if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
+    const t = Date.now();
+    const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
+      usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
+    });
+    const parsed = H.parseArcRetell(res.text || '');
+    retell = {
+      model: retellModel, modelId: res.modelId,
+      elapsedMs: Date.now() - t,
+      cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+      fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
+      finalArc: parsed.finalArc, critique: parsed.critique,
+      maxSeverity: H.critiqueMaxSeverity(parsed.critique),
+    };
+  }
+
+  return {
+    stageKind: 'arc_panel_replay',
+    storyId: target.storyId,
+    title: storyData.title || null,
+    creatorModel: report.creatorModel || null,
+    productionPanel: report.panelModels || null,
+    // The frozen input, so a reader can see the panel was handed the same arc.
+    committed,
+    promptChars: prompt.length,
+    prompt,
+    runs,
+    retell,
+    totalCost: Number([...runs.map(r => r.cost || 0), retell?.cost || 0].reduce((a, b) => a + b, 0).toFixed(4)),
+  };
+}
+
 const STORY_STAGES = {
   arc_rounds: runArcRoundsStage,
   cover: runCoverStage,
@@ -7505,6 +7632,7 @@ const STORY_STAGES = {
   clothing_review: runClothingReviewStage,
   story_scorecard: runStoryScorecardStage,
   score_rejudge: runScoreRejudgeStage,
+  arc_panel_replay: runArcPanelReplayStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.
