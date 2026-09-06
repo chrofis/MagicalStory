@@ -686,3 +686,18 @@ session had made further up the same file (655b25f9b). An empty index is not eno
 FILE is shared; check `git diff <file>` shows only your hunks, or stage your hunk alone with
 `git diff -U3 -- <file>` → keep your hunk → `git apply --cached`. Hot files tonight:
 promptBuilders.js, decisions.md, BACKLOG.md, prompts/story-*.txt.
+
+## 2026-09-06 — Get the authoritative artifact before theorising about a third-party UI
+A customer-facing "Google hasn't verified this app" screen took three wrong diagnoses before
+the right one, and every wrong turn came from reasoning about state I could not see. Theory 1
+(sensitive scopes on the customer project leak project-wide) died when the console's Data
+Access tables came back empty. Theory 2 (the owner was looking at the admin project's tab)
+died the moment the actual consent URL arrived carrying `client_id=…cl8hv6p5…` — the customer
+login client. The screen text alone never carried a client_id or a scope list, so re-pasting it
+could not discriminate between causes; the URL settled it in one message. Rule: when the
+evidence lives in a third-party console or a browser flow, ask for the ONE artifact that
+identifies the actor (a URL with its query string, a request id, a config table's contents) and
+stop reasoning until it arrives — and when a datum is asked for twice and not supplied, give the
+full remaining fix list rather than asking a third time. Also worth remembering: repo greps do
+prove things here — `grep` over both auth paths showed `scope: 'openid email profile'` and
+nothing else, which is what ruled out a rogue scope and pointed at undeclared-scope state.
