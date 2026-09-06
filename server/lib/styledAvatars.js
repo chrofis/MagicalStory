@@ -1179,9 +1179,27 @@ function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
  * @param {Function} fn - Async function to run within the scope
  * @returns {Promise} Result of fn
  */
-function runInCacheScope(scopeId, fn) {
+// scopeId → number of runInCacheScope callers currently inside it. A trial
+// DELIBERATELY shares one scope between the wizard's prepare-title prewarm and
+// the story job (`trial-<userId>`), so the job can await the prewarm's
+// in-flight sheet instead of paying for it twice. Whoever finishes first must
+// not wipe the scope while the other is still inside it: on staging
+// job_1788682208484 the prewarm finished 35 s after the job started, its
+// end-of-handler clear deleted the costumed sheet the job had just been handed,
+// and every page rendered the standard hoodie (covers showed the costume only
+// because their prompt spells the outfit out in words).
+const activeScopeRunners = new Map();
+
+async function runInCacheScope(scopeId, fn) {
   log.debug(`🔒 [STYLED AVATARS] Running in cache scope: ${scopeId}`);
-  return cacheContext.run(scopeId, fn);
+  activeScopeRunners.set(scopeId, (activeScopeRunners.get(scopeId) || 0) + 1);
+  try {
+    return await cacheContext.run(scopeId, fn);
+  } finally {
+    const remaining = (activeScopeRunners.get(scopeId) || 1) - 1;
+    if (remaining <= 0) activeScopeRunners.delete(scopeId);
+    else activeScopeRunners.set(scopeId, remaining);
+  }
 }
 
 /**
@@ -1190,6 +1208,13 @@ function runInCacheScope(scopeId, fn) {
  */
 function clearStyledAvatarCache() {
   const scope = getCacheScope();
+  const scopeId = cacheContext.getStore();
+  if (scopeId && (activeScopeRunners.get(scopeId) || 0) > 1) {
+    // Another runner (prewarm ↔ story job) is still inside this scope and
+    // will clear it when it finishes.
+    log.info(`⏭️ [STYLED AVATARS] Not clearing scope ${scopeId} — ${activeScopeRunners.get(scopeId) - 1} other runner(s) still active in it`);
+    return;
+  }
   if (scope) {
     // Only clear entries belonging to the current scope
     let cleared = 0;

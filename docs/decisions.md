@@ -28476,3 +28476,30 @@ answered, so the role stays tracked and the next reap retries.
 
 **Touched:** `photo_analyzer.py` (`kill_workers`).
 **Status:** ✅ active
+
+## 2026-09-06 — A styled-avatar cache scope is cleared only by its LAST active runner
+
+**Context:** A trial deliberately shares one cache scope, `trial-<userId>`, between the
+wizard's `/api/trial/prepare-title` prewarm and the story job, so the job can await the
+prewarm's in-flight costumed sheet instead of paying for it twice. Both callers ended with
+`clearStyledAvatarCache()`. `/api/trial/create-story` waits at most 60 s for an in-flight
+prewarm; a 2×4 sheet takes ~100 s. Staging trial `job_1788682208484_2a9fxiisj` (Noah, 3,
+sharing + pirate) shows the collision in its stored data: prewarm costumed sheet done at
+08:10:43 (score 9), job started 08:10:10, the prewarm's clear wiped the scope, the job's
+`ensureStyledAvatarCoverage` logged `avatar_category_missing: costumed` at 08:11:16 with
+`cached: ['standard']`, every page's reference photo was the standard hoodie sheet
+(photoType `bodyNoBg`, bucket substitution), and the avatars stage regenerated the costumed
+sheet at 08:12:45 — after the pages had already resolved their references. The covers show the
+costume only because the cover prompt spells the outfit out in words.
+
+**Decision:** `runInCacheScope` counts active runners per scope; `clearStyledAvatarCache()`
+is a no-op (logged) while another runner is still inside the same scope. Whoever leaves last
+clears. An abandoned prewarm (no job follows) still clears itself, so nothing leaks.
+
+**Rationale:** The shared scope is the intended design; the defect was that either side could
+destroy state the other was using. Refcounting fixes the hazard generically rather than
+special-casing the trial order of events. Raising the 60 s wait would only narrow the window.
+
+**Touched:** `server/lib/styledAvatars.js` (`runInCacheScope`, `clearStyledAvatarCache`),
+`tests/unit/styled-avatar-scope-guard.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active

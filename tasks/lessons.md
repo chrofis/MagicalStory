@@ -656,3 +656,10 @@ with `--help` (2026-09-06) started a real Dubois showcase on prod; it died only 
 output pipe closed. Never execute the orchestrator to learn its options — read the header
 comment (`sed -n 1,60p`) and `parseArgs()` instead. Same rule for every script under
 `scripts/admin/` that talks to a backend: read, don't run.
+
+## 2026-09-06 — Verify a scripted patch landed BEFORE the paid run
+A node heredoc patch on `tests/trial-to-full.spec.ts` silently did nothing (escaped
+backslashes in the search string), the run was launched anyway, and it burned another
+preview avatar failing on the exact same line. Rule: after any scripted edit, `grep` for the
+new text and read the diff; if a run costs money, the patch check is part of the launch
+command, not an afterthought. Prefer the Edit tool for literal replacements.

@@ -561,6 +561,15 @@
       "status": "fixed",
       "fixedIn": "staging 7e119dbab (2026-09-06)",
       "note": "14 readers across server and client picked ONE field name out of the three schemas that have existed (`description` current, `problem` pre-2026-08, `issue` older visual rows). Two of them (evalPipeline.js:1802/1932) read `problem` alone, so a shipped CRITICAL was invisible in the logs; three more (images.js legacy inpaint path, regeneration.js:3643, useRepairWorkflow.ts x4) built a repair instruction as `si.problem || `${si.type}: ${si.item}`` and handed Grok 'action_interaction: '; four client panels rendered `{issue.problem}` as a blank line next to the severity badge. Fix per the consolidate-at-copy-3 rule: ONE accessor, findingText(), exported from server/lib/scoring.js and mirrored in client/src/utils/findingText.ts, reading description||problem||issue and falling back to 'type: item' when a row carries no prose at all. Every reader now calls it. No stored field was renamed — old rows keep parsing. Regression test tests/unit/finding-text.test.ts asserts both implementations on all three schemas."
+    },
+    {
+      "id": "trial-prewarm-clears-shared-avatar-scope",
+      "title": "Trial prepare-title prewarm clears the styled-avatar cache scope it shares with the running story job, so pages lose the costumed sheet and render the standard outfit",
+      "reportedAt": "2026-09-06",
+      "source": "Confirmed from stored evidence: staging trial job_1788682208484_2a9fxiisj (Noah, 3, sharing + pirate). styledAvatarGeneration[0] costumed sheet success 08:10:43 (score 9); generationLog avatar_category_missing at 08:11:16 with cached=[standard], missing=[costumed]; all six sceneImages[].referencePhotos[0] are photoType bodyNoBg with the same hash c8992840 = the standard hoodie 2x4 sheet; styledAvatarGeneration[3] regenerated costumed at 08:12:45, after the pages had resolved their references. Every page image shows the green dinosaur hoodie; the covers show the pirate costume only because the cover prompt states the outfit in words.",
+      "status": "fixed",
+      "fixedIn": "staging (commit: fix(trial): a shared avatar cache scope is cleared only by its last runner, 2026-09-06)",
+      "note": "Root cause: /api/trial/create-story waits at most 60 s for an in-flight prepare-title, a 2x4 sheet takes ~100 s, and both the prewarm and the job end with clearStyledAvatarCache() on the same trial-<userId> scope. Fix: runInCacheScope refcounts active runners per scope and clearStyledAvatarCache() skips (logged) while another runner is inside; the last one out clears. Regression test tests/unit/styled-avatar-scope-guard.test.ts. decisions.md entry 2026-09-06."
     }
   ]
 }

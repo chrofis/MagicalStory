@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import path from 'path';
+import { storyTypes, lifeChallenges } from '../client/src/constants/storyTypes';
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
@@ -35,11 +36,26 @@ const AGES = ['4', '5', '6', '7', '8'] as const;
 // occasionally to also exercise alternate flows when this test runs in CI.
 const CATEGORY_INDEXES = [0, 0, 0, 1] as const;
 
-const TEST_PHOTO = `${PHOTO_DIR}/${seededPick(PHOTOS, 0)}`;
+// Explicit overrides for a targeted run (e.g. "a 3-year-old, life challenge,
+// pirate mode"): E2E_PHOTO (absolute path), E2E_NAME, E2E_AGE, E2E_CATEGORY
+// (0 = adventure, 1 = life-challenge), E2E_TOPIC / E2E_THEME (ids from
+// client/src/constants/storyTypes.ts, clicked by their localised label).
+const TEST_PHOTO = process.env.E2E_PHOTO || `${PHOTO_DIR}/${seededPick(PHOTOS, 0)}`;
 const TEST_EMAIL_BASE = process.env.E2E_EMAIL_BASE || 'rogerfischer+e2e';
-const CHAR_NAME = seededPick(NAMES, 1);
-const CHAR_AGE = seededPick(AGES, 2);
-const CATEGORY_INDEX = seededPick(CATEGORY_INDEXES, 3);
+const CHAR_NAME = process.env.E2E_NAME || seededPick(NAMES, 1);
+const CHAR_AGE = process.env.E2E_AGE || seededPick(AGES, 2);
+const CATEGORY_INDEX = process.env.E2E_CATEGORY ? Number(process.env.E2E_CATEGORY) : seededPick(CATEGORY_INDEXES, 3);
+const TOPIC_ID = process.env.E2E_TOPIC || '';
+const THEME_ID = process.env.E2E_THEME || '';
+
+// Any localised name of the given story type / life challenge. The wizard's
+// buttons also carry an emoji, so callers match this against the inner text
+// node (getByText), never against the whole button text.
+function labelRegex(entry: { name: Record<string, string> } | undefined, id: string): RegExp {
+  if (!entry) throw new Error(`Unknown topic/theme id: ${id}`);
+  const names = Object.values(entry.name).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^\\s*(${names.join('|')})\\s*$`);
+}
 
 const TRIAL_GEN_TIMEOUT_MS = 25 * 60 * 1000; // 25 min safety ceiling
 const WIZARD_STEP_TIMEOUT = 60 * 1000;
@@ -152,7 +168,10 @@ test.describe('Trial → full-account end-to-end', () => {
     // PHASE 0: Pre-inject admin JWT so Turnstile+fingerprint are bypassed
     // (Playwright can't solve Cloudflare challenges)
     // ═══════════════════════════════════════════════════════════════════════
-    const adminJwt = generateAdminJwt();
+    // E2E_ADMIN_JWT: a token minted by the target environment itself (see
+    // scripts/admin/get-admin-token.js) — needed when its JWT secret differs
+    // from the local one, e.g. staging.
+    const adminJwt = process.env.E2E_ADMIN_JWT || generateAdminJwt();
     await context.addInitScript(([token]) => {
       window.localStorage.setItem('auth_token', token);
     }, [adminJwt]);
@@ -226,7 +245,16 @@ test.describe('Trial → full-account end-to-end', () => {
     }
 
     // Fill character name + age
+    // The character step is photo-first: after the upload a "Continue" button
+    // leads to the details sub-step (name, age, gender).
     const nameInput = page.locator('input[type=text]').filter({ hasNot: page.locator('[type=file]') }).first();
+    const photoContinue = page.locator('button').filter({ hasText: /^(weiter|next|continue|suivant)\s*$/i }).first();
+    if (!(await nameInput.isVisible().catch(() => false))) {
+      await expect(photoContinue).toBeVisible({ timeout: 60000 });
+      await photoContinue.click();
+      console.log('✅ [P1] Photo sub-step → details');
+    }
+    await expect(nameInput).toBeVisible({ timeout: 60000 });
     await nameInput.fill(CHAR_NAME);
     console.log(`✅ [P1] Character name: ${CHAR_NAME}`);
 
@@ -289,7 +317,17 @@ test.describe('Trial → full-account end-to-end', () => {
     const themeButtons = themeGrid.locator('button');
     const themeCount = await themeButtons.count();
     console.log(`   Found ${themeCount} buttons in theme grid`);
-    if (themeCount > 0) {
+    // Life-challenge shows the TOPIC grid first, adventure the THEME grid.
+    const firstPickId = CATEGORY_INDEX === 1 ? TOPIC_ID : THEME_ID;
+    if (firstPickId) {
+      const entry = CATEGORY_INDEX === 1
+        ? lifeChallenges.find(c => c.id === firstPickId)
+        : storyTypes.find(t => t.id === firstPickId);
+      const target = themeGrid.locator('button').filter({ has: page.getByText(labelRegex(entry, firstPickId)) }).first();
+      await expect(target).toBeVisible({ timeout: 10000 });
+      await target.click();
+      console.log(`✅ [P2b] Picked by id: ${firstPickId}`);
+    } else if (themeCount > 0) {
       await themeButtons.first().click();
       console.log('✅ [P2b] Theme picked (first)');
     }
@@ -298,12 +336,18 @@ test.describe('Trial → full-account end-to-end', () => {
     // If the Weiter button already shows, we're done; otherwise pick another.
     await waitWithLog(page, 'post-theme settle', 1500);
     const weiterVisible = await page.locator('button').filter({ hasText: /^(weiter|next|continue|suivant)\s*$/i }).first().isVisible().catch(() => false);
-    if (!weiterVisible) {
+    if (!weiterVisible || (CATEGORY_INDEX === 1 && THEME_ID)) {
       const subGrid = page.locator('div.grid').filter({ has: page.locator('button') }).last();
       const subButtons = subGrid.locator('button');
       const subCount = await subButtons.count();
       console.log(`   Need another pick: ${subCount} sub-topic buttons`);
-      if (subCount > 0) {
+      if (CATEGORY_INDEX === 1 && THEME_ID) {
+        const entry = storyTypes.find(t => t.id === THEME_ID);
+        const target = subGrid.locator('button').filter({ has: page.getByText(labelRegex(entry, THEME_ID)) }).first();
+        await expect(target).toBeVisible({ timeout: 10000 });
+        await target.click();
+        console.log(`✅ [P2c] Theme picked by id: ${THEME_ID}`);
+      } else if (subCount > 0) {
         await subButtons.first().click();
         console.log('✅ [P2c] Sub-topic picked');
       }
