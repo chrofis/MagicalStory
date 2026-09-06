@@ -136,3 +136,59 @@ built, and the face worker was measured rather than guessed at:
   and refused (the patch context comes from the working tree, the index is at
   HEAD), so the edit was reverted rather than left to ride along in their commit.
   Both are one-line jobs the moment that session pushes.
+
+
+## Third pass — adversarial re-review of my own changes (2026-09-06)
+
+A second review was run against the changes above. It found two of them did not
+do what their commit message said. Both are fixed; all findings are recorded in
+`docs/decisions.md`.
+
+- **S1** `sess_options=` to `rembg.new_session` is accepted, carried and THROWN
+  AWAY on rembg 2.0.75 — no TypeError, so nothing fell back, and the process
+  logged `mem_arena=False, intra_op_threads=4` while neither was true. Measured
+  after that commit: face worker 1717.7MB, higher than before. Replaced with
+  `OMP_NUM_THREADS` (the one lever rembg reads), shipped OFF via
+  `REMBG_OMP_THREADS` because the latency/RSS trade is unmeasured.
+- **S2** the warmup merge only helped callers that NAMED `workers`; the repair
+  phase's force-warm names none, so it still fell through to "already warming".
+  A request without `workers` now means the DEFAULT role set.
+- **S3** `_warming_roles` could be poisoned permanently; claims are now taken at
+  dispatch and rolled back if the thread fails to start.
+- **S4/S5** adopted workers: `_adopted` was standing in for liveness (dead ones
+  stuck, permanent 502), and `kill_workers` erased its record before a recycle
+  the worker can REFUSE with HTTP 200.
+- **S6** a legitimately slow start looked like a wedge once the first waiter's
+  claim dropped; `_spawned_at` settles it.
+- **S7** presence sessions were being reclaimed at 3h and never re-opened.
+- **S8** `SESSION_LEAK_TIMEOUT_S` 1800 -> 5400: 30 min sat five minutes from the
+  20-25 min analyzer-silent window `jobs.js` documents.
+
+### VERIFIED on staging, analyzer deployment confirmed on commit 828c7cf0
+
+Checked the ANALYZER deployment's commit hash, not the web service's /api/health
+— the web image builds far faster than the ML image, and trusting it produced two
+rounds of measurements of the wrong build.
+
+Real user flow (presence session held):
+| step | result |
+|---|---|
+| presence beat, warm | face worker 1141.8MB / total 1236.2MB |
+| upload 1 / 2 / 3 | 1.90s / 1.31s / 1.16s |
+| user leaves | reaped to 94.6MB, sessions 0 |
+
+Sessionless flow (API client, no presence): every call respawns the worker —
+cold 30.4s, then ~4.6-5.1s each. Working as designed, but worth knowing.
+
+U2-Net bake CONFIRMED working: no `Downloading` line on a fresh container.
+
+## Still open after three passes
+- **S9** `ensure_worker` holds `_workers_lock` across a loopback HTTP probe and a
+  `Popen` — the pattern `kill_workers`' own docstring rejects. Convoy, not a
+  deadlock.
+- **S10** `/health` under-reports adopted workers; `_sessions` is uncapped;
+  after an ANALYZER restart present tabs never re-open their session; the Node
+  warm debounce is shared across role sets.
+- **Cold sessionless `remove-bg` is still ~30s** with the model on disk. Not yet
+  attributed — do not guess, profile it.
+- **C3** and the BACKLOG index lines, still blocked by the parallel session.
