@@ -21,7 +21,7 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE STORY (final — this arc IS the story. Every fact, cause, feeling and spoken line it states finds its home on some page, in its specific form. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown.)
+# THE STORY (final — this arc is the story in summary, and the text is the telling of it. Every fact, cause, feeling and spoken line it states finds its home on some page, in its specific form. The stake is said early and again later, the change is visible at the end, and nothing the story closes is left unsaid or unshown. A summary skips the ordinary business between its turns; the text writes it back in.)
 
 {STORY_ARC}
 
@@ -50,8 +50,8 @@ No rhetorical set-pieces: no paired negations, no coined sayings or incantations
 Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
 The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
-The text gives each page its feeling and its suspense, drawn from the story: feelings and dialogue may go beyond what it states, and so may the connective business it skips — crossing to a place, walking up to strangers, asking to join, a greeting, names given and heard. Where the story arrives somewhere without saying how, the text writes the arriving.
-The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens. Nothing else is added: no fact, object, character or event that changes what happens, to whom, or what it costs.
+The text gives each page its feeling and its suspense, and fills what the summary leaves out: feelings, dialogue, and the ordinary business between the story's turns — going somewhere and arriving, waiting, approaching people, asking, being answered, a greeting, names given and heard, a thing tried and let go. That is filler, not event, and the text invents it freely wherever the story jumps.
+What is fixed is what the story is made of: invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens.
 The final page gets the same care as the first sentence: land one feeling, plainly and warmly. A string of short solemn sentences is not an ending.
 Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone.
 No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.

@@ -27654,3 +27654,65 @@ was never meant to reach inside a sentence the Art Director wrote.
 verbatim).
 
 **Status:** ✅ active.
+
+---
+
+## 2026-09-06 — The arc is a SUMMARY and the writer fleshes it out: filler is free, invention is not (supersedes the narrower connective-tissue licence earlier today)
+
+**Context:** The earlier entry today granted the page-text writer a licence to write
+"the connective business it skips", enumerated as a short list (crossing to a
+place, walking up to strangers, asking to join, a greeting, names given and
+heard). The owner's ruling is that this is too narrow and the framing is wrong:
+
+> "The writer MUST fill any gaps, the arc is a summary, the writer must flesh it
+> out. It does not invent any new objects or characters. The playing with the
+> children is already there as an event, walking to the kids is a filler not an
+> own event."
+
+The distinction is between an EVENT (what happens, to whom, at what cost — the
+arc's business) and FILLER (getting there, waiting, approaching, asking,
+greeting, names exchanged — the text's business). A summary omits filler by
+nature; the text is the telling, and telling means writing it back in.
+
+**Decision:**
+- `story-text-from-beats.txt`: the section header changes from "this arc IS the
+  story" to "this arc is the story in summary, and the text is the telling of it
+  … A summary skips the ordinary business between its turns; the text writes it
+  back in."
+- The licence is stated as a principle, not a list: the text fills what the
+  summary leaves out — feelings, dialogue, and the ordinary business between the
+  story's turns — and "that is filler, not event, and the text invents it freely
+  wherever the story jumps."
+- The ban is stated against the story's *materials*: "invent no character,
+  creature, object, place or turn of the plot the story does not carry, and
+  nothing that changes what happens, to whom, or what it costs."
+- `text-refine.txt` gets the same framing, so the refiner does not cut as an
+  addition what the writer now adds by instruction.
+
+**Detection, measured:** the two text audits ran on
+`job_1788641639919_mpjwlzkf1` and produced 22 findings — they are not asleep. They
+caught this exact fault class on page 7 (TRANSITION: "suddenly at the secret gap
+… with no word of how he knew"; ASSUMED: knowledge the character could not have).
+They produced nothing for the page-2→3 arrival and nothing at all for the page-5
+name because of two wording gaps:
+
+- TRANSITION asked about being "in a place, or holding something" — place and
+  object, never *people*. A change of place across a page turn is explicitly
+  exempted as ordinary travel, which is correct; the missing thing was never the
+  walk, it was joining a group of strangers.
+- ASSUMED listed "knowledge a character could not have, an ability or possession
+  never established" — a name is neither an ability nor a possession.
+
+Both audits' TRANSITION now covers being "among people they were not among
+before", with "joining strangers is not travel" stated so the travel exemption
+does not swallow it, and ASSUMED now names "a name nobody said in their hearing".
+
+**Rationale:** A licence without a check produces nothing — the writer may now
+write the entry, but only the audit makes it write it. A check without a licence
+produces a fault the writer is forbidden to fix. Both halves are needed, and both
+are prompt-side.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`,
+`prompts/story-text-audit.txt`, `prompts/story-text-audit-blind.txt`
+
+**Status:** ✅ active — supersedes the connective-tissue entry earlier this date
