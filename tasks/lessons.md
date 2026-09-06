@@ -663,3 +663,19 @@ backslashes in the search string), the run was launched anyway, and it burned an
 preview avatar failing on the exact same line. Rule: after any scripted edit, `grep` for the
 new text and read the diff; if a run costs money, the patch check is part of the launch
 command, not an afterthought. Prefer the Edit tool for literal replacements.
+
+## 2026-09-06 — Never a bare `git commit` on the shared tree
+Two sessions swept each other's staged files within ten minutes: `git add <paths>` followed by
+a bare `git commit` takes WHATEVER is staged at that instant, including another session's
+files. 451286c91 carries one session's decisions entry over another session's diff. Rule:
+`git commit -- <explicit paths>` always, so a commit can only contain the files its author
+named; re-check `git show --stat HEAD` before pushing. Owner decision: one shared tree stays,
+discipline tightens. Also announce before starting a run; the push gate cannot see the build
+window, so a job that starts during a build dies on the restart.
+
+## 2026-09-06 — `--allow-empty` is not protection either
+An attribution note committed with a bare `git commit --allow-empty` took seven files another
+session had just staged (a8a6b5566). Rules that survive tonight: (1) never stage until the
+moment you commit, and commit in the same command; (2) every commit names its paths with
+`git commit -- <paths>`; (3) a deliberately empty commit is `git diff --cached --quiet &&
+git commit --only --allow-empty`; (4) `git show --stat HEAD` before every push.
