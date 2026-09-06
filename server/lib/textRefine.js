@@ -812,10 +812,16 @@ async function refineStoryText(storyData, pages, opts = {}) {
       const MAX_OUT = TEXT_MODELS[lectorModel].maxOutputTokens || 16000;
       // temperature 0: the A/B measured this prompt at 0, and a lector must not
       // paraphrase the page it quotes.
-      let lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, { temperature: 0, usageLabel: 'text_lector' });
+      // reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
+      // (de-ch, 16 pages, 4 CORE faults). Default (no key) burned 12,764 reasoning
+      // tokens / $0.1621 / 84s; 'medium' 7,135 / $0.0948 / 46s for the same 4/4 CORE
+      // catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
+      // so recall is a direct function of reasoning budget — do NOT lower this further.
+      const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
+      let lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, LECTOR_OPTS);
       if (!String(lr.text || '').trim()) {
         log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
-        lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, { temperature: 0, usageLabel: 'text_lector' });
+        lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, LECTOR_OPTS);
       }
       proofread = String(lr.text || '').trim();
       lectorFindings = parseLectorFindings(proofread);

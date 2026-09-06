@@ -29473,3 +29473,97 @@ diff pass), `server/lib/promptBuilders.js` + `server/lib/storyHelpers.js`
 (`textDiffModel`, `MODEL_PRICING`), `tests/unit/lector-quote-parse.test.ts`,
 `tests/unit/text-lector.test.ts`, `scripts/analysis/dry-run-text-diff.js`.
 **Status:** ✅ active — staging.
+
+---
+
+### The lector runs at reasoning effort 'medium', not the model default (measured, 2026-09-06)
+
+**Context.** The text lector (`server/lib/textRefine.js`, `usageLabel: 'text_lector'`,
+gemini-3.1-pro via OpenRouter) is the most expensive single text call in the pipeline at
+$0.16 per story. Almost all of it is reasoning tokens: 12,764 of 12,989 completion tokens
+on the measured run produce an 11-line findings list. The question was whether that budget
+can be cut without losing fault recall.
+
+**Decision.** Pass `reasoning: { effort: 'medium' }` on the lector call (and on its
+empty-output retry, via one shared `LECTOR_OPTS` const). Do not lower it to `'low'`, and do
+not remove the key to return to the default. The MODEL choice itself is unchanged — the
+gemini-3.1-pro / runs-LAST verdict at the 2026-09-03 entry above still stands; this entry
+only sets the reasoning budget on that same call.
+
+**Rationale — measured, one story, one run per arm.** Same prompt
+(`prompts/story-text-proofread.txt` as committed, built by `buildTextProofreadPrompt`),
+same text (job_1788380714660_4p9mr11xszu, de-ch, 16 pages), temperature 0, same MAX_OUT,
+production code path, scored against the piraterun4/lector-ab ground truth (4 CORE faults
+G1-G4, 8 borderlines, named FP class) via the real `parseLectorFindings` +
+`applyLectorFindings`:
+
+| | default (no key) | medium | low |
+|---|---|---|---|
+| wall | 83.9s | 46.0s | 14.0s |
+| completion tokens | 12,989 | 7,381 | 1,823 |
+| reasoning tokens | 12,764 | 7,135 | 1,696 |
+| direct cost | $0.1621 | $0.0948 | $0.0281 |
+| findings emitted / applied | 11 / 11 | 11 / 11 | 8 / 8 |
+| CORE G1-G4 caught | 4/4 | 4/4 | 0/4 |
+| borderlines | 5 | 4 | 2 |
+| hard false positives | 0 | 0 | 3-4 |
+
+`medium` holds all four CORE faults — both transitive-`schwimmen` uses on p11, the third on
+p15, and the «traurig für sie» Anglicism — at 58% of the cost and 55% of the latency. `low`
+loses every one of them and invents faults instead, so lector recall is a direct function of
+reasoning budget; there is no cheaper setting than `medium` that still works. **Do not retry
+`'low'`** — it is a measured severe regression, not an untested option.
+
+`medium` is a real tier on this route, not an alias: a one-word probe measured low 94 /
+medium 115 / default 134 / high 139 reasoning tokens — monotonic, collapsing onto neither
+`low` nor `high`. OpenRouter's endpoint catalogue declares `reasoning_effort` supported but
+does not enumerate its values, so this had to be measured rather than read. Reasoning also
+CANNOT be switched off on this model family: `thinkingBudget: 0` returns a Google 400
+("This model only works in thinking mode") and `MINIMAL` is rejected. `medium` is therefore
+the floor, not a midpoint on the way to zero.
+
+**Known costs of the change.** `medium` dropped one borderline the default caught (p5
+«Er war es nicht.») and added one marginal flag the default did not make (p6 «nicht Wrack»
+→ «kein Wrack», an elliptical contrast where bare `nicht` is defensible). Neither is a CORE
+miss or a hard FP. No ß hallucination in any arm. Limitation: n=1 — one story, one run
+per arm.
+
+**Touched:** `server/lib/textRefine.js` (lector call options).
+**Evidence.** scratchpad `lector-reasoning/` — `run.js`, `run-medium.js`, `prompt.txt`,
+`out-{control,medium,low}.txt`, `results.json`, `results-medium.json`, `probe-medium.json`.
+**Status:** ✅ active — staging.
+
+---
+
+### The diff pass does NOT invent prose, and must never get a length guard (correction, 2026-09-06)
+
+**Context.** The diff pass added in the 2026-09-06 entry above sometimes emits a
+"correction" whose replacement is LONGER than the span it quotes. That was initially
+suspected of the worst failure mode available to it — the model inventing prose and
+smuggling it in as a repair. It does not.
+
+**Verified against stored data** for `job_1788681313413_xqmtk2gcs`:
+
+- **p14.** The writer's BEFORE text reads *"Ethan said his did too, and that he thought it
+  was a very good smell for a Monday."* The repair cut it to *"He said his did too."* The
+  diff pass restored the deleted clause **verbatim**.
+- **p3.** *"the two of them stood on the pavement and watched until every lantern had gone"*
+  and *"The flat felt quieter than it had before"* are both verbatim in BEFORE, and were
+  restored verbatim.
+
+Every long replacement inspected was a restoration of writer text the repair had deleted,
+not new prose. The length asymmetry is the signature of the pass working, not of it drifting.
+
+**Decision.** **No length guard on diff findings.** A rule rejecting replacements longer
+than their quoted span would block exactly these correct restorations. This is recorded so a
+future session does not "fix" the long-replacement pattern on suspicion.
+
+**The interaction that produces them.** The repair deletes content to satisfy
+`FAULT[LENGTH]`, and the diff pass restores it. p14 was cut for being ONE word over a 150
+ceiling. The 20% grace band (commit 47767a855) already prevents that trigger, so the loop is
+closed at its source — the diff pass is the safety net behind a hole that is itself already
+patched, not the primary fix.
+
+**Touched:** none — this entry records a verified non-defect and a guard deliberately NOT
+built.
+**Status:** ✅ active.
