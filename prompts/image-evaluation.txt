@@ -51,7 +51,7 @@ Check every candidate finding against this list BEFORE reporting it. These are n
 - **N-06 Inferred motion.** Direction of travel of a mid-motion figure. A still frame cannot prove which way it moves — judge visible contact and pose only.
 - **N-07 Hidden parts.** Occluded or cropped anything. If the body part an item attaches to is outside the rendered area, the item is not missing.
 - **N-08 Back views.** No face is expected.
-- **N-09 Crowd extras.** Extra background figures when the scene describes a populated setting.
+- **N-09 Crowd extras.** Extra background figures when the scene describes a populated setting. The exception is D-03b: an extra carrying a named character's own reference features is never covered by this rule, at any crowd size.
 - **N-10 Brushwork.** Loose stylistic brushwork consistent with the rest of the artwork.
 - **N-11 Decorative counts.** Off-by-one or -two in a decorative cluster (apples, flowers, books, stars, buttons) when the cluster is present and the count is not tied to the action.
 - **N-12 Identity features.** A character's canonical glasses, hearing aid, or braces — identity, never anachronism against the setting.
@@ -109,7 +109,8 @@ Always output `coherence_gate: {applied, reason}`. When applied, also emit one `
 ## Identity and appearance
 
 **D-02 `character_identity` → CRITICAL.** Wrong reference matched, or the character is unrecognisable from face and build.
-**D-03 `duplicate_character` → CRITICAL.** Two figures match the same reference while another character is missing.
+**D-03 `duplicate_character` → CRITICAL.** Two figures in the cast match the same named character's reference. When the repeated figures are unnamed extras rather than the cast, it is D-03b instead — one of the two, never both.
+**D-03b `duplicate_identity` → CRITICAL.** Unnamed background or crowd figures rendered as copies of a named character: the same hair colour AND length, the same face, and the garment set the CLOTHING CONTRACT gives that character. Judge each extra against THAT character's reference and contract, never against the other extras. A group in matching uniform, costume, kit or livery is not a duplicate, and neither is a crowd sharing a palette or an era's dress — the test is whether the extras wear one named character's specific features. Fires however populated the scene is and however many extras repeat the character. ONE entry per page, naming the copied character and roughly how many figures repeat them. `fix`: "Redraw the background figures with their own hair colours, lengths, heights, ages and garments, distinct from the named character."
 **D-04 `missing_character` → CRITICAL.** A required character is entirely absent. Name the target region in the description.
 **D-05a `nudity` → CATASTROPHIC. A LAST-RESORT SAFETY NET — it should almost never fire.**
 

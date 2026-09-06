@@ -135,6 +135,13 @@ const TYPE_TO_BUCKET = {
   image_coherence: 'image_coherence',
   missing_character: 'character_presence', character_presence: 'character_presence',
   duplicate_character: 'character_presence', extra_character: 'character_presence',
+  // duplicate_identity (2026-09-06): unnamed extras rendered as copies of a
+  // named character. character_presence, NOT character_identity — the
+  // identity bucket repairs with a face patch, which cannot remove or vary
+  // figures. Evidence: job_1788681313413_xqmtk2gcs p1, where compliance saw
+  // '7 extra children all matching the protagonist's clothing and hair' and
+  // typed it character_identity at MAJOR; the page shipped at 80 unrepaired.
+  duplicate_identity: 'character_presence', cloned_extras: 'character_presence',
   character_identity: 'character_identity', identity: 'character_identity', reference: 'character_identity',
   clothing: 'clothing', color: 'clothing', garment: 'clothing',
   // hair is NOT clothing: typing it so put ponytail/parting complaints in the

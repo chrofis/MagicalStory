@@ -28553,3 +28553,122 @@ split stays.
 (`buildLifeSkillGuidelines`, `buildTrialStoryPrompt`), `prompts/story-trial.txt`,
 `prompts/life-challenge-guides.txt` `[sharing]`.
 **Status:** ✅ active — validated on one trial rerun so far; more runs at the owner's call.
+
+## Interiors are furnished: the plate's clearing clause is scoped to the figure bands, rule 1b covers everyday interiors, and a held prop keeps a hand (2026-09-06)
+
+**Context:** Staging story `job_1788681313413_xqmtk2gcs` (art style "realistic") rendered
+every domestic interior — pages 1, 2, 5, 6, 7 — as an unfurnished box room. A supper table
+carried no plates, glasses or food and still scored 100/100; a kitchen had no kettle, sink,
+taps or utensils. Outdoor pages were fine. Three prompt causes, all in the scene-expansion
+family: (a) the `emptyScenePrompt` bullet `Use "open foreground", "uncluttered centre"` was
+read as a whole-frame instruction — all 14 pages ended their plate prompt with a global
+clearing clause ("entirely uncluttered", "completely clear", "fully open"); (b) rule 1b
+granted self-detail only to "a fantastical or strongly-themed world", so an ordinary kitchen
+qualified for nothing; (c) rule 12e's "never set dressing" was read as a ban on furnishing
+rather than a rule about named plot props. No evaluator sees sparseness — `image-evaluation.txt`
+D-26 and `image-semantic.txt` only check the location is CORRECT, and extra objects are
+explicitly "never issues".
+
+Same story, page 9: the text was "held the lantern inside his coat to keep the flame out of
+the draught". The Art Director wrote the interaction as cradling the prop against the chest
+WHILE pulling the garment open, and the model rendered it literally — standing still, BOTH
+hands on the garment, no hand on the prop, the lantern floating against the chest. The beat's
+motion ("went slowly forward together") was lost to a static pose.
+
+**Decision:** three prompt edits, mirrored in `prompts/scene-expansion-all.txt` (beats, live)
+and `prompts/scene-expansion.txt`:
+1. The `emptyScenePrompt` clearing bullet now scopes the clearing to the depth band and frame
+   side the declared figures' positions name; everywhere else keeps its furnishing, and
+   clearing the whole frame is called out as wrong.
+2. Rule 1b is renamed "A setting carries its own detail" and extended to everyday interiors
+   (kitchen, living room, bedroom, workshop, classroom, shop), which name their own lived-in
+   detail — worn surfaces, crockery and cookware, appliances and fittings, textiles, things on
+   shelves and walls. "An unfurnished box room is a fault."
+3. New rule 7f: an action never occupies both hands while an essential prop is declared held —
+   one hand stays on the prop, or the action changes; and a movement verb in the plan line is
+   carried by the pose (a stride mid-step), not a static figure performing the gesture.
+
+12e is NOT weakened: it gains an explicit scope sentence saying it governs named plot-critical
+props only, and that rule 1b's ambient furnishing is unnamed, uncounted and outside it.
+
+**Rationale:** the two rules genuinely pull against each other, and the previous wording
+resolved the conflict the wrong way — 12e's "never set dressing" is there to stop a *plot*
+object being dropped into the background where it vanishes or duplicates, not to strip a
+kitchen of its kettle. Making the scope explicit in both rules is what stops the next session
+reading them as contradictory and deleting one. The clearing clause was similarly correct in
+intent (leave room for compositing) and wrong in scope; naming the bands preserves the intent
+at a tenth of the cost. Rule 7f is a hands-budget rule of the same family as rule 7 ("two
+hands = max two items") — the failure it catches is a *declared* held prop whose hand was
+spent elsewhere, which rule 7 does not count.
+
+**Verification:** Test Lab `scene_expansion` replays on stored interior pages of the motivating
+story, comparing the stored (old-template) `emptyScenePrompt` against the newly generated one.
+
+**Touched:** `prompts/scene-expansion-all.txt` (1b, 7f, 12e, plate clearing bullet),
+`prompts/scene-expansion.txt` (same four).
+**Status:** ✅ active
+
+
+## Cloned crowd extras are a CRITICAL `duplicate_identity`, and unnamed figures must be given a look (2026-09-06)
+**Context:** Staging story `job_1788681313413_xqmtk2gcs` page 1 rendered seven background
+children as exact copies of the protagonist — identical hair, identical garment set — and
+shipped unrepaired at score 80. Two independent faults produced it.
+
+The CAUSE was the scene brief. It described the named character in full detail, then said
+"a procession of anonymous children" with no appearance at all. `anonymous` names a role, not
+a look; with no description of its own the group inherits the only one on the page.
+
+The DETECTION failed twice over. `image-evaluation.txt` N-09 excuses "extra background figures
+when the scene describes a populated setting", and `image-prompt-compliance.txt` carries the
+mirror line — between them the defect is a non-deduction. D-03 `duplicate_character` was defined
+as "two figures match the same reference **while another character is missing**", which is
+structurally unfireable on a single-protagonist page. The compliance evaluator did see the
+defect ("VISION_INVENTORY shows 7 extra children all matching ... exact clothing and hair") but
+had no type for it, so it typed `character_identity` at MAJOR — a face-patch route that cannot
+remove or vary figures, at a severity below the critical arm.
+
+**Decision:**
+- Scene expansion (`scene-expansion.txt`, `scene-expansion-all.txt`, rule 3) requires unnamed
+  figures to carry varied hair colours and lengths, more than one garment shape, several
+  garment colours and a mix of heights and ages; a bare `anonymous`/`generic`/`unnamed` group is
+  named as a fault. `scene-review.txt` gains a matching `[extras_undescribed]` check.
+- New finding type `duplicate_identity` (D-03b in `image-evaluation.txt`), CRITICAL: unnamed
+  extras rendered with a named character's own hair colour and length, face, and the garment set
+  from the CLOTHING CONTRACT. Added to the closed vocabularies in `image-evaluation.txt`,
+  `image-prompt-compliance.txt`, `image-semantic.txt` and `feedback-consolidator.txt` (keeps its
+  own type when merging).
+- N-09 and its compliance mirror carve the new type out: extras are free unless they duplicate a
+  named character's reference features.
+- D-03's trailing "while another character is missing" clause is dropped. The two types are kept
+  disjoint by SUBJECT — D-03 is cast duplication (two figures both claiming a named character),
+  D-03b is unnamed extras cloned from one. The prompts say "one of the two, never both".
+- `TYPE_TO_BUCKET` maps it to `character_presence`, alongside `duplicate_character`.
+- Deliberately absent from `MAX_SEVERITY_TYPES`.
+
+**Rationale:** `character_presence` and not `character_identity`: the identity bucket's repair is
+`grok_face`, a face patch, which cannot remove figures or give them different hair and garments.
+No severity cap because CRITICAL is what fires `findBadPages`' critical arm and puts the page in
+the repair queue regardless of score — a cap at MAJOR reproduces this exact failure, which is
+what the evaluator already did on its own.
+
+Over-firing is guarded by anchoring the rule on THE NAMED CHARACTER'S OWN reference features,
+never on "the extras resemble each other". Legitimately uniform crowds — school uniforms,
+marching bands, soldiers in kit, sports teams, an era's shared dress — are stated in the prompt
+as not duplicates, and the scene-expansion rule exempts uniformed groups from garment variation
+(they vary hair, height and age instead).
+
+**Also noted, not fixed:** `extra_character` is registered in `evalBuckets.js` `TYPE_TO_BUCKET`
+but appears in no prompt vocabulary — an orphan that can never be emitted. It is a different
+defect (an unrequested figure, not a cloned one), so it was left alone.
+
+**Open:** `decideRepairMethod` does not route a CRITICAL quality finding to `iterate`; only the
+numeric floors, a CATASTROPHIC severity, or the consolidator's `scene_fix.requires_regeneration`
+flag do. A CRITICAL `duplicate_identity` therefore reaches the repair queue and falls through to
+inpaint. Adding a type-driven `iterate` gate is a code routing change beyond "code may only
+change a severity", so it needs owner sign-off and is not in this change.
+
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-review.txt`, `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`,
+`prompts/image-semantic.txt`, `prompts/feedback-consolidator.txt`, `server/lib/evalBuckets.js`,
+`server/lib/scoring.js`
+**Status:** ✅ active

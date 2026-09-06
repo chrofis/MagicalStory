@@ -176,6 +176,12 @@ const MAX_SEVERITY_TYPES = {
   // missing or wrong character, and must not reach the severity that routes a
   // page to character repair (settled critical-only routing, 2026-09-04).
   duplicate_object: 'major',
+  // duplicate_identity is deliberately ABSENT from this table (2026-09-06).
+  // Unnamed extras wearing a named character's hair, face and contract
+  // garments must keep CRITICAL: that severity is what fires findBadPages'
+  // critical arm and puts the page in the repair queue regardless of score.
+  // A cap at major reproduces job_1788681313413_xqmtk2gcs p1 exactly — the
+  // defect was seen, rated MAJOR, and shipped at 80.
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever
