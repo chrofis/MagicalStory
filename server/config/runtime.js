@@ -63,10 +63,12 @@ const SETTINGS = {
   // scene's own materials, full-bleed honoured (Imagine 1 broke the no-border
   // rule and produced flat outline type).
   //
-  // Staging-only ON PURPOSE: the composited path is safe by construction and
-  // the baked path trusts a model with spelling. Staging carries the risk while
-  // real books keep the guarantee, until there is enough evidence to promote it.
-  coverTitleMode: perEnvironment({ staging: 'baked', default: 'composited' }),
+  // The composited path is safe by construction; the baked path trusts a model
+  // with spelling. 'baked' everywhere since 2026-09-06 (owner: production equals staging;
+  // evidence: 9 staging trial covers that day, all spelled correctly incl.
+  // umlauts and possessives, plus the 2026-08-29 5-story sample). Was
+  // per-environment { staging: 'baked', default: 'composited' } from 2026-08-29.
+  coverTitleMode: 'baked',
 
   // Model used when coverTitleMode is 'baked'. Imagine 2.0 is the only Grok
   // model that renders legible lettering; the standard model produces flat

@@ -29285,8 +29285,14 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
    book — the exact defect being removed.
 
 4. **THE KEYSTONE — one object, one render call.** All states of an object are generated in a
-   SINGLE reference call: one grid, base look plus every state side by side, so they cannot look
-   like different things. This is guaranteed structurally, not requested:
+   SINGLE reference call: one grid, every state side by side, so they cannot look
+   like different things. **The states ARE the cells — there is no separate base cell**
+   (amended 2026-09-06, owner: "max we allow for an object are 4 and a VB element can hold up to
+   4 pics so we should be good"). Test Lab experiment #1037 on staging measured the redundancy: the
+   writer's `description` and its first state were the same picture in words, so a base cell
+   rendered the default look twice and pushed a 4-state object to 5 cells. The authoring templates
+   now require `states[]` to be the COMPLETE set of looks the object wears, the unaltered look
+   FIRST, at most 4 in all. This is guaranteed structurally, not requested:
    `referenceSheets.expandElementStateCells` is the ONLY code that mints a per-state cell, it
    always returns the whole set, `buildReferenceSheetBatches` routes a multi-state object into a
    batch of its own, and `assertStateCellsCoLocated` THROWS if any batching would split one
@@ -29294,10 +29300,11 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
    call, so it costs nothing and can never kill a paid run (it is not an exception to "gates are
    guidelines" — there is no run to kill yet).
    A multi-state object is routed to a batch of its OWN, which never passes through the
-   `maxPerBatch` chunker, so base + 4 states = 5 cells still render in one call — `maxPerBatch`
-   bounds the ordinary batches, never a stated object's grid. The ceiling of 4 is a legibility
-   limit on the grid (5 cells stack as one column; past that the cells are too small to serve as
-   references), not a batching limit. A multi-state object therefore consumes ONE element slot,
+   `maxPerBatch` chunker, so 4 states = 4 cells render in one call — `maxPerBatch` bounds the
+   ordinary batches, never a stated object's grid. The ceiling of 4 (`MAX_OBJECT_STATES`) is a
+   legibility limit on the grid, not a batching limit: the grid packer lays 4 cells out as a 2x2
+   (`cols = count === 4 ? 2 : 1`), while 5 stack as a 1x5 column of narrow, low-detail cells — which
+   is precisely why the base cell had to go rather than the ceiling being lowered. A multi-state object therefore consumes ONE element slot,
    not one per state, and `VB_ELEMENT_BUDGET = 3` (shipped the same day) stops being a constraint
    on the design.
 
@@ -29306,7 +29313,15 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
    page's pose cell, and the VB grid gives each element one cell.
    `getElementReferenceImagesForPage` returns the state's cell under the PARENT id, so the budget,
    the packer and the entity-consistency key all still see one object. A state with no cell of its
-   own falls back to the base render with a WARN rather than shipping none.
+   own falls back to the entry itself with a WARN rather than shipping none.
+   **The DEFAULT-STATE rule (2026-09-06):** a page that cites the bare parent `ART###`, or names
+   the object without any handle, resolves to the FIRST row of `states[]`. The templates order the
+   states as the story reaches them with the unaltered look first, so the first row IS the default
+   look by construction — no `default: true` flag is needed, and the rule reads the ordering the
+   data already carries. `defaultObjectState`, `hasElementReference` and `elementRefCell`
+   (`visualBible.js`) are the one place that resolution lives; `hasElementReference` also stops a
+   stated object — which now has no base render of its own — from being dropped as reference-less,
+   and `updateElementReferenceImage` marks the parent entry generated when a state cell lands.
 
 6. **Covers pin to the base state.** A cover shows the book's canonical object, never one
    mid-transformation, so `coverComposite` and `coverIterate` normalise a dotted handle to its
@@ -29632,4 +29647,23 @@ doubles (2 → 4 cents), about CHF 0.60 more per full story. Char-repair stays p
 Imagine 1.x (2026-09-01 G5), unchanged.
 
 **Touched:** `server/config/runtime.js`.
+**Status:** ✅ active — reaches production with the next master push.
+
+## 2026-09-06 — Cover titles are model-baked in production too (reverses the 2026-08-29 per-environment split)
+
+**Context:** `coverTitleMode` was `perEnvironment({ staging: 'baked', default: 'composited' })`:
+production stamped the title from a real font (spelling safe by construction), staging baked it
+into the artwork on Imagine 2.0. SETTLED.md carried this as the one line whose promotion "IS a
+reversal and needs the full protocol". The owner's rule tonight: production equals staging in
+every setting except repair rounds (`repairMaxPasses`: production 3, staging 1).
+
+**Evidence:** the 2026-08-29 five-story sample (five art styles, umlauts correct) and the nine
+staging trial covers of 2026-09-06, every title spelled correctly, including "Zürichsee",
+"Mermaid's Promise" and "Noah and the Apple Monkey of Zürich" (jobs `job_1788682208484` …
+`job_1788724538469` on staging). Sign-off given via AskUserQuestion, framed as a reversal.
+
+**Decision (owner):** `coverTitleMode` is the constant `'baked'`. A misspelled title now ships
+into the artwork with no font fallback; the evaluator's rendered-text check remains the net.
+
+**Touched:** `server/config/runtime.js`, `tests/unit/cover-title-mode.test.ts`, `docs/SETTLED.md`.
 **Status:** ✅ active — reaches production with the next master push.

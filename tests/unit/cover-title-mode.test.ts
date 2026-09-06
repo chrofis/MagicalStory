@@ -90,16 +90,27 @@ describe('resolveCoverTitleMode — staging (baked)', () => {
   });
 });
 
-describe('resolveCoverTitleMode — production / local (composited)', () => {
-  it('is two-pass for every cover, front included', async () => {
-    for (const env of [undefined, 'production']) {
+describe('resolveCoverTitleMode — production / local (baked everywhere, owner 2026-09-06)', () => {
+  it('bakes the front cover in every environment, like staging', async () => {
+    for (const env of [undefined, 'production', 'local']) {
       const resolve = await loadResolverFor(env);
-      for (const key of ['front', 'frontCover', 'backCover', 'initialPage']) {
+      for (const key of ['front', 'frontCover']) {
         const r = resolve(key, 'Fiona und der Feigenbaum');
-        expect(r.mode).toBe('composited');
+        expect(r.mode, `env=${env ?? '(unset)'}`).toBe('baked');
+        expect(r.baked).toBe(true);
+        expect(r.bakeTitle).toBe('Fiona und der Feigenbaum');
+        expect(r.bakedModel).toBe('grok-imagine-2');
+      }
+    }
+  });
+
+  it('never bakes the back cover or the initial page, in any environment', async () => {
+    for (const env of [undefined, 'production', 'local']) {
+      const resolve = await loadResolverFor(env);
+      for (const key of ['backCover', 'initialPage']) {
+        const r = resolve(key, 'Fiona und der Feigenbaum');
+        expect(r.isFront).toBe(false);
         expect(r.baked).toBe(false);
-        // Empty bakeTitle == buildCoverPrompt appends no TITLE block, and the
-        // render keeps the routed cover model: the path is unchanged.
         expect(r.bakeTitle).toBe('');
         expect(r.bakedModel).toBeNull();
       }
