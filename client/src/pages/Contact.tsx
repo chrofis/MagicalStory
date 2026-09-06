@@ -63,6 +63,21 @@ const contactContent: Record<string, {
     trialText: 'Essayez gratuitement — votre première histoire en moins de 3 minutes, sans compte.',
     trialButton: 'Créer une histoire gratuite',
   },
+  it: {
+    title: 'Contattaci',
+    subtitle: 'Hai una domanda o hai bisogno di aiuto? Siamo felici di assisterti.',
+    emailTitle: 'Scrivici',
+    emailText: 'Inviaci un messaggio e ti risponderemo il prima possibile.',
+    emailAddress: 'info@magicalstory.ch',
+    responseTitle: 'Tempo di risposta',
+    responseText: 'Di solito rispondiamo entro 24 ore, dal lunedì al venerdì.',
+    faqTitle: 'Consulta prima le FAQ',
+    faqText: 'Molte domande comuni trovano già risposta lì. Potresti trovare la tua risposta più velocemente.',
+    faqButton: 'Vai alle FAQ',
+    trialTitle: 'Non sei ancora sicuro?',
+    trialText: 'Provalo gratis — la tua prima storia in meno di 3 minuti, senza account.',
+    trialButton: 'Crea una storia gratuita',
+  },
 };
 
 export default function Contact() {

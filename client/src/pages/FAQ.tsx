@@ -380,6 +380,123 @@ const faqContent: Record<string, {
       },
     ],
   },
+  it: {
+    title: 'Come possiamo aiutarti?',
+    subtitle: 'Trova le risposte alle domande più comuni sulla creazione della tua storia personalizzata.',
+    searchPlaceholder: 'Cerca una domanda...',
+    noResults: 'Nessuna domanda corrispondente trovata. Prova un altro termine di ricerca.',
+    contactTitle: 'Hai ancora domande?',
+    contactText: 'Siamo felici di aiutarti. Inviaci un\'email e ti risponderemo entro 24 ore.',
+    contactButton: 'Contattaci',
+    categories: [
+      {
+        id: 'getting-started',
+        icon: BookOpen,
+        color: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        label: 'Per iniziare',
+        items: [
+          {
+            question: 'Come funziona?',
+            answer: 'Carica una foto di tuo figlio, scegli un tema per la storia e generiamo una storia personalizzata completamente illustrata. Tuo figlio appare come personaggio illustrato su ogni pagina, mantenendo il suo aspetto unico in tutto il libro.',
+          },
+          {
+            question: 'Quanto tempo ci vuole?',
+            answer: 'La tua prima storia gratuita è pronta in meno di 3 minuti. Le storie complete con più pagine e qualità superiore richiedono circa 10-15 minuti. Riceverai un\'email quando la tua storia sarà pronta.',
+          },
+          {
+            question: 'Per quali età è adatto?',
+            answer: 'Le storie possono essere create per bambini di tutte le età. Puoi adattare il livello di lettura al tuo bambino — da semplici libri illustrati per i più piccoli a storie più lunghe per i bambini in età scolare.',
+          },
+        ],
+      },
+      {
+        id: 'your-story',
+        icon: Palette,
+        color: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        label: 'La tua storia',
+        items: [
+          {
+            question: 'Posso aggiungere più personaggi?',
+            answer: 'Sì! Puoi aggiungere tutta la tua famiglia — figli, genitori, nonni, fratelli o amici. Ogni personaggio ottiene il proprio aspetto illustrato basato sulla sua foto.',
+          },
+          {
+            question: 'Quali stili di illustrazione sono disponibili?',
+            answer: 'Offriamo oltre 8 stili, tra cui 3D in stile Pixar, acquerello, fumetto, anime e altro ancora. Ogni stile viene applicato in modo coerente su tutte le pagine della tua storia.',
+          },
+          {
+            question: 'Posso modificare la storia dopo che è stata generata?',
+            answer: 'Sì, completamente. Ogni parola di ogni pagina è modificabile — riscrivi le frasi, cambia i nomi, sostituisci i dialoghi. L\'IA scrive la prima bozza, tu la rendi tua.',
+          },
+          {
+            question: 'E se una pagina non mi piace?',
+            answer: 'Rigenerala. Le singole pagine possono essere rigenerate tutte le volte che vuoi, mantenendo gli stessi personaggi e lo stesso stile artistico. Ogni rigenerazione crea una nuova versione — tieni quella che preferisci.',
+          },
+          {
+            question: 'Devo accettare la prima versione?',
+            answer: 'No. Nulla è definitivo finché non ordini il libro stampato. Puoi continuare a modificare — cambiare il testo, rigenerare le immagini, perfezionare l\'aspetto dei personaggi — finché il libro non è esattamente come lo avevi immaginato.',
+          },
+        ],
+      },
+      {
+        id: 'printing',
+        icon: Printer,
+        color: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        label: 'Stampa e qualità',
+        items: [
+          {
+            question: 'Come viene stampato il libro?',
+            answer: 'I libri sono stampati professionalmente su carta di alta qualità nel formato 20x20cm. Puoi scegliere tra copertina rigida e copertina morbida. La qualità di stampa è paragonabile a quella dei libri per bambini pubblicati professionalmente.',
+          },
+          {
+            question: 'Posso scaricare la mia storia in PDF?',
+            answer: 'Sì. Ogni storia può essere scaricata come PDF ad alta risoluzione, perfetto per la lettura su tablet o per la stampa a casa.',
+          },
+        ],
+      },
+      {
+        id: 'shipping',
+        icon: Truck,
+        color: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        label: 'Spedizione',
+        items: [
+          {
+            question: 'Dove spedite?',
+            answer: 'Al momento spediamo libri stampati all\'interno della Svizzera. La spedizione internazionale è disponibile con un costo aggiuntivo. Puoi anche scaricare la tua storia in PDF per leggerla su qualsiasi dispositivo.',
+          },
+        ],
+      },
+      {
+        id: 'pricing',
+        icon: CreditCard,
+        color: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        label: 'Prezzi',
+        items: [
+          {
+            question: 'Quanto costa?',
+            answer: 'La tua prima storia è completamente gratuita — senza bisogno di account. Successivamente, le storie vengono create con crediti. I libri stampati partono da CHF 28 per la copertina morbida e CHF 43 per la copertina rigida, più CHF 10 di spedizione forfettaria per ordine all\'interno della Svizzera (la spedizione viene addebitata una sola volta se ordini più libri). Consulta la nostra pagina dei prezzi per i dettagli.',
+          },
+        ],
+      },
+      {
+        id: 'privacy',
+        icon: Lock,
+        color: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        label: 'Privacy e dati',
+        items: [
+          {
+            question: 'I miei dati sono al sicuro?',
+            answer: 'Sì. Le tue foto vengono usate solo per creare le illustrazioni della tua storia e non vengono mai condivise, vendute o utilizzate per altri scopi. Prendiamo sul serio la privacy — consulta la nostra Informativa sulla Privacy per i dettagli.',
+          },
+        ],
+      },
+    ],
+  },
 };
 
 function FAQAccordion({ item, defaultOpen = false }: { item: FAQItem; defaultOpen?: boolean }) {

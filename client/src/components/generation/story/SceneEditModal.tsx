@@ -92,11 +92,13 @@ export function SceneEditModal({
             <Edit3 size={20} />
             {language === 'de' ? `Szene bearbeiten - Seite ${pageNumber}` :
              language === 'fr' ? `Modifier la scène - Page ${pageNumber}` :
+             language === 'it' ? `Modifica scena - Pagina ${pageNumber}` :
              `Edit Scene - Page ${pageNumber}`}
           </h3>
           <p className="text-sm text-gray-500 mt-1">
             {language === 'de' ? 'Bearbeiten Sie die Szenenbeschreibung und wählen Sie die Charaktere aus.' :
              language === 'fr' ? 'Modifiez la description de la scène et sélectionnez les personnages.' :
+             language === 'it' ? 'Modifica la descrizione della scena e seleziona i personaggi.' :
              'Edit the scene description and select the characters.'}
           </p>
         </div>
@@ -109,6 +111,7 @@ export function SceneEditModal({
                 <Users size={16} />
                 {language === 'de' ? 'Charaktere in dieser Szene:' :
                  language === 'fr' ? 'Personnages dans cette scène:' :
+                 language === 'it' ? 'Personaggi in questa scena:' :
                  'Characters in this scene:'}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -136,6 +139,7 @@ export function SceneEditModal({
               <p className="text-xs text-gray-400 mt-2">
                 {language === 'de' ? 'Wählen Sie die Charaktere aus, die im Bild erscheinen sollen.' :
                  language === 'fr' ? 'Sélectionnez les personnages qui doivent apparaître dans l\'image.' :
+                 language === 'it' ? 'Seleziona i personaggi che devono apparire nell\'immagine.' :
                  'Select the characters that should appear in the image.'}
               </p>
             </div>
@@ -284,6 +288,7 @@ export function SceneEditModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {language === 'de' ? 'Szenenbeschreibung:' :
                language === 'fr' ? 'Description de la scène:' :
+               language === 'it' ? 'Descrizione della scena:' :
                'Scene description:'}
             </label>
             <textarea
@@ -292,11 +297,13 @@ export function SceneEditModal({
               className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
               placeholder={language === 'de' ? 'Beschreiben Sie die Szene...' :
                           language === 'fr' ? 'Décrivez la scène...' :
+                          language === 'it' ? 'Descrivi la scena...' :
                           'Describe the scene...'}
             />
             <p className="text-xs text-gray-400 mt-2">
               {language === 'de' ? 'Tipp: Beschreiben Sie die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
                language === 'fr' ? 'Conseil: Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
+               language === 'it' ? 'Suggerimento: descrivi le azioni e l\'ambiente. I personaggi selezionati verranno aggiunti automaticamente.' :
                'Tip: Describe the actions and the environment. Selected characters will be added automatically.'}
             </p>
           </div>
@@ -308,6 +315,7 @@ export function SceneEditModal({
               <span>
                 {language === 'de' ? `${selectedCharacterIds.length} Charakter(e) ausgewählt` :
                  language === 'fr' ? `${selectedCharacterIds.length} personnage(s) sélectionné(s)` :
+                 language === 'it' ? `${selectedCharacterIds.length} personaggio/i selezionato/i` :
                  `${selectedCharacterIds.length} character(s) selected`}
               </span>
             )}
@@ -318,7 +326,7 @@ export function SceneEditModal({
               disabled={isRegenerating}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium disabled:opacity-50 order-2 sm:order-1"
             >
-              {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel'}
             </button>
             <button
               onClick={onRegenerate}
@@ -330,13 +338,13 @@ export function SceneEditModal({
               {isRegenerating ? (
                 <>
                   <RefreshCw size={16} className="animate-spin" />
-                  {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...'}
+                  {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : language === 'it' ? 'Generazione...' : 'Generating...'}
                 </>
               ) : (
                 <>
                   <RefreshCw size={16} />
-                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="text-xs opacity-80">({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})</span>
+                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : language === 'it' ? 'Rigenera' : 'Regenerate'}
+                  <span className="text-xs opacity-80">({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : language === 'it' ? 'crediti' : 'credits'})</span>
                 </>
               )}
             </button>

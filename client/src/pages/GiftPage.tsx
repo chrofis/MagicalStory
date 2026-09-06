@@ -70,6 +70,20 @@ const pageTexts: Record<string, {
     ctaButton: 'Commencer maintenant',
     viewTheme: 'Voir le thème',
   },
+  it: {
+    breadcrumbRoot: 'Idee regalo',
+    createButton: 'Crea la tua storia ora',
+    whyTitle: 'Perché un libro personalizzato?',
+    tipsTitle: 'Consigli per il regalo',
+    themesTitle: 'Temi consigliati',
+    themesSubtitle: 'I nostri migliori temi per questo regalo',
+    deliveryTitle: 'Tempi di consegna',
+    faqTitle: 'Domande frequenti',
+    ctaTitle: 'Crea la tua storia gratuita',
+    ctaSubtitle: 'Tuo figlio come protagonista della sua storia. Provalo gratis — nessun account necessario.',
+    ctaButton: 'Inizia ora',
+    viewTheme: 'Vedi il tema',
+  },
 };
 
 function getThemeInfo(themeId: string, category: CategorySlug): { name: LocalizedString; emoji: string } | null {
@@ -109,7 +123,7 @@ export default function GiftPage() {
     return <Navigate to="/geschenk" replace />;
   }
 
-  const lang = language as 'en' | 'de' | 'fr';
+  const lang = language as 'en' | 'de' | 'fr' | 'it';
   const name = gift.name[lang] || gift.name.en;
   const title = gift.title[lang] || gift.title.en;
   const description = gift.description[lang] || gift.description.en;

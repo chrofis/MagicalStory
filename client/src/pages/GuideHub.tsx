@@ -32,6 +32,15 @@ const texts = {
     ctaDesc: 'Téléchargez une photo, décrivez l\'histoire souhaitée et voyez le résultat avant de payer.',
     ctaButton: 'Commencer',
   },
+  it: {
+    title: 'Guide',
+    subtitle: 'Come creare un libro per bambini che valga la pena leggere due volte — e come scegliere tra i servizi che li realizzano.',
+    sections: { helping: 'Accompagnare i momenti difficili', creating: 'Creare un libro', choosing: 'Scegliere un servizio' } as Record<GuideCategory, string>,
+    minutes: 'min di lettura',
+    ctaTitle: 'Crea la tua prima storia gratis',
+    ctaDesc: 'Carica una foto, descrivi la storia che desideri e guarda il risultato prima di pagare qualsiasi cosa.',
+    ctaButton: 'Inizia ora',
+  },
 };
 
 const categoryOrder: GuideCategory[] = ['helping', 'creating', 'choosing'];

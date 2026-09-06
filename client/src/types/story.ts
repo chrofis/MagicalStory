@@ -53,7 +53,7 @@ export interface StoryCategory {
 
 // Swiss Stories types
 // Multilingual string for story ideas (title, description, context)
-export type SwissLocalizedString = { en: string; de: string; fr: string; it?: string };
+export type SwissLocalizedString = { en: string; de: string; fr: string; it: string };
 
 export interface SwissStoryIdea {
   id: string;      // 'bern-1'

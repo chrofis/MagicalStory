@@ -87,27 +87,27 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
       case 'delivered':
         return {
           icon: <CheckCircle size={14} />,
-          text: language === 'de' ? 'Geliefert' : language === 'fr' ? 'Livré' : 'Delivered',
+          text: language === 'de' ? 'Geliefert' : language === 'fr' ? 'Livré' : language === 'it' ? 'Consegnato' : 'Delivered',
           className: 'bg-green-100 text-green-800'
         };
       case 'shipped':
       case 'in_transit':
         return {
           icon: <Truck size={14} />,
-          text: language === 'de' ? 'Versendet' : language === 'fr' ? 'Expédié' : 'Shipped',
+          text: language === 'de' ? 'Versendet' : language === 'fr' ? 'Expédié' : language === 'it' ? 'Spedito' : 'Shipped',
           className: 'bg-blue-100 text-blue-800'
         };
       case 'printed':
         return {
           icon: <Package size={14} />,
-          text: language === 'de' ? 'Gedruckt' : language === 'fr' ? 'Imprimé' : 'Printed',
+          text: language === 'de' ? 'Gedruckt' : language === 'fr' ? 'Imprimé' : language === 'it' ? 'Stampato' : 'Printed',
           className: 'bg-indigo-100 text-indigo-800'
         };
       case 'in_production':
       case 'printing':
         return {
           icon: <Clock size={14} />,
-          text: language === 'de' ? 'Wird gedruckt' : language === 'fr' ? 'Impression' : 'Printing',
+          text: language === 'de' ? 'Wird gedruckt' : language === 'fr' ? 'Impression' : language === 'it' ? 'In stampa' : 'Printing',
           className: 'bg-indigo-100 text-indigo-800'
         };
       case 'cancelled':
@@ -115,13 +115,13 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
       case 'failed':
         return {
           icon: <Clock size={14} />,
-          text: language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : 'Failed',
+          text: language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : language === 'it' ? 'Fallito' : 'Failed',
           className: 'bg-red-100 text-red-800'
         };
       case 'paid':
         return {
           icon: <CheckCircle size={14} />,
-          text: language === 'de' ? 'Bezahlt' : language === 'fr' ? 'Payé' : 'Paid',
+          text: language === 'de' ? 'Bezahlt' : language === 'fr' ? 'Payé' : language === 'it' ? 'Pagato' : 'Paid',
           className: 'bg-emerald-100 text-emerald-800'
         };
       case 'created':
@@ -131,7 +131,7 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
       default:
         return {
           icon: <Clock size={14} />,
-          text: language === 'de' ? 'In Bearbeitung' : language === 'fr' ? 'En cours' : 'Processing',
+          text: language === 'de' ? 'In Bearbeitung' : language === 'fr' ? 'En cours' : language === 'it' ? 'In corso' : 'Processing',
           className: 'bg-amber-100 text-amber-800'
         };
     }
@@ -169,16 +169,16 @@ function CreditOrderCard({
             </div>
             <div>
               <p className="text-xs text-gray-500">
-                {language === 'de' ? 'Guthaben' : language === 'fr' ? 'Crédits' : 'Credits'}
+                {language === 'de' ? 'Guthaben' : language === 'fr' ? 'Crédits' : language === 'it' ? 'Crediti' : 'Credits'}
               </p>
               <h3 className="font-bold text-lg text-gray-800">
-                +{order.creditsAmount} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits'}
+                +{order.creditsAmount} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : language === 'it' ? 'crediti' : 'credits'}
               </h3>
             </div>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
             <CheckCircle size={14} />
-            {language === 'de' ? 'Abgeschlossen' : language === 'fr' ? 'Terminé' : 'Completed'}
+            {language === 'de' ? 'Abgeschlossen' : language === 'fr' ? 'Terminé' : language === 'it' ? 'Completato' : 'Completed'}
           </span>
         </div>
 
@@ -186,14 +186,14 @@ function CreditOrderCard({
         <div className="space-y-2 text-sm text-gray-600">
           <p>
             <span className="font-medium">
-              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : 'Date:'}
+              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : language === 'it' ? 'Data:' : 'Date:'}
             </span>{' '}
             {formatDate(order.createdAt)}
           </p>
           {order.amount != null && (
             <p>
               <span className="font-medium">
-                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
+                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : language === 'it' ? 'Importo:' : 'Amount:'}
               </span>{' '}
               {formatAmount(order.amount, order.currency)}
             </p>
@@ -257,7 +257,7 @@ function BookOrderCard({
         <div className="flex items-start justify-between mb-3">
           <div>
             <p className="text-xs text-gray-500">
-              {language === 'de' ? 'Bestellung' : language === 'fr' ? 'Commande' : 'Order'} {order.displayOrderId || `#${order.id}`}
+              {language === 'de' ? 'Bestellung' : language === 'fr' ? 'Commande' : language === 'it' ? 'Ordine' : 'Order'} {order.displayOrderId || `#${order.id}`}
             </p>
             <h3 className="font-bold text-lg text-gray-800 line-clamp-2">{order.storyTitle || 'Untitled Story'}</h3>
           </div>
@@ -268,14 +268,14 @@ function BookOrderCard({
         <div className="space-y-1 text-sm text-gray-600 mb-4">
           <p>
             <span className="font-medium">
-              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : 'Date:'}
+              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : language === 'it' ? 'Data:' : 'Date:'}
             </span>{' '}
             {formatDate(order.createdAt)}
           </p>
           {order.amount != null && (
             <p>
               <span className="font-medium">
-                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
+                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : language === 'it' ? 'Importo:' : 'Amount:'}
               </span>{' '}
               {formatAmount(order.amount, order.currency)}
             </p>
@@ -283,7 +283,7 @@ function BookOrderCard({
           {order.shippingAddress && (
             <p>
               <span className="font-medium">
-                {language === 'de' ? 'Lieferadresse:' : language === 'fr' ? 'Adresse:' : 'Ship to:'}
+                {language === 'de' ? 'Lieferadresse:' : language === 'fr' ? 'Adresse:' : language === 'it' ? 'Indirizzo:' : 'Ship to:'}
               </span>{' '}
               {order.shippingAddress.city}, {order.shippingAddress.country}
             </p>
@@ -294,7 +294,7 @@ function BookOrderCard({
         {order.trackingNumber && (
           <div className="bg-blue-50 rounded-lg p-3 mb-4">
             <p className="text-sm font-medium text-blue-800 mb-1">
-              {language === 'de' ? 'Sendungsverfolgung' : language === 'fr' ? 'Suivi' : 'Tracking'}
+              {language === 'de' ? 'Sendungsverfolgung' : language === 'fr' ? 'Suivi' : language === 'it' ? 'Tracciamento' : 'Tracking'}
             </p>
             {order.trackingUrl ? (
               <a
@@ -320,7 +320,7 @@ function BookOrderCard({
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 text-sm font-medium"
             >
               <Eye size={16} />
-              {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
+              {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : language === 'it' ? 'Vedi la storia' : 'View Story'}
             </button>
           </div>
         )}
@@ -382,7 +382,7 @@ export default function MyOrders() {
   const formatAmount = useCallback((amount: number, currency: string) => {
     // Amount is in cents
     const value = amount / 100;
-    return new Intl.NumberFormat(language === 'de' ? 'de-CH' : language === 'fr' ? 'fr-CH' : 'en-US', {
+    return new Intl.NumberFormat(language === 'de' ? 'de-CH' : language === 'fr' ? 'fr-CH' : language === 'it' ? 'it-CH' : 'en-US', {
       style: 'currency',
       currency: currency.toUpperCase()
     }).format(value);
@@ -406,7 +406,7 @@ export default function MyOrders() {
         </div>
 
         {isLoading ? (
-          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'} />
+          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
         ) : orders.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -415,6 +415,8 @@ export default function MyOrders() {
                 ? 'Noch keine Bestellungen'
                 : language === 'fr'
                 ? 'Aucune commande'
+                : language === 'it'
+                ? 'Ancora nessun ordine'
                 : 'No orders yet'}
             </p>
             <p className="text-gray-400 text-sm mt-2">
@@ -422,6 +424,8 @@ export default function MyOrders() {
                 ? 'Wenn du ein Buch bestellst, wird es hier angezeigt.'
                 : language === 'fr'
                 ? 'Quand vous commandez un livre, il apparaîtra ici.'
+                : language === 'it'
+                ? 'Quando ordini un libro, apparirà qui.'
                 : 'When you order a book, it will appear here.'}
             </p>
           </div>

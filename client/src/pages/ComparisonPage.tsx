@@ -93,6 +93,25 @@ const pageTexts: Record<string, {
     compareWith: 'Comparer avec MagicalStory',
     biasNote: 'Nous sommes MagicalStory, donc nous sommes biaisés — mais nous avons essayé d\'être honnêtes.',
   },
+  it: {
+    breadcrumbRoot: 'Confronti',
+    quickComparison: 'Confronto rapido',
+    ourStrengths: 'Dove MagicalStory eccelle',
+    theirStrengths: 'Dove {competitor} eccelle',
+    feature: 'Caratteristica',
+    magicalStory: 'MagicalStory',
+    detailedVerdict: 'Il nostro verdetto',
+    faqTitle: 'Domande frequenti',
+    ctaTitle: 'Prova MagicalStory gratis',
+    ctaSubtitle: 'La tua prima storia è gratuita — nessuna carta di credito richiesta. Scopri la qualità di persona.',
+    ctaButton: 'Crea la tua storia gratuita',
+    ranking: 'La nostra classifica',
+    price: 'Prezzo',
+    highlights: 'Funzionalità principali',
+    visitSite: 'Visita il sito',
+    compareWith: 'Confronta con MagicalStory',
+    biasNote: 'Siamo MagicalStory, quindi siamo di parte — ma abbiamo cercato di essere onesti su dove ogni opzione eccelle.',
+  },
 };
 
 function WinnerIcon({ winner }: { winner: 'us' | 'them' | 'tie' }) {
@@ -141,7 +160,7 @@ function ComparisonTable({
   language: string;
   t: typeof pageTexts.en;
 }) {
-  const lang = language as 'en' | 'de' | 'fr';
+  const lang = language as 'en' | 'de' | 'fr' | 'it';
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -198,7 +217,7 @@ function ListicleCard({
   language: string;
   t: typeof pageTexts.en;
 }) {
-  const lang = language as 'en' | 'de' | 'fr';
+  const lang = language as 'en' | 'de' | 'fr' | 'it';
   const isUs = entry.name === 'MagicalStory';
 
   return (
@@ -290,7 +309,7 @@ function ListicleCard({
 function ComparisonPageContent({ data }: { data: ComparisonData }) {
   const { language } = useLanguage();
   const t = pageTexts[language] || pageTexts.en;
-  const lang = language as 'en' | 'de' | 'fr';
+  const lang = language as 'en' | 'de' | 'fr' | 'it';
 
   const title = data.title[lang] || data.title.en;
   const intro = data.intro[lang] || data.intro.en;

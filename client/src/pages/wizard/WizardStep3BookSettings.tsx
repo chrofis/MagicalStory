@@ -9,6 +9,7 @@ import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 function defaultCountryFor(uiLang: string): string {
   if (uiLang === 'de') return 'Schweiz';
   if (uiLang === 'fr') return 'Suisse';
+  if (uiLang === 'it') return 'Svizzera';
   return 'Switzerland';
 }
 
@@ -243,10 +244,10 @@ export function WizardStep3BookSettings({
 
   // Season labels
   const seasonLabels: Record<string, Record<string, string>> = {
-    spring: { de: 'Frühling', fr: 'Printemps', en: 'Spring' },
-    summer: { de: 'Sommer', fr: 'Été', en: 'Summer' },
-    autumn: { de: 'Herbst', fr: 'Automne', en: 'Autumn' },
-    winter: { de: 'Winter', fr: 'Hiver', en: 'Winter' },
+    spring: { de: 'Frühling', fr: 'Printemps', it: 'Primavera', en: 'Spring' },
+    summer: { de: 'Sommer', fr: 'Été', it: 'Estate', en: 'Summer' },
+    autumn: { de: 'Herbst', fr: 'Automne', it: 'Autunno', en: 'Autumn' },
+    winter: { de: 'Winter', fr: 'Hiver', it: 'Inverno', en: 'Winter' },
   };
 
   // Page slider configuration
@@ -283,7 +284,7 @@ export function WizardStep3BookSettings({
   // All reading levels use the same picture-book layout (image on top, text below).
   // The only difference is text density: short, medium, or long text per page.
   // Approximate words/page comes from server/lib/storyHelpers.js LANGUAGE_LEVELS.
-  const wordsLabel = language === 'de' ? 'Wörter pro Seite' : language === 'fr' ? 'mots par page' : 'words per page';
+  const wordsLabel = language === 'de' ? 'Wörter pro Seite' : language === 'fr' ? 'mots par page' : language === 'it' ? 'parole per pagina' : 'words per page';
   const readingLevels = [
     {
       value: '1st-grade' as LanguageLevel,
@@ -313,8 +314,8 @@ export function WizardStep3BookSettings({
   const getPageLabel = (pageCount: number, isTest = false) => {
     const testSuffix = isTest ? ' (Test)' : '';
     const creditsCost = pageCount * CREDITS_PER_PAGE;
-    const creditsLabel = language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits';
-    const pagesLabel = language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages';
+    const creditsLabel = language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : language === 'it' ? 'crediti' : 'credits';
+    const pagesLabel = language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : language === 'it' ? 'pagine' : 'pages';
     return `${pageCount} ${pagesLabel} = ${creditsCost} ${creditsLabel}${testSuffix}`;
   };
 
@@ -324,7 +325,7 @@ export function WizardStep3BookSettings({
       <div className="flex flex-col gap-4">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <BookOpen size={24} />
-          {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
+          {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : language === 'it' ? 'Formato del libro' : 'Book Format'}
         </h2>
 
         {/* Language, Location, Season Row - full width */}
@@ -332,7 +333,7 @@ export function WizardStep3BookSettings({
           {/* Language Selection - Custom dropdown with languages and variants */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
+              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : language === 'it' ? 'Lingua:' : 'Language:'}
             </span>
             <div className="relative" ref={languageDropdownRef}>
               {/* Dropdown trigger button */}
@@ -403,7 +404,7 @@ export function WizardStep3BookSettings({
           <div className="flex items-center gap-2 flex-wrap">
             <MapPin className="text-gray-500 shrink-0" size={16} />
             <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : 'Location:'}
+              {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : language === 'it' ? 'Luogo:' : 'Location:'}
             </span>
             {isEditingLocation ? (
               <div className="flex items-center gap-1 flex-wrap">
@@ -415,21 +416,21 @@ export function WizardStep3BookSettings({
                   value={editPlz}
                   onChange={(e) => setEditPlz(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="PLZ"
-                  title={language === 'de' ? 'Schweizer PLZ (4 Ziffern)' : language === 'fr' ? 'NPA suisse (4 chiffres)' : 'Swiss PLZ (4 digits)'}
+                  title={language === 'de' ? 'Schweizer PLZ (4 Ziffern)' : language === 'fr' ? 'NPA suisse (4 chiffres)' : language === 'it' ? 'NPA svizzero (4 cifre)' : 'Swiss PLZ (4 digits)'}
                   className="px-2 py-1 border border-gray-300 rounded text-base w-20 focus:outline-none focus:border-indigo-500"
                 />
                 <input
                   type="text"
                   value={editCity}
                   onChange={(e) => setEditCity(e.target.value)}
-                  placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
+                  placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : language === 'it' ? 'Città' : 'City'}
                   className="px-2 py-1 border border-gray-300 rounded text-base w-44 focus:outline-none focus:border-indigo-500"
                 />
                 <input
                   type="text"
                   value={editCountry}
                   onChange={(e) => setEditCountry(e.target.value)}
-                  placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
+                  placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : language === 'it' ? 'Paese' : 'Country'}
                   className="px-2 py-1 border border-gray-300 rounded text-base w-40 focus:outline-none focus:border-indigo-500"
                 />
                 {/* Verification indicator */}
@@ -439,14 +440,14 @@ export function WizardStep3BookSettings({
                     <Check
                       size={16}
                       className="text-green-600"
-                      aria-label={language === 'de' ? 'Ort gefunden' : language === 'fr' ? 'Lieu trouvé' : 'Location found'}
+                      aria-label={language === 'de' ? 'Ort gefunden' : language === 'fr' ? 'Lieu trouvé' : language === 'it' ? 'Luogo trovato' : 'Location found'}
                     />
                   )}
                   {verifyState === 'fail' && (
                     <X
                       size={16}
                       className="text-red-500"
-                      aria-label={language === 'de' ? 'Ort nicht gefunden' : language === 'fr' ? 'Lieu introuvable' : 'Location not found'}
+                      aria-label={language === 'de' ? 'Ort nicht gefunden' : language === 'fr' ? 'Lieu introuvable' : language === 'it' ? 'Luogo non trovato' : 'Location not found'}
                     />
                   )}
                 </span>
@@ -475,7 +476,7 @@ export function WizardStep3BookSettings({
                         ? 'Ort nicht gefunden. Bitte korrigieren oder ohne Ort weitermachen.'
                         : language === 'fr'
                         ? 'Lieu introuvable. Veuillez corriger ou continuer sans lieu.'
-                        : 'Location not found. Please re-enter or continue without a location.'}
+                        : language === 'it' ? 'Luogo non trovato. Correggi o continua senza luogo.' : 'Location not found. Please re-enter or continue without a location.'}
                     </span>
                     <button
                       type="button"
@@ -486,7 +487,7 @@ export function WizardStep3BookSettings({
                         ? 'Ohne Ort weitermachen'
                         : language === 'fr'
                         ? 'Continuer sans lieu'
-                        : 'Continue without location'}
+                        : language === 'it' ? 'Continua senza luogo' : 'Continue without location'}
                     </button>
                   </div>
                 )}
@@ -499,16 +500,16 @@ export function WizardStep3BookSettings({
                 <button
                   onClick={handleStartEditing}
                   className="p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-indigo-200"
-                  title={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
-                  aria-label={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : 'Change location'}
+                  title={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : language === 'it' ? 'Modifica il luogo' : 'Change location'}
+                  aria-label={language === 'de' ? 'Ort ändern' : language === 'fr' ? 'Modifier le lieu' : language === 'it' ? 'Modifica il luogo' : 'Change location'}
                 >
                   <Pencil size={14} />
                 </button>
                 <button
                   onClick={handleClearLocation}
                   className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200"
-                  title={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : 'Remove location'}
-                  aria-label={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : 'Remove location'}
+                  title={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : language === 'it' ? 'Rimuovi il luogo' : 'Remove location'}
+                  aria-label={language === 'de' ? 'Ort entfernen' : language === 'fr' ? 'Supprimer le lieu' : language === 'it' ? 'Rimuovi il luogo' : 'Remove location'}
                 >
                   <X size={14} />
                 </button>
@@ -516,14 +517,14 @@ export function WizardStep3BookSettings({
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-400 italic">
-                  {language === 'de' ? 'Kein Ort' : language === 'fr' ? 'Aucun lieu' : 'No location'}
+                  {language === 'de' ? 'Kein Ort' : language === 'fr' ? 'Aucun lieu' : language === 'it' ? 'Nessun luogo' : 'No location'}
                 </span>
                 <button
                   onClick={handleStartEditing}
                   className="text-xs font-medium text-indigo-500 hover:text-indigo-600 flex items-center gap-0.5"
                 >
                   <Plus size={12} />
-                  {language === 'de' ? 'Ort hinzufügen' : language === 'fr' ? 'Ajouter un lieu' : 'Add location'}
+                  {language === 'de' ? 'Ort hinzufügen' : language === 'fr' ? 'Ajouter un lieu' : language === 'it' ? 'Aggiungi un luogo' : 'Add location'}
                 </button>
               </div>
             )}
@@ -532,7 +533,7 @@ export function WizardStep3BookSettings({
           {/* Season Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison:' : 'Season:'}
+              {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison:' : language === 'it' ? 'Stagione:' : 'Season:'}
             </span>
             <div className="relative">
               <select
@@ -600,21 +601,21 @@ export function WizardStep3BookSettings({
                   ? 'Nicht genügend Credits'
                   : language === 'fr'
                   ? 'Crédits insuffisants'
-                  : 'Not enough credits'}
+                  : language === 'it' ? 'Crediti insufficienti' : 'Not enough credits'}
               </p>
               <p className="text-red-600 text-sm">
                 {language === 'de'
                   ? `Du benötigst mindestens ${minCreditsNeeded} Credits für eine Geschichte mit ${minPages} Seiten. Dir fehlen noch ${creditsNeededForMin} Credits.`
                   : language === 'fr'
                   ? `Vous avez besoin d'au moins ${minCreditsNeeded} crédits pour une histoire de ${minPages} pages. Il vous manque ${creditsNeededForMin} crédits.`
-                  : `You need at least ${minCreditsNeeded} credits for a ${minPages}-page story. You need ${creditsNeededForMin} more credits.`}
+                  : language === 'it' ? `Ti servono almeno ${minCreditsNeeded} crediti per una storia di ${minPages} pagine. Te ne mancano ${creditsNeededForMin}.` : `You need at least ${minCreditsNeeded} credits for a ${minPages}-page story. You need ${creditsNeededForMin} more credits.`}
               </p>
               <p className="text-gray-500 text-xs mt-2">
                 {language === 'de'
                   ? `Aktuell: ${userCredits} Credits`
                   : language === 'fr'
                   ? `Actuel: ${userCredits} crédits`
-                  : `Current: ${userCredits} credits`}
+                  : language === 'it' ? `Attuale: ${userCredits} crediti` : `Current: ${userCredits} credits`}
               </p>
             </div>
           ) : (
@@ -639,7 +640,7 @@ export function WizardStep3BookSettings({
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">{minPages}</span>
                 <span className="text-xl font-bold text-indigo-500">
-                  {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
+                  {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : language === 'it' ? 'pagine' : 'pages'}
                 </span>
                 <span className="text-sm text-gray-400">{absoluteMaxPages}</span>
               </div>
@@ -651,7 +652,7 @@ export function WizardStep3BookSettings({
                     ? `Max. ${effectiveMaxPages} Seiten mit ${userCredits} Credits möglich`
                     : language === 'fr'
                     ? `Max. ${effectiveMaxPages} pages possibles avec ${userCredits} crédits`
-                    : `Max. ${effectiveMaxPages} pages possible with ${userCredits} credits`}
+                    : language === 'it' ? `Max. ${effectiveMaxPages} pagine possibili con ${userCredits} crediti` : `Max. ${effectiveMaxPages} pages possible with ${userCredits} credits`}
                 </div>
               )}
 

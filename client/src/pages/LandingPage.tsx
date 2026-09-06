@@ -462,7 +462,7 @@ export default function LandingPage() {
                     <img src="/images/Real person.webp" alt="Your Picture" width="360" height="433" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : 'Your Picture'}
+                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : language === 'it' ? 'La tua foto' : 'Your Picture'}
                   </p>
                 </div>
 
@@ -477,7 +477,7 @@ export default function LandingPage() {
                     <img src="/images/Avatar.webp" alt="Your Character" width="360" height="360" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
+                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : language === 'it' ? 'Il tuo personaggio' : 'Your Character'}
                   </p>
                 </div>
               </div>
@@ -503,7 +503,7 @@ export default function LandingPage() {
                   </video>
                 </div>
                 <p className="text-xs lg:text-base text-black font-semibold">
-                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : 'Your Story'}
+                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : language === 'it' ? 'La tua storia' : 'Your Story'}
                 </p>
               </div>
             </div>
@@ -644,7 +644,7 @@ export default function LandingPage() {
                 to="/themes"
                 className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
-                {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : 'Browse all themes'} <ArrowRight size={16} />
+                {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : language === 'it' ? 'Esplora tutti i temi' : 'Browse all themes'} <ArrowRight size={16} />
               </Link>
             </div>
             {/* Image - Second on mobile, peeks from below */}
@@ -901,7 +901,7 @@ export default function LandingPage() {
                   {desc}
                 </p>
                 <div className="mt-3 inline-flex items-center gap-1 text-indigo-500 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                  {language === 'de' ? 'Entdecken' : language === 'fr' ? 'Découvrir' : 'Explore'}
+                  {language === 'de' ? 'Entdecken' : language === 'fr' ? 'Découvrir' : language === 'it' ? 'Esplora' : 'Explore'}
                   <ArrowRight size={14} />
                 </div>
               </Link>

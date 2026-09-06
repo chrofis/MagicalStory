@@ -72,6 +72,29 @@ Les obligations de supprimer ou de bloquer l'utilisation d'informations conform�
         content: `Le contenu et les œuvres de ces pages créés par les opérateurs du site sont soumis au droit d'auteur suisse. La reproduction, le traitement, la distribution ou toute forme de commercialisation de ce matériel au-delà du champ d'application du droit d'auteur nécessite le consentement écrit préalable de son auteur ou créateur respectif.`
       }
     ]
+  },
+  it: {
+    title: 'Note Legali (Impressum)',
+    lastUpdated: 'Ultimo aggiornamento: gennaio 2025',
+    sections: [
+      {
+        title: 'Contatto',
+        content: `Roger Fischer
+Ennetbaden, Svizzera
+
+Email: info@magicalstory.ch`
+      },
+      {
+        title: 'Esclusione di responsabilità',
+        content: `Il contenuto di questo sito web è stato redatto con la massima cura possibile. Tuttavia, non possiamo garantire l'esattezza, la completezza o l'attualità dei contenuti. In qualità di fornitore di servizi, siamo responsabili dei nostri contenuti su queste pagine ai sensi delle leggi generali. Non siamo tuttavia obbligati a sorvegliare le informazioni di terzi trasmesse o memorizzate, né a ricercare circostanze che indichino un'attività illecita.
+
+Restano impregiudicati gli obblighi di rimozione o di blocco dell'utilizzo di informazioni ai sensi delle leggi generali. Tuttavia, una relativa responsabilità è possibile solo a partire dal momento in cui si viene a conoscenza di una violazione di legge specifica. Non appena verremo a conoscenza di violazioni di legge di questo tipo, provvederemo a rimuovere immediatamente tali contenuti.`
+      },
+      {
+        title: 'Diritto d\'autore',
+        content: `I contenuti e le opere presenti su queste pagine, creati dai gestori del sito, sono soggetti al diritto d'autore svizzero. La riproduzione, l'elaborazione, la distribuzione o qualsiasi forma di sfruttamento commerciale di tale materiale al di fuori dei limiti del diritto d'autore richiede il previo consenso scritto del rispettivo autore o creatore.`
+      }
+    ]
   }
 };
 
@@ -98,7 +121,7 @@ export default function Impressum() {
           className="flex items-center gap-2 text-indigo-500 hover:text-indigo-800 mb-6"
         >
           <ArrowLeft size={20} />
-          {language === 'de' ? 'Zurück' : language === 'fr' ? 'Retour' : 'Back'}
+          {language === 'de' ? 'Zurück' : language === 'fr' ? 'Retour' : language === 'it' ? 'Indietro' : 'Back'}
         </button>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{content.title}</h1>

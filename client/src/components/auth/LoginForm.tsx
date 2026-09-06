@@ -24,6 +24,12 @@ const emailNotRegisteredTexts = {
     changeEmail: 'Modifier l\'email',
     createAccount: 'Créer un compte',
   },
+  it: {
+    title: "Email non registrata",
+    message: "Questo indirizzo email non è registrato:",
+    changeEmail: "Cambia email",
+    createAccount: "Crea un account",
+  },
 };
 
 interface LoginFormProps {

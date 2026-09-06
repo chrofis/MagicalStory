@@ -66,7 +66,7 @@ export function WizardStep4StoryType({
     return (
       <div className="space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-          {language === 'de' ? 'Dein Thema' : language === 'fr' ? 'Votre thème' : 'Your Topic'}
+          {language === 'de' ? 'Dein Thema' : language === 'fr' ? 'Votre thème' : language === 'it' ? 'Il tuo tema' : 'Your Topic'}
         </h2>
         <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 flex items-center gap-4">
           <span className="text-4xl">{topicDisplay.emoji}</span>
@@ -76,14 +76,14 @@ export function WizardStep4StoryType({
           </div>
           <div className="flex items-center gap-2">
             <span className="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-              <Check size={12} /> {language === 'de' ? 'Gewählt' : language === 'fr' ? 'Choisi' : 'Selected'}
+              <Check size={12} /> {language === 'de' ? 'Gewählt' : language === 'fr' ? 'Choisi' : language === 'it' ? 'Selezionato' : 'Selected'}
             </span>
             <button
               onClick={() => setShowFullSelector(true)}
               className="text-xs text-indigo-500 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-indigo-50"
             >
               <RefreshCw size={12} />
-              {language === 'de' ? 'Ändern' : language === 'fr' ? 'Changer' : 'Change'}
+              {language === 'de' ? 'Ändern' : language === 'fr' ? 'Changer' : language === 'it' ? 'Cambia' : 'Change'}
             </button>
           </div>
         </div>

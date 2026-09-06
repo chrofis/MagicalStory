@@ -220,6 +220,34 @@ export function StoryCategorySelector({
       km: 'km',
       loading: 'Chargement...',
     },
+    it: {
+      storyType: 'Storia',
+      theme: 'Tema',
+      topic: 'Argomento',
+      setting: 'Ambientazione',
+      optionalTheme: 'Opzionale: aggiungi un tema avventura',
+      optionalThemeDesc: 'Trasformala in una storia di pirati, maghi o altra avventura',
+      noTheme: 'Nessun tema (realistico)',
+      selectedCategory: 'Tipo di storia',
+      selectedTopic: 'Argomento',
+      selectedTheme: 'Tema',
+      change: 'Cambia',
+      customThemePlaceholder: 'Descrivi qui la tua idea di storia...\n\nAd esempio:\n- Una storia sull\'imparare ad andare in bicicletta\n- Un\'avventura sulle montagne svizzere\n- Un drago amichevole che aiuta con i compiti',
+      customThemeLabel: 'Il tuo tema personalizzato:',
+      currentSelection: 'Selezione attuale',
+      changeStory: 'Scegli un\'altra storia',
+      category: 'Categoria',
+      yourCity: 'La tua città',
+      nearby: 'Nelle vicinanze',
+      byCanton: 'Per cantone',
+      sagen: 'Leggende e fiabe',
+      sageStoryIdea: 'Idea di storia',
+      sageBackground: 'Contesto',
+      sageChoose: 'Scegli questa storia',
+      ideas: 'idee',
+      km: 'km',
+      loading: 'Caricamento...',
+    },
   };
   const t = translations[lang as keyof typeof translations] || translations.en;
 
@@ -638,7 +666,7 @@ export function StoryCategorySelector({
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <Sparkles className="text-indigo-500" size={24} />
-          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : 'Historical Event'}
+          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : lang === 'it' ? 'Evento storico' : 'Historical Event'}
         </h2>
 
         <div className="space-y-3">
@@ -854,7 +882,7 @@ export function StoryCategorySelector({
                 >
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                     <span>🏘️</span> {t.nearby}
-                    <span className="text-xs text-gray-500 font-normal">({nearbyCities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : 'cities'})</span>
+                    <span className="text-xs text-gray-500 font-normal">({nearbyCities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : lang === 'it' ? 'città' : 'cities'})</span>
                   </span>
                   {expandedSwissSection === 'nearby' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </button>

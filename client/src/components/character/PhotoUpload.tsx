@@ -37,6 +37,15 @@ const consentTexts = {
     period: ', y compris le traitement de ces photos par l\'IA pour créer des avatars illustrés.',
     pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
   },
+  it: {
+    consent1: "Confermo di avere il diritto di utilizzare le foto caricate e, per le foto di minorenni, di essere il genitore/tutore o di aver ottenuto il loro consenso.",
+    consent2: "Accetto i",
+    termsLink: "Termini di Servizio",
+    and: "e la",
+    privacyLink: "Informativa sulla Privacy",
+    period: ", inclusa l'elaborazione di queste foto tramite IA per creare avatar illustrati.",
+    pleaseAccept: "Accetta le condizioni sopra per caricare una foto",
+  },
 };
 
 export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadProps) {
@@ -90,6 +99,8 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
     ? 'Deine Geschichte wird basierend auf den hochgeladenen Fotos erstellt. Verwende Fotos mit nur einer Person, idealerweise Ganzkörperaufnahmen, da auch die Kleidung in die Geschichte übernommen wird.'
     : language === 'fr'
     ? 'Votre histoire sera générée à partir des photos téléchargées. Utilisez des photos d\'une seule personne, idéalement en pied, car les vêtements seront également intégrés dans l\'histoire.'
+    : language === 'it'
+    ? "La tua storia sarà creata in base alle foto caricate. Usa foto di una sola persona, idealmente a figura intera, perché anche i vestiti verranno ripresi nella storia."
     : 'Your story will be generated based on the photos you upload. Use photos of a single person, ideally full body shots, as clothing will also be copied into the story.';
 
   return (
@@ -183,7 +194,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
               />
               <span className="text-xs text-green-600 font-medium">
-                {language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Corps entier' : 'Full body'}
+                {language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Corps entier' : language === 'it' ? 'Figura intera' : 'Full body'}
               </span>
             </div>
             {/* Good example 2: Upper body */}
@@ -195,7 +206,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
               />
               <span className="text-xs text-green-600 font-medium">
-                {language === 'de' ? 'Oberkörper' : language === 'fr' ? 'Buste' : 'Upper body'}
+                {language === 'de' ? 'Oberkörper' : language === 'fr' ? 'Buste' : language === 'it' ? 'Mezzo busto' : 'Upper body'}
               </span>
             </div>
             {/* Bad example 1: Close up or blurry */}
@@ -207,7 +218,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                {language === 'de' ? 'Zu nah / Unscharf' : language === 'fr' ? 'Trop proche / Flou' : 'Too close / Blurry'}
+                {language === 'de' ? 'Zu nah / Unscharf' : language === 'fr' ? 'Trop proche / Flou' : language === 'it' ? 'Troppo vicino / Sfocato' : 'Too close / Blurry'}
               </span>
             </div>
             {/* Bad example 2: Sunglasses, hat, helmet */}
@@ -219,7 +230,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                {language === 'de' ? 'Brille / Hut / Helm' : language === 'fr' ? 'Lunettes / Chapeau' : 'Glasses / Hat / Helmet'}
+                {language === 'de' ? 'Brille / Hut / Helm' : language === 'fr' ? 'Lunettes / Chapeau' : language === 'it' ? 'Occhiali / Cappello / Casco' : 'Glasses / Hat / Helmet'}
               </span>
             </div>
             {/* Bad example 3: Multiple people */}
@@ -231,7 +242,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                {language === 'de' ? 'Nur eine Person' : language === 'fr' ? 'Une seule personne' : 'Only one person'}
+                {language === 'de' ? 'Nur eine Person' : language === 'fr' ? 'Une seule personne' : language === 'it' ? 'Solo una persona' : 'Only one person'}
               </span>
             </div>
           </div>

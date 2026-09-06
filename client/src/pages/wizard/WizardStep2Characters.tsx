@@ -212,6 +212,8 @@ export function WizardStep2Characters({
                   ? 'Wähle mindestens einen Hauptcharakter aus'
                   : language === 'fr'
                   ? 'Sélectionnez au moins un personnage principal'
+                  : language === 'it'
+                  ? 'Seleziona almeno un personaggio principale'
                   : 'Select at least one main character'}
               </p>
               <p className="text-amber-600 text-sm mt-1">
@@ -219,6 +221,8 @@ export function WizardStep2Characters({
                   ? 'Klicke auf den Stern ⭐ neben einem Charakter, um ihn zum Hauptcharakter zu machen.'
                   : language === 'fr'
                   ? 'Cliquez sur l\'étoile ⭐ à côté d\'un personnage pour en faire le personnage principal.'
+                  : language === 'it'
+                  ? 'Clicca sulla stella ⭐ accanto a un personaggio per renderlo il personaggio principale.'
                   : 'Click the star ⭐ next to a character to make them the main character.'}
               </p>
             </div>
@@ -248,7 +252,7 @@ export function WizardStep2Characters({
         <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <p className="text-gray-600 mb-6">{t.startCreating}</p>
         <Button onClick={onStartNewCharacter} icon={Sparkles}>
-          {language === 'de' ? 'Ersten Charakter erstellen' : language === 'fr' ? 'Creer le premier personnage' : 'Create First Character'}
+          {language === 'de' ? 'Ersten Charakter erstellen' : language === 'fr' ? 'Creer le premier personnage' : language === 'it' ? 'Crea il primo personaggio' : 'Create First Character'}
         </Button>
       </div>
     </div>

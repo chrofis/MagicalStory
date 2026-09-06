@@ -74,12 +74,12 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
       <div className="p-4 flex flex-col flex-1">
         <div className="flex-1">
           <h3 className="font-bold text-lg text-gray-800 mb-1 truncate">
-            {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Generating...')}
+            {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : language === 'it' ? 'In creazione...' : 'Generating...')}
           </h3>
           <p className="text-sm text-indigo-500 mb-3">
             {percentage > 0
               ? `${percentage}%`
-              : (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : 'Starting...')}
+              : (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : language === 'it' ? 'Avvio...' : 'Starting...')}
           </p>
         </div>
 
@@ -198,7 +198,7 @@ const StoryCard = memo(function StoryCard({
         {story.isPartial && (
           <div className="absolute top-2 left-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
             <AlertTriangle size={12} />
-            {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
+            {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : language === 'it' ? 'Parziale' : 'Partial'}
           </div>
         )}
 
@@ -216,11 +216,11 @@ const StoryCard = memo(function StoryCard({
           <h3 className="font-bold text-lg text-gray-800 mb-2">{story.title}</h3>
           {story.isPartial ? (
             <p className="text-sm text-amber-600 mb-3">
-              {story.generatedPages || 0}/{story.totalPages || story.pages} {language === 'de' ? 'Seiten generiert' : language === 'fr' ? 'pages générées' : 'pages generated'} • {formatDate(story.created_at || story.createdAt)}
+              {story.generatedPages || 0}/{story.totalPages || story.pages} {language === 'de' ? 'Seiten generiert' : language === 'fr' ? 'pages générées' : language === 'it' ? 'pagine generate' : 'pages generated'} • {formatDate(story.created_at || story.createdAt)}
             </p>
           ) : (
             <p className="text-sm text-gray-500 mb-3">
-              {story.pageCount || story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
+              {story.pageCount || story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : language === 'it' ? 'pagine' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
             </p>
           )}
         </div>
@@ -232,12 +232,12 @@ const StoryCard = memo(function StoryCard({
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
           >
             <Eye size={18} />
-            {language === 'de' ? 'Lesen' : language === 'fr' ? 'Lire' : 'Read'}
+            {language === 'de' ? 'Lesen' : language === 'fr' ? 'Lire' : language === 'it' ? 'Leggi' : 'Read'}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-            title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}
           >
             <Pencil size={16} />
           </button>
@@ -301,7 +301,7 @@ export default function MyStories() {
     e.preventDefault();
     setPasswordError('');
     if (newPassword.length < 8) {
-      setPasswordError(language === 'de' ? 'Mindestens 8 Zeichen' : language === 'fr' ? 'Au moins 8 caractères' : 'At least 8 characters');
+      setPasswordError(language === 'de' ? 'Mindestens 8 Zeichen' : language === 'fr' ? 'Au moins 8 caractères' : language === 'it' ? 'Almeno 8 caratteri' : 'At least 8 characters');
       return;
     }
     setIsSettingPassword(true);
@@ -321,8 +321,8 @@ export default function MyStories() {
       refreshUser(); // Update AuthContext so hasPassword and credits reflect the change
       const resData = await res.json();
       const creditsMsg = resData.credits
-        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : `Password set! ${resData.credits} credits received.`)
-        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : 'Password set!');
+        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : language === 'it' ? `Password impostata! ${resData.credits} crediti ricevuti.` : `Password set! ${resData.credits} credits received.`)
+        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : language === 'it' ? 'Password impostata!' : 'Password set!');
       showSuccess(creditsMsg);
     } catch {
       setPasswordError('Failed to set password');
@@ -464,11 +464,11 @@ export default function MyStories() {
               : 'Votre livre a été envoyé à l’impression.',
           };
           const details = [
-            `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : 'Customer'}: ${finalData.order.customer_name}`,
+            `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : language === 'it' ? 'Cliente' : 'Customer'}: ${finalData.order.customer_name}`,
             `Email: ${finalData.order.customer_email}`,
-            `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : 'Amount'}: ${amount}`,
-            ...(tokensCredited > 0 ? [`${language === 'de' ? 'Tokens erhalten' : language === 'fr' ? 'Jetons gagnés' : 'Tokens earned'}: ${tokensCredited}`] : []),
-            `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : 'Shipping to'}: ${finalData.order.shipping_name}`,
+            `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : language === 'it' ? 'Importo' : 'Amount'}: ${amount}`,
+            ...(tokensCredited > 0 ? [`${language === 'de' ? 'Tokens erhalten' : language === 'fr' ? 'Jetons gagnés' : language === 'it' ? 'Token ricevuti' : 'Tokens earned'}: ${tokensCredited}`] : []),
+            `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : language === 'it' ? 'Spedizione a' : 'Shipping to'}: ${finalData.order.shipping_name}`,
             `${finalData.order.shipping_address_line1}`,
             `${finalData.order.shipping_postal_code} ${finalData.order.shipping_city}`,
             `${finalData.order.shipping_country}`,
@@ -488,7 +488,7 @@ export default function MyStories() {
         };
         showInfo(
           messages[language as keyof typeof messages] || messages.en,
-          language === 'de' ? 'Abgebrochen' : language === 'fr' ? 'Annulé' : 'Cancelled'
+          language === 'de' ? 'Abgebrochen' : language === 'fr' ? 'Annulé' : language === 'it' ? 'Annullato' : 'Cancelled'
         );
 
         // Clean up URL parameters
@@ -648,7 +648,7 @@ export default function MyStories() {
         ? 'Geschichten konnten nicht geladen werden'
         : language === 'fr'
         ? 'Impossible de charger les histoires'
-        : 'Failed to load stories');
+        : language === 'it' ? 'Impossibile caricare le storie' : 'Failed to load stories');
       // Invalidate cache on error
       storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
     } finally {
@@ -736,7 +736,7 @@ export default function MyStories() {
       ? 'Diese Geschichte wirklich löschen?'
       : language === 'fr'
       ? 'Voulez-vous vraiment supprimer cette histoire?'
-      : 'Are you sure you want to delete this story?';
+      : language === 'it' ? 'Vuoi davvero eliminare questa storia?' : 'Are you sure you want to delete this story?';
 
     if (!confirm(confirmMsg)) return;
 
@@ -759,7 +759,7 @@ export default function MyStories() {
         ? 'Geschichte konnte nicht gelöscht werden. Bitte versuche es erneut.'
         : language === 'fr'
         ? 'Impossible de supprimer l\'histoire. Veuillez réessayer.'
-        : 'Failed to delete story. Please try again.');
+        : language === 'it' ? 'Impossibile eliminare la storia. Riprova.' : 'Failed to delete story. Please try again.');
     }
   };
 
@@ -767,7 +767,7 @@ export default function MyStories() {
     if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : 'en-US', {
+      return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'it' ? 'it-CH' : 'en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -840,19 +840,19 @@ export default function MyStories() {
                 <p className="font-semibold text-amber-800 text-sm mb-1">
                   {language === 'de' ? `Setze ein Passwort und erhalte ${INITIAL_USER_CREDITS} Credits für weitere Geschichten!`
                     : language === 'fr' ? `Définissez un mot de passe et recevez ${INITIAL_USER_CREDITS} crédits pour plus d'histoires !`
-                    : `Set a password and get ${INITIAL_USER_CREDITS} credits for more stories!`}
+                    : language === 'it' ? `Imposta una password e ricevi ${INITIAL_USER_CREDITS} crediti per altre storie!` : `Set a password and get ${INITIAL_USER_CREDITS} credits for more stories!`}
                 </p>
                 <p className="text-amber-700 text-xs mb-2">
                   {language === 'de' ? 'Sichere deinen Zugang und schalte alle Funktionen frei.'
                     : language === 'fr' ? 'Sécurisez votre accès et débloquez toutes les fonctionnalités.'
-                    : 'Secure your account and unlock all features.'}
+                    : language === 'it' ? 'Proteggi il tuo accesso e sblocca tutte le funzioni.' : 'Secure your account and unlock all features.'}
                 </p>
                 <form onSubmit={handleSetPassword} className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder={language === 'de' ? 'Passwort (min. 8 Zeichen)' : language === 'fr' ? 'Mot de passe (min. 8 car.)' : 'Password (min. 8 characters)'}
+                    placeholder={language === 'de' ? 'Passwort (min. 8 Zeichen)' : language === 'fr' ? 'Mot de passe (min. 8 car.)' : language === 'it' ? 'Password (min. 8 caratteri)' : 'Password (min. 8 characters)'}
                     className="px-3 py-2 border border-amber-300 rounded-lg text-base focus:ring-2 focus:ring-amber-400 outline-none flex-1"
                     disabled={isSettingPassword}
                   />
@@ -862,7 +862,7 @@ export default function MyStories() {
                     className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
                   >
                     {isSettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                    {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}
+                    {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : language === 'it' ? 'Salva' : 'Save'}
                   </button>
                 </form>
                 {passwordError && <p className="text-red-600 text-xs mt-1">{passwordError}</p>}
@@ -937,7 +937,7 @@ export default function MyStories() {
         )}
 
         {isLoading ? (
-          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'} />
+          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
         ) : loadError ? (
           <div className="text-center py-12">
             <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
@@ -951,7 +951,7 @@ export default function MyStories() {
               }}
               className="px-6 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600"
             >
-              {language === 'de' ? 'Erneut versuchen' : language === 'fr' ? 'Réessayer' : 'Try Again'}
+              {language === 'de' ? 'Erneut versuchen' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Try Again'}
             </button>
           </div>
         ) : stories.length === 0 ? (
@@ -1052,11 +1052,11 @@ export default function MyStories() {
                   {isLoadingMore ? (
                     <>
                       <div className="w-5 h-5 spinner" />
-                      {language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'}
+                      {language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'}
                     </>
                   ) : (
                     <>
-                      {t.loadAll} ({totalStories - stories.length} {language === 'de' ? 'weitere' : language === 'fr' ? 'autres' : 'more'})
+                      {t.loadAll} ({totalStories - stories.length} {language === 'de' ? 'weitere' : language === 'fr' ? 'autres' : language === 'it' ? 'altre' : 'more'})
                     </>
                   )}
                 </button>

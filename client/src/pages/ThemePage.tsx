@@ -102,14 +102,34 @@ const pageTexts: Record<string, {
     heroPitchChallenge: 'Un livre illustré personnalisé où votre enfant est le héros — et surmonte ce défi lui-même. La première histoire est gratuite.',
     heroPitchGeneric: 'Un livre illustré personnalisé où votre enfant est le héros et vit cette histoire lui-même. La première histoire est gratuite.',
   },
+  it: {
+    breadcrumbRoot: 'Temi',
+    createButton: 'Crea questa storia',
+    whatToExpect: 'Cosa aspettarti',
+    howItWorks: 'Come funziona',
+    howStep1Title: 'Carica una foto',
+    howStep1Desc: 'Carica una foto di tuo figlio. Diventerà l\'eroe illustrato della storia.',
+    howStep2Title: 'Scegli questo tema',
+    howStep2Desc: 'Seleziona questo tema e personalizza le impostazioni della storia come preferisci.',
+    howStep3Title: 'Ricevi la tua storia',
+    howStep3Desc: 'La tua storia illustrata personalizzata è pronta in pochi minuti. Leggila online o ordina il libro stampato.',
+    relatedThemes: 'Temi correlati',
+    ctaTitle: 'Rendilo personale',
+    ctaSubtitle: 'Tuo figlio come protagonista della sua storia. Provalo gratis.',
+    ctaButton: 'Crea la tua storia gratuita',
+    yearLabel: 'Anno',
+    personLabel: 'Personaggio storico',
+    heroPitchChallenge: 'Un libro illustrato personalizzato in cui tuo figlio è l\'eroe — e supera da solo questa sfida. La prima storia è gratuita.',
+    heroPitchGeneric: 'Un libro illustrato personalizzato in cui tuo figlio è l\'eroe e vive questa storia in prima persona. La prima storia è gratuita.',
+  },
 };
 
 function getCategoryName(category: CategorySlug, language: string): string {
   const names: Record<CategorySlug, Record<string, string>> = {
-    adventure: { en: 'Adventure', de: 'Abenteuer', fr: 'Aventure' },
-    'life-challenges': { en: 'Life Skills', de: 'Lebenskompetenzen', fr: 'Compétences de vie' },
-    educational: { en: 'Learning', de: 'Lernen', fr: 'Apprentissage' },
-    historical: { en: 'History', de: 'Geschichte', fr: 'Histoire' },
+    adventure: { en: 'Adventure', de: 'Abenteuer', fr: 'Aventure', it: 'Avventura' },
+    'life-challenges': { en: 'Life Skills', de: 'Lebenskompetenzen', fr: 'Compétences de vie', it: 'Competenze di vita' },
+    educational: { en: 'Learning', de: 'Lernen', fr: 'Apprentissage', it: 'Apprendimento' },
+    historical: { en: 'History', de: 'Geschichte', fr: 'Histoire', it: 'Storia' },
   };
   return names[category]?.[language] || names[category]?.en || category;
 }
@@ -160,21 +180,25 @@ function getExpectBullets(category: CategorySlug, language: string): string[] {
       en: ['Your child as the main character', 'Exciting plot with surprises', 'Beautiful illustrations in your chosen style'],
       de: ['Dein Kind als Hauptfigur', 'Spannende Handlung mit Überraschungen', 'Wunderschöne Illustrationen im gewählten Stil'],
       fr: ['Votre enfant comme personnage principal', 'Une intrigue passionnante avec des surprises', 'De belles illustrations dans le style choisi'],
+      it: ['Tuo figlio come protagonista', 'Una trama avvincente piena di sorprese', 'Bellissime illustrazioni nello stile scelto'],
     },
     'life-challenges': {
       en: ['Your child facing the challenge with confidence', 'Positive, empowering message', 'Age-appropriate language and situations'],
       de: ['Dein Kind meistert die Herausforderung mit Selbstvertrauen', 'Positive, stärkende Botschaft', 'Altersgerechte Sprache und Situationen'],
       fr: ['Votre enfant affronte le défi avec confiance', 'Un message positif et encourageant', 'Un langage et des situations adaptés à l\'âge'],
+      it: ['Tuo figlio affronta la sfida con sicurezza', 'Un messaggio positivo e incoraggiante', 'Linguaggio e situazioni adatti all\'età'],
     },
     educational: {
       en: ['Fun learning integrated into the story', 'Your child discovering new concepts', 'Interactive elements on every page'],
       de: ['Spielerisches Lernen in die Geschichte integriert', 'Dein Kind entdeckt neue Konzepte', 'Interaktive Elemente auf jeder Seite'],
       fr: ['Un apprentissage ludique intégré à l\'histoire', 'Votre enfant découvre de nouveaux concepts', 'Des éléments interactifs à chaque page'],
+      it: ['Apprendimento divertente integrato nella storia', 'Tuo figlio scopre nuovi concetti', 'Elementi interattivi in ogni pagina'],
     },
     historical: {
       en: ['Historically accurate setting and details', 'Your child as a witness to history', 'Educational and entertaining'],
       de: ['Historisch akkurate Kulisse und Details', 'Dein Kind als Zeitzeuge', 'Lehrreich und unterhaltsam'],
       fr: ['Un cadre et des détails historiquement précis', 'Votre enfant comme témoin de l\'histoire', 'Éducatif et divertissant'],
+      it: ['Ambientazione e dettagli storicamente accurati', 'Tuo figlio come testimone della storia', 'Istruttivo e divertente'],
     },
   };
   return bullets[category]?.[language] || bullets[category]?.en || [];
@@ -331,7 +355,7 @@ export default function ThemePage() {
                   {skills && (
                     <div className="flex-1 min-w-[200px]">
                       <h3 className="text-sm font-semibold text-stone-500 mb-1">
-                        {language === 'de' ? 'Was dein Kind lernt' : language === 'fr' ? 'Ce que votre enfant apprend' : 'What your child learns'}
+                        {language === 'de' ? 'Was dein Kind lernt' : language === 'fr' ? 'Ce que votre enfant apprend' : language === 'it' ? 'Cosa impara tuo figlio' : 'What your child learns'}
                       </h3>
                       <p className="text-sm text-stone-700">{skills}</p>
                     </div>
@@ -339,9 +363,9 @@ export default function ThemePage() {
                   {ageRec && (
                     <div>
                       <h3 className="text-sm font-semibold text-stone-500 mb-1">
-                        {language === 'de' ? 'Empfohlenes Alter' : language === 'fr' ? 'Âge recommandé' : 'Recommended age'}
+                        {language === 'de' ? 'Empfohlenes Alter' : language === 'fr' ? 'Âge recommandé' : language === 'it' ? 'Età consigliata' : 'Recommended age'}
                       </h3>
-                      <p className="text-sm text-stone-700">{ageRec} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : 'years'}</p>
+                      <p className="text-sm text-stone-700">{ageRec} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}</p>
                     </div>
                   )}
                 </div>
@@ -370,7 +394,7 @@ export default function ThemePage() {
               }}
             />
             <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">
-              {language === 'de' ? 'Häufige Fragen' : language === 'fr' ? 'Questions fréquentes' : 'Frequently Asked Questions'}
+              {language === 'de' ? 'Häufige Fragen' : language === 'fr' ? 'Questions fréquentes' : language === 'it' ? 'Domande frequenti' : 'Frequently Asked Questions'}
             </h2>
             <div className="space-y-3">
               {faq.map((item, i) => (

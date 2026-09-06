@@ -9,9 +9,9 @@ import { findingText } from '../../../utils/findingText';
 
 // Cover type names for display
 const COVER_LABELS = {
-  frontCover: { en: 'Front Cover', de: 'Titelseite', fr: 'Couverture' },
-  initialPage: { en: 'Dedication Page', de: 'Widmungsseite', fr: 'Page de dédicace' },
-  backCover: { en: 'Back Cover', de: 'Rückseite', fr: 'Quatrième de couverture' },
+  frontCover: { en: 'Front Cover', de: 'Titelseite', fr: 'Couverture', it: 'Copertina' },
+  initialPage: { en: 'Dedication Page', de: 'Widmungsseite', fr: 'Page de dédicace', it: 'Pagina di dedica' },
+  backCover: { en: 'Back Cover', de: 'Rückseite', fr: 'Quatrième de couverture', it: 'Quarta di copertina' },
 };
 
 interface ImageHistoryModalProps {
@@ -80,13 +80,15 @@ export function ImageHistoryModal({
   const getTitle = () => {
     if (coverType) {
       const labels = COVER_LABELS[coverType];
-      const label = language === 'de' ? labels.de : language === 'fr' ? labels.fr : labels.en;
+      const label = language === 'de' ? labels.de : language === 'fr' ? labels.fr : language === 'it' ? labels.it : labels.en;
       return language === 'de' ? `Bild wählen - ${label}` :
              language === 'fr' ? `Choisir image - ${label}` :
+             language === 'it' ? `Scegli immagine - ${label}` :
              `Select Image - ${label}`;
     }
     return language === 'de' ? `Bild wählen - Seite ${pageNumber}` :
            language === 'fr' ? `Choisir image - Page ${pageNumber}` :
+           language === 'it' ? `Scegli immagine - Pagina ${pageNumber}` :
            `Select Image - Page ${pageNumber}`;
   };
 
@@ -261,14 +263,14 @@ export function ImageHistoryModal({
               return isActive ? (
                 <span className="bg-green-500 text-white text-sm font-bold px-4 py-1.5 rounded-lg flex items-center gap-1.5">
                   <Check size={14} />
-                  {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
+                  {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : language === 'it' ? 'Attivo' : 'Active'}
                 </span>
               ) : (
                 <button
                   onClick={() => { handleSelect(fullscreenIndex); setFullscreenIndex(null); }}
                   className="bg-white text-gray-800 text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  {language === 'de' ? 'Dieses Bild verwenden' : language === 'fr' ? 'Utiliser cette image' : 'Use this image'}
+                  {language === 'de' ? 'Dieses Bild verwenden' : language === 'fr' ? 'Utiliser cette image' : language === 'it' ? 'Usa questa immagine' : 'Use this image'}
                 </button>
               );
             })()}
@@ -345,14 +347,14 @@ export function ImageHistoryModal({
                       {isActiveVersion ? (
                         <span className="bg-green-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex items-center gap-0.5">
                           <Check size={10} className="sm:w-3 sm:h-3" />
-                          {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
+                          {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : language === 'it' ? 'Attivo' : 'Active'}
                         </span>
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleSelect(idx); }}
                           className="bg-white/90 hover:bg-white text-gray-800 text-[10px] sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded transition-colors cursor-pointer"
                         >
-                          {language === 'de' ? 'Wählen' : language === 'fr' ? 'Choisir' : 'Select'}
+                          {language === 'de' ? 'Wählen' : language === 'fr' ? 'Choisir' : language === 'it' ? 'Scegli' : 'Select'}
                         </button>
                       )}
                     </div>

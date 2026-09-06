@@ -48,6 +48,17 @@ const pageTexts: Record<string, {
     ctaSubtitle: 'Votre première histoire est gratuite — aucune carte de crédit requise. Comparez la qualité avec n\'importe quel concurrent.',
     ctaButton: 'Créer votre histoire gratuite',
   },
+  it: {
+    heroTitle: 'MagicalStory a confronto',
+    heroSubtitle: 'Confronti onesti tra MagicalStory e altre piattaforme di libri personalizzati per bambini. Riconosciamo i punti di forza dei concorrenti — scegli ciò che si adatta meglio alla tua famiglia.',
+    comparisonsTitle: 'Confronti 1 contro 1',
+    listiclesTitle: 'Classifiche',
+    viewComparison: 'Vedi il confronto',
+    viewRanking: 'Vedi la classifica',
+    ctaTitle: 'Scopri la differenza tu stesso',
+    ctaSubtitle: 'La tua prima storia è gratuita — nessuna carta di credito richiesta. Confronta la qualità con qualsiasi concorrente.',
+    ctaButton: 'Crea la tua storia gratuita',
+  },
 };
 
 const competitorDescriptions: Record<string, Record<string, string>> = {
@@ -55,41 +66,49 @@ const competitorDescriptions: Record<string, Record<string, string>> = {
     en: 'The template giant (11M+ books, Penguin Random House)',
     de: 'Der Vorlagen-Riese (11 Mio.+ Bücher, Penguin Random House)',
     fr: 'Le géant des modèles (11M+ livres, Penguin Random House)',
+    it: 'Il gigante dei modelli (11M+ libri, Penguin Random House)',
   },
   'hooray-heroes': {
     en: 'The emotional gifting specialists (3M+ books)',
     de: 'Die Spezialisten für emotionale Geschenke (3 Mio.+ Bücher)',
     fr: 'Les spécialistes des cadeaux émotionnels (3M+ livres)',
+    it: 'Gli specialisti dei regali emozionali (3M+ libri)',
   },
   librio: {
     en: 'The Swiss classic (sustainability, Globi books)',
     de: 'Der Schweizer Klassiker (Nachhaltigkeit, Globi-Bücher)',
     fr: 'Le classique suisse (durabilité, livres Globi)',
+    it: 'Il classico svizzero (sostenibilità, libri Globi)',
   },
   framily: {
     en: 'The licensed character specialist (PAW Patrol, Disney)',
     de: 'Der Spezialist für lizenzierte Figuren (PAW Patrol, Disney)',
     fr: 'Le spécialiste des personnages sous licence (PAW Patrol, Disney)',
+    it: 'Lo specialista dei personaggi su licenza (PAW Patrol, Disney)',
   },
   'lullaby-ink': {
     en: 'The budget AI option ($5/story)',
     de: 'Die günstige KI-Option ($5/Geschichte)',
     fr: 'L\'option IA économique (5$/histoire)',
+    it: 'L\'opzione IA economica (5$/storia)',
   },
   lovetoread: {
     en: 'The education-focused AI platform (K-5 reading levels)',
     de: 'Die bildungsfokussierte KI-Plattform (K-5 Lesestufen)',
     fr: 'La plateforme IA éducative (niveaux de lecture K-5)',
+    it: 'La piattaforma IA orientata all\'istruzione (livelli di lettura K-5)',
   },
   'beste-personalisierte-kinderbuecher': {
     en: 'Top 5 personalized children\'s book platforms for Swiss families',
     de: 'Top 5 personalisierte Kinderbuch-Plattformen für Schweizer Familien',
     fr: 'Top 5 des plateformes de livres personnalisés pour les familles suisses',
+    it: 'Le 5 migliori piattaforme di libri personalizzati per famiglie svizzere',
   },
   'beste-ki-kinderbuch-generatoren': {
     en: 'Top 6 AI-powered children\'s book generators reviewed',
     de: 'Top 6 KI-Kinderbuch-Generatoren im Test',
     fr: 'Top 6 des générateurs de livres pour enfants par IA testés',
+    it: 'I 6 migliori generatori di libri per bambini con IA a confronto',
   },
 };
 
@@ -125,7 +144,7 @@ export default function Comparisons() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {oneOnOne.map((comp) => {
-              const lang = language as 'en' | 'de' | 'fr';
+              const lang = language as 'en' | 'de' | 'fr' | 'it';
               const desc = competitorDescriptions[comp.id]?.[language] || competitorDescriptions[comp.id]?.en || '';
               return (
                 <Link
@@ -156,7 +175,7 @@ export default function Comparisons() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {listicles.map((comp) => {
-              const lang = language as 'en' | 'de' | 'fr';
+              const lang = language as 'en' | 'de' | 'fr' | 'it';
               const desc = competitorDescriptions[comp.id]?.[language] || competitorDescriptions[comp.id]?.en || '';
               return (
                 <Link

@@ -1733,6 +1733,9 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
   // "bad" only at end (Thermalbad) to avoid matching city names like "Ennetbaden"
   const germanLandmarkIndicator = /(burg|schloss|kirche|dom|kathedrale|abtei|kloster|brücke|turm|museum|park|garten|palast|brunnen|denkmal|statue|bahnhof|theater|halle|platz|markt|tor|mauer|ruine|bad$|therme|tempel|kapelle|bibliothek|universität|schule|spital|synagoge|moschee|tunnel|pass|stadion|arena|mühle|damm|see|fluss|wasserfall|höhle|berg|gipfel|insel|leuchtturm)/i;
 
+  // Italian landmark indicators (for it.wikipedia)
+  const italianLandmarkIndicator = /(castello|rocca|chiesa|basilica|duomo|cattedrale|abbazia|monastero|convento|ponte|torre|museo|parco|giardino|palazzo|villa|fontana|monumento|statua|stazione|teatro|piazza|mercato|porta|mura|rovine|terme|tempio|cappella|santuario|biblioteca|università|scuola|ospedale|sinagoga|moschea|galleria|traforo|passo|stadio|arena|mulino|diga|lago|fiume|cascata|grotta|monte|montagna|cima|isola|faro)/i;
+
   // French landmark indicators (for fr.wikipedia)
   const frenchLandmarkIndicator = /(château|église|cathédrale|abbaye|monastère|pont|tour|musée|parc|jardin|palais|fontaine|monument|statue|gare|théâtre|place|marché|porte|mur|ruine|bain|therme|temple|chapelle|bibliothèque|université|école|hôpital|synagogue|mosquée|tunnel|col|stade|moulin|barrage|lac|rivière|cascade|grotte|montagne|île|phare)/i;
 
@@ -1777,6 +1780,8 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
           hasLandmarkIndicator = hasLandmarkIndicator || germanLandmarkIndicator.test(name);
         } else if (lang === 'fr') {
           hasLandmarkIndicator = hasLandmarkIndicator || frenchLandmarkIndicator.test(name);
+        } else if (lang === 'it') {
+          hasLandmarkIndicator = hasLandmarkIndicator || italianLandmarkIndicator.test(name);
         }
 
         // Skip administrative divisions (not actual landmarks)

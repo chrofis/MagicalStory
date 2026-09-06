@@ -83,12 +83,25 @@ const strings: Record<string, {
     avatarReady: (name, gender) => `${name} est prêt${gender === 'female' ? 'e' : ''} pour sa première aventure !`,
     avatarLoading: (name) => `${name} se prépare pour l'histoire. Tu peux déjà choisir un sujet.`,
   },
+  it: {
+    title: 'Scegli il tuo tema',
+    subtitle: 'Che tipo di avventura vuoi creare?',
+    pickCategory: 'Scegli un tipo di storia',
+    pickTheme: 'Scegli un tema',
+    pickTopic: 'Scegli un argomento',
+    pickStyle: 'Che tipo di storia?',
+    back: 'Indietro',
+    next: 'Avanti',
+    change: 'Cambia',
+    avatarReady: (name, gender) => `${name} è pront${gender === 'female' ? 'a' : 'o'} per la sua prima avventura!`,
+    avatarLoading: (name) => `${name} si sta preparando per la storia. Puoi già scegliere un argomento qui sotto.`,
+  },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender }: Props) {
-  const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
+  const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : storyInput.language === 'it' ? 'it' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
   const avatarBanner = characterName ? (

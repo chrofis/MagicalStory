@@ -52,6 +52,20 @@ const endPageText: Record<string, Record<string, string>> = {
     f4: 'Meilleure qualité d\'image',
     f5: 'Commander en livre imprimé',
   },
+  it: {
+    secureTitle: 'Metti al sicuro la tua storia!',
+    secureDesc: 'Imposta una password per accedere alla tua storia in qualsiasi momento.',
+    setPassword: 'Imposta password',
+    benefits: 'Con il tuo account gratuito puoi:',
+    endTitle: 'Fine della storia',
+    printBook: 'Stampa come libro',
+    newStory: 'Nuova storia',
+    f1: 'Più personaggi in una storia',
+    f2: 'Storie più lunghe con più pagine',
+    f3: 'Diversi stili di disegno',
+    f4: 'Qualità immagine superiore e copertina',
+    f5: 'Ordina come libro stampato',
+  },
 };
 
 /**

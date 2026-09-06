@@ -9,10 +9,10 @@ interface ArtStyleSelectorProps {
 }
 
 const categoryLabels = {
-  popular: { en: 'Popular', de: 'Beliebt', fr: 'Populaire' },
-  realistic: { en: 'Realistic', de: 'Realistisch', fr: 'Réaliste' },
-  illustrated: { en: 'Illustrated', de: 'Illustriert', fr: 'Illustré' },
-  creative: { en: 'Creative', de: 'Kreativ', fr: 'Créatif' },
+  popular: { en: 'Popular', de: 'Beliebt', fr: 'Populaire', it: 'Popolari' },
+  realistic: { en: 'Realistic', de: 'Realistisch', fr: 'Réaliste', it: 'Realistici' },
+  illustrated: { en: 'Illustrated', de: 'Illustriert', fr: 'Illustré', it: 'Illustrati' },
+  creative: { en: 'Creative', de: 'Kreativ', fr: 'Créatif', it: 'Creativi' },
 };
 
 const categoryOrder: Array<'realistic' | 'illustrated' | 'creative'> = ['realistic', 'illustrated', 'creative'];
@@ -22,7 +22,7 @@ const POPULAR_STYLE_IDS = ['watercolor', 'anime', 'comic', 'pixar'];
 
 export function ArtStyleSelector({ selectedStyle, onSelect }: ArtStyleSelectorProps) {
   const { language } = useLanguage();
-  const lang = language as 'en' | 'de' | 'fr';
+  const lang = language as 'en' | 'de' | 'fr' | 'it';
 
   // All non-popular categories start collapsed.
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);

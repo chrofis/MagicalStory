@@ -213,38 +213,38 @@ const translations = {
 // render threw "Cannot access 'funnyMessages' before initialization"
 // and the whole page rendered blank.
 const funnyMessages = [
-  { en: '{name} is getting ready for their big adventure...', de: '{name} macht sich bereit für das grosse Abenteuer...', fr: '{name} se prépare pour sa grande aventure...' },
-  { en: '{name} is practicing their hero pose...', de: '{name} übt gerade die Heldenpose...', fr: '{name} s\'entraîne à prendre la pose du héros...' },
-  { en: '{name} can\'t wait to see what happens next!', de: '{name} kann es kaum erwarten zu sehen, was als Nächstes passiert!', fr: '{name} a hâte de voir ce qui va se passer !' },
-  { en: '{name} just found a magic feather! Adding it to the story...', de: '{name} hat gerade eine Zauberfeder gefunden!', fr: '{name} vient de trouver une plume magique !' },
-  { en: '{name} is whispering secrets to the story wizard...', de: '{name} flüstert dem Geschichtenzauberer Geheimnisse zu...', fr: '{name} chuchote des secrets au magicien des histoires...' },
-  { en: '{name} is doing a little happy dance!', de: '{name} macht einen kleinen Freudentanz!', fr: '{name} fait une petite danse de joie !' },
-  { en: '{name} is painting the next scene with imagination...', de: '{name} malt die nächste Szene mit viel Fantasie...', fr: '{name} peint la prochaine scène avec imagination...' },
-  { en: '{name} made friends with a talking squirrel!', de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!', fr: '{name} s\'est fait ami avec un écureuil parlant !' },
-  { en: 'The story wizard is adding extra sparkle for {name}...', de: 'Der Geschichtenzauberer fügt extra Glitzer für {name} hinzu...', fr: 'Le magicien ajoute des paillettes supplémentaires pour {name}...' },
-  { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite...' },
-  { en: '{name} is teaching the story characters a secret handshake...', de: '{name} bringt den Geschichtsfiguren einen geheimen Handschlag bei...', fr: '{name} apprend une poignée de main secrète aux personnages...' },
-  { en: '{name} is sneaking into the next page already...', de: '{name} schleicht sich schon auf die nächste Seite...', fr: '{name} se glisse déjà dans la page suivante...' },
-  { en: 'The illustrator is mixing fresh paint just for {name}...', de: 'Der Illustrator mischt neue Farben — extra für {name}...', fr: 'L\'illustrateur prépare des couleurs neuves pour {name}...' },
-  { en: '{name} is double-checking every comma...', de: '{name} prüft noch einmal jedes Komma...', fr: '{name} relit chaque virgule...' },
-  { en: '{name} is asking the moon for a tiny smile...', de: '{name} bittet den Mond um ein kleines Lächeln...', fr: '{name} demande à la lune un petit sourire...' },
-  { en: 'A tiny dragon just offered {name} some help. Polite refusal.', de: 'Ein kleiner Drache hat {name} Hilfe angeboten. Höflich abgelehnt.', fr: 'Un petit dragon propose son aide à {name}. Refus poli.' },
-  { en: '{name} is collecting just one more sparkle...', de: '{name} sammelt noch ein letztes Glitzern...', fr: '{name} ramasse encore un éclat de paillette...' },
-  { en: 'The story wizard mislaid a comma. Looking now.', de: 'Der Geschichtenzauberer hat ein Komma verlegt. Sucht es gerade.', fr: 'Le magicien a égaré une virgule. Il la cherche.' },
-  { en: '{name} is humming the title page tune...', de: '{name} summt die Melodie vom Titelbild...', fr: '{name} fredonne l\'air de la couverture...' },
-  { en: 'Adding extra colours to {name}\'s scarf...', de: 'Mehr Farben für {name}s Schal...', fr: 'Encore des couleurs pour l\'écharpe de {name}...' },
-  { en: '{name} is reading the last chapter twice for luck...', de: '{name} liest das letzte Kapitel zweimal, für\'s Glück...', fr: '{name} relit le dernier chapitre, pour porter chance...' },
-  { en: 'A fox in the margins waves at {name}...', de: 'Ein Fuchs am Seitenrand winkt {name} zu...', fr: 'Un renard dans la marge salue {name}...' },
-  { en: '{name} is stretching before the final scene...', de: '{name} streckt sich vor der letzten Szene...', fr: '{name} s\'étire avant la dernière scène...' },
-  { en: 'The font is fluffing its serifs for {name}...', de: 'Die Schrift macht ihre Serifen schön für {name}...', fr: 'La police arrange ses sérifs pour {name}...' },
-  { en: '{name} just found a hidden door in the story!', de: '{name} hat eine geheime Tür in der Geschichte entdeckt!', fr: '{name} a trouvé une porte secrète dans l\'histoire !' },
-  { en: 'Polishing the moonlight before the night scene...', de: 'Das Mondlicht wird poliert für die Nachtszene...', fr: 'On lustre le clair de lune pour la scène nocturne...' },
-  { en: '{name} is convincing a cloud to pose nicely...', de: '{name} überredet eine Wolke, schön zu posieren...', fr: '{name} convainc un nuage de poser joliment...' },
-  { en: '{name} is checking that all the leaves are the right green...', de: '{name} prüft, ob alle Blätter im richtigen Grün leuchten...', fr: '{name} vérifie que toutes les feuilles ont le bon vert...' },
-  { en: 'A page is being rewritten because it wasn\'t magical enough...', de: 'Eine Seite wird neu geschrieben — sie war nicht magisch genug...', fr: 'Une page est réécrite — elle n\'était pas assez magique...' },
-  { en: '{name} is rehearsing the very last sentence...', de: '{name} probt den allerletzten Satz...', fr: '{name} répète la toute dernière phrase...' },
-  { en: 'The story wizard is brewing one last bit of imagination...', de: 'Der Geschichtenzauberer braut die letzte Portion Fantasie...', fr: 'Le magicien brasse une dernière dose d\'imagination...' },
-  { en: '{name} is asking a star for an extra wish...', de: '{name} bittet einen Stern um einen weiteren Wunsch...', fr: '{name} demande à une étoile un voeu de plus...' },
+  { en: '{name} is getting ready for their big adventure...', de: '{name} macht sich bereit für das grosse Abenteuer...', fr: '{name} se prépare pour sa grande aventure...', it: '{name} si sta preparando per la grande avventura...' },
+  { en: '{name} is practicing their hero pose...', de: '{name} übt gerade die Heldenpose...', fr: '{name} s\'entraîne à prendre la pose du héros...', it: '{name} sta provando la posa da eroe...' },
+  { en: '{name} can\'t wait to see what happens next!', de: '{name} kann es kaum erwarten zu sehen, was als Nächstes passiert!', fr: '{name} a hâte de voir ce qui va se passer !', it: "{name} non vede l'ora di scoprire cosa succede dopo!" },
+  { en: '{name} just found a magic feather! Adding it to the story...', de: '{name} hat gerade eine Zauberfeder gefunden!', fr: '{name} vient de trouver une plume magique !', it: '{name} ha appena trovato una piuma magica!' },
+  { en: '{name} is whispering secrets to the story wizard...', de: '{name} flüstert dem Geschichtenzauberer Geheimnisse zu...', fr: '{name} chuchote des secrets au magicien des histoires...', it: '{name} sussurra segreti al mago delle storie...' },
+  { en: '{name} is doing a little happy dance!', de: '{name} macht einen kleinen Freudentanz!', fr: '{name} fait une petite danse de joie !', it: '{name} fa un piccolo ballo di gioia!' },
+  { en: '{name} is painting the next scene with imagination...', de: '{name} malt die nächste Szene mit viel Fantasie...', fr: '{name} peint la prochaine scène avec imagination...', it: '{name} dipinge la prossima scena con tanta fantasia...' },
+  { en: '{name} made friends with a talking squirrel!', de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!', fr: '{name} s\'est fait ami avec un écureuil parlant !', it: '{name} ha fatto amicizia con uno scoiattolo parlante!' },
+  { en: 'The story wizard is adding extra sparkle for {name}...', de: 'Der Geschichtenzauberer fügt extra Glitzer für {name} hinzu...', fr: 'Le magicien ajoute des paillettes supplémentaires pour {name}...', it: 'Il mago delle storie aggiunge scintille extra per {name}...' },
+  { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite...', it: "{name} sta scegliendo il vestito perfetto per l'avventura..." },
+  { en: '{name} is teaching the story characters a secret handshake...', de: '{name} bringt den Geschichtsfiguren einen geheimen Handschlag bei...', fr: '{name} apprend une poignée de main secrète aux personnages...', it: '{name} insegna ai personaggi una stretta di mano segreta...' },
+  { en: '{name} is sneaking into the next page already...', de: '{name} schleicht sich schon auf die nächste Seite...', fr: '{name} se glisse déjà dans la page suivante...', it: '{name} si sta già intrufolando nella pagina successiva...' },
+  { en: 'The illustrator is mixing fresh paint just for {name}...', de: 'Der Illustrator mischt neue Farben — extra für {name}...', fr: 'L\'illustrateur prépare des couleurs neuves pour {name}...', it: "L'illustratore sta mescolando i colori freschi solo per {name}..." },
+  { en: '{name} is double-checking every comma...', de: '{name} prüft noch einmal jedes Komma...', fr: '{name} relit chaque virgule...', it: '{name} sta ricontrollando ogni virgola...' },
+  { en: '{name} is asking the moon for a tiny smile...', de: '{name} bittet den Mond um ein kleines Lächeln...', fr: '{name} demande à la lune un petit sourire...', it: '{name} sta chiedendo alla luna un piccolo sorriso...' },
+  { en: 'A tiny dragon just offered {name} some help. Polite refusal.', de: 'Ein kleiner Drache hat {name} Hilfe angeboten. Höflich abgelehnt.', fr: 'Un petit dragon propose son aide à {name}. Refus poli.', it: 'Un draghetto ha offerto aiuto a {name}. Rifiuto gentile.' },
+  { en: '{name} is collecting just one more sparkle...', de: '{name} sammelt noch ein letztes Glitzern...', fr: '{name} ramasse encore un éclat de paillette...', it: '{name} sta raccogliendo ancora una scintilla...' },
+  { en: 'The story wizard mislaid a comma. Looking now.', de: 'Der Geschichtenzauberer hat ein Komma verlegt. Sucht es gerade.', fr: 'Le magicien a égaré une virgule. Il la cherche.', it: 'Il mago delle storie ha perso una virgola. La sta cercando.' },
+  { en: '{name} is humming the title page tune...', de: '{name} summt die Melodie vom Titelbild...', fr: '{name} fredonne l\'air de la couverture...', it: '{name} canticchia la melodia della pagina del titolo...' },
+  { en: 'Adding extra colours to {name}\'s scarf...', de: 'Mehr Farben für {name}s Schal...', fr: 'Encore des couleurs pour l\'écharpe de {name}...', it: 'Aggiungiamo altri colori alla sciarpa di {name}...' },
+  { en: '{name} is reading the last chapter twice for luck...', de: '{name} liest das letzte Kapitel zweimal, für\'s Glück...', fr: '{name} relit le dernier chapitre, pour porter chance...', it: "{name} rilegge l'ultimo capitolo due volte per fortuna..." },
+  { en: 'A fox in the margins waves at {name}...', de: 'Ein Fuchs am Seitenrand winkt {name} zu...', fr: 'Un renard dans la marge salue {name}...', it: 'Una volpe ai margini saluta {name}...' },
+  { en: '{name} is stretching before the final scene...', de: '{name} streckt sich vor der letzten Szene...', fr: '{name} s\'étire avant la dernière scène...', it: '{name} si sta scaldando prima della scena finale...' },
+  { en: 'The font is fluffing its serifs for {name}...', de: 'Die Schrift macht ihre Serifen schön für {name}...', fr: 'La police arrange ses sérifs pour {name}...', it: 'Il carattere si sta sistemando le grazie per {name}...' },
+  { en: '{name} just found a hidden door in the story!', de: '{name} hat eine geheime Tür in der Geschichte entdeckt!', fr: '{name} a trouvé une porte secrète dans l\'histoire !', it: '{name} ha trovato una porta segreta nella storia!' },
+  { en: 'Polishing the moonlight before the night scene...', de: 'Das Mondlicht wird poliert für die Nachtszene...', fr: 'On lustre le clair de lune pour la scène nocturne...', it: 'Stiamo lucidando il chiaro di luna prima della scena notturna...' },
+  { en: '{name} is convincing a cloud to pose nicely...', de: '{name} überredet eine Wolke, schön zu posieren...', fr: '{name} convainc un nuage de poser joliment...', it: '{name} sta convincendo una nuvola a mettersi in posa...' },
+  { en: '{name} is checking that all the leaves are the right green...', de: '{name} prüft, ob alle Blätter im richtigen Grün leuchten...', fr: '{name} vérifie que toutes les feuilles ont le bon vert...', it: '{name} controlla che tutte le foglie siano del verde giusto...' },
+  { en: 'A page is being rewritten because it wasn\'t magical enough...', de: 'Eine Seite wird neu geschrieben — sie war nicht magisch genug...', fr: 'Une page est réécrite — elle n\'était pas assez magique...', it: 'Una pagina viene riscritta perché non era abbastanza magica...' },
+  { en: '{name} is rehearsing the very last sentence...', de: '{name} probt den allerletzten Satz...', fr: '{name} répète la toute dernière phrase...', it: "{name} sta provando l'ultima frase..." },
+  { en: 'The story wizard is brewing one last bit of imagination...', de: 'Der Geschichtenzauberer braut die letzte Portion Fantasie...', fr: 'Le magicien brasse une dernière dose d\'imagination...', it: 'Il mago delle storie prepara un ultimo pizzico di fantasia...' },
+  { en: '{name} is asking a star for an extra wish...', de: '{name} bittet einen Stern um einen weiteren Wunsch...', fr: '{name} demande à une étoile un voeu de plus...', it: '{name} sta chiedendo a una stella un desiderio in più...' },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -658,7 +658,7 @@ export default function TrialGenerationPage() {
 
   const slideshowItems = useMemo<Slide[]>(() => {
     const items: Slide[] = [];
-    const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
+    const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr' | 'it';
     const characterName = state?.characterName || 'Your hero';
 
     // Once any real story image has arrived (cover OR a story page), the

@@ -504,6 +504,7 @@ export function StoryDisplay({
       const msg = e instanceof Error ? e.message : String(e);
       alert(language === 'de' ? `Titel konnte nicht geändert werden: ${msg}`
         : language === 'fr' ? `Impossible de modifier le titre : ${msg}`
+        : language === 'it' ? `Impossibile cambiare il titolo: ${msg}`
         : `Could not change the title: ${msg}`);
     } finally {
       setRepaintingTitle(false);
@@ -1699,15 +1700,15 @@ export function StoryDisplay({
               setCharRepairSelected(found[0].name);
               setCharRepairPopover({ pageNumber });
             } else {
-              alert(language === 'de' ? 'Keine Figuren im Bild erkannt.' : 'No characters detected in this image.');
+              alert(language === 'de' ? 'Keine Figuren im Bild erkannt.' : language === 'it' ? 'Nessun personaggio rilevato nell\'immagine.' : 'No characters detected in this image.');
             }
           } else {
-            alert(language === 'de' ? 'Keine Figuren im Bild erkannt.' : 'No characters detected in this image.');
+            alert(language === 'de' ? 'Keine Figuren im Bild erkannt.' : language === 'it' ? 'Nessun personaggio rilevato nell\'immagine.' : 'No characters detected in this image.');
           }
         }
       } catch (err) {
         console.error('Failed to detect bbox:', err);
-        alert(language === 'de' ? 'Erkennung fehlgeschlagen.' : 'Detection failed.');
+        alert(language === 'de' ? 'Erkennung fehlgeschlagen.' : language === 'it' ? 'Rilevamento non riuscito.' : 'Detection failed.');
       } finally {
         setCharDetectingBbox(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
       }
@@ -1737,14 +1738,14 @@ export function StoryDisplay({
           className={`w-full h-full min-h-[52px] bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
             isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
-          title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
+          title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : language === 'it' ? 'Ripara un personaggio in questa immagine (viso o corpo)' : 'Fix a character in this image (face or body)'}
         >
           {isRepairing ? (
-            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}</span>
+            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : language === 'it' ? 'Riparazione...' : 'Repairing...'}</span>
           ) : isDetecting ? (
-            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : 'Detecting...'}</span>
+            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : language === 'it' ? 'Rilevamento...' : 'Detecting...'}</span>
           ) : (
-            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({CHARACTER_REPAIR_COST} Credits)</span></>
+            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : language === 'it' ? 'Ripara personaggio' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({CHARACTER_REPAIR_COST} Credits)</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -1752,7 +1753,7 @@ export function StoryDisplay({
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <h4 className="text-base font-bold text-gray-800">
-                  {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}
+                  {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : language === 'it' ? 'Ripara personaggio' : 'Fix Character'}
                 </h4>
                 <button onClick={() => setCharRepairPopover(null)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors">
                   <X size={18} className="text-gray-500" />
@@ -1761,7 +1762,7 @@ export function StoryDisplay({
               <div className="p-5 space-y-5">
                 <div>
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">
-                    {language === 'de' ? 'Figur' : 'Character'}
+                    {language === 'de' ? 'Figur' : language === 'it' ? 'Personaggio' : 'Character'}
                   </label>
                   <select
                     value={charRepairSelected}
@@ -1775,7 +1776,7 @@ export function StoryDisplay({
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-2">
-                    {language === 'de' ? 'Bereich' : 'Target'}
+                    {language === 'de' ? 'Bereich' : language === 'it' ? 'Area' : 'Target'}
                   </label>
                   <div className="flex gap-2">
                     <button
@@ -1786,7 +1787,7 @@ export function StoryDisplay({
                           : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      {language === 'de' ? 'Gesicht' : 'Face'}
+                      {language === 'de' ? 'Gesicht' : language === 'it' ? 'Viso' : 'Face'}
                     </button>
                     <button
                       onClick={() => setCharRepairTarget('body')}
@@ -1796,7 +1797,7 @@ export function StoryDisplay({
                           : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      {language === 'de' ? 'Körper' : 'Body'}
+                      {language === 'de' ? 'Körper' : language === 'it' ? 'Corpo' : 'Body'}
                     </button>
                   </div>
                 </div>
@@ -1848,7 +1849,7 @@ export function StoryDisplay({
                   onClick={() => setCharRepairPopover(null)}
                   className="flex-1 px-4 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  {language === 'de' ? 'Abbrechen' : 'Cancel'}
+                  {language === 'de' ? 'Abbrechen' : language === 'it' ? 'Annulla' : 'Cancel'}
                 </button>
                 <button
                   onClick={async () => {
@@ -1867,7 +1868,7 @@ export function StoryDisplay({
                   disabled={!charRepairSelected}
                   className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                 >
-                  {language === 'de' ? 'Reparieren' : 'Repair'} ({CHARACTER_REPAIR_COST} {language === 'de' ? 'Credits' : 'credits'})
+                  {language === 'de' ? 'Reparieren' : language === 'it' ? 'Ripara' : 'Repair'} ({CHARACTER_REPAIR_COST} {language === 'de' ? 'Credits' : language === 'it' ? 'crediti' : 'credits'})
                 </button>
               </div>
             </div>
@@ -2259,7 +2260,7 @@ export function StoryDisplay({
           <div className="bg-white rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900">
-                {language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : 'Change title'}
+                {language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : language === 'it' ? 'Cambia titolo' : 'Change title'}
               </h3>
               <button onClick={() => !repaintingTitle && setTitleModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700"><X size={18} /></button>
             </div>
@@ -2292,13 +2293,14 @@ export function StoryDisplay({
               >
                 {repaintingTitle ? <Loader className="animate-spin" size={16} /> : <Palette size={16} />}
                 {repaintingTitle
-                  ? (language === 'de' ? 'Wird gemalt…' : language === 'fr' ? 'En cours…' : 'Working…')
-                  : (language === 'de' ? `Titel ändern (${TITLE_PAINT_COST} Credits)` : language === 'fr' ? `Modifier le titre (${TITLE_PAINT_COST} crédits)` : `Change title (${TITLE_PAINT_COST} credits)`)}
+                  ? (language === 'de' ? 'Wird gemalt…' : language === 'fr' ? 'En cours…' : language === 'it' ? 'In corso…' : 'Working…')
+                  : (language === 'de' ? `Titel ändern (${TITLE_PAINT_COST} Credits)` : language === 'fr' ? `Modifier le titre (${TITLE_PAINT_COST} crédits)` : language === 'it' ? `Cambia titolo (${TITLE_PAINT_COST} crediti)` : `Change title (${TITLE_PAINT_COST} credits)`)}
               </button>
             </div>
             <div className="text-[11px] text-gray-400 mt-2">
               {language === 'de' ? 'Der Titel wird im Stil des Bildes neu gemalt. Schlägt es fehl, bleibt der bisherige Titel und es werden keine Credits belastet.'
                 : language === 'fr' ? "Le titre est repeint dans le style de l'illustration. En cas d'échec, l'ancien titre reste et aucun crédit n'est débité."
+                : language === 'it' ? "Il titolo viene ridipinto nello stile dell'illustrazione. Se non riesce, resta il titolo precedente e non vengono addebitati crediti."
                 : "The title is repainted in the artwork's style. If it fails, the previous title stays and no credits are charged."}
             </div>
           </div>
@@ -2312,13 +2314,15 @@ export function StoryDisplay({
             <div className="text-amber-500 text-2xl">⚠️</div>
             <div>
               <h3 className="font-bold text-amber-800">
-                {language === 'de' ? 'Unvollständige Geschichte' : language === 'fr' ? 'Histoire incomplète' : 'Incomplete Story'}
+                {language === 'de' ? 'Unvollständige Geschichte' : language === 'fr' ? 'Histoire incomplète' : language === 'it' ? 'Storia incompleta' : 'Incomplete Story'}
               </h3>
               <p className="text-amber-700 text-sm mt-1">
                 {language === 'de'
                   ? `Diese Geschichte konnte nicht vollständig generiert werden. ${generatedPages || sceneImages.length} von ${totalPages || 'unbekannt'} Seiten wurden erstellt.`
                   : language === 'fr'
                   ? `Cette histoire n'a pas pu être générée complètement. ${generatedPages || sceneImages.length} sur ${totalPages || 'inconnu'} pages ont été créées.`
+                  : language === 'it'
+                  ? `Non è stato possibile generare completamente questa storia. Sono state create ${generatedPages || sceneImages.length} pagine su ${totalPages || 'sconosciute'}.`
                   : `This story could not be fully generated. ${generatedPages || sceneImages.length} of ${totalPages || 'unknown'} pages were created.`}
               </p>
               {failureReason && developerMode && (
@@ -2347,7 +2351,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
+            <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : language === 'it' ? 'Crea il libro' : 'Create Book'}
           </button>
         )}
 
@@ -2362,7 +2366,7 @@ export function StoryDisplay({
               }`}
             >
               <FileText size={16} />
-              {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
+              {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : language === 'it' ? 'Scarica PDF' : 'Download PDF'}
               <ChevronDown size={14} className={`transition-transform ${showPdfFormatDropdown ? 'rotate-180' : ''}`} />
             </button>
             {showPdfFormatDropdown && (
@@ -2398,7 +2402,7 @@ export function StoryDisplay({
                       className="text-indigo-500 rounded"
                     />
                     <span className="text-sm text-gray-700">
-                      {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : 'Text on image'}
+                      {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : language === 'it' ? 'Testo sull\'immagine' : 'Text on image'}
                     </span>
                   </label>
                 </div>
@@ -2409,7 +2413,7 @@ export function StoryDisplay({
                   }}
                   className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
                 >
-                  {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
+                  {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : language === 'it' ? 'Scarica' : 'Download'}
                 </button>
               </div>
             )}
@@ -2423,7 +2427,7 @@ export function StoryDisplay({
             className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600"
           >
             <BookOpen size={16} />
-            {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
+            {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : language === 'it' ? 'Vedi la storia' : 'View Story'}
           </a>
         )}
 
@@ -2436,7 +2440,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
+            <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : language === 'it' ? 'Nuova storia' : 'New Story'}
           </button>
         )}
 
@@ -2451,6 +2455,8 @@ export function StoryDisplay({
               ? 'Vorschau: Geschichte-Text auf den Bildern anzeigen — so sieht das gedruckte Buch aus. Ausschalten zeigt die Illustrationen ohne Text.'
               : language === 'fr'
               ? 'Aperçu : afficher le texte sur les images — comme dans le livre imprimé. Désactiver montre les illustrations seules.'
+              : language === 'it'
+              ? 'Anteprima: mostra il testo della storia sulle immagini — come nel libro stampato. Disattiva per vedere le illustrazioni senza testo.'
               : 'Preview: show the story text on the images — how the printed book looks. Turn off to see the clean illustrations.'}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               textOverlay
@@ -2459,7 +2465,7 @@ export function StoryDisplay({
             }`}
           >
             <Eye size={14} />
-            {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : 'Text on image'}
+            {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : language === 'it' ? 'Testo sull\'immagine' : 'Text on image'}
           </button>
         </div>
       )}
@@ -4978,14 +4984,14 @@ export function StoryDisplay({
         return (
           <div className="mt-6 max-w-5xl mx-auto">
             <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
-              {storyLang === 'de' ? 'Titelseite' : storyLang === 'fr' ? 'Couverture' : 'Front Cover'}
+              {storyLang === 'de' ? 'Titelseite' : storyLang === 'fr' ? 'Couverture' : storyLang === 'it' ? 'Copertina' : 'Front Cover'}
             </h4>
             <div className="relative">
               {isCoverLazyLoading ? (
                 <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                   <p className="text-indigo-500 font-medium">
-                    {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture...' : 'Loading cover...'}
+                    {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture...' : storyLang === 'it' ? 'Caricamento copertina...' : 'Loading cover...'}
                   </p>
                 </div>
               ) : (
@@ -5000,9 +5006,9 @@ export function StoryDisplay({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                   <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
-                    {charRepairingPages.has(-1) ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
-                      : editingPages.has(-1) ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
-                      : (language === 'de' ? 'Neues Bild wird erstellt...' : 'Generating new image...')}
+                    {charRepairingPages.has(-1) ? (language === 'de' ? 'Figur wird repariert...' : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                      : editingPages.has(-1) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                   </p>
                 </div>
               )}
@@ -5011,7 +5017,7 @@ export function StoryDisplay({
             {isGenerating && (
               <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
                 <Loader size={12} className="animate-spin" />
-                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : language === 'it' ? 'Controllo qualità in corso — modifica possibile al termine' : 'Quality checks running — editing available after completion'}
               </div>
             )}
             {/* Cover action buttons - hidden during generation */}
@@ -5025,12 +5031,12 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-1) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5041,12 +5047,12 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
+                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-1) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5057,9 +5063,9 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-1) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
+                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -5074,7 +5080,7 @@ export function StoryDisplay({
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('frontCover').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getCoverVersions('frontCover').length})
                 </button>
               </div>
             )}
@@ -5090,8 +5096,8 @@ export function StoryDisplay({
                 >
                   <Palette size={16} />
                   {repaintingTitle
-                    ? (language === 'de' ? 'Titel wird gemalt…' : language === 'fr' ? 'Titre en cours…' : 'Changing title…')
-                    : (language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : 'Change title')}
+                    ? (language === 'de' ? 'Titel wird gemalt…' : language === 'fr' ? 'Titre en cours…' : language === 'it' ? 'Titolo in corso…' : 'Changing title…')
+                    : (language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : language === 'it' ? 'Cambia titolo' : 'Change title')}
                 </button>
               </div>
             )}
@@ -5234,7 +5240,7 @@ export function StoryDisplay({
         return (
           <div className="mt-6 max-w-5xl mx-auto">
             <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
-              {storyLang === 'de' ? 'Widmungsseite' : storyLang === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
+              {storyLang === 'de' ? 'Widmungsseite' : storyLang === 'fr' ? 'Page de dédicace' : storyLang === 'it' ? 'Pagina di dedica' : 'Dedication Page'}
             </h4>
             <div className="relative">
               <DiagnosticImage
@@ -5247,9 +5253,9 @@ export function StoryDisplay({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                   <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
-                    {charRepairingPages.has(-2) ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
-                      : editingPages.has(-2) ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
-                      : (language === 'de' ? 'Neues Bild wird erstellt...' : 'Generating new image...')}
+                    {charRepairingPages.has(-2) ? (language === 'de' ? 'Figur wird repariert...' : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                      : editingPages.has(-2) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                   </p>
                 </div>
               )}
@@ -5258,7 +5264,7 @@ export function StoryDisplay({
             {isGenerating && (
               <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
                 <Loader size={12} className="animate-spin" />
-                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : language === 'it' ? 'Controllo qualità in corso — modifica possibile al termine' : 'Quality checks running — editing available after completion'}
               </div>
             )}
             {/* Cover action buttons - hidden during generation */}
@@ -5272,12 +5278,12 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-2) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5288,12 +5294,12 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
+                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-2) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5304,9 +5310,9 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-2) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
+                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -5321,7 +5327,7 @@ export function StoryDisplay({
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('initialPage').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getCoverVersions('initialPage').length})
                 </button>
               </div>
             )}
@@ -5336,8 +5342,8 @@ export function StoryDisplay({
                   >
                     <Edit3 size={14} />
                     {dedication?.trim()
-                      ? (language === 'de' ? 'Widmung bearbeiten' : language === 'fr' ? 'Modifier la dédicace' : 'Edit dedication')
-                      : (language === 'de' ? 'Widmung hinzufügen' : language === 'fr' ? 'Ajouter une dédicace' : 'Add dedication')}
+                      ? (language === 'de' ? 'Widmung bearbeiten' : language === 'fr' ? 'Modifier la dédicace' : language === 'it' ? 'Modifica dedica' : 'Edit dedication')
+                      : (language === 'de' ? 'Widmung hinzufügen' : language === 'fr' ? 'Ajouter une dédicace' : language === 'it' ? 'Aggiungi dedica' : 'Add dedication')}
                   </button>
                 ) : (
                   <div className="bg-white border border-indigo-200 rounded-lg p-3 space-y-2">
@@ -5346,7 +5352,7 @@ export function StoryDisplay({
                       onChange={e => setEditedDedication(e.target.value)}
                       rows={3}
                       className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
-                      placeholder={language === 'de' ? 'Für …' : language === 'fr' ? 'Pour …' : 'For …'}
+                      placeholder={language === 'de' ? 'Für …' : language === 'fr' ? 'Pour …' : language === 'it' ? 'Per …' : 'For …'}
                     />
                     <div className="flex gap-2">
                       <button
@@ -5365,14 +5371,14 @@ export function StoryDisplay({
                         className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {savingDedication ? <Loader size={14} className="animate-spin" /> : <Save size={14} />}
-                        {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}
+                        {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : language === 'it' ? 'Salva' : 'Save'}
                       </button>
                       <button
                         onClick={() => setIsEditingDedication(false)}
                         disabled={savingDedication}
                         className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >
-                        {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                        {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel'}
                       </button>
                     </div>
                   </div>
@@ -5468,6 +5474,8 @@ export function StoryDisplay({
                 ? 'Geschichte wird erstellt...'
                 : storyLang === 'fr'
                 ? 'Création de l\'histoire...'
+                : storyLang === 'it'
+                ? 'Creazione della storia...'
                 : 'Creating your story...'}
             </h3>
             <p className="text-indigo-500 mt-2">
@@ -5475,6 +5483,8 @@ export function StoryDisplay({
                 ? 'Die Seiten werden gleich angezeigt'
                 : storyLang === 'fr'
                 ? 'Les pages seront bientôt affichées'
+                : storyLang === 'it'
+                ? 'Le pagine appariranno a breve'
                 : 'Pages will appear shortly'}
             </p>
           </div>
@@ -5485,7 +5495,7 @@ export function StoryDisplay({
       {hasImages && story && (
         <div className="space-y-8 mt-8">
           <h3 className="text-2xl font-bold text-gray-800 text-center mb-6">
-            {title || (storyLang === 'de' ? 'Ihre Geschichte' : storyLang === 'fr' ? 'Votre histoire' : 'Your Story')}
+            {title || (storyLang === 'de' ? 'Ihre Geschichte' : storyLang === 'fr' ? 'Votre histoire' : storyLang === 'it' ? 'La tua storia' : 'Your Story')}
           </h3>
 
           {Array.from({ length: progressiveMode ? maxViewablePage : pageSlotCount }, (_, index) => {
@@ -5505,7 +5515,7 @@ export function StoryDisplay({
             return (
               <div key={pageNumber} className="p-4 md:p-6">
                 <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
-                  {storyLang === 'de' ? `Seite ${pageNumber}` : storyLang === 'fr' ? `Page ${pageNumber}` : `Page ${pageNumber}`}
+                  {storyLang === 'de' ? `Seite ${pageNumber}` : storyLang === 'fr' ? `Page ${pageNumber}` : storyLang === 'it' ? `Pagina ${pageNumber}` : `Page ${pageNumber}`}
                 </h4>
 
                 {/* Picture Book Layout: Image on top, text below */}
@@ -5517,13 +5527,13 @@ export function StoryDisplay({
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                         <p className="text-indigo-500 font-medium">
                           {isLazyLoading
-                            ? (storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...')
-                            : (storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image...' : 'Creating image...')
+                            ? (storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : storyLang === 'it' ? 'Caricamento immagine...' : 'Loading image...')
+                            : (storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image...' : storyLang === 'it' ? 'Creazione immagine...' : 'Creating image...')
                           }
                         </p>
                         {isWaitingForImage && (
                           <p className="text-indigo-400 text-sm mt-1">
-                            {storyLang === 'de' ? 'Die nächste Seite erscheint bald' : storyLang === 'fr' ? 'La page suivante arrive bientôt' : 'Next page coming soon'}
+                            {storyLang === 'de' ? 'Die nächste Seite erscheint bald' : storyLang === 'fr' ? 'La page suivante arrive bientôt' : storyLang === 'it' ? 'La pagina successiva arriva presto' : 'Next page coming soon'}
                           </p>
                         )}
                       </div>
@@ -5550,12 +5560,12 @@ export function StoryDisplay({
                             <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                             <p className="text-indigo-700 font-medium text-sm">
                               {charRepairingPages.has(pageNumber)
-                                ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
+                                ? (language === 'de' ? 'Figur wird repariert...' : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
                                 : editingPages.has(pageNumber)
-                                ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
+                                ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
                                 : improvingPages.has(pageNumber)
-                                ? (language === 'de' ? 'Bild wird verbessert...' : 'Improving image...')
-                                : (language === 'de' ? 'Neues Bild wird erstellt...' : 'Generating new image...')}
+                                ? (language === 'de' ? 'Bild wird verbessert...' : language === 'it' ? 'Miglioramento immagine...' : 'Improving image...')
+                                : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                             </p>
                           </div>
                         )}
@@ -5563,7 +5573,7 @@ export function StoryDisplay({
                         {isGenerating && !onImproveImage && (
                           <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
                             <Loader size={12} className="animate-spin" />
-                            {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                            {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : language === 'it' ? 'Controllo qualità in corso — modifica possibile al termine' : 'Quality checks running — editing available after completion'}
                           </div>
                         )}
                         {/* Image action buttons - hidden during generation */}
@@ -5578,12 +5588,12 @@ export function StoryDisplay({
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                                  title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                                   ) : (
-                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -5594,12 +5604,12 @@ export function StoryDisplay({
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
+                                  title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                                   ) : (
-                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -5610,9 +5620,9 @@ export function StoryDisplay({
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
+                                  title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
@@ -5630,7 +5640,7 @@ export function StoryDisplay({
                                     }`}
                                   >
                                     <Edit3 size={14} />
-                                    {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
+                                    {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : language === 'it' ? 'Modifica testo' : 'Edit Text'}
                                   </button>
                                 )}
                                 {showVersionPicker(getImageVersions(pageNumber).length) && (
@@ -5639,7 +5649,7 @@ export function StoryDisplay({
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
-                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
+                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getImageVersions(pageNumber).length})
                                   </button>
                                 )}
                               </div>
@@ -6073,12 +6083,12 @@ export function StoryDisplay({
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                             <p className="text-indigo-500 font-medium text-center">
-                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : 'Image is being created...'}
+                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : storyLang === 'it' ? 'Immagine ancora in creazione...' : 'Image is being created...'}
                             </p>
                           </>
                         ) : (
                           <p className="text-gray-500 text-center">
-                            {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
+                            {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : storyLang === 'it' ? 'Nessuna immagine per questa pagina' : 'No image for this page'}
                           </p>
                         )}
                       </div>
@@ -6095,7 +6105,7 @@ export function StoryDisplay({
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
                           className="w-full min-h-[400px] p-3 text-gray-800 leading-snug font-serif text-xl text-center bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
-                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : language === 'it' ? 'Inserisci il testo...' : 'Enter text...'}
                         />
                       ) : (
                         <p className="text-gray-800 leading-snug whitespace-pre-wrap break-words font-serif text-xl text-center">
@@ -6116,7 +6126,7 @@ export function StoryDisplay({
                         <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                           <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                           <p className="text-indigo-500 font-medium text-sm">
-                            {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...'}
+                            {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : storyLang === 'it' ? 'Caricamento immagine...' : 'Loading image...'}
                           </p>
                         </div>
                       </div>
@@ -6134,12 +6144,12 @@ export function StoryDisplay({
                               <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                               <p className="text-indigo-700 font-medium text-sm">
                                 {charRepairingPages.has(pageNumber)
-                                  ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
+                                  ? (language === 'de' ? 'Figur wird repariert...' : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
                                   : editingPages.has(pageNumber)
-                                  ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
+                                  ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
                                   : improvingPages.has(pageNumber)
-                                  ? (language === 'de' ? 'Bild wird verbessert...' : 'Improving image...')
-                                  : (language === 'de' ? 'Neues Bild wird erstellt...' : 'Generating new image...')}
+                                  ? (language === 'de' ? 'Bild wird verbessert...' : language === 'it' ? 'Miglioramento immagine...' : 'Improving image...')
+                                  : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                               </p>
                             </div>
                           )}
@@ -6148,7 +6158,7 @@ export function StoryDisplay({
                         {isGenerating && !onImproveImage && (
                           <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
                             <Loader size={12} className="animate-spin" />
-                            {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                            {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : language === 'it' ? 'Controllo qualità in corso — modifica possibile al termine' : 'Quality checks running — editing available after completion'}
                           </div>
                         )}
                         {/* Image action buttons - hidden during generation */}
@@ -6163,12 +6173,12 @@ export function StoryDisplay({
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                                  title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                                   ) : (
-                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -6179,12 +6189,12 @@ export function StoryDisplay({
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
+                                  title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                                   ) : (
-                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -6195,9 +6205,9 @@ export function StoryDisplay({
                                   className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                                     isPageBusy(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
-                                  title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
+                                  title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
@@ -6215,7 +6225,7 @@ export function StoryDisplay({
                                     }`}
                                   >
                                     <Edit3 size={14} />
-                                    {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
+                                    {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : language === 'it' ? 'Modifica testo' : 'Edit Text'}
                                   </button>
                                 )}
                                 {showVersionPicker(getImageVersions(pageNumber).length) && (
@@ -6224,7 +6234,7 @@ export function StoryDisplay({
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
-                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getImageVersions(pageNumber).length})
+                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getImageVersions(pageNumber).length})
                                   </button>
                                 )}
                               </div>
@@ -6656,12 +6666,12 @@ export function StoryDisplay({
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                             <p className="text-indigo-500 font-medium text-center">
-                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : 'Image is being created...'}
+                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : storyLang === 'it' ? 'Immagine ancora in creazione...' : 'Image is being created...'}
                             </p>
                           </>
                         ) : (
                           <p className="text-gray-500 text-center">
-                            {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
+                            {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : storyLang === 'it' ? 'Nessuna immagine per questa pagina' : 'No image for this page'}
                           </p>
                         )}
                       </div>
@@ -6674,7 +6684,7 @@ export function StoryDisplay({
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
                           className="w-full flex-1 min-h-[300px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
-                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : language === 'it' ? 'Inserisci il testo...' : 'Enter text...'}
                         />
                       ) : (
                         <div className="prose max-w-none">
@@ -6702,7 +6712,7 @@ export function StoryDisplay({
         return (
           <div className="mt-8 max-w-5xl mx-auto">
             <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
-              {storyLang === 'de' ? 'Rückseite' : storyLang === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
+              {storyLang === 'de' ? 'Rückseite' : storyLang === 'fr' ? 'Quatrième de couverture' : storyLang === 'it' ? 'Retro di copertina' : 'Back Cover'}
             </h4>
             <div className="relative">
               <DiagnosticImage
@@ -6715,9 +6725,9 @@ export function StoryDisplay({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                   <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
-                    {charRepairingPages.has(-3) ? (language === 'de' ? 'Figur wird repariert...' : 'Repairing character...')
-                      : editingPages.has(-3) ? (language === 'de' ? 'Bild wird bearbeitet...' : 'Editing image...')
-                      : (language === 'de' ? 'Neues Bild wird erstellt...' : 'Generating new image...')}
+                    {charRepairingPages.has(-3) ? (language === 'de' ? 'Figur wird repariert...' : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                      : editingPages.has(-3) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                   </p>
                 </div>
               )}
@@ -6726,7 +6736,7 @@ export function StoryDisplay({
             {isGenerating && (
               <div className="mt-3 text-center text-xs text-indigo-500 font-medium flex items-center justify-center gap-1.5 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
                 <Loader size={12} className="animate-spin" />
-                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : 'Quality checks running — editing available after completion'}
+                {language === 'de' ? 'Qualitätsprüfung läuft — Bearbeitung nach Abschluss möglich' : language === 'it' ? 'Controllo qualità in corso — modifica possibile al termine' : 'Quality checks running — editing available after completion'}
               </div>
             )}
             {/* Cover action buttons - hidden during generation */}
@@ -6740,12 +6750,12 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
+                    title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-3) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -6756,12 +6766,12 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
+                    title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-3) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -6772,9 +6782,9 @@ export function StoryDisplay({
                     className={`bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
                       isPageBusy(-3) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                     }`}
-                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
+                    title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -6789,7 +6799,7 @@ export function StoryDisplay({
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('backCover').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getCoverVersions('backCover').length})
                 </button>
               </div>
             )}
@@ -6865,7 +6875,7 @@ export function StoryDisplay({
       {hasImages && story && (
         <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 border-2 border-indigo-200 rounded-xl p-4 mt-6">
           <h3 className="text-base font-bold text-gray-800 mb-3 text-center">
-            {language === 'de' ? 'Was möchten Sie als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : 'What would you like to do next?'}
+            {language === 'de' ? 'Was möchten Sie als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : language === 'it' ? 'Cosa desidera fare adesso?' : 'What would you like to do next?'}
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {/* Create Book */}
@@ -6877,7 +6887,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
+                <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : language === 'it' ? 'Crea il libro' : 'Create Book'}
               </button>
             )}
 
@@ -6892,7 +6902,7 @@ export function StoryDisplay({
                   }`}
                 >
                   <FileText size={16} />
-                  {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
+                  {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : language === 'it' ? 'Scarica PDF' : 'Download PDF'}
                   <ChevronDown size={14} className={`transition-transform ${showPdfFormatDropdown ? 'rotate-180' : ''}`} />
                 </button>
                 {showPdfFormatDropdown && (
@@ -6928,7 +6938,7 @@ export function StoryDisplay({
                           className="text-indigo-500 rounded"
                         />
                         <span className="text-sm text-gray-700">
-                          {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : 'Text on image'}
+                          {language === 'de' ? 'Text auf Bild' : language === 'fr' ? 'Texte sur image' : language === 'it' ? 'Testo sull\'immagine' : 'Text on image'}
                         </span>
                       </label>
                     </div>
@@ -6939,7 +6949,7 @@ export function StoryDisplay({
                       }}
                       className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
                     >
-                      {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
+                      {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : language === 'it' ? 'Scarica' : 'Download'}
                     </button>
                   </div>
                 )}
@@ -6953,7 +6963,7 @@ export function StoryDisplay({
                 className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600"
               >
                 <BookOpen size={16} />
-                {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
+                {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : language === 'it' ? 'Vedi la storia' : 'View Story'}
               </a>
             )}
 
@@ -6966,7 +6976,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
+                <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : language === 'it' ? 'Nuova storia' : 'New Story'}
               </button>
             )}
           </div>
@@ -6980,11 +6990,11 @@ export function StoryDisplay({
             <div className="flex items-center gap-2 text-amber-600">
               <Edit3 size={18} className="flex-shrink-0" />
               <span className="font-semibold text-sm md:text-base">
-                {language === 'de' ? 'Bearbeitungsmodus' : language === 'fr' ? 'Mode édition' : 'Edit Mode'}
+                {language === 'de' ? 'Bearbeitungsmodus' : language === 'fr' ? 'Mode édition' : language === 'it' ? 'Modalità modifica' : 'Edit Mode'}
               </span>
               {originalStory && (
                 <span className="text-xs text-gray-500 hidden sm:inline">
-                  ({language === 'de' ? 'Original gespeichert' : language === 'fr' ? 'Original sauvegardé' : 'Original saved'})
+                  ({language === 'de' ? 'Original gespeichert' : language === 'fr' ? 'Original sauvegardé' : language === 'it' ? 'Originale salvato' : 'Original saved'})
                 </span>
               )}
             </div>
@@ -6995,7 +7005,7 @@ export function StoryDisplay({
                 className="px-3 md:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-semibold flex items-center gap-1.5"
               >
                 <X size={16} />
-                <span className="hidden sm:inline">{language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}</span>
+                <span className="hidden sm:inline">{language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel'}</span>
               </button>
               {originalStory && editedStory !== originalStory && (
                 <button
@@ -7004,7 +7014,7 @@ export function StoryDisplay({
                   className="px-3 md:px-4 py-2 border border-amber-400 text-amber-700 rounded-lg hover:bg-amber-50 text-sm font-semibold flex items-center gap-1.5"
                 >
                   <RotateCcw size={16} />
-                  <span className="hidden sm:inline">{language === 'de' ? 'Zurücksetzen' : language === 'fr' ? 'Restaurer' : 'Restore'}</span>
+                  <span className="hidden sm:inline">{language === 'de' ? 'Zurücksetzen' : language === 'fr' ? 'Restaurer' : language === 'it' ? 'Ripristina' : 'Restore'}</span>
                 </button>
               )}
               <button
@@ -7016,8 +7026,8 @@ export function StoryDisplay({
               >
                 <Save size={16} />
                 {isSaving
-                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde...' : 'Saving...')
-                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : 'Save')
+                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde...' : language === 'it' ? 'Salvataggio...' : 'Saving...')
+                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : language === 'it' ? 'Salva' : 'Save')
                 }
               </button>
             </div>
@@ -7050,19 +7060,22 @@ export function StoryDisplay({
                 <RefreshCw size={20} />
                 {language === 'de' ? 'Cover bearbeiten' :
                  language === 'fr' ? 'Modifier la couverture' :
+                 language === 'it' ? 'Modifica copertina' :
                  'Edit Cover'}
                 {' - '}
                 {coverEditModal.coverType === 'front'
-                  ? (language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover')
+                  ? (language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : language === 'it' ? 'Copertina' : 'Front Cover')
                   : coverEditModal.coverType === 'initial'
-                  ? (language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page de dédicace' : 'Dedication Page')
-                  : (language === 'de' ? 'Rückseite' : language === 'fr' ? 'Dos' : 'Back Cover')}
+                  ? (language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page de dédicace' : language === 'it' ? 'Pagina di dedica' : 'Dedication Page')
+                  : (language === 'de' ? 'Rückseite' : language === 'fr' ? 'Dos' : language === 'it' ? 'Retro di copertina' : 'Back Cover')}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
                 {language === 'de'
                   ? 'Bearbeite die Szenenbeschreibung und wähle die Charaktere aus'
                   : language === 'fr'
                   ? 'Modifiez la description de la scène et sélectionnez les personnages'
+                  : language === 'it'
+                  ? 'Modifica la descrizione della scena e scegli i personaggi'
                   : 'Edit the scene description and select the characters'}
               </p>
             </div>
@@ -7074,6 +7087,7 @@ export function StoryDisplay({
                     <Users size={16} />
                     {language === 'de' ? 'Charaktere auf dem Cover:' :
                      language === 'fr' ? 'Personnages sur la couverture:' :
+                     language === 'it' ? 'Personaggi sulla copertina:' :
                      'Characters on the cover:'}
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -7106,6 +7120,7 @@ export function StoryDisplay({
                   <p className="text-xs text-gray-400 mt-2">
                     {language === 'de' ? 'Wähle die Charaktere aus, die auf dem Cover erscheinen sollen.' :
                      language === 'fr' ? 'Sélectionnez les personnages qui doivent apparaître sur la couverture.' :
+                     language === 'it' ? 'Scegli i personaggi che devono apparire sulla copertina.' :
                      'Select the characters that should appear on the cover.'}
                   </p>
                 </div>
@@ -7117,6 +7132,7 @@ export function StoryDisplay({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {language === 'de' ? 'Titel:' :
                      language === 'fr' ? 'Titre:' :
+                     language === 'it' ? 'Titolo:' :
                      'Title:'}
                   </label>
                   <input
@@ -7127,6 +7143,8 @@ export function StoryDisplay({
                       ? 'Der Titel des Buches'
                       : language === 'fr'
                       ? 'Le titre du livre'
+                      : language === 'it'
+                      ? 'Il titolo del libro'
                       : 'The book title'}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
@@ -7139,6 +7157,7 @@ export function StoryDisplay({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {language === 'de' ? 'Widmung:' :
                      language === 'fr' ? 'Dédicace:' :
+                     language === 'it' ? 'Dedica:' :
                      'Dedication:'}
                   </label>
                   <input
@@ -7149,12 +7168,15 @@ export function StoryDisplay({
                       ? 'z.B. "Für meine liebste Tochter Emma"'
                       : language === 'fr'
                       ? 'par ex. "Pour ma chère fille Emma"'
+                      : language === 'it'
+                      ? 'es. "Alla mia cara figlia Emma"'
                       : 'e.g. "For my dear daughter Emma"'}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-xs text-gray-400 mt-1">
                     {language === 'de' ? 'Leer lassen für keine Widmung' :
                      language === 'fr' ? 'Laisser vide pour aucune dédicace' :
+                     language === 'it' ? 'Lascia vuoto per nessuna dedica' :
                      'Leave empty for no dedication'}
                   </p>
                 </div>
@@ -7165,6 +7187,7 @@ export function StoryDisplay({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {language === 'de' ? 'Szenenbeschreibung:' :
                    language === 'fr' ? 'Description de la scène:' :
+                   language === 'it' ? 'Descrizione della scena:' :
                    'Scene description:'}
                 </label>
                 <textarea
@@ -7174,12 +7197,15 @@ export function StoryDisplay({
                     ? 'z.B. "Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang"'
                     : language === 'fr'
                     ? 'par ex. "Le personnage principal devant un château magique au coucher du soleil"'
+                    : language === 'it'
+                    ? 'es. "Il personaggio principale davanti a un castello magico al tramonto"'
                     : 'e.g. "The main character standing in front of a magical castle at sunset"'}
                   className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
                 />
                 <p className="text-xs text-gray-400 mt-2">
                   {language === 'de' ? 'Tipp: Beschreibe die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
                    language === 'fr' ? 'Conseil: Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
+                   language === 'it' ? 'Suggerimento: descrivi le azioni e l\'ambiente. I personaggi selezionati vengono aggiunti automaticamente.' :
                    'Tip: Describe the actions and the environment. Selected characters will be added automatically.'}
                 </p>
               </div>
@@ -7190,6 +7216,7 @@ export function StoryDisplay({
                   <span>
                     {language === 'de' ? `${coverEditModal.selectedCharacterIds.length} Charakter(e) ausgewählt` :
                      language === 'fr' ? `${coverEditModal.selectedCharacterIds.length} personnage(s) sélectionné(s)` :
+                     language === 'it' ? `${coverEditModal.selectedCharacterIds.length} personaggio/i selezionato/i` :
                      `${coverEditModal.selectedCharacterIds.length} character(s) selected`}
                   </span>
                 )}
@@ -7199,7 +7226,7 @@ export function StoryDisplay({
                   onClick={() => setCoverEditModal(null)}
                   className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium order-2 sm:order-1"
                 >
-                  {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                  {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel'}
                 </button>
                 <button
                   onClick={handleRegenerateCoverWithScene}
@@ -7211,9 +7238,9 @@ export function StoryDisplay({
                   }`}
                 >
                   <RefreshCw size={16} />
-                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : language === 'it' ? 'Rigenera' : 'Regenerate'}
                   <span className="text-xs opacity-80">
-                    ({COVER_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})
+                    ({COVER_REGENERATION_COST} {language === 'de' ? 'Credits' : language === 'it' ? 'crediti' : 'credits'})
                   </span>
                 </button>
               </div>

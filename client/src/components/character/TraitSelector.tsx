@@ -82,7 +82,7 @@ export function TraitSelector({
               )}
               {selectedTraits.length > 0 && (
                 <span className={`text-sm font-normal ml-1 ${toneClass}`}>
-                  - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? 'sélectionné' : 'selected'}
+                  - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? 'sélectionné' : language === 'it' ? 'selezionato' : 'selected'}
                 </span>
               )}
             </>
@@ -107,7 +107,7 @@ export function TraitSelector({
       {/* Collapsed view: no traits selected */}
       {!isExpanded && selectedTraits.length === 0 && (
         <div className="ml-5 text-sm text-gray-400 italic">
-          {language === 'de' ? 'Klicken zum Auswählen...' : language === 'fr' ? 'Cliquer pour sélectionner...' : 'Click to select...'}
+          {language === 'de' ? 'Klicken zum Auswählen...' : language === 'fr' ? 'Cliquer pour sélectionner...' : language === 'it' ? 'Clicca per selezionare...' : 'Click to select...'}
         </div>
       )}
 
@@ -144,6 +144,8 @@ export function TraitSelector({
                     ? 'Eigene hinzufügen...'
                     : language === 'fr'
                     ? 'Ajouter personnalisé...'
+                    : language === 'it'
+                    ? 'Aggiungi personalizzato...'
                     : 'Add custom...'
                 }
                 className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"

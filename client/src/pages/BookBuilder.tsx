@@ -263,6 +263,55 @@ export default function BookBuilder() {
       balanceDiscount: 'Solde de parrainage',
       balanceMaxHint: 'Montant minimum CHF 1.00 — ajustez si trop élevé.',
     },
+    it: {
+      title: 'Crea il tuo libro',
+      subtitle: 'Ordina le tue storie e scegli il tipo di copertina',
+      noStories: 'Nessuna storia selezionata',
+      noStoriesDesc: 'Torna indietro e seleziona le storie da combinare.',
+      backToStories: 'Torna alle mie storie',
+      storyOrder: 'Ordine delle storie',
+      storyOrderHint: 'Trascina le storie per riordinarle. La copertina della prima storia sarà usata come copertina del libro.',
+      coverNote: 'La copertina della prima storia sarà usata come copertina del libro.',
+      moveUp: 'Sposta su',
+      moveDown: 'Sposta giù',
+      pages: 'pagine',
+      totalPages: 'Pagine totali',
+      chooseFormat: 'Scegli il formato',
+      softcover: 'Copertina morbida',
+      hardcover: 'Copertina rigida',
+      softcoverSize: '21 × 28 cm',
+      hardcoverSize: '21 × 28 cm',
+      bookSize: 'Dimensione del libro',
+      squareFormat: 'Quadrato',
+      squareSize: '20 × 20 cm',
+      portraitFormat: 'Verticale',
+      portraitSize: '21 × 28 cm',
+      price: 'Prezzo',
+      bookPriceLabel: 'Libro',
+      shippingLabel: 'Spedizione (Svizzera)',
+      shippingTime: 'Consegna in 5-7 giorni lavorativi',
+      creditsRefund: 'Tutti i crediti usati per creare le storie verranno rimborsati',
+      orderBook: 'Ordina il libro',
+      tooManyPages: 'Troppe pagine',
+      tooManyPagesDesc: 'Massimo 100 pagine. Rimuovi alcune storie.',
+      tooFewPages: 'Poche pagine selezionate',
+      tooFewPagesDesc: (pages: number) => `Hai selezionato storie con solo ${pages} pagine. La lunghezza minima del libro è di 30 pagine, quindi ci saranno pagine vuote. Valuta di aggiungere un'altra storia al tuo libro.`,
+      processing: 'Elaborazione...',
+      printPdf: 'Stampa PDF (Test)',
+      generatingPdf: 'Generazione PDF...',
+      quantity: 'Quantità',
+      shippingSavingHint: 'Risparmia sulla spedizione ordinando più libri insieme — la spedizione viene addebitata una sola volta.',
+      totalPrice: 'Totale',
+      perBook: 'per libro',
+      promoLabel: 'Hai un codice di invito?',
+      promoApply: 'Applica',
+      promoApplied: 'Sconto di CHF 10 applicato',
+      promoDiscount: 'Sconto invito',
+      balanceLabel: 'Usa saldo inviti',
+      balanceAvailable: 'Disponibile: CHF',
+      balanceDiscount: 'Saldo inviti',
+      balanceMaxHint: 'Importo minimo CHF 1.00 — modifica se troppo alto.',
+    },
   };
 
   const t = translations[language as keyof typeof translations] || translations.en;
@@ -332,6 +381,8 @@ export default function BookBuilder() {
           ? 'Checkout fehlgeschlagen. Bitte versuche es erneut.'
           : language === 'fr'
           ? 'Échec du paiement. Veuillez réessayer.'
+          : language === 'it'
+          ? 'Checkout non riuscito. Riprova.'
           : 'Checkout failed. Please try again.',
         variant: 'error'
       });
@@ -390,6 +441,8 @@ export default function BookBuilder() {
           ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`
           : language === 'fr'
           ? `Impossible de télécharger le PDF: ${errorMsg}`
+          : language === 'it'
+          ? `Impossibile scaricare il PDF: ${errorMsg}`
           : `Failed to download PDF: ${errorMsg}`,
         variant: 'error'
       });
@@ -406,7 +459,7 @@ export default function BookBuilder() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation currentStep={0} />
-        <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'} />
+        <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
       </div>
     );
   }
@@ -492,7 +545,7 @@ export default function BookBuilder() {
                     <p className="text-sm text-gray-500">{story.pages} {t.pages}</p>
                     {index === 0 && (
                       <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">
-                        {language === 'de' ? 'Titelbild' : language === 'fr' ? 'Couverture' : 'Cover'}
+                        {language === 'de' ? 'Titelbild' : language === 'fr' ? 'Couverture' : language === 'it' ? 'Copertina' : 'Cover'}
                       </span>
                     )}
                   </div>

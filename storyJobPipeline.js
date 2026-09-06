@@ -255,7 +255,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
     let coverImages = {};
     let pageClothingData = null;
     const lang = inputData?.language || 'en';
-    const pageWord = lang.startsWith('de') ? 'Seite' : lang.startsWith('fr') ? 'Page' : 'Page';
+    const pageWord = lang.startsWith('de') ? 'Seite' : lang.startsWith('it') ? 'Pagina' : lang.startsWith('fr') ? 'Page' : 'Page';
 
     for (const cp of checkpoints) {
       const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;

@@ -2456,7 +2456,7 @@ app.get('/sitemap.xml', (req, res) => {
 // Pre-rendered SEO files live under dist/prerendered/{path}.{lang}.html
 // Built by `node scripts/prerender.mjs` after the client + SSR builds.
 const PRERENDER_DIR = path.join(distPath, 'prerendered');
-const SUPPORTED_LANGS = new Set(['de', 'en', 'fr']);
+const SUPPORTED_LANGS = new Set(['de', 'en', 'fr', 'it']);
 
 function resolvePrerenderedFile(routePath, lang) {
   // Path traversal guard: only allow alnum, dash, underscore, slash, dot

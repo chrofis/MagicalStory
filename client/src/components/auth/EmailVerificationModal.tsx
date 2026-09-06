@@ -219,6 +219,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
         setError(
           language === 'de' ? `Bitte warten Sie ${error.retryAfter} Sekunden` :
           language === 'fr' ? `Veuillez patienter ${error.retryAfter} secondes` :
+          language === 'it' ? `Attendi ${error.retryAfter} secondi` :
           `Please wait ${error.retryAfter} seconds`
         );
       } else {
@@ -288,6 +289,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
             <span className="text-sm">
               {language === 'de' ? 'Warte auf Bestätigung...' :
                language === 'fr' ? 'En attente de verification...' :
+               language === 'it' ? 'In attesa di conferma...' :
                'Waiting for verification...'}
             </span>
           </div>
@@ -309,7 +311,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
             >
               <RefreshCw size={16} className="mr-2" />
               {cooldownSeconds > 0
-                ? `${language === 'de' ? 'Warten' : language === 'fr' ? 'Patienter' : 'Wait'} ${cooldownSeconds}s`
+                ? `${language === 'de' ? 'Warten' : language === 'fr' ? 'Patienter' : language === 'it' ? 'Attendi' : 'Wait'} ${cooldownSeconds}s`
                 : emailSent ? t.resendVerification : t.sendVerification}
             </Button>
 

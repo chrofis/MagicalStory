@@ -70,6 +70,20 @@ const pageTexts: Record<string, {
     ctaButton: 'Commencer maintenant',
     viewTheme: 'Voir le thème',
   },
+  it: {
+    breadcrumbRoot: 'Occasioni',
+    createButton: 'Crea la tua storia ora',
+    whyTitle: 'Perché un libro personalizzato?',
+    tipsTitle: 'Consigli per il regalo',
+    themesTitle: 'Temi consigliati',
+    themesSubtitle: 'I nostri migliori temi per questa occasione',
+    deliveryTitle: 'Tempi di consegna',
+    faqTitle: 'Domande frequenti',
+    ctaTitle: 'Crea la tua storia gratuita',
+    ctaSubtitle: 'Tuo figlio come protagonista della sua storia. Provalo gratis — nessun account necessario.',
+    ctaButton: 'Inizia ora',
+    viewTheme: 'Vedi il tema',
+  },
 };
 
 function getThemeInfo(themeId: string, category: CategorySlug): { name: LocalizedString; emoji: string } | null {
@@ -109,7 +123,7 @@ export default function OccasionPage() {
     return <Navigate to="/anlaesse" replace />;
   }
 
-  const dataLang = (language === 'it' ? 'en' : language) as 'en' | 'de' | 'fr';
+  const dataLang = language as 'en' | 'de' | 'fr' | 'it';
   const name = occasion.name[dataLang] || occasion.name.en;
   const title = occasion.title[dataLang] || occasion.title.en;
   const description = occasion.description[dataLang] || occasion.description.en;

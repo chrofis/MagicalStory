@@ -35,6 +35,16 @@ const texts = {
     ctaButton: 'Créer une histoire',
     minutes: 'min de lecture',
   },
+  it: {
+    back: 'Tutte le guide',
+    themeLink: 'Una storia personalizzata proprio su questo',
+    faqTitle: 'Domande frequenti',
+    relatedTitle: 'Continua a leggere',
+    ctaTitle: 'Provalo con la tua storia',
+    ctaDesc: 'La tua prima storia è gratis — nessun account, nessuna carta. Descrivi cosa deve succedere e guarda il risultato.',
+    ctaButton: 'Crea una storia',
+    minutes: 'min di lettura',
+  },
 };
 
 export default function GuidePage() {
@@ -135,7 +145,9 @@ export default function GuidePage() {
                     ? 'Kinderbuch erstellen mit KI'
                     : lang === 'fr'
                       ? 'Créer un livre pour enfant avec l\'IA'
-                      : 'Create a children\'s book with AI'}
+                      : lang === 'it'
+                        ? 'Creare un libro per bambini con l\'IA'
+                        : 'Create a children\'s book with AI'}
                 </span>
               </Link>
             </div>

@@ -44,6 +44,16 @@ const texts: Record<string, {
     giftBannerText: 'Découvrez des cadeaux personnalisés pour enfants pour chaque occasion, chaque âge et chaque destinataire.',
     giftBannerLink: 'Voir le guide cadeaux',
   },
+  it: {
+    title: 'Il regalo perfetto per ogni occasione',
+    subtitle: 'Che si tratti di un compleanno, del Natale o di una grande tappa della vita — un libro di storie personalizzato è il regalo più significativo che tu possa fare a un bambino. Scopri le nostre guide per occasione qui sotto.',
+    ctaTitle: 'Crea la tua storia gratuita',
+    ctaSubtitle: 'Scegli un tema e crea una storia personalizzata in pochi minuti. La tua prima storia è completamente gratuita.',
+    ctaButton: 'Inizia ora',
+    giftBannerTitle: 'Altre idee regalo',
+    giftBannerText: 'Scopri regali personalizzati per bambini per ogni occasione, ogni età e ogni destinatario.',
+    giftBannerLink: 'Sfoglia la guida ai regali',
+  },
 };
 
 export default function Occasions() {
@@ -69,7 +79,7 @@ export default function Occasions() {
         {/* Occasion Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-16">
           {occasions.map((occasion) => {
-            const dataLang = (language === 'it' ? 'en' : language) as 'en' | 'de' | 'fr';
+            const dataLang = language as 'en' | 'de' | 'fr' | 'it';
             const name = occasion.name[dataLang] || occasion.name.en;
             const description = occasion.description[dataLang] || occasion.description.en;
             // Truncate description to ~100 chars for the card

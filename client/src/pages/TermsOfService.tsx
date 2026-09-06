@@ -423,6 +423,146 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
         content: `Pour toute question concernant ces Conditions, veuillez nous contacter à : legal@magicalstory.ch`
       }
     ]
+  },
+  it: {
+    title: 'Termini di Servizio',
+    lastUpdated: 'Ultimo aggiornamento: gennaio 2025',
+    sections: [
+      {
+        title: '1. Accettazione dei Termini',
+        content: `Accedendo e utilizzando Magical Story ("il Servizio"), accetti di essere vincolato dai presenti Termini di Servizio. Se non accetti questi termini, ti preghiamo di non utilizzare il Servizio.`
+      },
+      {
+        title: '2. Disponibilità del Servizio e Idoneità',
+        content: `IMPORTANTE: questo Servizio è destinato esclusivamente ai residenti della Svizzera e dell'Unione Europea.
+
+• Questo Servizio NON è disponibile per residenti o cittadini degli Stati Uniti d'America
+• Utilizzando questo Servizio, dichiari e garantisci di essere residente in Svizzera o in uno Stato membro dell'Unione Europea
+• Confermi di accedere a questo Servizio dalla Svizzera o dall'Unione Europea
+• Qualsiasi tentativo di accedere a questo Servizio dagli Stati Uniti o da parte di residenti statunitensi è vietato
+• Ci riserviamo il diritto di chiudere account e di rifiutare il servizio a chiunque dichiari il falso in merito alla propria residenza o posizione`
+      },
+      {
+        title: '3. Descrizione del Servizio',
+        content: `Magical Story è una piattaforma basata sull'intelligenza artificiale che crea libri di storie personalizzati sulla base di foto e descrizioni dei personaggi che fornisci. Le foto vengono trasformate in avatar illustrati che compaiono nella tua storia personalizzata.`
+      },
+      {
+        title: '4. Responsabilità e Garanzie dell\'Utente',
+        content: `Utilizzando il Servizio, dichiari e garantisci che:
+
+• Sei residente in Svizzera o nell'Unione Europea (non negli Stati Uniti)
+• Possiedi i diritti d'autore su qualsiasi foto carichi, OPPURE hai ottenuto l'autorizzazione esplicita del titolare dei diritti d'autore (di norma il fotografo)
+• Hai ottenuto il consenso esplicito di ogni persona ritratta nelle foto caricate per la creazione di avatar e storie generati dall'IA
+• Per le foto di minori, sei il genitore o il tutore legale con piena autorità per concedere tale consenso
+• NON caricherai foto di celebrità, personaggi pubblici o di qualsiasi persona senza il loro esplicito consenso scritto
+• NON creerai personaggi che imitano, fanno riferimento a, o violano personaggi immaginari protetti da diritto d'autore (ad es. da film, libri, giochi)
+• Tutte le informazioni fornite sono accurate e non fuorvianti
+• Non utilizzerai il Servizio per alcuno scopo illecito`
+      },
+      {
+        title: '5. Contenuti Vietati e Uso Consentito',
+        content: `I seguenti contenuti sono severamente vietati:
+
+• Foto di persone senza il loro consenso
+• Foto di celebrità o personaggi pubblici senza autorizzazione documentata
+• Descrizioni di personaggi che imitano personaggi immaginari protetti da diritto d'autore
+• Contenuti diffamatori, calunniosi o dannosi per la reputazione di una persona
+• Incitamento all'odio, molestie o contenuti discriminatori
+• Contenuti sessualmente espliciti, osceni o pornografici
+• Contenuti che raffigurano violenza, gore o attività illegali
+• Contenuti che sfruttano o danneggiano minori in qualsiasi modo
+• Qualsiasi contenuto che violi le leggi applicabili
+
+Ci riserviamo il diritto di rifiutare il servizio, rimuovere contenuti e chiudere account che violino questa politica senza preavviso né rimborso.`
+      },
+      {
+        title: '6. Proprietà Intellettuale',
+        content: `• Mantieni tutti i diritti sulle foto originali che carichi
+• Ci concedi una licenza non esclusiva, mondiale e gratuita per usare, copiare, modificare e visualizzare i contenuti caricati esclusivamente ai fini della fornitura del Servizio
+• Il contenuto della storia generata e le illustrazioni diventano di tua proprietà dopo l'acquisto
+• Puoi utilizzare le storie generate per scopi personali e non commerciali
+• L'uso commerciale dei contenuti generati richiede una licenza separata
+• La nostra piattaforma, tecnologia e marchio restano di nostra proprietà intellettuale`
+      },
+      {
+        title: '7. Revisione dei Contenuti e Responsabilità Finale',
+        content: `IMPORTANTE: sei tu l'editore finale della tua storia.
+
+• Il Servizio fornisce contenuti in bozza generati dall'IA che TU devi revisionare prima della finalizzazione
+• Salvando, scaricando o condividendo la tua storia, confermi di aver revisionato tutti i contenuti
+• Accetti la responsabilità esclusiva e completa per il contenuto finale e per la sua conformità a tutte le leggi
+• Sei responsabile di assicurarti che la storia non diffami, danneggi o violi i diritti di nessuno
+• La piattaforma è uno strumento; tu sei l'editore dell'opera finale`
+      },
+      {
+        title: '8. Reclami per Violazione del Diritto d\'Autore e Rimozioni',
+        content: `Rispettiamo i diritti di proprietà intellettuale e rispondiamo a segnalazioni di violazione valide.
+
+• Se ritieni che un contenuto violi il tuo diritto d'autore, contattaci all'indirizzo legal@magicalstory.ch indicando: (1) l'identificazione dell'opera protetta da diritto d'autore, (2) l'identificazione del materiale che viola tale diritto, (3) i tuoi dati di contatto, (4) una dichiarazione di buona fede, e (5) una dichiarazione, sotto pena di spergiuro, di essere autorizzato ad agire
+• Esamineremo la segnalazione e potremmo rimuovere i contenuti che violano diritti di proprietà intellettuale
+• Ai trasgressori recidivi verrà chiuso l'account`
+      },
+      {
+        title: '9. Segnalazione di Violazioni',
+        content: `Se riscontri contenuti che violano questi Termini o le leggi applicabili:
+
+• Segnalali immediatamente a legal@magicalstory.ch
+• Includi i dettagli della violazione e qualsiasi prova rilevante
+• Esamineremo tutte le segnalazioni e adotteremo le misure appropriate
+• Potremmo rimuovere i contenuti e chiudere gli account senza preavviso`
+      },
+      {
+        title: '10. Limitazione di Responsabilità',
+        content: `NELLA MISURA MASSIMA CONSENTITA DALLA LEGGE:
+
+• Il Servizio è fornito "così com'è" senza garanzie di alcun tipo
+• Non siamo responsabili per danni indiretti, incidentali, speciali o consequenziali
+• La nostra responsabilità totale non supererà l'importo che hai pagato per lo specifico servizio da cui deriva la richiesta
+• Non siamo responsabili per richieste derivanti da un uso improprio del Servizio o dalla violazione di questi termini da parte tua`
+      },
+      {
+        title: '11. Manleva',
+        content: `Accetti di manlevare, difendere e tenere indenne Magical Story, i suoi dirigenti, amministratori, dipendenti e agenti da qualsiasi rivendicazione, danno, perdita o spesa (comprese le spese legali) derivante da:
+
+• Il tuo utilizzo del Servizio
+• La tua violazione di questi Termini
+• La tua violazione di diritti di terzi
+• Contenuti che carichi o crei utilizzando il Servizio`
+      },
+      {
+        title: '12. Trattamento dei Dati',
+        content: `• Le foto vengono trattate mediante tecnologia IA per creare illustrazioni avatar
+• Caricando le foto, acconsenti al trattamento dei tratti del viso e dei dati biometrici per la creazione dell'avatar
+• Le foto originali vengono conservate temporaneamente per il trattamento e vengono eliminate secondo quanto previsto dalla nostra Informativa sulla Privacy
+• Non vendiamo né condividiamo le tue foto personali con terzi per scopi di marketing
+• Consulta la nostra Informativa sulla Privacy per i dettagli completi sul trattamento dei dati`
+      },
+      {
+        title: '13. Requisiti di Età',
+        content: `• Devi avere almeno 18 anni per creare un account
+• I genitori/tutori possono creare storie con i propri figli minorenni come protagonisti
+• Caricando foto di minori, confermi di avere l'autorità genitoriale o il consenso esplicito`
+      },
+      {
+        title: '14. Modifiche ai Termini',
+        content: `Ci riserviamo il diritto di modificare questi Termini in qualsiasi momento. L'uso continuato del Servizio dopo le modifiche costituisce accettazione dei nuovi termini. Informeremo gli utenti di modifiche significative via email o tramite notifica sulla piattaforma.`
+      },
+      {
+        title: '15. Risoluzione',
+        content: `Possiamo risolvere o sospendere il tuo account in qualsiasi momento in caso di violazione di questi Termini. Alla risoluzione, il tuo diritto di utilizzare il Servizio cessa immediatamente.`
+      },
+      {
+        title: '16. Legge Applicabile e Foro Competente',
+        content: `• Questi Termini sono disciplinati esclusivamente dal diritto svizzero
+• Qualsiasi controversia derivante da questi Termini o dal tuo utilizzo del Servizio sarà risolta esclusivamente dai tribunali di Zurigo, Svizzera
+• Accetti di sottoporti alla giurisdizione esclusiva dei tribunali di Zurigo, Svizzera
+• La Convenzione delle Nazioni Unite sui contratti di compravendita internazionale di merci non si applica`
+      },
+      {
+        title: '17. Contatti',
+        content: `Per domande su questi Termini, contattaci all'indirizzo: legal@magicalstory.ch`
+      }
+    ]
   }
 };
 
@@ -451,7 +591,7 @@ export default function TermsOfService() {
           className="flex items-center gap-2 text-indigo-500 hover:text-indigo-800 mb-6"
         >
           <ArrowLeft size={20} />
-          {language === 'de' ? 'Zurück' : language === 'fr' ? 'Retour' : 'Back'}
+          {language === 'de' ? 'Zurück' : language === 'fr' ? 'Retour' : language === 'it' ? 'Indietro' : 'Back'}
         </button>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{content.title}</h1>

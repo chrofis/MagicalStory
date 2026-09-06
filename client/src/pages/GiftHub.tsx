@@ -53,6 +53,19 @@ const texts: Record<string, {
       age: 'Par âge',
     },
   },
+  it: {
+    title: 'Idee regalo per bambini',
+    subtitle: 'Trova il libro personalizzato perfetto da regalare',
+    ctaTitle: 'Crea la tua storia gratuita',
+    ctaSubtitle: 'Scegli un tema e crea una storia personalizzata in pochi minuti. La tua prima storia è completamente gratuita.',
+    ctaButton: 'Inizia ora',
+    sections: {
+      recipient: 'Per chi?',
+      occasion: 'Per occasione',
+      attribute: 'Regali speciali',
+      age: 'Per età',
+    },
+  },
 };
 
 const categoryOrder: Category[] = ['recipient', 'occasion', 'attribute', 'age'];
@@ -91,8 +104,8 @@ export default function GiftHub() {
               <h2 className="font-title text-xl font-bold text-stone-900 mb-5">{label}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {items.map((gift) => {
-                  const name = gift.name[language as 'en' | 'de' | 'fr'] || gift.name.en;
-                  const description = gift.description[language as 'en' | 'de' | 'fr'] || gift.description.en;
+                  const name = gift.name[language as 'en' | 'de' | 'fr' | 'it'] || gift.name.en;
+                  const description = gift.description[language as 'en' | 'de' | 'fr' | 'it'] || gift.description.en;
                   const shortDesc = description.length > 110 ? description.slice(0, 110).replace(/\s+\S*$/, '') + '...' : description;
 
                   return (

@@ -128,7 +128,10 @@ async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight, op
 function parseStoryPages(storyData) {
   const storyText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
   if (!storyText) return [];
-  const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
+  // Italian stories label pages "Pagina" (storyJobPipeline pageWord); French uses the
+  // English word "Page", so it is already covered. "Pagina" is listed before "Page" so
+  // the longer label wins the alternation outright.
+  const pageMatches = storyText.split(/(?:---\s*(?:Pagina|Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Pagina|Page)\s+\d+)/i);
   return pageMatches.slice(1).filter(p => p.trim().length > 0);
 }
 

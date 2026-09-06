@@ -33,22 +33,26 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
         ? 'Fehler beim Erstellen der Zahlung. Bitte versuchen Sie es erneut.'
         : language === 'fr'
         ? 'Erreur lors de la création du paiement. Veuillez réessayer.'
+        : language === 'it'
+        ? 'Errore durante la creazione del pagamento. Riprova.'
         : 'Failed to create payment. Please try again.');
       setIsBuyingCredits(false);
     }
   };
 
   const texts = {
-    title: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des credits' : 'Buy Credits',
-    credits: language === 'de' ? 'Credits' : language === 'fr' ? 'credits' : 'credits',
+    title: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des credits' : language === 'it' ? 'Acquista crediti' : 'Buy Credits',
+    credits: language === 'de' ? 'Credits' : language === 'fr' ? 'credits' : language === 'it' ? 'crediti' : 'credits',
     securePayment: language === 'de'
       ? 'Sichere Zahlung mit Stripe'
       : language === 'fr'
       ? 'Paiement securise avec Stripe'
+      : language === 'it'
+      ? 'Pagamento sicuro con Stripe'
       : 'Secure payment with Stripe',
-    cancel: language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel',
-    buyNow: language === 'de' ? 'Jetzt kaufen' : language === 'fr' ? 'Acheter maintenant' : 'Buy Now',
-    loading: language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement...' : 'Loading...'
+    cancel: language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel',
+    buyNow: language === 'de' ? 'Jetzt kaufen' : language === 'fr' ? 'Acheter maintenant' : language === 'it' ? 'Acquista ora' : 'Buy Now',
+    loading: language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'
   };
 
   return (
