@@ -28425,3 +28425,50 @@ compares it; whether an invented child is a peer is the bible's own declaration.
 `server/lib/visualBible.js` (`buildCharacterDescription`, now exported),
 `tests/unit/invented-age-band-wiring.test.ts`, `tests/unit/vb-authoring-contract.test.ts`.
 **Status:** ✅ active
+
+## 2026-09-06 — A warm hold is not the spawn mutex
+
+**Context:** `_warm_roles` was made to hold a `_bringing_up` claim across all the
+roles it was warming, so that a worker warmed early could not be reaped before a
+later role started. But `_bringing_up` also serves as the SPAWN MUTEX:
+`ensure_worker` treats a non-zero claim as "another thread is already bringing
+this role up" and waits instead of spawning. With the warm holding the claim,
+nobody ever spawned. Warming stopped working entirely while every counter looked
+healthy — measured on the deployed build, a presence beat left `face: false`
+after 50s and the first uploads took 70.2s and 35.1s before settling at 0.9s.
+
+**Decision:** Reaping protection and spawn arbitration are separate concerns and
+get separate state. `_warm_hold` is a refcount that only makes `kill_workers`
+refuse; `_bringing_up` remains the single-spawn mutex. The hold is taken at
+DISPATCH, before the warm thread starts — the starting request's own teardown
+fires `_maybe_reap_workers`, and it could otherwise land between `thread.start()`
+and the thread's first instruction and kill the fleet the warm was about to build.
+
+**Rationale:** Overloading one counter with two meanings is what made this
+invisible: every assertion about claims held, and the failure showed up only as
+slow uploads much later. Two names, two purposes.
+
+**Touched:** `photo_analyzer.py` (`_warm_hold`, `_take_warm_hold`,
+`_release_warm_hold`, `kill_workers`, `/warmup`),
+`tests/manual/test_worker_bringup_race.py` (case H, and the harness now restores
+the real `ensure_worker` between cases — case H ran against case G's stub until
+it did, which is exactly how a warm/ensure_worker interaction bug stays hidden).
+**Status:** ✅ active
+
+## 2026-09-06 — HTTPError subclasses URLError, so "it errored" is not "it is gone"
+
+**Context:** `kill_workers` asks an adopted orphan to exit over HTTP and, on an
+exception, decided whether the process was gone with
+`isinstance(e, (ConnectionError, URLError))`. `urllib.error.HTTPError` is a
+SUBCLASS of `URLError`, so any 404/405/500 from that worker counted as "gone" —
+while its record in `_workers`/`_adopted`/`_worker_ready` had already been
+cleared. An adopted worker comes from a PREVIOUS parent, so an older route shape
+answering 404 is exactly the case to expect. The result was a ~1.4GB worker
+resident for the life of the container, invisible to `/health` and unreachable by
+every later kill.
+
+**Decision:** Only a connection-level failure means gone; an `HTTPError` means it
+answered, so the role stays tracked and the next reap retries.
+
+**Touched:** `photo_analyzer.py` (`kill_workers`).
+**Status:** ✅ active
