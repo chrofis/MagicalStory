@@ -391,6 +391,28 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
       }
       oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
         .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+      // AN EMPTY SILHOUETTE IS NOT A SILHOUETTE (2026-09-06). `sil` non-null but
+      // fully transparent — SAM answering "nothing here" rather than failing —
+      // made `dest-in` erase the entire hatch and clip the face blur to nothing.
+      // The treated image then came out PIXEL-IDENTICAL to the untouched crop,
+      // and the model was handed a plain photograph plus "repaint the area
+      // covered by the magenta crosshatch". With no mark to obey it redrew the
+      // whole scene from scratch, every time. Measured on staging
+      // job_1788681313413_xqmtk2gcs back cover: the stored `charRepairWhiteout`
+      // frames carry 0.000% magenta and no blur.
+      //
+      // The other two treatments already refuse this — buildFaceTreatmentMask
+      // throws at `cov < 40`. This path computed the same `cov` and discarded
+      // it. Fall back to the RECTANGULAR hatch, which is the degraded behaviour
+      // this function already documents and accepts for a null silhouette: a
+      // marked region the model can act on beats an unmarked one it cannot.
+      if (gateCoverage && cov < 40) {
+        log.warn(`[FACE REPAIR] crosshatch: silhouette is empty (${cov}px opaque) — RECTANGULAR hatch, face blur skipped`);
+        sil = null;
+        hatchRegion = hatchOnly;
+        oldMaskPng = null;
+        cov = 0;
+      }
     }
   } catch (err) {
     log.warn(`[FACE REPAIR] crosshatch silhouette clip failed (${err.message}) — rectangular hatch`);

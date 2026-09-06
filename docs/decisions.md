@@ -1561,6 +1561,31 @@ re-segmenting until their covers are re-detected.
 **Status:** ✅ active.
 
 
+### An empty SAM silhouette is not a silhouette — the crosshatch gets the same coverage gate as the other treatments (2026-09-06)
+**Context:** Diagnosing why the back-cover repair on `job_1788681313413_xqmtk2gcs`
+produced whole-scene redraws rather than a patched figure. The three stored
+`charRepairWhiteout` frames — what `faceRepair` actually sent to Grok — are
+byte-identical and carry **0.000% magenta and 0.000% white**, with the target's
+face sharp and unblurred, on a run whose geometry is unambiguously the
+`crosshatch` treatment. The model was handed a plain photograph plus *"repaint
+the area covered by the magenta crosshatch"*. With no mark to obey, it invented a
+new picture — three times.
+**Decision:** `buildCrosshatchTreatment` honours `gateCoverage` (`cov < 40`) and
+falls back to the RECTANGULAR hatch, warning and stamping `hatchClipped: false`.
+**Rationale:** `buildFaceTreatmentMask` — whiteout and blur — has always thrown
+at `cov < 40`. The crosshatch path computed the identical `cov` and threw it
+away, and handled only `sil === null`; a non-null but fully transparent mask (SAM
+answering "nothing here" rather than failing) passed straight through `dest-in`
+and erased the hatch AND the face blur. A rectangular hatch is the degraded
+behaviour this function already documents and accepts when SAM returns nothing —
+a marked region the model can act on beats an unmarked one it cannot. Second and
+independent cause of the same owner report as the style-guard entry above; the
+two together explain both *why* the output was a cartoon and *why* it was a
+different scene.
+**Touched:** `server/lib/faceRepair.js`.
+**Status:** ✅ active.
+
+
 ---
 
 ## Cross-cuts already documented elsewhere

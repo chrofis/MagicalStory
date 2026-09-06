@@ -597,6 +597,15 @@
       "status": "fixed",
       "fixedIn": "staging (2026-09-06)",
       "note": "saveCoverData (the atomic refresh-bbox path) has always persisted cover masks; the full-story save loop in server/services/database.js read covers from dataForStorage (the clone) and never called persistFigureMasks at all. _gdinoMasks is non-enumerable so the clone cannot carry it - the identical trap the scene loop 20 lines above documents. Fix: call persistFigureMasks from the ORIGINAL storyData cover object with COVER_PAGE_NUMBERS[coverType]. Affects new stories; existing stories keep re-segmenting until their covers are re-detected."
+    },
+    {
+      "id": "empty-sam-silhouette-makes-the-crosshatch-treatment-a-no-op",
+      "title": "buildCrosshatchTreatment has no coverage gate: a non-null but fully transparent SAM silhouette erases the whole hatch, so the image sent to Grok carries no repaint mark at all",
+      "reportedAt": "2026-09-06",
+      "source": "Staging job_1788681313413_xqmtk2gcs back cover, Rachel. The three stored attemptFrames[*].charRepairWhiteout frames are byte-identical (338,468 bytes) and, measured over raw pixels, contain 0.000% magenta (max magenta-ness 38, identical to the untouched page) and 0.000% white, with the target's face sharp and unblurred. The recovered crop rect (x384 y0 340x545, by normalised cross-correlation against the page) matches resolveRegion's cutout+PAD_FACTOR 0.4 geometry, i.e. treatment 'crosshatch' — which always composites magenta. Grok's three outputs are whole-scene redraws, the behaviour expected of a model told to 'repaint the area covered by the magenta crosshatch' on an image with no crosshatch.",
+      "status": "fixed",
+      "fixedIn": "staging (2026-09-06)",
+      "note": "buildFaceTreatmentMask (whiteout and blur) throws at cov < 40. buildCrosshatchTreatment computes the same cov and discarded it, and only handled sil === null ('rectangular hatch'), never sil non-null-but-empty. dest-in against a fully transparent mask erased the hatch and clipped the face blur to nothing, so treatedBuf came out pixel-identical to the untouched crop and the run was a silent no-op that still paid for the model call. Fix: honour gateCoverage in the crosshatch path and fall back to the RECTANGULAR hatch — the degraded behaviour the function already documents and accepts for a null silhouette — with a warn and hatchClipped:false in treatmentInfo. Second, independent cause of the same owner report as repair-style-guard-forces-illustration-on-photographic-stories."
     }
   ]
 }
