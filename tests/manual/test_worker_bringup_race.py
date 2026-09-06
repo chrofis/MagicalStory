@@ -29,6 +29,14 @@ import photo_analyzer as pa  # noqa: E402
 
 FAILURES = []
 
+# Tests monkeypatch these; keep the originals so each case starts from the real
+# implementation. (Test H exercises the REAL ensure_worker, and silently ran
+# against test G's stub until this existed.)
+_REAL_ENSURE_WORKER = pa.ensure_worker
+_REAL_HEALTH_OK = pa._worker_health_ok
+_REAL_POPEN = pa.subprocess.Popen
+_REAL_URLOPEN = pa._urlreq.urlopen
+
 
 def check(label, ok, detail=''):
     print(f"  {'PASS' if ok else 'FAIL'}  {label}{(' — ' + detail) if detail else ''}")
@@ -78,12 +86,17 @@ def install_fakes(ready_after_s):
 
 
 def reset_state():
+    pa.ensure_worker = _REAL_ENSURE_WORKER
+    pa._worker_health_ok = _REAL_HEALTH_OK
+    pa.subprocess.Popen = _REAL_POPEN
+    pa._urlreq.urlopen = _REAL_URLOPEN
     pa._workers.clear()
     pa._bringing_up.clear()
     pa._worker_ready.clear()
     pa._sessions.clear()
     pa._active_sessions = 0
     pa._warming_roles.clear()
+    pa._warm_hold.clear()
     pa._spawned_at.clear()
     pa._adopted.clear()
     pa._active_sessions = 0
@@ -300,6 +313,39 @@ def test_warmup_merges_for_a_caller_that_names_no_workers():
           f'_warming_roles={pa._warming_roles}')
 
 
+def test_warm_actually_spawns_the_worker():
+    """A warm must really bring the worker UP, not just claim it.
+
+    Regression: the warm held `_bringing_up` — which doubles as the spawn mutex —
+    so ensure_worker concluded another thread was already spawning and nobody
+    ever did. Warming silently stopped working while every claim looked healthy.
+    Test G stubs ensure_worker, so only a test that exercises the REAL one
+    catches this.
+    """
+    print('\n[H] warm actually spawns')
+    reset_state()
+    pa._warm_hold.clear()
+    install_fakes(ready_after_s=0.2)
+    pa._urlreq.urlopen = lambda *a, **k: type('R', (), {'read': lambda self: b'{}'})()
+
+    client = pa.app.test_client()
+    r = client.post('/warmup', json={'dino': False, 'workers': ['face']})
+    check('warm dispatched', r.get_json().get('warming') == ['face'], str(r.get_json()))
+
+    deadline = time.time() + 10
+    while time.time() < deadline and 'face' not in pa._worker_ready:
+        time.sleep(0.1)
+
+    check('the worker was actually spawned', pa._workers.get('face') is not None,
+          f'_workers={list(pa._workers)}')
+    check('and reached ready', 'face' in pa._worker_ready,
+          f'_worker_ready={pa._worker_ready}')
+    check('the warm hold is released', not pa._warm_hold,
+          f'_warm_hold={pa._warm_hold}')
+    check('the spawn mutex is released', not pa._bringing_up,
+          f'_bringing_up={pa._bringing_up}')
+
+
 if __name__ == '__main__':
     print('worker bring-up race — regression test')
     test_reaper_cannot_kill_a_starting_worker()
@@ -309,5 +355,6 @@ if __name__ == '__main__':
     test_wedged_worker_fails_fast()
     test_session_end_cannot_steal_another_session()
     test_warmup_merges_for_a_caller_that_names_no_workers()
+    test_warm_actually_spawns_the_worker()
     print('\n' + ('FAILED: ' + ', '.join(FAILURES) if FAILURES else 'ALL PASSED'))
     sys.exit(1 if FAILURES else 0)

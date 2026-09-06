@@ -461,6 +461,12 @@ _spawned_at = {}
 # /session/reset promises a clean slate, and a worker from the previous era
 # surviving it is exactly what that promise excludes.
 _kill_generation = 0
+# Roles a warm is responsible for, refcounted. Deliberately NOT `_bringing_up`:
+# that one doubles as the SPAWN MUTEX, so holding it around a warm made
+# ensure_worker conclude somebody else was already spawning and nobody ever did
+# — warming silently stopped working. This set only tells kill_workers to keep
+# its hands off.
+_warm_hold = {}
 # Roles that have answered /health since they were spawned. Lets the common path
 # (worker already serving) skip the readiness probe entirely — without it every
 # proxied request paid a loopback round trip. Cleared on spawn and on kill.
@@ -731,9 +737,10 @@ def kill_workers(reason, expect_epoch=None, force=False):
         # `force` is the deliberate override: /release-memory?force=true is
         # documented as "kill it anyway", and a Node-boot reset is claiming a
         # clean slate. Everything else waits.
-        if _bringing_up and not force:
+        if (_bringing_up or _warm_hold) and not force:
+            busy_roles = sorted(set(_bringing_up) | set(_warm_hold))
             print(f"[WORKERS] kill aborted ({reason}): "
-                  f"{', '.join(sorted(_bringing_up))} still starting")
+                  f"{', '.join(busy_roles)} still starting or warming")
             return False
         # Detach under the lock, terminate OUTSIDE it. This function's own
         # docstring rejects holding `_request_lock` across `terminate() +
@@ -769,7 +776,15 @@ def kill_workers(reason, expect_epoch=None, force=False):
         except Exception as e:
             # A refused connection means it is already gone, which is the
             # outcome we wanted; anything else is a live worker we cannot reach.
-            gone = isinstance(e, (ConnectionError, _urlerr.URLError))
+            # HTTPError SUBCLASSES URLError, so a plain isinstance check on
+            # URLError classified every 404/405/500 from the orphan as "gone" —
+            # and we had already erased its record, leaving a ~1.4GB worker
+            # resident, invisible to /health and unreachable by any later kill.
+            # An orphan is from a PREVIOUS parent, so an older route shape is
+            # exactly what to expect there.
+            gone = (isinstance(e, ConnectionError)
+                    or (isinstance(e, _urlerr.URLError)
+                        and not isinstance(e, _urlerr.HTTPError)))
             print(f"[WORKERS] adopted {role} exit request failed: {e}")
         if not gone:
             # Keep tracking it so the next reap tries again and /health still
@@ -2995,6 +3010,22 @@ def detect_figures_text_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+def _take_warm_hold(roles):
+    """Claim `roles` against reaping for the duration of a warm."""
+    with _workers_lock:
+        for role in roles:
+            _warm_hold[role] = _warm_hold.get(role, 0) + 1
+
+
+def _release_warm_hold(roles):
+    with _workers_lock:
+        for role in roles:
+            if _warm_hold.get(role, 0) > 1:
+                _warm_hold[role] -= 1
+            else:
+                _warm_hold.pop(role, None)
+
+
 def _warm_roles(roles, body):
     """Parent-side warm: spawn each role and forward the warmup body to it.
 
@@ -3002,13 +3033,11 @@ def _warm_roles(roles, body):
     roles get the identical treatment rather than being dropped.
     """
     t0 = time.time()
-    # Hold a bring-up claim over the WHOLE warm, not one role at a time. Warming
-    # is sequential, so once `face` finished its claim dropped, and any unrelated
-    # request teardown could reap the worker we had just warmed before `torch`
-    # was even started — silently defeating the warm the caller asked for.
-    with _workers_lock:
-        for role in roles:
-            _bringing_up[role] = _bringing_up.get(role, 0) + 1
+    # The caller took `_warm_hold` for these roles at DISPATCH, before this
+    # thread existed — warming is sequential, so a per-role hold would let an
+    # unrelated request teardown reap the worker we just warmed before the next
+    # role even started, and a hold taken in here would race the teardown of the
+    # request that started us. We only release it.
     try:
         for role in roles:
             try:
@@ -3022,12 +3051,7 @@ def _warm_roles(roles, body):
                 with _warmup_lock:
                     _warming_roles.discard(role)
     finally:
-        with _workers_lock:
-            for role in roles:
-                if _bringing_up.get(role, 0) > 1:
-                    _bringing_up[role] -= 1
-                else:
-                    _bringing_up.pop(role, None)
+        _release_warm_hold(roles)
     print(f"[WARMUP] workers up in {time.time() - t0:.1f}s ({', '.join(roles)})")
 
 
@@ -3166,12 +3190,18 @@ def warmup_endpoint():
                 return jsonify({"success": True, "status": "already warming",
                                 "covered": sorted(_warming_roles)})
             _warming_roles.update(outstanding)
+            # Held BEFORE the thread starts: this request's own teardown fires
+            # _maybe_reap_workers, and it used to land between start() and the
+            # thread's first instruction — killing the very fleet the warm was
+            # about to build.
+            _take_warm_hold(outstanding)
             thread = threading.Thread(target=_warm_roles,
                                       args=(list(outstanding), dict(body)),
                                       daemon=True)
             try:
                 thread.start()
             except Exception as e:
+                _release_warm_hold(outstanding)
                 # Never leave a claim behind a thread that does not exist — that
                 # is the poisoning case above, and it is silent.
                 for role in outstanding:
