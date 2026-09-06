@@ -4065,6 +4065,33 @@ to shared helpers), `server.js` (vantage LOCATION line),
 `tests/manual/test-cover-sanitize.js` (updated to English-ref contract).
 **Status:** ✅ active.
 
+**Follow-up 2026-09-06 — the ref is a CLAUSE, and the trimmer is shared.**
+`englishEntityRef` took up to 12 words of the description with no clause
+awareness, so every substituted reference could end mid-phrase: on staging
+`job_1788641639919_mpjwlzkf1`, ART001 became "small hat knitted from chunky red
+wool, dome-shaped at the crown **with**" and ART007 "stack of split logs roughly
+a metre and a half tall **and**". The REQUIRED OBJECTS label had already fixed
+this for itself (cb50250bb) with a private `shortRef` trimmer, so the label was
+clean while the id→ref map, the consolidator input sanitising (15ebbbc59), the
+cover hint's `_artifactDescsEn` and `coverIterate:1521` all shipped the chop.
+Both now call ONE helper, `clauseRef` in visualBible.js: first clause (comma,
+semicolon, dash or period), a word cap applied only if that clause is longer,
+extension past a trailing colour/material modifier to the noun it qualifies,
+and a tail trim so the ref never ends on a conjunction, preposition, article or
+approximator. Three rules the real pools forced: a leading `[scope, season,
+time]` landmark tag is stripped; a one-token opening clause absorbs the next one
+(a location description opens with a bare "indoor,"); and units/dimension words
+are trimmed ONLY when a cap actually cut the phrase — "roughly four centimetres
+across" is a complete clause and says something real. Finally, for a NON-English
+story the entry's own `type` wins when it is present, ≤ 4 words and not a bare
+pool-category word, mirroring the proper-name substitution pass: "large egg"
+rather than a guess at where "An oval egg standing about as tall as a toddler's
+fist" ends. English stories are unaffected — the name path already wins there.
+**Touched:** `server/lib/visualBible.js` (`clauseRef` + `englishEntityRef`),
+`server/lib/promptBuilders.js` (`shortRef` delegates; the label site threads
+`language`), `tests/unit/english-entity-ref.test.ts` (new, ART001/ART007/ART008
+verbatim from that story).
+
 ## Split outline review — Sonnet writes, Opus reviews (2026-07-31)
 
 **Context:** testing-backlog #2 (cross-model review A/B) + owner: "the review of

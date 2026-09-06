@@ -381,6 +381,10 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     }
   }
 
+  // Set by gate 2b when a CRITICAL non-clothing finding outranks a MAJOR
+  // clothing finding; read by step 3 for the decision reason.
+  let deferredClothing = null;
+
   // 2b. Clothing is a FIGURE REDO, never an inpaint patch or a scene rewrite.
   //
   // Owner decision 2026-08-09, after reviewing a full 14-page story: a wrong
@@ -398,7 +402,34 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       String(i?.type || '').toLowerCase() === 'clothing'
       && /^(major|critical|catastrophic)$/i.test(String(i?.severity || ''))
       && String(i?.character || '').trim());
-    if (clothingIssue) {
+    // SEVERITY PRECEDENCE (2026-09-06). A char-fix DISCARDS the consolidated
+    // plan and repaints the figure from the clothing description alone, so a
+    // round spent here executes none of the plan's CRITICAL fixes. When the
+    // page's worst inpaintable finding outranks the clothing one, the CRITICAL
+    // is executed first and the wardrobe gets its figure redo next round —
+    // the 2026-08-09 "clothing is a figure redo" verdict is unchanged, only
+    // its turn in the queue is. Declared `type`/`severity` fields only.
+    // Evidence: job_1788641639919_mpjwlzkf1 p5 v0 — action_interaction CRITICAL
+    // + clothing MAJOR routed to char-fix; the CRITICAL was never acted on and
+    // the page went 60 → 40.
+    const clothingSev = clothingIssue ? String(clothingIssue.severity).toLowerCase() : null;
+    const worseNonClothing = clothingSev === 'major' && severityIssues.find(i => {
+      if (!/^critical$/i.test(String(i?.severity || ''))) return false;
+      // Types inpaint may not touch (clothing / identity / hair / skin / scale)
+      // cannot claim precedence — they are not executable by the fall-through.
+      if (NOT_INPAINTABLE_TYPES.has(String(i?.type || '').toLowerCase())) return false;
+      // Entity-sourced findings keep the 2026-09-04 routing: MAJOR entity gets
+      // no automatic repair, and CRITICAL entity already claimed the page at
+      // gate 2. They never override the clothing gate here.
+      const sources = Array.isArray(i?.sources) ? i.sources.map(s => String(s).toLowerCase()) : [];
+      if (sources.length && sources.every(s => s === 'entity')) return false;
+      return true;
+    });
+    if (clothingIssue && worseNonClothing) {
+      deferredClothing = worseNonClothing;
+      log.info(`👕 [REPAIR-DECIDE] page ${pageNumber}: clothing MAJOR deferred — a CRITICAL ${worseNonClothing.type || 'finding'} outranks it this round`);
+    }
+    if (clothingIssue && !worseNonClothing) {
       const charName = String(clothingIssue.character).trim();
       const issueDescription = require('./scoring').findingText(clothingIssue);
       const { resolveRepairAxes } = require('./faceRepair');
@@ -417,8 +448,17 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   }
 
   // 3. Inpaint when there's something inpaintable.
+  // `deferredClothing` is set when gate 2b stood down this round (severity
+  // precedence, above); it is carried into the reason so the round log says
+  // WHY the page took the inpaint route.
+  const precedenceNote = deferredClothing
+    ? `CRITICAL ${deferredClothing.type || 'finding'} outranks clothing MAJOR (clothing figure redo deferred to next round)`
+    : null;
+  const withPrecedence = (d) => (precedenceNote && d && d.method === 'inpaint'
+    ? { ...d, reason: `${precedenceNote}; ${d.reason || ''}`.trim() }
+    : d);
   if (typeof options.chooseRepairStrategy === 'function') {
-    return mapStrategyToMethod(options.chooseRepairStrategy(evaluator));
+    return withPrecedence(mapStrategyToMethod(options.chooseRepairStrategy(evaluator)));
   }
   // Inline fallback when chooseRepairStrategy isn't injected (tests).
   const fixableCount = evaluator.fixableIssues?.length || 0;
@@ -431,7 +471,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     if (fixableCount) parts.push(`${fixableCount} quality`);
     if (semanticIssueCount) parts.push(`${semanticIssueCount} semantic`);
     if (enrichedCount || fixTargetCount) parts.push(`${enrichedCount + fixTargetCount} targets`);
-    return { method: 'inpaint', reason: parts.join(', ') || 'default' };
+    return withPrecedence({ method: 'inpaint', reason: parts.join(', ') || 'default' });
   }
 
   // 4. Nothing actionable.

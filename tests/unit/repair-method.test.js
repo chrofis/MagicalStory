@@ -138,5 +138,94 @@ test('CRITICAL entity issue on a different page does not claim this page', () =>
   assert.strictEqual(decision.method, 'skip');
 });
 
+
+console.log('\ndecideRepairMethod — clothing vs CRITICAL severity precedence (2026-09-06)');
+// Evidence: staging job_1788641639919_mpjwlzkf1 page 5 v0.
+const clothingMajor = (char) => ({
+  type: 'clothing', severity: 'MAJOR', character: char,
+  description: 'wears a blue duffle coat instead of a blue hooded anorak',
+  sources: ['compliance'],
+});
+const criticalAction = {
+  type: 'action_interaction', severity: 'CRITICAL', sources: ['semantic'],
+  description: 'holds the chestnut at his open mouth instead of pinching it between his fingers',
+};
+test('CRITICAL action + MAJOR clothing → inpaint, reason names the precedence', () => {
+  const decision = decideRepairMethod(5, {
+    scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+    fixableIssues: [],
+    // The CRITICAL also lives in the semantic pool, as on the real page —
+    // the inline fallback counts the evaluator pools, not the plan.
+    semanticResult: { issues: [criticalAction] },
+    consolidatedPlan: { deduped_issues: [criticalAction, clothingMajor('Ethan')] },
+  }, null);
+  assert.strictEqual(decision.method, 'inpaint', `expected inpaint, got ${decision.method} (${decision.reason})`);
+  assert.ok(/outranks clothing MAJOR/.test(decision.reason), `reason must name the precedence, got: ${decision.reason}`);
+});
+test('MAJOR clothing alone still routes to char-fix (2026-08-09 unchanged)', () => {
+  const decision = decideRepairMethod(5, {
+    scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+    fixableIssues: [],
+    consolidatedPlan: { deduped_issues: [clothingMajor('Ethan')] },
+  }, null);
+  assert.strictEqual(decision.method, 'char-fix', `expected char-fix, got ${decision.method} (${decision.reason})`);
+  assert.strictEqual(decision.charName, 'Ethan');
+});
+test('a CRITICAL clothing/identity-typed finding cannot claim precedence', () => {
+  const decision = decideRepairMethod(5, {
+    scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+    fixableIssues: [],
+    consolidatedPlan: {
+      deduped_issues: [
+        { type: 'hair', severity: 'CRITICAL', sources: ['quality'], description: 'hair is blonde, not dark brown' },
+        clothingMajor('Ethan'),
+      ],
+    },
+  }, null);
+  assert.strictEqual(decision.method, 'char-fix');
+});
+test('CRITICAL entity + MAJOR clothing → char-fix on the entity issue, unchanged (2026-09-04)', () => {
+  const decision = decideRepairMethod(16, {
+    scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+    fixableIssues: [],
+    consolidatedPlan: { deduped_issues: [clothingMajor('Lorena')] },
+  }, entityReportWith('CRITICAL'));
+  assert.strictEqual(decision.method, 'char-fix');
+  assert.strictEqual(decision.charName, 'Lorena');
+  assert.ok(/^entity critical/.test(decision.reason), `entity gate must win, got: ${decision.reason}`);
+});
+
+console.log('\nconsolidator — rule 7 scene_fix guard');
+const { applyRule7SceneFixGuard } = require('../../server/lib/feedbackConsolidator');
+test('clothing-typed scene_fix moves to dropped_issues and is cleared', () => {
+  const plan = {
+    scene_fix: { severity: 'MAJOR', types: ['clothing'], instruction: 'Replace the blue duffle coat with a blue hooded anorak.' },
+    dropped_issues: [],
+  };
+  applyRule7SceneFixGuard(plan, 5);
+  assert.strictEqual(plan.scene_fix.instruction, '');
+  assert.strictEqual(plan.scene_fix.severity, 'NONE');
+  assert.strictEqual(plan.dropped_issues.length, 1);
+  assert.strictEqual(plan.dropped_issues[0].reason, 'requires_char_fix_not_inpaint');
+});
+test('a scene_fix with an inpaintable type is left alone', () => {
+  const plan = {
+    scene_fix: { severity: 'MODERATE', types: ['clothing', 'object_presence'], instruction: 'Add a glow to the stone.' },
+    dropped_issues: [],
+  };
+  applyRule7SceneFixGuard(plan, 5);
+  assert.strictEqual(plan.scene_fix.instruction, 'Add a glow to the stone.');
+  assert.strictEqual(plan.dropped_issues.length, 0);
+});
+test('a scene_fix with no declared types is never guessed at from prose', () => {
+  const plan = {
+    scene_fix: { severity: 'MAJOR', instruction: 'Replace the blue duffle coat with a blue hooded anorak.' },
+    dropped_issues: [],
+  };
+  applyRule7SceneFixGuard(plan, 5);
+  assert.strictEqual(plan.scene_fix.instruction, 'Replace the blue duffle coat with a blue hooded anorak.');
+  assert.strictEqual(plan.dropped_issues.length, 0);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

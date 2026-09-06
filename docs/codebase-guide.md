@@ -58,6 +58,10 @@ Step 2  ROUND LOOP (round 1..maxPasses):
         │        >= iterateSalvageFloor is NOT regenerated — see salvage floor)
         │    2. major/critical entity issue on this page (scene pages only) → char-fix
         │    2b. MAJOR+ clothing naming a character → char-fix (figure redo)
+        │        — stands down for ONE round when the clothing finding is only
+        │          MAJOR and the page carries a CRITICAL finding of an inpaintable,
+        │          non-entity type: the CRITICAL plan runs first (inpaint), the
+        │          figure redo follows next round (decisions.md 2026-09-06)
         │    3. anything inpaintable (fixableIssues/fixTargets/semantic)   → inpaint
         │    4. otherwise → skip
         ├─ flip logic: inpaint↔iterate flips when the last repair regressed or the

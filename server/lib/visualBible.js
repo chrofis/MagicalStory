@@ -247,7 +247,15 @@ function generateId(prefix, index) {
  */
 function buildCharacterDescription(char) {
   const parts = [];
-  if (char.age) parts.push(char.age);
+  // The bible states a secondary character's age as a NUMBER since 2026-09-06
+  // (prompts/story-bible-from-beats.txt). This string is copied verbatim into
+  // prompts, and one that opens "10." is a fragment, so the same fact is
+  // rendered as words. A prose age from an older bible passes through.
+  if (char.age != null && String(char.age).trim()) {
+    const raw = String(char.age).trim();
+    const numeric = /^\d{1,3}$/.test(raw) ? parseInt(raw, 10) : null;
+    parts.push(numeric == null ? raw : `a ${numeric}-year-old`);
+  }
   if (char.build) parts.push(char.build);
   if (char.hair) parts.push(char.hair);
   if (char.face) parts.push(char.face);
@@ -644,24 +652,112 @@ function significantEntityTokens(text) {
   );
 }
 
+// Tokens a reference must never END on, whatever the reason: a conjunction,
+// preposition, article, approximator or bare number leaves the ref pointing at
+// nothing ("…dome-shaped at the crown with", "…a half tall and").
+const REF_DANGLING_TAIL = /^(?:roughly|about|approximately|around|nearly|almost|over|under|x|×|by|per|of|with|and|or|the|a|an|in|on|at|for|to|its|his|her|their)$|^[\d(]/i;
+// Units and dimension words are dangling ONLY when a word cap cut the phrase.
+// A clause that ENDS on one is complete and says something real ("a single
+// horse chestnut roughly four centimetres across") — trimming it there was the
+// over-correction the first draft of this helper made.
+const REF_DANGLING_UNIT = /^(?:cm|mm|m|km|meters?|metres?|centimet(?:re|er)s?|millimet(?:re|er)s?|kilomet(?:re|er)s?|ft|feet|inch(?:es)?|long|wide|tall|high|deep|thick|across|diameter)$/i;
+// A MODIFIER end is the same defect one step subtler: a ref that stops on a
+// colour or material adjective has lost the head noun it qualified.
+const REF_TRAILING_MODIFIER = /^(?:red|orange|yellow|green|blue|indigo|violet|purple|pink|brown|black|white|grey|gray|silver|gold|golden|copper|bronze|crimson|scarlet|amber|teal|turquoise|maroon|beige|cream|tan|ochre|navy|dark|light|pale|deep|bright|chunky|coarse|fine|smooth|rough|soft|thick|thin|woollen|woolen|wooden|woven|knitted|plaited|braided|polished|painted|plain|striped|spotted|checked)$/i;
+// Approximators that open a measurement tail. When a word cap cuts INSIDE such
+// a tail the measurement is half-stated and worthless as a label, so the whole
+// tail goes and the ref keeps the noun phrase before it.
+const REF_APPROXIMATOR = /^(?:roughly|about|approximately|around|nearly|almost)$/i;
+// Landmark descriptions open with a "[scope, season, time]" tag
+// (feedback_landmark_photo_descriptions). It is metadata, not the thing.
+const REF_LEADING_TAG = /^\s*\[[^\]]*\]\s*/;
+// Pool-type words are the CATEGORY, not a description — an entry whose `type`
+// is one of these carries no visual information and must not become the ref.
+const REF_GENERIC_TYPE = /^(?:artifacts?|objects?|items?|props?|vehicles?|clothing|outfits?|garments?|locations?|places?|characters?|animals?)$/i;
+
+/**
+ * Clause-aware short reference for a free-text description.
+ *
+ * A reference is the FIRST CLAUSE of the description — cut at the first comma,
+ * semicolon, dash, or period — capped at `maxWords` only when that clause is
+ * still longer, and never left ending on a conjunction, preposition, article,
+ * unit, or a trailing colour/material modifier. Shared by `englishEntityRef`
+ * (the id→ref map, the VB section, the cover hint) and the REQUIRED OBJECTS
+ * label in promptBuilders, which used to carry its own copy of the trimming
+ * rules (cb50250bb) while this one had none — hence "…dome-shaped at the crown
+ * with" reaching prompts through every non-label caller.
+ *
+ * @param {string} text        source description
+ * @param {object} [opts]
+ * @param {number} [opts.maxWords=12] soft cap
+ * @param {number} [opts.hardCap]     ceiling when extending past a modifier
+ * @param {number} [opts.minWords=3]  absorb further clauses below this length
+ *                                    ("indoor, ground-floor flat interior" —
+ *                                    a location's first clause is often a
+ *                                    single indoor/outdoor token)
+ */
+function clauseRef(text, opts = {}) {
+  const maxWords = opts.maxWords ?? 12;
+  const hardCap = opts.hardCap ?? maxWords + 4;
+  const minWords = opts.minWords ?? 3;
+
+  const src = String(text || '').replace(REF_LEADING_TAG, '').trim();
+  if (!src) return '';
+
+  // First clause, extended across further clause breaks while it is too short
+  // to name anything.
+  const clauses = src.split(/\s*(?:[,;.\n]|—|–|\s-\s)\s*/).map(c => c.trim()).filter(Boolean);
+  if (clauses.length === 0) return '';
+  let clause = clauses[0];
+  for (let i = 1; i < clauses.length && clause.split(/\s+/).length < minWords; i++) {
+    clause = `${clause}, ${clauses[i]}`;
+  }
+
+  const all = clause.replace(/^(?:a|an|the)\s+/i, '').split(/\s+/).filter(Boolean);
+  if (all.length === 0) return '';
+  const truncated = all.length > maxWords;
+  let words = all.slice(0, maxWords);
+  // Extend past a trailing modifier to the word it qualifies.
+  while (words.length < all.length && words.length < hardCap
+         && REF_TRAILING_MODIFIER.test(words[words.length - 1])) {
+    words.push(all[words.length]);
+  }
+  // A cap that landed inside a measurement tail: drop the tail entirely.
+  if (truncated) {
+    const cut = words.findIndex((w, i) => i > 0 && REF_APPROXIMATOR.test(w));
+    if (cut > 0) words = words.slice(0, cut);
+  }
+  // Whatever is left must not end mid-phrase.
+  const isDangling = (w) => REF_DANGLING_TAIL.test(w)
+    || REF_TRAILING_MODIFIER.test(w)
+    || (truncated && REF_DANGLING_UNIT.test(w));
+  while (words.length > 1 && isDangling(words[words.length - 1])) words.pop();
+  return words.join(' ').replace(/[,\s]+$/, '');
+}
+
 /**
  * Short ENGLISH image-facing reference for a VB entity. The entity NAME
  * follows the story language (a German "Roter Umhang" must never reach the
  * English image prompt as the thing to draw), so build the reference from the
- * entry's description instead: first clause, capped at 12 words, leading
- * article stripped. Falls back to the pool-generic noun when the entry has no
- * usable description (same generic-noun approach as sanitizeVbIdsInPrompt).
- * Canonical implementation — coverIterate re-exports it, storyHelpers'
- * page-prompt emission sites use it directly.
+ * entry's English `type` or description instead. Falls back to the
+ * pool-generic noun when the entry has neither (same generic-noun approach as
+ * sanitizeVbIdsInPrompt). Canonical implementation — coverIterate re-exports
+ * it, storyHelpers' page-prompt emission sites use it directly.
  */
-function englishEntityRef(entry, genericNoun = 'object') {
-  const desc = String(entry?.extractedDescription || entry?.description || '').trim();
-  if (desc) {
-    const clause = desc.split(/[.;\n]/)[0].trim();
-    const words = clause.replace(/^(?:a|an|the)\s+/i, '').split(/\s+/).slice(0, 12).join(' ').trim();
-    if (words) return words.replace(/[,\s]+$/, '');
+function englishEntityRef(entry, genericNoun = 'object', opts = {}) {
+  // The entry's own `type` is English by construction and is already a clean
+  // noun phrase ("children's knitted hat"), where any description cut is a
+  // guess at where the noun phrase ends. For a NON-English story — the only
+  // case in which this ref is reached instead of the entry name — prefer it,
+  // exactly as the proper-name substitution pass in sanitizeVbIdsInPrompt
+  // does. Callers that do not thread the story language keep the description.
+  const language = String(opts.language || '').trim();
+  if (language && !/^en(?:[-_]|$)/i.test(language)) {
+    const type = String(entry?.type || '').trim();
+    if (type && type.split(/\s+/).length <= 4 && !REF_GENERIC_TYPE.test(type)) return type;
   }
-  return genericNoun;
+  const ref = clauseRef(entry?.extractedDescription || entry?.description, { maxWords: 12 });
+  return ref || genericNoun;
 }
 
 /**
@@ -2455,6 +2551,7 @@ module.exports = {
   buildVisualBiblePrompt,
   buildFullVisualBiblePrompt,
   englishEntityRef,
+  clauseRef,
   englishLocationRef,
   resolveSceneCreatures,
   significantEntityTokens,
@@ -2478,6 +2575,7 @@ module.exports = {
   // Reference image support
   getElementsNeedingReferenceImages,
   updateElementReferenceImage,
+  buildCharacterDescription,
   getElementReferenceImagesForPage,
   getEmptySceneElementReferences,
   isRecurringCreature,

@@ -11,7 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens } = require('./visualBible');
+const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef } = require('./visualBible');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
@@ -3446,33 +3446,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // built from the STATE-AWARE description so a stripped attachment
         // clause can't sneak back in via the lead.
         const refEntry = placedElsewhere ? { description } : obj.entry;
-        // The lead is a checklist NAME — one clean short noun phrase. The raw
-        // englishEntityRef clause often runs into measurement prose without a
-        // comma ("…sailing ship roughly 25 m long"), so a bare word-count chop
-        // cut mid-phrase ("…sailing ship roughly 25"). Cap the words, then
-        // trim trailing dangling tokens (approximators, numbers, units,
-        // dimension words, function words) until the ref ends on a content
-        // word.
-        const DANGLING_TAIL = /^(?:roughly|about|approximately|around|nearly|almost|over|under|x|×|by|per|of|with|and|or|the|a|an|in|on|at|for|to|its|his|her|their|cm|mm|m|km|meters?|metres?|ft|feet|inch(?:es)?|long|wide|tall|high|deep|thick|across|diameter)$|^[\d(]/i;
-        // A word cap must never end on a MODIFIER: a label that stops on a
-        // colour or material adjective has lost the head noun it qualified.
-        // Staging job_1788641639919_mpjwlzkf1 p3, ART001 ("A small hat knitted
-        // from chunky red wool, dome-shaped at the crown…"): the flat six-word
-        // cap emitted "small hat knitted from chunky red" — "wool" chopped
-        // off, leaving a colour with nothing to colour. Extend past a trailing
-        // modifier to the word it qualifies (hard stop at 10 words), then trim
-        // dangling tokens as before.
-        const TRAILING_MODIFIER = /^(?:red|orange|yellow|green|blue|indigo|violet|purple|pink|brown|black|white|grey|gray|silver|gold|golden|copper|bronze|crimson|scarlet|amber|teal|turquoise|maroon|beige|cream|tan|ochre|navy|dark|light|pale|deep|bright|chunky|coarse|fine|smooth|rough|soft|thick|thin|woollen|woolen|wooden|woven|knitted|plaited|braided|polished|painted|plain|striped|spotted|checked)$/i;
-        const shortRef = (r) => {
-          const all = r.split(',')[0].trim().split(/\s+/);
-          let words = all.slice(0, 6);
-          while (words.length < all.length && words.length < 10
-                 && TRAILING_MODIFIER.test(words[words.length - 1])) {
-            words.push(all[words.length]);
-          }
-          while (words.length > 1 && DANGLING_TAIL.test(words[words.length - 1])) words.pop();
-          return words.join(' ');
-        };
+        // The lead is a checklist NAME — one clean short noun phrase, trimmed
+        // clause-aware so it never stops on a modifier or a half-stated
+        // measurement. Both rules now live in ONE place: visualBible's
+        // `clauseRef`, which englishEntityRef itself also runs (the label's
+        // copy was the only trimmer until then, so every other consumer of
+        // the ref got the untrimmed chop).
+        const shortRef = (r) => clauseRef(r, { maxWords: 6, hardCap: 10 });
+
+
         // A two-sided prop is TWO bible entries whose orientation lives in the
         // NAME's parenthetical ("… (turned away)", "… (face to camera)").
         // decisions.md 2026-08-26 made that orientation reach the prompt via
@@ -3500,7 +3482,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           ? obj.name
           : (nameIsUsable
             ? nameLabel
-            : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object')));
+            : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object', { language })));
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
           : `**${refName}${qualifier}** (${obj.type})`;

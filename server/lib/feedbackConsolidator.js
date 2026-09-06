@@ -524,6 +524,8 @@ async function consolidateFeedback({
         }));
     }
 
+    applyRule7SceneFixGuard(plan, pageNumber);
+
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
     // empirically a 6-fix inpaint often changes nothing. Cap severity-first and
@@ -580,6 +582,41 @@ async function consolidateFeedback({
     log.warn(`⚠️ [FEEDBACK-CONSOLIDATOR] failed: ${err.message}`);
     return { plan: null, usage: null, error: err.message };
   }
+}
+
+/**
+ * Prompt rule 7 guard: a scene_fix whose declared types are all types inpaint
+ * may not execute (clothing / identity / hair / skin / scale) is a character
+ * repair, not a scene fix. Move it to dropped_issues and clear scene_fix.
+ * Declared `types` only — never the prose (docs/SETTLED.md).
+ */
+function applyRule7SceneFixGuard(plan, pageNumber) {
+  if (!plan || !plan.scene_fix) return plan;
+  if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
+  // PROMPT RULE 7 GUARD (2026-09-06). A scene_fix whose declared types are
+  // ALL types inpaint may not execute (clothing / identity / hair / skin /
+  // scale) is not a scene fix at all — it is a character repair wearing a
+  // scene_fix's clothes, and the inpaint executor would hand Grok a garment
+  // swap. Observed on job_1788641639919_mpjwlzkf1 p5: scene_fix.instruction
+  // was "Replace the blue duffle coat with a blue hooded anorak…".
+  // Routes on the DECLARED `types` array only (SETTLED: classification is
+  // the prompt's job) — a scene_fix with no declared types is left alone.
+  const { NOT_INPAINTABLE_TYPES } = require('./repairLogic');
+  const sceneTypes = Array.isArray(plan.scene_fix.types)
+    ? plan.scene_fix.types.map(t => String(t || '').toLowerCase()).filter(Boolean)
+    : [];
+  if (plan.scene_fix.instruction && sceneTypes.length
+      && sceneTypes.every(t => NOT_INPAINTABLE_TYPES.has(t))) {
+    plan.dropped_issues.push({
+      issue: plan.scene_fix.instruction,
+      severity: plan.scene_fix.severity || null,
+      reason: 'requires_char_fix_not_inpaint',
+    });
+    log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: scene_fix typed ${sceneTypes.join('/')} is a character repair, not an inpaint — dropped (rule 7)`);
+    plan.scene_fix.instruction = '';
+    plan.scene_fix.severity = 'NONE';
+  }
+  return plan;
 }
 
 /**
@@ -777,6 +814,7 @@ async function consolidateEvaluation({
 }
 
 module.exports = {
+  applyRule7SceneFixGuard,
   consolidateFeedback,
   medianSeverity, // exported for testing
   consolidateEvaluation,
