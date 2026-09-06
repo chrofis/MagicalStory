@@ -429,15 +429,25 @@ async function writeMarker(pool, key, iso) {
 function startDbHousekeeping({ pool, log }) {
   const { ch } = require('../../scripts/lib/chTime');
 
+  // Production reclaims on Sundays; STAGING reclaims DAILY (owner, 2026-09-06).
+  // Staging churns test data far faster than prod — one day of Test Lab runs and
+  // showcase stories produced 84% dead space in `characters` — and it has no
+  // paying users, so the ACCESS EXCLUSIVE lock and the Postgres restart cost
+  // nothing there. Anything that is not explicitly staging keeps the weekly
+  // cadence, so an unknown environment errs toward the safer schedule.
+  const isStaging = process.env.RAILWAY_ENVIRONMENT_NAME === 'staging';
+  const reclaimOpts = isStaging ? {} : { weekday: SUNDAY };
+  const reclaimCadence = isStaging ? 'daily' : 'Sundays';
+
   const tick = async () => {
     try {
       const now = new Date();
 
       const lastWeekly = await readMarker(pool, KEY_WEEKLY);
-      if (shouldRun(now, lastWeekly, { weekday: SUNDAY })) {
+      if (shouldRun(now, lastWeekly, reclaimOpts)) {
         // Marker first: a crash mid-reclaim must not retry the lock every 5 min.
         await writeMarker(pool, KEY_WEEKLY, now.toISOString());
-        log.info(`[db-housekeeping] weekly reclaim due at ${ch(now)}`);
+        log.info(`[db-housekeeping] reclaim (${reclaimCadence}) due at ${ch(now)}`);
         await runWeeklyReclaim({ pool, log });
         return; // the restart may drop our own connections; leave daily to the next tick
       }
@@ -455,7 +465,7 @@ function startDbHousekeeping({ pool, log }) {
 
   const timer = setInterval(tick, TICK_MS);
   if (timer.unref) timer.unref();
-  log.info('[db-housekeeping] armed — daily 03:30 CH, weekly reclaim Sundays 03:30 CH');
+  log.info(`[db-housekeeping] armed — housekeeping daily 03:30 CH, reclaim ${reclaimCadence} 03:30 CH`);
   return timer;
 }
 
