@@ -301,7 +301,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   ];
   const catastrophicIssue = severityIssues.find(i => /catastrophic/i.test(String(i?.severity || '')));
   if (catastrophicIssue) {
-    const desc = String(catastrophicIssue.description || catastrophicIssue.problem || '').slice(0, 80);
+    const desc = require('./scoring').findingText(catastrophicIssue).slice(0, 80);
     return { method: 'iterate', reason: `CATASTROPHIC issue — ${desc || 'full regen required'}` };
   }
 
@@ -400,7 +400,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       && String(i?.character || '').trim());
     if (clothingIssue) {
       const charName = String(clothingIssue.character).trim();
-      const issueDescription = clothingIssue.description || clothingIssue.problem || '';
+      const issueDescription = require('./scoring').findingText(clothingIssue);
       const { resolveRepairAxes } = require('./faceRepair');
       // forceTarget 'body' so this never degrades into a face-only cutout:
       // the whole figure is redrawn, which is the point of the route.

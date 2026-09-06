@@ -5,6 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { ImageVersion } from '@/types/story';
 import { versionScore } from '@/utils/versionScore';
+import { findingText } from '../../../utils/findingText';
 
 // Cover type names for display
 const COVER_LABELS = {
@@ -662,8 +663,8 @@ export function ImageHistoryModal({
                   {(() => {
                     const fixable = detailVersion.fixableIssues || [];
                     const semanticOnly = (detailVersion.semanticResult?.semanticIssues || [])
-                      .filter(s => !fixable.some(f => (f.description || '').toLowerCase().includes((s.problem || '').slice(0, 30).toLowerCase())))
-                      .map(s => ({ description: s.problem, severity: s.severity, source: 'semantic', type: 'semantic' as string, fix: '' }));
+                      .filter(s => !fixable.some(f => (f.description || '').toLowerCase().includes(findingText(s).slice(0, 30).toLowerCase())))
+                      .map(s => ({ description: findingText(s), severity: s.severity, source: 'semantic', type: 'semantic' as string, fix: '' }));
                     // Entity issues: prefer per-version (stored at eval time on
                     // version.entityIssues — actual source of THIS version's
                     // entityPenalty). Fall back to page-scoped finalChecksReport

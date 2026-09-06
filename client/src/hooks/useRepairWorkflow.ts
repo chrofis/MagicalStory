@@ -12,6 +12,7 @@ import type {
 import type { Character } from '../types/character';
 import { storyService } from '../services/storyService';
 import { REPAIR_DEFAULTS } from '../config/repairDefaults';
+import { findingText } from '../utils/findingText';
 
 // Cover type ↔ virtual page number mapping
 const COVER_PAGES: Record<string, number> = { frontCover: -1, initialPage: -2, backCover: -3 };
@@ -419,7 +420,7 @@ export function useRepairWorkflow({
         if (evalPage?.semanticResult) {
           for (const si of (evalPage.semanticResult.semanticIssues || [])) {
             addIssue({
-              description: si.problem || `${si.type || 'semantic'}: ${si.item || ''}`,
+              description: findingText(si) || 'semantic',
               severity: si.severity?.toLowerCase() || 'medium',
               type: si.type || 'semantic',
               fix: si.expected ? `Expected: ${si.expected}` : '',
@@ -427,7 +428,7 @@ export function useRepairWorkflow({
           }
           for (const si of (evalPage.semanticResult.issues || [])) {
             addIssue({
-              description: si.problem || `${si.type}: ${si.item || ''}`,
+              description: findingText(si),
               severity: si.severity?.toLowerCase() || 'medium',
               type: si.type || 'semantic',
               fix: '',
@@ -601,7 +602,7 @@ export function useRepairWorkflow({
           if (evalPage?.semanticResult) {
             for (const si of (evalPage.semanticResult.semanticIssues || [])) {
               addIssue({
-                description: si.problem || `${si.type || 'semantic'}: ${si.item || ''}`,
+                description: findingText(si) || 'semantic',
                 severity: si.severity?.toLowerCase() || 'medium',
                 type: si.type || 'semantic',
                 fix: si.expected ? `Expected: ${si.expected}` : '',
@@ -609,7 +610,7 @@ export function useRepairWorkflow({
             }
             for (const si of (evalPage.semanticResult.issues || [])) {
               addIssue({
-                description: si.problem || `${si.type}: ${si.item || ''}`,
+                description: findingText(si),
                 severity: si.severity?.toLowerCase() || 'medium',
                 type: si.type || 'semantic',
                 fix: '',

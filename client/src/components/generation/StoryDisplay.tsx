@@ -14,6 +14,7 @@ import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
 import { EntityConsistencyView } from './EntityConsistencyView';
 import { IMAGE_REGENERATION_COST, COVER_REGENERATION_COST, TITLE_PAINT_COST, CHARACTER_REPAIR_COST } from '@/constants/credits';
+import { findingText } from '../../utils/findingText';
 
 interface StoryTextPrompt {
   batch: number;
@@ -5971,7 +5972,7 @@ export function StoryDisplay({
                                           <span className={`font-medium ${
                                             issue.severity === 'CRITICAL' ? 'text-red-600' :
                                             issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
-                                          }`}>[{issue.severity}]</span> {issue.problem}
+                                          }`}>[{issue.severity}]</span> {findingText(issue)}
                                         </li>
                                       ))}
                                     </ul>
@@ -6554,7 +6555,7 @@ export function StoryDisplay({
                                           <span className={`font-medium ${
                                             issue.severity === 'CRITICAL' ? 'text-red-600' :
                                             issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
-                                          }`}>[{issue.severity}]</span> {issue.problem}
+                                          }`}>[{issue.severity}]</span> {findingText(issue)}
                                         </li>
                                       ))}
                                     </ul>

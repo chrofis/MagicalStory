@@ -279,6 +279,28 @@ function semanticPenaltyPoints(semanticIssues) {
 }
 
 /**
+ * The prose of a single evaluator finding, whatever schema produced it.
+ *
+ * The semantic evaluator (prompts/image-semantic.txt → sceneValidator.js)
+ * emits `description`; the pre-2026-08 semantic schema and some stored rows
+ * carry `problem`, and older visual rows carry `issue`. Readers used to
+ * hand-pick ONE of those names — `i.problem` in the evalPipeline summary
+ * builders — which rendered every fresh semantic finding as an empty string
+ * (`"SEMANTIC: "`), hiding a shipped CRITICAL from the logs entirely.
+ * One accessor, so no reader has to know which schema wrote the row.
+ */
+function findingText(issue) {
+  if (!issue || typeof issue !== 'object') return '';
+  const text = issue.description || issue.problem || issue.issue || '';
+  if (text) return String(text).trim();
+  // Nothing prose-y at all: fall back to the structured identity so a
+  // summary still names the finding instead of printing nothing.
+  const type = issue.type || issue.category || '';
+  const item = issue.item || issue.character || '';
+  return [type, item].filter(Boolean).join(': ');
+}
+
+/**
  * Normalize a list of raw evaluator issues into the deductions shape.
  * Filters out anything without a severity.
  */
@@ -1068,6 +1090,7 @@ module.exports = {
   applyScore,
   capEntityPenalty,
   semanticPenaltyPoints,
+  findingText,
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   versionDeductionTotal,

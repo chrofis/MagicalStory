@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, Play } from 'lucide-react';
 import api from '@/services/api';
+import { findingText } from '../../../utils/findingText';
 
 interface EvalTestingPanelProps {
   storyId: string;
@@ -230,7 +231,7 @@ export function EvalTestingPanel({ storyId, pageNumber, language }: EvalTestingP
                   {result.semanticIssues.map((issue, idx) => (
                     <li key={idx} className="text-xs text-purple-700">
                       <span className="font-medium">{issue.type}: </span>
-                      {issue.problem}
+                      {findingText(issue)}
                       {issue.expected && <span className="text-purple-500"> (expected: {issue.expected})</span>}
                     </li>
                   ))}

@@ -667,7 +667,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             type: issue.type || null,
             subType: issue.subType || null,
             severity: issue.severity,
-            description: issue.description || issue.problem || '',
+            description: require('./scoring').findingText(issue),
             source: 'character',
           });
         }
@@ -684,7 +684,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             type: issue.type || null,
             subType: issue.subType || null,
             severity: issue.severity,
-            description: issue.description || issue.problem || '',
+            description: require('./scoring').findingText(issue),
             source: 'object',
           });
         }
@@ -1946,7 +1946,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           ...(latestEval?.semanticResult?.semanticIssues || latestEval?.semanticResult?.issues || []),
         ].filter(i => /catastrophic|critical/i.test(String(i?.severity || '')));
         if (outstanding.length > 0) {
-          log.warn(`  ⚠️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: giving up with ${outstanding.length} unaddressed ${outstanding.length === 1 ? 'issue' : 'issues'} — ${outstanding.map(i => `[${i.severity}] ${String(i.description || i.problem || '').substring(0, 60)}`).join(' | ')}`);
+          log.warn(`  ⚠️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: giving up with ${outstanding.length} unaddressed ${outstanding.length === 1 ? 'issue' : 'issues'} — ${outstanding.map(i => `[${i.severity}] ${require('./scoring').findingText(i).substring(0, 60)}`).join(' | ')}`);
         } else {
           log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — both inpaint and iterate already tried, neither improved the original`);
         }

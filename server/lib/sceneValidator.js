@@ -852,7 +852,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
 
     log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
-      log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.description || i.problem).join('; ')}`);
+      log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => require('./scoring').findingText(i)).join('; ')}`);
     } else {
       log.verbose('[SEMANTIC] No semantic issues found (score: 10/10)');
     }

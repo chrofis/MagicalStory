@@ -112,7 +112,7 @@ function buildFeedbackInput({
       const sev = iss.severity || 'MAJOR';
       const type = iss.type || 'general';
       const item = iss.item ? ` [${iss.item}]` : '';
-      const problem = iss.problem || iss.description || '(no description)';
+      const problem = require('./scoring').findingText(iss) || '(no description)';
       const expected = iss.expected ? ` — expected: ${iss.expected}` : '';
       const observed = iss.observed ? ` — observed: ${iss.observed}` : '';
       parts.push(`- [${sev}] (${type})${item} ${problem}${expected}${observed}`);
@@ -499,7 +499,7 @@ async function consolidateFeedback({
       plan.deduped_issues = plan.deduped_issues
         .filter(i => i && typeof i === 'object' && (i.description || i.problem || i.issue))
         .map(i => ({
-          description: String(i.description || i.problem || i.issue || '').trim(),
+          description: require('./scoring').findingText(i),
           severity: (() => {
             const chosen = String(i.severity || 'MODERATE').toUpperCase();
             return medianSeverity(i.severities) || chosen;

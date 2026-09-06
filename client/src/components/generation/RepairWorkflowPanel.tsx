@@ -28,6 +28,7 @@ import { EntityConsistencyView } from './EntityConsistencyView';
 import storyService from '@/services/storyService';
 import type { SceneImage, CoverImages, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult, StoryLanguageCode } from '@/types/story';
 import type { Character } from '@/types/character';
+import { findingText } from '../../utils/findingText';
 
 /** Map negative page numbers to cover display names */
 const COVER_PAGE_NAMES: Record<number, string> = { [-1]: 'Front Cover', [-2]: 'Initial Page', [-3]: 'Back Cover' };
@@ -401,7 +402,7 @@ function PageFeedbackCard({
                       <span className={`font-medium ${
                         issue.severity === 'CRITICAL' ? 'text-red-600' :
                         issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
-                      }`}>[{issue.severity}]</span> {issue.problem}
+                      }`}>[{issue.severity}]</span> {findingText(issue)}
                     </li>
                   ))}
                 </ul>

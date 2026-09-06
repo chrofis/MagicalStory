@@ -1799,7 +1799,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             finalScore = score - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`🔍 [SEMANTIC] Semantic score: ${semanticResult.score}/100, penalty: ${semanticPenalty} points (quality ${score} → final ${finalScore})`);
             // Append semantic issues to summary
-            const semanticSummary = semanticResult.semanticIssues.map(i => i.problem).join('; ');
+            const semanticSummary = semanticResult.semanticIssues.map(i => require('./scoring').findingText(i)).join('; ');
             combinedIssuesSummary = issuesSummary
               ? `${issuesSummary}; SEMANTIC: ${semanticSummary}`
               : `SEMANTIC: ${semanticSummary}`;
@@ -1929,7 +1929,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult.semanticIssues);
             finalScore = qualityScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`🔍 [SEMANTIC] Applied ${semanticPenalty} point penalty for semantic issues (${qualityScore} → ${finalScore})`);
-            issuesSummary = `SEMANTIC: ${semanticResult.semanticIssues.map(i => i.problem).join('; ')}`;
+            issuesSummary = `SEMANTIC: ${semanticResult.semanticIssues.map(i => require('./scoring').findingText(i)).join('; ')}`;
           }
         } catch (semanticErr) {
           log.warn(`[SEMANTIC] Parallel evaluation failed: ${semanticErr.message}`);
