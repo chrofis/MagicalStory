@@ -261,7 +261,7 @@ export default function TrialIdeasStep({
       setError(err.message || 'Failed to generate ideas');
       setIsGenerating(false);
     }
-  }, [characterData, storyInput]);
+  }, [characterData, storyInput, userLocation]);
 
   // When both ideas are final, persist to parent
   useEffect(() => {
