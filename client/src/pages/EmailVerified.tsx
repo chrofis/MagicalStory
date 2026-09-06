@@ -65,6 +65,25 @@ const translations = {
       'Commander en livre imprimé',
     ],
   },
+  it: {
+    title: 'E-mail confermata!',
+    checkingOtherWindow: 'Torna alla finestra del browser da cui sei partito: la tua storia dovrebbe essere in creazione lì...',
+    generatingInOtherWindow: 'La tua storia è in creazione nell\'altra finestra del browser!',
+    otherWindowHint: 'Puoi chiudere questa scheda e tornare alla finestra iniziale.',
+    manualHint: 'La finestra iniziale potrebbe essere stata chiusa. Clicca qui sotto per creare la tua storia.',
+    notLoggedInHint: 'Accedi per creare la tua storia.',
+    createStory: 'Crea la tua storia',
+    login: 'Accedi',
+    goHome: 'Vai alla pagina iniziale',
+    upsellTitle: 'Più possibilità con un account completo',
+    upsellFeatures: [
+      'Più personaggi in una sola storia',
+      'Storie più lunghe',
+      'Diversi stili di disegno',
+      'Qualità delle immagini superiore e pagina del titolo',
+      'Ordinala come libro stampato',
+    ],
+  },
 };
 
 type Status = 'checking' | 'other_window' | 'manual';

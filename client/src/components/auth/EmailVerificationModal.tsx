@@ -62,6 +62,22 @@ const translations = {
     checkSpam: 'Pas trouvé ? Vérifiez votre dossier spam.',
     fillAllFields: 'Veuillez remplir tous les champs',
   },
+  it: {
+    title: 'Controlla la tua e-mail',
+    description: 'Ti abbiamo inviato un link di conferma. La tua storia partirà automaticamente appena confermi la tua e-mail!',
+    currentEmail: 'Conferma inviata a',
+    sendVerification: 'Invia e-mail di conferma',
+    resendVerification: 'Invia di nuovo l\'e-mail di conferma',
+    emailSent: 'E-mail di conferma inviata! Controlla la tua casella di posta.',
+    changeEmail: 'E-mail sbagliata? Cambiala',
+    newEmail: 'Nuovo indirizzo e-mail',
+    currentPassword: 'Password attuale',
+    confirmChange: 'Cambia e conferma',
+    cancel: 'Annulla',
+    emailChanged: 'E-mail cambiata! Controlla la nuova casella di posta per la conferma.',
+    checkSpam: 'Non la trovi? Controlla la cartella spam.',
+    fillAllFields: 'Compila tutti i campi',
+  },
 };
 
 export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVerificationModalProps) {

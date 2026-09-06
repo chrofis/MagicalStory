@@ -51,6 +51,19 @@ const translations = {
     successDesc: 'Votre mot de passe a ete mis a jour.',
     close: 'Fermer',
   },
+  it: {
+    title: 'Cambia password',
+    description: 'Inserisci la password attuale e scegline una nuova.',
+    currentPassword: 'Password attuale',
+    newPassword: 'Nuova password',
+    confirmPassword: 'Conferma la nuova password',
+    changePassword: 'Cambia password',
+    passwordsMatch: 'Le password devono coincidere',
+    passwordTooShort: 'La password deve contenere almeno 8 caratteri',
+    success: 'Password cambiata con successo!',
+    successDesc: 'La tua password è stata aggiornata.',
+    close: 'Chiudi',
+  },
 };
 
 export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProps) {

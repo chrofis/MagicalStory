@@ -55,6 +55,21 @@ const translations = {
     invalidTokenDesc: 'Ce lien de reinitialisation de mot de passe est invalide ou a expire. Veuillez en demander un nouveau.',
     requestNewLink: 'Demander un nouveau lien',
   },
+  it: {
+    title: 'Reimposta la password',
+    description: 'Inserisci qui sotto la tua nuova password.',
+    newPassword: 'Nuova password',
+    confirmPassword: 'Conferma la password',
+    resetPassword: 'Reimposta la password',
+    passwordsMatch: 'Le password devono coincidere',
+    passwordTooShort: 'La password deve contenere almeno 8 caratteri',
+    success: 'Password reimpostata con successo!',
+    successDesc: 'Ora puoi accedere con la tua nuova password.',
+    goToLogin: 'Vai all\'accesso',
+    invalidToken: 'Link non valido o scaduto',
+    invalidTokenDesc: 'Questo link per reimpostare la password non è valido o è scaduto. Richiedine uno nuovo.',
+    requestNewLink: 'Richiedi un nuovo link',
+  },
 };
 
 export default function ResetPassword() {

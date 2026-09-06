@@ -80,6 +80,29 @@ const translations = {
 
     step: 'Étape',
   },
+  it: {
+    welcome: 'Benvenuto su MagicalStory!',
+    subtitle: 'Creiamo il tuo libro di storie personalizzato. Ecco come funziona:',
+
+    step1Title: 'Crea i personaggi',
+    step1Desc: 'Carica le foto di familiari e amici. Aggiungi dettagli sui personaggi per dare vita alla storia.',
+
+    step2Title: 'Progetta la tua storia',
+    step2Desc: 'Scegli un tema, uno stile artistico e personalizza la storia. Quando è tutto pronto, creiamo la tua storia e ti inviamo un\'e-mail.',
+
+    step3Title: 'Stampa e condividi',
+    step3Desc: 'Scarica subito il PDF oppure ordina un libro stampato.',
+
+    creditsTitle: 'I tuoi crediti iniziali',
+    creditsAmount: String(INITIAL_USER_CREDITS),
+    creditsLabel: 'crediti gratuiti',
+    creditsExplain: `Ogni pagina costa ${CREDITS_PER_PAGE} crediti. Una storia di ${EXAMPLE_STORY_PAGES} pagine = ${EXAMPLE_STORY_CREDITS} crediti.`,
+    creditsBonus: 'Ordina un libro stampato e riavrai i tuoi crediti!',
+
+    cta: 'Crea la tua prima storia',
+
+    step: 'Passo',
+  },
 };
 
 export default function WelcomePage() {

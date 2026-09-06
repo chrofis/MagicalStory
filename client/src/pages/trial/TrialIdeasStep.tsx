@@ -103,6 +103,24 @@ const strings: Record<string, {
     errorTitle: 'Quelque chose s\'est mal passé',
     errorRetry: 'Réessayer',
   },
+  it: {
+    title: 'Idee per la tua storia',
+    subtitle: 'Ecco due trame uniche. Scegli la tua preferita!',
+    editHint: 'Puoi cliccare sul testo per modificare l\'idea prima di creare la storia.',
+    generating: 'Stiamo creando idee magiche...',
+    idea: 'Idea per la storia',
+    selectIdea: 'Clicca per selezionare',
+    selected: 'Selezionata',
+    worldLocation: 'La tua città',
+    worldFantasy: 'Mondo fantastico',
+    changeCity: 'Cambia città',
+    cityNotFound: 'Città non trovata. Controlla come è scritta.',
+    createStory: 'Crea la mia storia',
+    regenerate: 'Genera nuove idee',
+    back: 'Indietro',
+    errorTitle: 'Qualcosa è andato storto',
+    errorRetry: 'Riprova',
+  },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────

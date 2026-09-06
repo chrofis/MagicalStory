@@ -33,6 +33,13 @@ const translations = {
     uploadDifferent: 'Télécharger une autre photo',
     confidence: 'Confiance',
   },
+  it: {
+    title: 'Rilevati più volti',
+    description: 'Abbiamo rilevato più persone nella tua foto. Seleziona il volto del personaggio che vuoi creare.',
+    selectFace: 'Seleziona il volto',
+    uploadDifferent: 'Carica un\'altra foto',
+    confidence: 'Affidabilità',
+  },
 };
 
 export function FaceSelectionModal({
