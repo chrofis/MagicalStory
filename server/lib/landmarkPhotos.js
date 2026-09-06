@@ -30,9 +30,12 @@ setInterval(() => {
   if (cleaned > 0) log.debug(`[PHOTO CACHE] Cleaned ${cleaned} expired entries, ${photoCache.size} remaining`);
 }, 60 * 60 * 1000);
 
-// Normalize string for comparison: lowercase + convert umlauts/accents to ASCII
+// Normalize string for comparison: trim + lowercase + convert umlauts/accents to ASCII.
+// Every town-name lookup binds this value as $1, so the trim here is the ONE
+// place a hand-typed "Boppelsen " loses its trailing space before it reaches SQL.
 function normalizeForCompare(str) {
   return str
+    .trim()
     .toLowerCase()
     .replace(/[üù]/g, 'u')
     .replace(/[äàâ]/g, 'a')
@@ -2641,10 +2644,17 @@ async function bestPhotoSlots(ids) {
 // below Baden's own four.
 //
 // $1 is the normalised town name in every query that uses these.
-const TOWN_SQL = `coalesce(locality, municipality, nearest_city)`;
+//
+// The three place columns are matched INDEPENDENTLY, never through a coalesce:
+// `coalesce(municipality, nearest_city)` hid nearest_city whenever municipality
+// was set, and 2026-09-06 prod stories set in Wabern, Rudolfstetten and Adlikon
+// found nothing although the index holds rows anchored to each — Wabern's rows
+// carry municipality Bern/Köniz, Adlikon's carry Andelfingen, so the anchor
+// name was unreachable and the town fell through to nothing (no lat/lon).
 const NORM_SQL = t => `LOWER(translate(${t}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns'))`;
-const TOWN_MATCHES_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
-  OR ${NORM_SQL('coalesce(municipality, nearest_city)')} = $1)`;
+const TOWN_COLUMNS = ['locality', 'municipality', 'nearest_city'];
+const ANY_TOWN_COLUMN_SQL = pred => `(${TOWN_COLUMNS.map(c => pred(NORM_SQL(`coalesce(${c}, '')`))).join('\n  OR ')})`;
+const TOWN_MATCHES_SQL = ANY_TOWN_COLUMN_SQL(col => `${col} = $1`);
 
 // Ranking below the commune was not separation enough (owner's call,
 // 2026-09-05): a Baden story was set at Turgi's station and church, both
@@ -2656,9 +2666,15 @@ const TOWN_MATCHES_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
 // A NULL locality inside commune X means X itself: Nominatim zoom 14 returns
 // no sub-locality for the town proper (33 of Baden's 40 rows — Ruine Stein,
 // Stadtturm, Holzbrücke), while Turgi, Dättwil and Ennetbaden rows carry theirs.
+//
+// nearest_city is deliberately NOT an own-locality signal. It is the discovery
+// anchor — "within the 10 km radius of the town we searched from" — not "in the
+// town": Wabern's rows are Bern's Elfenau-Park and the German embassy. Those
+// reach a Wabern story through the widening rung (TOWN_MATCHES_SQL), ranked
+// behind anything the locality itself owns, never as rung 1a.
 const MIN_OWN_LOCALITY_ROWS = 5;
 const OWN_LOCALITY_SQL = `(${NORM_SQL(`coalesce(locality, '')`)} = $1
-  OR (locality IS NULL AND ${NORM_SQL('coalesce(municipality, nearest_city)')} = $1))`;
+  OR (locality IS NULL AND ${NORM_SQL(`coalesce(municipality, '')`)} = $1))`;
 
 // A landmark the premise NAMES is pinned to the front of the offered list
 // (resolveAvailableLandmarks `premiseText`). The rule is lexical only: strip a
@@ -2899,7 +2915,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       const commune = normalizeForCompare(communeOf(result.rows) || city);
       result = await pool.query(`
         SELECT * FROM landmark_index
-        WHERE (${TOWN_MATCHES_SQL} OR ${NORM_SQL('coalesce(municipality, nearest_city)')} = $3)
+        WHERE (${TOWN_MATCHES_SQL} OR ${NORM_SQL(`coalesce(municipality, '')`)} = $3)
           AND ${NEVER_A_SETTING_SQL}
           AND ${JUDGED_USABLE_SQL}
           AND ${HAS_PHOTO_SQL}
@@ -2916,7 +2932,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       const inputNorm = normalizedCity.replace(/,/g, '').replace(/\s+/g, ' ').trim();
       result = await pool.query(`
         SELECT * FROM landmark_index
-        WHERE TRIM(REPLACE(LOWER(translate(${TOWN_SQL}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')), ',', '')) = $1
+        WHERE ${ANY_TOWN_COLUMN_SQL(col => `TRIM(REPLACE(${col}, ',', '')) = $1`)}
           AND ${NEVER_A_SETTING_SQL}
         AND ${JUDGED_USABLE_SQL}
         AND ${HAS_PHOTO_SQL}
@@ -2934,7 +2950,7 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       result = await pool.query(`
         SELECT * FROM landmark_index
         WHERE (${TOWN_MATCHES_SQL}
-               OR LOWER(translate(${TOWN_SQL}, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) LIKE $1 || ',%')
+               OR ${ANY_TOWN_COLUMN_SQL(col => `${col} LIKE $1 || ',%'`)})
           AND ${NEVER_A_SETTING_SQL}
           AND ${JUDGED_USABLE_SQL}
           AND ${HAS_PHOTO_SQL}

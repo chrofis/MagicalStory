@@ -29576,3 +29576,43 @@ patched, not the primary fix.
 **Touched:** none — this entry records a verified non-defect and a guard deliberately NOT
 built.
 **Status:** ✅ active.
+
+## 2026-09-06 — Town-name lookup matches locality, municipality and nearest_city independently; nearest_city widens (rung 1b) but is never "own"
+
+**Context:** Prod stories set in Wabern, Rudolfstetten and Adlikon were served no
+landmark although the index holds rows anchored to each town. Every town-name
+query matched `coalesce(municipality, nearest_city)`, so `nearest_city` was
+invisible whenever `municipality` was populated — and it always is: Wabern's
+rows carry `municipality` Bern/Köniz, Adlikon's carry Andelfingen, Rudolfstetten's
+carry Bergdietikon/Dietikon. Separately, hand-typed cities with a trailing space
+("Boppelsen ", "Poschiavo ") missed rungs 1a/1b because neither
+`normalizeForCompare()` nor the bound SQL parameter was trimmed; they only
+survived on the comma fallback, whose `TRIM()` happened to rescue them.
+
+**Decision:** (1) `normalizeForCompare()` trims — it is the single entry point
+that produces `$1` for every town-name query, so JS and SQL are fixed together;
+the wizard's save path also trims (`WizardStep3BookSettings` `handleSaveLocation`;
+`verify-location` already trimmed). (2) `ANY_TOWN_COLUMN_SQL` matches
+`locality`, `municipality` and `nearest_city` each on their own; it backs
+`TOWN_MATCHES_SQL` (rung 1b, first-word rung, `townAlreadyIndexed`) and the
+comma rung. **`OWN_LOCALITY_SQL` (rung 1a) keeps municipality only** — a
+NULL-locality row is "the town itself" only when the row's own commune has
+that name. A nearest_city hit therefore always lands in rung 1b, ranked behind
+own-locality rows by `LOCALITY_FIRST_SQL`.
+
+**Rationale:** `nearest_city` is the discovery anchor ("within 10 km of the town
+we searched from"), not a statement that the landmark is in that town. Treating
+it as rung 1a would have made Bern's Elfenau-Park and the German embassy
+"Wabern's own", re-opening the Turgi/Baden separation the 2026-09-05 entry
+closed. Same tier as the municipality-wide widening is exactly what the data
+warrants. `townAlreadyIndexed` now also sees nearest_city-only towns as indexed,
+so they can no longer trigger paid re-discovery. Verified read-only on staging:
+Wabern 0 → 19, Rudolfstetten 0 → 6, Adlikon 0 → 22 (all rung 1b); "Boppelsen "
+comma → 1b (3), "Poschiavo " comma → 1a (13); Baden 26 and Zurich 30 unchanged
+on rung 1a; Turgi still 1b with its own rows first.
+
+**Touched:** `server/lib/landmarkPhotos.js` (`normalizeForCompare`,
+`ANY_TOWN_COLUMN_SQL`, `TOWN_MATCHES_SQL`, `OWN_LOCALITY_SQL`, comma/first-word
+rungs; `TOWN_SQL` removed), `client/src/pages/wizard/WizardStep3BookSettings.tsx`,
+`docs/landmark-database.md` §7.
+**Status:** ✅ active.

@@ -179,10 +179,18 @@ the ideas route and the story pipeline. `getIndexedLandmarks()` tries in order:
      `MIN_OWN_LOCALITY_ROWS` (5) usable rows — a Baden story no longer gets
      Turgi's station and church, merged into Baden's commune in 2024.
    - **1b municipality-wide** — otherwise `TOWN_MATCHES_SQL` (locality **or**
-     municipality/nearest_city) widened to the commune the own rows name in
+     municipality **or** nearest_city, each matched on its own — since
+     2026-09-06; the earlier `coalesce(municipality, nearest_city)` hid the
+     anchor town whenever a municipality was set, so Wabern, Rudolfstetten and
+     Adlikon resolved to nothing) widened to the commune the own rows name in
      `municipality`, own-locality rows first (`LOCALITY_FIRST_SQL`). Turgi's
      three widen to all of Baden; a village with no own row and no known
-     commune gets the plain name match as before.
+     commune gets the plain name match as before. `nearest_city` never counts
+     as *own* (rung 1a): it is the discovery anchor, not "in the town" —
+     Wabern's rows are Bern's Elfenau-Park and the German embassy.
+
+   The town string is trimmed once, in `normalizeForCompare()`, which produces
+   the `$1` every rung binds — a hand-typed "Boppelsen " used to miss 1a/1b.
 2. comma-normalised match — `Bremgarten Aargau` → `Bremgarten, Aargau`
 3. first-word match — `Bremgarten` from `Bremgarten Aargau`
 4. **proximity** at 20 → 50 → 100 km (only when lat/lon are numbers)

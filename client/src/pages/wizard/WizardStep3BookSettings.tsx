@@ -210,7 +210,7 @@ export function WizardStep3BookSettings({
 
   const handleSaveLocation = () => {
     onLocationChange({
-      city: editCity || null,
+      city: editCity.trim() || null,
       region: null,
       country: editCountry || null,
     });
