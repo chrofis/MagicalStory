@@ -26411,6 +26411,48 @@ to `null` genuinely state no time of day, so `null` is the correct answer there.
 **Touched files:** `server/lib/repairPipeline.js`, `server/lib/styleConsistency.js`,
 `tests/unit/season-and-visual-flow.test.ts`
 
+**Follow-up 2026-09-06 — that fix did not work; the field name was wrong.** The next story
+through the pipeline, `job_1788641639919_mpjwlzkf1` (staging, 14 pages), came back with all 17
+`finalChecksReport.styleConsistency.timeFlow` cells still `declared: null` and
+`declaredText: ""` — the signature of an empty brief string — although seven of its briefs
+name an hour ("Soft orange and pale grey **dusk** light fills the **evening** sky…", p7; "the
+**night** sky, casting deep shadows over the cobbles", p13). Two reasons, both in the caller:
+
+1. **Field-name mismatch.** `storyJobPipeline.js` builds the pipeline's story data with
+   `sceneImages: rawImages.map(r => ({ pageNumber, imageData, description: r.sceneDescription, … }))`
+   — the brief is under `description`. The fix read `s.sceneDescription`, so `briefByPage` was
+   empty on every page of every unified run. (The stored `stories.data.sceneImages` rows are that
+   same projection, so `description` is what a saved story carries too.)
+2. **The fallback never got its array.** `styleInput` passed only
+   `{ sceneImages, coverImages, artStyle }`, so `storyData.sceneDescriptions` — the very array
+   the new `briefFallback` reads — was absent from the audit's input. Both paths to the brief
+   were cut at once, which is why the belt-and-braces fix still measured nothing.
+
+The WARN added by the first fix was not at fault and did not misfire: the run finished
+19:38 UTC and the commit was authored 19:56 UTC, so that code was not deployed yet. Under this
+input it *would* have fired. It has been strengthened anyway to name what it saw
+(`sceneDescriptions` length + the actual keys on the page objects), because "no brief anywhere"
+and "the caller renamed the field" were indistinguishable in the log and the second one has now
+shipped twice.
+
+**The real fix — one projection, owned by the consumer.** The brief lookup is now
+`pageBriefMap(storyData)` in `styleConsistency.js`: the single function that knows a page brief
+may live at `sceneDescriptions[].description` (canonical, the Art Director's `expandedScenes`),
+`sceneImages[].sceneDescription`, or `sceneImages[].description`, canonical winning. The repair
+pipeline no longer hand-rolls a third shape: it calls the exported
+`buildStyleAuditInput(storyData, finalBestPerPage)`, which lives next to the code that consumes
+it, stamps the brief on each page, and passes `sceneDescriptions` straight through so the
+whole-blob callers (`testlab.js` runStyleCheckStage, `POST /api/stories/:id/style-check`) and
+the pipeline caller now hand the audit the same shape. Replayed offline against this story's
+stored briefs: **0/14 declared before, 7/14 after** (p7–p11 evening, p13–p14 night; the other
+seven state no hour, so `null` is correct there).
+
+**Lesson:** when a fix carries a value across a module boundary, the field name is the fix —
+verify it against the PRODUCER's code (`storyJobPipeline.js` here), not against the reader's
+expectation, and pin it with a test that feeds the producer's literal shape. A projection that
+exists for one caller belongs in the consumer's module, exported, so there is one shape to get
+right instead of one per call site.
+
 **Status:** ✅ active
 
 ---

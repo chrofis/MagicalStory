@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { resolveSeason, normalizeSeason, seasonForDate, seasonLabel, buildSeasonNote } = require('../../server/lib/season.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { extractDeclaredLight } = require('../../server/lib/styleConsistency.js');
+const { extractDeclaredLight, buildStyleAuditInput, pageBriefMap } = require('../../server/lib/styleConsistency.js');
 
 describe('season resolver', () => {
   it('honours an explicit season', () => {
@@ -90,5 +90,95 @@ describe('extractDeclaredLight — the vocabulary the briefs actually use', () =
   it('reads the brief only, never the METADATA block', () => {
     const brief = 'A boy stands on the path.\n---METADATA---\n{"sceneIntent":"night sky over the valley"}';
     expect(extractDeclaredLight(brief).token).toBeNull();
+  });
+});
+
+/**
+ * SECOND fix for the same bug (job_1788641639919_mpjwlzkf1, 17 cells, all
+ * `declared: null` / `declaredText: ""`). The first fix carried
+ * `sceneDescription` into the style-audit projection — but the pipeline's own
+ * story data names the page brief `description`
+ * (`storyJobPipeline.js`: `sceneImages: rawImages.map(r => ({ pageNumber,
+ * imageData, description: r.sceneDescription, ... }))`), so the lookup missed
+ * on every page and the audit input carried no fallback array either.
+ *
+ * These tests feed the EXACT pipeline projection shape through the real input
+ * builder — no re-implementation of it here, or the next rename slips through
+ * again.
+ */
+describe("buildStyleAuditInput — the repair pipeline's style-audit projection", () => {
+  // Verbatim from job_1788641639919_mpjwlzkf1.
+  const P7 = 'Soft orange and pale grey dusk light fills the evening sky above the heavy tree canopies.';
+  const P13 = 'The dense horse chestnut tree canopy above blocks out the night sky, casting deep shadows over the cobbles.';
+  const P1 = 'Margaret — an elderly woman of average build, wearing a soft purple long-line wool cardigan.';
+
+  // Exactly what storyJobPipeline hands the repair pipeline: page rows keyed
+  // `description`, plus the Art Director's expandedScenes as sceneDescriptions.
+  const pipelineStoryData = {
+    sceneImages: [
+      { pageNumber: 1, imageData: 'x', description: P1 },
+      { pageNumber: 7, imageData: 'x', description: P7 },
+      { pageNumber: 13, imageData: 'x', description: P13 },
+    ],
+    sceneDescriptions: [
+      { pageNumber: 1, description: P1 },
+      { pageNumber: 7, description: P7 },
+      { pageNumber: 13, description: P13 },
+    ],
+    coverImages: { frontCover: { imageData: 'cover' } },
+    artStyle: 'watercolor',
+  };
+  // finalBestPerPage holds image VERSION objects — pixels + scores, no brief.
+  const bestByPage = new Map<number, any>([
+    [1, { imageData: 'p1' }],
+    [7, { imageData: 'p7' }],
+    [13, { imageData: 'p13' }],
+    [-1, { imageData: 'front' }],
+  ]);
+
+  it("resolves a brief for every page from the pipeline's `description` key", () => {
+    const input = buildStyleAuditInput(pipelineStoryData, bestByPage);
+    expect(input.sceneImages.map((s: any) => s.pageNumber)).toEqual([1, 7, 13]);
+    expect(input.sceneImages.every((s: any) => !!s.sceneDescription)).toBe(true);
+    // The bug in one assertion: dusk must be declared, not null.
+    const p7 = input.sceneImages.find((s: any) => s.pageNumber === 7);
+    expect(extractDeclaredLight(p7.sceneDescription).token).toBe('evening');
+    expect(extractDeclaredLight(p7.sceneDescription).text).toContain('dusk');
+    const p13 = input.sceneImages.find((s: any) => s.pageNumber === 13);
+    expect(extractDeclaredLight(p13.sceneDescription).token).toBe('night');
+  });
+
+  it('carries the picked-best pixels, never the input page rows', () => {
+    const input = buildStyleAuditInput(pipelineStoryData, bestByPage);
+    expect(input.sceneImages.map((s: any) => s.imageData)).toEqual(['p1', 'p7', 'p13']);
+  });
+
+  it("passes the expandedScenes array through so the audit's own fallback is not empty", () => {
+    const input = buildStyleAuditInput(pipelineStoryData, bestByPage);
+    expect(input.sceneDescriptions).toHaveLength(3);
+    expect(input.artStyle).toBe('watercolor');
+  });
+
+  it('covers join at their negative page numbers, pipeline pixels preferred', () => {
+    const input = buildStyleAuditInput(pipelineStoryData, bestByPage);
+    // frontCover was repaired in this run -> picked-best pixels win.
+    expect(input.coverImages.frontCover.imageData).toBe('front');
+    // A cover this run never touched still joins from the input story data.
+    const input2 = buildStyleAuditInput(
+      { ...pipelineStoryData, coverImages: { frontCover: { imageData: 'stored' }, backCover: { imageData: 'storedBack' } } },
+      new Map([[1, { imageData: 'p1' }]])
+    );
+    expect(input2.coverImages.frontCover.imageData).toBe('stored');
+    expect(input2.coverImages.backCover.imageData).toBe('storedBack');
+  });
+
+  it('pageBriefMap reads all three historical key names, canonical winning', () => {
+    expect(pageBriefMap({ sceneImages: [{ pageNumber: 2, description: 'A' }] }).get(2)).toBe('A');
+    expect(pageBriefMap({ sceneImages: [{ pageNumber: 2, sceneDescription: 'B' }] }).get(2)).toBe('B');
+    expect(pageBriefMap({
+      sceneImages: [{ pageNumber: 2, description: 'page-row copy' }],
+      sceneDescriptions: [{ pageNumber: 2, description: 'canonical' }],
+    }).get(2)).toBe('canonical');
+    expect(pageBriefMap({}).size).toBe(0);
   });
 });

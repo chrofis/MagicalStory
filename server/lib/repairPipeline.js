@@ -2861,50 +2861,24 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   await updateProgress(94, 'Style consistency audit...');
   let styleConsistency = null;
   try {
-    const { checkStoryStyleConsistency } = require('./styleConsistency');
-    const { COVER_PAGE_NUMBERS } = require('./coverKeys');
-    // Build a minimal storyData-shaped object from finalBestPerPage so we
-    // never accidentally feed pre-repair pixels to the audit.
-    // The brief must ride along. `finalBestPerPage` holds image VERSION objects
-    // (pixels + scores), not page rows, so a projection of `{pageNumber,
-    // imageData}` alone left the visual-flow pass with `sceneDescription`
-    // undefined on every page: extractDeclaredLight returned `{token: null}`
-    // for all 21 cells of job_1788614817116_vxnu60yjg even though 13 of its 18
-    // briefs state an hour outright ("Warm golden morning light…", p6). With
-    // nothing declared, a rendered time can never be a mismatch and the whole
-    // measurement was inert. The brief lives on the story's page rows.
-    const briefByPage = new Map(
-      (storyData?.sceneImages || [])
-        .filter(s => s?.sceneDescription)
-        .map(s => [s.pageNumber, s.sceneDescription])
-    );
-    const stylePages = [...finalBestPerPage.entries()]
-      .filter(([pn]) => pn > 0)
-      .sort((a, b) => a[0] - b[0])
-      .map(([pageNumber, best]) => ({
-        pageNumber,
-        imageData: best?.imageData,
-        sceneDescription: best?.sceneDescription || briefByPage.get(pageNumber) || null,
-      }));
-    // Covers = pages (owner directive): all three covers join the audit at
-    // their negative page numbers. Prefer the pipeline's picked-best pixels
-    // (covers run through the repair rounds as pages -1/-2/-3); fall back to
-    // the input storyData covers for any cover not in this pipeline run.
-    const styleCovers = {};
-    for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_NUMBERS)) {
-      const pipelineBest = finalBestPerPage.get(coverPage);
-      const imageData = pipelineBest?.imageData
-        || storyData?.coverImages?.[coverKey]?.imageData
-        || null;
-      if (imageData) styleCovers[coverKey] = { imageData };
-    }
-    const styleInput = {
-      sceneImages: stylePages,
-      coverImages: styleCovers,
-      // Commissioned style — lets the audit judge the dominant cluster against
-      // what was actually ordered, not just against itself.
-      artStyle: storyData?.artStyle,
-    };
+    const { checkStoryStyleConsistency, buildStyleAuditInput } = require('./styleConsistency');
+    // Build a storyData-shaped object from finalBestPerPage so we never
+    // accidentally feed pre-repair pixels to the audit.
+    //
+    // The projection itself lives in styleConsistency.buildStyleAuditInput —
+    // ONE place, next to the code that consumes it. It was written inline here
+    // and got the brief's field name wrong twice: `finalBestPerPage` holds
+    // image VERSION objects (pixels + scores), not page rows, and the story
+    // data this pipeline carries names the page brief `description`
+    // (storyJobPipeline builds `sceneImages: [{ pageNumber, imageData,
+    // description }]`) while the reader wanted `sceneDescription`. Result both
+    // times: extractDeclaredLight saw '' on every page, all cells came back
+    // `declared: null`, and since a rendered time can only be wrong against a
+    // DECLARED time the whole visual-flow measurement was inert —
+    // job_1788614817116_vxnu60yjg (21 cells) and, after the first fix,
+    // job_1788641639919_mpjwlzkf1 (17 cells).
+    const styleInput = buildStyleAuditInput(storyData, finalBestPerPage);
+    const stylePages = styleInput.sceneImages;
     if (stylePages.filter(p => p.imageData).length >= 2) {
       styleConsistency = await checkStoryStyleConsistency(styleInput, { usageTracker });
       log.info(`🎨 [UNIFIED PIPELINE] Step 5: style verdict=${styleConsistency.verdict} (cluster=${styleConsistency.dominantCluster?.length || 0}, outliers=${styleConsistency.outliers?.length || 0})`);

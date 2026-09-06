@@ -294,6 +294,85 @@ async function buildStyleGrid(cells) {
 }
 
 /**
+ * Page number -> the page's illustration brief. THE one place that knows where
+ * a brief lives on a story blob, because it has lived under three different
+ * key names and the audit reads it through a caller's projection:
+ *
+ *   storyData.sceneDescriptions[].description  - canonical. What the Art
+ *       Director produced (`expandedScenes`), carried by every stored story
+ *       and by the pipeline's in-memory story data.
+ *   storyData.sceneImages[].sceneDescription   - the copy the story rows carry
+ *       in some vintages.
+ *   storyData.sceneImages[].description        - the copy `storyJobPipeline`
+ *       writes into its own `sceneImages` projection (and therefore what a
+ *       stored story from the unified pipeline actually holds).
+ *
+ * Reading only one of them is what made the time-of-day pass inert twice.
+ */
+function pageBriefMap(storyData) {
+  const map = new Map();
+  for (const s of (storyData?.sceneImages || [])) {
+    const brief = s?.sceneDescription || s?.description;
+    if (s?.pageNumber != null && brief) map.set(s.pageNumber, brief);
+  }
+  // Canonical last: it wins over a page-row copy.
+  for (const d of (storyData?.sceneDescriptions || [])) {
+    if (d?.pageNumber != null && d?.description) map.set(d.pageNumber, d.description);
+  }
+  return map;
+}
+
+/**
+ * Build the style-audit input for the repair pipeline.
+ *
+ * The other two callers (testlab runStyleCheckStage, POST /style-check) hand
+ * `checkStoryStyleConsistency` the whole story blob. The repair pipeline
+ * cannot: its freshest pixels live in `finalBestPerPage` (image VERSION
+ * objects, not page rows), so it must project. This function is that
+ * projection — the ONLY one — so the shape the audit sees is defined here
+ * rather than re-derived at the call site.
+ *
+ * @param {Object} storyData        the pipeline's story data (page rows, briefs, artStyle)
+ * @param {Map<number,Object>} bestByPage  pageNumber -> picked-best version {imageData}
+ */
+function buildStyleAuditInput(storyData, bestByPage) {
+  const { COVER_PAGE_NUMBERS } = require('./coverKeys');
+  const briefs = pageBriefMap(storyData);
+  const best = bestByPage instanceof Map ? bestByPage : new Map(Object.entries(bestByPage || {}).map(([k, v]) => [Number(k), v]));
+
+  const sceneImages = [...best.entries()]
+    .filter(([pn]) => pn > 0)
+    .sort((a, b) => a[0] - b[0])
+    .map(([pageNumber, version]) => ({
+      pageNumber,
+      imageData: version?.imageData,
+      sceneDescription: version?.sceneDescription || briefs.get(pageNumber) || null,
+    }));
+
+  // Covers = pages (owner directive): all three join the audit at their
+  // negative page numbers. Prefer the pipeline's picked-best pixels; fall back
+  // to the input covers for any cover this run did not touch.
+  const coverImages = {};
+  for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_NUMBERS)) {
+    const imageData = best.get(coverPage)?.imageData
+      || storyData?.coverImages?.[coverKey]?.imageData
+      || null;
+    if (imageData) coverImages[coverKey] = { imageData };
+  }
+
+  return {
+    sceneImages,
+    coverImages,
+    // The canonical brief array rides along untouched, so the audit's own
+    // fallback sees exactly what the whole-blob callers give it.
+    sceneDescriptions: storyData?.sceneDescriptions || [],
+    // Commissioned style — lets the audit judge the dominant cluster against
+    // what was actually ordered, not just against itself.
+    artStyle: storyData?.artStyle,
+  };
+}
+
+/**
  * Run the style-consistency check. Loads all page images + front cover,
  * builds a labelled grid, sends to Gemini for clustering, returns JSON.
  *
@@ -343,11 +422,7 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   // projecting only `{pageNumber, imageData}` did to
   // job_1788614817116_vxnu60yjg. Fall back to the story's own scene-description
   // rows, and say so loudly when no page carries one at all.
-  const briefFallback = new Map(
-    (storyData.sceneDescriptions || [])
-      .filter(d => d?.description)
-      .map(d => [d.pageNumber, d.description])
-  );
+  const briefFallback = pageBriefMap(storyData);
   for (const s of pages) {
     const brief = s.sceneDescription || briefFallback.get(s.pageNumber) || '';
     cells.push({
@@ -360,7 +435,11 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
     });
   }
   if (pages.length && !pages.some(s => s.sceneDescription || briefFallback.has(s.pageNumber))) {
-    log.warn(`🕑 [VISUAL-FLOW] no page brief reached the style check (${pages.length} page(s)) - time-of-day measurement is inert for this run`);
+    // Say WHICH failure it is. "No brief anywhere" and "briefs present but the
+    // caller handed me a projection that renamed/dropped the field" look
+    // identical from the outside, and the second one shipped twice.
+    const carriers = Object.keys(pages[0] || {}).join(', ');
+    log.warn(`🕑 [VISUAL-FLOW] no page brief reached the style check (${pages.length} page(s), storyData.sceneDescriptions=${(storyData.sceneDescriptions || []).length}, page keys: ${carriers}) - time-of-day measurement is inert for this run`);
   }
 
   if (cells.length < 2) {
@@ -718,6 +797,8 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
 
 module.exports = {
   checkStoryStyleConsistency,
+  buildStyleAuditInput,
+  pageBriefMap,
   buildStyleGrid,
   extractDeclaredLight,
   batchCells,
