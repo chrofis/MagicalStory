@@ -606,6 +606,15 @@
       "status": "fixed",
       "fixedIn": "staging (2026-09-06)",
       "note": "buildFaceTreatmentMask (whiteout and blur) throws at cov < 40. buildCrosshatchTreatment computes the same cov and discarded it, and only handled sil === null ('rectangular hatch'), never sil non-null-but-empty. dest-in against a fully transparent mask erased the hatch and clipped the face blur to nothing, so treatedBuf came out pixel-identical to the untouched crop and the run was a silent no-op that still paid for the model call. Fix: honour gateCoverage in the crosshatch path and fall back to the RECTANGULAR hatch — the degraded behaviour the function already documents and accepts for a null silhouette — with a warn and hatchClipped:false in treatmentInfo. Second, independent cause of the same owner report as repair-style-guard-forces-illustration-on-photographic-stories."
+    },
+    {
+      "id": "faceonly-null-from-shared-contract-downgrades-every-face-repair",
+      "title": "buildCharRepairRequest fills faceOnly with null, and repairCharacterMismatch treats null as a deliberate override — so every face repair silently becomes a full-figure repair",
+      "reportedAt": "2026-09-06",
+      "source": "Measured from what RAN, not what was asked: Lab exp #996 on staging job_1788681313413_xqmtk2gcs was launched with whiteoutTarget 'face' + repairMode 'blended' — the exact combination the production 'Figur reparieren' button sends for Gesicht + Auto — and the stored result records descriptor 'grok:box:blur:body'. legacyFlagsToAxes resolves that input to 'grok:cutout:blur:face'. Reproduced offline: buildCharRepairRequest({imageBackend:'grok',whiteoutTarget:'face',faceBbox,bodyBbox}).faceOnly === null; images.js used `if (options.faceOnly !== undefined)`, null passes it, so explicitAxes.faceOnly = !!null = false; the body box (height 0.884 > 0.85) then trips the degenerate-cutout->box geometry guard, giving exactly the observed grok:box:blur:body.",
+      "status": "fixed",
+      "fixedIn": "staging (2026-09-06)",
+      "note": "buildCharRepairRequest materialises EVERY canonical key, filling absent ones with null, so faceOnly:null rides on every request the button, the automatic pipeline and the Test Lab build. treatment and regionSource were spared only because their guards are truthiness tests and null is falsy; faceOnly is the one boolean axis and the one that broke. Net effect: face-only repair has been unreachable through the shared contract since it landed — a face repair repaints the whole figure. Fix: treat null as 'not set' (`!== undefined && !== null`). An explicit faceOnly:false is still honoured. Regression cases in tests/unit/repair-style-guard-medium.test.ts."
     }
   ]
 }

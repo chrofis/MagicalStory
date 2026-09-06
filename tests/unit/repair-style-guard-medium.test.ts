@@ -120,3 +120,57 @@ describe('the style guard token can never ship as a hole', () => {
     expect(filled).not.toMatch(/more photographically than the surrounding artwork/);
   });
 });
+
+describe('a null axis from the shared contract is "not set", not an override', () => {
+  // buildCharRepairRequest materialises every canonical key, filling absent ones
+  // with null. `faceOnly: null` was therefore present on every request the
+  // button, the pipeline and the Lab build, and `!== undefined` accepted it as a
+  // deliberate override — forcing faceOnly false and silently downgrading EVERY
+  // face repair to a full-figure one. Reproduced in Lab exp #996: whiteoutTarget
+  // 'face' came back with descriptor grok:box:blur:body.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { buildCharRepairRequest } = require('../../server/lib/charRepairRequest');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { legacyFlagsToAxes, applyGeometryGuards, repairDescriptor } = require('../../server/lib/faceRepair');
+
+  const FACE = [0.08, 0.53, 0.33, 0.75];
+  const BODY = [0.08, 0.53, 0.96, 0.76];
+
+  // The exact merge repairCharacterMismatch performs.
+  const resolve = (request: Record<string, unknown>) => {
+    const axes = legacyFlagsToAxes({
+      useBlended: true, whiteoutTarget: 'face', hasFaceBbox: true, model: 'grok',
+    });
+    const explicit: Record<string, unknown> = {};
+    if (request.treatment) explicit.treatment = request.treatment;
+    if (request.regionSource) explicit.regionSource = request.regionSource;
+    if (request.faceOnly !== undefined && request.faceOnly !== null) {
+      explicit.faceOnly = !!request.faceOnly;
+    }
+    return repairDescriptor(
+      applyGeometryGuards({ ...axes, ...explicit }, { faceBbox: FACE, bodyBbox: BODY }),
+    );
+  };
+
+  it('the contract fills faceOnly with null when the caller omits it', () => {
+    const req = buildCharRepairRequest({
+      imageBackend: 'grok', whiteoutTarget: 'face', faceBbox: FACE, bodyBbox: BODY,
+    });
+    expect(req.faceOnly).toBeNull();
+  });
+
+  it('a face repair stays a FACE repair', () => {
+    const req = buildCharRepairRequest({
+      imageBackend: 'grok', whiteoutTarget: 'face', faceBbox: FACE, bodyBbox: BODY,
+    });
+    expect(resolve(req)).toBe('grok:cutout:blur:face');
+  });
+
+  it('an explicit faceOnly:false is still honoured', () => {
+    const req = buildCharRepairRequest({
+      imageBackend: 'grok', whiteoutTarget: 'face', faceBbox: FACE, bodyBbox: BODY,
+      faceOnly: false,
+    });
+    expect(resolve(req)).toBe('grok:box:blur:body');
+  });
+});

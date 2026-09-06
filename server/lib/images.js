@@ -4283,10 +4283,22 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   // face got the mapping's answer instead, so a blur-vs-whiteout A/B silently
   // ran the same treatment twice (exps 862/863). Only keys the caller actually
   // set are re-applied, so production — which sets none — is unchanged.
+  // NULL IS "NOT SET" (2026-09-06). buildCharRepairRequest materialises EVERY
+  // canonical key, filling absent ones with null — so `faceOnly: null` is present
+  // on every request the button, the pipeline and the Lab build. `!== undefined`
+  // accepted that null as a deliberate override and forced `faceOnly = false`,
+  // silently downgrading EVERY face repair to a full-figure one: the resolved
+  // axes `grok:cutout:blur:face` became `grok:box:blur:body` (the body box then
+  // trips the degenerate-cutout→box guard). Reproduced in Lab exp #996 —
+  // whiteoutTarget 'face' came back with descriptor grok:box:blur:body. treatment
+  // and regionSource were unaffected only because their checks are truthiness
+  // tests and null is falsy; faceOnly is the one boolean axis, so it is the one
+  // that broke. Face repair has therefore been unreachable through the shared
+  // contract since it landed.
   const explicitAxes = {};
   if (options.treatment) explicitAxes.treatment = options.treatment;
   if (options.regionSource) explicitAxes.regionSource = options.regionSource;
-  if (options.faceOnly !== undefined) explicitAxes.faceOnly = !!options.faceOnly;
+  if (options.faceOnly !== undefined && options.faceOnly !== null) explicitAxes.faceOnly = !!options.faceOnly;
 
   return repairCharacterFace(imageData, characterPhoto, {
     ...options,      // issueDescription, clothingDescription, sceneDescription,

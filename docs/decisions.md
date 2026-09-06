@@ -1608,6 +1608,29 @@ and exp **#998** (figure, `grok:box:crosshatch:body`) both return `ok: true` on
 the page whose repair was refused three times before these fixes.
 
 
+### A null axis from the shared char-repair contract means "not set" (2026-09-06)
+**Context:** Verifying what the two Lab arms ACTUALLY ran rather than what they
+were asked to run. Exp **#996** was launched with `whiteoutTarget: 'face'` +
+`repairMode: 'blended'` — the exact pair the production "Figur reparieren" button
+sends for *Gesicht + Auto* — and its stored result records descriptor
+`grok:box:blur:body`. `legacyFlagsToAxes` resolves that input to
+`grok:cutout:blur:face`. A face repair had run as a full-figure repair.
+**Decision:** `repairCharacterMismatch` treats `null` as "not set"
+(`!== undefined && !== null`) when reading the explicit axis overrides.
+**Rationale:** `buildCharRepairRequest` materialises EVERY canonical key, filling
+absent ones with `null` — so `faceOnly: null` rides on every request the button,
+the automatic pipeline and the Lab build. `!== undefined` accepted it as a
+deliberate override and set `faceOnly = false`; the body box (height 0.884 >
+0.85) then tripped the `degenerate-cutout→box` geometry guard, producing exactly
+the observed descriptor. `treatment` and `regionSource` were spared only because
+their guards are truthiness tests and `null` is falsy. `faceOnly` is the one
+boolean axis, so it is the one that broke — **face-only repair has been
+unreachable through the shared contract since it landed.** An explicit
+`faceOnly: false` is still honoured.
+**Touched:** `server/lib/images.js`, `tests/unit/repair-style-guard-medium.test.ts`.
+**Status:** ✅ active.
+
+
 ---
 
 ## Cross-cuts already documented elsewhere
