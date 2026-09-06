@@ -107,7 +107,8 @@ ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
 # variable. Baking into /app/.u2net and setting U2NET_HOME looked right, built
 # clean, and changed nothing — the container still logged 'Downloading ... to
 # /root/.u2net/u2net.onnx' on its first upload. Verified from that log line.
-RUN mkdir -p /root/.u2net && curl -fL -o /root/.u2net/u2net.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx || echo "WARN: U2-Net pre-fetch failed — rembg will download it lazily at runtime"
+# (The U2-Net bake lives in the main Dockerfile — see the note there. That is
+# the file railway.json actually builds for this service; this one is not used.)
 
 # GroundingDINO-base weights pre-fetched into the image (~900MB) so the
 # /detect-figures-text cold start doesn't download from HuggingFace at runtime.

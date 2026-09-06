@@ -231,6 +231,30 @@ RUN python3 -c "from deepface import DeepFace; \
     DeepFace.build_model('ArcFace')" \
     || echo "WARN: ArcFace pre-fetch failed — will download lazily on first use"
 
+
+# U2-Net (rembg) weights (~176MB) baked in so the first photo upload after a
+# deploy does not fetch them from GitHub inside the user's request. Measured on
+# a fresh container: 27.6s downloading vs 0.9s from disk.
+#
+# THE PATH IS $HOME/.u2net. Not $U2NET_HOME — this rembg version ignores that
+# variable; the container logs "Downloading ... to /root/.u2net/u2net.onnx"
+# whatever it is set to. And this belongs in THIS file, not Dockerfile.analyzer:
+# railway.json pins dockerfilePath "Dockerfile", so the analyzer service builds
+# this image and merely starts it differently (start-analyzer.sh). A bake put in
+# Dockerfile.analyzer builds nothing and fails silently — that cost two rounds
+# on 2026-09-06 before the build log's vite output gave it away.
+#
+# Non-fatal like the two above, but it VERIFIES the result: a truncated or
+# error-page download is worse than none, because rembg would re-fetch at
+# runtime with the very cost this step removes, and nothing would say so.
+RUN mkdir -p /root/.u2net \
+    && (curl -fL --retry 3 -o /root/.u2net/u2net.onnx \
+        https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx \
+        && python3 -c "import os,sys; p='/root/.u2net/u2net.onnx'; n=os.path.getsize(p); print(f'U2-Net {n} bytes'); sys.exit(0 if n > 100000000 else 1)" \
+        && echo 'U2-Net baked OK') \
+    || (rm -f /root/.u2net/u2net.onnx; \
+        echo 'WARN: U2-Net pre-fetch failed — rembg will download it lazily at runtime')
+
 # Application source. `dist` is in .dockerignore, so nothing stale from a local
 # build can shadow the built bundle copied in below.
 COPY . .

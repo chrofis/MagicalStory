@@ -309,15 +309,17 @@ async function phase2() {
   console.log('\nPHASE 2 COMPLETE. Verify, then master can be fast-forwarded.');
 }
 
-async function printDeploys() {
+async function printDeploys(envId) {
+  const useEnv = envId || ENV_PROD;
   for (const [label, serviceId] of [['web', SVC_WEB], ['analyzer', SVC_ANALYZER]]) {
     const d = await gql(
       `query($p:String!,$e:String!,$s:String!){
          deployments(first:3, input:{projectId:$p, environmentId:$e, serviceId:$s}){
            edges{ node{ id status createdAt } } } }`,
-      { p: PROJECT_ID, e: ENV_PROD, s: serviceId }
+      { p: PROJECT_ID, e: useEnv, s: serviceId }
     );
-    console.log(`\n=== production / ${label} — last 3 deployments ===`);
+    const envName = useEnv === ENV_PROD ? 'production' : 'staging';
+    console.log(`\n=== ${envName} / ${label} — last 3 deployments ===`);
     d.deployments.edges.forEach((e) => {
       console.log(`  ${e.node.createdAt}  ${e.node.status.padEnd(12)}  ${e.node.id.slice(0, 8)}`);
     });
@@ -411,7 +413,7 @@ async function printMemory(minutes) {
       return;
     }
     if (has('deploys')) {
-      await printDeploys();
+      await printDeploys(arg('env','') === 'staging' ? ENV_STAGING : ENV_PROD);
       return;
     }
     if (has('status')) {

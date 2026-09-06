@@ -241,6 +241,42 @@ else:
     print("[INFO] rembg not installed - MediaPipe fallback will be used")
 
 
+def _ort_session_kwargs():
+    """ONNX Runtime options for the U2-Net session, chosen for RSS not throughput.
+
+    u2net.onnx is 176MB on disk, but the loaded session was measured between 526
+    and 877MB — and the SPREAD is the tell. Two ORT defaults explain it:
+
+      * the CPU memory arena pre-reserves and never returns pool memory, so the
+        session's footprint tracks its high-water mark, not its working set;
+      * intra-op parallelism defaults to the visible CPU count, which in this
+        container is the cgroup quota of 24 — each thread carrying its own
+        allocation.
+
+    Railway bills resident memory per minute and this worker is spawned for
+    anyone who merely opens the wizard, so a few hundred MB held for minutes at a
+    time costs more than a second of latency on one background removal. Both are
+    overridable, because that trade is environment-specific and someone should be
+    able to put it back without a code change.
+    """
+    kwargs = {}
+    try:
+        import onnxruntime as ort
+        opts = ort.SessionOptions()
+        if os.environ.get('REMBG_DISABLE_MEM_ARENA', '1') == '1':
+            opts.enable_cpu_mem_arena = False
+        threads = int(os.environ.get('REMBG_INTRA_OP_THREADS', '4'))
+        if threads > 0:
+            opts.intra_op_num_threads = threads
+        kwargs['sess_options'] = opts
+        print(f"[REMBG] session options: mem_arena="
+              f"{opts.enable_cpu_mem_arena}, intra_op_threads={threads}")
+    except Exception as e:
+        # Never let a tuning knob stop background removal from working.
+        print(f"[REMBG] session options unavailable ({e}) — using ORT defaults")
+    return kwargs
+
+
 def get_rembg_session():
     """Build (or reuse) the U2-Net session. Returns None if rembg is unusable."""
     global rembg_remove, _rembg_session
@@ -253,7 +289,7 @@ def get_rembg_session():
             try:
                 from rembg import remove as _remove, new_session
                 print("[REMBG] Loading U2-Net session...")
-                _rembg_session = new_session("u2net")
+                _rembg_session = new_session("u2net", **_ort_session_kwargs())
                 rembg_remove = _remove
                 print(f"[REMBG] U2-Net loaded — RSS now {_rss_mb()} MB")
             except Exception as e:
@@ -510,6 +546,10 @@ def ensure_worker(role, wait_ready=True, _retried=False):
         if role in _worker_ready and (_worker_alive(role) or role in _adopted):
             return url
         if not _worker_alive(role):
+            # INVARIANT: _worker_ready never outlives the process it describes.
+            # Every not-alive route passes through here, kill_workers clears the
+            # whole set, and _terminate_wedged discards its own role — so no
+            # reader can see a ready role with a dead process (F12).
             _worker_ready.discard(role)
             if _worker_health_ok(role):
                 print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
@@ -660,7 +700,12 @@ def _maybe_reap_workers():
         busy = _inflight_requests > 0
         sessions = _active_sessions
         epoch = _request_epoch
-    if sessions == 0 and not busy and (_workers or _adopted):
+    # Read the worker structures under THEIR lock rather than relying on dict
+    # truthiness being atomic (F13). Cheap, and it stops this being the one
+    # unsynchronised reader of state three other paths mutate.
+    with _workers_lock:
+        have_workers = bool(_workers or _adopted)
+    if sessions == 0 and not busy and have_workers:
         # Pass the epoch: if a request arrived between the check above and the
         # kill, abort rather than terminate a worker mid-call.
         if kill_workers('sessions=0, idle', expect_epoch=epoch):
@@ -688,7 +733,7 @@ def _maybe_reap_workers():
     # end cleanly. Reclaim it. The guard is REQUEST activity, not wall-clock —
     # a genuinely long story is issuing analyzer calls throughout, and any
     # in-flight request blocks this.
-    if sessions > 0 and not busy and (_workers or _adopted):
+    if sessions > 0 and not busy and have_workers:
         now = time.time()
         idle_for = now - _last_request_ts
         # Two independent reclaims, because either alone has a hole.

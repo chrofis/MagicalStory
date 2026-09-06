@@ -27326,72 +27326,61 @@ re-tells against the new panel output, so "does it help" is answerable end to en
 
 **Status:** ✅ active
 
-## 2026-09-06 — Repair inpaint and style repair follow the STORY's page tier; char repair stays pinned to 1.x
+## 2026-09-06 — Repairs stay on the edit tier, and style repair keeps its inherited score (two reverts)
 
 **Context:** A routing audit of the four repair methods (`decideRepairMethod`:
-`char-fix`, `inpaint`, `iterate`, `style-repair`) found only ONE of them on
-Imagine 2.0, and only on staging. `iterate` reads `runtime('pageRenderModel')`
-so a full page redo matched the page tier, but `inpaint` read the flat edit key
-`MODEL_DEFAULTS.pageImage` and `style-repair` read a hardcoded `'grok-imagine'`
-in `styleRepair.js`'s own lookup table — a third source of image-model truth
-beside `MODEL_DEFAULTS` and `REPAIR_DEFAULTS`. On a staging page rendered by
-2.0, a repair was therefore painted by a different model than the pixels it was
-patching.
+`char-fix`, `inpaint`, `iterate`, `style-repair`) found only `iterate` following
+`runtime('pageRenderModel')`; `inpaint` read the flat edit key
+`MODEL_DEFAULTS.pageImage` and `style-repair` a hardcoded `'grok-imagine'`. Both
+were changed to follow the page tier, then **reverted the same day by the owner**.
+A second audit, over stored `imageVersions[].finalScore`, reported that
+style-repair "never improves the score and can never ship" — a **false positive**,
+which had already caused a code change (`0a3049bce`, item 4) that is also reverted
+here.
 
-**Decision (owner, 2026-09-06):**
-- `inpaint` passes `MODEL_DEFAULTS.pageRenderImage` explicitly to
-  `editImageWithPrompt` — 2.0 on staging, Standard in production, and it moves
-  with the page tier automatically from here on.
-- `style-repair`'s `grok` selector resolves to `pageRenderImage` through a lazy
-  getter instead of a hardcoded key. A style repaint replaces the whole page's
-  rendering, so it must be painted by the model that rendered the page it is
-  matching. Not user-triggerable — pipeline-only, gated on
-  `styleRepairProduction`.
-- `char-fix` **stays on Imagine 1.x**, unchanged. The 2026-09-01 (G5) pin in
-  `REPAIR_DEFAULTS.charRepairModel` holds: 1.x measured 0/82 structural anatomy
-  defects vs 2.0's 2/29, and it is half the price.
-- `MODEL_DEFAULTS.pageImage` keeps its Standard value and its meaning narrows to
-  the EDIT tier: user prompt edits and the title paint-in. Those are cheap
-  one-shot ops and should not double when a page tier moves.
+**Decision 1 — repair model routing (REVERTED to the prior state):** `inpaint` and
+`style-repair` stay pinned to the Imagine 1.x edit tier in every environment. Only
+the page and cover RENDER follow the per-environment tier split. Char repair keeps
+its own 2026-09-01 (G5) pin. So no repair path routes to Imagine 2.0. **Do not
+re-propose "a repair should be painted by the model that rendered the page" as a
+consistency fix — it has been proposed, implemented and declined.**
 
-**Rationale:** A repair paints into pixels the page render produced. Mixing
-brushes across a single page is the defect the tier split was supposed to
-prevent, and it was invisible because each path resolved its model from a
-different place. Superseding the old `pageImage` comment ("stays on Standard in
-every environment: doubling it would double every inpaint") — the cost argument
-was real but it applied to user edits, not to repairs of a 2.0 page.
+**Decision 2 — style-repair scoring (REVERTS item 4 of `0a3049bce`):** a
+style-repair version once again inherits `prevBest.score`, and `recordRepair`
+writes `'kept'` when the proximity gate passes. The `accepted[]` deferred
+`evaluateImageBatch`, the `not_selected` outcome and the per-repaint score stamp
+are removed.
 
-**Cost effect:** none in production (everything is Standard, $0.02). On staging,
-inpaint and style repair go $0.02 → $0.04 per call. `repairMaxPasses` is 1 on
-staging, so the worst case is bounded.
+**Rationale:** style repair is not decided by `finalScore`. `repairPageStyle` runs
+its OWN comparative eval — `compareStyleProximity(before, after)` — which shows a
+judge the original and the repaint together and ships only on
+`better === 'after' && changed.length === 0`. That verdict is stored on the version
+as `styleRepair.passedGate` / `styleComparison`. A style repaint changes the
+MEDIUM, not the content: the ordinary per-image quality score is blind to the thing
+being repaired (two images can score identically while only one is in the right
+style), so scoring the repaint independently adds a number that cannot see the
+defect and then lets it veto the gate that can. `0a3049bce`'s reasoning — that a
+version sharing its predecessor's score loses `selectBestVersion`'s `earliest`
+tie-break — described the tie correctly but misidentified it as the selector.
 
-**Verified before wiring:** 2.0 on the edit endpoint is already exercised —
-staging page renders call `editWithGrok` with reference images — and both tiers
-carry identical `maxPromptLength` (7900) and `maxCharactersPerScene` (5), so no
-prompt-fitting or cast-cap behaviour changes. Resolution checked in both
-environments: `resolveStyleRepairModelId('grok')` → `grok-imagine` locally,
-`grok-imagine-2` with `RAILWAY_ENVIRONMENT_NAME=staging`.
+**Items 1-3 of `0a3049bce` are KEPT** (`recutBatches`, the single-cell confirmation
+pass, `voidCollapsedBatches` in `styleConsistency.js`, plus
+`tests/unit/style-collapse-guard.test.ts` — 15 tests, passing after this revert).
+Only the scoring change is undone.
 
-**Known follow-ons (not changed here):**
-- `promptBuilders.js:2882,3148,4072,4734,6065` and `beatsPipeline.js:729` still
-  read `pageImage` for prompt budgets and cast caps. Harmless today (both tiers
-  are 7900 / 5); it becomes a real mismatch if the tiers ever diverge.
-- `STYLE_REPAIR_MODEL` / `STYLE_REPAIR_PRODUCTION` are still env vars, against
-  the "behaviour is code, only secrets are env vars" rule, and neither is
-  reported by `GET /api/health/config` — so the deployed style-repair backend
-  cannot be confirmed from outside.
-- `repairCharacterMismatch` defaults to Gemini and relies on an explicit
-  `imageBackend:'grok'` literal in the request builder — correct today, but
-  fail-open rather than fail-loud.
+**Guard against re-flagging:** the same false positive has now been raised more than
+once from stored data. It is documented at four sites an auditor lands on: the
+fenced header block in `server/lib/styleRepair.js`, the `passedGate` line in
+`repairPageStyle`, the restored inherited-score block in `repairPipeline.js`, and a
+line in `docs/SETTLED.md`. All say the same thing: **read `styleRepair.passedGate`,
+not `finalScore`.**
 
 **Touched:**
-- `server/lib/images.js` (`inpaintPage` → `CONFIG_DEFAULTS.pageRenderImage`)
-- `server/lib/styleRepair.js` (`STYLE_REPAIR_MODEL_IDS.grok` → lazy page-tier getter)
-- `server/config/models.js` (`pageImage` comment narrowed; `grok-imagine-2` registry comment corrected — it said "Test Lab A/B only, no default routes here" while staging had routed pages and covers there since 1a253d866)
+- `server/lib/images.js`, `server/lib/styleRepair.js`, `server/config/models.js` (routing reverted; comments now record that the reroute was declined)
+- `server/lib/repairPipeline.js` (item 4 of `0a3049bce` reverse-applied; inherited-score block re-documented)
+- `docs/SETTLED.md` (new line under the style-repair entry)
 
-**Status:** ✅ active
-
----
+**Status:** ✅ active — supersedes item 4 of `0a3049bce` (2026-09-05); items 1-3 of that commit stand.
 
 ## 2026-09-06 — Calendar nouns join the plan-counter place exclusion, derived from Intl for the story language
 
@@ -27716,3 +27705,156 @@ are prompt-side.
 `prompts/story-text-audit.txt`, `prompts/story-text-audit-blind.txt`
 
 **Status:** ✅ active — supersedes the connective-tissue entry earlier this date
+
+## 2026-09-06 — Analyzer sessions are IDENTITIES, not a refcount
+
+**Context:** `sessionBegin`/`sessionEnd` are fire-and-forget with connection-only
+retry, and `session_end` clamped with `max(0, n-1)`. A begin that never landed
+(an analyzer restart is enough) therefore turned a LOST INCREMENT into a STOLEN
+DECREMENT: story A's end took story B's count to zero, and B's workers were
+reaped mid-repair. B's next `/figure-mask` either 503s or pays a cold respawn,
+which `figureDetection.js` records as a fallback to Gemini. Same class as the
+`/release-memory` 409 guard added 2026-09-05 — that guard went on the admin path
+only, while the ordinary path kept the hole.
+
+**Decision:** `/session/begin` registers an id, `/session/end` removes that id,
+and an id that was never registered is a NO-OP. Node sends ids it already makes
+unique per job (`story:${jobId}`, `avatar:${jobId}`, `testlab:${experimentId}`);
+presence keys on the tab token, because two tabs share a surface and would
+otherwise collide. `_active_sessions` remains as a derived count so every reader
+(/health, /release-memory, the reaper) is unchanged.
+
+**Rationale:** A refcount cannot distinguish "my begin was lost" from "someone
+else's session is open" — the information is not in the number. Identities make a
+duplicate end, a retried end and an orphaned end all harmless.
+
+**Touched:** `photo_analyzer.py` (`_sessions`, `_recount_sessions_locked`,
+session endpoints), `server/lib/analyzerClient.js`, `server/lib/presenceSessions.js`.
+**Status:** ✅ active
+
+## 2026-09-06 — A wedged worker is terminated and respawned, not merely reported
+
+**Context:** The 2026-09-05 fix made a worker that is alive but not answering fail
+fast instead of hanging 120s. It did not recover it. The state was ABSORBING:
+`_worker_alive` is true so ensure_worker never respawned, `_worker_ready` is empty
+so the fast path never fired, and `kill_workers` could not reach it until every
+session closed. Every request re-failed at the short budget, forever, while the
+process kept its full RSS. During a story that is a permanent 503 loop.
+
+**Decision:** On the wedge branch, terminate the process and respawn once
+(`_terminate_wedged`, `_retried`). The replacement gets the full
+`WORKER_START_TIMEOUT_S`, because model imports legitimately take that long.
+
+**Rationale:** "Fails fast with a 503 the caller can act on" was only half true —
+no caller acts on it, and nothing else cleared it. Supersedes the wedged-worker
+paragraph of the 2026-09-05 entry.
+
+**Touched:** `photo_analyzer.py`, `tests/manual/test_worker_bringup_race.py` (case E).
+**Status:** ✅ active
+
+## 2026-09-06 — /warmup merges the caller's roles instead of dropping them
+
+**Context:** `/warmup` single-flighted on a thread and returned "already warming",
+DISCARDING the second caller's `workers`/`dino`/`arcface`. So a presence beat
+asking for `['face']` could swallow the repair phase's warm — the one that carries
+`force: true` specifically so a concurrent story cannot skip it. `force` only ever
+bypassed the Node-side debounce; it never reached this decision. The documented
+consequence follows: DINO's ~90s load lands on the first real detection, which
+times out into the Gemini bbox fallback rather than waiting.
+
+**Decision:** The in-flight warm publishes the roles it covers (`_warming_roles`);
+a second caller starts a thread for the remainder only.
+
+**Touched:** `photo_analyzer.py` (`_warm_roles`, `_warming_roles`, `_warmup_lock`).
+**Status:** ✅ active
+
+## 2026-09-06 — The leaked-session reclaim ages SESSIONS, and /warmup is not activity
+
+**Context:** The reclaim required 1800s of GLOBAL request silence, but
+`_last_request_ts` was stamped by every activity request — and `/warmup` is one,
+triggered by any wizard visitor. So during business hours the timer never aged: a
+single hard-crashed story pinned the whole worker fleet and ~1.3GB of page cache
+24/7, precisely the bill the analyzer split exists to remove. The original comment
+reasoned about the leaking job's own traffic and silently assumed a single tenant.
+
+**Decision:** `/warmup` joins `_NON_ACTIVITY_PATHS`, and sessions are ALSO
+reclaimed by their own age (`SESSION_MAX_AGE_S`, default 3h) — no job runs that
+long, and unlike global silence, per-session age cannot be held off by other
+users' traffic. The count is now cleared only for the sessions actually
+identified, and never unconditionally: zeroing it while a refused kill left the
+workers running made the next teardown reap them mid-work.
+
+**Touched:** `photo_analyzer.py` (`_maybe_reap_workers`, `_NON_ACTIVITY_PATHS`).
+**Status:** ✅ active
+
+## 2026-09-06 — Warm the workers a caller needs, not the default set
+
+**Context:** `/warmup` grew a `workers` field (see the 2026-09-05 entry), but two
+callers still took the default and paid for a torch worker they never touch:
+`jobs.js` at story start held ~430MB through the 20-25 minutes of outline and text
+generation in which nothing touches the analyzer at all, and `faceIdentity.js`
+dragged torch along with `{arcface:true}`. The repair phase force-warms torch
+where masking actually happens.
+
+**Decision:** Story start warms `['face']`; the avatar path warms
+`['face','arcface']`. `photos.js` already reasoned this for uploads; it simply was
+not carried across.
+
+**Touched:** `server/routes/jobs.js`, `server/lib/faceIdentity.js`.
+**Status:** ✅ active
+
+## 2026-09-06 — The page-cache sweep stopped refusing the roots it exists to drop
+
+**Context:** `drop_file_cache` required a root to have at least 3 path segments,
+guarding against a misresolved `/` or `/usr`. Every model-cache root has two — so
+every sweep logged `refusing suspiciously broad root: /app/.hf_cache`,
+`/app/.deepface` and `/app/mobile_sam.pt`, the last of which is a single FILE. The
+weights were never advised away; only site-packages was reclaimed.
+
+**Decision:** Floor of two segments plus an explicit denylist (`/`, `/app`,
+`/usr`, ...). Name the danger instead of approximating it by depth.
+
+**Touched:** `photo_analyzer.py` (`_CACHE_DROP_DENY`, `drop_file_cache`).
+**Status:** ✅ active
+
+## 2026-09-06 — Model bakes go in the main Dockerfile; Dockerfile.analyzer is not built
+
+**Context:** The first `/remove-bg` on a fresh container spent 27.6s fetching
+`u2net.onnx` from GitHub inside the user's request (0.9s once on disk) — the only
+model not pre-fetched. Two fixes failed silently before the cause was visible:
+(1) `ENV U2NET_HOME=/app/.u2net` — this rembg version ignores that variable and
+still logs `Downloading ... to /root/.u2net/u2net.onnx`; (2) baking into
+`/root/.u2net` **in `Dockerfile.analyzer`**, which is never built. `railway.json`
+pins `dockerfilePath: "Dockerfile"`, so the analyzer service builds the MAIN image
+and only starts it differently (`start-analyzer.sh`). The giveaway was the
+analyzer's own build log containing vite client output, which `Dockerfile.analyzer`
+does not produce.
+
+**Decision:** The U2-Net bake lives in `Dockerfile` alongside MobileSAM, DINO and
+ArcFace, targets `$HOME/.u2net`, and VERIFIES the downloaded size before accepting
+it — an error page saved as `u2net.onnx` is worse than no file, because rembg
+would silently re-fetch at runtime with the exact cost the step removes.
+
+**Touched:** `Dockerfile`, `Dockerfile.analyzer` (pointer comment).
+**Status:** ✅ active
+
+## 2026-09-06 — The U2-Net session is built for resident size, not throughput
+
+**Context:** `u2net.onnx` is 176MB on disk but the loaded session measured between
+526MB and 877MB, and the SPREAD was the tell. ONNX Runtime's CPU memory arena
+pre-reserves and never returns pool memory, so the footprint tracks the
+high-water mark; and intra-op parallelism defaults to the visible CPU count,
+which in this container is the cgroup quota of 24, each thread carrying its own
+allocation.
+
+**Decision:** Build the session with `enable_cpu_mem_arena=False` and
+`intra_op_num_threads=4`, both overridable via `REMBG_DISABLE_MEM_ARENA` and
+`REMBG_INTRA_OP_THREADS`.
+
+**Rationale:** Railway bills resident memory per minute and this worker is spawned
+for anyone who merely opens the wizard, so a few hundred MB held for minutes costs
+more than a second of latency on one background removal. The knobs exist because
+that trade is environment-specific.
+
+**Touched:** `photo_analyzer.py` (`_ort_session_kwargs`, `get_rembg_session`).
+**Status:** 🟡 conditional — verify latency on staging before trusting it in prod.

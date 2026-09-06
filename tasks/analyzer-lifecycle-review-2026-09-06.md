@@ -64,8 +64,8 @@ exists to produce.
       function's own docstring rejects doing this with `_request_lock`.
 - [x] **F10 (MED) Four `*_IDLE_UNLOAD_S` env vars and four `*_last_used` stamps
       are dead code.** Setting `GROUNDINGDINO_IDLE_UNLOAD_S` silently does nothing.
-- [ ] **F12 (LOW) `_worker_ready` not cleared on every not-alive path.**
-- [ ] **F13 (LOW) `_maybe_reap_workers` reads `_workers` outside the lock.**
+- [x] **F12 (LOW) `_worker_ready` not cleared on every not-alive path.**
+- [x] **F13 (LOW) `_maybe_reap_workers` reads `_workers` outside the lock.**
 
 ## Waste
 
@@ -77,21 +77,21 @@ exists to produce.
 - [x] **W3 The cache-drop guard refuses all three model-cache roots.** The `>=3`
       path-segment floor rejects `/app/.hf_cache`, `/app/.deepface` and the
       single FILE `/app/mobile_sam.pt`, so model weights are never dropped.
-- [ ] **W4 U2-Net downloads from GitHub at runtime — NOT FIXED, two attempts.**
-      27.6s vs 0.9s cached, and an external host in the user's upload path.
-      Attempt 1: baked to `/app/.u2net` + `ENV U2NET_HOME`. Ineffective — this
-      rembg version ignores that variable; the container still logged
-      `Downloading ... to /root/.u2net/u2net.onnx`.
-      Attempt 2: baked to `/root/.u2net`, the path the log names. STILL
-      downloads. Deployment `918438ef` is confirmed built from commit `2911dc71`
-      (which contains the RUN), the Dockerfile is single-stage so the layer
-      should persist, and yet the build log's 12 steps do not include the U2-Net
-      RUN at all — while mobile_sam/DINO/ArcFace steps are all there.
-      NEXT: find why that RUN is absent from the build (Railway build cache? a
-      different Dockerfile actually being built? the analyzer build log also
-      contains vite client output, which is itself suspicious). Do NOT try a
-      third blind variant — read the build definition first.
-      The Dockerfile line currently in the tree is harmless but INERT.
+- [x] **W4 U2-Net downloaded from GitHub at runtime — FIXED on the third attempt.**
+      27.6s vs 0.9s cached, with an external host inside the user's upload path.
+      Attempt 1 baked to `/app/.u2net` + `ENV U2NET_HOME`: this rembg version
+      ignores that variable. Attempt 2 baked to `/root/.u2net` (the path the log
+      names) but put it in **`Dockerfile.analyzer`, which is never built** —
+      `railway.json` pins `dockerfilePath: "Dockerfile"`, so the analyzer service
+      builds the MAIN image and only starts it differently. The giveaway was vite
+      client output in the analyzer's own build log, which Dockerfile.analyzer
+      cannot produce. Now in `Dockerfile` beside MobileSAM/DINO/ArcFace, with a
+      size assertion so a truncated download cannot pass silently.
+- [x] **W5 U2-Net session built for RSS, not throughput.** 176MB on disk loaded as
+      526-877MB; the SPREAD pointed at ONNX Runtime's CPU memory arena plus
+      intra-op threads defaulting to the cgroup quota of 24.
+      `enable_cpu_mem_arena=False`, `intra_op_num_threads=4`, both overridable.
+      NEEDS A LATENCY CHECK before prod.
 
 ## Doc / comment contradictions
 
@@ -103,8 +103,8 @@ exists to produce.
 - [x] C5 `analyzerClient.js` header "the analyzer exits itself when idle".
 - [x] C6 `photo_analyzer.py` "one sweep at a time" vs `/release-memory` (F8).
 - [x] C7 `kill_workers` docstring vs its own `_workers_lock` hold (F9).
-- [ ] C8 `docs/decisions.md` "a wedged worker fails fast" — never recovers (F2).
-- [ ] C9 `/warmup` "callers that know an avatar is coming send arcface" — dropped
+- [x] C8 `docs/decisions.md` "a wedged worker fails fast" — never recovers (F2).
+- [x] C9 `/warmup` "callers that know an avatar is coming send arcface" — dropped
       by the single-flight (F4).
 
 ## Review
@@ -120,14 +120,19 @@ pre-push gate 6c: bring-up guard, alive-is-not-ready, force override, ready-cach
 `WORKER_START_TIMEOUT_S` was extracted from a hardcoded 120 so the wedge test can
 bound itself instead of waiting two minutes.
 
-### Deliberately NOT done in this pass
-- **F12/F13** — cosmetic; `_worker_ready` is only read alongside a liveness check
-  and the unsynchronised `_workers` read is a CPython-atomic dict truthiness.
-- **C3** (`storyJobPipeline.js` "idle-unload after ~15 min") and the
-  `docs/decisions.md` entries for this work: both files had UNCOMMITTED changes
-  from a parallel session in this shared tree, and committing them by explicit
-  path would have swept that session's work into this commit. Do them once that
-  session has pushed.
-- **The face worker's ~1,445MB** (94% of the warm footprint, 483MB of it
-  mediapipe at import). Measurement job, not a cleanup — see the open item in
-  BACKLOG.
+### Second pass, 2026-09-06
+
+F12/F13 closed, the U2-Net bake finally landed in the file that is actually
+built, and the face worker was measured rather than guessed at:
+
+- **mediapipe's 483MB is legitimate and role-gated.** The parent raises
+  ImportError on purpose so only the face/arcface workers pay it. Not waste.
+- **The reducible part was the U2-Net session** — see W5.
+
+### STILL BLOCKED by the shared tree
+- **C3** (`storyJobPipeline.js` comment) and the **BACKLOG index lines**.
+  `storyJobPipeline.js` and `tasks/BACKLOG.md` still carry another session's
+  uncommitted work. Staging just my hunk via `git apply --cached` was attempted
+  and refused (the patch context comes from the working tree, the index is at
+  HEAD), so the edit was reverted rather than left to ride along in their commit.
+  Both are one-line jobs the moment that session pushes.
