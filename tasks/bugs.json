@@ -615,6 +615,15 @@
       "status": "fixed",
       "fixedIn": "staging (2026-09-06)",
       "note": "buildCharRepairRequest materialises EVERY canonical key, filling absent ones with null, so faceOnly:null rides on every request the button, the automatic pipeline and the Test Lab build. treatment and regionSource were spared only because their guards are truthiness tests and null is falsy; faceOnly is the one boolean axis and the one that broke. Net effect: face-only repair has been unreachable through the shared contract since it landed — a face repair repaints the whole figure. Fix: treat null as 'not set' (`!== undefined && !== null`). An explicit faceOnly:false is still honoured. Regression cases in tests/unit/repair-style-guard-medium.test.ts."
+    },
+    {
+      "id": "styled-sheet-skipped-when-character-photos-are-r2-urls",
+      "title": "Styled 2x4 sheets are skipped when the character photos are R2 URLs: the costumed path accepts only inline data for its fallback body photo, so since the characters.data offload (2244b4a14) trial characters get no sheet at all and the raw cutout is sliced by the cell cropper",
+      "reportedAt": "2026-09-06",
+      "source": "Confirmed from stored evidence: staging trial job_1788719728575_78bsxj6pu (Léa, 6, telling-truth + mermaid), run at 20:35 CH (naive created_at column reads 16:35Z; the trial user email carries 183452Z), after 2244b4a14 deployed with 66b5d86f at 20:25 CH (the row photos.face/bodyNoBg are https://images-staging.../inline/... URLs). Web log: \"Léa: no styled standard avatar → using bodyNoBg/face cutout as body ref for costumed:mermaid\" then \"no base avatar for costumed:mermaid, skipping\" twice (prewarm and avatars stage); styledAvatarGeneration[0] = \"no styled avatar generated — raw bg-removed body photo seeded\"; preGeneratedStyledAvatars.Léa.standard is byte-identical to photos.bodyNoBg (436100 bytes); sceneImages[0].referencePhotos[0].photoUrl is a 7 KB sliver of the polka-dot dress; pages render a different child, page 4 a boy. The previous trial job_1788715081819 (before the deploy, photos inline) generated both sheets.",
+      "status": "fixed",
+      "fixedIn": "staging (commit: fix(avatars): sheet inputs resolve inline-or-R2 photos, 2026-09-06)",
+      "note": "styledAvatars.js: new photoAsDataUri(value) (inline passthrough, R2 fetch otherwise) used for the fallback body photo AND the face photo on both the standard and the costumed sheet paths; resolveAvatarBytes shares it. Secondary, backlogged: the cell cropper slices any \"standard\" entry as a 2x4 sheet, including a guarantee-seeded raw photo."
     }
   ]
 }

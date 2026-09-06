@@ -29121,3 +29121,26 @@ visitor is known and accepted behaviour, not a leak.
 - `server/routes/storyIdeas.js` (`discoverOnMiss: true`)
 - `docs/landmark-database.md` §8 (documents the trigger; the count was unmeasured until now)
 **Status:** ✅ active
+
+## 2026-09-06 — Sheet inputs resolve inline-or-R2 photos (fallout of the characters.data offload)
+
+**Context:** `2244b4a14` (19:14 CH) sweeps every `characters.data` write to R2, so a trial
+character's `photos.face` / `photos.bodyNoBg` are URLs from the first save. The costumed 2×4 path
+took `getPrimaryPhoto(char)` as its fallback body reference and required `startsWith('data:image')`,
+so it skipped the sheet; the standard path handed the URL to the sheet builder and got nothing back.
+The avatar guarantee then seeded the raw cutout as "standard", the cell cropper sliced a 2×4 cell out
+of a single figure, and every page of staging trial `job_1788719728575_78bsxj6pu` was drawn from a
+sliver of dress: a different child on each page, a boy on page 4. The trial before the deploy
+(`job_1788715081819`, photos inline) generated both sheets.
+
+**Decision:** one helper, `photoAsDataUri`, returns bytes for inline data and for an R2 URL alike;
+the fallback body photo and the face photo go through it on both sheet paths, and
+`resolveAvatarBytes` shares it. Registered in `tasks/bugs.json`.
+
+**Still open:** the cell cropper trusts any `standard` entry to be a 2×4 sheet — a guarantee-seeded
+raw photo should never be cropped. Backlogged. Other readers of `getPrimaryPhoto` / `getFacePhoto`
+(`clothingResolve`, `entityConsistency`, `repairPipeline`, `avatars.js`, `trial.js:2665`) need the
+same inline-or-URL check.
+
+**Touched:** `server/lib/styledAvatars.js`.
+**Status:** ✅ active — validation trial pending.

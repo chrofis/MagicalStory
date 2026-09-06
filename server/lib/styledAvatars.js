@@ -49,15 +49,32 @@ async function resolveAvatarBytes(avatars, category) {
   // URIs stored on `avatars.{category}` short-circuit before this point.
   const url = getStandardAvatar(avatars, category);
   if (typeof url !== 'string' || !/^https?:\/\//.test(url)) return null;
+  return photoAsDataUri(url, `resolveAvatarBytes(${category})`);
+}
+
+/**
+ * A photo field as an inline data URI, whether it holds inline data or an R2
+ * URL. Every characters.data write is swept to R2 (2026-09-06), so
+ * photos.bodyNoBg / photos.face are URLs from the first save on — and the
+ * sheet builders take bytes. Before this, the costumed path checked
+ * `startsWith('data:image')` on the raw fallback photo and SKIPPED the sheet
+ * for a URL (staging trial job_1788719728575: no costumed sheet, the raw
+ * cutout seeded as "standard", the cell cropper sliced a sliver of dress out
+ * of it, and every page lost the child's identity).
+ */
+async function photoAsDataUri(value, what = 'photo') {
+  if (!value) return null;
+  if (typeof value === 'string' && value.startsWith('data:image')) return value;
+  if (typeof value !== 'string' || !/^https?:\/\//.test(value)) return null;
   try {
-    const buf = await fetchImageBytes(url);
+    const buf = await fetchImageBytes(value);
     if (!buf) return null;
     const mime = buf[0] === 0x89 && buf[1] === 0x50 ? 'image/png'
                : buf[0] === 0xFF && buf[1] === 0xD8 ? 'image/jpeg'
                : 'image/jpeg';
     return `data:${mime};base64,${buf.toString('base64')}`;
   } catch (err) {
-    log.warn(`[STYLED AVATARS] resolveAvatarBytes(${category}) R2 fetch failed: ${err.message}`);
+    log.warn(`[STYLED AVATARS] ${what} R2 fetch failed: ${err.message}`);
     return null;
   }
 }
@@ -606,7 +623,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       // 'formal' was a legacy clothing category — fully removed Phase 5.
       if (!originalAvatar) {
         originalAvatar = (await resolveAvatarBytes(avatars, 'standard'))
-                      || getPrimaryPhoto(char);  // last-resort raw photo
+                      || await photoAsDataUri(getPrimaryPhoto(char), `${charName} primary photo`);  // last-resort raw photo
         if (originalAvatar && (await resolveAvatarBytes(avatars, 'standard'))) {
           log.debug(`[STYLED AVATARS] ${charName}: standard avatar resolved from R2 fallback`);
         } else if (originalAvatar) {
@@ -619,7 +636,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
       // Get high-resolution face photo for identity preservation
       // Priority: face thumbnail (768px) > original photo
-      const facePhoto = getFacePhoto(char);  // Uses canonical photos.* with legacy fallback
+      const facePhoto = await photoAsDataUri(getFacePhoto(char), `${charName} face photo`);  // canonical photos.* with legacy fallback, inline or R2
 
       // Log what data is available for debugging
       log.debug(`🎨 [STYLED AVATAR] ${charName}: facePhoto=${facePhoto ? 'yes' : 'no'}, photos.face=${char.photos?.face ? 'yes' : 'no'}, physical=${Object.keys(char.physical || {}).length} keys`);
@@ -751,7 +768,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     // there was no warning, so the failure was invisible.
     let originalAvatar = await resolveAvatarBytes(avatars, 'standard');
     if (!originalAvatar) {
-      const fallback = getPrimaryPhoto(char);
+      const fallback = await photoAsDataUri(getPrimaryPhoto(char), `${charName} primary photo`);
       if (fallback) {
         // Expected for trial and any character without a styled standard
         // avatar. getPrimaryPhoto returns photos.bodyNoBg first (background
@@ -763,7 +780,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         originalAvatar = fallback;
       }
     }
-    const facePhoto = getFacePhoto(char);
+    const facePhoto = await photoAsDataUri(getFacePhoto(char), `${charName} face photo`);
     const costumeDescription = costumeConfig.description || `${costumeType} costume`;
 
     if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
