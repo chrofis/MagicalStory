@@ -28058,3 +28058,61 @@ outfit-text strip), `server/lib/beatsPipeline.js` (fed-back worn-state round,
 `tests/unit/worn-items.test.ts`.
 
 **Status:** ✅ active
+
+
+### Three Visual Bible elements per page, enforced at the Art Director (2026-09-06)
+
+**Context:** The packing budget added the day before (`VB_SLOT_MAX_ELEMENTS`,
+`server/lib/grok.js`) caps a page slot at four VB reference cells with a
+200px cell floor. That is a downstream safety net: it silently drops whatever
+the brief over-requested, after the brief, the prose and the page text were all
+written around the dropped element. Replaying the counter over the stored
+briefs of staging `job_1788641639919_mpjwlzkf1` (14 pages) shows 8 pages over
+three elements, and `job_1788614817116_vxnu60yjg` (18 pages) 6 pages, one of
+them (p7) requesting SIX — a dragon, four vehicles and a location.
+
+**Decision:** The limit is the Art Director's, and it is three (owner ruling,
+2026-09-06: "Never more than 3 VB elements per scene. Drop the least important
+ones if more are requested. Do a mechanical check of it and feed it into the
+feedback loop."). Three enforcement points, one constant
+(`VB_ELEMENT_BUDGET`, `server/lib/vbElementBudget.js`):
+1. GENERATOR — `{VB_ELEMENT_BUDGET}` is filled into both scene-expansion
+   templates from that constant.
+2. CRITIQUE + FED-BACK RETRY — the counter runs as brief check G
+   (`vb_element_overflow`), lands in the scene review's BRIEF FAULTS block
+   naming the ranked elements and exactly which ids to drop, and the review's
+   existing targeted second round re-sends the faulted pages with that text
+   verbatim.
+3. STRIKE TWO — whatever still overflows is truncated in code
+   (`truncateBriefToBudget`): the lowest-ranked ids leave `objects[]`, the page
+   ships with a WARN and a stored `vbElementOverflow: {requested, kept,
+   dropped}`. The run is never killed (gates are guidelines).
+
+Ranking is data, never prose: recurring creature first (as
+`getElementReferenceImagesForPage` pins it), then the selection's own type
+order (character, animal, artifact, vehicle, invented location), then focal on
+the page (named in `interactions[]`), then asked-for in `objects[]`, then
+`appearsInPages` length, then id. Real-landmark LOCs never count — they ship
+as photographs, not packed cells.
+
+**Rationale:** Truncation can only take back what the BRIEF asked for; an
+element the bible placed via `appearsInPages` is not the brief's to withdraw.
+So the page-gen reference selection is now called with the same
+`VB_ELEMENT_BUDGET` and the same priority order
+(`referenceSheets.js`, `storyJobPipeline.js`), which bounds that half and keeps
+exactly the three the counter ranks first — no double-drop, because both sides
+sort identically. Grok's `VB_SLOT_MAX_ELEMENTS` deliberately STAYS at 4: it is
+the net under the paths this budget does not author (covers, repair and iterate
+call the selection with maxRefs 6), and a page arriving there with four is now
+a violation worth seeing rather than one the cap hides.
+
+**Touched:** `server/lib/vbElementBudget.js` (new),
+`server/lib/sceneBriefCheck.js` (check G + REVIEWABLE),
+`server/lib/beatsPipeline.js` (strike-two truncation, `vbElementOverflow` on
+the scene), `server/lib/promptBuilders.js` ({VB_ELEMENT_BUDGET} fill in both
+scene-expansion builders), `server/lib/referenceSheets.js` +
+`storyJobPipeline.js` (page-gen selection cap), `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `docs/image-generation-methods.html`,
+`tests/unit/vb-element-budget.test.ts`.
+
+**Status:** ✅ active

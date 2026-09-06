@@ -18,6 +18,7 @@ const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { loadVbReferenceBytes } = require('./characterPhotos');
 const { escapeXml } = require('./repairGrid');
+const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentification } = require('./sheetGrid');
 
 const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForImage(...args);
@@ -789,7 +790,12 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
   // painted. The empty-scene grid keeps its own cap of 9
   // (buildEmptySceneVbGrid) — it is a different grid, sent to a call with no
   // character slots competing for space.
-  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 4, sceneObjectIds, sceneMetadata);
+  // The cap is the owner's brief-side budget (2026-09-06): the Art Director is
+  // told at most three, the brief check reports an overflow and the pipeline
+  // truncates what survives — so the selection here bounds the SAME number,
+  // with the same priority order. A looser cap here would let an element the
+  // budget dropped back in through `appearsInPages`.
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, VB_ELEMENT_BUDGET, sceneObjectIds, sceneMetadata);
   // Landmarks never ride in the grid — a real photograph composited among
   // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
   // landmark reaches the image only as its own reference photo, and when a

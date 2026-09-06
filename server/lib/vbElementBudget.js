@@ -37,6 +37,17 @@
  * overflows after that round SHIPS, with the lowest-ranked ids truncated out of
  * `objects[]` in code and a stored `vbElementOverflow` flag — a gate is a
  * guideline, it never kills a paid run.
+ *
+ * TWO HALVES, TWO ENFORCERS. Truncation can only take back what the BRIEF
+ * asked for; an element the bible placed on the page through `appearsInPages`
+ * is not the brief's to withdraw, so re-running the truncation on an already
+ * truncated brief still counts it. That half is bounded where it actually
+ * matters — the page-gen reference selection, which is called with this same
+ * VB_ELEMENT_BUDGET and this same priority order (referenceSheets.js,
+ * storyJobPipeline.js), so it keeps exactly the three this module ranks first.
+ * Grok's own VB_SLOT_MAX_ELEMENTS stays at 4: it is the net under the paths
+ * this budget does not author (covers, repair, iterate), and a page that
+ * reaches it with four is a violation worth seeing rather than hiding.
  */
 
 const { extractSceneMetadata, parseProseMetadataFormat } = require('./sceneMetadata');

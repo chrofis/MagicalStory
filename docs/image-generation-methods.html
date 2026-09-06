@@ -509,7 +509,14 @@ measured in the finished slot's pixels (every slot normalises to a 1024px long s
 element budget above. Overflow is DROPPED with an INFO log naming what went &mdash;
 <code>capVbElements</code> enforces it on BOTH VB paths, so the iterate/repair and
 cover callers that ask <code>getElementReferenceImagesForPage</code> for 6 can no
-longer widen the budget.</li>
+longer widen the budget.
+<br><strong>The Art Director's budget is 3</strong> (owner, 2026-09-06 &mdash;
+<code>VB_ELEMENT_BUDGET</code>, <code>server/lib/vbElementBudget.js</code>): a page
+brief may reference at most three packable VB elements, the scene review is handed
+every overflow with the ids to drop, and what survives is truncated in code. The
+page-gen selection is called with that same 3, so this cap-4 is now only the net
+under the paths the budget does not author (covers, repair, iterate) &mdash; a page
+hitting it is a violation, not routine.</li>
 <li><strong>Floor 200px</strong> (<code>VB_CELL_FLOOR_PX</code>) on a cell's shorter
 side. When four cells would breach it the count drops to <strong>3</strong>
 (<code>VB_SLOT_MIN_ELEMENTS</code>) &mdash; elements are dropped before cells shrink.

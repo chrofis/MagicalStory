@@ -9,10 +9,10 @@
  * metadata still gets trusted — nothing reconciles them, so the contradiction
  * ships.
  *
- * Six checks, all computed from the brief itself, all free — no API call, no
+ * Seven checks, all computed from the brief itself, all free — no API call, no
  * image. Four are contradictions between the two halves (A, B, E and the id
- * variant), two are declared limits the brief exceeds (C, D). Only the types in
- * REVIEWABLE reach a prompt.
+ * variant), three are declared limits the brief exceeds (C, D, G). Only the
+ * types in REVIEWABLE reach a prompt.
  *
  * Comparison is deterministic but NOT string equality where names are
  * concerned: `isSameFigureName` (sceneMetadata.js) treats a title prefix or a
@@ -42,6 +42,7 @@
 
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, findCastMissingFromMetadata, isSameFigureName } = require('./sceneMetadata');
+const { checkVbElementBudget } = require('./vbElementBudget');
 
 // A visual-bible id: three letters, three digits, optionally a landmark variant
 // suffix (`LOC003.1` is variant 1 of LOC003 and resolves to it). Anything not
@@ -337,6 +338,14 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
     });
   }
 
+  // G — the VB element budget (owner, 2026-09-06): never more than three
+  // packable Visual Bible elements on a page. Counted and ranked in
+  // vbElementBudget.js against the same set and the same priority order the
+  // reference selection uses, so the finding names exactly the elements the
+  // packer would keep and drop.
+  const overflow = checkVbElementBudget(page.pageNumber, metadata, visualBible);
+  if (overflow) findings.push(overflow);
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -406,7 +415,12 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     distribution floors are a whole-book tally and carry pageNumber 0; R4's
 //     collision is per page. Both restore rules the old unified chain enforced
 //     and the beats chain silently dropped (rule-survival audit, 2026-09-03).
+//   vb_element_overflow  the owner's cap of three packable Visual Bible
+//     elements per page (2026-09-06). Mechanical, and the fix is a deletion the
+//     reviewer can make without inventing anything. SENT; what survives the
+//     review is truncated in code.
 const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
+  'vb_element_overflow',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They

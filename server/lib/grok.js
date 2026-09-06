@@ -647,6 +647,13 @@ const CHAR_BG = { r: 255, g: 255, b: 255 };
 //                         card and rendered with the lead child's auburn curls.
 //   VB_COLUMN_MAX_FRACTION  the VB column never eats more than a third of the
 //                         slot's width — the character cards stay the subject.
+// STAYS 4 after the owner's 2026-09-06 source-side ruling (at most THREE VB
+// elements per page brief, VB_ELEMENT_BUDGET in server/lib/vbElementBudget.js).
+// The page path is already bounded at 3 by the reference selection, so this cap
+// now only nets the paths the Art Director does not author — covers, repair and
+// iterate, which ask getElementReferenceImagesForPage for 6. Lowering it to 3
+// would silently narrow those; leaving it at 4 also means a page arriving here
+// with four elements is a visible violation rather than one the cap hides.
 const VB_SLOT_MAX_ELEMENTS = 4;
 const VB_SLOT_MIN_ELEMENTS = 3;
 const VB_CELL_FLOOR_PX = 200;

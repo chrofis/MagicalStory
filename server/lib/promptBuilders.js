@@ -22,6 +22,7 @@ const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, coll
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote } = require('./season');
 const { highActionPagesPhrase } = require('./planCounters');
+const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
 /**
  * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
@@ -2305,6 +2306,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     RECURRING_ELEMENTS: buildRecurringElementsText(options.visualBible || null),
     AVAILABLE_AVATARS: options.availableAvatars || buildAvailableAvatarsForPrompt(characters),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
+    // The owner's cap of three packable Visual Bible elements per page, from
+    // the same constant the mechanical check and the code-side truncation use.
+    VB_ELEMENT_BUDGET,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -2531,6 +2535,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     LANGUAGE_NOTE: getLanguageNote(language),
     CORRECTION_NOTES: '',
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
+    // The owner's cap of three packable Visual Bible elements per page, from
+    // the same constant the mechanical check and the code-side truncation use.
+    VB_ELEMENT_BUDGET,
     // Season governs foliage, ground cover and daylight colour, and it must be
     // the SAME on every page. The Art Director is the only writer of the scene
     // prose and of `emptyScenePrompt` (the background plate), so this is the
