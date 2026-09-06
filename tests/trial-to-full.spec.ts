@@ -272,12 +272,16 @@ test.describe('Trial → full-account end-to-end', () => {
     // Gender is required (canProceed in TrialCharacterStep gates Next).
     // Button labels are locale-dependent: en "Boy", de "Junge", fr "Garçon",
     // and sometimes just "Male"/"Männlich". Include every variant.
-    const maleBtn = page.getByRole('button', {
-      name: /^(boy|junge|gar[çc]on|male|m[äa]nnlich)\s*$/i,
+    // E2E_GENDER=female picks the girl button; default stays male.
+    const wantFemale = /^f/i.test(process.env.E2E_GENDER || '');
+    const genderBtn = page.getByRole('button', {
+      name: wantFemale
+        ? /^(girl|m[äa]dchen|fille|female|weiblich)\s*$/i
+        : /^(boy|junge|gar[çc]on|male|m[äa]nnlich)\s*$/i,
     }).first();
-    await expect(maleBtn).toBeVisible({ timeout: 10000 });
-    await maleBtn.click();
-    console.log('✅ [P1] Gender selected: male');
+    await expect(genderBtn).toBeVisible({ timeout: 10000 });
+    await genderBtn.click();
+    console.log(`✅ [P1] Gender selected: ${wantFemale ? 'female' : 'male'}`);
 
     // After photo upload, the wizard silently kicks off an avatar preview
     // generation (30-90s). During that window the Next button is disabled
@@ -381,10 +385,13 @@ test.describe('Trial → full-account end-to-end', () => {
     // Wait for at least one card to have a readable title text node.
     const ideaCards = page.locator('div.relative.text-left.p-5.rounded-xl.border-2');
     await expect(ideaCards.first()).toBeVisible({ timeout: 30000 });
+    // E2E_IDEA=2 picks the second card (the make-believe-world idea); default 1.
+    const ideaIndex = Math.max(0, (Number(process.env.E2E_IDEA) || 1) - 1);
+    const chosenIdea = ideaCards.nth(ideaIndex);
     // Wait for text to arrive in the first card (means streaming is done enough
     // to select). We look for any textarea since each idea renders as a textarea
     // when editable.
-    const firstIdeaTextarea = ideaCards.first().locator('textarea');
+    const firstIdeaTextarea = chosenIdea.locator('textarea');
     await expect(firstIdeaTextarea).toBeVisible({ timeout: 3 * 60 * 1000 });
     // Give the textarea a beat to actually contain text — streaming can start
     // before the content has arrived.
@@ -393,14 +400,14 @@ test.describe('Trial → full-account end-to-end', () => {
       if (val.length > 20) break;
       await page.waitForTimeout(1000);
     }
-    console.log('✅ [P3] First idea textarea has content');
+    console.log(`✅ [P3] Idea ${ideaIndex + 1} textarea has content`);
 
     // Each idea card has an explicit "Klicke zum Auswählen" / "Click to
     // select" / "Cliquer pour choisir" button. Click it — clicking the card
     // div itself can hit the textarea (stopPropagation) or get rejected
     // while ideas are still streaming (isEditable=false). The select-button
     // is only rendered once the idea is final.
-    const selectBtn = ideaCards.first().locator('button').filter({
+    const selectBtn = chosenIdea.locator('button').filter({
       hasText: /auswählen|select|choisir|wählen/i,
     }).first();
     // If the select button isn't present yet, wait a bit longer for streaming
@@ -408,11 +415,11 @@ test.describe('Trial → full-account end-to-end', () => {
     try {
       await expect(selectBtn).toBeVisible({ timeout: 60000 });
       await selectBtn.click();
-      console.log('✅ [P3] First idea selected via select-button');
+      console.log(`✅ [P3] Idea ${ideaIndex + 1} selected via select-button`);
     } catch {
       // Fallback: click the card header area (not the textarea)
-      await ideaCards.first().locator('div').first().click({ force: true });
-      console.log('✅ [P3] First idea selected via card header fallback');
+      await chosenIdea.locator('div').first().click({ force: true });
+      console.log(`✅ [P3] Idea ${ideaIndex + 1} selected via card header fallback`);
     }
 
     // Click the create-story button at the bottom
