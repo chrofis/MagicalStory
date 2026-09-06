@@ -457,6 +457,8 @@ Output ONLY a JSON array — no markdown fence, no commentary:
 }
 
 module.exports = {
+  normalizeName,
+  isKnownName,
   findPhantomNames,
   resolveVbIdCharacterKeys,
   detectAndPatchPhantomCharacters,

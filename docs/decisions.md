@@ -28346,3 +28346,38 @@ completeness rather than firing on a name that can never be rendered.
 `server/lib/phantomCharacters.js` (exports `normalizeName` / `isKnownName`),
 `storyJobPipeline.js`, `tests/unit/cover-hint-cast.test.ts`
 **Status:**    ✅ active
+
+## A CRITICAL non-clothing finding outranks a MAJOR clothing finding for one repair round (2026-09-06)
+**Context:**   Staging story `job_1788641639919_mpjwlzkf1`, page 5, `sceneImages[4].imageVersions[0]`.
+The consolidated plan carried an `action_interaction` **CRITICAL** ("chestnut held at the open mouth
+instead of pinched between the fingers") plus two `clothing` **MAJOR** findings. `per_character_fixes[0]`
+was the CRITICAL fix; `scene_fix.instruction`, in violation of consolidator prompt rules 4 and 7, was a
+garment swap ("Replace the blue duffle coat with a blue hooded anorak…"). `decideRepairMethod` hit gate
+2b (clothing MAJOR+ → char-fix) before anything could act on the CRITICAL. char-fix DISCARDS the
+consolidated plan and repaints the figure from the clothing description alone, so the round executed
+none of the plan; the page went 60 → 40. `findBadPages` already computes a per-page CRITICAL flag, but
+`decideRepairMethod` never read it.
+**Decision:**   Two additive guards.
+1. `repairLogic.decideRepairMethod`: gate 2b stands down for **one round** when the clothing finding is
+   only MAJOR and the page carries a **CRITICAL** finding of a type inpaint can actually execute
+   (declared `type` not in `NOT_INPAINTABLE_TYPES`, and not entity-sourced). The page falls through to
+   inpaint, the CRITICAL `per_character_fixes` / `scene_fix` are executed, and the wardrobe gets its
+   figure redo next round. The decision reason names the precedence.
+2. `feedbackConsolidator.applyRule7SceneFixGuard`: a `scene_fix` whose **declared** `types` are all
+   non-inpaintable (clothing / identity / hair / skin / scale) moves to `dropped_issues` with reason
+   `requires_char_fix_not_inpaint` and `scene_fix` is cleared. This enforces prompt rule 7 in code
+   without a prompt change.
+**Rationale:** Additive to — not a reversal of — two settled decisions, both of which stay intact:
+*2026-08-09 "clothing is a figure redo, never an inpaint patch"* (clothing STILL routes to char-fix and
+is never inpainted; only its turn in the queue moves when something worse is on the page) and
+*2026-09-04 "critical-only entity char-fix"* (gate 2 and its entity threshold are untouched, and
+entity-sourced findings can never claim the precedence). Routing is on declared `type` / `severity`
+fields only — no prose matching (docs/SETTLED.md:29). Severity precedence is the same principle
+`findBadPages` already applies when ordering bad pages; this extends it to the method choice.
+**Known gap:** the consolidator prompt's JSON schema requires `types` on `per_character_fixes[]`
+(rule 7a) but not on `scene_fix`, so guard 2 is inert until a `scene_fix.types` field is specified —
+deliberately, since inferring the type from the instruction prose is exactly what SETTLED forbids.
+Tracked in `tasks/BACKLOG.md`.
+**Touched:**   `server/lib/repairLogic.js` (gate 2b + step 3 reason), `server/lib/feedbackConsolidator.js`
+(`applyRule7SceneFixGuard`), `tests/unit/repair-method.test.js`
+**Status:**    ✅ active

@@ -54,7 +54,8 @@ Scan the page plan and list every element that must stay consistent across illus
 
 - All locations, all objects, all vehicles, all animals, all worn costumes and garments.
 - Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
-- Every secondary-character entry states the character's sex and apparent age in its first sentence ("a woman in her thirties", "a boy of about eight"). Build, jaw and facial-hair notes carry neither.
+- Every secondary-character entry carries `age` as a NUMBER of years (`8`, `34`), never prose, and opens `build` with the character's sex ("a boy, slightly tall for his age", "a woman, broad-shouldered"). Jaw and facial-hair notes carry neither.
+{CHILD_AGE_BAND}
 - Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`); the wearer's clothing requirement describes the same item in that slot, in the same words.
@@ -91,6 +92,7 @@ Each cover is a structured spec, not prose. The fields are the spec.
 - Each cover takes a different LOC as its backdrop, preferring LOCs with `isRealLandmark: true` that the story's pages already use. Never add a real landmark to the Visual Bible only for a cover; when the story uses fewer than three, reuse one or use an invented LOC.
 - The Title Page backdrop is a LOC with `isRealLandmark: true` whenever the Visual Bible holds one — never a fictional, underground or imagined LOC. With no real landmark in the bible at all, take the most story-defining invented LOC.
 - List every character by name. Never "the family", "everyone", "the group".
+- Only names from the cast lists below. No invented, descriptive or unnamed figures.
 - Clothing is one of `standard | winter | summer | costumed` and must be a category that character marked `used: true`.
 - `holds` is exactly one ART### from `Objects:`, or the word `nothing`.
 - `priority` is `essential | normal | low`.
@@ -133,7 +135,8 @@ Only the three blocks below. No preamble, no commentary.
       "id": "CHR001",
       "name": "[Name]",
       "pages": [1],
-      "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']",
+      "age": [age in years as a number],
+      "peer": "[yes|no — yes only for an invented child who plays, competes or shares a group with the commissioned children]",
       "build": "[height, body type]",
       "hair": "[colour, style, length]",
       "face": "[eye colour, distinctive features; for adults state facial hair]",

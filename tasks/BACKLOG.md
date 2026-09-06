@@ -18,15 +18,17 @@ to sweep forty files to find out what is open.
 **Not searched by future sweeps:** `docs/archive/` (superseded, see its README) and
 `.claude/skills/` + `prompts/*.txt` (checkbox templates, not tasks).
 
-Last full sweep: **2026-08-20**.
+Last full sweep: **2026-09-06**.
 
 ---
 
 ## P0 — gating the production promotion
 
-- [ ] Verify on staging before promoting to master — **35 commits ahead as of 2026-08-20**
-      (the "259 commits" figure in the source file is from 2026-07-20 and has since been
-      promoted) → `docs/compliance-and-todo.html:81`
+- [ ] Verify on staging before promoting to master — **36 commits ahead as of 2026-09-06**
+      (`origin/master..origin/staging`; the "259 commits" figure in the source file is from
+      2026-07-20 and has since been promoted). Always compare ORIGIN refs: a naive
+      `master..staging` gives 1756 because the LOCAL master ref is stale at 2026-07-10
+      → `docs/compliance-and-todo.html:81`
 - [ ] Confirm location-verify + the landing #418 fix with a fresh showcase
       → `docs/compliance-and-todo.html:83`
 
@@ -44,6 +46,13 @@ Last full sweep: **2026-08-20**.
 
 ## Image quality — unresolved render defects
 
+- [ ] **Baden eval B4 — duplicate/ghost props undetected** (hat twice p3, pompom p12, kettle on the
+      initial page); no prop-multiplicity / prop-vs-VB check → `tasks/baden-eval-2026-09-06.md:B4`
+- [x] **Baden eval B5 — closed 2026-09-06: staging runs a single repair pass on purpose (owner)** → `tasks/baden-eval-2026-09-06.md:B5`
+- [ ] **Baden eval B6 — white-box plate failure retried twice, bad plate kept; wrong tower on p2/p10** → `tasks/baden-eval-2026-09-06.md:B6`
+- [ ] **Baden eval B7 — VB ids leak into the consolidator preserve list (p8)** → `tasks/baden-eval-2026-09-06.md:B7`
+- [x] (2026-09-06, 12b1aab37) **Baden eval I9 — season consistency stated, not measured** (p6 yellow vs p3/p5 copper) → `tasks/baden-eval-2026-09-06.md:I9`
+- [ ] **Baden eval I11 — invented children's ages unconstrained** (scarf boy 11–12 beside a 6-year-old) → `tasks/baden-eval-2026-09-06.md:I11`
 The first two are corroborated by more than one source, which is why they lead.
 
 - [x] **Interaction load — FIXED 2026-08-23 (c191eef6d).** Pages declaring two distinct
@@ -166,6 +175,10 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ## Story text quality — the review stages trade feeling for logistics
 
+- [ ] **Baden eval I8 — pacing budget unenforced**, no page under 111 words at standard level → `tasks/baden-eval-2026-09-06.md:I8`
+- [x] (2026-09-06, 4271daaa2) **Baden eval I10 — "Monday" parsed as an invented character** → `tasks/baden-eval-2026-09-06.md:I10`
+- [ ] **Baden eval I12 — no friend is ever named in a making-friends book** → `tasks/baden-eval-2026-09-06.md:I12`
+- [ ] **Baden eval I13 — cost $5.58 vs baseline; one 0/14 scene-expansion batch wasted** → `tasks/baden-eval-2026-09-06.md:I13`
 - [ ] **The landmark mandate teleports a toddler book — 2 of 2 toddler stories (2026-08-25).** `story-trial.txt`'s
       LANDMARKS section says "At least one scene MUST take place at one of these real local
       landmarks", and toddler mode says "No journeys. The story begins where it happens." In staging
@@ -203,29 +216,30 @@ review, beats review and text refine each fix real faults by adding logistics an
 them by deleting an emotional or characterising sentence. Text refine alone: 14 faults fixed,
 **8 emotional sentences destroyed, 3 new defects created.** All fixes below are prompt-only.
 
-- [ ] **T3 — text refine invents plot to close an audit fault, destroying an obstacle.** "Max hat
+- [x] (2026-09-06, 4b346fb0d) **T3 — text refine invents plot to close an audit fault, destroying an obstacle.** "Max hat
       sein Velo durch das seichte Wasser geschoben" (p8) makes the p4 stream obstacle
       retroactively fake. The refiner has no "delete the detail" disposition, only "fix on a page"
       → `tasks/story-text-quality-2026-08-25.md:T3`
-- [ ] **T5 — page-turn travel raised as a continuity fault → travelogue openers.** "Nach der
+- [x] (2026-09-06, 4b346fb0d) **T5 — page-turn travel raised as a continuity fault → travelogue openers.** "Nach der
       Ruine steigen die vier Buben…", "Nach dem Flug…". The beats review had already ruled this
       "stands"; the text audit has no memory of it → `tasks/story-text-quality-2026-08-25.md:T5`
-- [ ] **T2 — text refine deletes emotion to pay for logistics (8 measured deletions).** Includes
+- [x] (2026-09-06, 4b346fb0d) **T2 — text refine deletes emotion to pay for logistics (8 measured deletions).** Includes
       "Er dreht sich fast um" (p4), the hesitation beat the beats review explicitly *mandated*.
       Needs a protected class + a deletion ledger → `tasks/story-text-quality-2026-08-25.md:T2`
-- [ ] **T1 — prop bookkeeping written into BEAT instead of SCENE → "Julian hält die Folie" on
+- [x] (2026-09-06, 4b346fb0d) **T1 — prop bookkeeping written into BEAT instead of SCENE → "Julian hält die Folie" on
       7 pages.** The beats-review ledger routes around the writer's "do not narrate staging" rule
-      → `tasks/story-text-quality-2026-08-25.md:T1`
-- [ ] **T6 — arc review closes an orphan prop by carrying it through 11 pages** (Max's Velo). No
+      Additionally SUPERSEDED: 824fb02d9 deleted beat prose, 75fc965e9 replaced SCENE with the
+      PAGE PLAN line → `tasks/story-text-quality-2026-08-25.md:T1`
+- [x] (2026-09-06, 4b346fb0d) **T6 — arc review closes an orphan prop by carrying it through 11 pages** (Max's Velo). No
       "retire the object" disposition → `tasks/story-text-quality-2026-08-25.md:T6`
-- [ ] **T4 — clock times written into prose** ("am Nachmittag", "später Nachmittag") to patch an
+- [x] (2026-09-06, 4b346fb0d) **T4 — clock times written into prose** ("am Nachmittag", "später Nachmittag") to patch an
       arc-level problem: a nightfall deadline starting on a "Sommermorgen"
       → `tasks/story-text-quality-2026-08-25.md:T4`
-- [ ] **T8 / T11 / T13 — three missing checks, one clause each.** A build-up page whose action
+- [x] (2026-09-06, 4b346fb0d) **T8 / T11 / T13 — three missing checks, one clause each.** A build-up page whose action
       is taken by someone else (Max p5 → Julian p6); a final-challenge blocker that is never
       foreshadowed (the mist); an ending with a sentiment ceiling and no floor ("Niemand sagt
       viel.") → `tasks/story-text-quality-2026-08-25.md:T8`
-- [ ] **T9(a) / T10 — reading level not re-checked after the writer** (p9 carries a 20-word
+- [x] (2026-09-06, 4b346fb0d) **T9(a) / T10 — reading level not re-checked after the writer** (p9 carries a 20-word
       nested clause at 1st-grade); no pacing check that the story's most-wanted image gets a page
       (the hatch happens between p2 and p3) → `tasks/story-text-quality-2026-08-25.md:T9`
 - [ ] **T15 — `stories.data.dedication` is empty on a delivered book.** Undiagnosed: wizard never
@@ -627,8 +641,12 @@ Recorded so nobody re-proposes them as gaps.
 - **Landmark PRESERVE-exactly wording overrides the era/no-modern-elements rule (2026-09-04, piraterun5 p4/5).** The landmark-fidelity block's preserve-the-photo instruction outranked the era guard, so modern bicycles from the reference photo shipped into a pirate-era story — needs a prompt-precedence fix + Lab check → server/services/prompts.js landmark block
 - **Text-repair may not alter counts the plan fixed (2026-09-04, piraterun5 p13).** The text-refine repair rewrote a group of three figures into five after the plan had fixed the number — candidate repair-prompt rule: staged counts are load-bearing and repairs must keep them → prompts text-refine/repair templates
 - [x] (2026-09-05) 5 landmark photos cannot be copied to R2: corrupt source JPEGs on Commons (VipsJpeg "Invalid SOS parameters") — slots dropped in the description sweep (#11382_2/3, #12026_3, #9437_3 panorama over pixel limit, #3350_2 source 404); every remaining photo has an R2 copy → scripts/admin/backfill-landmark-photos-to-r2.js
-- **Phantom guide images for the avatar sheet's cell 4/8 still show a pure 180° back, out of sync with the 2026-09-05 prompt fix asking for a turned head there (one eye/cheek visible).** The `assets/phantom-watercolor-*.png` mannequin guides (per age tier, plus `-axes` arrow variant) feed `character2x4Sheet.js` as the ONLY-for-direction reference; prompt text now overrides them for cells 4/8 ("turn further than Image 1 shows"), which should work but is a text/image mismatch that would go away if the guide images themselves showed the turned pose. Needs actual asset editing per age tier, not a text change. → `server/lib/character2x4Sheet.js` `loadPhantomVariant`, `assets/phantom-watercolor-*.png`
+- [x] (2026-09-05) ~~Phantom guide images for the avatar sheet's cell 4/8 still show a pure 180° back~~ — CLOSED, was a misdiagnosis. Opened the actual `phantom-watercolor-adult-axes.png`: cells 1/2/4 are all the SAME front-facing mannequin, only the arrow overlay changes — there was no rival back-view image to blame. The real blocker was the literal phrase "back view" anchoring Grok's render regardless of qualifiers; renaming the pose to "REAR TURN" (dropping "back view" wording entirely for cells 4/8) fixed it, live-tested against a real character. See `docs/decisions.md` 2026-09-05, commit `ca8287441`.
+- **`planCounters.js`'s fixed plan-quality quotas don't scale down for short books with a large cast (found 2026-09-04, owner-scoped fix not yet implemented).** A 4-page book with 5 commissioned characters needs ≥2 close-ups + ≥2 ultra-wides + ≥1 solo + ≥1 peopleless page (`planCounters.js:209-236`) PLUS every character in frame on ≥2 pages (`:286-293`) — arithmetically more page-roles than a 4-page book can hold, which forced a real re-plan to strip a story-load-bearing character (Hans) out of the climax page to manufacture an artificial solo page, breaking text/image agreement (see `job_1788378719225_8hpr0mzzh` page 4). Owner chose the fix location (scale the code-side quotas in `planCounters.js` by page count, not a prompt-side or minimum-page-count fix) but the conversation moved to the arc-per-character bug before this was implemented — still open. → `server/lib/planCounters.js:167-236`
 - **Two analyzer model files have never been in the deployed image (2026-09-04).** `blaze_face_short_range.tflite` (MediaPipe, `photo_analyzer.py:168` and `:797`) and `yolo11n-pose.pt` (`POSE_WEIGHTS`, the `/pose-heads` endpoint used by the 2×4 sheet head-row check) exist on dev machines but are untracked and absent from production — `ls /app/*.tflite /app/*.pt` on the running container returns only `lbpcascade_animeface.xml` and `mobile_sam.pt`. So MediaPipe face detection falls back to Haar and `/pose-heads` cannot be working in production; `character2x4Sheet.js` degrades to Gemini for the head-row check and logs a warning nobody reads. `Dockerfile.analyzer` deliberately reproduces this rather than silently fixing it inside a refactor. Decide: bake them in (they are 228 KB and 6 MB) or delete the dead code paths. → `photo_analyzer.py:168`, `photo_analyzer.py:2024` `/pose-heads`, `Dockerfile.analyzer` COPY list
 - **The 2026-09-04 landmark minimum fails EVERY themed showcase entry that takes the home-town idea (found 2026-09-05).** `storyJobPipeline.js:2466` fails a job outright when `premiseNamedWorld === false` and the story stages fewer than two real landmarks. `premiseNamedWorld` is decided by WHICH idea is chosen — index 0 plays in the reader's home town, index 1 in a make-believe world — and the demo spec used to always click `.first()`. A superhero/pirate/mermaid story that must also build in two real Swiss landmarks is a contradiction the writer cannot satisfy; it retries once and dies. Killed `job_1788558535073_dm6qxomqe` at 56%. Fixed in the spec (themed entries now take index 1), but the same trap applies to any caller that picks an idea positionally, and to a user who picks the home-town idea and then adds a fantasy world in the wizard — that path is unguarded. → `storyJobPipeline.js:2466`, `server/lib/premiseWorld.js`, `tests/demo-story.spec.ts` idea selection
 - **`englishEntityRef` chops a description at 12 words with no clause awareness (2026-09-06).** `visualBible.js:661` slices `description.split(/[.;
 ]/)[0]` to 12 words, so a VB-id substitution can end on a dangling conjunction — ART001 on `job_1788641639919_mpjwlzkf1` resolves to "small hat knitted from chunky red wool, dome-shaped at the crown with". Pre-existing at every `sanitizeVbIdsInPrompt` call site since `5da568617`; the 2026-09-06 leak fix widens where it shows (the consolidator input and the evaluators' interaction blocks now use it too) but does not cause it. Trim on a clause boundary, or prefer `entry.type` the way the NAME pass already does. → `server/lib/visualBible.js:657`, docs/decisions.md 2026-09-06
+- [x] (2026-09-06) **A page's two-step text compresses into one un-drawable instant** — the PLAN line joined "presses forehead against a pane" and "turns to the other child" with a trailing clause; scene expansion hardened it into head-on-surface + eye contact off to the side, and the render dropped the declared essential interaction, leaving two children nose-to-nose in a close-up (`job_1788641639919_mpjwlzkf1` p2). Corpus: 4 pages / 3 stories / 82 plan pages (4.9%). FIXED prompt-side on both generator and critique; `sceneBriefCheck.js` deliberately untouched (semantic, not deterministic). → `tasks/cover-cast-and-eval-fixes-2026-09-06.md` §3, `prompts/story-beats.txt:39`, `prompts/scene-expansion.txt` 7e, `prompts/scene-review.txt` check 7, docs/decisions.md 2026-09-06
+- [ ] `scene_fix` has no declared `types` field in the consolidator JSON schema, so the rule-7 parser guard (`applyRule7SceneFixGuard`) can never fire — a clothing-only `scene_fix` still reaches the inpaint executor (observed: `job_1788641639919_mpjwlzkf1` p5). Fix is a prompt schema change (extend rule 7a to `scene_fix`), which is the owner's call. → `prompts/feedback-consolidator.txt` (rule 7a), `server/lib/feedbackConsolidator.js:applyRule7SceneFixGuard`
+- [x] (2026-09-06) **Cover hint casts could name a phantom and drop a real character** — the beats bible writer wrote "The smallest girl (centre front, facing viewer)" into the back cover of `job_1788641639919_mpjwlzkf1` and dropped primary Margaret; the phantom key spread to characterDetails/characterClothing/characterPerspectives, only 4 references were packed and the eval raised an unrepairable `missing_character`. FIXED: prompt rule + `validateCoverHintCast()` drops unresolved names and refills slots from the real cast before persistence. → `tasks/cover-cast-and-eval-fixes-2026-09-06.md`, docs/decisions.md 2026-09-06
