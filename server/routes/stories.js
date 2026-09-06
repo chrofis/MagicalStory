@@ -563,7 +563,9 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const sceneSeedRows = await dbQuery(
         `SELECT (scene->>'pageNumber')::int AS page_number,
                 scene->'compositeBboxes' AS bboxes,
-                (scene->>'hasCompositeStages')::boolean AS has_stages
+                (scene->>'hasCompositeStages')::boolean AS has_stages,
+                scene->'unrepairedCritical' AS unrepaired_critical,
+                (scene ? 'unrepairedCritical') AS has_unrepaired_critical
          FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
          WHERE id = $1`,
         [id]
@@ -579,6 +581,13 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           activeVersion: 0,
           hasCompositeStages: row.has_stages === true,
           compositeBboxes: row.bboxes || null,
+          // `unrepairedCritical` has three meaningful states and the repair panel
+          // distinguishes all three: an array (shipped with CRITICALs), null
+          // (checked and clean), and ABSENT (story predates the marker — never
+          // checked, never shown as verified). `->` collapses stored-null and
+          // missing-key into SQL NULL, so the key is emitted only when the scene
+          // actually carries it.
+          ...(row.has_unrepaired_critical ? { unrepairedCritical: row.unrepaired_critical } : {}),
         });
       }
 

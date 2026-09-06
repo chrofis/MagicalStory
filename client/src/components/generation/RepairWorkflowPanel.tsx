@@ -123,11 +123,21 @@ function PageFeedbackCard({
   reEvalResult,
   isMarkedForRedo,
   onToggleRedo,
+  unrepairedCritical,
 }: {
   feedback: PageFeedback;
   reEvalResult?: ReEvalResult;
   isMarkedForRedo?: boolean;
   onToggleRedo?: () => void;
+  /**
+   * Scene-level `unrepairedCritical` marker, verbatim from the stored scene:
+   *   array (non-empty) — the shipped version still carries these CRITICALs
+   *   `null`            — checked and clean
+   *   `undefined`       — story predates the field; never checked
+   * Only a non-empty array renders anything: "checked and clean" and "never
+   * checked" both stay silent, and neither is presented as verified.
+   */
+  unrepairedCritical?: SceneImage['unrepairedCritical'];
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -225,6 +235,15 @@ function PageFeedbackCard({
 
   const pageName = getPageName(feedback.pageNumber);
 
+  // Non-empty array only — `null` (clean) and `undefined` (never checked) render nothing.
+  const unrepairedCriticalIssues = (Array.isArray(unrepairedCritical) ? unrepairedCritical : []).map(f => ({
+    // Same `[label] text` shape the entity/object issue lists use, so the type
+    // is visible in renderIssueList (which prints severity + description only).
+    description: f.type ? `[${f.type}] ${findingText(f)}` : findingText(f),
+    severity: f.severity,
+    type: f.type || undefined,
+  }));
+
   const renderIssueList = (issues: typeof allIssues, color: string) => (
     <div className="space-y-0.5">
       {issues.map((issue, idx) => (
@@ -303,6 +322,11 @@ function PageFeedbackCard({
               {verdict}
             </span>
           )}
+          {unrepairedCriticalIssues.length > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+              Shipped with {unrepairedCriticalIssues.length} unrepaired CRITICAL
+            </span>
+          )}
           {totalIssues > 0 && (
             <span className="text-xs text-gray-500">{totalIssues} issues</span>
           )}
@@ -331,6 +355,16 @@ function PageFeedbackCard({
             }`}>
               {issuesSummary}
             </p>
+          )}
+
+          {/* CRITICALs still present on the version that shipped (repair budget ran out) */}
+          {unrepairedCriticalIssues.length > 0 && (
+            <div className="text-xs pl-2 border-l-2 border-red-400 bg-red-50 p-1.5 rounded-r">
+              <div className="font-semibold text-red-800 mb-1">
+                Shipped with unrepaired CRITICAL ({unrepairedCriticalIssues.length}):
+              </div>
+              {renderIssueList(unrepairedCriticalIssues, 'text-red-600')}
+            </div>
           )}
 
           {/* Source-grouped issues with per-issue penalty values */}
@@ -442,6 +476,14 @@ export function RepairWorkflowPanel({
   const [whiteoutTarget, setWhiteoutTarget] = useState<'auto' | 'face' | 'body'>('auto');
   const [retryingPages, setRetryingPages] = useState<Set<string>>(new Set()); // "char:pageNum" keys
   const effectiveImageModel = overrideImageModel || imageModel;
+
+  // Per-page `unrepairedCritical` markers, straight off the stored scenes.
+  // Missing entry === field absent === never checked (renders nothing, same as `null`).
+  const unrepairedCriticalByPage = useMemo(() => {
+    const map = new Map<number, SceneImage['unrepairedCritical']>();
+    for (const scene of sceneImages) map.set(scene.pageNumber, scene.unrepairedCritical);
+    return map;
+  }, [sceneImages]);
 
   const {
     workflowState,
@@ -865,6 +907,7 @@ export function RepairWorkflowPanel({
                               feedback={feedback}
                               isMarkedForRedo={workflowState.redoPages.pageNumbers.includes(feedback.pageNumber)}
                               onToggleRedo={() => toggleRedoPage(feedback.pageNumber)}
+                              unrepairedCritical={unrepairedCriticalByPage.get(feedback.pageNumber)}
                             />
                           ))}
                       </div>
@@ -1092,6 +1135,7 @@ export function RepairWorkflowPanel({
                               key={page}
                               feedback={feedbackData}
                               reEvalResult={result}
+                              unrepairedCritical={unrepairedCriticalByPage.get(pageNum)}
                             />
                           );
                         })}

@@ -29276,3 +29276,24 @@ stored versions of that job: p9 (2 findings) and p10 (5) are flagged, p12
 end-of-stage warn), `storyJobPipeline.js` (the sceneImages persist whitelist —
 the single gate on what reaches `stories.data`).
 **Status:** ✅ active
+
+## 2026-09-06 — The make-believe trial idea carries no landmark mandate; the chosen idea's kind travels to the story prompt
+
+**Context:** The trial offers two ideas by design (2026-08-25): the own-town one and the
+make-believe-world one. The landmark mandate ("at least one scene at one of these real local
+landmarks") sat in the SHARED idea prompt, and the trial story prompt pinned every story to the
+real city regardless of which card was chosen. Three mermaid-world trials in a row
+(`job_1788721172453`, `job_1788721596038`) were written at the Zürichsee with the second card
+selected.
+
+**Decision (owner: "the 2nd one should be in the mermaid land"):** the idea prompt puts the
+landmark line into the own-town variant only, and the make-believe variant says the world it
+enters has no real place names. The client sends `ideaKind` ('local' for the first card,
+'fantasy' for the second) with create-story; it is stored on the job's inputData; for 'fantasy'
+`buildTrialStoryPrompt` replaces the Location/landmarks section with a World section: first and
+last scene where the child really is, every scene between inside the make-believe world. The
+two-kinds split itself is unchanged.
+
+**Touched:** `server/routes/trial.js` (generate-ideas-stream, create-story, createTrialStoryJob),
+`server/lib/promptBuilders.js` (`buildTrialStoryPrompt`), `client/src/pages/TrialWizard.tsx`.
+**Status:** ✅ active — validation trial pending.
