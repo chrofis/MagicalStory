@@ -84,6 +84,8 @@ def reset_state():
     pa._sessions.clear()
     pa._active_sessions = 0
     pa._warming_roles.clear()
+    pa._spawned_at.clear()
+    pa._adopted.clear()
     pa._active_sessions = 0
     pa._inflight_requests = 0
 
@@ -203,6 +205,9 @@ def test_wedged_worker_fails_fast():
     try:
         wedged = FakeProc()  # alive, unproven, no bring-up in flight
         pa._workers['face'] = wedged
+        # Started long ago: a worker still inside its start budget is NOT a
+        # wedge (S6), so the age has to say this one is past that.
+        pa._spawned_at['face'] = time.time() - 3600
         t0 = time.time()
         try:
             pa.ensure_worker('face')

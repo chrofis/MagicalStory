@@ -453,6 +453,9 @@ _bringing_up = {}
 # it asks them to exit over HTTP instead. Tracked so they are neither immortal
 # nor invisible in the memory accounting (2026-09-06).
 _adopted = set()
+# When each role's process was started, so a legitimately slow boot is not
+# mistaken for a wedge (see ensure_worker).
+_spawned_at = {}
 # Roles that have answered /health since they were spawned. Lets the common path
 # (worker already serving) skip the readiness probe entirely — without it every
 # proxied request paid a loopback round trip. Cleared on spawn and on kill.
@@ -499,6 +502,7 @@ def _terminate_wedged(role):
     with _workers_lock:
         proc = _workers.pop(role, None)
         _worker_ready.discard(role)
+        _adopted.discard(role)
     if proc is None or proc.poll() is not None:
         return
     print(f"[WORKERS] {role} worker is wedged (alive, not answering) — terminating")
@@ -539,8 +543,23 @@ def ensure_worker(role, wait_ready=True, _retried=False):
     with _workers_lock:
         # Proven-ready and still alive: the overwhelmingly common case. Skip the
         # probe — this is a per-request path.
-        if role in _worker_ready and (_worker_alive(role) or role in _adopted):
+        if role in _worker_ready and _worker_alive(role):
             return url
+        if role in _adopted:
+            # An adopted role has no Popen, so `_worker_alive` is permanently
+            # False for it and cannot be used as the liveness test. Probe it
+            # instead — cheap, and the alternative was worse: treating adoption
+            # itself as "alive" made a DEAD adopted worker sticky, returning its
+            # URL forever so every call 502'd with ECONNREFUSED and the role
+            # could never fall through to a respawn. That is the likely case,
+            # not a corner: _parent_watchdog makes every orphan exit within 5s
+            # of its parent disappearing, and an adopted worker is by definition
+            # an orphan.
+            if _worker_health_ok(role):
+                return url
+            print(f"[WORKERS] adopted {role} worker has gone — dropping it")
+            _adopted.discard(role)
+            _worker_ready.discard(role)
         if not _worker_alive(role):
             # INVARIANT: _worker_ready never outlives the process it describes.
             # Every not-alive route passes through here, kill_workers clears the
@@ -559,10 +578,18 @@ def ensure_worker(role, wait_ready=True, _retried=False):
             print(f"[WORKERS] spawning {role} worker on :{WORKER_PORTS[role]}")
             _workers[role] = subprocess.Popen(
                 [sys.executable, '-u', os.path.abspath(__file__)], env=env)
+            _spawned_at[role] = time.time()
             spawned = True
         # Someone else is already waiting on this role's startup, so the long
         # budget is the right one even though WE did not spawn it.
-        starting = spawned or _bringing_up.get(role, 0) > 0
+        # A worker nobody is CURRENTLY waiting on is otherwise indistinguishable
+        # from a wedged one: the first waiter's 120s could expire, its
+        # _bringing_up claim drop, and the next arrival 1s later would apply the
+        # 15s budget to a process still legitimately importing models — then
+        # kill it and start again, forever. Its own age settles it.
+        age = time.time() - _spawned_at.get(role, 0)
+        starting = (spawned or _bringing_up.get(role, 0) > 0
+                    or age < WORKER_START_TIMEOUT_S)
         if not wait_ready:
             return url
         _bringing_up[role] = _bringing_up.get(role, 0) + 1
@@ -649,13 +676,29 @@ def kill_workers(reason, expect_epoch=None, force=False):
     # this it survived every kill path and kept its full RSS billed.
     for role in orphans:
         print(f"[WORKERS] asking adopted {role} worker to exit ({reason})")
+        gone = False
         try:
             req = _urlreq.Request(
                 f"http://127.0.0.1:{WORKER_PORTS[role]}/release-memory?recycle=true",
                 data=b'', method='POST')
-            _urlreq.urlopen(req, timeout=5).read()
+            body = _urlreq.urlopen(req, timeout=5).read()
+            # The worker REFUSES with HTTP 200 and {"recycled": false} when it is
+            # busy. Reading only the transport result meant a refusal looked like
+            # success — and we had already erased every record of the process, so
+            # it kept its full RSS, untracked and unkillable. Believe the body.
+            gone = b'"recycled": true' in body or b'"recycled":true' in body
+            if not gone:
+                print(f"[WORKERS] adopted {role} refused to exit: {body[:120]!r}")
         except Exception as e:
-            print(f"[WORKERS] adopted {role} did not exit on request: {e}")
+            # A refused connection means it is already gone, which is the
+            # outcome we wanted; anything else is a live worker we cannot reach.
+            gone = isinstance(e, (ConnectionError, _urlerr.URLError))
+            print(f"[WORKERS] adopted {role} exit request failed: {e}")
+        if not gone:
+            # Keep tracking it so the next reap tries again and /health still
+            # reports it, rather than silently losing a resident process.
+            with _workers_lock:
+                _adopted.add(role)
     for role, proc in doomed:
         if proc.poll() is None:
             print(f"[WORKERS] killing {role} worker ({reason})")
@@ -671,9 +714,14 @@ def kill_workers(reason, expect_epoch=None, force=False):
 
 
 # A session that has seen no request traffic for this long did not end cleanly.
-# Generous on purpose: a real story issues analyzer calls throughout, and the
-# gap between its stages is minutes, not half an hour.
-_SESSION_LEAK_TIMEOUT_S = int(os.environ.get('SESSION_LEAK_TIMEOUT_S', '1800'))
+#
+# 90 minutes, not 30 (2026-09-06). jobs.js documents that a story has "20-25
+# minutes in which nothing touches the analyzer at all" between story start and
+# the repair phase, and on a quiet box that IS global silence — so a 30-minute
+# timeout could declare a healthy story leaked and kill its workers immediately
+# before the repair phase needed them. A five-minute gap between a documented
+# normal duration and a destructive timeout is not a margin.
+_SESSION_LEAK_TIMEOUT_S = int(os.environ.get('SESSION_LEAK_TIMEOUT_S', '5400'))
 
 # No single job runs this long. A session older than this leaked, however busy
 # the rest of the process is — the global-silence rule above can be held off
@@ -742,8 +790,16 @@ def _maybe_reap_workers():
         #     cleanly, no matter how busy the process is. This is what survives
         #     a multi-tenant day: (a) can be held off forever by OTHER users'
         #     traffic, and the leak is not their fault.
+        # Presence sessions are EXEMPT from the age rule: a tab left open on the
+        # wizard is a legitimate multi-hour session, `started` is stamped once
+        # and never refreshed, and Node does not re-open a session it thinks is
+        # already open — so reclaiming one stranded that user with cold starts
+        # for the life of the tab. They have their own guard: Node's 5-minute
+        # presence TTL sends the end, and a Node restart clears them all via
+        # /session/reset.
         stale = [sid for sid, meta in list(_sessions.items())
-                 if now - meta['started'] > _SESSION_MAX_AGE_S]
+                 if now - meta['started'] > _SESSION_MAX_AGE_S
+                 and not str(meta.get('label', '')).startswith('presence:')]
         leaked_globally = idle_for > _SESSION_LEAK_TIMEOUT_S
 
         if not stale and not leaked_globally:
