@@ -50,14 +50,14 @@ describe('page + cover render tier', () => {
     expect(IMAGE_MODELS[MODEL_DEFAULTS.complexPageImage].modelId).toBe('grok-imagine-image-2.0');
   });
 
-  it('production and every other environment stay on grok-imagine-image', async () => {
+  it('production and every other environment render on grok-imagine-image-2.0 too (owner, 2026-09-06)', async () => {
     for (const env of ['production', undefined, 'local']) {
       const { MODEL_DEFAULTS, IMAGE_MODELS } = await loadModelsFor(env);
       const where = `env=${env ?? '(unset)'}`;
-      expect(IMAGE_MODELS[MODEL_DEFAULTS.pageRenderImage].modelId, where).toBe('grok-imagine-image');
-      expect(IMAGE_MODELS[MODEL_DEFAULTS.coverImage].modelId, where).toBe('grok-imagine-image');
-      expect(IMAGE_MODELS[MODEL_DEFAULTS.simplePageImage].modelId, where).toBe('grok-imagine-image');
-      expect(IMAGE_MODELS[MODEL_DEFAULTS.complexPageImage].modelId, where).toBe('grok-imagine-image');
+      expect(IMAGE_MODELS[MODEL_DEFAULTS.pageRenderImage].modelId, where).toBe('grok-imagine-image-2.0');
+      expect(IMAGE_MODELS[MODEL_DEFAULTS.coverImage].modelId, where).toBe('grok-imagine-image-2.0');
+      expect(IMAGE_MODELS[MODEL_DEFAULTS.simplePageImage].modelId, where).toBe('grok-imagine-image-2.0');
+      expect(IMAGE_MODELS[MODEL_DEFAULTS.complexPageImage].modelId, where).toBe('grok-imagine-image-2.0');
     }
   });
 
@@ -137,13 +137,13 @@ describe('runtime declaration', () => {
     expect(snap.coverRenderModel).toBe('grok-imagine-2');
   });
 
-  it('defaults both tiers to grok-imagine outside staging', async () => {
+  it('keeps both tiers on grok-imagine-2 outside staging (owner, 2026-09-06)', async () => {
     vi.resetModules();
     process.env.RAILWAY_ENVIRONMENT_NAME = 'production';
     // @ts-expect-error - JS module without types
     const { runtimeSnapshot } = await import('../../server/config/runtime.js');
     const snap = runtimeSnapshot();
-    expect(snap.pageRenderModel).toBe('grok-imagine');
-    expect(snap.coverRenderModel).toBe('grok-imagine');
+    expect(snap.pageRenderModel).toBe('grok-imagine-2');
+    expect(snap.coverRenderModel).toBe('grok-imagine-2');
   });
 });
