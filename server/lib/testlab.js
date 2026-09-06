@@ -1795,7 +1795,7 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
         const sev = String(issue.severity || '').toLowerCase();
         const pts = SEVERITY_POINTS[sev] || 0;
         const pages = issue.pages || issue.pagesToFix || (issue.pageNumber != null ? [issue.pageNumber] : []);
-        issues.push({ name, severity: sev, points: pts, pages: [...pages].sort((x, y) => x - y), description: issue.description || issue.problem || '' });
+        issues.push({ name, severity: sev, points: pts, pages: [...pages].sort((x, y) => x - y), description: require('./scoring').findingText(issue) });
         for (const p of pages) pagePenalty[p] = (pagePenalty[p] || 0) + pts;
       }
     }

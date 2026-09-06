@@ -3640,7 +3640,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
         // Entity/consistency issues are excluded — those need bbox detection + face repair
         const qualityIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
         const semanticIssues = (preEvalResult.semanticResult?.issues || preEvalResult.semanticResult?.semanticIssues || [])
-          .map(si => ({ description: si.problem || `${si.type}: ${si.item || ''}`, source: 'semantic' }));
+          .map(si => ({ description: require('../lib/scoring').findingText(si), source: 'semantic' }));
         const combinedIssues = [...qualityIssues, ...semanticIssues]
           .filter((issue, idx, arr) => {
             const desc = issue.description || issue.issue || '';
@@ -4068,7 +4068,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
             entityIssues.push({
               name: issue.character || issue.element || '',
               severity: issue.severity,
-              description: issue.description || issue.problem || '',
+              description: require('../lib/scoring').findingText(issue),
               source: issue.source === 'entity check' ? 'character' : 'image-checks',
             });
           }

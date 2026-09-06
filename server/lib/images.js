@@ -2685,7 +2685,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // Collect semantic issues (legacy path)
   const semanticIssues = (evaluation.semanticResult?.issues || evaluation.semanticResult?.semanticIssues || [])
     .map(si => ({
-      description: si.problem || `${si.type}: ${si.item || ''}`,
+      description: require('./scoring').findingText(si),
       source: 'semantic',
       type: si.type,
       item: si.item
