@@ -29728,5 +29728,6 @@ they belong to the Ads manager account not the Cloud project). No application
 code changed. Verified after migration: `node scripts/ads/whoami.js` → both
 customer accounts, `node scripts/seo/report.js` → live Search Console data.
 
-**Status:** ✅ active. Do NOT consolidate the two Cloud projects back into one,
-and never add a sensitive scope to `magical-story-3b745`.
+**Status:** ✅ active — verified on production 2026-09-06: the trial sign-in shows a
+plain consent card, no warning screen. Do NOT consolidate the two Cloud projects
+back into one, and never add a sensitive scope to `magical-story-3b745`.
