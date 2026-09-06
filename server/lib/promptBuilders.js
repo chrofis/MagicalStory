@@ -3111,18 +3111,35 @@ function stripWornStateFromDescription(description) {
  *
  * The cap is what keeps the extension from becoming a reversal. It is applied
  * in code rather than trusted to the authoring prompt because the prompt is
- * where the 2026-09-02 failure came from in the first place.
+ * where the 2026-09-02 failure came from in the first place. It matches the
+ * word budget the authoring templates ask for, so a compliant delta always
+ * survives whole.
  */
-const STATE_CLAUSE_MAX_WORDS = 12;
+const STATE_CLAUSE_MAX_WORDS = 15;
 
 /**
+ * Cut an over-long state delta down to the cap — LOUDLY.
+ *
+ * The delta is the ONLY thing that tells one state of an object from another,
+ * so a silent cut can remove exactly the distinguishing words and the wrong
+ * variant is drawn with nothing in the log to say why. It warns with the full
+ * authored text so the cut is diagnosable after the run.
+ *
+ * It never throws: an over-long delta must not kill a paid generation
+ * (docs/decisions.md, "gates are guidelines"), so the trim is the fallback and
+ * the warning is the signal.
+ *
  * @param {string} delta - the authored state delta
+ * @param {Object} [ctx] - identity for the warning: { id, name }
  * @returns {string} the delta, cut to STATE_CLAUSE_MAX_WORDS words
  */
-function trimStateClause(delta) {
+function trimStateClause(delta, ctx = null) {
   const words = String(delta || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
   if (words.length <= STATE_CLAUSE_MAX_WORDS) return words.join(' ');
-  log.info(`[IMAGE PROMPT] State clause cut from ${words.length} to ${STATE_CLAUSE_MAX_WORDS} words - the line is a delta, not a description`);
+  const who = ctx && (ctx.id || ctx.name)
+    ? `${ctx.id || '?'}${ctx.name ? ` "${ctx.name}"` : ''}`
+    : 'unidentified state';
+  log.warn(`⚠️ [IMAGE PROMPT] State clause for ${who} cut from ${words.length} to ${STATE_CLAUSE_MAX_WORDS} words — the tail is dropped and may hold what tells this state from another. Authored delta: "${words.join(' ')}"`);
   return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
 }
 
@@ -3607,7 +3624,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // grounding label and the entity-consistency key - one object would
         // read as several across the book, which is the defect this whole
         // model exists to remove.
-        const stateNote = obj.state ? ` — ${trimStateClause(obj.state.delta)}` : '';
+        const stateNote = obj.state ? ` — ${trimStateClause(obj.state.delta, obj.state)}` : '';
         requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {

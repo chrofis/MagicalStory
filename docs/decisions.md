@@ -29252,7 +29252,7 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
 
 **Decision (owner, three calls, built as one change):**
 
-1. **The state model.** An artifact entry may carry `states[]` — up to 3 rows of
+1. **The state model.** An artifact entry may carry `states[]` — up to 4 rows of
    `{id: "ART###.N", name, delta, pages[]}`. `description` holds what is true of the object on
    every page; `delta` is only what changed (one clause, ≤15 words, never material/colour/size).
    A page cites a state with the dotted handle in `objects[]`. Not `ART001:lit`: the id guard
@@ -29271,9 +29271,14 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
    parenthetical. This is an EXTENSION of the 2026-09-02 name-only ruling, not a reversal: that
    ruling forbids emitting the Visual Bible DESCRIPTION (a full exterior spec for an element the
    shot shows part of), and a delta is not a description. What keeps the extension from becoming a
-   reversal is a cap in CODE — `trimStateClause`, 12 words — rather than a request in the prompt,
-   because the prompt is where the 2026-09-02 failure came from. Nothing about REQUIRED OBJECTS
-   appears on `docs/SETTLED.md`; this entry is the record.
+   reversal is a cap in CODE — `trimStateClause`, 15 words, matching the budget the authoring
+   templates ask for — rather than a request in the prompt, because the prompt is where the
+   2026-09-02 failure came from. The cap WARNS when it bites, naming the object, the state, the
+   word count and the full authored delta: the delta is the only thing telling one state from
+   another, so a silent cut can drop exactly the distinguishing words and the wrong variant is
+   drawn with nothing in the log to explain it. It trims rather than throws — an over-long delta
+   must never kill a paid run. Nothing about REQUIRED OBJECTS appears on `docs/SETTLED.md`; this
+   entry is the record.
    The clause sits AFTER the type and never inside the bold name: `parseVisualBibleObjects`
    captures what is between the asterisks, so a state in the name would become the GroundingDINO
    grounding label and the entity-consistency key, and one object would read as several across the
@@ -29288,9 +29293,13 @@ normalised by `vbElementBudget.baseId()`. States are the artifact-side twin of i
    object's cells across calls. That assertion runs at batch-construction time, before any image
    call, so it costs nothing and can never kill a paid run (it is not an exception to "gates are
    guidelines" — there is no run to kill yet).
-   Base + 3 states = 4 cells, which is the grid's own `maxPerBatch`, so a whole object always
-   fits one call. A multi-state object therefore consumes ONE element slot, not one per state, and
-   `VB_ELEMENT_BUDGET = 3` (shipped the same day) stops being a constraint on the design.
+   A multi-state object is routed to a batch of its OWN, which never passes through the
+   `maxPerBatch` chunker, so base + 4 states = 5 cells still render in one call — `maxPerBatch`
+   bounds the ordinary batches, never a stated object's grid. The ceiling of 4 is a legibility
+   limit on the grid (5 cells stack as one column; past that the cells are too small to serve as
+   references), not a batching limit. A multi-state object therefore consumes ONE element slot,
+   not one per state, and `VB_ELEMENT_BUDGET = 3` (shipped the same day) stops being a constraint
+   on the design.
 
 5. **Per-page attachment hands over the right CELL, not the whole grid.** That is the precedent
    every other multi-cell reference already follows — the 2×4 character sheet is cropped to the
@@ -29331,7 +29340,7 @@ parse, `getElementReferenceImagesForPage`, `updateElementReferenceImage`),
 `server/lib/coverIterate.js`, `server/lib/r2.js`, `prompts/story-unified.txt`,
 `prompts/story-trial.txt`, `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`,
 `prompts/scene-expansion-all.txt`, `tests/unit/vb-object-states.test.ts`.
-**Status:** ✅ active — 30 unit tests green (dotted id end to end: `matchesEntry` → REQUIRED
+**Status:** ✅ active — 34 unit tests green (dotted id end to end: `matchesEntry` → REQUIRED
 OBJECTS → reference resolution → element budget, plus the old un-stated shape at every one of
 them). No story generation was run: validating the authoring half needs a paid run, which was not
 mandated.

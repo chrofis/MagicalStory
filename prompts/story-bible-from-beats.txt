@@ -163,7 +163,7 @@ Only the three blocks below. No preamble, no commentary.
       "name": "[Name]",
       "pages": [1],
       "type": "[what kind of object]",
-      "states": "[OMIT unless the story alters this object. Otherwise up to 3, in the order the story reaches them: {\"name\": \"[one or two words]\", \"delta\": \"[only what changed, one clause, at most 15 words — never material, colour or size, those stay in description]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`, or in none for the unaltered look.]"
+      "states": "[OMIT unless the story alters this object. Otherwise up to 4, in the order the story reaches them: {\"name\": \"[one or two words]\", \"delta\": \"[only what changed, one clause, at most 15 words — never material, colour or size, those stay in description, and never a feature `description` already carries]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`, or in none for the unaltered look.]"
       "description": "[size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face gets two entries, one per side.]"
     }
   ],

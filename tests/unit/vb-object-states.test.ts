@@ -26,6 +26,7 @@ const {
 const { buildReferenceSheetBatches, expandElementStateCells, assertStateCellsCoLocated } =
   require_('../../server/lib/referenceSheets');
 const { objectIds } = require_('../../server/lib/vbElementBudget');
+const { addLogListener, removeLogListener } = require_('../../server/utils/logger');
 const { keyForVbReference } = require_('../../server/lib/r2');
 
 // @ts-expect-error - JS module without types
@@ -164,14 +165,46 @@ describe('REQUIRED OBJECTS — a dotted handle reaches the block', () => {
     expect(line).toMatch(/light source burns inside/);
   });
 
-  it('caps the clause at 12 words so it cannot regrow into a description', () => {
+  // The cap matches the word budget the authoring templates ask for, so a
+  // compliant delta survives whole. The words are numbered so the cut is exact.
+  const numbers = (n: number) =>
+    ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven',
+     'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen'].slice(0, n).join(' ');
+
+  const withDelta = (delta: string) => {
     const vb = bible();
-    vb.artifacts[0].states[2].delta =
-      'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen';
-    const line = requiredObjectsBlock(promptFor(['ART001.3'], vb))
-      .split('\n').find(l => l.includes('hollowed carved vessel'))!;
-    expect(line).toContain('twelve');
-    expect(line).not.toContain('thirteen');
+    vb.artifacts[0].states[2].delta = delta;
+    const warnings: string[] = [];
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    let line: string;
+    try {
+      line = requiredObjectsBlock(promptFor(['ART001.3'], vb))
+        .split('\n').find(l => l.includes('hollowed carved vessel'))!;
+    } finally { removeLogListener(listener); }
+    return { line, warnings };
+  };
+
+  it('a delta at the template word budget (15) survives untrimmed, and silent', () => {
+    const { line, warnings } = withDelta(numbers(15));
+    expect(line).toContain('fifteen');
+    expect(warnings.filter(w => /State clause/.test(w))).toHaveLength(0);
+  });
+
+  it('caps the clause at 15 words so it cannot regrow into a description', () => {
+    const { line } = withDelta(numbers(16));
+    expect(line).toContain('fifteen');
+    expect(line).not.toContain('sixteen');
+  });
+
+  it('a cut delta WARNS - the dropped tail may hold what tells one state from another', () => {
+    const { warnings } = withDelta(numbers(16));
+    const w = warnings.find(x => /State clause/.test(x));
+    expect(w).toBeDefined();
+    expect(w).toContain('ART001.3');   // which object, which state
+    expect(w).toContain('lit');        // the state's name
+    expect(w).toContain('16');         // the authored word count
+    expect(w).toContain(numbers(16));  // the full authored text, for diagnosis
   });
 
   it('a BARE id on a stated object emits no clause (the unaltered look)', () => {
@@ -281,7 +314,36 @@ describe('reference sheet — every state of one object renders in ONE call', ()
     expect(owning).toHaveLength(1);
     expect(owning[0].map((c: any) => c.id)).toEqual(['ART001', 'ART001.1', 'ART001.2', 'ART001.3']);
     // one call per batch, so the whole object is one call
-    expect(owning[0].length).toBeLessThanOrEqual(4);
+    expect(owning[0].length).toBe(4);
+  });
+
+  it('the CEILING still renders in ONE call - base + 4 states = 5 cells, one batch', () => {
+    const maxed = {
+      ...STATED,
+      type: 'artifact',
+      states: [
+        ...STATED.states,
+        { id: 'ART001.4', name: 'emptied', delta: 'the inner cavity is bare, the openings dark', pages: [9] },
+      ],
+    };
+    // A multi-state object is routed to a batch of its OWN: `maxPerBatch`
+    // chunks only the ordinary elements, so the ceiling is not bounded by it.
+    const batches = buildReferenceSheetBatches(
+      [maxed, el('ART003', 'artifact'), el('ART004', 'artifact'), el('CHR002', 'character')], null, 4,
+    );
+    const owning = batches.filter((b: any[]) => b.some(c => baseVbId(c.id) === 'ART001'));
+    expect(owning).toHaveLength(1);
+    expect(owning[0].map((c: any) => c.id))
+      .toEqual(['ART001', 'ART001.1', 'ART001.2', 'ART001.3', 'ART001.4']);
+    // and nothing else shares that call
+    expect(owning[0]).toHaveLength(5);
+  });
+
+  it('normaliseObjectStates admits 4 states, and a 5th is dropped', () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({ name: `s${i}`, delta: `change ${i}` }));
+    const out = normaliseObjectStates(five, 'ART001');
+    expect(out).toHaveLength(4);
+    expect(out.map((st: any) => st.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3', 'ART001.4']);
   });
 
   it('the batch is built BEFORE any image call, and refuses a split', () => {

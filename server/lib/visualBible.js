@@ -29,10 +29,13 @@ const { baseVbId, vbIdFacet } = require('./vbIdGuard');
  * three visually distinct forms across one book, two of them with no handle
  * for the character holding it.
  *
- * The cap is 3. Base + 3 states = 4 cells, which is the reference grid's own
- * `maxPerBatch` — so a whole object always fits in ONE render call.
+ * The cap is 4. A multi-state object is routed to a batch of its OWN
+ * (`referenceSheets.buildReferenceSheetBatches` puts its cells in `solo`,
+ * which never passes through the `maxPerBatch` chunker), so base + 4 states =
+ * 5 cells still render in ONE call. The cap bounds the grid, not the batching:
+ * past this the cells get too small to be usable references.
  */
-const MAX_OBJECT_STATES = 3;
+const MAX_OBJECT_STATES = 4;
 
 /**
  * Normalise an authored `states[]` array. Drops anything without a delta,
