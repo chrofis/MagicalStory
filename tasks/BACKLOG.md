@@ -50,7 +50,11 @@ Last full sweep: **2026-09-06**.
       initial page); no prop-multiplicity / prop-vs-VB check → `tasks/baden-eval-2026-09-06.md:B4`
 - [x] **Baden eval B5 — closed 2026-09-06: staging runs a single repair pass on purpose (owner)** → `tasks/baden-eval-2026-09-06.md:B5`
 - [ ] **Baden eval B6 — white-box plate failure retried twice, bad plate kept; wrong tower on p2/p10** → `tasks/baden-eval-2026-09-06.md:B6`
-- [ ] **Baden eval B7 — VB ids leak into the consolidator preserve list (p8)** → `tasks/baden-eval-2026-09-06.md:B7`
+- [ ] **Baden eval B7 — diagnose why sanitisation misses standalone-id `preserve` entries (p8).**
+      The cleaner IS wired — `feedbackConsolidator.js:458-467` sanitises `instruction`, `fix_draft`,
+      `fix_critique` AND maps `preserve` through the same cleaner since 65d132d06 (2026-08-09), and
+      `sanitizeVbIdsInPrompt` handles locations incl. `LOC005.1` sub-ids. The cause is elsewhere
+      → `tasks/baden-eval-2026-09-06.md:B7`
 - [x] (2026-09-06, 12b1aab37) **Baden eval I9 — season consistency stated, not measured** (p6 yellow vs p3/p5 copper) → `tasks/baden-eval-2026-09-06.md:I9`
 - [ ] **Baden eval I11 — invented children's ages unconstrained** (scarf boy 11–12 beside a 6-year-old) → `tasks/baden-eval-2026-09-06.md:I11`
 The first two are corroborated by more than one source, which is why they lead.
@@ -68,8 +72,10 @@ The first two are corroborated by more than one source, which is why they lead.
       reviewer; this rule has only prose behind it, and prose alone moved neither writer in
       four experiments. Same treatment would apply: a declared field, a count, a finding
       → `docs/decisions.md` (2026-08-23 exp 825 entry)
-- [ ] **The brief checks run once, before the scene review — a rewrite can create a new
-      violation nobody re-checks (exp 830).** p8 was flagged for two actions; the reviewer merged
+- [x] (2026-09-06, edd75f3c2) **The brief checks run once, before the scene review — a rewrite can create a new
+      violation nobody re-checks (exp 830).** CLOSED: `beatsPipeline.js:1491-1530` re-runs `checkBriefs`
+      post-review, splits `beats_brief_introduced` / `beats_brief_unfixed`, plus a targeted second review
+      round. Original finding: p8 was flagged for two actions; the reviewer merged
       them into one shared action and the result has two characters gripping one wheel, which the
       hands rule forbids. Correct fix on the flagged finding, new violation created, no second
       pass. Re-running `checkScenes` on the rewritten briefs would catch it — either as a report
@@ -83,7 +89,9 @@ The first two are corroborated by more than one source, which is why they lead.
 - [ ] **Text-prop and VB-face rules are unverified (🟡).** Prop writing is never model-spelled,
       a prop's VB entry describes the object not its face, and 12c/12d now live in both scene
       templates. No story has run under any of it. Watch `viewer_address` and `object_presence`
-      on pages carrying a map, letter or note → `docs/decisions.md` (2026-08-23 entries)
+      on pages carrying a map, letter or note. **Needs re-measurement, not re-coding: hardened
+      since by 34e46855a, 3dcc6c5d6, 969eba010 — needs a scored re-run, not a new fix.**
+      → `docs/decisions.md` (2026-08-23 entries)
 - [ ] **Owner hypothesis, untestable as built: a menu of suggested interactions may beat a
       mandate.** `buildExactPosesBlock` emits every row as the same imperative bullet and
       `priority` only sorts them, so "the model may pick one of five" is not a behaviour that
@@ -115,29 +123,49 @@ The first two are corroborated by more than one source, which is why they lead.
       the likeness is lost → `docs/decisions.md` (2026-08-21 title entry, same feedback round)
 
 - [ ] **Per-page art style breaks to photorealism** (showcase p5, −22). Still occurring in
-      prod despite `style_repair`; three candidate causes listed in the routing doc
+      prod despite `style_repair`; three candidate causes listed in the routing doc.
+      **Needs re-measurement, not re-coding: code moved since (40ac24430 restored watercolour's
+      anti-photo clauses, plus 3f1b05f4a, 0a3049bce) — needs a scored re-run, not a new fix.**
       → `docs/showcase-2026-08-10-findings.md:40`, `docs/image-routing.md:163`
 - [ ] **`garment-recolour` makes pages much worse** (p14: 30 → −80). Independently measured
-      2026-08-20: recolour children swing 100 → 0 semantically on several prod pages
+      2026-08-20: recolour children swing 100 → 0 semantically on several prod pages.
+      **Needs re-measurement, not re-coding: code moved since (d11cf70d0, c61ff290c, 1dcdb3c09 all
+      attacked its failure mode) — needs a scored re-run, not a new fix.**
       → `docs/showcase-2026-08-10-findings.md:69`
-- [ ] Character repair runs, produces nothing, logs nothing (`wasCharacterFixed` false on all
-      14 pages) → `docs/showcase-2026-08-10-findings.md:52`
-- [ ] Fake handwriting rendered on a prop (p13) → `docs/showcase-2026-08-10-findings.md:76`
+- [ ] Verify char-repair fires on a **CRITICAL** page. Critical-only char-fix is settled BY DESIGN
+      (8eb622229 makes CRITICAL findings mark a page bad and rank first; memory
+      `project_repair_routing_settled`, 2026-09-04 — MAJOR entity findings are unrepaired on purpose),
+      so `wasCharacterFixed` false on 14 non-critical pages is expected, not the bug it was filed as.
+      The "logs nothing" half was fixed by 3a597b6c7 (one failure log)
+      → `docs/showcase-2026-08-10-findings.md:52`
+- [x] (2026-09-06, e4ca42a25) Fake handwriting rendered on a prop (p13) — blanket no-lettering guard restored
+      (`image-generation.txt:3`); eval side D-23 `rendered_text` CATASTROPHIC (`image-evaluation.txt:162`);
+      34e46855a quarantines declared lettering into solo reference calls
+      → `docs/showcase-2026-08-10-findings.md:76`
 - [ ] `costumeReads` sub-score has never been observed firing — unproven, not known broken
       → `docs/showcase-2026-08-10-findings.md:80`
-- [ ] Back-cover "magicalstory.ch" unreliable (3/4 missing, 1 doubled)
+- [x] (2026-09-06, c0d594a75) Back-cover "magicalstory.ch" unreliable (3/4 missing, 1 doubled) — cover
+      templates retired; branding is no longer model-rendered: `coverTypography.js:140` BRAND_TEXT is
+      composited deterministically in the back path (`:530-538`); font rotation 1e1fd0782
       → `tasks/showcase-bugs-2026-07-20.md:15`
 - [ ] Figure detection fails on 4 known pages (Sarah initialPage bodyBox 69%×72% merged +
-      faceBox mislocated; Sarah p2; Hans p3; Noah p9)
+      faceBox mislocated; Sarah p2; Hans p3; Noah p9).
+      **Needs re-measurement, not re-coding: the detection stack was rebuilt since (39b4d6b4c,
+      225f57208, 14aa9d666) — needs a scored re-run, not a new fix.**
       → `tasks/showcase-bugs-2026-07-20.md:27-31`
 - [ ] Detection guard fires but is not 100% — 3 residual `fixed=-` figures, bbox-cache
-      suspected, staging-only → `tasks/showcase-bugs-2026-07-20.md:91`
+      suspected, staging-only. **Needs re-measurement, not re-coding: 329170a3e (cache keys on
+      bytes) may have removed the suspected cause — needs a scored re-run, not a new fix.**
+      → `tasks/showcase-bugs-2026-07-20.md:91`
 - [ ] Lena's VB binding is name-only in the prompt → `tasks/showcase-bugs-2026-07-20.md:74`
 - [ ] `som_identity_fallback=4` on smoke `job_1787250416967_9owpz1j3b` is unexplained (noted
       inside an otherwise-fixed bug entry) → `tasks/bugs.json`
-- [ ] Cover text: not verified inside a full generation; no restamp route for the back cover;
-      the cover prompt asks for naturalistic lighting AND a stylised look, so the evaluator
-      penalises it → `docs/cover-text-rendering-research.md:229`
+- [x] (2026-09-06) Cover text — restamp route for the back cover: `coverTypography.js:787,820`
+      `restampCover` / `restampServedCover` map `backCover` to `'back'` and throw on unknown keys
+      → `docs/cover-text-rendering-research.md:229`
+- [ ] Cover text: still not verified inside a full generation; and the cover prompt asks for
+      naturalistic lighting AND a stylised look, so the evaluator penalises it
+      → `docs/cover-text-rendering-research.md:229`
 - [ ] Mitigation playbook for known image failure modes — deferred wholesale (hazard list in
       scene-expansion, matching eval checks, Lab validation)
       → `docs/image-failure-modes.md:35`
@@ -147,10 +175,12 @@ The first two are corroborated by more than one source, which is why they lead.
       the setting is already trimmed to fit → `docs/decisions.md` 2026-08-24 flat-lineup entry
       (the flat-lineup half of this item is FIXED in `143ed6f05`: pose resolver, compound
       interaction keys, and the fabricated left/right direction)
-- [ ] Composite delivers 0 pages out of every trigger measured so far — 3 real production
-      triggers across two finished stories (2026-08-24) all aborted; earlier audit found 11
-      gate-true pages / 161 with no record. Whether the gates are right or the plate is too weak
-      is the open question → `docs/decisions.md` 2026-08-24 stage-frames entry
+- [ ] Composite is **Lab-only — re-measure before any re-enable.** It is DISABLED in the pipeline
+      (`storyJobPipeline.js:4584`: "Scene composite was killed 2026-05-16 — every page goes through
+      the direct path"); only `testlab.js:4284` reaches `generateSceneComposite`, so the historical
+      "0 pages out of every trigger" figure describes a path production no longer takes. See memory
+      `project_scene_composite_killed`. Whether the gates are right or the plate is too weak is the
+      open question → `docs/decisions.md` 2026-08-24 stage-frames entry
 - [ ] **Scored A/B for `grok-imagine-2` pages/covers before production can follow staging.**
       Staging renders pages + covers on Imagine 2.0 ($0.04) since 2026-08-30; production stays
       on `grok-imagine` ($0.02). The switch has NO scored evidence — Lab 959/963/965 all ran
@@ -165,7 +195,9 @@ The first two are corroborated by more than one source, which is why they lead.
 - [ ] 2×4 costumed sheet: Row-1 costume leak; need 5× per character for a real `IMAGE_OTHER`
       rate; identity drift across angles; downstream consumer / index remap undecided
       → `docs/tests/costumed-2x4-findings.md:100`
-- [ ] Sarah's photo triggers `IMAGE_OTHER` on every Gemini call
+- [ ] The Gemini **fallback** refuses on this photo — accepted; Grok is primary. 21a6ce41b and
+      7dbb45de4 corrected the framing: it is a broad safety refusal, not face-specific and not
+      "Gemini blocks adults", and both avatar passes now default to Grok (`AVATAR_STYLE_BACKEND`)
       → `docs/tests/costumed-2x4-findings.md:95`
 - [ ] Qwen composite: identity scores vs refs, 4-insertion drift, interacting poses and
       occlusion-order steerability all unmeasured
@@ -247,7 +279,8 @@ them by deleting an emotional or characterising sentence. Text refine alone: 14 
 
 ## Tests
 
-- [ ] **3 unit tests fail on `staging` HEAD: `tests/unit/active-version-recompute.test.ts`.**
+- [x] (2026-09-06) **3 unit tests fail on `staging` HEAD: `tests/unit/active-version-recompute.test.ts`** —
+      re-ran 2026-09-06: 10 passed / 10, 0 failed (vitest 4.0.17). No longer reproduces.
       `recomputeAllActiveVersions` leaves `sceneImages[0].activeVersion` undefined where the test
       expects 1. Pre-existing (reproduced with all local changes stashed), found 2026-08-23 while
       verifying an unrelated change. Not filed in `tasks/bugs.json` because it is undiagnosed —
@@ -266,10 +299,13 @@ Full detail for this whole section: `tasks/eval-variance-backlog.md` (recovered 
 after `tasks/todo.md` was overwritten; the head of the original, including the A-section noise
 measurement, is lost).
 
-- [ ] **B1–B2 — add a `subject` field to clothing and object findings.** Without it,
-      per-character billing degrades to per-page: two characters' clothing problems collapse
-      into one charge. Only 11% of `object_presence` and 3% of `setting` findings carry a
-      subject today → `tasks/eval-variance-backlog.md`
+- [ ] **B1–B2 — emit a `subject` on clothing and object findings.** The CONSUMER plumbing already
+      landed: 2bee3632c (the jury merges per `(bucket, subject)`) and `evalBuckets.js:265-353` carries
+      subject through and warns that scoring bills per `(class, subject)`. What remains is the
+      PROMPT-side emission — neither `prompts/image-evaluation.txt` nor `image-semantic.txt` instructs
+      the evaluator to emit one — plus owner approval. Without it per-character billing degrades to
+      per-page. Only 11% of `object_presence` and 3% of `setting` findings carry a subject today
+      → `tasks/eval-variance-backlog.md`
       **needs owner approval before coding** (classification is the prompt's job)
 - [x] B3 `viewer_address` + B4 `emotion` own types — **done 2026-08-20**
       (`evalBuckets.js:91,101`; `docs/decisions.md:13936`)
@@ -302,13 +338,20 @@ measurement, is lost).
 
 ## Growth, ads, product
 
-- [ ] **E1 — confirm the GA4 conversion event actually fires.** The ads file itself flags this
-      as outranking all the quality-score work → `tasks/ads-quality-score.md:64`
-- [ ] Ads quality score: 21 further items — A1–A6 landing/LCP, B1–B4 keyword and ad-group
-      hygiene, C1–C8 asset audit, D1–D3 weekly tracking → `tasks/ads-quality-score.md:21-61`
+- [x] (2026-09-06, e37e3194a) **E1 — confirm the GA4 conversion event actually fires** — CONFIRMED:
+      `client/src/utils/gtagConversion.ts` defines 3 Ads conversions, wired in `TrialWizard.tsx` +
+      `TrialGenerationPage.tsx`; `decisions.md:1500` records a conversion-goal decision taken ON real
+      conversion data; e37e3194a fixed the consent default that was discarding attribution
+      → `tasks/ads-quality-score.md:64`
+- [x] (2026-09-06, a51316ad7 + 0d3fb7efd) Ads quality score A1 — ship the LCP fix to prod: both
+      commits are present on `origin/master` for `client/index.html` → `tasks/ads-quality-score.md:21-61`
+- [ ] Ads quality score: 20 remaining items — A2–A6 landing, B1–B4 keyword and ad-group hygiene,
+      C1–C8 asset audit, D1–D3 weekly tracking. All Google-Ads-account-side, not repo-verifiable
+      → `tasks/ads-quality-score.md:21-61`
 - [ ] Sentry error alerting; Plausible/Umami analytics → `docs/compliance-and-todo.html:87`
-- [ ] Activate the referral programme — code is shipped, the surface is hidden
-      → `docs/compliance-and-todo.html:89`
+- [ ] Promote the referral programme on the **marketing site**. The in-app surface is NOT hidden:
+      `AccountPage.tsx:12-18` renders code, balance and referral count, and `BookBuilder.tsx` +
+      `MyOrders.tsx` consume it → `docs/compliance-and-todo.html:89`
 - [ ] R2 storage Phase 2 + Phase 3 → `docs/compliance-and-todo.html:90`
 - [ ] Audio narration prototype → `docs/compliance-and-todo.html:91`
 - [ ] P2: Life Skills story library; subscription tier; fairy-tales category; Test-models panel
@@ -325,19 +368,29 @@ measurement, is lost).
 
 ## Refactor + tech debt
 
-- [ ] STR-1 — split `processUnifiedStoryJob` (~4,600 lines); STR-2–STR-5 + VAR-1 each ship as
+- [ ] STR-1 — split `processUnifiedStoryJob` — **now ~6,559 lines (`storyJobPipeline.js:378-6937`,
+      file total 7,570); it GREW ~40% since the ~4,600 estimate**; STR-2–STR-5 + VAR-1 each ship as
       their own PR → `docs/review-2026-07-04-structural-plan.md:3`
-- [ ] Split `evaluateImageQuality` (1,058 lines) and `generateImageWithQualityRetry` (761
-      lines); re-cluster `images.js`; move `inpaintPage`; hoist 10 closures in
-      `runUnifiedRepairPipeline`; break the generation↔evaluation cycle
+- [x] (2026-09-06) Split `generateImageWithQualityRetry` (761 lines) — **function DELETED** by the
+      2026-08 pipeline unification; zero occurrences in `server/`, `client/src`, `storyJobPipeline.js`
       → `docs/scoring-simplification-review.md:170`
+- [ ] Split `evaluateImageQuality` — now **~1,210 lines** (grew from the 1,058 estimate) and it MOVED
+      to `server/lib/evalPipeline.js:822-2032`; re-cluster `images.js`; move `inpaintPage` (still
+      un-moved at `server/lib/images.js:2617`); hoist the 10 closures in `runUnifiedRepairPipeline`
+      (**~3,161 lines, `server/lib/repairPipeline.js:303-3464`; closures still inline — 9 arrow-function
+      consts in the first 600 lines alone**);
+      break the generation↔evaluation cycle → `docs/scoring-simplification-review.md:170`
 - [ ] Dead code: unused `IMAGE_MODELS` import in `repairPipeline.js`; callerless
       `detectGrokBorder`; test-only exports; two competing "is this dressed" thresholds
       → `docs/scoring-simplification-review.md:170`
 - [ ] Re-run the `eea385113` sweep (61.5% outfit omission); turn the destructure audit into a
       unit test → `docs/scoring-simplification-review.md:170`
-- [ ] Migration drift into CI; prune `scripts/_tmp_*.js`; collapse 40+ `refine-tell-vN.js`;
-      inline base64 → R2 Phase 3; drop the legacy `pictureBook` / `outlineAndText` paths;
+- [x] (2026-09-06) Drop the legacy `pictureBook` / `outlineAndText` paths — **done**; the only
+      surviving mentions are comments at `storyJobPipeline.js:7365` and `promptBuilders.js:3064`
+      stating unified is the only pipeline → `docs/compliance-and-todo.html:114`
+- [ ] Migration drift into CI — **nothing was wired: there is no `.github/` directory at all**;
+      prune `scripts/_tmp_*.js` (**12 files still present**); collapse 40+ `refine-tell-vN.js`;
+      inline base64 → R2 Phase 3;
       consolidate the three test-image panels → `docs/compliance-and-todo.html:114`
 - [ ] REV-7 (P3) deferred minors: second poller lacks `knownPages`; `imgRowToBytes` is a
       hand-copied fork of `imgBytesAsync`; `dropInlineBase64` mutates shared refs
@@ -379,7 +432,9 @@ measurement, is lost).
 - [ ] Run a full trial on staging as admin; query `trial_events` for the complete ordered row
       trail for one `visit_id` → `tasks/todo.md:49`
 - [ ] Confirm the admin card renders the funnel with real staging rows → `tasks/todo.md:51`
-- [ ] T5 — confirm the pipeline completes styled avatars BEFORE page generation
+- [ ] T5 — take the **run-level proof** that styled avatars complete before page generation. The CODE
+      half is proven: `storyJobPipeline.js:1856-1866` `onClothingRequirementsReady` starts avatar styling
+      and it is awaited before page images (~`:4870`), with a comment documenting the ordering
       → `tasks/sam-clothing-tasks-2026-07-20.md:39`
 - [ ] T6 — validate the redress fix (`1ad718b4`) on a complete run
       → `tasks/sam-clothing-tasks-2026-07-20.md:43`
@@ -399,7 +454,9 @@ measurement, is lost).
 - [ ] Admin drafts: no admin UI (publishing is a raw POST); old demo accounts not consolidated;
       the draft path is unproven end-to-end
       → `docs/production-todo-admin-drafts.md:63`
-- [ ] SEO theme pages — 13 unchecked verification steps (title/FAQ JSON-LD/sitemap/robots/
+- [ ] SEO theme pages — **the FEATURE shipped** (`/themes`, `/themes/:category`,
+      `/themes/:category/:themeId` in `App.tsx:109-111`; metadata in `server/lib/seoMeta.js:363`).
+      Only the VERIFICATION is outstanding: 13 unchecked steps (title/FAQ JSON-LD/sitemap/robots/
       hreflang/og:title, `/themes` in DE/EN/FR, Rich Results Test)
       → `docs/plans/2026-03-10-seo-theme-pages.md:479`
 - [ ] Demo stories — test the setup-demo-user script; run the demo test locally
@@ -412,13 +469,15 @@ measurement, is lost).
 Nothing below should be coded until it is answered.
 
 - [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
-- [ ] C1 targeted confirmation eval — yes or no → `tasks/eval-variance-backlog.md`
+- [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
+      `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every 100 with
+      a second eval was offered and declined" (restated `:14904`) → `tasks/eval-variance-backlog.md`
 - [ ] Trial: generate the 2×4 costumed sheet eagerly or lazily?
       → `tasks/story-scoped-avatars-plan.md:89`
-- [ ] Cover/page unification — 8 open risks: checkpoint UX for score-less covers, TITLE_ERROR
-      regen mapping, composite `score: null` eval exemption, `iterateCover` consumers outside
-      the pipeline, aspect drift after removing the fallback, entity check on negative pages,
-      keeping trial covers cheap, whether cover gen moves into Phase 5a
+- [ ] Cover/page unification — **the unification SHIPPED** (`decisions.md:8998`, 2026-08-10,
+      "covers are pages with flags"); the `coverTitleMode` resolver and `iterateCover` precedence are
+      settled (SETTLED.md, wiring 2026-09-03). **Surviving risks, re-scoped: keeping trial covers
+      cheap, and the entity check on negative pages** — neither has a decisions.md entry
       → `docs/plans/2026-08-10-cover-page-unification-review.md:193`
 - [ ] Anonymous account flow — keep or drop the ideas step; story viewing without email;
       cleanup interval 24h vs 48h; localStorage vs sessionStorage
@@ -434,9 +493,10 @@ Nothing below should be coded until it is answered.
 - [ ] **T12 — dialogue floor, and does a companion animal get a name?** ~8 spoken lines in 18
       pages; the dragon is never named. The name rule changes story convention, not just prose
       → `tasks/story-text-quality-2026-08-25.md:T12`
-- [ ] **T14 — must every title contain the main character's name?** Hard rule in
-      `story-text-from-beats.txt`; produces "Levin und der kleine Drache" for a four-lead story.
-      Product call (shelf recognisability) vs craft call
+- [x] (2026-09-06, b3acb951c) **T14 — must every title contain the main character's name?** —
+      **ANSWERED IN CODE.** `buildTitleRule()` in `server/lib/promptBuilders.js` branches on cast size:
+      1 name required, 2 both, 3+ optional ("prefer what they do together"). Shipped 2026-08-25 19:47 CH,
+      tested dc12c088e (20:33 CH) — the same evening T14 was written
       → `tasks/story-text-quality-2026-08-25.md:T14`
 
 ---
@@ -445,8 +505,15 @@ Nothing below should be coded until it is answered.
 
 Seeded 2026-07-21. None of these is committed work — they are candidates.
 
-- [ ] Rewrite self-critique into per-page failure-mode verdicts → `docs/testing-backlog.md`
-- [ ] Cross-model review A/B (Sonnet writes / Opus reviews) → `docs/testing-backlog.md`
+- [ ] ~~Rewrite self-critique into per-page failure-mode verdicts~~ — **SUPERSEDED, retire.** It
+      targets the `prompts/story-unified.txt` draft → self-critique → patch chain, which no longer
+      exists: 2026-09-03 replaced it with two parallel audits, a merge, one repair and one lector
+      (`decisions.md:24967`, `:25539`); the named questions shipped as plan-check Q5–Q7
+      → `docs/testing-backlog.md`
+- [x] (2026-09-06) Cross-model review A/B (Sonnet writes / Opus reviews) — **RUN, repeatedly**:
+      beats-reviewer bake-off of 8 candidates 2026-08-15 (`models.js:146,231`), repair bake-off to
+      claude-opus 2026-09-03 (`decisions.md:25244`), arc-auditor bake-off (`models.js:370`). The
+      reviewer is now DeepSeek V4 Pro by measurement → `docs/testing-backlog.md`
 - [ ] Extend the acceptance gate (count/position/location + simpler-shot fallback)
       → `docs/testing-backlog.md`
 - [ ] Enum scene descriptors; palette-locked hex consistency → `docs/testing-backlog.md`
@@ -455,18 +522,23 @@ Seeded 2026-07-21. None of these is committed work — they are candidates.
 - [ ] Ten ranked competitive follow-ups (Gemini 3.x vs Grok avatar A/B, layflat hardcover tier,
       persistent watermarked trial share link, on-demand landmark acquisition, SAM 3.1 concept
       prompting, local illuminant estimation, judge-ensemble gate, embedding identity score,
-      typographic art direction, production text-quality judge gate)
+      typographic art direction). **#10 "production text-quality judge gate" was DEDUPED 2026-09-06 —
+      it is the same open question as T9(b); tracked there, not here.**
       → `docs/testing-backlog.md:140`
-- [ ] Verify the claim that Sonnet 5 pricing moves $2/$10 → $3/$15 on Sep 1 before relying on
-      it → `docs/testing-backlog.md:203`
+- [x] (2026-09-06) Verify the claim that Sonnet 5 pricing moves $2/$10 → $3/$15 on Sep 1 —
+      **CONFIRMED TRUE.** `server/config/models.js:1003-1006`: `claude-sonnet-4-6` and `claude-sonnet`
+      are both `{ input: 3.00, output: 15.00 }` → `docs/testing-backlog.md:203`
 
 ---
 
 ## Backlog of decisions never written up
 
-- [ ] Trial cover `onTitle` → `onCoverScene`; `extractTitle` legacy fallback conditions;
-      cascade face-detection merge order; why Grok is the avatar-face provider
-      → `docs/decisions.md:1385`
+- [x] (2026-09-06) ~~why Grok is the avatar-face provider~~ — written up: `docs/SETTLED.md`
+      ("Avatar passes 1 AND 2 default to Grok") plus the `IMAGE_OTHER` entries and 21a6ce41b
+      → `docs/decisions.md:1710-1724`
+- [ ] Three still unwritten: trial cover `onTitle` → `onCoverScene`; `extractTitle` legacy fallback
+      conditions; cascade face-detection merge order → `docs/decisions.md:1710-1724`
+      (the old `:1385` pointer was STALE — the list moved as the file grew to 28,235 lines)
 
 ---
 
@@ -485,12 +557,13 @@ Recorded so nobody re-proposes them as gaps.
 - [x] A visual-bible actor (the dragon) can never act — FIXED 2026-08-24 (VB actors admitted + resolved; unknown actors now reported) — `sanitizeInteractions` validates the actor against the human scene cast only, so `ANI001→ART005` is dropped. Prod p7 lost its whole action ("crossing the log") this way and rendered with an empty EXACT POSES block. → `server/lib/sceneMetadata.js:191`
 - [x] The visual-bible entity NAME gets painted onto the prop as legible text — FIXED 2026-08-24 (sanitizeVbIdsInPrompt now rewrites names, not just ids) — "Fiona's Schatzkarte" lettered across the map (staging p5), "Goldene Möwe" across the hull (p4). The brief never quotes a string; it just uses the VB name as the noun phrase. 12c does not cover this. → `prompts/scene-expansion-all.txt:42`
 - [x] 12d loses to face description — RULE TIGHTENED 2026-08-24 (face content banned from the brief); unverified until a story runs with the evaluator alive: 7 of 7 pages whose brief describes what is ON a document rendered that face to the camera, including one that also said "angled toward herself" (staging p13). The angle instruction cannot win while the prose spends a clause on the face. → `prompts/scene-expansion-all.txt:44`
-- [ ] Objects declared once get drawn 2-3 times — one rope rendered as three (staging p11), one book as two (prod p3). No check counts rendered instances against declared ones.
+- [x] (2026-09-06, 6daa2520f) Objects declared once get drawn 2-3 times — CLOSED: D-32 `duplicate_object` added (`prompts/image-evaluation.txt:160`, `evalBuckets.js:123`, MAJOR ceiling `scoring.js:178`, consolidator merge rule, unit test). Original finding: one rope rendered as three (staging p11), one book as two (prod p3).
 - [ ] Cast members go missing without a finding — prod p7 drew 2 of 4 boys, p15 and p18 drew 3 of 4. The brief check only catches cast in the prose but absent from metadata, never the reverse.
-- [ ] `style_repair` repaints the COMPOSED cover, title text and all — it selected page -1 in Lab #837 and all three arms restyled the title instead of repainting `${key}Art` and restamping via `composeCover`. The text survived legibly this time; nothing guarantees it will. → `server/lib/styleRepair.js` (cover targets from `planStyleRepair`)
+- [x] (2026-09-06, a228bdeb1) `style_repair` repaints the COMPOSED cover — CLOSED: `styleRepair.js:227-238`
+      now sources `${coverKey}Art` and the caller restamps via `composeCover`. Original finding: title text and all — it selected page -1 in Lab #837 and all three arms restyled the title instead of repainting `${key}Art` and restamping via `composeCover`. The text survived legibly this time; nothing guarantees it will. → `server/lib/styleRepair.js` (cover targets from `planStyleRepair`)
 - [ ] The style gate cannot tell grain from brushwork — Lab #837 scored a noise-filtered photographic face as `better: 'after'`, "prominent brushstrokes". The content veto works (`changed: []` was right every time); the style half is credulous. → `server/lib/styleAnalysis.js` (`compareStyleProximity`)
 - [ ] PARKED (owner, 2026-08-24): face-crop style repaint — crop the face box, repaint it at full frame so the face IS the image, composite back via the feathered insert-blend. Lab #837 measured Grok spreading repaint effort uniformly (face/rest = 1.07), so a small face gets almost none of it and the page still returns looking worked-on. Not rejected, not scheduled. → `docs/decisions.md` (Lab #837 entry)
-- [ ] The style repaint changes the page ASPECT RATIO — 864x1222 in, 832x1248 out, on all three Lab #837 arms (Grok's documented input-aspect coercion, and Gemini's repaint did it too). A repaint that ships would silently re-crop the page or cover. → `server/lib/styleRepair.js` (`repairPageStyle`, aspectRatio opt)
+- [ ] The **Gemini** style repaint arm changes the page ASPECT RATIO — `styleRepair.js:114-141` still picks a preset aspect, so a repaint that ships would silently re-crop the page or cover. The **Grok arm is FIXED** by 09037f6c2 (2026-09-03: aspect-drift crop enabled by default, `skipOutputCrop` opt-out). Original finding: 864x1222 in, 832x1248 out on all three Lab #837 arms. → `server/lib/styleRepair.js` (`repairPageStyle`, aspectRatio opt)
 - [x] Verify the closed-prop reference actually flips the render — DONE 2026-08-24, 4 renders: closed ref works, face-free description is the required other half — 2 pages x 4 arms (baseline / closed ref / no ref / closed ref + OTS-egocentric text) in the Test Lab. Owner approved 2 pages 2026-08-24. → docs/decisions.md 2026-08-24 "drawn CLOSED"
 - [ ] Orientation phrasing is still intrinsic ("angled toward herself"); GenSpace says egocentric final-image phrasing binds far better ("the plain reverse side faces the viewer"), and only "over-the-shoulder shot" / "shot from behind" are attested vocabulary. → prompts/scene-expansion-all.txt 12d
 - [ ] Scale similes in a visual-bible description render literally — "roughly the size of two open palms" drew two human hands onto the parchment in a prop reference sheet. Phrase is live in production ART001. Compare a prop against a neutral object, or give size in cm. → prompts/story-bible-from-beats.txt artifact description hint
@@ -500,7 +573,7 @@ Recorded so nobody re-proposes them as gaps.
 - [x] referenceView is applied inconsistently — MOOT 2026-08-26: referenceView replaced by two bible entries per face-prop, so the side is an id choice, not an optional field — staging job_1787638394061_hs70901tfsn has two maps; ART001 got the field, ART004 ("Rossas Kartenkopie") did not, though a map is squarely in the type list. The field is optional, so the bible author can just omit it.
 - [ ] A visual-bible description still states who holds a prop — ART004 in the same story reads "held in one hand along its lower edge" and describes its face, against the rule that a description never says who holds/carries/wears it. → prompts/story-bible-from-beats.txt
 - [x] CARRY_ROUTES is unexercised — EXERCISED 2026-08-25 in prod job_1787689073034_1v6ew0y1kae, all three routes fired — no story has yet run with a non-empty arc or beats audit carry block. Confirm on the next staging run that the block appears in the plan/Art Director/text prompts and that nothing regresses. → server/lib/beatsPipeline.js CARRY_ROUTES
-- [ ] **Validate the 2026-08-25 review fixes on a live run**: first toddler story through the injected arc/beats reviewers, and first story with a non-empty REVIEWER'S RULINGS carry block → `docs/decisions.md` (2026-08-25 "Carried findings travel WITH the reviewer's rulings" entry)
+- [ ] **Validate the 2026-08-25 review fixes on a live run**: first story in a low AGE BAND (toddler MODE no longer exists — bae4d540d replaced it with five whole-year age bands; use `routine` or `quest`) through the injected arc/beats reviewers, and first story with a non-empty REVIEWER'S RULINGS carry block → `docs/decisions.md` (2026-08-25 "Carried findings travel WITH the reviewer's rulings" entry)
 - [ ] **SEO repositioning onto the creation differentiator** — measured: ~10 clicks/month, all 149 ranking queries are the template-book category at pos 38-52 (Librio's turf), creation queries at pos 27-61. Phase B shipped 2026-08-25 (footer link architecture, /so-funktionierts→/kinderbuch-erstellen + 301, www→apex 301, page rewritten to the searched vocabulary). Phases C (scale the AI-generator comparison set, creation hub, editorial surface) and D (authority: Swiss family bloggers, Trustpilot, startup press, roundup listings, expand /science) still open. → `tasks/seo-creation-repositioning-2026-08-25.md`
 - [ ] Comparison slugs live in two places — `COMPARISONS` in `server/lib/seoMeta.js:488` duplicates the ids in `client/src/constants/comparisonData.ts`. Adding a comparison requires editing both; missing the server one silently costs the page its meta, canonical and sitemap entry. Derive one from the other. → `server/lib/seoMeta.js:488`
 - [ ] **Page 7 shipped as a reference SHEET, not a scene (2026-08-26).** staging
@@ -521,7 +594,10 @@ Recorded so nobody re-proposes them as gaps.
 - [ ] **A watercolour page rendered as a photographed painting (2026-08-26).** Same story p2: the
       illustration is depicted as a physical painting lying on a white surface, with paper edges
       and margins inside the frame instead of filling it. → `prompts/image-generation.txt`
-- [ ] **Trial empty-scene plates never generate for variant-backed landmarks, so the PAGE edits a raw photo (2026-08-26).**
+- [x] (2026-09-06, 40c02edcd) **Trial empty-scene plates never generate for variant-backed landmarks, so the PAGE edits a raw photo (2026-08-26)** —
+      CLOSED 2026-08-26: `storyJobPipeline.js:2005-2035` resolves via `resolveLandmarkPhotoForLocation`; the old
+      `photoFetchStatus === 'success'` gate is removed; unit test `tests/unit/landmark-plate-resolve.test.ts` added.
+      Original finding:
       `storyJobPipeline.js:1856` gates plate generation on `loc.photoFetchStatus === 'success'`. That status is
       only ever set by `prefetchLandmarkPhotos` (`landmarkPhotos.js:1370,1395`) — and the call site at
       `storyJobPipeline.js:2578` filters to `!l.photoVariants?.length`, so any landmark WITH photo variants is
@@ -543,19 +619,6 @@ Recorded so nobody re-proposes them as gaps.
       so a photographic plate passes QC even in full mode.
       -> `storyJobPipeline.js:1843-1917,2578`, `server/lib/grok.js:1113-1124`, `server/lib/landmarkPhotos.js`
 
-- [ ] **Trial sends the whole 2x4 character sheet as the page reference instead of the matching pose (2026-08-26).**
-      The intended design is already one-pose: `cropAvatarCell` (`sceneComposite.js:936`) exists and the full
-      pipeline uses it (`storyJobPipeline.js:3303-3310`). On the trial path it no-ops for two independent
-      reasons. (1) `projectStoryCharacterAvatars` reads ONLY `char.avatars.styledAvatars[artStyle]`
-      (`storyAvatars.js:62`); the DB reload clears that to `{}` (`storyJobPipeline.js:6267-6270`) and trial
-      seeds its sheets via `setStyledAvatar`, which writes the module cache only — so the map is empty and
-      `applyStoryCellRefs` hits `if (!story) continue` (`storyAvatars.js:237`) leaving the full sheet in
-      `photoUrl`. (2) Trial passes raw character records from `getCharactersInScene`, which carry no
-      `pose`/`perspective`, so `resolveCellPose` would return `threeQuarter` for every page anyway, and no
-      `closeUp` flag is passed. Verified on prod `job_1787647410717_5dvfqu8jg` p2: the stored reference image
-      is the full 8-panel sheet. Known cost of whole-sheet refs: Grok reproducing the sheet, scored -140
-      (`decisions.md:10189`, `:10703`).
-      → `storyJobPipeline.js:1046-1055`, `server/lib/storyAvatars.js:56-99,230-240`, `server/lib/styledAvatars.js:543,1149`
 - [x] A closed prop reference cannot serve a page that needs the prop OPEN — ADDRESSED 2026-08-26 by the two-entry rule (turned away / face to camera); unverified, see the verify item below — prod job_1787689073034_1v6ew0y1kae p9 ("looking up from the book") rendered the open book flat to camera. The reference fixes the carried case; the read case still rests on 12d prose alone.
 - [ ] **Trial pages still send the whole 2x4 sheet, not the pose cell (2026-08-26, OPEN).** Landmark half of
       the same work is fixed and verified; this half is not. Every page's stored ref is `photoType=bodyNoBg`,
@@ -564,7 +627,16 @@ Recorded so nobody re-proposes them as gaps.
       page render. `publishStyledAvatarsToCharacters` at the end of `prepareStyledAvatars` did not close it.
       The silent `continue` paths in `applyStoryCellRefs` are now loud, so the next trial names the reason —
       look for `[CELL REFS] ... sending the FULL reference image`. Two paid trials already spent; do not
-      re-run blind. → `server/lib/storyAvatars.js:233-250`, `storyJobPipeline.js:1046-1095`
+      re-run blind. Still OPEN 2026-09-06: `storyAvatars.js:242-268` still has three "sending the FULL
+      reference image" warn paths — the loud logging shipped, the fix did not. (Merged 2026-09-06 with the
+      earlier duplicate entry of the same defect: `cropAvatarCell` (`sceneComposite.js:936`) exists and the
+      full pipeline uses it (`storyJobPipeline.js:3303-3310`); on the trial path
+      `projectStoryCharacterAvatars` reads only `char.avatars.styledAvatars[artStyle]`
+      (`storyAvatars.js:62`) which the DB reload clears to `{}`, and trial passes raw character records
+      from `getCharactersInScene` carrying no `pose`/`perspective`. Known cost of whole-sheet refs: Grok
+      reproducing the sheet, scored -140 — `decisions.md:10189`, `:10703`.)
+      → `server/lib/storyAvatars.js:233-250`, `storyJobPipeline.js:1046-1095`,
+      `server/lib/styledAvatars.js:543,1149`
 - [ ] Verify the two-entry face-prop rule on a real story — that the bible emits a pair with matching identity, that the Art Director names exactly one per page (never both), and that a page needing the face gets it. Replaces referenceView, which was verified; the pair is not. → docs/decisions.md 2026-08-26
 - [ ] finalScore does not reconcile with its stored breakdown (prod dragon p18: 45 with visual 100, entity 0, no findings) — every deduction must be attributable from the stored record → `server/lib/scoring.js`
 - [ ] Entity clothing check now catches the covers but still misses one page. Two calls per grid shipped 2026-08-27 (identity on the head grid, wardrobe on the body grid, one image each) after five single-call prompt wordings measured 0 findings. Verified 8 grids: 1 TP / 1 FN / 0 FP, 8 identity findings kept, zero cross-leakage. The miss is p12 of job_1787689073034_1v6ew0y1kae (grid 5 cell C) — same garment, same character, caught on grid 6. → docs/decisions.md 2026-08-27 "Entity consistency runs two calls per grid"
@@ -605,7 +677,7 @@ Recorded so nobody re-proposes them as gaps.
 - [x] Beats-review checks overhaul for the post-SCENE shape (change-field check, redundancy check, re-site-or-declare rule) — separate campaign; 2026-08-31 redesign only made the template consistent — MOOT 2026-09-01: the beats reviewer (story-beats-review.txt) was deleted, not overhauled → scratchpad piraterun/q8-p12/, docs/decisions.md 2026-09-01 "Old beats review/audit machinery deleted"
 - [x] **Body character repair on busy multi-figure pages — DONE 2026-09-01 (G7 deep fix).** Root cause was NOT model behaviour to gate away: git archaeology showed the pre-spine fullScene design (d68bd8815 → 2026-07-11 union composite) NEVER trusted the model's background — it feathered only the old∪new figure union onto the ORIGINAL scene, so a whole-scene re-render was harmless by construction and the path never rejected. Stage-3 (24842d2bd) put it behind the crop-space gate battery and 2026-08-06 added a bg-residual hard reject premised on "the model edits in place" — false for Grok box mode → 100% refusal. Fixed: bg residual is registration telemetry (never a reject); new FIGURE registration (scale+shift, feet-anchored) normalises in-place redraws before the unchanged IoU/style/white-card/sharpness/naturalness gates. → docs/decisions.md 2026-09-01 "Background mismatch is registration telemetry", tasks/bugs.json `edit-mode-char-repair-gate-battery-regression`, scratchpad piraterun2/g7-deep/
 - Landmark photo descriptions: ~10,000 `photo_description[_N]` slots are NULL (fetch-landmark-photos-free rows); prep/merge scripts shipped 2026-09-02, the agent describing run itself has not been done → scripts/admin/prep-landmark-descriptions.js, docs/landmark-database.md §11
-- Pre-existing unit-test failures on staging HEAD: tests/unit/active-version-recompute.test.ts 3/10 fail ("blob mirror" assertions expect storyData.sceneImages[0].activeVersion stamped, get undefined) — reproduced on clean HEAD a53c7262c with the repair working tree stashed, so it predates the 2026-09-02 repair commit; triage whether recomputeAllActiveVersions dropped the blob stamp or the test is stale → tests/unit/active-version-recompute.test.ts:83
+- [x] (2026-09-06) ~~Pre-existing unit-test failures on staging HEAD~~ — re-ran 2026-09-06: 10/10 pass (vitest 4.0.17). Original finding: tests/unit/active-version-recompute.test.ts 3/10 fail ("blob mirror" assertions expect storyData.sceneImages[0].activeVersion stamped, get undefined) — reproduced on clean HEAD a53c7262c with the repair working tree stashed, so it predates the 2026-09-02 repair commit; triage whether recomputeAllActiveVersions dropped the blob stamp or the test is stale → tests/unit/active-version-recompute.test.ts:83
 - **`parseVisualBibleObjects` has ALWAYS returned `[]` for real prompts (found 2026-09-02, verified empirically at HEAD and on the stored pirate prompts).** Its section regex `/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i` carries the `i` flag, so the `\*\*[A-Z]` lookahead matches the very FIRST `* **entry**` bullet — the capture group is always empty and no object name is ever extracted. Consequence: `images.js:2376` merges nothing into `expectedObjects`, and the bbox/entity path has been running on `sceneMetadata.objects` alone. Fix is one character (`(?=\n\n|\n\*\*[A-Z]|$)` or dropping `i`), but it would newly feed English short refs to GroundingDINO on EVERY page — a behaviour change on the whole corpus, so it needs owner sign-off, not a silent patch. → `server/lib/bboxDetection.js:92`, `server/lib/images.js:2376`
 - **Legacy composite blend boilerplate still promises object descriptions that no longer exist (2026-09-02).** `sceneComposite.js:1769` tells the model to "render each one according to its description" from the brief's REQUIRED OBJECTS — now a name-only checklist. Legacy branch only (fires when `cast` is empty; production takes the `people.length` branch), so cosmetic. Reword when that branch is next touched. → `server/lib/sceneComposite.js:1769`, docs/decisions.md 2026-09-02 "Visual Bible element detail is Art-Director-mediated"
 - **The VB grid REFERENCE IMAGE is an unfixable-by-text channel for hull lettering and phantom vessels (measured 2026-09-02, Lab exp 975).** After REQUIRED OBJECTS went name-only, p2 of `job_1788295892348_l028ggiq7a` still rendered a second complete ship with "Golden Gull" painted on the stern — the prompt provably no longer carries the name, so the source is the Visual-Bible grid image, which depicts the vessel's whole exterior including its painted name and is attached to every page. Options: drop VEH/large-LOC entries from the page grid, crop them to a detail, or accept. Owner call. → `server/lib/referenceSheets.js` (`buildPageCompositeRefs`), docs/decisions.md 2026-09-02 "Visual Bible element detail is Art-Director-mediated"
@@ -650,3 +722,7 @@ Recorded so nobody re-proposes them as gaps.
 - [x] (2026-09-06) **A page's two-step text compresses into one un-drawable instant** — the PLAN line joined "presses forehead against a pane" and "turns to the other child" with a trailing clause; scene expansion hardened it into head-on-surface + eye contact off to the side, and the render dropped the declared essential interaction, leaving two children nose-to-nose in a close-up (`job_1788641639919_mpjwlzkf1` p2). Corpus: 4 pages / 3 stories / 82 plan pages (4.9%). FIXED prompt-side on both generator and critique; `sceneBriefCheck.js` deliberately untouched (semantic, not deterministic). → `tasks/cover-cast-and-eval-fixes-2026-09-06.md` §3, `prompts/story-beats.txt:39`, `prompts/scene-expansion.txt` 7e, `prompts/scene-review.txt` check 7, docs/decisions.md 2026-09-06
 - [ ] `scene_fix` has no declared `types` field in the consolidator JSON schema, so the rule-7 parser guard (`applyRule7SceneFixGuard`) can never fire — a clothing-only `scene_fix` still reaches the inpaint executor (observed: `job_1788641639919_mpjwlzkf1` p5). Fix is a prompt schema change (extend rule 7a to `scene_fix`), which is the owner's call. → `prompts/feedback-consolidator.txt` (rule 7a), `server/lib/feedbackConsolidator.js:applyRule7SceneFixGuard`
 - [x] (2026-09-06) **Cover hint casts could name a phantom and drop a real character** — the beats bible writer wrote "The smallest girl (centre front, facing viewer)" into the back cover of `job_1788641639919_mpjwlzkf1` and dropped primary Margaret; the phantom key spread to characterDetails/characterClothing/characterPerspectives, only 4 references were packed and the eval raised an unrepairable `missing_character`. FIXED: prompt rule + `validateCoverHintCast()` drops unresolved names and refills slots from the real cast before persistence. → `tasks/cover-cast-and-eval-fixes-2026-09-06.md`, docs/decisions.md 2026-09-06
+- [ ] `scene_fix` has no declared `types` field in the consolidator JSON schema, so the rule-7 parser guard (`applyRule7SceneFixGuard`) can never fire — a clothing-only `scene_fix` still reaches the inpaint executor (observed: `job_1788641639919_mpjwlzkf1` p5). Fix is a prompt schema change (extend rule 7a to `scene_fix`), which is the owner's call. → `prompts/feedback-consolidator.txt` (rule 7a), `server/lib/feedbackConsolidator.js:applyRule7SceneFixGuard`
+- [ ] **Lab replay stages resolve their own model default instead of the one production uses (2026-09-06).** `runStoryTextReplayStage` picks `params.textModel || MODEL_DEFAULTS.outline`, while the production page-text writer picks `modelOverrides.textModel || MODEL_DEFAULTS.storyText` (`beatsPipeline.js:382`). They agree today only because both constants are `claude-sonnet`; change either and the Lab silently stops measuring what production runs, with nothing to signal the drift. Found while A/B-ing a writer-prompt change on exp 992 — cost a false "different model" caveat in the reported result. Check the sibling replays too: `scene_review_replay` falls back to `outlineReviewModel`, `story_bible_replay` resolves its own. Fix: each replay reads the SAME constant its production stage reads. → `server/lib/testlab.js` `runStoryTextReplayStage`, `runSceneReviewReplayStage`, `runStoryBibleReplayStage`; `server/lib/beatsPipeline.js:382`
+- [ ] **`textRefineReport` prompt/briefsIn/analysis are forward-only — existing stories still show an empty Text-Überarbeitung analysis (2026-09-06).** `b63d71552` writes the three fields at generation time; nothing backfilled. For stories already in the DB, `analysis` IS recoverable from `roundTrace[].analysis` (10,429 ch on `job_1788641639919_mpjwlzkf1`), `briefsIn` partially from `pages[].before` (changed pages only — 12 of 14), and `prompt` is unrecoverable (never persisted before). Options: a read-side fallback in the shared `renderDiffPanel`, or a backfill migration. Owner asked to be given the choice; not yet made. → `client/src/components/generation/StoryDisplay.tsx` `renderDiffPanel`, `storyJobPipeline.js` textRefineReport projection, docs/decisions.md 2026-09-06
+- [ ] **A staging deploy killed a running Test Lab experiment despite the idle gate (2026-09-06).** Exp 991 (`story_text_replay`) was left stranded at status `running` with zero log lines while `/api/health/busy` reported `busy:false` — nine commits from other sessions landed during its run and a deploy restarted the container mid-call. The gate demonstrably works (it blocked a push earlier the same hour with `testlab: 1 experiment(s) running`), so either a Lab run has a window before it registers as busy, or a push bypassed the hook. Also: a killed experiment never transitions out of `running`, so a stale row is indistinguishable from a live one — worth a heartbeat or a startup sweep. → `.githooks/pre-push`, `server/routes/admin/testlab.js` experiment lifecycle, `GET /api/health/busy`
