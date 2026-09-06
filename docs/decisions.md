@@ -27858,3 +27858,52 @@ that trade is environment-specific.
 
 **Touched:** `photo_analyzer.py` (`_ort_session_kwargs`, `get_rembg_session`).
 **Status:** 🟡 conditional — verify latency on staging before trusting it in prod.
+
+## 2026-09-06 — The text-refine panel gets the same three fields its siblings have, and the page-text writer's ANALYSIS stops being thrown away
+
+**Context:** The dev-mode story report renders three sibling panels through ONE
+shared helper (`renderDiffPanel` in `StoryDisplay.tsx`): Beats review, Scene
+review, Text refine. The helper already rendered `prompt`, `briefsIn` and
+`analysis` — but only two panels ever had them. Measured on staging story
+`job_1788641639919_mpjwlzkf1`: `beatsReviewReport` carried analysis (5,574 ch),
+prompt (12,170 ch) and 14 briefsIn; `sceneReviewReport` 720 / 50,061 / 14;
+`textRefineReport` had NONE of the three. The text panel showed a diff with no
+prompt, no source text and no reasoning. All three fields already existed inside
+`textRefineReport.roundTrace[]` and the refiner's snapshot — they were simply
+never projected to the top level the panel reads.
+
+Separately, `prompts/story-text-from-beats.txt` requires the page-text writer to
+emit an `---ANALYSIS---` block before the pages (which stretch each page tells,
+which pages risk repeating the one before, which arc facts have not found a
+page). `parseRefinedText` split that block off and **the caller kept only the
+page bodies** — the writer's own continuity reasoning was discarded at the moment
+it was produced and was unrecoverable after the run. Beats mode also shipped
+`storyTextPrompts: []`, so the writer's prompt and raw reply were lost with it,
+and the existing "Full API Output (Story Text)" panel had nothing to render.
+
+**Decision:**
+1. `textRefineReport` now carries `prompt` (the repair round's prompt; the lector
+   round has its own template and no rewrite prompt), `briefsIn` (the page text as
+   sent, `{pageNumber, brief}` — the shape the shared helper expects), and
+   `analysis` (EVERY round's analysis, each labelled with its round, kind and
+   model, concatenated). Field names copied verbatim from the two working reports.
+2. The page-text writer's call is published on `meta.storyTextCall` and projected
+   into the EXISTING `storyTextPrompts` array — prompt, raw reply, the parsed
+   `analysis`, model and usage. No new storage key.
+
+**Rationale:** One shared helper means the three panels must be fed the same
+shape; a per-panel special case in the client would have been the wrong fix, and
+none was needed — the client was already correct. Storing only the last round's
+analysis would have been misleading (this story ran a repair round with a
+10,429-character analysis followed by a lector round with none), hence the
+labelled concatenation. `storyTextPrompts` is the pre-existing home for "the
+prompt that wrote the pages plus its raw reply" and is already rendered, so the
+writer's analysis needed a projection, not a parallel path.
+
+**Touched:** `storyJobPipeline.js` (textRefineReport projection at the refine
+join; `storyTextPrompts` built beside the other beats reports and used in both
+result objects), `server/lib/beatsPipeline.js` (`runStoryText` returns the prompt
+and usage; `meta.storyTextCall`), `client/src/components/generation/StoryDisplay.tsx`
+(type widened to `ReviewDiffReport`, a third briefsIn label for the text panel in
+the SHARED helper, writer-analysis block in the existing story-text panel).
+**Status:** ✅ active

@@ -3539,6 +3539,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const challengeDraw = beatsResult?.challengeDraw || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
+    // The page-text writer's own call (beats mode). storyTextPrompts is the
+    // EXISTING home for "the prompt that wrote the pages + its raw reply" and
+    // the dev-mode "Full API Output (Story Text)" panel already renders it —
+    // beats mode just shipped it empty, so the writer's Step-1 ---ANALYSIS---
+    // block (page-by-page continuity reasoning) was parsed and thrown away.
+    // One entry: beats writes every page in a single call.
+    const storyTextPrompts = beatsResult?.meta?.storyTextCall
+      ? [{
+        batch: 1,
+        startPage: beatsResult.meta.storyTextCall.startPage,
+        endPage: beatsResult.meta.storyTextCall.endPage,
+        prompt: beatsResult.meta.storyTextCall.prompt,
+        rawResponse: beatsResult.meta.storyTextCall.rawResponse,
+        analysis: beatsResult.meta.storyTextCall.analysis,
+        modelId: beatsResult.meta.storyTextCall.modelId,
+        usage: beatsResult.meta.storyTextCall.usage,
+      }]
+      : [];
     if (refineEnabled) {
       const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
       const refinablePages = extractRefinablePages(expandedScenes);
@@ -3752,7 +3770,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // locations the plate already paints. The grid shares ONE Grok
         // reference slot, so every extra cell shrinks all the others —
         // 6 cells is 4 elements' worth of unreadable.
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4, sceneMetadata?.objects || null);
+        // Cap = the owner's brief-side VB element budget (2026-09-06): three, the
+        // same number the Art Director is given and the pipeline truncates to.
+        const { VB_ELEMENT_BUDGET } = require('./server/lib/vbElementBudget');
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_ELEMENT_BUDGET, sceneMetadata?.objects || null);
         // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
         // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
         // this pageData map (they iterate the pageDataArray it produces), so at
@@ -5817,6 +5838,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
           durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
           model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
+          // Same three fields beatsReviewReport and sceneReviewReport carry, so
+          // renderDiffPanel shows all three panels alike (owner 2026-09-06).
+          // They were already IN the round entries — this only projects them.
+          // `prompt` is the repair round's prompt (the lector round has its own
+          // template and no rewrite prompt); `briefsIn` is the page text as
+          // sent in; `analysis` concatenates EVERY round's analysis, labelled,
+          // because a run has a repair round and a lector round and storing
+          // only the last would read as the whole stage's reasoning.
+          prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
+          briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
+          analysis: usable.rounds
+            .filter(r => (r.analysis || '').trim())
+            .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
+            .join('\n\n'),
           pages: usable.pages
             .filter(p => usable.changed.includes(p.pageNumber))
             .map(p => ({
@@ -6259,7 +6294,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlineModelId: unifiedModelId, // Model used (dev mode)
       outlineUsage: unifiedUsage, // Token usage (dev mode)
       outlineReview: outlineReviewMeta, // { model, modelId, durationMs, fixCount, reviewChars, hintCount } | null
-      storyTextPrompts: [], // Not used in unified mode (single prompt generates all)
+      storyTextPrompts, // beats: the page-text writer's prompt + raw reply (incl. its ANALYSIS block); [] on the streaming path
       visualBible: (() => {
         // Phase 2: project per-character costume descriptions onto the visual
         // bible's `costumes` field so the story has a single source of truth
@@ -6559,7 +6594,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlineModelId: unifiedModelId,
       outlineUsage: unifiedUsage,
       outlineReview: outlineReviewMeta,
-      storyTextPrompts: [], // Not used in unified mode
+      storyTextPrompts, // beats: the page-text writer's prompt + raw reply (incl. its ANALYSIS block); [] on the streaming path
       story: fullStoryText,  // Frontend expects 'story' not 'storyText'
       visualBible,
       styledAvatarGeneration: getStyledAvatarGenerationLog(),

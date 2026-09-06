@@ -1531,10 +1531,35 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
   }
 
+  // STRIKE TWO — the VB element budget applied in code (owner, 2026-09-06).
+  // The Art Director was given the budget in its prompt, and the scene review
+  // was handed every overflow as a fault with the ids to drop named. Whatever
+  // still exceeds three is truncated HERE, lowest-ranked first, so the packer
+  // never sees a fourth element — and the page ships, flagged, never killed.
+  // Runs unconditionally: a review that failed, timed out or had no template
+  // must not be a way past the budget.
+  const vbOverflowByPage = new Map();
+  try {
+    const { truncateBriefToBudget } = require('./vbElementBudget');
+    for (const x of expansions) {
+      const t2 = truncateBriefToBudget(x.brief, visualBible, x.pageNumber);
+      if (!t2) continue;
+      x.brief = t2.brief;
+      vbOverflowByPage.set(x.pageNumber, { requested: t2.requested, kept: t2.kept, dropped: t2.dropped });
+      log.warn(`⚠️ [BEATS] VB element budget: page ${x.pageNumber} still referenced ${t2.requested.length} elements after the review — kept ${t2.kept.join(', ')}, dropped ${t2.dropped.join(', ')}`);
+      gl.warn('beats_vb_element_overflow',
+        `Page ${x.pageNumber} referenced ${t2.requested.length} Visual Bible elements (budget 3) after the scene review — dropped ${t2.dropped.join(', ')}`,
+        null, { pageNumber: x.pageNumber, requested: t2.requested, kept: t2.kept, dropped: t2.dropped });
+    }
+    if (vbOverflowByPage.size === 0) log.info('🧱 [BEATS] VB element budget: every page within three elements');
+  } catch (vbErr) {
+    log.warn(`⚠️ [BEATS] VB element budget truncation failed (${vbErr.message}) — briefs ship as written`);
+  }
+
   // ── Step 6: page text — runs HERE, after the scene review, with the briefs ─
   await stage(51, 'Writing the page text...', { next: 56, ms: 75000 });
   const textResult = await runStoryText(expansions);
-  const { textRaw, textModelId, parsedText } = textResult;
+  const { textRaw, textModelId, parsedText, textPromptSent, textUsage } = textResult;
 
   if (parsedText.missing.length > 0) {
     log.warn(`⚠️ [BEATS] Text writer omitted page(s) ${parsedText.missing.join(', ')} after retry — those pages are dropped`);
@@ -1603,6 +1628,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     let raw = '';
     let modelId = textModel;
     let parsed = null;
+    let usage = null;
     const t0 = Date.now();
     for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
       try {
@@ -1614,6 +1640,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
         raw = res.text || '';
         modelId = res.modelId || textModel;
+        usage = res.usage || null;
         parsed = candidate;
       } catch (err) {
         log.warn(`⚠️ [BEATS] Story text attempt ${attempt} failed: ${err.message}`);
@@ -1622,7 +1649,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
     meta.timings.storyTextMs = Date.now() - t0;
     if (!parsed || parsed.pages.length === 0) throw new Error('Beats text writer returned no parseable pages');
-    return { textRaw: raw, textModelId: modelId, parsedText: parsed };
+    // The prompt and the RAW reply travel with the parse (2026-09-06). Step 1
+    // of story-text-from-beats.txt is an ---ANALYSIS--- block — which stretch
+    // each page tells, which pages risk repeating the one before, which arc
+    // facts have not found a page. parseRefinedText splits it off and only the
+    // page bodies were kept, so the writer's own continuity reasoning was
+    // unrecoverable after the run. `raw` carries it verbatim; `parsed.analysis`
+    // is the same block already isolated.
+    return { textRaw: raw, textModelId: modelId, parsedText: parsed, textPromptSent: textPrompt, textUsage: usage };
   }
 
   // ── Assemble the downstream contract ──────────────────────────────────────
@@ -1669,6 +1703,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // and the Lab's stored-beats recovery all decide beats-vs-unified mode
       // from this field's shape.
       outlineExtract: `PLAN: ${b.planLine || ''}`,
+      // Present only on a page whose brief was truncated to the three-element
+      // budget: {requested, kept, dropped} ids, for the page view and the Lab.
+      ...(vbOverflowByPage.has(b.pageNumber) ? { vbElementOverflow: vbOverflowByPage.get(b.pageNumber) } : {}),
     });
   }
   if (pages.length === 0) throw new Error('Beats pipeline produced no usable pages');
@@ -1719,6 +1756,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   meta.totalMs = Date.now() - started;
   meta.title = title;
   meta.textModelId = textModelId;
+  // The page-text writer's call, for the dev-mode "Full API Output (Story
+  // Text)" panel — beats mode used to ship storyTextPrompts empty, which is
+  // where the Step-1 ANALYSIS block was being lost.
+  meta.storyTextCall = {
+    prompt: textPromptSent || '',
+    rawResponse: textRaw || '',
+    analysis: (parsedText.analysis || '').trim(),
+    modelId: textModelId,
+    usage: textUsage || { input_tokens: 0, output_tokens: 0 },
+    startPage: pages.length ? pages[0].pageNumber : 1,
+    endPage: pages.length ? pages[pages.length - 1].pageNumber : 0,
+  };
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
   return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
