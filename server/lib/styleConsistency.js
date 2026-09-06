@@ -30,6 +30,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('./r2');
 const { resolveArtStyle } = require('./storyHelpers');
+const { resolveSeason } = require('./season');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -103,6 +104,110 @@ function extractDeclaredLight(sceneDescription) {
     cursor = end + 1;
   }
   return { token: best.token, text: (sentence || brief).trim().slice(0, 200) };
+}
+
+// ───────────────────────────────────────────────────
+// SEASON — declared-vs-rendered, and place-vs-place, on the same grid pass.
+//
+// The season block shipped in e920e1d4f STATES that foliage is identical from
+// page to page for the same place. Nothing measured it, and on
+// job_1788641639919_mpjwlzkf1 page 6 rendered the same square as pages 3 and 5
+// with yellow foliage where those two are copper.
+//
+// Unlike time-of-day, a season is a BOOK-level fact: one story is commissioned
+// in one season, so every cell is judged against the same declaration
+// (`resolveSeason(storyData)` — the same resolver the story brief used). Two
+// independent findings come out of the one judged field:
+//
+//   SEASON_DECLARED_MISMATCH — a cell renders a season the book did not order.
+//   SEASON_LOCATION_CONFLICT — two cells standing in the SAME place render
+//       different seasons. This one holds even when neither cell contradicts
+//       the declaration, and it is the failure actually observed.
+//
+// Classification lives in the judge prompt (a season word per cell); code only
+// compares the returned fields. GUIDELINE semantics, exactly like the time-flow
+// axis above: findings are reported and stored, nothing here changes a score,
+// enters the outlier list, or triggers a repaint.
+// ───────────────────────────────────────────────────
+
+const SEASON_BUCKETS = 'spring|summer|autumn|winter|indeterminate';
+
+/**
+ * The Visual-Bible location ids a page's brief stands in.
+ *
+ * The Art Director writes them into the brief's METADATA block as
+ * `"objects": ["LOC003", …]`, so that array is read first; any LOC token in the
+ * brief is the fallback for a vintage that formats the metadata differently.
+ *
+ * Vantage variants collapse to their base id: `LOC001.1` and `LOC001` are two
+ * framings of ONE place, and foliage has to agree across them — which is the
+ * whole claim being measured.
+ *
+ * @param {string} sceneDescription
+ * @returns {string[]} unique base LOC ids, in first-appearance order
+ */
+function extractSceneLocationIds(sceneDescription) {
+  const text = String(sceneDescription || '');
+  if (!text) return [];
+  const objectsBlock = text.match(/"objects"\s*:\s*\[([^\]]*)\]/i);
+  const scope = objectsBlock ? objectsBlock[1] : text;
+  const ids = [];
+  for (const m of scope.matchAll(/\bLOC\d+/gi)) {
+    const id = m[0].toUpperCase();
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * Compare the judged seasons across a story's cells.
+ *
+ * Pure — takes the observation rows the grid pass produced and returns
+ * findings. Everything it needs is already on each row, so the whole axis is
+ * unit-testable against synthetic judge output with no image and no API call.
+ *
+ * A cell contributes nothing when its rendered season is missing or
+ * `indeterminate`: an interior, a night sky or a close-up on a face genuinely
+ * carries no season, and calling that a contradiction would flag most books.
+ *
+ * @param {Array<{page:number, declaredSeason:string|null, renderedSeason:string|null, locationIds:string[]}>} rows
+ * @returns {Array<{code:string, pages:number[], detail:string}>}
+ */
+function compareSeasons(rows = []) {
+  const findings = [];
+  const readable = rows.filter(r => r && r.renderedSeason && r.renderedSeason !== 'indeterminate');
+
+  // 1. Against the commissioned season.
+  const contradicting = readable.filter(r => r.declaredSeason && r.renderedSeason !== r.declaredSeason);
+  for (const r of contradicting) {
+    findings.push({
+      code: 'SEASON_DECLARED_MISMATCH',
+      pages: [r.page],
+      detail: `declared ${r.declaredSeason}, rendered ${r.renderedSeason}`,
+    });
+  }
+
+  // 2. Against each other, per place. Grouped by base LOC id, so a page
+  //    standing in two locations is counted under both.
+  const byLocation = new Map();
+  for (const r of readable) {
+    for (const loc of (r.locationIds || [])) {
+      if (!byLocation.has(loc)) byLocation.set(loc, []);
+      byLocation.get(loc).push(r);
+    }
+  }
+  for (const [loc, group] of [...byLocation.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const seasons = [...new Set(group.map(r => r.renderedSeason))];
+    if (seasons.length < 2) continue;
+    findings.push({
+      code: 'SEASON_LOCATION_CONFLICT',
+      pages: group.map(r => r.page).sort((a, b) => a - b),
+      detail: `${loc} is rendered in ${seasons.length} different seasons across its pages (`
+        + group.map(r => `p${r.page}=${r.renderedSeason}`).join(', ') + ')',
+    });
+  }
+
+  return findings;
 }
 
 // Cells per grid. Also the unit the confirmation pass has to BREAK UP: a
@@ -369,6 +474,12 @@ function buildStyleAuditInput(storyData, bestByPage) {
     // Commissioned style — lets the audit judge the dominant cluster against
     // what was actually ordered, not just against itself.
     artStyle: storyData?.artStyle,
+    // Commissioned season. Same reason as artStyle, and the same failure mode
+    // the brief field had twice: a projection that drops it makes the season
+    // axis inert instead of loud. `season` is the raw stored value — the audit
+    // runs it through resolveSeason itself, exactly as the story brief did.
+    season: storyData?.season,
+    createdAt: storyData?.createdAt,
   };
 }
 
@@ -387,7 +498,10 @@ function buildStyleAuditInput(storyData, bestByPage) {
  *   outliers: Array<{page: number, severity: 'major'|'moderate'|'minor', differences: string[]}>,
  *   reasoning: string,
  *   gridImage: string,  // base64 data URL of the grid sent to Gemini (for UI display)
- *   styleMatch: {requestedStyle: string, verdict: 'matches'|'drifted'|'wrong_medium', differences: string[]}|null
+ *   styleMatch: {requestedStyle: string, verdict: 'matches'|'drifted'|'wrong_medium', differences: string[]}|null,
+ *   seasonFlow: Array<{page:number, declaredSeason:string|null, renderedSeason:string|null, locationIds:string[]}>,
+ *   seasonFindings: Array<{code:'SEASON_DECLARED_MISMATCH'|'SEASON_LOCATION_CONFLICT', pages:number[], detail:string}>,
+ *   declaredSeason: string|null
  * }>}
  */
 async function checkStoryStyleConsistency(storyData, opts = {}) {
@@ -423,6 +537,12 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   // job_1788614817116_vxnu60yjg. Fall back to the story's own scene-description
   // rows, and say so loudly when no page carries one at all.
   const briefFallback = pageBriefMap(storyData);
+  // ONE declaration for the whole book, from the same resolver the story brief
+  // used — never the raw field, which is "" on some jobs and an alias on others.
+  // resolveSeason reads `season` and falls back to the story's OWN date, never
+  // to "now" — a repair run months later resolves the season the pages were
+  // drawn in.
+  const declaredSeason = resolveSeason(storyData || {}) || null;
   for (const s of pages) {
     const brief = s.sceneDescription || briefFallback.get(s.pageNumber) || '';
     cells.push({
@@ -432,6 +552,11 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
       // Covers declare nothing (they have no brief), so they stay undefined and
       // can never contribute a time mismatch.
       declared: extractDeclaredLight(brief),
+      // Season is a BOOK-level declaration, so every page cell carries the same
+      // one; the LOC ids are per page and are what the place-vs-place check
+      // groups on.
+      declaredSeason,
+      locationIds: extractSceneLocationIds(brief),
     });
   }
   if (pages.length && !pages.some(s => s.sceneDescription || briefFallback.has(s.pageNumber))) {
@@ -505,8 +630,9 @@ For each flagged page, name 2-4 SPECIFIC differences. Severity:
 - "moderate" — the commissioned medium, but a defining property named in the style is clearly absent
 - "minor"    — subtle inconsistency (slight colour cast, small edge-style variation)
 
-Separately, report two OBSERVATIONS per cell. These are descriptions, not judgments — never let them change a style verdict.
+Separately, report three OBSERVATIONS per cell. These are descriptions, not judgments — never let them change a style verdict.
 - "renderedTime": the time of day the cell's own light shows, one of: ${TIME_BUCKETS}. Use "indoor-unclear" when the light gives no time.
+- "renderedSeason": the season this cell's own foliage, ground cover and daylight colour show, one of: ${SEASON_BUCKETS}. Judge the cell alone; never carry a season from another cell. Use "indeterminate" for an interior, a night frame, or any cell showing no foliage, ground or sky.
 - "facing": which way the dominant figure faces — "frame-left", "frame-right", or "camera". Use "none" when no figure dominates.
 ${declaredBlock ? `
 Each line below is the sentence a page's own brief used to set its light. Report only what the pixels show; do not let the sentence decide your answer, and do not assume the pages share one day.
@@ -523,7 +649,7 @@ Judge only how it is DRAWN, never whether a scene suits its subject. A majority 
 ` : ''}Return ONLY this JSON, no prose. \`cells\` carries ONE entry per code listed above, in that order — never fewer, never merged, never a shared verdict:
 {
   "cells": [
-    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"], "renderedTime": "${TIME_BUCKETS}", "facing": "frame-left"|"frame-right"|"camera"|"none" }
+    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"], "renderedTime": "${TIME_BUCKETS}", "renderedSeason": "${SEASON_BUCKETS}", "facing": "frame-left"|"frame-right"|"camera"|"none" }
   ],${requestedStyle ? `
   "dominantStyleVerdict": "matches" | "drifted" | "wrong_medium",
   "requestedStyleDifferences": ["<how the departing cells depart; empty when they match>"],` : ''}
@@ -577,8 +703,10 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     const outliers = [];
     const observations = [];
     const TIME_SET = new Set(TIME_BUCKETS.split('|'));
+    const SEASON_SET = new Set(SEASON_BUCKETS.split('|'));
     const FACING_SET = new Set(['frame-left', 'frame-right', 'camera', 'none']);
     const declaredByPage = new Map(batch.map(c => [c.page, c.declared || null]));
+    const byPage = new Map(batch.map(c => [c.page, c]));
     for (const c of cellVerdicts) {
       if (typeof c?.page !== 'number' || !inBatch.has(c.page) || answered.has(c.page)) continue;
       answered.add(c.page);
@@ -587,6 +715,10 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
       // must not become a mismatch against a real declaration.
       const rendered = TIME_SET.has(c.renderedTime) ? c.renderedTime : null;
       const declared = declaredByPage.get(c.page) || null;
+      const cell = byPage.get(c.page) || {};
+      // An unrecognised season word is dropped rather than coerced, for the
+      // same reason as the hour: a made-up bucket must never become a finding.
+      const renderedSeason = SEASON_SET.has(c.renderedSeason) ? c.renderedSeason : null;
       observations.push({
         page: c.page,
         declared: declared?.token || null,
@@ -597,6 +729,12 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
         // legitimately look like any hour.
         mismatch: !!(declared?.token && rendered && rendered !== 'indoor-unclear' && rendered !== declared.token),
         facing: FACING_SET.has(c.facing) ? c.facing : null,
+        // Season rides on the same row. `declaredSeason` is undefined on cover
+        // cells (they carry no brief and no location), so they can neither
+        // contradict the commission nor join a place group.
+        declaredSeason: cell.declaredSeason || null,
+        renderedSeason,
+        locationIds: cell.locationIds || [],
       });
       if (c.matchesStyle === false) {
         outliers.push({
@@ -726,6 +864,15 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
   const timeFlow = results
     .flatMap(r => r.observations || [])
     .sort((a, b) => a.page - b.page);
+  // SEASON — the same rows, read on the season fields. Covers ride along with
+  // declaredSeason null and no locations, so they contribute nothing.
+  const seasonFlow = timeFlow.map(t => ({
+    page: t.page,
+    declaredSeason: t.declaredSeason || null,
+    renderedSeason: t.renderedSeason || null,
+    locationIds: t.locationIds || [],
+  }));
+  const seasonFindings = compareSeasons(seasonFlow);
   const dominantCluster = cells.map(c => c.page).filter(p => !outlierPages.has(p));
   const anchorPage = dominantCluster.find(p => p >= 1) ?? dominantCluster[0] ?? (cells[0]?.page ?? null);
 
@@ -768,6 +915,11 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     // UI look like pages 7+ were never checked.
     gridImages: results.map(r => `data:image/jpeg;base64,${r.gridBuffer.toString('base64')}`),
     timeFlow,
+    // GUIDELINE, like timeFlow: reported and stored, never an outlier, never a
+    // score change, never a repaint. Callers surface it on the style report.
+    seasonFlow,
+    seasonFindings,
+    declaredSeason,
     styleMatch: requestedStyle
       ? { requestedStyle, verdict: medium, differences: medium === 'matches' ? [] : mediumDiffs.slice(0, 4) }
       : null,
@@ -792,6 +944,12 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
     log.warn(`🕑 [VISUAL-FLOW] time-of-day mismatch on p${t.page}: declared ${t.declared}, rendered ${t.rendered}`);
   }
 
+  const seasonRead = seasonFlow.filter(r => r.renderedSeason && r.renderedSeason !== 'indeterminate').length;
+  log.info(`🍂 [SEASON-FLOW] declared ${declaredSeason || 'none'}; ${seasonRead}/${seasonFlow.length} cell(s) rendered a readable season; ${seasonFindings.length} finding(s)`);
+  for (const f of seasonFindings) {
+    log.warn(`🍂 [SEASON-FLOW] ${f.code} page ${f.pages.join(', ')}: ${f.detail}`);
+  }
+
   return out;
 }
 
@@ -801,9 +959,12 @@ module.exports = {
   pageBriefMap,
   buildStyleGrid,
   extractDeclaredLight,
+  extractSceneLocationIds,
+  compareSeasons,
   batchCells,
   recutBatches,
   voidCollapsedBatches,
   CHUNK,
   CONFIRMATION_FLAG_RATIO,
+  SEASON_BUCKETS,
 };

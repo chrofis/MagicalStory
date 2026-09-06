@@ -182,3 +182,122 @@ describe("buildStyleAuditInput — the repair pipeline's style-audit projection"
     expect(pageBriefMap({}).size).toBe(0);
   });
 });
+
+// ────────────────────────────────────────────────────────────────
+// I9 — the season block STATES that foliage is identical page to page for the
+// same place (e920e1d4f); nothing measured it. The style audit now carries a
+// season axis alongside the time-of-day one: the grid judge returns a
+// `renderedSeason` per cell, code compares it against the commissioned season
+// and against the other cells standing in the same VB location.
+//
+// GUIDELINE semantics, mirroring timeFlow exactly: findings are reported and
+// stored; nothing here enters the outlier list, changes a score, or triggers a
+// repaint.
+// ────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { extractSceneLocationIds, compareSeasons, SEASON_BUCKETS } = require('../../server/lib/styleConsistency.js');
+
+describe('extractSceneLocationIds', () => {
+  // The real shape: the Art Director writes the LOC ids into the brief's
+  // METADATA block (job_1788641639919_mpjwlzkf1, p6).
+  const BRIEF = 'A boy of about ten stands on the left side of the stone-paved square.\n'
+    + '--- METADATA ---\n'
+    + '{"shot": "medium", "landmarkView": "exterior", "objects": ["LOC003"], "interactions": []}';
+
+  it('reads the metadata objects array', () => {
+    expect(extractSceneLocationIds(BRIEF)).toEqual(['LOC003']);
+  });
+
+  it('collapses vantage variants onto their base place', () => {
+    const b = '--- METADATA ---\n{"objects": ["LOC001.1", "LOC001", "ART007"]}';
+    expect(extractSceneLocationIds(b)).toEqual(['LOC001']);
+  });
+
+  it('falls back to any LOC token when the metadata is shaped differently', () => {
+    expect(extractSceneLocationIds('the square at LOC003, seen from LOC002.1')).toEqual(['LOC003', 'LOC002']);
+  });
+
+  it('an absent or LOC-less brief yields nothing, never a throw', () => {
+    expect(extractSceneLocationIds('')).toEqual([]);
+    expect(extractSceneLocationIds(null)).toEqual([]);
+    expect(extractSceneLocationIds('a kitchen with a kettle')).toEqual([]);
+  });
+});
+
+describe('compareSeasons — synthetic judge output', () => {
+  const cell = (page: number, renderedSeason: string | null, locationIds: string[] = [], declaredSeason: string | null = 'autumn') =>
+    ({ page, declaredSeason, renderedSeason, locationIds });
+
+  it('the vocabulary is the five buckets the judge is given', () => {
+    expect(SEASON_BUCKETS.split('|')).toEqual(['spring', 'summer', 'autumn', 'winter', 'indeterminate']);
+  });
+
+  it('a cell rendering against the commissioned season is a finding', () => {
+    const f = compareSeasons([cell(1, 'autumn', ['LOC001']), cell(2, 'summer', ['LOC004'])]);
+    expect(f).toHaveLength(1);
+    expect(f[0].code).toBe('SEASON_DECLARED_MISMATCH');
+    expect(f[0].pages).toEqual([2]);
+    expect(f[0].detail).toBe('declared autumn, rendered summer');
+  });
+
+  it('cells sharing a VB location that disagree are a finding on their own', () => {
+    // Neither cell contradicts the declaration; they contradict each other.
+    const f = compareSeasons([
+      cell(3, 'autumn', ['LOC003']),
+      cell(5, 'autumn', ['LOC003']),
+      cell(6, 'winter', ['LOC003'], 'winter'),
+    ]);
+    const conflict = f.find((x: any) => x.code === 'SEASON_LOCATION_CONFLICT');
+    expect(conflict).toBeTruthy();
+    expect(conflict.pages).toEqual([3, 5, 6]);
+    expect(conflict.detail).toContain('LOC003');
+    expect(conflict.detail).toContain('p6=winter');
+  });
+
+  it('different places may legitimately differ — only the same place must agree', () => {
+    expect(compareSeasons([cell(1, 'autumn', ['LOC001']), cell(2, 'winter', ['LOC002'], 'winter')]))
+      .toEqual([]);
+  });
+
+  it('a page standing in two locations is counted under both', () => {
+    const f = compareSeasons([
+      cell(1, 'autumn', ['LOC001', 'LOC002']),
+      cell(2, 'winter', ['LOC002'], 'winter'),
+    ]);
+    expect(f.map((x: any) => x.code)).toEqual(['SEASON_LOCATION_CONFLICT']);
+    expect(f[0].detail).toContain('LOC002');
+  });
+
+  it('"indeterminate" and a missing verdict contradict nothing', () => {
+    // An interior, a night frame or a close-up carries no season. Treating that
+    // as a contradiction would flag most books.
+    expect(compareSeasons([
+      cell(1, 'autumn', ['LOC003']),
+      cell(2, 'indeterminate', ['LOC003']),
+      cell(3, null, ['LOC003']),
+    ])).toEqual([]);
+  });
+
+  it('cover cells (no declaration, no location) contribute nothing', () => {
+    expect(compareSeasons([
+      { page: -1, declaredSeason: null, renderedSeason: 'summer', locationIds: [] },
+      { page: -3, declaredSeason: null, renderedSeason: 'winter', locationIds: [] },
+    ])).toEqual([]);
+  });
+
+  it('is pure and total — no rows, junk rows, no throw', () => {
+    expect(compareSeasons()).toEqual([]);
+    expect(compareSeasons([null as any, undefined as any])).toEqual([]);
+  });
+});
+
+describe('buildStyleAuditInput carries the season declaration', () => {
+  it('projects season and createdAt so the axis is never inert', () => {
+    const out = buildStyleAuditInput(
+      { season: 'autumn', createdAt: '2026-09-05T21:38:00Z', artStyle: 'watercolour', sceneImages: [], sceneDescriptions: [] },
+      new Map([[1, { imageData: 'x' }]]),
+    );
+    expect(out.season).toBe('autumn');
+    expect(out.createdAt).toBe('2026-09-05T21:38:00Z');
+  });
+});
