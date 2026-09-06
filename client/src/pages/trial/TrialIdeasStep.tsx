@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, Loader2, MapPin, RefreshCw, Sparkles } from 'lucide-react';
+import { storyTypes } from '@/constants/storyTypes';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
 import { trackTrialStep } from '@/utils/trialFunnel';
 
@@ -35,6 +36,8 @@ const strings: Record<string, {
   idea: string;
   selectIdea: string;
   selected: string;
+  worldLocation: string;
+  worldFantasy: string;
   createStory: string;
   regenerate: string;
   back: string;
@@ -49,6 +52,8 @@ const strings: Record<string, {
     idea: 'Story Idea',
     selectIdea: 'Click to select',
     selected: 'Selected',
+    worldLocation: 'Your city',
+    worldFantasy: 'Fantasy world',
     createStory: 'Create My Story',
     regenerate: 'Generate New Ideas',
     back: 'Back',
@@ -63,6 +68,8 @@ const strings: Record<string, {
     idea: 'Geschichtenidee',
     selectIdea: 'Klicke zum Auswählen',
     selected: 'Ausgewählt',
+    worldLocation: 'Deine Stadt',
+    worldFantasy: 'Fantasiewelt',
     createStory: 'Meine Geschichte erstellen',
     regenerate: 'Neue Ideen erstellen',
     back: 'Zurück',
@@ -77,6 +84,8 @@ const strings: Record<string, {
     idea: 'Idée d\'histoire',
     selectIdea: 'Cliquez pour sélectionner',
     selected: 'Sélectionnée',
+    worldLocation: 'Ta ville',
+    worldFantasy: 'Monde fantastique',
     createStory: 'Créer mon histoire',
     regenerate: 'Générer de nouvelles idées',
     back: 'Retour',
@@ -298,6 +307,10 @@ export default function TrialIdeasStep({
     : streamingIdeas;
 
   const canCreate = selectedIdeaIndex !== null && !isGenerating;
+  const themeEntry = storyTypes.find((st) => st.id === storyInput.storyTheme);
+  const themeName = themeEntry ? (themeEntry.name[lang] || themeEntry.name.en) : '';
+  const worldLocationLabel = userLocation?.city ? `${t.worldLocation}: ${userLocation.city}` : t.worldLocation;
+  const worldFantasyLabel = themeName ? `${t.worldFantasy}: ${themeName}` : t.worldFantasy;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -364,6 +377,15 @@ export default function TrialIdeasStep({
                       {t.selected}
                     </span>
                   )}
+                </div>
+
+                {/* World badge — same convention as the full wizard: card 1 plays in
+                    the reader's town, card 2 in the make-believe theme world. */}
+                <div className={`mb-3 -mx-5 px-5 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
+                  index === 0 ? 'bg-sky-50 text-sky-700' : 'bg-purple-50 text-purple-700'
+                }`}>
+                  {index === 0 ? <MapPin size={12} /> : <Sparkles size={12} />}
+                  <span>{index === 0 ? worldLocationLabel : worldFantasyLabel}</span>
                 </div>
 
                 {/* Content */}
