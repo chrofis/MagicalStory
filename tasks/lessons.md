@@ -679,3 +679,10 @@ session had just staged (a8a6b5566). Rules that survive tonight: (1) never stage
 moment you commit, and commit in the same command; (2) every commit names its paths with
 `git commit -- <paths>`; (3) a deliberately empty commit is `git diff --cached --quiet &&
 git commit --only --allow-empty`; (4) `git show --stat HEAD` before every push.
+
+## 2026-09-06 — `docs/decisions.md` is a hotspot: stage it by hunk
+Appending an entry and `git add docs/decisions.md` took three uncommitted amendments another
+session had made further up the same file (655b25f9b). An empty index is not enough when the
+FILE is shared; check `git diff <file>` shows only your hunks, or stage your hunk alone with
+`git diff -U3 -- <file>` → keep your hunk → `git apply --cached`. Hot files tonight:
+promptBuilders.js, decisions.md, BACKLOG.md, prompts/story-*.txt.
