@@ -36,7 +36,6 @@ up as a value rather than as a difference buried in a 7,000-line file.
 
 | call | divergence | why | experiment | status |
 |---|---|---|---|---|
-| `char_repair` | `detectionBodyMask: null` | production reuses the SAM silhouette produced by its detection pass; a Lab stage run has no detection pass, so the blend gate re-runs `/figure-mask` on the same pixels | n/a — structural, not a behaviour test | `testing` |
 | `char_repair` | forces a method via the legacy mode flags (`useBlended` / `useCutout` / `useFullScene`) | production picks the method from the finding; a Lab A/B has to pin one. The flags are read by production's own adapter, so the choice still flows through `legacyFlagsToAxes` rather than around it | method A/B runs (#784 face vs #785 full-figure) | `testing` |
 | `char_repair` | `protectTargetFace` — adds the target's OWN face box to the protected set, so a body repaint preserves the original head pixels | tests the two-pass idea (body first, then face) against the measured failure: a full-figure repaint returns a head in the wrong medium and proportion in 7 of 8 runs, while face-only repair is 5 of 5 clean | #789 (this test) vs #785/#787 baseline | `testing` |
 | `char_repair` | Lab-only mechanics: `addStep`, `reuseCandidate`, `promptName`, `blurStrength`, `r2Prompt`, `blurFace` | step capture, deterministic replay, and A/B knobs — instrumentation, not behaviour | ongoing | `testing` |
@@ -48,6 +47,7 @@ up as a value rather than as a difference buried in a 7,000-line file.
 | `char_repair` | sent the RAW 2x4 avatar sheet while every generation path picks the pose-matched cell (`resolveCellPose`/`cropAvatarCell`) | PROMOTED: both the production char-fix and the Lab stage now pick the cell by declared facing — body cell for body repair, stacked face+body for face repair. Measured: full sheet 1/5 clean, body cells 6/6 (Lab #785 vs #792/#793). `referenceCells` stays as an A/B override ('full'/'body4'/'body1') |
 | `char_repair` | called `repairCharacterFace` directly with locally resolved axes, bypassing production's adapter — and with it the bbox validation, the **face-box union expansion** (a face box poking outside the body box expands the body box so the mask does not miss half the face) and the `char_repair_run` metric. The Lab could therefore repair a different REGION than production would. | the stage now calls `images.repairCharacterMismatch`, the same entry point the story pipeline calls |
 | `char_repair` | neither caller passed `artStyle` | one shared contract (`charRepairRequest.js`) + parity test |
+| `char_repair` | `detectionBodyMask: null` — the Lab never reused the stored silhouette, on the grounds that "a Lab stage run has no detection pass" | STALE since masks were persisted: the stage now calls `charRepairTarget.resolveFigureMask` with the story's `sourceImageFp`, exactly as production does, and reports a miss rather than absorbing it (`testlab.js`). Confirmed live in exps #996/#998, which surfaced the real resolver's reuse-MISS warning for a cover page |
 
 ## Adding a divergence
 
