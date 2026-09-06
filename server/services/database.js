@@ -2024,6 +2024,24 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
     }
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
+      // FROM THE ORIGINAL, not the clone — identical reasoning to the scene loop
+      // above: `cloneForStorage` walks enumerable properties and `_gdinoMasks` is
+      // deliberately non-enumerable, so the clone never carries a silhouette.
+      // saveCoverData (the atomic refresh-bbox path) has always persisted these;
+      // the GENERATION path never did, so a finished story had figure_mask rows
+      // for every scene page and none for its three covers. Every cover repair
+      // therefore re-segmented on a crop — the call that returns background
+      // instead of the figure — and reported the reuse miss. Measured on staging
+      // job_1788681313413_xqmtk2gcs: 51 mask rows, pages 1-14, nothing for
+      // -1/-2/-3. Covers key on their negative page number, the same one
+      // resolveFigureMask asks for.
+      const { COVER_PAGE_NUMBERS: COVER_PAGE_NUMBERS_FOR_MASKS } = require('../lib/coverKeys');
+      const coverPageNumber = COVER_PAGE_NUMBERS_FOR_MASKS[coverType];
+      if (coverPageNumber != null) {
+        imagesSaved += await persistFigureMasks(
+          storyId, storyData?.coverImages?.[coverType], coverPageNumber,
+        );
+      }
       if (coverData.imageData) {
         // Same v0 single-writer rule as scenes: skip the top-level v0 task
         // when imageVersions[0] (the original) will write version_index 0.

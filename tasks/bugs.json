@@ -588,6 +588,15 @@
       "status": "fixed",
       "fixedIn": "staging (2026-09-06)",
       "note": "Root cause: server/services/prompts.js REPAIR_STYLE_GUARD was one constant substituted at LOAD time into all four character-repair templates. Its text names the target medium 'illustration', asks for 'line work' and forbids rendering 'more realistically or more photographically' - directly contradicting the {artStyleContext} block one line below it, which on a realistic story reads 'match this medium exactly: A photograph.'. style_drift is in RETRYABLE_REJECTIONS so the same contradictory prompt was redrawn 3x and exhausted. Deterministic: character repair could never succeed on a realistic story. Fix: repairStyleGuard(artStyle) picks a photographic or the verbatim-unchanged illustrated guard; the four style-scoped templates keep the token at load and faceRepair.js fills it per story; fillTemplate defaults any unfilled token to the illustrated text so no path can ship a hole. Also fixed the hardcoded \"This is a children's book illustration\" fallback at faceRepair.js buildPrompt. Style gate NOT weakened - it was correct. Same class as the 2026-08-15 BLEND_STYLE_LINES entry in docs/decisions.md."
+    },
+    {
+      "id": "cover-figure-masks-never-persisted-on-the-generation-path",
+      "title": "persistFigureMasks is never called for covers during story generation, so every cover repair re-segments on a crop",
+      "reportedAt": "2026-09-06",
+      "source": "Staging job_1788681313413_xqmtk2gcs: story_images has 51 figure_mask rows, page_number 1-14 only, and none for -1/-2/-3 while all three covers exist with figure detections. resolveFigureMask (server/lib/charRepairTarget.js) therefore returns null for every cover repair and faceRepair.js logs the reuse MISS and re-runs SAM on the crop - the call its own comment names as the one that returns background instead of the figure (job_1787689073034_1v6ew0y1kae initialPage, IoU 0%).",
+      "status": "fixed",
+      "fixedIn": "staging (2026-09-06)",
+      "note": "saveCoverData (the atomic refresh-bbox path) has always persisted cover masks; the full-story save loop in server/services/database.js read covers from dataForStorage (the clone) and never called persistFigureMasks at all. _gdinoMasks is non-enumerable so the clone cannot carry it - the identical trap the scene loop 20 lines above documents. Fix: call persistFigureMasks from the ORIGINAL storyData cover object with COVER_PAGE_NUMBERS[coverType]. Affects new stories; existing stories keep re-segmenting until their covers are re-detected."
     }
   ]
 }
