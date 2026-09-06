@@ -83,6 +83,7 @@ def reset_state():
     pa._worker_ready.clear()
     pa._sessions.clear()
     pa._active_sessions = 0
+    pa._warming_roles.clear()
     pa._active_sessions = 0
     pa._inflight_requests = 0
 
@@ -253,6 +254,47 @@ def test_session_end_cannot_steal_another_session():
           f'active={pa._active_sessions} sessions={pa._sessions}')
 
 
+def test_warmup_merges_for_a_caller_that_names_no_workers():
+    """S2/S3: the repair-phase force-warm sends no `workers`. It must still warm."""
+    print('\n[G] warmup merge')
+    reset_state()
+    client = pa.app.test_client()
+
+    started = []
+    gate = threading.Event()
+
+    def slow_ensure(role, wait_ready=True, _retried=False):
+        started.append(role)
+        gate.wait(timeout=5)          # hold the warm "in flight"
+        return f'http://127.0.0.1:{pa.WORKER_PORTS[role]}'
+
+    pa.ensure_worker = slow_ensure
+    pa._urlreq.urlopen = lambda *a, **k: type('R', (), {'read': lambda self: b'{}'})()
+
+    # A presence beat claims face and stays in flight.
+    r1 = client.post('/warmup', json={'dino': False, 'workers': ['face']})
+    check('presence warm starts face', r1.get_json().get('warming') == ['face'],
+          str(r1.get_json()))
+    time.sleep(0.3)
+
+    # The repair phase warms with NO workers key. Before the fix this returned
+    # "already warming" and torch was never spawned.
+    r2 = client.post('/warmup', json={'dino': True})
+    body = r2.get_json()
+    check('a caller naming no workers still gets torch warmed',
+          'torch' in (body.get('warming') or []),
+          str(body))
+    check('it does not claim to already be warming', body.get('status') != 'already warming',
+          str(body))
+
+    gate.set()
+    deadline = time.time() + 5
+    while time.time() < deadline and pa._warming_roles:
+        time.sleep(0.1)
+    check('claims are released when the warms finish', not pa._warming_roles,
+          f'_warming_roles={pa._warming_roles}')
+
+
 if __name__ == '__main__':
     print('worker bring-up race — regression test')
     test_reaper_cannot_kill_a_starting_worker()
@@ -261,5 +303,6 @@ if __name__ == '__main__':
     test_ready_worker_skips_the_probe()
     test_wedged_worker_fails_fast()
     test_session_end_cannot_steal_another_session()
+    test_warmup_merges_for_a_caller_that_names_no_workers()
     print('\n' + ('FAILED: ' + ', '.join(FAILURES) if FAILURES else 'ALL PASSED'))
     sys.exit(1 if FAILURES else 0)

@@ -241,40 +241,35 @@ else:
     print("[INFO] rembg not installed - MediaPipe fallback will be used")
 
 
-def _ort_session_kwargs():
-    """ONNX Runtime options for the U2-Net session, chosen for RSS not throughput.
+def _apply_rembg_thread_limit():
+    """Cap ONNX Runtime's thread count for the U2-Net session, if asked to.
 
-    u2net.onnx is 176MB on disk, but the loaded session was measured between 526
-    and 877MB — and the SPREAD is the tell. Two ORT defaults explain it:
+    WHAT DOES NOT WORK, verified rather than assumed (2026-09-06): passing
+    `sess_options=` to `rembg.new_session`. On rembg 2.0.75 `new_session` builds
+    its OWN SessionOptions, and `BaseSession.__init__` forwards leftover kwargs
+    to `download_models`, which ignores them. The option object is accepted,
+    carried and thrown away — no TypeError, so it fails completely silently. A
+    previous version of this file logged "mem_arena=False, intra_op_threads=4"
+    while neither was true.
 
-      * the CPU memory arena pre-reserves and never returns pool memory, so the
-        session's footprint tracks its high-water mark, not its working set;
-      * intra-op parallelism defaults to the visible CPU count, which in this
-        container is the cgroup quota of 24 — each thread carrying its own
-        allocation.
+    `OMP_NUM_THREADS` is the one lever rembg reads (it checks the env var in
+    new_session and sets both inter- and intra-op counts from it). The CPU memory
+    arena is NOT reachable through new_session at all — changing that needs the
+    session constructed directly, which is a bigger change than it is worth until
+    someone has measured that the arena is actually the cost.
 
-    Railway bills resident memory per minute and this worker is spawned for
-    anyone who merely opens the wizard, so a few hundred MB held for minutes at a
-    time costs more than a second of latency on one background removal. Both are
-    overridable, because that trade is environment-specific and someone should be
-    able to put it back without a code change.
+    Unset by default: the ORT default is the visible CPU count, which in this
+    container is the cgroup quota of 24. Capping it is an unproven trade of
+    latency for RSS, so it ships OFF and someone can measure it with
+    REMBG_OMP_THREADS rather than inherit a guess.
     """
-    kwargs = {}
-    try:
-        import onnxruntime as ort
-        opts = ort.SessionOptions()
-        if os.environ.get('REMBG_DISABLE_MEM_ARENA', '1') == '1':
-            opts.enable_cpu_mem_arena = False
-        threads = int(os.environ.get('REMBG_INTRA_OP_THREADS', '4'))
-        if threads > 0:
-            opts.intra_op_num_threads = threads
-        kwargs['sess_options'] = opts
-        print(f"[REMBG] session options: mem_arena="
-              f"{opts.enable_cpu_mem_arena}, intra_op_threads={threads}")
-    except Exception as e:
-        # Never let a tuning knob stop background removal from working.
-        print(f"[REMBG] session options unavailable ({e}) — using ORT defaults")
-    return kwargs
+    threads = os.environ.get('REMBG_OMP_THREADS')
+    if not threads:
+        return
+    if 'OMP_NUM_THREADS' in os.environ:
+        return  # an explicit environment setting wins
+    os.environ['OMP_NUM_THREADS'] = str(threads)
+    print(f"[REMBG] OMP_NUM_THREADS={threads} (REMBG_OMP_THREADS)")
 
 
 def get_rembg_session():
@@ -289,7 +284,8 @@ def get_rembg_session():
             try:
                 from rembg import remove as _remove, new_session
                 print("[REMBG] Loading U2-Net session...")
-                _rembg_session = new_session("u2net", **_ort_session_kwargs())
+                _apply_rembg_thread_limit()
+                _rembg_session = new_session("u2net")
                 rembg_remove = _remove
                 print(f"[REMBG] U2-Net loaded — RSS now {_rss_mb()} MB")
             except Exception as e:
@@ -2933,16 +2929,8 @@ def warmup_endpoint():
 
     def _warm():
         t0 = time.time()
-        if ANALYZER_ROLE == 'parent':
-            # Spawn the workers this session will need; forward the SAME warmup
-            # body to each so it preloads its own models. face loads mediapipe
-            # at boot; rembg/torch preload below; arcface only when asked.
-            roles = want_roles if want_roles is not None else (
-                ['face', 'torch'] + (['arcface'] if want_arcface else []))
-            with _warmup_lock:
-                _warming_roles.update(roles)
-            _warm_roles(roles, body)
-            return
+        # (The parent never reaches _warm: it dispatches _warm_roles directly so
+        # that every request merges into the roles already being warmed.)
         # Worker roles preload only what they own.
         if ANALYZER_ROLE == 'face':
             # This worker owns the whole photo path, so it loads U2-Net itself.
@@ -2971,28 +2959,56 @@ def warmup_endpoint():
                 print(f"[WARMUP] arcface failed: {e}")
         print(f"[WARMUP] {ANALYZER_ROLE} done in {time.time() - t0:.1f}s — rss {_rss_mb()} MB")
 
-    # SINGLE-FLIGHT MERGES, IT DOES NOT DROP (2026-09-06). This used to return
-    # "already warming" and discard the second caller's request entirely — so a
-    # presence beat asking for ['face'] could swallow the repair phase's
-    # force-warm, and DINO's ~90s load then landed on the first real detection,
-    # which times out into the Gemini bbox fallback. `force` on the Node side
-    # only bypasses ITS debounce; it never reached this decision. Anything the
-    # in-flight warm is not already covering is started in its own thread.
-    with _warmup_lock:
-        in_flight = _warmup_thread is not None and _warmup_thread.is_alive()
-        outstanding = [r for r in (want_roles or []) if r not in _warming_roles]
-        if in_flight and ANALYZER_ROLE == 'parent' and want_roles and not outstanding:
-            return jsonify({"success": True, "status": "already warming",
-                            "covered": sorted(_warming_roles)})
-        if in_flight and ANALYZER_ROLE == 'parent' and outstanding:
-            print(f"[WARMUP] merging {', '.join(outstanding)} into the warm in flight")
-            extra = threading.Thread(target=_warm_roles, args=(list(outstanding), dict(body)),
-                                     daemon=True)
+    # SINGLE-FLIGHT MERGES, IT DOES NOT DROP.
+    #
+    # The parent never returns a bare "already warming": it works out which
+    # worker ROLES this request needs, subtracts the ones a warm in flight is
+    # already covering, and starts a thread for the remainder. Two earlier
+    # versions of this got it wrong and both failed silently:
+    #
+    #  * the original dropped the second caller's request entirely;
+    #  * the first fix only merged for callers that NAMED `workers` — and the
+    #    caller that matters most, the repair phase's force-warm
+    #    (storyJobPipeline.js), names none. It fell through to the bare return,
+    #    so a presence beat could still swallow it and DINO's ~90s load still
+    #    landed on the first real detection. Hence `effective_roles` below:
+    #    a request without `workers` means the DEFAULT set, not "no roles".
+    #
+    # Roles are claimed at DISPATCH, under the lock, before the thread starts —
+    # not from inside the thread. Claiming them later let a merged thread finish
+    # and discard a role that the original thread had not yet claimed, after
+    # which the set kept that role forever and every later caller was told it was
+    # covered by a thread that had already exited.
+    if ANALYZER_ROLE == 'parent':
+        effective_roles = want_roles if want_roles is not None else (
+            ['face', 'torch'] + (['arcface'] if want_arcface else []))
+        with _warmup_lock:
+            outstanding = [r for r in effective_roles if r not in _warming_roles]
+            if not outstanding:
+                return jsonify({"success": True, "status": "already warming",
+                                "covered": sorted(_warming_roles)})
             _warming_roles.update(outstanding)
-            extra.start()
-            return jsonify({"success": True, "status": "warming",
-                            "merged": sorted(outstanding)})
-        if in_flight:
+            thread = threading.Thread(target=_warm_roles,
+                                      args=(list(outstanding), dict(body)),
+                                      daemon=True)
+            try:
+                thread.start()
+            except Exception as e:
+                # Never leave a claim behind a thread that does not exist — that
+                # is the poisoning case above, and it is silent.
+                for role in outstanding:
+                    _warming_roles.discard(role)
+                print(f"[WARMUP] could not start warm thread: {e}")
+                return jsonify({"success": False, "error": str(e)}), 503
+        print(f"[WARMUP] warming {', '.join(outstanding)}")
+        return jsonify({"success": True, "status": "warming",
+                        "warming": sorted(outstanding),
+                        "covered": sorted(_warming_roles)})
+
+    # Worker roles preload their own models; one warm at a time is enough.
+    global _warmup_thread
+    with _warmup_lock:
+        if _warmup_thread is not None and _warmup_thread.is_alive():
             return jsonify({"success": True, "status": "already warming"})
         _warmup_thread = threading.Thread(target=_warm, daemon=True)
         _warmup_thread.start()
