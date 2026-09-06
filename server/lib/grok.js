@@ -1126,9 +1126,14 @@ async function extractBottomBody3Columns(buffer) {
   try {
     const meta = await sharp(buffer).metadata();
     if (!meta.width || !meta.height) return [];
-    // 2×4 sheets are landscape — width should be about 2× the height.
+    // A 2×4 sheet is 4 columns wide whatever the canvas: Grok now returns it
+    // on a square canvas (tall cells), older sheets were ~2:1. Reject only a
+    // portrait image, which is a single figure (a raw cutout or a 9:16
+    // preview), never a grid — slicing that gives a sliver of dress. The old
+    // 1.6–2.4 gate rejected every square sheet, so every trial slideshow got
+    // ONE slide, the whole grid, and never changed.
     const aspect = meta.width / meta.height;
-    if (aspect < 1.6 || aspect > 2.4) return [];
+    if (aspect < 0.9 || aspect > 2.4) return [];
 
     const w = meta.width;
     const h = meta.height;
