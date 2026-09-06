@@ -77,9 +77,21 @@ exists to produce.
 - [x] **W3 The cache-drop guard refuses all three model-cache roots.** The `>=3`
       path-segment floor rejects `/app/.hf_cache`, `/app/.deepface` and the
       single FILE `/app/mobile_sam.pt`, so model weights are never dropped.
-- [x] **W4 U2-Net downloads from GitHub at runtime** while MobileSAM, DINO and
-      ArcFace are baked into the image. 27.6s vs 0.9s, and an external dependency
-      in the user's upload path.
+- [ ] **W4 U2-Net downloads from GitHub at runtime — NOT FIXED, two attempts.**
+      27.6s vs 0.9s cached, and an external host in the user's upload path.
+      Attempt 1: baked to `/app/.u2net` + `ENV U2NET_HOME`. Ineffective — this
+      rembg version ignores that variable; the container still logged
+      `Downloading ... to /root/.u2net/u2net.onnx`.
+      Attempt 2: baked to `/root/.u2net`, the path the log names. STILL
+      downloads. Deployment `918438ef` is confirmed built from commit `2911dc71`
+      (which contains the RUN), the Dockerfile is single-stage so the layer
+      should persist, and yet the build log's 12 steps do not include the U2-Net
+      RUN at all — while mobile_sam/DINO/ArcFace steps are all there.
+      NEXT: find why that RUN is absent from the build (Railway build cache? a
+      different Dockerfile actually being built? the analyzer build log also
+      contains vite client output, which is itself suspicious). Do NOT try a
+      third blind variant — read the build definition first.
+      The Dockerfile line currently in the tree is harmless but INERT.
 
 ## Doc / comment contradictions
 
