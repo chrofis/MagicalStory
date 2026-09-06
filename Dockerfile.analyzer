@@ -97,6 +97,14 @@ RUN curl -fL -o /app/mobile_sam.pt \
     https://github.com/ultralytics/assets/releases/download/v8.3.0/mobile_sam.pt
 ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
 
+# U2-Net (rembg) baked in too (2026-09-06). Measured on a fresh production
+# container: the first /remove-bg spent 27.6s because rembg fetched u2net.onnx
+# from GitHub at request time, versus 0.9s once it was on disk — and it put an
+# external host in the user's photo-upload path. Every other model here is
+# pre-fetched; this one was the exception. rembg looks in $U2NET_HOME.
+ENV U2NET_HOME=/app/.u2net
+RUN mkdir -p /app/.u2net && curl -fL -o /app/.u2net/u2net.onnx     https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx     || echo "WARN: U2-Net pre-fetch failed — rembg will download it lazily at runtime"
+
 # GroundingDINO-base weights pre-fetched into the image (~900MB) so the
 # /detect-figures-text cold start doesn't download from HuggingFace at runtime.
 # Cache lives under HF_HOME; photo_analyzer.py reads GROUNDINGDINO_MODEL.

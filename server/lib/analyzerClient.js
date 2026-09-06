@@ -1,13 +1,17 @@
 /**
  * Client for the Python photo analyzer, with two jobs:
  *
- *  1. Survive a restart. The analyzer deliberately exits itself when idle and
- *     bloated (only process exit reclaims its ~1GB of fragmentation — a forced
- *     malloc_trim reclaims literally nothing). start.sh brings it back in ~10s,
- *     during which nothing is listening on port 5000. Repair calls fall back to
+ *  1. Survive a restart. The analyzer is a separate Railway service since
+ *     2026-09-04, so it redeploys and restarts independently of Node, and
+ *     nothing is listening on port 5000 while it does. Repair calls fall back to
  *     Gemini, but photo upload has NO fallback: a user would just see their
  *     upload fail. Retrying a refused connection closes that window, which no
  *     amount of scheduling can fully close on its own.
+ *
+ *     (This used to say the analyzer "exits itself when idle and bloated". That
+ *     mechanism was deleted on 2026-08-23 — memory now comes back by killing
+ *     whole workers when the session count reaches zero. The retry policy is
+ *     still right; only the stated reason had gone stale.)
  *
  *  2. Warm it while the user is active, so models load during the wizard or
  *     during the story's opening Claude calls, instead of costing ~570MB and
@@ -115,9 +119,11 @@ function ensureWarm(reason = 'user-active', { force = false, workers = null } = 
 // cost of a missed END is bounded — workers linger until the next session
 // closes or the next sessionless request completes, not forever.
 
-function _sessionCall(path, reason) {
+function _sessionCall(path, reason, body) {
   return analyzerFetch(path, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
     signal: AbortSignal.timeout(5000),
   }, { retries: 1, retryDelayMs: 2000 })
     .then((r) => r.json().catch(() => null))
@@ -131,8 +137,21 @@ function _sessionCall(path, reason) {
     });
 }
 
-const sessionBegin = (reason = 'work') => _sessionCall('/session/begin', reason);
-const sessionEnd = (reason = 'work') => _sessionCall('/session/end', reason);
+// SESSIONS ARE IDENTIFIED, NOT COUNTED (2026-09-06).
+//
+// These calls are fire-and-forget with connection-only retry, so a begin CAN be
+// lost — during an analyzer restart, most obviously. Under the old bare refcount
+// a lost increment became a stolen decrement: story A's end took story B's count
+// to zero and reaped B's workers mid-repair. An id the analyzer never registered
+// is simply absent, so ending it is a no-op instead of somebody else's loss.
+//
+// `id` defaults to `reason`, which every caller already makes unique per job
+// (`story:${jobId}`, `avatar:${jobId}`, `testlab:${experimentId}`). Presence is
+// the exception — two tabs share a surface — so it passes the tab token.
+const sessionBegin = (reason = 'work', { id = reason } = {}) =>
+  _sessionCall('/session/begin', reason, { id, label: reason });
+const sessionEnd = (reason = 'work', { id = reason } = {}) =>
+  _sessionCall('/session/end', reason, { id });
 const sessionReset = () => _sessionCall('/session/reset', 'node-boot');
 
 module.exports = { analyzerFetch, ensureWarm, sessionBegin, sessionEnd, sessionReset };

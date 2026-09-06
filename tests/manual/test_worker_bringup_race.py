@@ -81,6 +81,8 @@ def reset_state():
     pa._workers.clear()
     pa._bringing_up.clear()
     pa._worker_ready.clear()
+    pa._sessions.clear()
+    pa._active_sessions = 0
     pa._active_sessions = 0
     pa._inflight_requests = 0
 
@@ -194,20 +196,61 @@ def test_wedged_worker_fails_fast():
     # Shorten the budget so this runs on every push; the code reads the module
     # global at call time. What is under test is that the SHORT budget is chosen
     # at all, not its exact value.
-    original = pa.WEDGED_WORKER_TIMEOUT_S
+    original = (pa.WEDGED_WORKER_TIMEOUT_S, pa.WORKER_START_TIMEOUT_S)
     pa.WEDGED_WORKER_TIMEOUT_S = 2
+    pa.WORKER_START_TIMEOUT_S = 2
     try:
-        pa._workers['face'] = FakeProc()  # alive, unproven, no bring-up in flight
+        wedged = FakeProc()  # alive, unproven, no bring-up in flight
+        pa._workers['face'] = wedged
         t0 = time.time()
         try:
             pa.ensure_worker('face')
             check('raised for a wedged worker', False, 'returned normally')
         except RuntimeError as e:
             waited = time.time() - t0
-            check('failed fast rather than hanging 120s', waited < 60,
+            # The wedge is detected on the SHORT budget, the process is killed,
+            # and a replacement is spawned that gets the full start budget. What
+            # must never happen again is the old behaviour: recognise the wedge
+            # and then leave the process running forever.
+            check('terminated the wedged process', wedged.poll() is not None,
+                  f'poll()={wedged.poll()}')
+            check('respawned rather than giving up', pa._workers.get('face') is not wedged,
+                  f'registered process is {"a replacement" if pa._workers.get("face") is not wedged else "STILL THE WEDGED ONE"}')
+            check('bounded by short + start budget, not unbounded', waited < 30,
                   f'raised after {waited:.1f}s: {e}')
     finally:
-        pa.WEDGED_WORKER_TIMEOUT_S = original
+        pa.WEDGED_WORKER_TIMEOUT_S, pa.WORKER_START_TIMEOUT_S = original
+
+
+def test_session_end_cannot_steal_another_session():
+    """F1: an end for an id that was never opened must not close someone else's."""
+    print('\n[F] session identities')
+    reset_state()
+    client = pa.app.test_client()
+
+    # Story B opens a session. Story A's begin was lost (never arrived).
+    client.post('/session/begin', json={'id': 'story-B', 'label': 'story:B'})
+    check('B is open', pa._active_sessions == 1, f'active={pa._active_sessions}')
+
+    # A finishes and ends its session. Under the old refcount this decremented
+    # B's count to zero and reaped B's workers mid-repair.
+    r = client.post('/session/end', json={'id': 'story-A'})
+    check('ending an unknown id is a no-op', pa._active_sessions == 1,
+          f'active={pa._active_sessions} after ending story-A')
+    check('response reports B still open', r.get_json()['active'] == 1,
+          str(r.get_json()))
+
+    # A duplicate end must not double-decrement either.
+    client.post('/session/end', json={'id': 'story-B'})
+    client.post('/session/end', json={'id': 'story-B'})
+    check('B closes once and stays closed', pa._active_sessions == 0,
+          f'active={pa._active_sessions}')
+
+    # Reset clears everything.
+    client.post('/session/begin', json={'id': 'x', 'label': 'x'})
+    client.post('/session/reset')
+    check('reset clears all sessions', pa._active_sessions == 0 and not pa._sessions,
+          f'active={pa._active_sessions} sessions={pa._sessions}')
 
 
 if __name__ == '__main__':
@@ -217,5 +260,6 @@ if __name__ == '__main__':
     test_force_still_kills()
     test_ready_worker_skips_the_probe()
     test_wedged_worker_fails_fast()
+    test_session_end_cannot_steal_another_session()
     print('\n' + ('FAILED: ' + ', '.join(FAILURES) if FAILURES else 'ALL PASSED'))
     sys.exit(1 if FAILURES else 0)

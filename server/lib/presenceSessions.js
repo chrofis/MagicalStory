@@ -49,7 +49,10 @@ function beat(token, surface = 'unknown') {
   }
   tokens.set(token, { lastBeat: Date.now(), surface });
   log.debug(`[PRESENCE] ${surface} arrived (${tokens.size} present) — opening analyzer session + warm`);
-  sessionBegin(`presence:${surface}`);
+  // Keyed on the TAB TOKEN: two tabs share a surface, so `presence:trial`
+  // would collide — the second begin would be ignored and the first leave
+  // would close both.
+  sessionBegin(`presence:${surface}`, { id: token });
   // Warm the photo-upload path only: face (mediapipe) + rembg. The story
   // pipeline warms torch at story start, which is 20+ minutes before the repair
   // phase needs it.
@@ -74,7 +77,7 @@ function leave(token) {
   if (!entry) return { ok: true, active: tokens.size };
   tokens.delete(token);
   log.debug(`[PRESENCE] ${entry.surface} left (${tokens.size} present) — closing analyzer session`);
-  sessionEnd(`presence:${entry.surface}`);
+  sessionEnd(`presence:${entry.surface}`, { id: token });
   return { ok: true, active: tokens.size };
 }
 
@@ -84,7 +87,7 @@ function _sweep() {
     if (now - entry.lastBeat > PRESENCE_TTL_MS) {
       tokens.delete(token);
       log.debug(`[PRESENCE] ${entry.surface} expired after ${Math.round((now - entry.lastBeat) / 1000)}s idle — closing analyzer session`);
-      sessionEnd(`presence-expired:${entry.surface}`);
+      sessionEnd(`presence-expired:${entry.surface}`, { id: token });
     }
   }
 }

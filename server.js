@@ -2530,11 +2530,15 @@ initialize().then(() => {
     log.info(`📍 URL: http://localhost:${PORT}`);
   });
 
-  // Zero the analyzer's session count. A restarted Node cannot know how many
+  // Clear the analyzer's open sessions. A restarted Node cannot know which
   // sessions its predecessor left open (crash mid-story = /session/end never
-  // sent), and a wrong count would keep model workers resident forever. In the
-  // container this is belt-and-suspenders — start.sh dies with Node — but local
-  // dev restarts Node against a long-lived analyzer. Fire-and-forget.
+  // sent), and a stale one keeps model workers resident.
+  //
+  // This is LOAD-BEARING in production, not belt-and-suspenders (corrected
+  // 2026-09-06). It was written when the analyzer ran inside this container and
+  // died with Node; since the analyzer became its own Railway service on
+  // 2026-09-04 that coupling is gone, and this call is the only thing that
+  // clears state a crashed Node left behind. Fire-and-forget.
   require('./server/lib/analyzerClient').sessionReset();
 
   // Staging-only: stop the container once it's provably idle so we stop paying

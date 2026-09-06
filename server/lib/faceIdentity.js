@@ -183,7 +183,10 @@ function warmArcFace() {
   // Never warm a disabled gate: the warmup is what pulls TensorFlow into the
   // analyzer, and that is precisely what starves GroundingDINO.
   if (!GATE_ENABLED) return;
-  analyzerPost('/warmup', { arcface: true }, 5000)
+  // workers named explicitly (2026-09-06): {arcface:true} alone left the
+  // analyzer on its default role set, so an avatar job also spawned the torch
+  // worker it never touches.
+  analyzerPost('/warmup', { arcface: true, workers: ['face', 'arcface'] }, 5000)
     .then(() => log.debug('[ARCFACE] warmup requested'))
     .catch((err) => log.debug(`[ARCFACE] warmup skipped: ${err.message}`));
 }

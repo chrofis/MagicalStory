@@ -227,11 +227,13 @@ except Exception as _e:
     REMBG_AVAILABLE = False
 rembg_remove = None
 _rembg_session = None
-_rembg_last_used = 0.0
 # Serialize the import + session build. Photo analysis runs concurrently, so two
 # threads racing `from rembg import ...` would otherwise double-load the model.
 _rembg_lock = threading.Lock()
-_REMBG_IDLE_UNLOAD_S = int(os.environ.get('REMBG_IDLE_UNLOAD_S', '900'))
+# (An idle-unload timer used to live here. Deleted 2026-09-06: the reaper that
+# read it was removed on 2026-08-23 in favour of killing whole workers at
+# session zero, so the constant and its _last_used stamp had been dead for
+# weeks — and setting the env var on Railway silently did nothing.)
 
 if REMBG_AVAILABLE:
     print("[OK] rembg background removal available (U2-Net, lazy)")
@@ -241,8 +243,7 @@ else:
 
 def get_rembg_session():
     """Build (or reuse) the U2-Net session. Returns None if rembg is unusable."""
-    global rembg_remove, _rembg_session, _rembg_last_used
-    _rembg_last_used = time.time()
+    global rembg_remove, _rembg_session
     if _rembg_session is not None:
         return _rembg_session
     if not REMBG_AVAILABLE:
@@ -254,7 +255,6 @@ def get_rembg_session():
                 print("[REMBG] Loading U2-Net session...")
                 _rembg_session = new_session("u2net")
                 rembg_remove = _remove
-                _rembg_last_used = time.time()
                 print(f"[REMBG] U2-Net loaded — RSS now {_rss_mb()} MB")
             except Exception as e:
                 # Stay None so the caller falls back to MediaPipe rather than 500ing.
@@ -307,7 +307,13 @@ _boot_mark("haar cascades (ready)")
 # timer forever and the recycler could never fire — the watcher would silently
 # prevent the thing it was watching. These paths are still counted as in-flight
 # (we must not exit mid-response), just not as *activity*.
-_NON_ACTIVITY_PATHS = frozenset({'/health', '/release-memory'})
+# /warmup is here (2026-09-06) because it is not evidence that the SESSION that
+# is open is alive. Any wizard visitor triggers one, so leaving it in stamped
+# _last_request_ts continuously and the leaked-session reclaim below could never
+# fire during business hours — a crashed story pinned the whole worker fleet and
+# ~1.3GB of page cache 24/7, which is the exact bill this subsystem exists to
+# avoid.
+_NON_ACTIVITY_PATHS = frozenset({'/health', '/release-memory', '/warmup'})
 
 
 def _is_activity(path):
@@ -380,18 +386,41 @@ def _track_request_end(exc=None):
 # ═══════════════════════════════════════════════════════════════════════════
 import json
 import subprocess
+import uuid
 import urllib.request as _urlreq
 import urllib.error as _urlerr
 
 _workers_lock = threading.Lock()
 _workers = {}            # role -> subprocess.Popen
+
+# Sessions are IDENTITIES, not a count (2026-09-06). A bare refcount with a
+# `max(0, n-1)` end was unsafe: `sessionBegin` is fire-and-forget with
+# connection-only retry, so a lost increment became a STOLEN DECREMENT — story
+# A's end could take story B's count to zero and reap B's workers mid-repair.
+# An id that was never registered simply is not in this dict, so ending it is a
+# no-op instead of someone else's loss.
+#   id -> {'label': str, 'started': float}
+_sessions = {}
+# Derived count, kept in step with `_sessions` so every existing reader
+# (/health, /release-memory, the reaper) stays unchanged.
 _active_sessions = 0
+
+
+def _recount_sessions_locked():
+    """Re-derive `_active_sessions` from `_sessions`. Call under `_request_lock`."""
+    global _active_sessions
+    _active_sessions = len(_sessions)
 # Roles currently being brought up — spawned, or alive but not yet answering
 # /health. A worker in here is NOT reap-eligible: see kill_workers().
 # REFCOUNTED, not a set: /warmup's thread and a concurrent photo upload can both
 # be waiting on the same role, and whichever finished first would otherwise drop
 # the protection while the other was still waiting.
 _bringing_up = {}
+# Roles being served by a process we did NOT spawn (an orphan from a previous
+# parent). We hold no Popen for these, so `kill_workers` cannot terminate them —
+# it asks them to exit over HTTP instead. Tracked so they are neither immortal
+# nor invisible in the memory accounting (2026-09-06).
+_adopted = set()
 # Roles that have answered /health since they were spawned. Lets the common path
 # (worker already serving) skip the readiness probe entirely — without it every
 # proxied request paid a loopback round trip. Cleared on spawn and on kill.
@@ -403,6 +432,10 @@ _worker_ready = set()
 # full 120s budget still applies to a worker we just spawned or that another
 # thread is starting, because model imports legitimately take that long.
 WEDGED_WORKER_TIMEOUT_S = 15
+
+# How long a worker we just spawned may take to answer. Model imports gate it:
+# mediapipe ~5s, U2-Net ~28s on a cold container that must fetch it, TF ~15s.
+WORKER_START_TIMEOUT_S = int(os.environ.get('WORKER_START_TIMEOUT_S', '120'))
 
 def _note_arcface_used():
     """Stub kept for the embed paths; lifecycle is session-driven now."""
@@ -422,7 +455,32 @@ def _worker_health_ok(role, timeout=2):
         return False
 
 
-def ensure_worker(role, wait_ready=True):
+def _terminate_wedged(role):
+    """Kill a worker that is alive but will not answer, so it can be respawned.
+
+    Without this the wedged state is ABSORBING: `_worker_alive` is True so
+    ensure_worker never respawns, `_worker_ready` is empty so the fast path never
+    fires, and `kill_workers` cannot reach it until every session closes. Every
+    request then re-failed at the short budget, forever, while the process kept
+    its full RSS.
+    """
+    with _workers_lock:
+        proc = _workers.pop(role, None)
+        _worker_ready.discard(role)
+    if proc is None or proc.poll() is not None:
+        return
+    print(f"[WORKERS] {role} worker is wedged (alive, not answering) — terminating")
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    except Exception as e:
+        print(f"[WORKERS] terminating wedged {role} failed: {e}")
+
+
+def ensure_worker(role, wait_ready=True, _retried=False):
     """Spawn (or adopt) the worker for `role`; return its base URL.
 
     Adoption: if something already answers /health on the role's port — an
@@ -449,13 +507,14 @@ def ensure_worker(role, wait_ready=True):
     with _workers_lock:
         # Proven-ready and still alive: the overwhelmingly common case. Skip the
         # probe — this is a per-request path.
-        if role in _worker_ready and _worker_alive(role):
+        if role in _worker_ready and (_worker_alive(role) or role in _adopted):
             return url
         if not _worker_alive(role):
             _worker_ready.discard(role)
             if _worker_health_ok(role):
                 print(f"[WORKERS] adopting existing {role} worker on :{WORKER_PORTS[role]}")
                 _worker_ready.add(role)
+                _adopted.add(role)
                 return url
             env = dict(os.environ)
             env['ANALYZER_ROLE'] = role
@@ -471,10 +530,11 @@ def ensure_worker(role, wait_ready=True):
         if not wait_ready:
             return url
         _bringing_up[role] = _bringing_up.get(role, 0) + 1
+    wedged = False
     try:
         # Model imports gate readiness (mediapipe ~5s, TF ~15s). Poll rather
         # than sleep so the fast workers don't pay the slow ones' budget.
-        budget = 120 if starting else WEDGED_WORKER_TIMEOUT_S
+        budget = WORKER_START_TIMEOUT_S if starting else WEDGED_WORKER_TIMEOUT_S
         deadline = time.time() + budget
         while time.time() < deadline:
             if _worker_health_ok(role):
@@ -485,13 +545,24 @@ def ensure_worker(role, wait_ready=True):
                 raise RuntimeError(f"{role} worker exited during startup")
             time.sleep(0.5)
         else:
-            raise RuntimeError(f"{role} worker not ready within {budget}s")
+            if starting:
+                # It really is still importing models. Nothing to recover.
+                raise RuntimeError(f"{role} worker not ready within {budget}s")
+            wedged = True
     finally:
         with _workers_lock:
             if _bringing_up.get(role, 0) > 1:
                 _bringing_up[role] -= 1
             else:
                 _bringing_up.pop(role, None)
+    if wedged:
+        # Outside the finally so the bring-up guard is already released — the
+        # respawn below has to be able to register its own.
+        _terminate_wedged(role)
+        if _retried:
+            raise RuntimeError(f"{role} worker wedged and did not recover after a respawn")
+        print(f"[WORKERS] respawning {role} after a wedge")
+        return ensure_worker(role, wait_ready=wait_ready, _retried=True)
     return url
 
 
@@ -527,19 +598,39 @@ def kill_workers(reason, expect_epoch=None, force=False):
             print(f"[WORKERS] kill aborted ({reason}): "
                   f"{', '.join(sorted(_bringing_up))} still starting")
             return False
-        for role, proc in list(_workers.items()):
-            if proc.poll() is None:
-                print(f"[WORKERS] killing {role} worker ({reason})")
+        # Detach under the lock, terminate OUTSIDE it. This function's own
+        # docstring rejects holding `_request_lock` across `terminate() +
+        # wait(5)`; holding `_workers_lock` there was no better — every
+        # ensure_worker needs it, so three workers could block a spawn for 15s,
+        # and the request that waited then found the worker gone and paid a
+        # cold start (2026-09-06).
+        doomed = list(_workers.items())
+        orphans = list(_adopted)
+        _workers.clear()
+        _worker_ready.clear()
+        _adopted.clear()
+    # An adopted worker has no Popen to terminate, so ask it to exit. Without
+    # this it survived every kill path and kept its full RSS billed.
+    for role in orphans:
+        print(f"[WORKERS] asking adopted {role} worker to exit ({reason})")
+        try:
+            req = _urlreq.Request(
+                f"http://127.0.0.1:{WORKER_PORTS[role]}/release-memory?recycle=true",
+                data=b'', method='POST')
+            _urlreq.urlopen(req, timeout=5).read()
+        except Exception as e:
+            print(f"[WORKERS] adopted {role} did not exit on request: {e}")
+    for role, proc in doomed:
+        if proc.poll() is None:
+            print(f"[WORKERS] killing {role} worker ({reason})")
+            try:
+                proc.terminate()
                 try:
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                except Exception as e:
-                    print(f"[WORKERS] kill {role} failed: {e}")
-            _workers.pop(role, None)
-            _worker_ready.discard(role)
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            except Exception as e:
+                print(f"[WORKERS] kill {role} failed: {e}")
     return True
 
 
@@ -547,6 +638,11 @@ def kill_workers(reason, expect_epoch=None, force=False):
 # Generous on purpose: a real story issues analyzer calls throughout, and the
 # gap between its stages is minutes, not half an hour.
 _SESSION_LEAK_TIMEOUT_S = int(os.environ.get('SESSION_LEAK_TIMEOUT_S', '1800'))
+
+# No single job runs this long. A session older than this leaked, however busy
+# the rest of the process is — the global-silence rule above can be held off
+# indefinitely by OTHER users' traffic, which is not evidence about THIS session.
+_SESSION_MAX_AGE_S = int(os.environ.get('SESSION_MAX_AGE_S', str(3 * 3600)))
 
 
 def _maybe_reap_workers():
@@ -564,7 +660,7 @@ def _maybe_reap_workers():
         busy = _inflight_requests > 0
         sessions = _active_sessions
         epoch = _request_epoch
-    if sessions == 0 and not busy and _workers:
+    if sessions == 0 and not busy and (_workers or _adopted):
         # Pass the epoch: if a request arrived between the check above and the
         # kill, abort rather than terminate a worker mid-call.
         if kill_workers('sessions=0, idle', expect_epoch=epoch):
@@ -592,36 +688,95 @@ def _maybe_reap_workers():
     # end cleanly. Reclaim it. The guard is REQUEST activity, not wall-clock —
     # a genuinely long story is issuing analyzer calls throughout, and any
     # in-flight request blocks this.
-    if sessions > 0 and not busy and _workers:
-        idle_for = time.time() - _last_request_ts
-        if idle_for > _SESSION_LEAK_TIMEOUT_S:
-            print(f"[SESSIONS] {sessions} session(s) open but no request for "
-                  f"{idle_for:.0f}s — treating as leaked, resetting to 0")
-            with _request_lock:
-                _active_sessions = 0
-            if kill_workers('leaked session reclaimed', expect_epoch=epoch):
-                _drop_file_cache_async('leaked session reclaimed')
+    if sessions > 0 and not busy and (_workers or _adopted):
+        now = time.time()
+        idle_for = now - _last_request_ts
+        # Two independent reclaims, because either alone has a hole.
+        #
+        # (a) GLOBAL SILENCE. Nothing at all has arrived for the timeout. Only
+        #     sound now that /warmup is not an activity path — otherwise any
+        #     wizard visitor kept this timer permanently reset and a leaked
+        #     session was immortal (2026-09-06).
+        # (b) PER-SESSION AGE. A session outliving any plausible job did not end
+        #     cleanly, no matter how busy the process is. This is what survives
+        #     a multi-tenant day: (a) can be held off forever by OTHER users'
+        #     traffic, and the leak is not their fault.
+        stale = [sid for sid, meta in list(_sessions.items())
+                 if now - meta['started'] > _SESSION_MAX_AGE_S]
+        leaked_globally = idle_for > _SESSION_LEAK_TIMEOUT_S
+
+        if not stale and not leaked_globally:
+            return
+
+        # Drop the identified sessions FIRST, then let the kill decide for
+        # itself. Zeroing unconditionally (the pre-2026-09-06 behaviour) left
+        # the count saying "idle" while the workers were still serving whenever
+        # the kill refused — so the next teardown reaped them mid-work.
+        with _request_lock:
+            if leaked_globally:
+                print(f"[SESSIONS] {sessions} session(s) open but no request for "
+                      f"{idle_for:.0f}s — treating as leaked")
+                _sessions.clear()
+            else:
+                for sid in stale:
+                    meta = _sessions.pop(sid, None)
+                    if meta:
+                        age = now - meta['started']
+                        print(f"[SESSIONS] {sid} ({meta['label']}) open for "
+                              f"{age:.0f}s — past the max age, reclaiming")
+            _recount_sessions_locked()
+            still_open = _active_sessions
+
+        if still_open == 0 and kill_workers('leaked session reclaimed',
+                                            expect_epoch=epoch):
+            _drop_file_cache_async('leaked session reclaimed')
 
 
 @app.route('/session/begin', methods=['POST'])
 def session_begin():
-    global _active_sessions
+    """Open a session. Body {id, label}; `id` is the caller's handle for it.
+
+    An id is required to close a session again. One is generated when the caller
+    omits it (and returned), so an old client still opens a session it can only
+    lose — never one it can steal from someone else.
+    """
+    body = request.get_json(silent=True) or {}
+    sid = str(body.get('id') or f"anon-{uuid.uuid4().hex[:12]}")
+    label = str(body.get('label') or 'unlabelled')[:80]
     with _request_lock:
-        _active_sessions += 1
+        if sid in _sessions:
+            print(f"[SESSION] begin {sid} ({label}) — already open, ignoring")
+        else:
+            _sessions[sid] = {'label': label, 'started': time.time()}
+        _recount_sessions_locked()
         n = _active_sessions
-    print(f"[SESSION] begin -> {n} active")
-    return jsonify({"success": True, "active": n})
+    print(f"[SESSION] begin {sid} ({label}) -> {n} active")
+    return jsonify({"success": True, "active": n, "id": sid})
 
 
 @app.route('/session/end', methods=['POST'])
 def session_end():
-    global _active_sessions
+    """Close the session named by {id}. An unknown id is a NO-OP.
+
+    That is the whole point of identities: a duplicate end, a retry, or an end
+    whose begin never landed cannot decrement somebody else's session away.
+    """
+    body = request.get_json(silent=True) or {}
+    sid = body.get('id')
     with _request_lock:
-        _active_sessions = max(0, _active_sessions - 1)
+        if sid is None:
+            known = None
+            print("[SESSION] end without an id — ignoring (cannot tell whose)")
+        else:
+            known = _sessions.pop(str(sid), None)
+            if known is None:
+                print(f"[SESSION] end {sid} — not open, ignoring")
+        _recount_sessions_locked()
         n = _active_sessions
-    print(f"[SESSION] end -> {n} active")
+    if known is not None:
+        print(f"[SESSION] end {sid} ({known['label']}) -> {n} active")
     # No reap here: the teardown hook fires _maybe_reap_workers the moment THIS
-    # request finishes, with the counter already decremented. One trigger path,
+    # request finishes, with the counter already updated. One trigger path,
     # no race between a route-spawned thread and the teardown accounting.
     return jsonify({"success": True, "active": n})
 
@@ -632,7 +787,8 @@ def session_reset():
     its predecessor left open, so the only correct count is zero."""
     global _active_sessions
     with _request_lock:
-        _active_sessions = 0
+        _sessions.clear()
+        _recount_sessions_locked()
     # force: a restarted Node is claiming a clean slate, so a worker left
     # starting by the previous era must not survive the reset.
     kill_workers('session reset (Node boot)', force=True)
@@ -1886,6 +2042,16 @@ except Exception:
     _libc = None
 
 
+# Roots that must never be swept no matter how they were derived: a
+# misresolved PYTHONHOME returning one of these would walk millions of inodes.
+# Named explicitly rather than approximated by path depth, because the depth
+# rule also rejected every root we actually target (see drop_file_cache).
+_CACHE_DROP_DENY = frozenset({
+    '/', '/app', '/usr', '/lib', '/lib64', '/bin', '/sbin', '/etc', '/var',
+    '/opt', '/root', '/home', '/tmp', '/proc', '/sys', '/dev',
+})
+
+
 def _release_memory():
     try:
         gc.collect()
@@ -1965,7 +2131,14 @@ def _cache_drop_roots():
         # misresolved PYTHONHOME returning '/' or '/usr' would otherwise walk
         # millions of inodes. The hardcoded list was bounded by inspection; a
         # derived one needs the rail written down.
-        if len([p for p in r.split('/') if p]) < 3:
+        # Floor of TWO segments plus an explicit denylist (2026-09-06). The old
+        # floor of three refused every model-cache root we actually target —
+        # /app/.hf_cache, /app/.deepface and the single FILE /app/mobile_sam.pt
+        # all have two — so the weights were never advised away and only
+        # site-packages was reclaimed. The danger being guarded against is a
+        # misresolved root like '/' or '/usr', which the denylist names directly.
+        segments = [p for p in r.split('/') if p]
+        if len(segments) < 2 or r.rstrip('/') in _CACHE_DROP_DENY:
             print(f"[CACHE-DROP] refusing suspiciously broad root: {r}")
             continue
         out.append(r)
@@ -1978,8 +2151,19 @@ def _cache_drop_roots():
 _cache_drop_lock = threading.Lock()
 
 
-def drop_file_cache(roots=None):
-    """Hand back the page cache of files nothing is using. Returns (files, ms)."""
+def drop_file_cache(roots=None, record=False):
+    """Hand back the page cache of files nothing is using. Returns (files, ms).
+
+    `record=True` serialises against the async sweep and stamps the throttle, so
+    an on-demand caller cannot start a second concurrent walk of ~74k inodes and
+    does not leave the next reap free to sweep again immediately. It still runs
+    synchronously — the caller wants the numbers in its response.
+    """
+    if record:
+        global _last_cache_drop_ts
+        with _cache_drop_lock:
+            _last_cache_drop_ts = time.time()
+            return drop_file_cache(roots=roots)
     started = time.time()
     roots = roots or _cache_drop_roots()
     touched = 0
@@ -2087,8 +2271,10 @@ def _drop_file_cache_async(reason):
 # memory per minute, so that was ~570MB charged 24/7 for a model used only
 # during character repair. It now has the same idle reaper as rembg/GDINO.
 _mobilesam_model = None
-_mobilesam_last_used = 0.0
-_MOBILESAM_IDLE_UNLOAD_S = int(os.environ.get('MOBILESAM_IDLE_UNLOAD_S', '900'))
+# (An idle-unload timer used to live here. Deleted 2026-09-06: the reaper that
+# read it was removed on 2026-08-23 in favour of killing whole workers at
+# session zero, so the constant and its _last_used stamp had been dead for
+# weeks — and setting the env var on Railway silently did nothing.)
 # Serializes ALL access to the one shared MobileSAM model + its ultralytics
 # predictor (load, inference, cache-clear, idle-unload). The predictor is NOT
 # thread-safe — it stashes the current run's image / prompts / results on itself
@@ -2117,7 +2303,7 @@ def _free_sam_cache():
     Clearing them therefore costs nothing to recompute, which is why this runs
     per call. Unloading the model itself is a different trade — that would force
     a ~570 MB reload on the next page mid-story — so it stays warm and is only
-    dropped by the idle reaper after MOBILESAM_IDLE_UNLOAD_S of no work.
+    dropped when the worker holding it is killed at session zero.
 
     ONLY `features` and `results` are cleared, and each is reset to the type the
     library expects rather than to None:
@@ -2156,8 +2342,7 @@ def _free_sam_cache():
 
 
 def get_mobilesam():
-    global _mobilesam_model, _mobilesam_last_used
-    _mobilesam_last_used = time.time()
+    global _mobilesam_model
     if _mobilesam_model is None:
         with _mobilesam_lock:
             if _mobilesam_model is None:  # double-checked: another thread may have loaded it
@@ -2323,8 +2508,10 @@ def figure_mask_endpoint():
 # — no overlap. Runs only on the realistic pass-1 sheet, where pose models are
 # strongest; pass-2 styled sheets never lose heads so they don't hit this.
 _pose_model = None
-_pose_last_used = 0.0
-_POSE_IDLE_UNLOAD_S = int(os.environ.get('POSE_IDLE_UNLOAD_S', '900'))
+# (An idle-unload timer used to live here. Deleted 2026-09-06: the reaper that
+# read it was removed on 2026-08-23 in favour of killing whole workers at
+# session zero, so the constant and its _last_used stamp had been dead for
+# weeks — and setting the env var on Railway silently did nothing.)
 # Ultralytics' YOLO predictor stashes the last run's results/batch on itself, so
 # it is NOT thread-safe — the same reason MobileSAM is locked. Serialize load +
 # inference so concurrent /pose-heads calls under waitress don't interleave.
@@ -2332,8 +2519,7 @@ _pose_lock = threading.Lock()
 
 
 def get_pose_model():
-    global _pose_model, _pose_last_used
-    _pose_last_used = time.time()
+    global _pose_model
     if _pose_model is None:
         with _pose_lock:
             if _pose_model is None:  # double-checked
@@ -2429,7 +2615,6 @@ def pose_heads():
 # docs/research-log.html. base > tiny: tiny missed the occluded figure.
 _gdino_model = None
 _gdino_processor = None
-_gdino_last_used = 0.0
 # Serialize model load AND the transformers import. Per-page detection runs
 # concurrently, so without this lock two threads race `from transformers
 # import ...` on a half-initialised module → "cannot import name AutoProcessor"
@@ -2438,12 +2623,14 @@ _gdino_lock = threading.Lock()
 # Free the ~1.9GB model after this many idle seconds so we don't pay for RAM
 # 24/7 when detection runs only occasionally (e.g. one story/week on staging).
 # Railway bills actual RAM per minute, so an unloaded model costs nothing.
-_GDINO_IDLE_UNLOAD_S = int(os.environ.get('GROUNDINGDINO_IDLE_UNLOAD_S', '600'))
+# (An idle-unload timer used to live here. Deleted 2026-09-06: the reaper that
+# read it was removed on 2026-08-23 in favour of killing whole workers at
+# session zero, so the constant and its _last_used stamp had been dead for
+# weeks — and setting the env var on Railway silently did nothing.)
 
 
 def get_groundingdino():
-    global _gdino_model, _gdino_processor, _gdino_last_used
-    _gdino_last_used = time.time()
+    global _gdino_model, _gdino_processor
     if _gdino_model is not None:
         return _gdino_model, _gdino_processor
     with _gdino_lock:
@@ -2477,7 +2664,6 @@ def get_groundingdino():
             model.eval()
             _gdino_processor = proc
             _gdino_model = model
-            _gdino_last_used = time.time()
             print("[GDINO] GroundingDINO loaded")
     return _gdino_model, _gdino_processor
 
@@ -2605,7 +2791,32 @@ def detect_figures_text_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+def _warm_roles(roles, body):
+    """Parent-side warm: spawn each role and forward the warmup body to it.
+
+    Shared by the main warm thread and by a merged one, so a second caller's
+    roles get the identical treatment rather than being dropped.
+    """
+    t0 = time.time()
+    for role in roles:
+        try:
+            base = ensure_worker(role)
+            req = _urlreq.Request(f"{base}/warmup", data=json.dumps(body).encode(),
+                                  headers={'Content-Type': 'application/json'}, method='POST')
+            _urlreq.urlopen(req, timeout=10).read()
+        except Exception as e:
+            print(f"[WARMUP] {role} worker warm failed: {e}")
+        finally:
+            with _warmup_lock:
+                _warming_roles.discard(role)
+    print(f"[WARMUP] workers up in {time.time() - t0:.1f}s ({', '.join(roles)})")
+
+
 _warmup_thread = None
+_warmup_lock = threading.Lock()
+# Roles the in-flight warm is covering, so a second caller can tell what is
+# already handled and start only the remainder.
+_warming_roles = set()
 
 
 @app.route('/warmup', methods=['POST'])
@@ -2633,8 +2844,6 @@ def warmup_endpoint():
     plus arcface when asked).
     """
     global _warmup_thread
-    if _warmup_thread is not None and _warmup_thread.is_alive():
-        return jsonify({"success": True, "status": "already warming"})
 
     # WHAT TO PRELOAD IS THE CALLER'S ANSWER (owner, 2026-08-17).
     #
@@ -2685,15 +2894,9 @@ def warmup_endpoint():
             # at boot; rembg/torch preload below; arcface only when asked.
             roles = want_roles if want_roles is not None else (
                 ['face', 'torch'] + (['arcface'] if want_arcface else []))
-            for role in roles:
-                try:
-                    base = ensure_worker(role)
-                    req = _urlreq.Request(f"{base}/warmup", data=json.dumps(body).encode(),
-                                          headers={'Content-Type': 'application/json'}, method='POST')
-                    _urlreq.urlopen(req, timeout=10).read()
-                except Exception as e:
-                    print(f"[WARMUP] {role} worker warm failed: {e}")
-            print(f"[WARMUP] workers up in {time.time() - t0:.1f}s")
+            with _warmup_lock:
+                _warming_roles.update(roles)
+            _warm_roles(roles, body)
             return
         # Worker roles preload only what they own.
         if ANALYZER_ROLE == 'face':
@@ -2723,20 +2926,44 @@ def warmup_endpoint():
                 print(f"[WARMUP] arcface failed: {e}")
         print(f"[WARMUP] {ANALYZER_ROLE} done in {time.time() - t0:.1f}s — rss {_rss_mb()} MB")
 
-    _warmup_thread = threading.Thread(target=_warm, daemon=True)
-    _warmup_thread.start()
+    # SINGLE-FLIGHT MERGES, IT DOES NOT DROP (2026-09-06). This used to return
+    # "already warming" and discard the second caller's request entirely — so a
+    # presence beat asking for ['face'] could swallow the repair phase's
+    # force-warm, and DINO's ~90s load then landed on the first real detection,
+    # which times out into the Gemini bbox fallback. `force` on the Node side
+    # only bypasses ITS debounce; it never reached this decision. Anything the
+    # in-flight warm is not already covering is started in its own thread.
+    with _warmup_lock:
+        in_flight = _warmup_thread is not None and _warmup_thread.is_alive()
+        outstanding = [r for r in (want_roles or []) if r not in _warming_roles]
+        if in_flight and ANALYZER_ROLE == 'parent' and want_roles and not outstanding:
+            return jsonify({"success": True, "status": "already warming",
+                            "covered": sorted(_warming_roles)})
+        if in_flight and ANALYZER_ROLE == 'parent' and outstanding:
+            print(f"[WARMUP] merging {', '.join(outstanding)} into the warm in flight")
+            extra = threading.Thread(target=_warm_roles, args=(list(outstanding), dict(body)),
+                                     daemon=True)
+            _warming_roles.update(outstanding)
+            extra.start()
+            return jsonify({"success": True, "status": "warming",
+                            "merged": sorted(outstanding)})
+        if in_flight:
+            return jsonify({"success": True, "status": "already warming"})
+        _warmup_thread = threading.Thread(target=_warm, daemon=True)
+        _warmup_thread.start()
     return jsonify({"success": True, "status": "warming", "role": ANALYZER_ROLE, "groundingdino": want_dino})
 
 
 @app.route('/release-memory', methods=['POST'])
 def release_memory_endpoint():
-    """Force a memory release NOW instead of waiting out the idle reapers.
+    """Force a memory release NOW instead of waiting for the next session to close.
 
-    The reapers only fire after 10-15 minutes of no use, which is right for
-    normal running but useless when you want to reclaim RAM on demand or verify
-    that the release actually works. Railway bills resident memory per minute,
-    so being able to hand pages back without restarting the container is an
-    operational lever, not just a test hook.
+    There are no idle reapers any more (deleted 2026-08-23): memory comes back
+    when the active-session count reaches zero and the workers are killed. That
+    is right for normal running but useless when you want to reclaim RAM on
+    demand, or verify that the release actually works. Railway bills resident
+    memory per minute, so handing pages back without restarting the container is
+    an operational lever, not just a test hook.
 
     POST /release-memory            gc + malloc_trim, models stay loaded
     POST /release-memory?unload=true  also drop every lazily-loaded model
@@ -2769,12 +2996,22 @@ def release_memory_endpoint():
                 "hint": "retry when idle, or pass &force=true to kill it anyway",
             }), 409
         if _workers:
-            unloaded = [f"worker:{r}" for r in _workers]
-            kill_workers('release-memory',
-                         force=request.args.get('force') == 'true')
+            # Name the workers only if the kill actually happened. The list used
+            # to be built BEFORE the call, and kill_workers can refuse (a worker
+            # still starting), so the response claimed to have unloaded
+            # processes that were still running (2026-09-06).
+            candidates = list(_workers)
+            if kill_workers('release-memory',
+                            force=request.args.get('force') == 'true'):
+                unloaded = [f"worker:{r}" for r in candidates]
+            else:
+                unloaded = ['workers:kill-refused (still starting)']
         # Synchronous here (not the async helper): a caller asking to reclaim on
-        # demand wants the numbers in the response, not eventually.
-        cache_files, cache_ms = drop_file_cache()
+        # demand wants the numbers in the response, not eventually. It still goes
+        # through the shared throttle so it cannot start a SECOND concurrent walk
+        # of ~74k inodes alongside a reap-driven sweep, and so the next reap sees
+        # a fresh timestamp instead of immediately sweeping again.
+        cache_files, cache_ms = drop_file_cache(record=True)
         unloaded.append(f'page-cache:{cache_files}files/{cache_ms}ms')
     elif request.args.get('unload') == 'true':
         if _mobilesam_model is not None:
@@ -2821,11 +3058,19 @@ def release_memory_endpoint():
     if request.args.get('recycle') == 'true':
         with _request_lock:
             others = max(0, _inflight_requests - 1)  # exclude this request
-        if others > 0:
-            print(f"[RELEASE-MEMORY] recycle refused — {others} request(s) still in flight")
+            sessions_open = _active_sessions
+        # Sessions count here too (2026-09-06). `?unload=true` was hardened
+        # against killing a different user's generation; recycle exits the WHOLE
+        # parent — strictly more destructive — and checked only in-flight
+        # requests. A story between analyzer calls has zero in flight for
+        # minutes at a time.
+        if others > 0 or sessions_open > 0:
+            why = (f"{others} request(s) in flight" if others > 0
+                   else f"{sessions_open} session(s) open")
+            print(f"[RELEASE-MEMORY] recycle refused — {why}")
             return jsonify({
                 "success": True, "recycled": False,
-                "reason": f"{others} request(s) in flight",
+                "reason": why,
                 "rss_before_mb": before, "rss_after_mb": after, "freed_mb": freed, "unloaded": unloaded,
             })
 

@@ -99,11 +99,16 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
 
     // A story is starting. Its first minutes are Claude calls for outline and
     // text — nothing touches the analyzer until page images exist — so this is
-    // the ideal runway to load the models. Warming here means character repair
-    // never pays the ~570MB MobileSAM load mid-loop, and it keeps the analyzer's
-    // idle-recycle window shut for the whole generation.
+    // the ideal runway to load the models.
     // Fire-and-forget: never let warming delay or fail story creation.
-    require('../lib/analyzerClient').ensureWarm('story-start');
+    //
+    // face ONLY (2026-09-06). This used to take the default and spawn torch too,
+    // then sessionBegin pinned it for the whole job — ~430MB resident through
+    // 20-25 minutes in which nothing touches the analyzer at all. The first mask
+    // call is in the repair phase, which force-warms torch itself
+    // (storyJobPipeline.js). photos.js reasons the identical argument for the
+    // upload path; it simply was not carried over to here.
+    require('../lib/analyzerClient').ensureWarm('story-start', { workers: ['face'] });
 
     // Extract and validate idempotency key (optional but recommended)
     const idempotencyKey = req.body.idempotencyKey ? sanitizeString(req.body.idempotencyKey, 100) : null;
