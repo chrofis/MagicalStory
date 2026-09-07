@@ -30401,3 +30401,53 @@ break the fixed key set the panel averages over.
 
 **Touched:** `prompts/story-arc-judge.txt`.
 **Status:** ✅ active (staging, not pushed)
+
+## 2026-09-07 — The baked cover title states a trim-safe margin as a fraction of canvas width
+
+**Context:** `coverTitleMode` is `baked` everywhere (2026-09-06), so the image
+model — not the app — sets the front-cover type. Nothing told it where the
+edges are. Two staging trials painted ink into the last pixel column of an
+864px-wide cover: `job_1788763045123_z8so79ngb` "Emmas Blumengeheimnis" (ink
+19→863, right margin **0px**, final `s` sliced in half) and
+`job_1788802404497_i1mm4yn6h` "Emma und das vergessene Geschenk" (ink 47→861,
+right margin **2px**, final `k` missing its lower leg). `server/lib/pdf.js`
+adds a 3mm bleed per side for Gelato and the printer trims it — 3/148 of the
+cover width, ~18px on that raster — so both books lose their final letter
+physically. The margins were asymmetric (19/47px left vs 0/2px right): the
+model sets the line and runs out of room, it is not centring tight on both
+sides. The app-side typography path was never affected — `coverTypography.js`
+places from a real font at `MARGIN = 0.045` and `BRAND_INSET = 0.08`.
+
+**Decision:** `bakedTitleLine()` in `server/lib/promptBuilders.js` gains two
+sentences at the end of the existing instruction: every letter, accent and
+descender stays at least **8% of the canvas width** clear of the left and
+right edges, and a long title **breaks onto more lines** rather than reaching
+that margin. The margin is a FRACTION, never pixels — the raster differs by
+book format. The addition stays inside the TITLE block at the absolute end of
+the prompt; that tail placement is what `shrinkPromptForModel` preserves
+verbatim, and a title moved earlier was silently deleted on an over-cap prompt
+(`job_1788551692337_bc479p945` shipped a titleless cover).
+
+**Rationale:** Prompt-side first, per the settled rule that a stated
+constraint is tried before code. Measured on four renders through the real
+cover path (`iterateCover`, `grok-imagine-2`, `skipTypography`), two of them a
+deliberately long German title:
+
+| cover | before | after |
+|---|---|---|
+| Emmas Blumengeheimnis | L 19px / R **0px** | L 76px / R 55px, title on 2 lines |
+| Emma und das vergessene Geschenk | L 47px / R **2px** | L 34px / R 129px, 3 lines |
+| "Emma und das grosse Blumengeheimnis vom Uetliberg" (49 chars) | — | L 87px / R 35px, 3 lines |
+| "Emmas allergroesstes Blumengeheimnis am Grossmuenster" (52 chars) | — | title ends x≈750, R ≈114px, 3 lines |
+
+Every glyph clears the 18px trim on all four. The model reliably takes the
+extra line rather than the extra width, which is the behaviour the second
+sentence buys. Caveat on measurement: the band-wide dark-ink box is confounded
+by scene ink on covers whose foliage reaches the top corners — the
+Grossmuenster cover measures R=0 automatically while a crop shows the last
+letter 114px inside the frame. A future geometric gate must measure the
+letterforms, not the band.
+
+**Touched:** `server/lib/promptBuilders.js` (`bakedTitleLine`),
+`tests/unit/cover-title-trim-margin.test.ts`.
+**Status:** ✅ active
