@@ -5294,6 +5294,7 @@ function buildArcBudgetSection(inputData, pageCount) {
     '# BUDGETS',
     `- This book carries at most ${events} events${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
     `- This book carries at most ${actions} actions, ${aMin}-${aMax} to a page. An action is one thing a character does that changes something — a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`,
+    ...(lvl === '1st-grade' ? ['- This book is read aloud to a 3-5 year old and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.'] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line in the arc stating why the story cannot work without them.`,
   ].join('\n');
 }
