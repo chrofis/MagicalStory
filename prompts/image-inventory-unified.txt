@@ -20,7 +20,7 @@ For EACH human figure:
 
 `interactions`: one entry per engaged pair, both referred to by label — who faces, looks at, reaches toward, holds or touches whom, and where the contact is. Facing, gaze, reach and contact only. Empty when no two figures are engaged.
 
-`objects`: each notable object, animal or vehicle — what it is, dominant and secondary colour, what it looks made of, position in frame, whether it is grounded or floating, and its size relative to the figures.
+`objects`: each notable object, animal or vehicle — what it is, dominant and secondary colour, what it looks made of, position in frame, whether it is grounded or floating, and its size relative to the figures. For an animal or creature add `complete`: true when it reads as one whole body; false when its head or body is missing where it should be visible. Frame crop or occlusion by scenery is not incomplete.
 
 `setting`: indoor or outdoor, key visual elements, lighting direction and quality, camera angle.
 
@@ -67,7 +67,7 @@ Return JSON only, no other text. Emit exactly these keys.
     { "from": "the young boy in green", "to": "the woman in the red coat", "observed": "faces her and extends the lantern toward her at chest height" }
   ],
   "objects": [
-    { "what": "a large dog", "colour": "golden, darker ears", "material": "fur", "position": "right-foreground", "grounded": true, "relative_size": "reaches the boy's waist" }
+    { "what": "a large dog", "colour": "golden, darker ears", "material": "fur", "position": "right-foreground", "grounded": true, "relative_size": "reaches the boy's waist", "complete": true }
   ],
   "setting": { "indoor_outdoor": "outdoor", "elements": "narrow street, stone buildings, shuttered windows", "lighting": "low warm light from the left", "camera": "eye-level, medium" },
   "lettering": [

@@ -2832,11 +2832,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // A single alternation over the ORIGINAL text fixes it by construction:
     // replacement output is never re-examined. Longest name first so a name
     // that contains another ("Anna Maria" over "Anna") wins.
-    const stripNames = (text, ownVisualId) => stripCharacterNames(text, {
+    const stripNames = (text, ownVisualId, ownName = null) => stripCharacterNames(text, {
       names: characterNames,
       vidByName: visualIdByName,
       fallbackByName: descriptorByName,
       ownVisualId,
+      ownName,
     });
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
@@ -2877,7 +2878,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
           log.warn(`[INPAINT PAGE] P${pageNumber}: per-character fix for ${p.characterName || visualId} has no fix_instruction — dropped (a diagnosis is not an edit instruction)`);
           return null;
         }
-        const fix = stripNames(fixRaw, visualId);
+        const fix = stripNames(fixRaw, visualId, p.characterName || null);
         return { severity: p.severity, text: `For ${visualId}: ${fix}` };
       })
       .filter(x => x && x.text);
@@ -3082,7 +3083,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // there are no surrounding pixels to match and "match the source" drifts to
     // photoreal — anchor the medium explicitly for that case only.
     const reframe = consolidatedPlan?.scene_fix?.requires_regeneration === true;
-    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, reframe ? (artStyle || null) : null, aspectRatio);
+    // The page inpaint is painted by the PAGE RENDER tier (owner, 2026-09-07,
+    // reversing the 2026-09-06 pin). A Standard-tier whole-frame edit of a
+    // 2.0 render repaints everything it was not told to keep: it removed a
+    // named animal's head (job_1788727233899 p7) and wiped two real landmarks
+    // (job_1788614817116 p2). Char repair keeps its own 1.x pin.
+    const editResult = await editImageWithPrompt(imageData, fullInstruction, CONFIG_DEFAULTS.pageRenderImage, referenceImages, reframe ? (artStyle || null) : null, aspectRatio);
     if (editResult?.imageData) {
       if (editResult.imageData.length < 1000) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);

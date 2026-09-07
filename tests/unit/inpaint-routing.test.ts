@@ -60,6 +60,18 @@ describe('stripCharacterNames', () => {
     expect(occurrences).toBe(1);
   });
 
+  it('writes the subject of a per-character fix as "this character", never its own identifier', () => {
+    const out = stripCharacterNames("Replace the object in Levin's left hand; stretch Levin's arm toward Kiaan", {
+      names,
+      vidByName: new Map([['levin', 'the preschooler in the red T-shirt']]),
+      fallbackByName,
+      ownVisualId: 'the preschooler in the red T-shirt',
+      ownName: 'Levin',
+    });
+    expect(out).toBe("Replace the object in this character's left hand; stretch this character's arm toward the preschooler");
+    expect(out).not.toContain('red T-shirt');
+  });
+
   it('handles possessives and bare apostrophes', () => {
     expect(stripCharacterNames("Rotate Levin's head", { names, vidByName: new Map(), fallbackByName }))
       .toBe("Rotate the toddler's head");

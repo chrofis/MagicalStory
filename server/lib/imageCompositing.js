@@ -734,11 +734,21 @@ function buildCharActionContextFromInteractions(sceneDescription, charName, visu
  * @param {Map} opts.vidByName           lowercased name -> visual identifier
  * @param {Map} opts.fallbackByName      lowercased name -> age/gender descriptor
  * @param {string|null} opts.ownVisualId identifier of the entry being written
+ * @param {string|null} opts.ownName     the entry's own character name. A
+ *   per-character fix is already headed "For <identifier>:", so the subject's
+ *   own name inside the body becomes "this character" — repeating the full
+ *   identifier there produced unreadable instructions (three copies of a
+ *   30-word descriptor in two sentences, job_1788727233899 p7).
  */
-function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), ownVisualId = null } = {}) {
+function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), ownVisualId = null, ownName = null } = {}) {
   if (!text || typeof text !== 'string' || names.length === 0) return text;
   const escapeRe = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const vidFor = (name) => vidByName.get(name.toLowerCase()) || ownVisualId
+  const own = ownName ? String(ownName).toLowerCase() : null;
+  // ownVisualId stands in for a name only when the caller gave no ownName
+  // (legacy). With ownName known, another character never inherits the
+  // subject's identifier — that made "toward Kiaan" read as the subject.
+  const vidFor = (name) => (own && name.toLowerCase() === own ? 'this character' : null)
+    || vidByName.get(name.toLowerCase()) || (own ? null : ownVisualId)
     || fallbackByName.get(name.toLowerCase()) || 'the character';
   const alternation = [...names].sort((a, b) => b.length - a.length).map(escapeRe).join('|');
   // Possessives: both "Hans's" and bare-apostrophe "Hans'" — the bare form

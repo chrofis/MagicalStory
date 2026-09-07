@@ -414,12 +414,12 @@ const MODEL_DEFAULTS = {
   // promptBuilders. It stays on Standard in every environment: doubling it
   // would double every inpaint. The final page render reads pageRenderImage.
   //
-  // Routing repair inpaint to follow pageRenderImage was tried and REVERTED by
-  // the owner on 2026-09-06 (docs/decisions.md). Repairs stay on the cheap edit
-  // tier in every environment; only the page/cover RENDER follows the tier
-  // split. Don't re-propose the "a repair should be painted by the model that
-  // rendered the page" consistency argument — it has been heard and declined.
-  pageImage: 'grok-imagine',                 // Edit/inpaint tier ($0.02/image)
+  // The page INPAINT no longer reads this key: since 2026-09-07 inpaintPage
+  // passes pageRenderImage explicitly — the owner's reversal of the 2026-09-06
+  // pin, with evidence in docs/decisions.md 2026-09-07. Style repair and the
+  // generic edit path stay here on Standard; char repair has its own pin
+  // (charRepairModel).
+  pageImage: 'grok-imagine',                 // Edit tier ($0.02/image)
   // The tier a final page render — and every redo/repair regeneration of a
   // page — uses. Per-environment (see runtime.js): Imagine 2.0 on staging,
   // Standard everywhere else. Redos read this same key so a page cannot change

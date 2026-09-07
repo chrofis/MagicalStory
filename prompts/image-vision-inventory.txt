@@ -27,6 +27,7 @@ For EACH notable object, animal, or vehicle:
 - Position in frame
 - Is it grounded properly or floating?
 - Relative size
+- For an animal or creature: complete (one whole body) or incomplete (head or body missing where it should be visible; frame crop or occlusion does not count)
 
 Setting:
 - Indoor/outdoor
