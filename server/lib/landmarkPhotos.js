@@ -1709,7 +1709,7 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
   let languages = defaultLangs;
   if (/switzerland|schweiz|suisse|svizzera/i.test(countryLower)) {
-    languages = ['de', 'en', 'fr']; // Swiss: German, English, French
+    languages = ['de', 'en', 'fr', 'it']; // Swiss: all four national/site languages — it.wikipedia is the only source for many Ticino and Italian-Grigioni landmarks
   } else if (/germany|deutschland/i.test(countryLower)) {
     languages = ['de', 'en']; // Germany: German, English
   } else if (/austria|österreich/i.test(countryLower)) {
