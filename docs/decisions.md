@@ -30129,3 +30129,84 @@ sheet correctly.
 **Touched:** `server/lib/character2x4Sheet.js` (`runStyleTransferPass`),
 `tests/unit/avatar-sheet-anchor-guard.test.ts`, `docs/image-routing.md`
 **Status:** ✅ active
+
+## 2026-09-07 — The arc budgets ACTIONS, not just events; the over-length word fault stops asking for lost meaning
+
+**Context:** `job_1788727233899_1dpnym94p` (18 pages, `1st-grade`) shipped
+incoherent text. The stage reports show the arc was *inside* its budget and the
+damage happened anyway:
+
+- `buildArcBudgetSection` budgets **events**: `max(3, round(pages/divisor))`,
+  divisor 3 / 2 / 1.5 by reading level (entry of 2026-09-05, "buildArcBudgetSection
+  computes an event budget"). That run got 6 events and the arc critique correctly
+  self-reported "six, at budget".
+- But the prompt defines an event as "steps within one happening count as one
+  event", so one event holds any number of actions. The 18 beats carried **66
+  action clauses, 3.0 per page**.
+- Words are spent per **action**, not per event. At `1st-grade` the band is
+  25-50 words/page, so **13 of 18 pages ran 61-128 words**.
+- `buildWordBudgetFindings` then emitted `FAULT[LENGTH]: … shorten without losing
+  content` on **11 pages**. At a 60% cut that instruction is impossible, so the
+  refiner obeyed the only way it could: it deleted causality — a character's act
+  of courage, the ravens' motivation, the explanation a later image depends on.
+
+Nothing in the pipeline counted the unit that costs words. `story-beats.txt`
+lines 38-40 do carry one-action rules, but they constrain the **picture** only
+("give the picture one of them"); the beat keeps every action.
+
+**Decision:**
+1. **An action budget in the arc, keyed on reading level.** `buildArcBudgetSection`
+   emits a third `# BUDGETS` line alongside events and invented figures:
+   `1st-grade` 1-2 actions/page, `standard` 2-4, `advanced` 5-8; the stated total
+   is `pages × per-page-max`. The numbers are interpolated in code — never written
+   into a prompt file — the same single-source-of-truth pattern as the two
+   existing lines.
+2. **The arc counts its own actions.** The CRITIQUE instruction in *both*
+   consumers of `{ARC_BUDGETS}` (`prompts/arc-create.txt`, `prompts/arc-retell.txt`)
+   gains, immediately after the existing event count, an actions count — counted
+   one by one even where several sit inside one event — with the same MAJOR
+   severity and the same remedy: cut whole events, never compress them.
+   The count is performed by the ARC, deliberately: no counter was added to
+   `planCounters.js` or the beats stage.
+3. **The word-budget tolerance becomes asymmetric.** `WORD_BUDGET_TOLERANCE = 0.2`
+   splits into `WORD_BUDGET_TOLERANCE_OVER = 0.5` and
+   `WORD_BUDGET_TOLERANCE_UNDER = 0.2`. An overlong page is faulted only past
+   **+50%**; the under-budget side is unchanged.
+4. **The over-length finding stops asking for deletion.** `— shorten without
+   losing content` becomes `— tighten the wording; keep every action, line of
+   dialogue and feeling. Losing one is a fault.` The under-length finding
+   (`expand without padding`) is untouched, and both still name the TRUE budget.
+
+**Rationale:** the event budget was necessary and is kept — it is the unit a
+child retells — but it is not the unit that costs words, so it cannot bound page
+length on its own. Fixing this at the text stage alone is impossible by
+construction: once 66 actions are in the beats, no rewrite fits them into 25-50
+words a page without deleting some. So the real fix is upstream, at the arc,
+where an action can still be cut whole; the text stage merely stops making the
+impossible demand. The two directions of the word band do not carry the same
+risk — running a few words long costs nothing, forcing a 60% cut costs an action
+— which is why the tolerance is no longer symmetric. Meaning outranks word
+count: overrun by a few words rather than delete an action.
+
+Validated statically (no paid run): `buildArcBudgetSection` rendered across all
+three levels and page counts 4/8/10/12/18/24 (18 / `1st-grade` / cast 4 →
+6 events, "at most 36 actions, 1-2 to a page", 0 invented figures);
+`buildWordBudgetFindings` exercised at both band edges per level (1st-grade
+75 words silent, 76 fires; advanced 198 fires under-min, 203 silent); both arc
+templates render with zero unfilled placeholders.
+
+**Touched:**
+- `server/lib/promptBuilders.js` (`buildArcBudgetSection`)
+- `prompts/arc-create.txt`, `prompts/arc-retell.txt` (CRITIQUE action count)
+- `server/lib/textRefine.js` (`WORD_BUDGET_TOLERANCE_OVER` /
+  `WORD_BUDGET_TOLERANCE_UNDER`, `buildWordBudgetFindings`)
+- `tasks/action-budget-2026-09-07.md`
+
+**Status:** ✅ active. **Extends** the 2026-09-05 event-budget entry (search
+"buildArcBudgetSection computes an event budget") — the event budget stands
+unchanged; this adds a second, finer unit beside it. **Supersedes** the
+2026-09-06 entry "The word-budget counter gets a 20% grace band" *in its
+symmetry only*: the grace band, the true-budget-in-the-finding-text rule, the
+`LANGUAGE_LEVELS` single source of truth and the lector idiom line all stand;
+only the over-budget bound moves from 0.2 to 0.5, and only the over-length
+finding's wording changes. Not a `SETTLED.md` reversal.

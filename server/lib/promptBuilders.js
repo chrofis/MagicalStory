@@ -5271,6 +5271,14 @@ function arcLengthRange(pageCount) {
  * Invented-named-figure allowance from commissioned cast size + page count:
  * round(pages/8) - floor(cast/2), clamped 0..3 (owner anchors, 2026-09-05:
  * 1 character/20 pages → 3; 5 characters/10 pages → 0).
+ *
+ * ACTION budget (2026-09-07): an event may hold any number of actions, but
+ * words are spent per ACTION, so the event budget alone does not bound page
+ * length. Per page by reading level: 1-2 at 1st-grade, 2-4 at standard, 5-8 at
+ * advanced; total = pages x per-page. Evidence:
+ * job_1788727233899_1dpnym94p (18 pages, 1st-grade) sat AT its 6-event budget
+ * yet carried 66 action clauses (3.0/page) and overran the 25-50 word band on
+ * 13 of 18 pages.
  */
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
@@ -5280,9 +5288,12 @@ function buildArcBudgetSection(inputData, pageCount) {
   const cast = (inputData?.characters || []).length || 1;
   const allowance = Math.max(0, Math.min(3, Math.round(pages / 8) - Math.floor(cast / 2)));
   const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
+  const [aMin, aMax] = lvl === '1st-grade' ? [1, 2] : lvl === 'advanced' ? [5, 8] : [2, 4];
+  const actions = pages * aMax;
   return [
     '# BUDGETS',
     `- This book carries at most ${events} events${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
+    `- This book carries at most ${actions} actions, ${aMin}-${aMax} to a page. An action is one thing a character does that changes something — a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`,
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line in the arc stating why the story cannot work without them.`,
   ].join('\n');
 }

@@ -207,6 +207,7 @@ The first two are corroborated by more than one source, which is why they lead.
 
 ## Story text quality — the review stages trade feeling for logistics
 
+- [x] (2026-09-07) **Arc budgets ACTIONS, not just events; over-length word fault stops demanding deleted meaning** (job_1788727233899_1dpnym94p: 66 actions inside a met 6-event budget, 13/18 pages over the word band) → `tasks/action-budget-2026-09-07.md`
 - [ ] **Baden eval I8 — pacing budget unenforced**, no page under 111 words at standard level → `tasks/baden-eval-2026-09-06.md:I8`
 - [x] (2026-09-06, 4271daaa2) **Baden eval I10 — "Monday" parsed as an invented character** → `tasks/baden-eval-2026-09-06.md:I10`
 - [ ] **Baden eval I12 — no friend is ever named in a making-friends book** → `tasks/baden-eval-2026-09-06.md:I12`

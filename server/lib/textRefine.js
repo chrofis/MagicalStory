@@ -169,11 +169,14 @@ function mergeAuditFindings(lists = []) {
 // ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
 
 /**
- * Grace band around the reading level's word budget, applied to both bounds.
+ * Grace band around the reading level's word budget — ASYMMETRIC (2026-09-07).
  * A rewrite is never worth its risk for a few words: only a page more than this
- * far outside the band is reported as a fault.
+ * far outside the band is reported as a fault. The two directions do not carry
+ * the same risk, so they do not share a number: cutting is destructive, padding
+ * is not. See buildWordBudgetFindings for the evidence.
  */
-const WORD_BUDGET_TOLERANCE = 0.2;
+const WORD_BUDGET_TOLERANCE_OVER = 0.5;
+const WORD_BUDGET_TOLERANCE_UNDER = 0.2;
 
 /** Whitespace-token word count — deterministic, no model involved. */
 function countPageWords(text) {
@@ -193,12 +196,23 @@ function countPageWords(text) {
  * averaged 71 words/page, 14/18 pages over budget, finale at 149 — and neither
  * AI auditor flagged length.
  *
- * A page only counts as a violation when it is more than WORD_BUDGET_TOLERANCE
- * outside the band (2026-09-06): job_1788681313413_xqmtk2gcs was 157 words
- * against a 150 ceiling — a 4.7% overage — and the forced rewrite corrupted a
- * verb collocation. The finding text still names the TRUE budget, so a page
- * that does trip the band is rewritten toward the real target, not the
- * tolerated one.
+ * A page only counts as a violation when it is more than the tolerance outside
+ * the band (2026-09-06): job_1788681313413_xqmtk2gcs was 157 words against a
+ * 150 ceiling — a 4.7% overage — and the forced rewrite corrupted a verb
+ * collocation. The finding text still names the TRUE budget, so a page that
+ * does trip the band is rewritten toward the real target, not the tolerated
+ * one.
+ *
+ * The tolerance is ASYMMETRIC — 0.5 over, 0.2 under (2026-09-07, superseding
+ * the single 0.2 of 2026-09-06). Meaning outranks word count: a page that runs
+ * a few words long costs nothing, while forcing a 60% cut costs an action, a
+ * line of dialogue or the causal link a later page depends on. Evidence:
+ * job_1788727233899_1dpnym94p (18 pages, 1st-grade, budget 25-50) carried 66
+ * action clauses against a 6-event budget it did meet; 13 of 18 pages ran
+ * 61-128 words, 11 drew a LENGTH fault, and the refiner obeyed by deleting
+ * causality. The real fix is upstream — the arc's action budget
+ * (buildArcBudgetSection) — so this stage no longer forces the impossible cut;
+ * it may overrun by a few words rather than delete an action.
  *
  * @param {Array<{pageNumber:number,text:string}>} pages
  * @param {string} languageLevel
@@ -209,13 +223,13 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
   const level = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   const min = level.wordsPerPageMin;
   const max = level.wordsPerPageMax;
-  const hi = max * (1 + WORD_BUDGET_TOLERANCE);
-  const lo = min * (1 - WORD_BUDGET_TOLERANCE);
+  const hi = max * (1 + WORD_BUDGET_TOLERANCE_OVER);
+  const lo = min * (1 - WORD_BUDGET_TOLERANCE_UNDER);
   const lines = [];
   for (const p of pages) {
     const n = countPageWords(p.text);
     if (n > hi) {
-      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — shorten without losing content`);
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — tighten the wording; keep every action, line of dialogue and feeling. Losing one is a fault.`);
     } else if (n < lo) {
       lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — expand without padding`);
     }
