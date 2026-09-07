@@ -5325,6 +5325,15 @@ const INVENTED_FIGURE_BASE_STANDARD = {
   advanced: 9,
 };
 
+// Per-page action shape at 6+ where no band applies. Every band, and the
+// 1st-grade level here, gets the young shape (one action, at most two).
+// advanced dropped 5-8 -> 3-4 on measured evidence: an advanced arc wrote
+// 2.17 actions/page unprompted, less than half its old band.
+const ACTION_SHAPE_STANDARD = {
+  standard: 'two to three',
+  advanced: 'three to four',
+};
+
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
@@ -5349,13 +5358,18 @@ function buildArcBudgetSection(inputData, pageCount) {
     ?? INVENTED_FIGURE_BASE_STANDARD.standard;
   const allowance = Math.max(2, base - Math.floor(cast / 2));
   const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
-  const [aMin, aMax] = lvl === '1st-grade' ? [1, 2] : lvl === 'advanced' ? [5, 8] : [2, 4];
-  const actions = pages * aMax;
+  // Per-page SHAPE, never a book total: a total is an arithmetic claim the
+  // model re-granulates until it passes (two models self-certified compliance
+  // while overrunning it). A shape has nothing to count.
+  const olderShape = band === 'standard' ? (ACTION_SHAPE_STANDARD[lvl] || null) : null;
+  const actionsLine = olderShape
+    ? `- A page carries ${olderShape} actions, and one of them is the main one — the picture renders that one. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`
+    : '- A page carries ONE main action — at most two. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action. A page where several things happen at once is too much for this reader.';
   return [
     '# BUDGETS',
     `- This book carries at most ${events}${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
     ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
-    `- This book carries at most ${actions} actions, ${aMin}-${aMax} to a page. An action is one thing a character does that changes something — a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`,
+    actionsLine,
     ...(lvl === '1st-grade' ? ['- This book is read aloud to a 3-5 year old and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.'] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast — enough for the story's opposition and its help; each one past that carries one line in the arc stating why the story cannot work without them.`,
   ].join('\n');
