@@ -87,6 +87,21 @@ function objectStateFor(entry, handle) {
 }
 
 /**
+ * The state whose own `pages[]` covers this page, or null.
+ *
+ * The bible declares WHERE each state is worn, and the authoring templates
+ * require every page of the entry to fall in exactly one state's pages. That
+ * declaration is the deterministic channel: a brief that cites the bare parent
+ * id (`ART001`, which is what the Art Director writes unless it repeats the
+ * dotted handle) still lands on the right cell for the page.
+ */
+function objectStateForPage(entry, pageNumber) {
+  if (!Number.isFinite(Number(pageNumber))) return null;
+  const n = Number(pageNumber);
+  return objectStates(entry).find(st => Array.isArray(st.pages) && st.pages.map(Number).includes(n)) || null;
+}
+
+/**
  * The DEFAULT state of an object: the FIRST row of `states[]`.
  *
  * The states ARE the rendered pictures (there is no separate base cell), so a
@@ -121,12 +136,24 @@ function hasElementReference(entry) {
  * at all, takes the DEFAULT state's. A state with no cell of its own falls
  * back to the entry itself (an old stored bible, where the entry IS the cell).
  *
- * @returns {{cell: Object, state: Object|null, cited: Object|null}}
+ * @param {number|null} pageNumber - the page being rendered, so a bare citation
+ *   resolves to the state the bible declares for that page
+ * @returns {{cell: Object, state: Object|null, cited: Object|null, substituted: Object|null}}
  */
-function elementRefCell(entry, handle = null) {
+function elementRefCell(entry, handle = null, pageNumber = null) {
   const cited = handle ? objectStateFor(entry, handle) : null;
-  const state = cited || defaultObjectState(entry);
-  return { cell: (state && hasRefImage(state)) ? state : entry, state, cited };
+  // Resolution order: the handle the brief cited, then the state the BIBLE
+  // declares for this page, then the default (first) state.
+  const state = cited || objectStateForPage(entry, pageNumber) || defaultObjectState(entry);
+  if (state && hasRefImage(state)) return { cell: state, state, cited, substituted: null };
+  if (hasRefImage(entry)) return { cell: entry, state, cited, substituted: null };
+  // The wanted state has no cell and there is no base render (a stated object
+  // never gets one). Ship SOME cell of the same object rather than none: its
+  // identity is right either way, and an object rendered in the wrong state
+  // beats an object the model invents from scratch.
+  const substituted = objectStates(entry).find(hasRefImage) || null;
+  if (substituted) return { cell: substituted, state, cited, substituted };
+  return { cell: entry, state, cited, substituted: null };
 }
 
 // Lazy-load storyHelpers to break circular dependency
@@ -2157,7 +2184,13 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
  * @param {string} referenceImageData - Base64 image data
  */
 function updateElementReferenceImage(visualBible, elementId, referenceImageData, referenceImageUrl = null) {
-  if (!visualBible || !elementId || !referenceImageData) return;
+  if (!visualBible || !referenceImageData) return;
+  if (!elementId) {
+    // A rendered cell with no id cannot be written anywhere: the paid render
+    // is discarded and the element ships with no reference. Never silent.
+    log.error('[VISUAL BIBLE] A rendered reference cell arrived with no element id — the render is discarded and its element will have no reference');
+    return;
+  }
 
   // A dotted handle addresses one STATE of an object, and its cell is written
   // onto the state row, not onto the entry. The entry keeps the base cell, so
@@ -2306,13 +2339,17 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     if (adAuthored) {
       if (!sceneObjectsNameEntry(sceneObjects, entry)) continue;
     } else if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    // hasRef admits a stated element whose render lives on a state row, so the
+    // cell has to be resolved here too — reading the entry's own fields would
+    // push an undefined image onto the plate call.
+    const { cell } = elementRefCell(entry);
     refs.push({
       id: entry.id,
       name: entry.name,
       type: 'vehicle',
       description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
+      referenceImageData: cell.referenceImageData,
+      referenceImageUrl: cell.referenceImageUrl,
       priority: 1,
     });
   }
@@ -2323,13 +2360,14 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     if (entry.isRealLandmark) continue;
     if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    const { cell } = elementRefCell(entry);
     refs.push({
       id: entry.id,
       name: entry.name,
       type: 'location',
       description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
+      referenceImageData: cell.referenceImageData,
+      referenceImageUrl: cell.referenceImageUrl,
       priority: 2,
     });
   }
@@ -2447,12 +2485,25 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
-      if (!hasRef(entry)) continue;
       const parentId = baseVbId(entry.id) || String(entry.id || '').trim().toUpperCase();
       const onPage = entry.appearsInPages && entry.appearsInPages.includes(pageNumber);
       const handle = entry.id ? askedFor.get(parentId) : undefined;
       const named = !!handle;
       if (!onPage && !named) continue;
+      if (!hasRef(entry)) {
+        // An element the page needs and that WAS rendered (or is a stated
+        // object, which is always rendered) but resolves to no cell is a
+        // silent quality failure: the model invents the thing on every page it
+        // appears on. Never degrade quietly here — this is exactly how a
+        // stated object shipped un-referenced through a whole book
+        // (job_1788763045123_z8so79ngb, d473434ed).
+        if (entry.referenceImageGenerated || objectStates(entry).length > 0) {
+          log.error(`[VB-REF] Page ${pageNumber}: ${parentId} ("${entry.name}") has a reference sheet but NO usable cell`
+            + `${objectStates(entry).length ? ` (${objectStates(entry).length} state(s), none carrying a render)` : ''}`
+            + ' — the page will render it unreferenced');
+        }
+        continue;
+      }
 
       // OBJECT STATE. When the brief cites a state (`ART001.2`), hand the page
       // that state's CELL out of the object's one reference grid — the same
@@ -2464,9 +2515,18 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       // none: the object's identity is right either way.
       // A BARE citation (or none at all) resolves to the DEFAULT state — the
       // first row — because a stated object has no base cell to hand over.
-      const { cell, state, cited } = elementRefCell(entry, handle);
+      const { cell, state, cited, substituted } = elementRefCell(entry, handle, pageNumber);
       if (cited && cell === entry) {
         log.warn(`[VB-REF] Page ${pageNumber}: ${handle} ("${state.name}") has no state cell — using ${parentId}'s base render`);
+      } else if (state && !cited && onPage && !objectStateForPage(entry, pageNumber)) {
+        // The bible declares a state's pages; a page of the entry that falls in
+        // none of them is a gap in the bible's own declaration, and the object
+        // silently renders in its default look there.
+        log.warn(`[VB-REF] Page ${pageNumber}: ${parentId} appears on this page but no state declares it — using the default "${state.name}" cell`);
+      }
+      if (substituted && state) {
+        log.error(`[VB-REF] Page ${pageNumber}: ${parentId} state "${state.name}" has no cell and the object has no base render`
+          + ` — substituting the "${substituted.name}" cell so the page keeps the object's identity`);
       }
 
       const recurring = recurringIds.has(parentId);
@@ -2506,13 +2566,14 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
 
+    const { cell: locCell } = elementRefCell(entry);
     relevantRefs.push({
       id: entry.id,
       name: entry.name,
       type: 'location',
       description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
+      referenceImageData: locCell.referenceImageData,
+      referenceImageUrl: locCell.referenceImageUrl,
       priority: 5 // Lower priority than objects/characters
     });
   }
@@ -2775,6 +2836,7 @@ module.exports = {
   normaliseObjectStates,
   objectStates,
   objectStateFor,
+  objectStateForPage,
   defaultObjectState,
   hasElementReference,
   elementRefCell,

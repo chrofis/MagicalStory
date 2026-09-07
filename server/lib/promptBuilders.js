@@ -12,7 +12,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, objectStateFor } = require('./visualBible');
+const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, objectStateFor, objectStateForPage } = require('./visualBible');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -3565,7 +3565,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const handle = typeof objName === 'string' ? objName : (objName && objName.id);
         requiredObjects.push({
           name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact,
-          state: objectStateFor(artifact, handle),
+          // The cited handle first, then the state the bible declares for this
+          // page. The Art Director usually writes the bare parent id, so
+          // without the page fallback the page's own state delta ("corner torn
+          // away, flower missing") never reached the render at all.
+          state: objectStateFor(artifact, handle) || objectStateForPage(artifact, pageNumber),
         });
         continue;
       }

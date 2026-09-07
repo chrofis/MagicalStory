@@ -214,11 +214,25 @@ describe('REQUIRED OBJECTS — a dotted handle reaches the block', () => {
     expect(w).toContain(numbers(16));  // the full authored text, for diagnosis
   });
 
-  it('a BARE id on a stated object emits no clause (the unaltered look)', () => {
+  it('a BARE id takes the state the BIBLE declares for the page (the brief rarely repeats the handle)', () => {
+    // Supersedes "a bare id emits no clause": the Art Director writes the bare
+    // parent id on nearly every page, so leaving the delta off a bare citation
+    // meant the page's own state never reached the render
+    // (job_1788763045123_z8so79ngb p3: "flower missing", flower still drawn).
+    // promptFor renders page 7, which STATED declares as the "lit" state.
     const line = requiredObjectsBlock(promptFor(['ART001']))
       .split('\n').find(l => l.includes('hollowed carved vessel'))!;
-    expect(line).not.toMatch(/light source burns/);
+    expect(line).toMatch(/light source burns/);
     expect(line).toContain('fits in two cupped hands');
+  });
+
+  it('a bare id on a page NO state declares still emits no clause', () => {
+    const vb = bible();
+    vb.artifacts[0].appearsInPages.push(9);
+    const line = requiredObjectsBlock(
+      buildImagePrompt(scene(['ART001']), { language: 'en' }, null, vb, 9, null, {}))
+      .split('\n').find(l => l.includes('hollowed carved vessel'))!;
+    expect(line).not.toMatch(/light source burns/);
   });
 
   it('the bracket form carries the dotted suffix too — "[ART001.3]"', () => {
@@ -267,9 +281,19 @@ describe('getElementReferenceImagesForPage — dotted handles resolve', () => {
     expect(refs.find((r: any) => r.id === 'ART001').referenceImageUrl).toBe('https://r2/base.jpg');
   });
 
-  it('a bare id resolves to the DEFAULT state cell — the first state', () => {
+  it('a bare id resolves to the state the BIBLE declares for that page', () => {
+    // page 7 is declared by state 3 ("lit"). The bible's own pages[] is the
+    // deterministic channel — the brief usually cites the bare parent id.
     const refs = getElementReferenceImagesForPage(withCells(), 7, 4, ['ART001']);
     const row = refs.find((r: any) => r.id === 'ART001');
+    expect(row.referenceImageUrl).toBe('https://r2/state3.jpg');
+    expect(row.stateId).toBe('ART001.3');
+  });
+
+  it('a bare id on a page no state declares falls back to the DEFAULT (first) state cell', () => {
+    const vb = withCells();
+    vb.artifacts[0].appearsInPages.push(9);
+    const row = getElementReferenceImagesForPage(vb, 9, 4, ['ART001']).find((r: any) => r.id === 'ART001');
     expect(row.referenceImageUrl).toBe('https://r2/state1.jpg');
     expect(row.stateId).toBe('ART001.1');
   });
@@ -406,5 +430,134 @@ describe('updateElementReferenceImage — dotted writes land on the state', () =
   it('the R2 key has no second extension, and bare-id keys are unchanged', () => {
     expect(keyForVbReference('s1', 'ART001.2')).toBe('stories/s1/vb/ART001_2.jpg');
     expect(keyForVbReference('s1', 'ART001')).toBe('stories/s1/vb/ART001.jpg');
+  });
+});
+
+// ── 8. STATE CELL → PAGE RESOLUTION ───────────────────────────────────────
+// The production defect (staging job_1788763045123_z8so79ngb, d473434ed):
+// since a stated object has NO base cell, an object whose state rows carry no
+// dotted id renders its paid sheet into nothing and is referenced on NO page.
+// Three guarantees are locked down here: the live parse path mints the ids;
+// a page resolves to the cell the BIBLE declares for it (the brief writes the
+// bare parent id, so the dotted handle alone is not a channel we can rely on);
+// and an object with a sheet but no usable cell fails LOUDLY.
+describe('state cell → page resolution', () => {
+  const { UnifiedStoryParser } = require_('../../server/lib/outlineParser/unified');
+  const {
+    objectStateForPage, elementRefCell, hasElementReference, defaultObjectState,
+  } = require_('../../server/lib/visualBible');
+
+  const rendered = () => {
+    const vb = bible();
+    // What the sheet run writes back: one cell per state, no base cell.
+    delete vb.artifacts[0].referenceImageUrl;
+    for (const st of vb.artifacts[0].states) {
+      updateElementReferenceImage(vb, st.id, 'data:image/png;base64,xx', `https://r2/${st.id}.jpg`);
+    }
+    return vb;
+  };
+
+  it('the LIVE parse path mints dotted ids and empty cells for every state', () => {
+    const response = '---VISUAL BIBLE---\n```json\n' + JSON.stringify({
+      artifacts: [{
+        id: 'ART001', name: 'carved vessel', pages: [1, 2],
+        states: [{ name: 'whole', delta: 'unbroken', pages: [1] }, { name: 'cracked', delta: 'split down one wall', pages: [2] }],
+      }],
+    }) + '\n```\n';
+    const vb = new UnifiedStoryParser(response).extractVisualBible();
+    expect(vb.artifacts[0].states.map((s: any) => s.id)).toEqual(['ART001.1', 'ART001.2']);
+    expect(vb.artifacts[0].states[0]).toHaveProperty('referenceImageUrl', null);
+    // A state-less entry is untouched — no `states` key invented.
+    const plain = new UnifiedStoryParser('---VISUAL BIBLE---\n```json\n'
+      + JSON.stringify({ artifacts: [{ id: 'ART002', name: 'basket', pages: [1] }] }) + '\n```\n').extractVisualBible();
+    expect(plain.artifacts[0].states).toBeUndefined();
+  });
+
+  it('a page resolves to the state the bible declares for it, with no dotted handle in the brief', () => {
+    const vb = rendered();
+    for (const [page, name] of [[5, 'cracked'], [6, 'mended'], [7, 'lit'], [8, 'lit']] as const) {
+      const refs = getElementReferenceImagesForPage(vb, page, 4, ['ART001'], null);
+      const card = refs.find((r: any) => r.id === 'ART001');
+      expect(card, `page ${page}`).toBeTruthy();
+      expect(card.stateName, `page ${page}`).toBe(name);
+      expect(card.referenceImageUrl).toBe(`https://r2/${card.stateId}.jpg`);
+    }
+  });
+
+  it('a cited dotted handle outranks the page declaration', () => {
+    const vb = rendered();
+    const refs = getElementReferenceImagesForPage(vb, 5, 4, ['ART001.3'], null);
+    expect(refs.find((r: any) => r.id === 'ART001').stateName).toBe('lit');
+  });
+
+  it('a page no state declares falls back to the DEFAULT (first) state', () => {
+    const vb = rendered();
+    vb.artifacts[0].appearsInPages.push(9);
+    const refs = getElementReferenceImagesForPage(vb, 9, 4, ['ART001'], null);
+    expect(refs.find((r: any) => r.id === 'ART001').stateName).toBe(defaultObjectState(vb.artifacts[0]).name);
+  });
+
+  it('NO-STATE case — a plain object still resolves to its own render', () => {
+    const vb = rendered();
+    const card = getElementReferenceImagesForPage(vb, 5, 4, ['ART002'], null).find((r: any) => r.id === 'ART002');
+    expect(card.referenceImageUrl).toBe('https://r2/plain.jpg');
+    expect(card.stateId).toBeNull();
+  });
+
+  it('MULTI-STATE — every state that rendered is reachable, each from its own cell', () => {
+    const vb = rendered();
+    const seen = [5, 6, 7].map(p => getElementReferenceImagesForPage(vb, p, 4, ['ART001'], null)
+      .find((r: any) => r.id === 'ART001').stateId);
+    expect(new Set(seen).size).toBe(3);
+  });
+
+  it('a stated object with only SOME cells rendered substitutes a sibling cell rather than shipping none', () => {
+    const vb = bible();
+    delete vb.artifacts[0].referenceImageUrl;
+    updateElementReferenceImage(vb, 'ART001.3', 'data:image/png;base64,xx', 'https://r2/ART001.3.jpg');
+    const card = getElementReferenceImagesForPage(vb, 5, 4, ['ART001'], null).find((r: any) => r.id === 'ART001');
+    expect(card.referenceImageUrl).toBe('https://r2/ART001.3.jpg');
+    expect(elementRefCell(vb.artifacts[0], null, 5).substituted.name).toBe('lit');
+  });
+
+  it('an object with a sheet but NO usable cell is dropped LOUDLY, never in silence', () => {
+    const vb = bible();
+    delete vb.artifacts[0].referenceImageUrl; // no base cell, no state cells either
+    expect(hasElementReference(vb.artifacts[0])).toBe(false);
+    const errors: string[] = [];
+    const listener = (level: string, line: string) => { if (level === 'error') errors.push(line); };
+    addLogListener(listener);
+    try {
+      const refs = getElementReferenceImagesForPage(vb, 5, 4, ['ART001'], null);
+      expect(refs.find((r: any) => r.id === 'ART001')).toBeUndefined();
+    } finally { removeLogListener(listener); }
+    expect(errors.join('\n')).toMatch(/ART001.*reference sheet but NO usable cell/);
+  });
+
+  it('objectStateForPage reads the bible declaration, and is null for a state-less entry', () => {
+    expect(objectStateForPage(STATED, 6).name).toBe('mended');
+    expect(objectStateForPage(STATED, 99)).toBeNull();
+    expect(objectStateForPage(PLAIN, 5)).toBeNull();
+  });
+
+  it('the page PROMPT carries the state delta the bible declares for that page', () => {
+    const vb = rendered();
+    const input = { language: 'en', artStyle: 'watercolor', characters: [{ name: 'Ada', age: 6 }], layout: { textInImage: true } };
+    const p6 = buildImagePrompt(scene(['carved vessel [ART001]']), input, null, vb, 6, null, { skipVisualBible: true });
+    expect(p6).toContain('a strip of clear tape along the split on the side wall');
+    const p5 = buildImagePrompt(scene(['carved vessel [ART001]']), input, null, vb, 5, null, { skipVisualBible: true });
+    expect(p5).toContain('a jagged vertical split down one side wall');
+  });
+
+  it('expandElementStateCells backfills a missing state id LOUDLY (bibles stored before the parser fix)', () => {
+    const legacy = JSON.parse(JSON.stringify(STATED));
+    for (const st of legacy.states) delete st.id;
+    const errors: string[] = [];
+    const listener = (level: string, line: string) => { if (level === 'error') errors.push(line); };
+    addLogListener(listener);
+    let cells: any[];
+    try { cells = expandElementStateCells(legacy); } finally { removeLogListener(listener); }
+    expect(cells.map(c => c.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3']);
+    expect(errors.join('\n')).toMatch(/state\(s\) with no id/);
   });
 });

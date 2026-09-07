@@ -2961,7 +2961,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const itemName = (missing.item || '').toLowerCase().trim();
     if (!itemName) continue;
 
-    const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+    // hasElementReference, not a raw field read: a stated artifact's render
+    // lives on a state row, so a raw check drops it from repair references.
+    const hasRef = require('./visualBible').hasElementReference;
 
     const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
     if (vbAnimal) {
@@ -2985,7 +2987,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     }
     const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
     if (vbArtifact) {
-      const bytes = await loadVbReferenceBytes(vbArtifact);
+      const bytes = await loadVbReferenceBytes(require('./visualBible').elementRefCell(vbArtifact).cell);
       if (bytes) {
         referenceImages.push(`data:image/jpeg;base64,${bytes}`);
         referenceImageSources.push(`vb-artifact:${missing.item}`);

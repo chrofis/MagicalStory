@@ -73,7 +73,11 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
     if (!id || !/^ART\d+$/.test(id)) continue;
     const art = (visualBible?.artifacts || []).find(a => baseVbId(a?.id) === id);
     if (!art) continue;
-    const src = art.referenceImageUrl || art.referenceImageData;
+    // A stated object has no base render — its cells live on its state rows —
+    // so the cover prop image must be resolved through elementRefCell (the
+    // default state), never read off the entry.
+    const { cell } = require('./visualBible').elementRefCell(art);
+    const src = cell.referenceImageUrl || cell.referenceImageData;
     if (src) enriched._artifactImages[id] = src;
   }
   return enriched;

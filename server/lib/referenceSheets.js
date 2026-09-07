@@ -465,8 +465,22 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  */
 function expandElementStateCells(el) {
   const { objectStates } = require('./visualBible');
+  const { baseVbId } = require('./vbIdGuard');
   const states = objectStates(el);
   if (states.length === 0) return [el];
+  // A state row with no dotted id mints a cell with `id: undefined`: the grid
+  // renders, and every write-back and page lookup keyed on that id then finds
+  // nothing, so the paid sheet is discarded in silence. That shipped
+  // (job_1788763045123_z8so79ngb — the live parse path never normalised
+  // states). Ids come from `normaliseObjectStates` at parse time; backfill
+  // them here for a bible stored before that fix, and say so loudly.
+  const parent = baseVbId(el.id);
+  const missing = states.filter(st => !st.id);
+  if (missing.length > 0 && parent) {
+    log.error(`[REF-SHEET] "${el.name}" (${parent}) has ${missing.length} state(s) with no id — `
+      + 'backfilling dotted ids so the rendered cells can be written back');
+    states.forEach((st, i) => { if (!st.id) st.id = `${parent}.${i + 1}`; });
+  }
   const baseDesc = String(el.extractedDescription || el.description || '').trim().replace(/[.;\s]+$/, '');
   // The STATES ARE THE PICTURES. No separate base cell: the unaltered look is
   // itself one of the states (the first), so minting a base cell would render

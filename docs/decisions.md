@@ -29984,3 +29984,60 @@ branch is byte-identical to the pre-gate wording. 809 unit tests pass (12 new).
 `storyJobPipeline.js`, `tests/unit/trial-idea-costume-gate.test.ts`,
 `tests/manual/render-trial-idea-prompt.js`
 **Status:** ✅ active
+
+### Object states are normalised on the LIVE parse path, and a page resolves its state cell from the bible's own `pages[]`
+**Context:** Staging trial story `job_1788763045123_z8so79ngb` shipped its central
+prop — a hand-drawn greeting card with three declared states — with **no reference
+image on any of the 5 pages it appears on**, and with none of its per-page state
+deltas in the prompt. The paid 3-cell sheet rendered correctly and was discarded:
+`referenceSheetBatches[2]` stored `elementIds: [null, null, null]`. Two causes, one
+class. (1) `normaliseObjectStates` — which mints each state's dotted id
+(`ART001.2`) and its empty cell fields — was called only from
+`visualBible.parseVisualBible`, a function with **no callers**; the live path is
+`outlineParser/unified.js#extractVisualBible`, which spread the raw JSON and left
+`states[]` id-less. Ids never mattered while `expandElementStateCells` also emitted
+a base cell carrying the parent id — `d473434ed` removed that base cell (4 states,
+4 cells), so the object's ONLY cells were the id-less ones: nothing could be written
+back, and `getElementReferenceImagesForPage` found no cell on any page. (2) The Art
+Director cites the **bare** parent id on almost every page (measured: 6/6 pages of
+that story wrote `[ART001]`, never `[ART001.2]`) — partly because the States line it
+is given rendered as `[undefined]` — so state resolution keyed only on a dotted
+handle never fired, and p3's `torn and wet` delta ("flower missing") never reached
+the render.
+**Decision:** (a) `extractVisualBible` normalises `states[]` through
+`normaliseObjectStates` for every entry that declares them — the one live place
+state ids are minted. (b) State→page resolution gains a deterministic second
+channel: `objectStateForPage(entry, pageNumber)` reads the state's own declared
+`pages[]`. Resolution order everywhere is **cited dotted handle → the state the
+bible declares for this page → the default (first) state**; it feeds both the
+reference cell (`elementRefCell`) and the REQUIRED OBJECTS delta clause. (c) The
+degradation is now LOUD: an element on a page that has a reference sheet but
+resolves to no usable cell `log.error`s; a rendered cell arriving with no element id
+`log.error`s instead of returning silently; a state row with no id is backfilled at
+sheet-build time with a `log.error` (bibles stored before this fix); a page of a
+stated object that no state declares `log.warn`s. (d) A stated object whose wanted
+state has no cell substitutes a sibling state's cell (right object, wrong state)
+rather than shipping no reference at all.
+**Rationale:** `d473434ed`'s verdict — 4 states, 4 cells, no base cell — is NOT
+reversed; this fixes the parse and consumer sides so it works without a base cell,
+which is the shape the owner asked for. Of the three candidate fixes (restore the
+base cell / give the state cells their ids / teach the page lookup about state
+cells), the base cell is the reversal and was not taken; the other two are both
+implemented, because ids alone would still have left every page on the default
+state while the brief writes bare ids. Page-based resolution beats trusting the
+model to echo a dotted handle: the bible already declares which pages each state
+covers, and the authoring templates require that mapping to be total. Verified with
+no paid calls by replaying the stored story through the current builders: before,
+p1/p2/p3 carried no reference-images line at all and p4/p5/p6 named only ART002;
+after, all six pages carry the card, p3 resolves to the `torn and wet` cell, and its
+prompt carries "corner torn away, paper wrinkled and damp, flower missing".
+Sibling paths swept in the same change: the empty-scene plate references, the
+page-lookup location loop, the cover prop image (`coverIterate`, which read the
+entry's own render and so lost a stated prop's picture), and the inpaint
+missing-element artifact reference (`images.js`) all resolve through `elementRefCell`
+now instead of reading `referenceImageData/Url` off the entry.
+**Touched:** `server/lib/outlineParser/unified.js`, `server/lib/visualBible.js`,
+`server/lib/promptBuilders.js`, `server/lib/referenceSheets.js`,
+`server/lib/coverIterate.js`, `server/lib/images.js`,
+`tests/unit/vb-object-states.test.ts`
+**Status:** ✅ active (2026-09-07)

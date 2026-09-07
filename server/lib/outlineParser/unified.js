@@ -191,12 +191,27 @@ class UnifiedStoryParser {
         this._cache.visualBible = JSON.parse(jsonMatch[1]);
 
         // Normalize pages -> appearsInPages field mapping (Claude generates "pages", code expects "appearsInPages")
+        //
+        // OBJECT STATES are normalised here too, and this is the ONLY live
+        // place they are. `normaliseObjectStates` mints each state's dotted id
+        // (`ART001.2`) and its empty reference-cell fields; without ids the
+        // per-state cells minted by `referenceSheets.expandElementStateCells`
+        // carry `id: undefined`, so the rendered sheet is written back to
+        // nothing and `getElementReferenceImagesForPage` finds no cell for the
+        // object on ANY page (staging job_1788763045123_z8so79ngb: the story's
+        // central prop referenced on none of its 5 pages). The other parse
+        // path that calls it, `visualBible.parseVisualBible`, has no callers.
+        const { normaliseObjectStates } = require('../visualBible');
         const normalizeVisualBibleEntries = (entries) => {
           if (!entries || !Array.isArray(entries)) return entries;
-          return entries.map(entry => ({
-            ...entry,
-            appearsInPages: entry.appearsInPages || entry.pages || [],
-          }));
+          return entries.map(entry => {
+            const out = {
+              ...entry,
+              appearsInPages: entry.appearsInPages || entry.pages || [],
+            };
+            if (entry.states !== undefined) out.states = normaliseObjectStates(entry.states, entry.id);
+            return out;
+          });
         };
 
         // Apply normalization to all entry arrays
