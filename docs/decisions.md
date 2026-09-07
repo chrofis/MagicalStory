@@ -30041,3 +30041,46 @@ now instead of reading `referenceImageData/Url` off the entry.
 `server/lib/coverIterate.js`, `server/lib/images.js`,
 `tests/unit/vb-object-states.test.ts`
 **Status:** ✅ active (2026-09-07)
+
+## 2026-09-07 — A skipped avatar-sheet eval scores `null`, never 10
+**Context:** Staging story `job_1788763045123_z8so79ngb` stored a styled 2×4
+avatar sheet at 10/10 on every axis — layout, identity, outfit, clean — while
+the image itself is a merged crowd: overlapping semi-transparent figures with no
+cell grid, including two adults who are not the character. The stored record
+shows why: `passes.pass2.attempts[0].stage = "no-eval-requested"`,
+`finalVerdict: null`, and pass-1's verdict carries `heads: null`, `bodies: null`,
+`identityReport: null` with all scores 10. **No judge ever ran.** The run passed
+`skipQualityEval` (trial fast path) and each skip branch minted a passing 10:
+`generateComposited2x4`'s two row loops (`review = { valid: true, score: 10 }`),
+its `finalScore = skipReview ? 10 : …` plus the `?? 10` sub-score defaults, and
+`runStyleTransferPass`'s `best = { …, score: 10, verdict: null }`. Same disease
+as `hollow-eval-scores-100` (2026-09-02): an evidence-free eval became a perfect
+score.
+**Decision:** An unevaluated sheet is **unknown**, not perfect. Every skip path
+records `score: null`, `evaluated: false`, and the verdict carries
+`evalSkipped: 'skipQualityEval'`; sub-scores are `null` rather than 10. `valid`
+stays `true` and the sheet still ships (the caller asked for no reviews, and a
+trial cannot act on a verdict — gates are guidelines). Best-of-N ranks an
+unscored attempt below any judged one. `styledAvatars.js` reports
+`innerFinalScore`/`combinedScore` as `null` with `evaluated: false` and logs
+"shipped UNSCORED — quality eval skipped".
+**Rationale:** The gate did not misjudge this sheet; it never saw it. The only
+defect that can be fixed on the eval side is the silent default. Nulling the
+axes keeps the fail-open behaviour those branches were written for while making
+"nobody looked" impossible to read as "verified perfect".
+**Also (prompt side):** no rubric asked whether a cell contains exactly one
+figure. `sheet-row-heads-eval.txt` and `sheet-row-bodies-eval.txt` gain a SINGLE
+SUBJECT task (one head / one figure per cell, ghosted and blended figures
+included, merged cells score 1-3), mirrored into `sheet-2x4-evaluation.txt`; the
+Pass-2 style eval already had it as TASK 8. `applyPoseHeadGate`'s recompute —
+which is what the gate reads, not the model's own `finalScore` — includes the
+new `soloScore`, or it would be scored and silently dropped.
+**Not fixed (reported):** a trial still ships an unjudged styled sheet. Catching
+this class inside a trial needs the Pass-2 solo check to actually run there, which
+is a paid Gemini call per character on the fast path — owner's call, not built.
+The corruption itself (the style anchor's cast blending into the sheet;
+`usedAnchor: true` on the winning attempt) is a separate bug.
+**Touched:** `server/lib/character2x4Sheet.js`, `server/lib/styledAvatars.js`,
+`prompts/sheet-row-heads-eval.txt`, `prompts/sheet-row-bodies-eval.txt`,
+`prompts/sheet-2x4-evaluation.txt`, `tests/unit/avatar-sheet-eval-gate.test.ts`
+**Status:** ✅ active

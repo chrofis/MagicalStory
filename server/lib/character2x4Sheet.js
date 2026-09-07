@@ -340,6 +340,7 @@ function applyPoseHeadGate(bodies, poseHeads) {
     bodies.outfit?.outfitScore ?? 10,
     bodies.costumeReads?.costumeReadsScore ?? 10,
     bodies.proportions?.score ?? 10,
+    bodies.solo?.soloScore ?? 10,
     bodies.background?.backgroundScore ?? 10,
   );
   bodies.valid = bodies.finalScore >= 6;
@@ -401,7 +402,11 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     const res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
     if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_body_row', res.modelId);
-    let review = { valid: true, score: 10, bodies: null };
+    // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
+    // a sheet with three strangers merged across its cells was stored at 10/10 on
+    // every axis without a single judge call). score null = unscored; valid stays
+    // true so the sheet still ships (the caller asked for no reviews).
+    let review = { valid: true, score: null, evaluated: false, bodies: null };
     if (!skipReview) {
       try {
         review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker });
@@ -414,7 +419,8 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       }
     }
     attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
-    if (!bestBody || review.score > bestBody.review.score) bestBody = { row: res.imageData, review };
+    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
   }
@@ -434,7 +440,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
-    let review = { valid: true, score: 10, heads: null, identity: null };
+    let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
     if (!skipReview) {
       try {
         review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age });
@@ -444,7 +450,8 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       }
     }
     attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid });
-    if (!bestHead || review.score > bestHead.review.score) bestHead = { row: res.imageData, review };
+    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+    if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review };
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
   }
@@ -455,20 +462,25 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const bodies = bestBody.review.bodies;
   const heads = bestHead.review.heads;
   const identity = bestHead.review.identity;
-  const idScore = identity?.identityScore ?? 10;
-  const finalScore = skipReview ? 10 : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
+  // skipReview → nothing was judged: every axis is null (unknown), not 10.
+  const sc = (v) => (skipReview ? null : v);
+  const idScore = skipReview ? null : (identity?.identityScore ?? 10);
+  const finalScore = skipReview ? null : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
   // When a row judge threw, its sub-report is null and the ?? defaults below
   // read as a perfect 10. Carry the failure so consumers show "unscored", not
   // a fake pass — the sheet still ships, it just wasn't judged.
   const evalFailed = bestBody.review.evalFailed || bestHead.review.evalFailed || null;
   const verdict = {
-    split: true, splitY, finalScore, valid: finalScore >= 6, evalFailed,
+    split: true, splitY, finalScore,
+    // Unevaluated is not a failure: the sheet ships, it is simply unjudged.
+    valid: skipReview ? true : finalScore >= 6,
+    evaluated: !skipReview, evalSkipped: skipReview ? 'skipQualityEval' : null, evalFailed,
     failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
-    layout: { layoutScore: bodies?.fullBody?.fullBodyScore ?? 10 },
+    layout: { layoutScore: sc(bodies?.fullBody?.fullBodyScore ?? 10) },
     identity: { identityScore: idScore, reason: identity?.reason },
-    outfit: { outfitScore: bodies?.outfit?.outfitScore ?? 10 },
+    outfit: { outfitScore: sc(bodies?.outfit?.outfitScore ?? 10) },
     sourceMatch: { sourceMatchScore: idScore },
-    cleanRender: { cleanScore: heads?.cleanRender?.cleanScore ?? 10 },
+    cleanRender: { cleanScore: sc(heads?.cleanRender?.cleanScore ?? 10) },
     heads, bodies, identityReport: identity,
   };
   return {
@@ -1396,6 +1408,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
   let best = null;
+  // Unscored (null) ranks below any judged attempt, so a skipped or failed eval
+  // can never win best-of-N by pretending to be a perfect score.
+  const rank = (v) => (typeof v === 'number' ? v : -1);
 
   const trackUsage = (result) => {
     if (usageTracker && result.usage) {
@@ -1452,8 +1467,11 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // first style transfer instead of scoring and retrying it.
     if (!process.env.GEMINI_API_KEY || skipQualityEval) {
       if (!process.env.GEMINI_API_KEY) log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
-      best = { result, attempt, score: 10, verdict: null, prompt };
-      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
+      // score null, NOT 10 — an unjudged style transfer must not be stored as a
+      // perfect one (job_1788763045123_z8so79ngb shipped a corrupt sheet at 10/10
+      // this way). `valid` below stays true, so the sheet still ships.
+      best = { result, attempt, score: null, evaluated: false, verdict: null, prompt };
+      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: null, evaluated: false, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
       break;
     }
 
@@ -1478,7 +1496,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
       const candidate = { result, attempt, score: 5, verdict: null, prompt };
       attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
-      if (!best || candidate.score > best.score) best = candidate;
+      if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
       continue;
     }
 
@@ -1499,7 +1517,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       usedAnchor: !!anchorForAttempt,
     });
     const candidate = { result, attempt, score, verdict, prompt };
-    if (!best || candidate.score > best.score) best = candidate;
+    if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
     if (verdict.valid) break;
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
   }

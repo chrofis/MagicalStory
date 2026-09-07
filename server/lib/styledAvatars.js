@@ -368,9 +368,14 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // "unscored" and the gate treats the dimension as unknown (null → passes,
     // so the sheet still ships, which is the intended fail-open).
     const evalFailed = pass1Verdict?.evalFailed || null;
+    // The caller asked for no reviews (trial): every axis is unknown, not 10.
+    const evalSkipped = pass1Verdict?.evalSkipped || null;
     const faceMatchScore = evalFailed ? null : (pass1Verdict?.sourceMatch?.sourceMatchScore ?? pass1Verdict?.sourceMatchScore ?? null);
     const clothingMatchScore = evalFailed ? null : (pass1Verdict?.outfit?.outfitScore ?? pass1Verdict?.outfitScore ?? null);
-    const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 0;
+    // null = unscored. Never 0 (reads as a failure) and never 10 (reads as a
+    // verified pass — staging job_1788763045123_z8so79ngb stored a corrupt sheet
+    // at 10/10 on every axis with no judge call made).
+    const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : null;
     // styled === false means Pass 2 was wanted but every attempt was rejected,
     // so what shipped is the realistic Pass-1 sheet in a painted story. That is
     // a real defect and must not read as success: this gate previously scored
@@ -397,6 +402,10 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       innerOutfitScore: pass1Verdict?.outfit?.outfitScore ?? null,
       innerFinalScore: innerFinal,
       combinedScore: innerFinal,
+      // False = no judge ran on this sheet. A consumer must not read its scores
+      // as a pass; they are unknown.
+      evaluated: !(evalSkipped || evalFailed),
+      evalSkipped,
       // False = the shipped sheet is the realistic Pass-1 fallback, not a
       // style-converted one. Read by the dev panel so an unstyled avatar is
       // visible as such instead of looking like a normal pass.
@@ -430,7 +439,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       }
     }
 
-    if (evalFailed) {
+    if (evalSkipped) {
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — quality eval skipped (${evalSkipped}); no axis was judged`);
+    } else if (evalFailed) {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — row eval failed (${evalFailed}); sheet kept but not judged`);
     } else if (passed) {
       log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10)`);
