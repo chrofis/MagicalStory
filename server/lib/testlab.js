@@ -731,6 +731,12 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     issuesSummary: result.issuesSummary || null,
     fixableIssues: result.fixableIssues || [],
     figures: (result.figures || []).map(f => ({ name: f.name, match: f.match, issues: f.issues })),
+    // The judge's parsed output as returned, BEFORE the fixable_issues mapper
+    // and gates. Without it a rule the judge ignores and a finding a gate
+    // dropped are indistinguishable in the Lab (2026-09-08, experiment 1057:
+    // the inventory said `complete: false`, the prompt carried the rule, and
+    // nothing arrived — no way to tell which side lost it).
+    complianceRaw: result.threeStageResult?.complianceResult || null,
     storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, semanticScore: ctx.scene.semanticScore ?? null },
   };
 }
