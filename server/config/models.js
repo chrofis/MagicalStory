@@ -144,7 +144,11 @@ const TEXT_MODELS = {
   // tier. Pricing from the OpenRouter catalogue. For scoring/writer A/B in the Lab.
   'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 16384, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
   // Cheap reviewer candidates (2026-08-15 beats-reviewer bake-off; see docs/decisions.md)
-  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 16384, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter (~$0.38/$1.88 per 1M)' },
+  // Price verified 2026-09-07 on openrouter.ai and ai.google.dev: $0.75/$3.75
+  // per 1M (Flex route, Google list through 2026), $1.50/$7.50 on the standard
+  // route and Google list from 2027. The earlier "$0.38/$1.88" here matched no
+  // vendor page and led to a wrong cost-neutral claim.
+  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 16384, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M Flex; $1.50/$7.50 standard)' },
   'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 16384, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
   'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 16384, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
   'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 via OpenRouter (~$0.30/$1.20 per 1M)' },

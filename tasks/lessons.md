@@ -701,3 +701,8 @@ stop reasoning until it arrives — and when a datum is asked for twice and not 
 full remaining fix list rather than asking a third time. Also worth remembering: repo greps do
 prove things here — `grep` over both auth paths showed `scope: 'openid email profile'` and
 nothing else, which is what ruled out a rogue scope and pointed at undeclared-scope state.
+
+## 2026-09-07 — A price in a code comment is not a price
+
+**What happened:** I told the owner Gemini 3.7 Flash was cost-neutral against 2.5 Flash, taking "$0.38/$1.88 per 1M" from a comment in `server/config/models.js`. The owner doubted it. The vendor pages say $0.75/$3.75 (Flex, Google list through 2026) and $1.50/$7.50 (standard route, list from 2027): 1.8-3.5x per call, not neutral.
+**Rule:** any cost comparison put in front of the owner is computed from a vendor page fetched that day (ai.google.dev pricing, openrouter.ai model page, x.ai pricing), with the source named in the table. Repo comments, memory and model-card summaries are leads, never the number. Include the date-bound price when the vendor announces a change.
