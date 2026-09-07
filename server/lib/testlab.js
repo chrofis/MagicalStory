@@ -7327,7 +7327,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
   const { ARC_RUBRIC } = sc;
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
   if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
-  const context = sc.buildBriefContext({ ...storyData, pages: pageCount });
+  const context = sc.buildBriefContext({ ...storyData, pages: pageCount }, { arc: true });
 
   // A judge draw can be empty, truncated, or carry a key outside the rubric —
   // one bad draw must not read as "this round could not be scored".
@@ -7345,7 +7345,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
         const keys = ARC_RUBRIC.arc.filter(k => { const n = Number(dims[k]); return Number.isFinite(n) && n >= 1 && n <= 10; });
         if (keys.length < ARC_RUBRIC.arc.length) throw new Error(`missing dims: ${ARC_RUBRIC.arc.filter(k => !keys.includes(k)).join(',')}`);
         const score = Math.round((keys.reduce((s, k) => s + Number(dims[k]), 0) / keys.length) * 10) / 10;
-        return { score, dims, notes: String(parsed.arc.notes || ''), cost: costOf(r) };
+        return { score, dims, notes: sc.flattenNotes(parsed.arc.notes), cost: costOf(r) };
       } catch (err) {
         log.warn(`⚠️ [ARC] judge ${judge} attempt ${attempt}/3 unusable: ${err.message}`);
       }

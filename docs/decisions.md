@@ -30251,3 +30251,111 @@ finding's wording changes. Not a `SETTLED.md` reversal.
 **Rationale:** one adapter in the existing shape, so the inventory parser, retries and fallback are shared and a model swap stays a one-key change if a candidate wins.
 **Touched:** server/lib/images.js, server/lib/evalPipeline.js, server/config/models.js.
 **Status:** ✅ active (staging)
+
+### The ARC judge is briefed with the ARC commission, not the beats commission (2026-09-07)
+**Context:** `sc.buildBriefContext()` builds the BRIEF the arc judge scores an arc against
+(`server/lib/testlab.js` `runArcRoundsStage`). It called `buildStoryShapeSection(d, pages)`
+with no options, so the judge received the full **beats-stage** shape block ("Challenges:
+exactly 3", "Page budget: opening 2, 3 major challenges at 3 pages each (9), 2 secondary
+moments…") while the arc creator received the lean arc variant (owner ruling 2026-08-31:
+"here a full page budget, this belongs to the beats. the arc should just make the story").
+It also never included `buildAgeModeSection()` (the `prompts/age-band-*.txt` file) or
+`buildArcBudgetSection()`. The judge was therefore grading against a commission the arc was
+never given — and the arc retell, which is driven verbatim by the judges' notes and lowest
+dims, then restructured arcs toward the superseded spec.
+**Evidence:** measured over seven arc configurations this session. Judges quoted the
+superseded budget verbatim ("an opening-heavy 18-beat list against the 2+9+4+2 budget"). A
+correct age-3 arc scored mean 4.7 with `change` 2/10 and `focus` 1/10. Worst case, config E
+(age 2, `quest` band, 18 pages): the band file says "No danger, no villain, nobody unkind,
+nothing lost for good", the draft obeyed it, the un-briefed judges scored `blockers` 1/2/5
+and `lost` 6/4/8 because the generic rubric demands them, and the retell wrote a theft, an
+anger beat, a deadline and a low point into a two-year-old's book. Gemini's own note stated
+the mismatch: "While the arc perfectly calibrates difficulty, entrances, and focus for a
+1-year-old, it fails standard structural dimensions by delaying the sole challenge until
+page 14 and omitting attempts, blockers, and character change."
+**Decision:** `buildBriefContext(d, { arc = false } = {})`. Opt-in: with `arc: true` it passes
+`{ arc: true }` to `buildStoryShapeSection` and appends `buildAgeModeSection(d)` and
+`buildArcBudgetSection(d, pages)`. The arc judge path (`testlab.js` `runArcRoundsStage`)
+passes it; the full-story scorecard path (`runStoryScorecardStage`) does not and is
+byte-identical to before. The existing lazy require + try/catch degradation is kept — a judge
+context must never throw.
+**Rationale:** a judge and a creator working from different commissions is not a strict
+rubric, it is a broken measurement: every deduction on a dimension the age band forbids is a
+false positive, and the retell turns those false positives into real damage to the book.
+Opt-in rather than a global change because the full-story scorecard grades finished beats,
+where the page-allocation block is the correct commission.
+**Effect (verified):** for the three simple bands (`routine`, `quest`, `tries`) the shape block
+was already band-specific — the change there is the added age-band file and `# BUDGETS`. For
+`fear-choice`, `journey` and `standard` (configs F, J, B, C) the "Challenges: exactly N /
+Page budget / secondary moments" lines are gone from the brief.
+**Measured after the fix (21 judge calls, $0.69, 2026-09-07; scratchpad `rejudge_*`):** panel
+means old → new — D 4.5→5.8, E 5.3→3.6, A 4.7→4.7, F 6.3→5.4, J 7.0→7.2, B 6.3→6.1, C 7.2→5.6.
+The scores did NOT simply rise for the simple bands: the corrected brief makes judges stricter,
+because it also hands them the age-band rules and the event budget, and they now catch real
+band violations. On E, gemini went 6.4→3.7 with band-anchored reasons that are all correct
+("the dog resolves the search, taking the discovery away from Levin"; "carrying the disguised
+object for 14 pages is a trick/puzzle, explicitly forbidden for a 2-year-old"; "Julian speaks on
+page 8 but his arrival is completely omitted") where before it praised the same arc and deducted
+on missing blockers instead. The literal old-spec quotes ("2+9+4+2", "exactly 3", "secondary
+moments") appear in zero new notes and appeared in four old ones. **Still open:** the rubric
+dims `attempts`, `lost`, `blockers` and `change` continue to be deducted on the simple bands
+even with the band file in the brief (E: blockers 1/1/5, change 1/1/2) — the brief tells the
+judge the band forbids them, but `prompts/story-arc-judge.txt` still asks for them, and one
+judge explicitly cited "the rubric explicitly penalises". Fixing that is a rubric/prompt change
+and needs the owner. What the brief fix DID buy is the retell: see below.
+**The retell no longer damages the book (config E, the decisive test):** re-running the arc
+retell on the corrected panel, the marmots stay friendly ("they show him a heap of shiny
+pebbles and not one scale"; they whistle at their burrow at the end) and the theft, the anger
+beat, the deadline and the low point the damaged retell had written in are all absent; Levin
+finds the scale himself out of his own basket. One place per page and the verbatim repeated
+call survive across all search pages.
+**Touched:** `server/lib/storyScorecard.js` (`buildBriefContext` options, `flattenNotes`),
+`server/lib/testlab.js` (arc judge call site, notes flattening).
+**Status:** ✅ active (staging, not pushed)
+
+## 2026-09-07 — The arc RULES OF THE TELLING are band-conditional, not one fixed block
+
+**Context:** Seven arc renders across ages 1/2/3/4/5/8 (this session) showed the arc prompt
+layer contradicting itself in four places. `# RULES OF THE TELLING` was byte-identical in
+`prompts/arc-create.txt` and `arc-retell.txt` for every band and demanded "near the end the
+goal looks lost before it is won", "each challenge... harder because the last was not clean",
+an unyielding blocker, and a rival thread — against `prompts/age-band-routine.txt` /
+`age-band-quest.txt`, which say "no danger, no villain, nobody unkind, nothing lost for good".
+The measured cost was already visible downstream: an age-2 arc that obeyed its own band was
+then scored against a rubric demanding a villain and a low point. Three further collisions in
+the same prompt: the `routine` STORY SHAPE said "N pages, N distinct events" while `# BUDGETS`
+said "at most 1 event"; the reader line was hardcoded to "a 3-5 year old" for every 1st-grade
+book including ages 1 and 2; and the invented-figure rule ("one line in the arc stating why
+the story cannot work without them") produced a justification written INSIDE a numbered story
+sentence — production text a child would hear. Separately, 4 of the 7 arcs split the cast onto
+separate paths, including the age-3 book whose own budget says "one thread" — the single most
+repeated structural fault across all bands.
+
+**Decision:** the block is emitted by `buildTellingRulesSection(inputData, { landmarks })` and
+interpolated as `{TELLING_RULES}`; the templates are not forked. For `SIMPLE_BANDS`
+(`routine`/`quest`/`tries`) the escalation/low-point line and the unyielding-blocker line are
+REPLACED by their simple-band equivalents (repetition shape; nothing stands in the way on
+purpose) rather than deleted, and the rival-thread line is dropped. A no-split line is added
+for every band except `standard` at the standard/advanced reading levels, where the STORY
+SHAPE legitimately allows a second thread. The `routine` shape line no longer says "events"
+(page-moments, not plot events — the event budget is unchanged). The reader-age phrase is
+derived from the band via `READER_AGE_BY_BAND` (routine → 1-2, quest → 2-3, rest → 3-5) and
+still appears only at 1st-grade. The invented-figure justification must sit on its own line
+before the numbered arc, enforced in `buildArcBudgetSection` and in both CRITIQUE sentences.
+
+**Rationale:** a prompt that demands what another section of the same prompt forbids is one
+tweak away from the model resolving it the wrong way; both test runs happened to resolve it
+correctly, which is luck, not a guarantee. Replacing rather than deleting keeps a shape for
+the simple bands — a board book still needs one, just not escalation. Band-conditional text is
+computed in code and interpolated so the two templates never diverge.
+
+**Effect (verified, rendered matrix ages 1/2/3/4/5/8 x 1st-grade + age 8 standard/advanced):**
+ages 1-3 get the repetition/friendly-obstacle lines and no rival thread; ages 4+ keep the
+originals; the reader phrase tracks the band; no STORY SHAPE/BUDGETS event contradiction at any
+age; the emitted rules block at age 8 standard and advanced is byte-identical to before except
+the no-split line, which is correctly absent there.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildTellingRulesSection`, `READER_AGE_BY_BAND`,
+`buildArcBudgetSection`, `buildStoryShapeSection` routine branch, both arc prompt builders,
+exports), `prompts/arc-create.txt`, `prompts/arc-retell.txt`.
+**Status:** ✅ active (staging, not pushed)
