@@ -2050,8 +2050,14 @@ function buildCoverPrompt(coverType, {
 }
 
 // The painted-title instruction of a baked cover.
+// The margin clause is trim insurance: pdf.js adds a 3mm bleed per side for
+// Gelato and the printer cuts it away (~2% of an 864px-wide cover raster).
+// Two staging trials painted ink to x=863 and x=861 of 864 and lost their
+// final letter on the physical book (job_1788763045123_z8so79ngb,
+// job_1788802404497_i1mm4yn6h) — the margin is stated as a FRACTION because
+// the raster size varies by book format.
 function bakedTitleLine(title) {
-  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`;
+  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area. Every letter, accent and descender stays at least 8% of the canvas width clear of the left and right edges. A long title breaks onto more lines rather than reaching that margin.`;
 }
 
 function buildReferenceCardColours(chars, referencePhotos) {
@@ -4775,7 +4781,11 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
         ? 'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.'
         : 'No traits are recorded for them, so the pages come from what every small child is: hungry, sleepy, curious, delighted, grumpy.',
       alongside,
-      `Page budget: ${pages} pages, ${pages} distinct events. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
+      // Deliberately not phrased as "events": the event budget in # BUDGETS
+      // prices PLOT events (at most 1 for this band), while these are
+      // page-moments. Calling both "events" put two contradicting numbers in
+      // the same prompt (measured 2026-09-07, age-1 arc render).
+      `Page budget: ${pages} pages, a different moment on each. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
     ].filter(Boolean).join('\n');
   }
 
@@ -5334,6 +5344,18 @@ const ACTION_SHAPE_STANDARD = {
   advanced: 'three to four',
 };
 
+// Who the 1st-grade book is read aloud to. Derived from the band, not
+// hardcoded: the line said "3-5 year old" for every 1st-grade book, including
+// the age-1 and age-2 bands (measured 2026-09-07).
+const READER_AGE_BY_BAND = {
+  routine: 'a 1-2 year old',
+  quest: 'a 2-3 year old',
+  tries: 'a 3-5 year old',
+  'fear-choice': 'a 3-5 year old',
+  journey: 'a 3-5 year old',
+  standard: 'a 3-5 year old',
+};
+
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
@@ -5370,8 +5392,64 @@ function buildArcBudgetSection(inputData, pageCount) {
     `- This book carries at most ${events}${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
     ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
     actionsLine,
-    ...(lvl === '1st-grade' ? ['- This book is read aloud to a 3-5 year old and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.'] : []),
-    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast — enough for the story's opposition and its help; each one past that carries one line in the arc stating why the story cannot work without them.`,
+    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${READER_AGE_BY_BAND[band] || READER_AGE_BY_BAND.standard} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
+    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast — enough for the story's opposition and its help; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
+  ].join('\n');
+}
+
+/**
+ * # RULES OF THE TELLING for the arc prompts ({TELLING_RULES} in arc-create and
+ * arc-retell). Interpolated rather than baked into the templates because four
+ * of its lines demanded exactly what the simple bands forbid: escalation, a
+ * low point near the end, an unyielding blocker and a rival thread, against
+ * age-band files that say "no danger, no villain, nobody unkind, nothing lost
+ * for good" (measured 2026-09-07 across seven arc runs). The simple bands get
+ * the repetition shape instead — a simple book still has a shape.
+ *
+ * `landmarks` adds the create-only landmark line; that is the sole difference
+ * between the two templates' blocks.
+ */
+function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
+  const band = resolveAgeBand(inputData);
+  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
+  const simple = SIMPLE_BANDS.has(band);
+  // A second thread is legitimate only at the standard band on the older
+  // reading levels, where the STORY SHAPE explicitly allows one. Four of seven
+  // measured arcs split the cast, including a band whose own budget says
+  // "one thread".
+  const noSplit = band !== 'standard' || lvl === '1st-grade';
+  return [
+    '# RULES OF THE TELLING',
+    '- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.',
+    '- Every sentence follows from the one before — therefore, or but. Never "and then".',
+    '- Name what the main figures feel at each turn, as plain fact — a feeling stated is part of the story.',
+    '- Each character\'s nature causes a problem or solves one.',
+    '- The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves. Early on, a character says aloud what must happen and why.',
+    simple
+      ? '- The shape is repetition, not escalation: the same want, the same call, the same kind of try, page after page, until the last one works. Nothing gets worse, nothing is lost for good, and the goal never looks lost.'
+      : '- Each challenge is met at a cost, each harder because the last was not clean; near the end the goal looks lost before it is won. No obstacle is removed in the moment that introduces it; passing one costs something named — time, a possession, a plan, help asked for.',
+    '- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes an obstacle; adults may comfort, permit or watch.',
+    '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
+    '- Serve character coverage by giving several characters deeds inside the same event — never by opening a new event per character.',
+    simple
+      ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
+      : '- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request.',
+    '- Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.',
+    '- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.',
+    ...(simple ? [] : ['- A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.']),
+    '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
+    '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
+    '- The ending is the page the child remembers: one emotion or one image that stays — never bookkeeping, never a stated moral. Settle debts and props before the final page; the last page belongs to the feeling.',
+    '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
+    '- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows. The group stays together unless it has a reason to separate and a reason to meet again.',
+    ...(noSplit ? ['- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'] : []),
+    '- Characters enter in ones or twos — never more than three at once — and each gets one line of their own on first appearance, doing or saying something only they would.',
+    '- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.',
+    '- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.',
+    '- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.',
+    '- When the deadline is a time of day, the story starts at an hour the book\'s length can cross to reach it.',
+    '- The commission\'s central figure acts in every third of the story — chooses, moves, speaks, changes something; never reduced to cargo another figure carries.',
+    ...(landmarks ? ['- Landmarks join the story only where they belong to the world the commission names — at most on the opening page before the adventure leaves home, or not at all; a story set elsewhere uses none, renamed or otherwise; never relocate the story to reach one.'] : []),
   ].join('\n');
 }
 
@@ -5389,6 +5467,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     AGE_MODE: buildAgeModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
+    TELLING_RULES: buildTellingRulesSection(inputData, { landmarks: true }),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -5423,6 +5502,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
     AGE_MODE: buildAgeModeSection(inputData),
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
+    TELLING_RULES: buildTellingRulesSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -6930,6 +7010,7 @@ module.exports = {
   buildArcRetellPrompt,
   buildArcHintsPrompt,
   buildArcBudgetSection,
+  buildTellingRulesSection,
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
