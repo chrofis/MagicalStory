@@ -30359,3 +30359,45 @@ the no-split line, which is correctly absent there.
 `buildArcBudgetSection`, `buildStoryShapeSection` routine branch, both arc prompt builders,
 exports), `prompts/arc-create.txt`, `prompts/arc-retell.txt`.
 **Status:** ✅ active (staging, not pushed)
+
+## 2026-09-07 — The arc-judge rubric is age-band aware
+
+**Context:** three of the 14 arc dimensions demand exactly what the simple age bands forbid.
+`lost` wants "a point before the end where the goal looks finished"; `attempts` wants challenges
+"in rising order; each fails or costs for a different reason and leaves the cast worse off";
+`blockers` wants "whoever stands in the way wants something of their own". `age-band-quest.txt`
+and `age-band-routine.txt` say the opposite — "No danger, no villain, nobody unkind, nothing lost
+for good" — and `age-band-tries.txt` is the third member of `SIMPLE_BANDS`. Since `c903b6473`
+`buildBriefContext(d, { arc: true })` hands the judge the age-band file and the `# BUDGETS`
+block, so the judge can SEE the band; it deducted anyway, because the rubric still demanded the
+forbidden thing. Measured on the re-judge run, config E (age 2, `quest`): `blockers` 1/1/5,
+`change` 1/1/2, `attempts` 2/2/4. `claude-sonnet` named the conflict outright — *"this is the
+same failure repeated 14 times, which the rubric explicitly penalises."* `gemini-3.1-pro`
+partially self-corrected — *"blockers: 5 — appropriately follows the Age 2 rule of friendly
+encounters without real blockers"* — proving the judge WILL adapt when it reasons about the
+band, but nothing in the rubric told it to. Consequence: a correctly-executed toddler book
+cannot score above roughly 5/10, and those scores feed the repair as panel input.
+
+**Decision:** the rubric now states that the BRIEF's age-band section, where present, governs
+which dimensions apply, and that a dimension the band forbids is scored on whether the arc does
+the RIGHT thing for that band rather than deducted for the absence of the forbidden thing. Four
+dimensions are named with what they measure instead: `attempts` → whether the repetition holds
+its shape (same move, band's count, a new place/thing/way each turn; escalation not wanted);
+`lost` → whether the book correctly stays clear of a low point; `blockers` → whether what holds
+the character up is a thing, a size, a place or the weather rather than someone unwilling;
+`change` → where the band gives no arc, whether the character stays recognisably themselves and
+the book closes as the band says. The anchor paragraph's deduction list is scoped the same way.
+Where the BRIEF carries no age-band section the whole rubric applies unchanged and hard — an
+age 5 `journey` book, and anything at 6+, is judged exactly as before. The strict-JSON contract
+is untouched: all 14 keys, same order, every one still a 1-10 integer; no nulls, no N/A, no
+variable key set, because `ARC_RUBRIC` validation in `testlab.js:7345` requires all 14 finite
+and in range and treats a missing key as an unusable draw.
+
+**Rationale:** this completes the `c903b6473` fix. That change let the judge SEE the band; this
+one tells it what to DO with it. Fixing it in the rubric rather than in code keeps the
+classification in the prompt where it belongs, and keeps a single scale — redefining what a
+dimension measures for a band preserves the 1-10 contract, whereas exempting a dimension would
+break the fixed key set the panel averages over.
+
+**Touched:** `prompts/story-arc-judge.txt`.
+**Status:** ✅ active (staging, not pushed)
