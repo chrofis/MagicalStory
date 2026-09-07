@@ -5266,11 +5266,21 @@ function arcLengthRange(pageCount) {
 
 /**
  * Concrete budgets for the arc prompts ({ARC_BUDGETS} in arc-create and
- * arc-retell). Event budget scales with reading level: pages/3 at 1st-grade
- * (one obstacle chain), pages/2 at standard, pages/1.5 at advanced, floor 3.
- * Invented-named-figure allowance from commissioned cast size + page count:
- * round(pages/8) - floor(cast/2), clamped 0..3 (owner anchors, 2026-09-05:
- * 1 character/20 pages → 3; 5 characters/10 pages → 0).
+ * arc-retell).
+ *
+ * EVENT budget (2026-09-07, supersedes the 2026-09-05 reading-level-only
+ * arithmetic): plot complexity is keyed on the AGE BAND, and only gently on
+ * page count. Two independent knobs — the band says how hard the story is
+ * allowed to be, page count and reading level say how long it is. Extra pages
+ * buy INSTANCES (another place searched, another try), not proportionally more
+ * plot. Owner anchors: a simple 3-year-old story carries 1 event at 5 pages and
+ * 3-4 at 20. The slope steepens with age. Emitted as a RANGE so the arc may use
+ * fewer. Floor 1 — the old `Math.max(3, ...)` forced three events into a
+ * five-page toddler book. At 6+ no band applies, so the reading level stands in
+ * as the maturity proxy.
+ *
+ * Invented-named-figure allowance: flat per band minus half the commissioned
+ * cast, clamped 0..3. Page count no longer buys invented figures at all.
  *
  * ACTION budget (2026-09-07): an event may hold any number of actions, but
  * words are spent per ACTION, so the event budget alone does not bound page
@@ -5280,19 +5290,59 @@ function arcLengthRange(pageCount) {
  * yet carried 66 action clauses (3.0/page) and overran the 25-50 word band on
  * 13 of 18 pages.
  */
+// Event divisors per band: [lo, hi] pages-per-event. A flat number means the
+// band carries that many events whatever the page count.
+const EVENT_BUDGETS = {
+  routine: { flat: 1 },
+  quest: { flat: 1 },
+  tries: { lo: 7, hi: 5 },
+  'fear-choice': { lo: 6, hi: 4 },
+  journey: { lo: 5, hi: 4 },
+};
+// At 6+ no band applies — the reading level is the maturity proxy.
+const EVENT_BUDGETS_STANDARD = {
+  '1st-grade': { lo: 4, hi: 3 },
+  standard: { lo: 3, hi: 2 },
+  advanced: { lo: 2, hi: 1.5 },
+};
+// Invented named figures the band tolerates before the cast deduction.
+const INVENTED_FIGURE_BASE = {
+  routine: 0,
+  quest: 0,
+  tries: 1,
+  'fear-choice': 1,
+  journey: 2,
+  standard: 3,
+};
+
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
-  const divisor = lvl === '1st-grade' ? 3 : lvl === 'advanced' ? 1.5 : 2;
-  const events = Math.max(3, Math.round(pages / divisor));
+  const band = resolveAgeBand(inputData);
+  const rule = EVENT_BUDGETS[band]
+    || EVENT_BUDGETS_STANDARD[lvl]
+    || EVENT_BUDGETS_STANDARD.standard;
+  let lo;
+  let hi;
+  if (rule.flat) {
+    lo = rule.flat;
+    hi = rule.flat;
+  } else {
+    lo = Math.max(1, Math.round(pages / rule.lo));
+    hi = Math.max(1, Math.round(pages / rule.hi));
+  }
+  hi = Math.max(lo, hi);
+  const events = lo === hi ? `${lo} event${lo === 1 ? '' : 's'}` : `${lo}-${hi} events`;
   const cast = (inputData?.characters || []).length || 1;
-  const allowance = Math.max(0, Math.min(3, Math.round(pages / 8) - Math.floor(cast / 2)));
+  const base = INVENTED_FIGURE_BASE[band] ?? INVENTED_FIGURE_BASE.standard;
+  const allowance = Math.max(0, Math.min(3, base - Math.floor(cast / 2)));
   const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
   const [aMin, aMax] = lvl === '1st-grade' ? [1, 2] : lvl === 'advanced' ? [5, 8] : [2, 4];
   const actions = pages * aMax;
   return [
     '# BUDGETS',
-    `- This book carries at most ${events} events${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
+    `- This book carries at most ${events}${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
+    ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
     `- This book carries at most ${actions} actions, ${aMin}-${aMax} to a page. An action is one thing a character does that changes something — a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`,
     ...(lvl === '1st-grade' ? ['- This book is read aloud to a 3-5 year old and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.'] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line in the arc stating why the story cannot work without them.`,
