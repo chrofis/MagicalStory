@@ -383,12 +383,13 @@ export default function MyStories() {
 
         // Initial honest message: payment received, processing.
         const processingTitles = {
-          en: 'Payment received', de: 'Zahlung erhalten', fr: 'Paiement reçu',
+          en: 'Payment received', de: 'Zahlung erhalten', fr: 'Paiement reçu', it: 'Pagamento ricevuto',
         };
         const processingMessages = {
           en: 'We received your payment and are processing your book order. You will get an email confirmation as soon as it is sent to print.',
           de: 'Wir haben Ihre Zahlung erhalten und bearbeiten Ihre Buchbestellung. Sobald sie in den Druck geht, erhalten Sie eine Bestätigung per E-Mail.',
           fr: 'Nous avons reçu votre paiement et traitons votre commande de livre. Vous recevrez un e-mail de confirmation dès qu’elle sera envoyée à l’impression.',
+          it: 'Abbiamo ricevuto il tuo pagamento e stiamo elaborando il tuo ordine del libro. Riceverai una conferma via e-mail non appena sarà inviato in stampa.',
         };
         showInfo(
           processingMessages[language as keyof typeof processingMessages] || processingMessages.en,
@@ -433,11 +434,13 @@ export default function MyStories() {
             en: 'Order could not be placed',
             de: 'Bestellung konnte nicht aufgegeben werden',
             fr: 'La commande n’a pas pu être passée',
+            it: 'Impossibile effettuare l’ordine',
           };
           const failedMessages = {
             en: 'Your payment went through but we could not finalize the print order. Our team has been alerted and will refund or retry on your behalf — you will receive an email shortly. If you do not hear from us within a day, reply to your payment receipt.',
             de: 'Ihre Zahlung ging durch, aber wir konnten den Druckauftrag nicht abschliessen. Unser Team wurde benachrichtigt und wird Ihnen das Geld zurückerstatten oder es erneut versuchen — Sie erhalten in Kürze eine E-Mail. Falls Sie innerhalb eines Tages nichts von uns hören, antworten Sie bitte auf Ihre Zahlungsquittung.',
             fr: 'Votre paiement a abouti mais nous n’avons pas pu finaliser la commande d’impression. Notre équipe a été alertée et procédera à un remboursement ou réessayera — vous recevrez un e-mail sous peu. Si vous n’avez pas de nouvelles dans la journée, répondez à votre reçu de paiement.',
+            it: 'Il tuo pagamento è andato a buon fine ma non siamo riusciti a finalizzare l’ordine di stampa. Il nostro team è stato avvisato e ti rimborserà o riproverà per tuo conto — riceverai un’e-mail a breve. Se non hai nostre notizie entro un giorno, rispondi alla ricevuta del pagamento.',
           };
           showError(
             failedMessages[language as keyof typeof failedMessages] || failedMessages.en,
@@ -450,7 +453,7 @@ export default function MyStories() {
           const amount = `CHF ${(finalData.order.amount_total / 100).toFixed(2)}`;
           const tokensCredited = finalData.order.tokens_credited || 0;
           const titles = {
-            en: 'Order confirmed!', de: 'Bestellung bestätigt!', fr: 'Commande confirmée!',
+            en: 'Order confirmed!', de: 'Bestellung bestätigt!', fr: 'Commande confirmée!', it: 'Ordine confermato!',
           };
           const messages = {
             en: tokensCredited > 0
@@ -462,6 +465,9 @@ export default function MyStories() {
             fr: tokensCredited > 0
               ? `Votre livre a été envoyé à l’impression. Vous avez gagné ${tokensCredited} jetons!`
               : 'Votre livre a été envoyé à l’impression.',
+            it: tokensCredited > 0
+              ? `Il tuo libro è stato inviato in stampa. Hai guadagnato ${tokensCredited} token!`
+              : 'Il tuo libro è stato inviato in stampa.',
           };
           const details = [
             `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : language === 'it' ? 'Cliente' : 'Customer'}: ${finalData.order.customer_name}`,
@@ -485,6 +491,7 @@ export default function MyStories() {
           en: 'Payment was cancelled. You can try again when ready.',
           de: 'Zahlung wurde abgebrochen. Sie können es erneut versuchen.',
           fr: 'Paiement annulé. Vous pouvez réessayer quand vous êtes prêt.',
+          it: 'Il pagamento è stato annullato. Puoi riprovare quando sei pronto.',
         };
         showInfo(
           messages[language as keyof typeof messages] || messages.en,

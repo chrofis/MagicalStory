@@ -21,6 +21,8 @@ export function WizardStep5ArtStyle({
     ? 'Kunststil'
     : language === 'fr'
     ? 'Style artistique'
+    : language === 'it'
+    ? 'Stile artistico'
     : 'Art Style';
 
   return (

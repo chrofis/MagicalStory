@@ -75,12 +75,12 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
   const [colorSel, setColorSel] = useState<string>(currentStyle?.color || 'auto');
   const [alignSel, setAlignSel] = useState<string>(currentStyle?.align || 'auto');
 
-  const t = (de: string, fr: string, en: string) => (language === 'de' ? de : language === 'fr' ? fr : en);
+  const t = (de: string, fr: string, en: string, it: string = en) => (language === 'de' ? de : language === 'fr' ? fr : language === 'it' ? it : en);
   const LAYOUTS: Array<{ id: string; label: string }> = [
-    { id: 'arch', label: t('Bogen', 'Arche', 'Arch') },
-    { id: 'archdown', label: t('Bogen unten', 'Arche inversée', 'Arch down') },
-    { id: 'tilt', label: t('Geneigt', 'Incliné', 'Tilted') },
-    { id: 'straight', label: t('Gerade', 'Droit', 'Straight') },
+    { id: 'arch', label: t('Bogen', 'Arche', 'Arch', 'Arco') },
+    { id: 'archdown', label: t('Bogen unten', 'Arche inversée', 'Arch down', 'Arco rovesciato') },
+    { id: 'tilt', label: t('Geneigt', 'Incliné', 'Tilted', 'Inclinato') },
+    { id: 'straight', label: t('Gerade', 'Droit', 'Straight', 'Dritto') },
   ];
 
   const buildStyle = (): CoverTextStyle | null => {
@@ -99,7 +99,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
       await onApply(style);
       if (style === null) { setFontSel('auto'); setLayoutSel('auto'); setColorSel('auto'); setAlignSel('auto'); }
     } catch (e: any) {
-      setError(e?.message || t('Fehler beim Anwenden', "Échec de l'application", 'Failed to apply'));
+      setError(e?.message || t('Fehler beim Anwenden', "Échec de l'application", 'Failed to apply', "Impossibile applicare"));
     } finally {
       setBusy(false);
     }
@@ -114,8 +114,8 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
       >
         <Palette size={14} />
         {kind === 'front'
-          ? t('Titel-Design', 'Style du titre', 'Title style')
-          : t('Widmungs-Design', 'Style de la dédicace', 'Dedication style')}
+          ? t('Titel-Design', 'Style du titre', 'Title style', 'Stile del titolo')
+          : t('Widmungs-Design', 'Style de la dédicace', 'Dedication style', 'Stile della dedica')}
       </button>
 
       {open && (
@@ -123,7 +123,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
           {/* Font */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
-              {t('Schriftart', 'Police', 'Font')}
+              {t('Schriftart', 'Police', 'Font', 'Carattere')}
             </label>
             {(() => {
               const sample = (previewText || '').trim().split(/\s+/).filter(Boolean).slice(0, 10).join(' ');
@@ -134,7 +134,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
                     onClick={() => setFontSel('auto')}
                     className={`w-full text-left px-3 py-2 text-sm ${fontSel === 'auto' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
                   >
-                    {t('Automatisch', 'Automatique', 'Automatic')}
+                    {t('Automatisch', 'Automatique', 'Automatic', 'Automatico')}
                   </button>
                   {fonts.map(f => (
                     <button
@@ -165,14 +165,14 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
           {kind === 'front' && (
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                {t('Effekt', 'Effet', 'Effect')}
+                {t('Effekt', 'Effet', 'Effect', 'Effetto')}
               </label>
               <select
                 value={layoutSel}
                 onChange={e => setLayoutSel(e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"
               >
-                <option value="auto">{t('Automatisch', 'Automatique', 'Automatic')}</option>
+                <option value="auto">{t('Automatisch', 'Automatique', 'Automatic', 'Automatico')}</option>
                 {LAYOUTS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
             </div>
@@ -183,17 +183,17 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
           {kind === 'dedication' && (
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                {t('Position', 'Position', 'Position')}
+                {t('Position', 'Position', 'Position', 'Posizione')}
               </label>
               <select
                 value={alignSel}
                 onChange={e => setAlignSel(e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"
               >
-                <option value="auto">{t('Automatisch', 'Automatique', 'Automatic')}</option>
-                <option value="left">{t('Links', 'À gauche', 'Left')}</option>
-                <option value="center">{t('Mitte', 'Centré', 'Center')}</option>
-                <option value="right">{t('Rechts', 'À droite', 'Right')}</option>
+                <option value="auto">{t('Automatisch', 'Automatique', 'Automatic', 'Automatico')}</option>
+                <option value="left">{t('Links', 'À gauche', 'Left', 'Sinistra')}</option>
+                <option value="center">{t('Mitte', 'Centré', 'Center', 'Centro')}</option>
+                <option value="right">{t('Rechts', 'À droite', 'Right', 'Destra')}</option>
               </select>
             </div>
           )}
@@ -201,14 +201,14 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
           {/* Colour */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
-              {t('Farbe', 'Couleur', 'Colour')}
+              {t('Farbe', 'Couleur', 'Colour', 'Colore')}
             </label>
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => setColorSel('auto')}
                 className={`px-2 py-1 rounded-md text-xs font-medium border ${colorSel === 'auto' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-300 text-gray-600 hover:border-indigo-300'}`}
               >
-                {t('Auto', 'Auto', 'Auto')}
+                {t('Auto', 'Auto', 'Auto', 'Auto')}
               </button>
               {SWATCHES.map(hex => (
                 <button
@@ -224,7 +224,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
                 value={colorSel !== 'auto' ? colorSel : '#e63946'}
                 onChange={e => setColorSel(e.target.value)}
                 className="w-9 h-8 p-0.5 border border-gray-300 rounded cursor-pointer"
-                title={t('Eigene Farbe', 'Couleur personnalisée', 'Custom colour')}
+                title={t('Eigene Farbe', 'Couleur personnalisée', 'Custom colour', 'Colore personalizzato')}
               />
             </div>
           </div>
@@ -238,16 +238,16 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
               className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Palette size={14} />}
-              {t('Anwenden', 'Appliquer', 'Apply')}
+              {t('Anwenden', 'Appliquer', 'Apply', 'Applica')}
             </button>
             <button
               onClick={() => apply(null)}
               disabled={busy}
               className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-50"
-              title={t('Zurück zu Automatisch', 'Retour à automatique', 'Back to automatic')}
+              title={t('Zurück zu Automatisch', 'Retour à automatique', 'Back to automatic', 'Torna ad automatico')}
             >
               <RotateCcw size={13} />
-              {t('Auto', 'Auto', 'Auto')}
+              {t('Auto', 'Auto', 'Auto', 'Auto')}
             </button>
           </div>
         </div>

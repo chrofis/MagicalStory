@@ -101,7 +101,9 @@ const strings: Record<string, {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender }: Props) {
-  const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : storyInput.language === 'it' ? 'it' : 'en') as Language;
+  // Match on the BASE language so regional codes ('de-ch', 'fr-ch', 'it-ch') resolve too.
+  const langBase = (storyInput.language || '').toLowerCase().split('-')[0];
+  const lang = (langBase === 'de' ? 'de' : langBase === 'fr' ? 'fr' : langBase === 'it' ? 'it' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
   const avatarBanner = characterName ? (

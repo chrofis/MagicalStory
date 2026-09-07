@@ -139,7 +139,9 @@ export default function TrialIdeasStep({
   userLocation,
   onLocationChange,
 }: Props) {
-  const lang = storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en';
+  // Match on the BASE language so regional codes ('de-ch', 'fr-ch', 'it-ch') resolve too.
+  const base = (storyInput.language || '').toLowerCase().split('-')[0];
+  const lang = base === 'de' ? 'de' : base === 'fr' ? 'fr' : base === 'it' ? 'it' : 'en';
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
   const [streamingIdeas, setStreamingIdeas] = useState<StreamingIdea[]>([

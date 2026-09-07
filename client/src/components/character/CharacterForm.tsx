@@ -2662,11 +2662,15 @@ export function CharacterForm({
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6">
             <h3 className="text-xl font-bold text-gray-800 mb-2">
-              {language === 'de' ? 'Wähle deinen Avatar' : 'Choose Your Avatar'}
+              {language === 'de' ? 'Wähle deinen Avatar' : language === 'fr' ? 'Choisis ton avatar' : language === 'it' ? 'Scegli il tuo avatar' : 'Choose Your Avatar'}
             </h3>
             <p className="text-gray-600 mb-4 text-sm">
               {language === 'de'
                 ? 'Klicke auf das Bild, das dir am besten gefällt'
+                : language === 'fr'
+                ? 'Clique sur l\'image que tu préfères'
+                : language === 'it'
+                ? 'Clicca sull\'immagine che preferisci'
                 : 'Click on the image you like best'}
             </p>
 
@@ -2702,7 +2706,7 @@ export function CharacterForm({
                 disabled={selectedOptionId === null}
                 className="flex-1 px-4 py-3 bg-indigo-500 text-white rounded-xl font-semibold hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {language === 'de' ? 'Auswahl verwenden' : 'Use Selected'}
+                {language === 'de' ? 'Auswahl verwenden' : language === 'fr' ? 'Utiliser la sélection' : language === 'it' ? 'Usa la selezione' : 'Use Selected'}
               </button>
               <button
                 onClick={() => {

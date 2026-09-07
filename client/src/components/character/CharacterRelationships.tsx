@@ -165,7 +165,7 @@ export function CharacterRelationships({
                     }`}
                   >
                     <option value="__CREATE_CUSTOM__">
-                      + {lang === 'de' ? 'Eigene' : lang === 'fr' ? 'Personnalisé' : 'Custom'}
+                      + {lang === 'de' ? 'Eigene' : lang === 'fr' ? 'Personnalisé' : lang === 'it' ? 'Personalizzato' : 'Custom'}
                     </option>
                     {allRelationshipTypes.map((type, idx) => (
                       <option key={idx} value={type.value[lang] || type.value.en}>

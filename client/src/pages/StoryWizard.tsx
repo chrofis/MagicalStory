@@ -120,6 +120,13 @@ const wizardHelperTexts: Record<string, Record<number, string>> = {
     4: "Choisissez un style d'illustration pour votre livre",
     5: "Vérifiez vos choix, ajoutez des détails de l'intrigue, puis générez votre histoire!",
   },
+  it: {
+    1: "Aggiungi le foto dei tuoi personaggi - appariranno in modo coerente in tutta la tua storia!",
+    2: "Imposta la lunghezza del libro e il livello di lettura per il tuo pubblico",
+    3: "Scegli un tipo di storia e un tema",
+    4: "Scegli uno stile illustrativo per il tuo libro",
+    5: "Rivedi le tue scelte, aggiungi dettagli alla trama, poi genera la tua storia!",
+  },
 };
 
 export default function StoryWizard() {
@@ -1476,11 +1483,13 @@ export default function StoryWizard() {
               en: 'Payment Successful!',
               de: 'Zahlung erfolgreich!',
               fr: 'Paiement réussi!',
+              it: 'Pagamento riuscito!',
             };
             const messages = {
               en: 'Your book order has been received and will be printed soon.',
               de: 'Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
               fr: 'Votre commande de livre a été reçue et sera bientôt imprimée.',
+              it: 'Il tuo ordine del libro è stato ricevuto e sarà presto stampato.',
             };
             const details = [
               `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : language === 'it' ? 'Cliente' : 'Customer'}: ${data.order.customer_name}`,
@@ -1512,6 +1521,7 @@ export default function StoryWizard() {
           en: 'Payment was cancelled. You can try again when ready.',
           de: 'Zahlung wurde abgebrochen. Sie können es erneut versuchen.',
           fr: 'Paiement annulé. Vous pouvez réessayer quand vous êtes prêt.',
+          it: 'Il pagamento è stato annullato. Puoi riprovare quando sei pronto.',
         };
         showInfo(
           messages[language as keyof typeof messages] || messages.en,
@@ -1534,6 +1544,7 @@ export default function StoryWizard() {
           en: 'Credits Added!',
           de: 'Credits hinzugefuegt!',
           fr: 'Credits ajoutes!',
+          it: 'Crediti aggiunti!',
         };
         // No pack size here — the checkout return carries no package info, and every
         // pack (150/350/750/2000) landed on a hardcoded "100 credits" before. The
@@ -1542,6 +1553,7 @@ export default function StoryWizard() {
           en: 'Your credits have been added to your account.',
           de: 'Deine Credits wurden deinem Konto gutgeschrieben.',
           fr: 'Vos credits ont ete ajoutes a votre compte.',
+          it: 'I tuoi crediti sono stati accreditati sul tuo conto.',
         };
         showSuccess(
           messages[language as keyof typeof messages] || messages.en,
@@ -1559,6 +1571,7 @@ export default function StoryWizard() {
           en: 'Credits purchase was cancelled.',
           de: 'Kreditkauf wurde abgebrochen.',
           fr: 'L\'achat de credits a ete annule.',
+          it: "L'acquisto di crediti è stato annullato.",
         };
         showInfo(
           messages[language as keyof typeof messages] || messages.en,
@@ -2397,6 +2410,10 @@ export default function StoryWizard() {
         if (!cooldown.canRegenerate) {
           const waitMsg = language === 'de'
             ? `Bitte warten Sie ${cooldown.waitSeconds} Sekunden, bevor Sie ein neues Foto hochladen.`
+            : language === 'fr'
+            ? `Veuillez attendre ${cooldown.waitSeconds} secondes avant de télécharger une nouvelle photo.`
+            : language === 'it'
+            ? `Attendi ${cooldown.waitSeconds} secondi prima di caricare una nuova foto.`
             : `Please wait ${cooldown.waitSeconds} seconds before uploading a new photo.`;
           showError(waitMsg);
           return;
@@ -3225,7 +3242,7 @@ export default function StoryWizard() {
         });
 
         log.success(`💾 Character saved with new avatars, traits, and clothing`);
-        showSuccess(language === 'de' ? 'Charakter gespeichert und Avatar regeneriert' : 'Character saved and avatar regenerated');
+        showSuccess(language === 'de' ? 'Charakter gespeichert und Avatar regeneriert' : language === 'fr' ? 'Personnage enregistré et avatar régénéré' : language === 'it' ? 'Personaggio salvato e avatar rigenerato' : 'Character saved and avatar regenerated');
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);
         showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
@@ -3511,12 +3528,20 @@ export default function StoryWizard() {
         log.error('Failed to delete character:', result.error);
         showError(language === 'de'
           ? 'Charakter konnte nicht gelöscht werden'
+          : language === 'fr'
+          ? 'Échec de la suppression du personnage'
+          : language === 'it'
+          ? 'Impossibile eliminare il personaggio'
           : 'Failed to delete character');
       }
     } catch (error) {
       log.error('Failed to delete character:', error);
       showError(language === 'de'
         ? 'Charakter konnte nicht gelöscht werden'
+        : language === 'fr'
+        ? 'Échec de la suppression du personnage'
+        : language === 'it'
+        ? 'Impossibile eliminare il personaggio'
         : 'Failed to delete character');
     }
   };

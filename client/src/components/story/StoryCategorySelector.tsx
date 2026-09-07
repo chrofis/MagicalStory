@@ -943,7 +943,7 @@ export function StoryCategorySelector({
                           >
                             <span className="text-sm font-medium text-gray-700">
                               {cantonName}
-                              <span className="text-xs text-gray-400 ml-2">({cities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : 'cities'})</span>
+                              <span className="text-xs text-gray-400 ml-2">({cities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : lang === 'it' ? 'città' : 'cities'})</span>
                             </span>
                             {isCantonExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>

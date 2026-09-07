@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import { wordDiff, diffStats } from '@/utils/wordDiff';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection, ReviewDiffReport } from '@/types/story';
-import type { LanguageLevel } from '@/types/story';
+import type { LanguageLevel, UILanguage } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
 import { CoverTextStylePanel } from './story/CoverTextStylePanel';
@@ -439,9 +439,14 @@ export function StoryDisplay({
   const { t, language } = useLanguage();
 
   // Use story language for in-story labels (Page/Seite), fallback to UI language
-  // Normalize de-ch/de-de to 'de' for label matching
-  const storyLang = storyLanguage
-    ? (storyLanguage.startsWith('de') ? 'de' : storyLanguage as 'en' | 'fr')
+  // Normalize regional codes to their base language for label matching:
+  // 'de-ch' → 'de', 'fr-ch' → 'fr', 'it-ch' → 'it', 'en-gb' → 'en'.
+  // Anything else (e.g. the gsw-* dialects) falls back to English, as before.
+  const storyLang: UILanguage = storyLanguage
+    ? (() => {
+        const base = storyLanguage.toLowerCase().split('-')[0];
+        return base === 'de' || base === 'fr' || base === 'it' ? base : 'en';
+      })()
     : language;
 
   // Check if user has enough credits (-1 means infinite/unlimited, impersonating admins also bypass)

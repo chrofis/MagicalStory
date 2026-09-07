@@ -21,11 +21,11 @@ interface WizardStep4Props {
 }
 
 const categoryLabels: Record<string, Record<string, string>> = {
-  'adventure': { en: 'Adventure', de: 'Abenteuer', fr: 'Aventure' },
-  'life-challenge': { en: 'Life Challenge', de: 'Lebensthema', fr: 'Défi de vie' },
-  'educational': { en: 'Educational', de: 'Lerngeschichte', fr: 'Éducatif' },
-  'historical': { en: 'History', de: 'Geschichte', fr: 'Histoire' },
-  'swiss-stories': { en: 'Swiss Stories', de: 'Schweizer Geschichten', fr: 'Histoires Suisses' },
+  'adventure': { en: 'Adventure', de: 'Abenteuer', fr: 'Aventure', it: 'Avventura' },
+  'life-challenge': { en: 'Life Challenge', de: 'Lebensthema', fr: 'Défi de vie', it: 'Tema di vita' },
+  'educational': { en: 'Educational', de: 'Lerngeschichte', fr: 'Éducatif', it: 'Didattico' },
+  'historical': { en: 'History', de: 'Geschichte', fr: 'Histoire', it: 'Storia' },
+  'swiss-stories': { en: 'Swiss Stories', de: 'Schweizer Geschichten', fr: 'Histoires Suisses', it: 'Storie Svizzere' },
 };
 
 /**

@@ -1056,7 +1056,10 @@ function normalizeLang(lang) {
 function pickLang(map, lang) {
   if (!map) return undefined;
   if (map[lang]) return map[lang];
-  if (lang === 'it' && map.en) return map.en;
+  // Any non-German language falls back to ENGLISH, never German: serving German
+  // text on an English or French page is a language mismatch to Google, and it
+  // is how the comparison-title / unknown-route / gift-description bugs hid.
+  if (lang !== 'de' && map.en) return map.en;
   return map.de;
 }
 
@@ -1255,7 +1258,11 @@ function getMetaForRoute(routePath, lang) {
       return {
         title: lang === 'it'
           ? `${title} — Confronto onesto | MagicalStory`
-          : `${title} — Ehrlicher Vergleich | MagicalStory`,
+          : lang === 'fr'
+            ? `${title} — comparaison honnête | MagicalStory`
+            : lang === 'en'
+              ? `${title} — an honest comparison | MagicalStory`
+              : `${title} — Ehrlicher Vergleich | MagicalStory`,
         description: buildComparisonDescription(comp.name, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1298,7 +1305,7 @@ function getMetaForRoute(routePath, lang) {
           },
           buildBreadcrumbJsonLd([
             { name: 'Home', url: '/' },
-            { name: lang === 'de' ? 'Ratgeber' : lang === 'it' ? 'Guide' : 'Guides', url: '/ratgeber' },
+            { name: lang === 'de' ? 'Ratgeber' : lang === 'fr' ? 'Guides' : lang === 'it' ? 'Guide' : 'Guides', url: '/ratgeber' },
             { name: title },
           ]),
         ],
@@ -1407,10 +1414,18 @@ function getMetaForRoute(routePath, lang) {
   return {
     title: lang === 'it'
       ? 'Magical Story – Il tuo bambino protagonista della sua storia'
-      : 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
+      : lang === 'fr'
+        ? 'Magical Story – Votre enfant, héros de sa propre histoire'
+        : lang === 'en'
+          ? 'Magical Story – Your Child as the Hero of Their Own Story'
+          : 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
     description: lang === 'it'
       ? 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.'
-      : 'Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
+      : lang === 'fr'
+        ? 'Faites de votre enfant le héros de sa propre histoire. Chargez une photo, choisissez un thème, créez la première histoire gratuitement.'
+        : lang === 'en'
+          ? 'Make your child the hero of their own story. Upload a photo, pick a theme, create your first story free.'
+          : 'Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
     canonical: canonicalUrl,
     path: cleanPath,
     noindex: false,
@@ -1635,7 +1650,11 @@ function buildGiftDescription(giftSlug, lang) {
   return pickLang(descriptions[giftSlug], lang)
     || (lang === 'it'
       ? 'Un libro personalizzato per bambini come regalo — con la foto del tuo bambino da protagonista. Da CHF 33, prima storia gratuita.'
-      : 'Personalisiertes Kinderbuch als Geschenk — mit dem Foto deines Kindes als Held. Ab CHF 33, erste Geschichte gratis.');
+      : lang === 'fr'
+        ? 'Un livre personnalisé pour enfant comme cadeau — avec la photo de votre enfant en héros. Dès CHF 33, première histoire gratuite.'
+        : lang === 'en'
+          ? 'A personalized children\'s book as a gift — with your child\'s photo as the hero. From CHF 33, first story free.'
+          : 'Personalisiertes Kinderbuch als Geschenk — mit dem Foto deines Kindes als Held. Ab CHF 33, erste Geschichte gratis.');
 }
 
 // ─── injectMeta ───────────────────────────────────────────────────────────────
