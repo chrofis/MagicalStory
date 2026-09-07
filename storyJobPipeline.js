@@ -685,20 +685,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
     // This runs in parallel with story generation (no need to wait for outline clothing)
     if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
-      const { getTrialCostume } = require('./server/config/trialCostumes');
+      const { getTrialCostumeForStory } = require('./server/config/trialCostumes');
       const mainChar = (inputData.characters || [])[0];
-      // For life-challenge: storyTheme has the adventure type (pirate), storyTopic has the challenge (cleaning-up)
-      // For adventure: storyTheme has the theme, storyTopic may be empty
-      // For historical: storyTopic has the event ID
-      const lookupCategory = inputData.storyCategory === 'historical' ? 'historical' : 'adventure';
-      const lookupTopic = inputData.storyCategory === 'historical'
-        ? (inputData.storyTopic || '')
-        : (inputData.storyTheme || inputData.storyTopic || '');
-      const costume = getTrialCostume(
-        lookupTopic,
-        lookupCategory,
-        mainChar?.gender || ''
-      );
+      // Category/theme/topic -> costume mapping lives in trialCostumes.js, so the
+      // avatar prewarm, this job and the idea generator cannot disagree about
+      // whether this story has a costume at all.
+      const costume = getTrialCostumeForStory({
+        storyCategory: inputData.storyCategory,
+        storyTheme: inputData.storyTheme,
+        storyTopic: inputData.storyTopic,
+        gender: mainChar?.gender || ''
+      });
 
       // Build clothing requirements from config (not from outline)
       const trialClothingRequirements = {};

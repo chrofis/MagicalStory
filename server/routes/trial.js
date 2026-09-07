@@ -2081,6 +2081,18 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     const { buildAgeModeSection } = require('../lib/promptBuilders');
 
+    // A trial's clothing does not come from the writer — it comes from the
+    // static costume table, and a theme with no entry gets no costumed avatar
+    // sheet. An idea that has the child put a costume ON is then unrenderable:
+    // the pipeline can only paint the garment as scenery (prod
+    // job_1788698812047_q5b1vuds7). The generator is told which of the two it
+    // is, so the premise never asks for what cannot be worn.
+    const { getTrialCostumeForStory } = require('../config/trialCostumes');
+    const ideaCostume = getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender: mainGender });
+    const { buildTrialIdeaCostumeInstructions } = require('../lib/promptBuilders');
+    const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
+    if (!ideaCostume) log.debug(`  [COSTUME] none configured for ${storyCategory}/${storyTheme || storyTopic} — ideas stay costume-free`);
+
     const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
       CHARACTER: charDesc,
       CATEGORY_CONTEXT: categoryContext,
@@ -2088,6 +2100,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       LANDMARKS: '',
       LANG_INSTRUCTION: langInstruction,
       AGE_MODE: buildAgeModeSection({ characters }),
+      COSTUME_RULE: costumeRule,
     });
     // The two ideas exist to offer a real choice, so they differ in KIND, not
     // just in detail (owner, 2026-08-25): one grounded in the child's own town
@@ -2096,8 +2109,10 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // mandate nothing to attach to, and the writer bolted one onto the last page.
     // The landmark mandate belongs to the own-town idea only; in the shared
     // base it dragged the make-believe idea to the real lake as well.
-    const localIdea = `\n${landmarksText}\nSet this idea in the child's own town, at the real local places named above. A costume or theme shows in what they wear and how they play — the play is the story, never a trip somewhere else.`;
-    const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — dressing up, or starting to play — and the make-believe follows from that; the world it enters has no real place names.`;
+    // Both branch instructions used to invite dressing up unconditionally, which
+    // is what asked a costume-less theme for a worn costume.
+    const localIdea = `\n${landmarksText}\nSet this idea in the child's own town, at the real local places named above. ${themeShows} — the play is the story, never a trip somewhere else.`;
+    const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
     const prompt1Local = prompt1 + localIdea;
     const prompt2 = prompt1 + fantasyIdea;
 
@@ -2213,12 +2228,10 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       return res.status(400).json({ error: 'storyCategory and storyTopic or storyTheme are required' });
     }
 
-    // Resolve which topic/category to look up costumes from:
-    // - adventure: storyTheme has the theme (pirate, knight, etc.), storyTopic is empty
-    // - life-challenge: storyTopic has the challenge, storyTheme has the adventure theme → use storyTheme
-    // - historical: storyTopic has the event ID → use storyTopic
-    const lookupTopic = storyCategory === 'historical' ? storyTopic : (storyTheme || storyTopic);
-    const lookupCategory = storyCategory === 'historical' ? 'historical' : 'adventure';
+    // Resolve which topic/category to look up costumes from (trialCostumes.js
+    // owns the mapping — see resolveTrialCostumeLookup).
+    const { resolveTrialCostumeLookup } = require('../config/trialCostumes');
+    const { topic: lookupTopic, category: lookupCategory } = resolveTrialCostumeLookup({ storyCategory, storyTheme, storyTopic });
 
     log.info(`[TRIAL AVATARS] Preparing styled avatars for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
 

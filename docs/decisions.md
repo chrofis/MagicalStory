@@ -29902,3 +29902,85 @@ had not deployed it when that story ran.
 **Touched:** `server/lib/promptBuilders.js`,
 `tests/unit/secondary-cast-appearance.test.ts`
 **Status:** ✅ active
+
+---
+
+## 2026-09-07 — A trial premise never asks for a costume the trial cannot render
+
+### The idea generator is told whether this theme has a costume
+**Context:** Prod `job_1788698812047_q5b1vuds7` (trial, `storyCategory:
+adventure`, `storyTheme: mothers-day`) shipped a premise — accepted untouched —
+in which the child puts a costume ON and then explores a museum in it. A trial's
+clothing does not come from the writer: `storyJobPipeline.js` discards the
+writer's `clothingRequirements` in trial mode and uses the static
+`getTrialCostume` table, which has no `mothers-day` entry. `costumed.used` was
+therefore `false`, no costumed avatar sheet was ever generated, and the pipeline
+could only paint the garment as scenery. `3f537c51f` fixed the downstream half
+(the trial story prompt no longer instructs a costume that does not exist, and
+`reconcilePageClothingWithRequirements()` stops the two fields disagreeing) —
+which made the render coherent but left it diverging from the premise the user
+accepted.
+
+The idea generator (`POST /api/trial/generate-ideas-stream` →
+`prompts/trial-idea.txt`) had no knowledge of costume availability at all, and
+two of its instructions actively invited a worn costume: the own-town branch
+("A costume or theme shows in what they **wear**…") and the make-believe branch
+("It opens where the child really is — **dressing up**, or starting to play").
+
+**Decision:** the idea generator performs the same costume lookup the pipeline
+does, and is instructed accordingly.
+- costume available → wording unchanged, byte-identical.
+- no costume → the appended rule states that no character puts on, changes into
+  or wears a costume, disguise or special outfit, and that a costume may still
+  appear as an object in the scene (on display, on a rack, carried); the two
+  branch instructions drop "wear" and "dressing up".
+
+The three strings live in one builder, `buildTrialIdeaCostumeInstructions()`
+(`server/lib/promptBuilders.js`), and the category/theme/topic → costume mapping
+— previously hand-rolled identically at two call sites — now lives once in
+`server/config/trialCostumes.js` as `resolveTrialCostumeLookup()` /
+`getTrialCostumeForStory()`, used by the story job, the avatar prewarm and the
+idea generator.
+
+**Rationale:** the premise and the renderable pipeline must agree, and the cheap
+side to move is the premise: a costume-less theme simply never proposes a worn
+costume. The rejected alternative was promoting a premise costume into
+`clothingRequirements` and generating a real costumed sheet — an extra paid Grok
+sheet per trial and a second, writer-driven source of trial clothing, which is
+exactly the split `3f537c51f` closed. The worn-vs-prop distinction the rule
+draws is the one already codified at `prompts/story-bible-from-beats.txt:61`.
+
+Reach: of the 33 adventure themes, exactly three have no costume entry —
+`mothers-day`, `fathers-day`, `custom` — and all 54 historical topics have one.
+The trial wizard offers only the 13 "popular" themes, of which two are
+costume-less (`mothers-day`, `fathers-day`), in both trial categories
+(life-challenge picks its theme from the same list). `custom` is not reachable
+from the trial.
+
+One divergence the unification closed: `buildTrialStoryPrompt` resolved the
+lookup as `storyTopic || storyTheme`, so a **life-challenge** trial looked the
+challenge id (`understanding-rules`) up in the costume table, found nothing, and
+— after `3f537c51f` made the costume instructions conditional — would have told
+the writer the story has no costume while `clothingRequirements` and the avatar
+sheets carried the theme's costume (prod `job_1788727744192_gxf6gbywo`,
+`job_1788724538469_n6ylqxq7w`: `costumed.used: true`, costume `cowboy` /
+`superhero`, from a topic that is not in the table). Prod never ran that
+combination — `3f537c51f` is staging-only and prod still carries the
+unconditional wording — so no shipped story is affected. Adventure and
+historical trials resolve identically before and after.
+
+Sibling path: full stories are unaffected by design. Their
+`clothingRequirements` come from the writer (`storyJobPipeline.js` — the
+`inputData.trialMode` ternary), and the avatar pipeline generates a costumed
+sheet on demand from whatever the writer declared, so a full-story premise that
+needs a costume produces one. The gate is trial-only.
+
+**Verified without paid calls:** `tests/manual/render-trial-idea-prompt.js`
+renders both branches from stored inputs and asserts the costume-available
+branch is byte-identical to the pre-gate wording. 809 unit tests pass (12 new).
+
+**Touched:** `prompts/trial-idea.txt`, `server/routes/trial.js`,
+`server/lib/promptBuilders.js`, `server/config/trialCostumes.js`,
+`storyJobPipeline.js`, `tests/unit/trial-idea-costume-gate.test.ts`,
+`tests/manual/render-trial-idea-prompt.js`
+**Status:** ✅ active

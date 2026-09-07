@@ -6489,13 +6489,20 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
 
   if (PROMPT_TEMPLATES.storyTrial) {
     // Look up costume from config
-    const { getTrialCostume } = require('../config/trialCostumes');
+    // Same resolver as the story job and the avatar prewarm. This used to read
+    // `storyTopic || storyTheme`, which on a life-challenge trial looks the
+    // challenge id up in the costume table and finds nothing — so the story
+    // prompt would state "no costume" for a story whose clothingRequirements
+    // and avatar sheets carry the theme's costume.
+    const { getTrialCostumeForStory } = require('../config/trialCostumes');
     const mainChar = (inputData.characters || [])[0];
-    const topic = inputData.storyTopic || inputData.storyTheme || '';
     const category = inputData.storyCategory || 'adventure';
-    const gender = mainChar?.gender || '';
-
-    const costume = getTrialCostume(topic, category, gender);
+    const costume = getTrialCostumeForStory({
+      storyCategory: inputData.storyCategory,
+      storyTheme: inputData.storyTheme,
+      storyTopic: inputData.storyTopic,
+      gender: mainChar?.gender || ''
+    });
 
     // Every costume instruction in the template is conditional on a costume
     // actually existing. The template used to state them unconditionally — the
@@ -6712,6 +6719,33 @@ function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious 
 // ============================================================================
 
 
+/**
+ * Costume instructions for the trial idea generator.
+ *
+ * A trial's clothing comes from the static costume table, not the writer, so a
+ * theme with no entry never gets a costumed avatar sheet and a premise that has
+ * a character put a costume ON cannot be rendered as worn (prod
+ * job_1788698812047_q5b1vuds7). With a costume the three pieces are the
+ * historical wording, unchanged.
+ *
+ * @param {{costumeType: string, description: string}|null} costume
+ * @returns {{costumeRule: string, themeShows: string, fantasyOpening: string}}
+ */
+function buildTrialIdeaCostumeInstructions(costume) {
+  if (costume) {
+    return {
+      costumeRule: '',
+      themeShows: 'A costume or theme shows in what they wear and how they play',
+      fantasyOpening: 'dressing up, or starting to play'
+    };
+  }
+  return {
+    costumeRule: ' No character puts on, changes into or wears a costume, disguise or special outfit; a costume may appear as an object in the scene — on display, on a rack, carried — never on a character.',
+    themeShows: 'The theme shows in what they play with and where they play',
+    fantasyOpening: 'starting to play'
+  };
+}
+
 module.exports = {
   wrapUserInput,
   getPhysicalFromChar,
@@ -6843,5 +6877,6 @@ module.exports = {
   buildUnifiedStoryPrompt,
   buildTrialStoryPrompt,
   buildAvailableLandmarksSection,
+  buildTrialIdeaCostumeInstructions,
   buildPreviousScenesContext
 };
