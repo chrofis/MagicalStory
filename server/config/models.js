@@ -151,7 +151,11 @@ const TEXT_MODELS = {
   'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 16384, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M Flex; $1.50/$7.50 standard)' },
   'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 16384, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
   'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 16384, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
-  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 via OpenRouter (~$0.30/$1.20 per 1M)' },
+  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.23/$0.96 per 1M, verified 2026-09-07)' },
+  // Vision-judge candidates for the blind inventory (Lab sets 25/27, 2026-09-07).
+  // Prices from openrouter.ai the same day.
+  'qwen3.6-plus': { provider: 'openrouter', modelId: 'qwen/qwen3.6-plus', maxOutputTokens: 16384, description: 'Qwen3.6 Plus (text+image+video in) via OpenRouter ($0.325/$1.95 per 1M)' },
+  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 16384, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.56/$3.39 per 1M)' },
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.

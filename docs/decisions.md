@@ -30244,3 +30244,10 @@ finding's wording changes. Not a `SETTLED.md` reversal.
 
 **Touched:** server/lib/images.js (inpaintPage model, stripNames ownName), server/lib/imageCompositing.js (stripCharacterNames), server/config/models.js (comment), prompts/image-inventory-unified.txt, prompts/image-prompt-compliance.txt, prompts/image-evaluation.txt, prompts/image-vision-inventory.txt, tests/unit/inpaint-routing.test.ts, docs/SETTLED.md.
 **Status:** ✅ active (staging)
+
+### The blind inventory can run an OpenRouter vision judge (2026-09-07)
+**Context:** the animal-completeness check (above) is only answered correctly by gemini-3.7-flash, at 1.8-3.5x the per-call price of 2.5 Flash. The owner asked for cheaper judges, Chinese models included. `runVisualInventory` spoke only Gemini (direct) and xAI, so no OpenRouter model could be measured.
+**Decision:** `callOpenRouterVisionAPI` (images.js) returns the same Gemini-shaped response as `callGrokVisionAPI`; `runVisualInventory` routes `provider: 'openrouter'` models through it. TEXT_MODELS gains `qwen3.6-plus` and `kimi-k2.6`; `qwen3-vl` and `minimax-m3` already existed. Temperature 0 (SETTLED). No production default changes — `qualityEval` stays gemini-2.5-flash; this is Lab plumbing.
+**Rationale:** one adapter in the existing shape, so the inventory parser, retries and fallback are shared and a model swap stays a one-key change if a candidate wins.
+**Touched:** server/lib/images.js, server/lib/evalPipeline.js, server/config/models.js.
+**Status:** ✅ active (staging)

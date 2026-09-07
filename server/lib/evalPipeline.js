@@ -88,6 +88,10 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     let p1Response;
     if (modelConfig?.provider === 'xai') {
       p1Response = await require('./images').callGrokVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
+    } else if (modelConfig?.provider === 'openrouter') {
+      // Chinese/OpenRouter vision judges (Lab candidates for the blind
+      // inventory). Same response shape as the Grok path.
+      p1Response = await require('./images').callOpenRouterVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
     } else {
       p1Response = await withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;

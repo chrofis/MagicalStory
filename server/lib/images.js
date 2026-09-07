@@ -210,6 +210,53 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
   };
 }
 
+/**
+ * OpenRouter vision call in the same Gemini-compatible response shape as
+ * callGrokVisionAPI, so the blind inventory can run a Chinese/OpenRouter
+ * vision judge (Qwen3-VL, Qwen3.6 Plus, Kimi K2.6, MiniMax M3) through the
+ * same parsing. Temperature 0 (SETTLED: eval judges run at temperature 0).
+ */
+async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptText) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    log.error('❌ [OPENROUTER VISION] OPENROUTER_API_KEY not configured');
+    return { ok: false, text: () => 'OPENROUTER_API_KEY not configured', json: () => ({}) };
+  }
+  const content = [];
+  for (const part of geminiParts) {
+    if (part.inline_data) {
+      content.push({ type: 'image_url', image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` } });
+    } else if (part.text) {
+      content.push({ type: 'text', text: part.text });
+    }
+  }
+  const body = { model: modelId, max_tokens: 16000, temperature: 0, messages: [{ role: 'user', content }] };
+  const startTime = Date.now();
+  const response = await withRetry(async () => fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(180000)
+  }), { maxRetries: 2, baseDelay: 2000 });
+  if (!response.ok) {
+    const errText = await response.text();
+    log.error(`❌ [OPENROUTER VISION] ${modelKey} API error (${response.status}): ${errText.substring(0, 200)}`);
+    return response;
+  }
+  const result = await response.json();
+  const inputTokens = result.usage?.prompt_tokens || 0;
+  const outputTokens = result.usage?.completion_tokens || 0;
+  log.debug(`📊 [OPENROUTER VISION] ${modelKey} (${Date.now() - startTime}ms): ${inputTokens} in, ${outputTokens} out`);
+  const text = result.choices?.[0]?.message?.content || '';
+  return {
+    ok: true,
+    json: async () => ({
+      candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: inputTokens, candidatesTokenCount: outputTokens, thoughtsTokenCount: 0 }
+    })
+  };
+}
+
 // Gemini safety settings — used for all Gemini API calls to avoid content filtering
 const GEMINI_SAFETY_SETTINGS = [
   { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -4889,6 +4936,7 @@ module.exports = {
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache
   FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval
+  callOpenRouterVisionAPI,  // OpenRouter vision judges for the blind inventory (Lab)
   GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls
   enrichWithBoundingBoxes,
 
