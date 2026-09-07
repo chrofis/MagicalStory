@@ -39,6 +39,12 @@ const STATE_PATH = path.join(__dirname, '..', '..', 'tests', 'trial-showcase-sta
 const PHOTO_ROOT = path.join(__dirname, '..', '..', 'tests', 'fixtures', 'demo-photos');
 const DEFAULT_BASE = 'https://staging.magicalstory.ch';
 const POLL_TIMEOUT_MS = 20 * 60 * 1000;
+// Trial speed target, measured as a JOB duration (story_jobs start → completed),
+// which is what stories.data.analytics.totalDurationMs reports. Production's own
+// trial job measured 126s on job_1788698812047_q5b1vuds7, so this is the right
+// order. It does NOT include the harness's setup calls — see the timing note at
+// the t0 declaration before changing how this is printed.
+const JOB_BASELINE_SECS = 123;
 
 function parseArgs() {
   const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true, over: {} };
@@ -131,7 +137,18 @@ function faceDataUri(entry) {
     return;
   }
 
+  // Timing is reported in TWO parts, because the trial speed baseline is a JOB
+  // duration and the harness's own wall clock is not comparable to it.
+  //
+  // Before 2026-09-07 this script printed only end-to-end and invited a
+  // comparison against "123s baseline". End-to-end also contains photo
+  // analysis and the preview avatar — ~67s on an idle staging, where the
+  // Python analyzer is cold: measured 45s for a fully-cold analyze-photo
+  // against ~6.5s warm (tests/manual/time-analyzer-warmup.js). Production
+  // traffic keeps that service warm, so no real user pays it. Reading the two
+  // numbers as one made a 141s job look like a 224s regression.
   const t0 = Date.now();
+  let tJobStart = null;
   const jwt = adminJwt(args.base);
   const { token: adminToken } = await api(args.base, '/api/trial/admin-bypass-token', { method: 'GET', bearer: jwt });
   console.log(`[${chTime(new Date())}] admin bypass token acquired (Turnstile + fingerprint skipped)`);
@@ -195,7 +212,8 @@ function faceDataUri(entry) {
     },
   });
   const jobId = started.jobId || started.id;
-  console.log(`[${chTime(new Date())}] story job ${jobId} started`);
+  tJobStart = Date.now();
+  console.log(`[${chTime(new Date())}] story job ${jobId} started — setup took ${Math.round((tJobStart - t0) / 1000)}s (photo analysis + preview avatar; not part of the job baseline)`);
   advanceState(entry, entries);
 
   if (!args.wait) {
@@ -217,12 +235,21 @@ function faceDataUri(entry) {
     }
     if (st.status === 'completed' || st.status === 'failed') {
       const secs = Math.round((Date.now() - t0) / 1000);
+      const setupSecs = tJobStart ? Math.round((tJobStart - t0) / 1000) : null;
+      const jobSecs = tJobStart ? Math.round((Date.now() - tJobStart) / 1000) : null;
       console.log('─'.repeat(72));
-      console.log(`${st.status.toUpperCase()} in ${secs}s (${(secs / 60).toFixed(1)} min)`);
+      console.log(`${st.status.toUpperCase()} in ${secs}s (${(secs / 60).toFixed(1)} min) end-to-end`);
+      if (jobSecs != null) {
+        console.log(`  setup : ${setupSecs}s  (photo analysis + preview avatar — cold on an idle staging, warm in production)`);
+        console.log(`  job   : ${jobSecs}s  ← compare THIS against the baseline`);
+      }
       if (st.error_message) console.log(`error: ${st.error_message}`);
       console.log(`story : ${args.base}/create?storyId=${jobId}`);
       console.log(`job   : ${jobId}`);
-      console.log(`Compare against the trial speed baseline: 123s end-to-end (last real prod trial, 5 pages).`);
+      console.log(`Trial speed baseline: ${JOB_BASELINE_SECS}s for the JOB (last real prod trial). Setup is not in it —`);
+      console.log(`comparing end-to-end against that number reads ~70s of cold-start as a regression.`);
+      console.log(`Job stage split: stories.data.analytics (storyGen/images/covers/repair) —`);
+      console.log(`node tests/manual/compare-trial-timings.js`);
       console.log('─'.repeat(72));
       process.exit(st.status === 'completed' ? 0 : 1);
     }
