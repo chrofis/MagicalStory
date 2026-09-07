@@ -84,14 +84,34 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     inventoryParts.push({ text: inventoryPrompt });
 
     // Route to Grok vision API for xAI models
-    const modelConfig = TEXT_MODELS[modelId];
-    let p1Response;
-    if (modelConfig?.provider === 'xai') {
+    let modelConfig = TEXT_MODELS[modelId];
+    let p1Response = null;
+    if (modelConfig?.provider === 'openrouter') {
+      // OpenRouter vision judge (Qwen3-VL on staging — runtime.js
+      // `inventoryModel`). Same response shape as the Grok path. A failed,
+      // stalled or errored call FALLS BACK TO GEMINI 2.5 FLASH (owner,
+      // 2026-09-07): the inventory is on every page's critical path and the
+      // single upstream provider stalled 3 of 20 Lab pages (experiment 1053).
+      const pageLabel = pageContext ? `[${pageContext}] ` : '';
+      try {
+        p1Response = await require('./images').callOpenRouterVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
+      } catch (e) {
+        log.warn(`⚠️ [QUALITY P1] ${pageLabel}${modelId} threw (${e.message}) — falling back to gemini-2.5-flash`);
+        p1Response = null;
+      }
+      if (p1Response && !p1Response.ok) {
+        log.warn(`⚠️ [QUALITY P1] ${pageLabel}${modelId} returned HTTP ${p1Response.status} — falling back to gemini-2.5-flash`);
+        p1Response = null;
+      }
+      if (!p1Response) {
+        modelId = 'gemini-2.5-flash';
+        modelConfig = TEXT_MODELS[modelId];
+      }
+    }
+    if (p1Response) {
+      // OpenRouter answered — nothing more to fetch.
+    } else if (modelConfig?.provider === 'xai') {
       p1Response = await require('./images').callGrokVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
-    } else if (modelConfig?.provider === 'openrouter') {
-      // Chinese/OpenRouter vision judges (Lab candidates for the blind
-      // inventory). Same response shape as the Grok path.
-      p1Response = await require('./images').callOpenRouterVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
     } else {
       p1Response = await withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
@@ -214,6 +234,14 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     if (!inventoryJson) {
       log.warn(`⚠️ [QUALITY P1] No JSON in response`);
       return null;
+    }
+
+    // Boxes on the inventory's own scale contract (0-1). Qwen3-VL mixes
+    // 0-1000 pixel values into the same array; every provider passes through
+    // here so the pairing downstream never sees a mixed box.
+    const boxStats = require('./inventoryBoxes').normaliseInventoryBoxes(inventoryJson);
+    if (boxStats.fixed || boxStats.dropped) {
+      log.info(`📊 [EVAL P1] ${modelId}: normalised ${boxStats.fixed} box(es) from 0-1000 scale, dropped ${boxStats.dropped} malformed`);
     }
 
     const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
@@ -985,7 +1013,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
         p1Promise = runVisualInventory(
           [{ inline_data: { mime_type: invMime, data: invB64 } }],
-          qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+          // The inventory has its own judge key since 2026-09-07 (runtime.js
+          // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
+          // Lab quality-model override still wins so an A/B measures one model.
+          qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
           process.env.GEMINI_API_KEY, pageContext
         );
         log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);

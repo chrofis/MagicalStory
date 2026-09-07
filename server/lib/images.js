@@ -236,8 +236,12 @@ async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptTex
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(180000)
-  }), { maxRetries: 2, baseDelay: 2000 });
+    // 120s like the Grok path, one retry: 3 of 20 Lab pages stalled on the
+    // single upstream provider (experiment 1053), and the inventory has a
+    // Gemini fallback waiting — a bounded wait then falling back beats a
+    // nine-minute retry ladder on a page render's critical path.
+    signal: AbortSignal.timeout(120000)
+  }), { maxRetries: 1, baseDelay: 2000 });
   if (!response.ok) {
     const errText = await response.text();
     log.error(`❌ [OPENROUTER VISION] ${modelKey} API error (${response.status}): ${errText.substring(0, 200)}`);

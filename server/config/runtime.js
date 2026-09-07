@@ -114,6 +114,19 @@ const SETTINGS = {
   // (job_1786193650012_7baiaeftb) cost ~15 of its 50 minutes, and the owner is
   // watching the result, not the convergence.
   repairMaxPasses: perEnvironment({ default: 3, staging: 1, local: 1 }),
+
+  // ── Blind inventory judge (eval Stage 1) ───────────────────────────────
+  // The vision model that describes a rendered page before any judging. Its
+  // output feeds the compliance judge, the figure pairing and the animal
+  // completeness check. Qwen3-VL 32B (OpenRouter, ~$0.0007/call) is the only
+  // judge measured to SEE a headless animal or a ghost figure — Gemini 2.5
+  // Flash, 2.5 Pro, 3.1 Pro and Grok 4.6 all described a headless dragon as
+  // whole (Lab sets 24-26, experiments 1038-1054, 2026-09-07). Its boxes come
+  // back on mixed 0-1 / 0-1000 scales and are normalised in the parser; a
+  // failed or stalled call falls back to Gemini 2.5 Flash. Staging first
+  // (owner, 2026-09-07): production follows once staging stories confirm the
+  // compliance scores hold.
+  inventoryModel: perEnvironment({ default: 'gemini-2.5-flash', staging: 'qwen3-vl', local: 'qwen3-vl' }),
 };
 
 /**

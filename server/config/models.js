@@ -457,6 +457,9 @@ const MODEL_DEFAULTS = {
   // Quality evaluation models
   // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
   qualityEval: 'gemini-2.5-flash',          // Image quality evaluation. Lite missed small distant targets (e.g. paper-on-bench) and produced confused "X pointing at Y" reads — the resulting bad fix-targets triggered repair loops that cost more than the eval-tier upgrade.
+  // Blind inventory (eval Stage 1) judge — per-environment, see runtime.js.
+  // Was the same key as qualityEval until 2026-09-07.
+  inventoryModel: require('./runtime').runtime('inventoryModel'),
   bboxDetection: 'gemini-2.5-flash',        // Bounding box detection — kept on the same tier as qualityEval so missing-object detection lines up with the eval that uses it.
 
   // Image-prompt compression — the head rewrite in shrinkPromptForModel when a
