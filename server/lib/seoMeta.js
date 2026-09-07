@@ -682,81 +682,264 @@ const ORGANIZATION_JSON_LD = {
     '@type': 'ContactPoint',
     contactType: 'customer service',
     url: `${BASE_URL}/contact`,
-    availableLanguage: ['German', 'English', 'French'],
+    availableLanguage: ['German', 'English', 'French', 'Italian'],
   },
 };
 
-const PRODUCT_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'Product',
-  name: 'Personalisiertes Kinderbuch',
-  description: 'KI-illustriertes Kinderbuch mit deinem Kind als Held. 170+ Themen, 8 Kunststile, 3 Sprachen.',
-  brand: { '@type': 'Brand', name: 'MagicalStory' },
-  offers: {
-    '@type': 'AggregateOffer',
-    lowPrice: '0',
-    highPrice: '96',
-    priceCurrency: 'CHF',
-    availability: 'https://schema.org/InStock',
-    offerCount: '170',
+const PRODUCT_JSON_LD_BY_LANG = {
+  de: {
+    name: 'Personalisiertes Kinderbuch',
+    description: 'KI-illustriertes Kinderbuch mit deinem Kind als Held. 170+ Themen, 8 Kunststile, 4 Sprachen.',
   },
-  category: 'Personalized Children\'s Books',
+  en: {
+    name: "Personalized children's book",
+    description: "AI-illustrated children's book with your child as the hero. 170+ themes, 8 art styles, 4 languages.",
+  },
+  fr: {
+    name: 'Livre pour enfants personnalisé',
+    description: "Livre illustré par IA avec votre enfant comme héros. Plus de 170 thèmes, 8 styles, 4 langues.",
+  },
+  it: {
+    name: 'Libro per bambini personalizzato',
+    description: "Libro illustrato con l'IA e tuo figlio come protagonista. Oltre 170 temi, 8 stili, 4 lingue.",
+  },
 };
 
-const FAQ_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: [
-    {
-      '@type': 'Question',
-      name: 'Wie funktioniert MagicalStory?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Lade ein Foto deines Kindes hoch, wähle ein Geschichten-Thema, und erhalte in wenigen Minuten eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als Hauptfigur auf jeder Seite.',
-      },
+// The structured data a page carries must be in the page's own language:
+// German JSON-LD on an English page is a language mismatch to Google and can
+// surface German text inside a non-German rich result.
+function buildProductJsonLd(lang) {
+  const copy = PRODUCT_JSON_LD_BY_LANG[lang] || PRODUCT_JSON_LD_BY_LANG.en;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: copy.name,
+    description: copy.description,
+    brand: { '@type': 'Brand', name: 'MagicalStory' },
+    offers: {
+      '@type': 'AggregateOffer',
+      lowPrice: '0',
+      highPrice: '96',
+      priceCurrency: 'CHF',
+      availability: 'https://schema.org/InStock',
+      offerCount: '170',
     },
-    {
-      '@type': 'Question',
-      name: 'Wie lange dauert es?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Deine erste kostenlose Geschichte ist in unter 3 Minuten fertig. Text und alle Illustrationen werden automatisch generiert.',
+    category: "Personalized Children's Books",
+  };
+}
+
+const FAQ_BY_LANG = {
+    "de": [
+      {
+        "@type": "Question",
+        "name": "Wie funktioniert MagicalStory?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Lade ein Foto deines Kindes hoch, wähle ein Geschichten-Thema, und erhalte in wenigen Minuten eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als Hauptfigur auf jeder Seite."
+        }
       },
-    },
-    {
-      '@type': 'Question',
-      name: 'Für welches Alter ist MagicalStory geeignet?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Geschichten können für Kinder jeden Alters erstellt werden. Inhalt und Komplexität werden an das angegebene Alter angepasst.',
+      {
+        "@type": "Question",
+        "name": "Wie lange dauert es?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Deine erste kostenlose Geschichte ist in unter 3 Minuten fertig. Text und alle Illustrationen werden automatisch generiert."
+        }
       },
-    },
-    {
-      '@type': 'Question',
-      name: 'Kann ich mehrere Charaktere hinzufügen?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Ja! Du kannst die ganze Familie, Freunde oder Haustiere als Figuren in der Geschichte hinzufügen. Jeder Charakter bekommt eigene personalisierte Illustrationen.',
+      {
+        "@type": "Question",
+        "name": "Für welches Alter ist MagicalStory geeignet?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Geschichten können für Kinder jeden Alters erstellt werden. Inhalt und Komplexität werden an das angegebene Alter angepasst."
+        }
       },
-    },
-    {
-      '@type': 'Question',
-      name: 'Was kostet MagicalStory?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 33 als hochwertiges Hardcover.',
+      {
+        "@type": "Question",
+        "name": "Kann ich mehrere Charaktere hinzufügen?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Ja! Du kannst die ganze Familie, Freunde oder Haustiere als Figuren in der Geschichte hinzufügen. Jeder Charakter bekommt eigene personalisierte Illustrationen."
+        }
       },
-    },
-    {
-      '@type': 'Question',
-      name: 'Sind meine Daten sicher?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Ja. Deine Fotos werden ausschliesslich zur Erstellung der Illustrationen verwendet und niemals an Dritte weitergegeben. Wir nehmen Datenschutz ernst und halten uns an die Schweizer Datenschutzgesetze.',
+      {
+        "@type": "Question",
+        "name": "Was kostet MagicalStory?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 33 als hochwertiges Hardcover."
+        }
       },
-    },
-  ],
-};
+      {
+        "@type": "Question",
+        "name": "Sind meine Daten sicher?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Ja. Deine Fotos werden ausschliesslich zur Erstellung der Illustrationen verwendet und niemals an Dritte weitergegeben. Wir nehmen Datenschutz ernst und halten uns an die Schweizer Datenschutzgesetze."
+        }
+      }
+    ],
+    "en": [
+      {
+        "@type": "Question",
+        "name": "How does MagicalStory work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Upload a photo of your child, choose a story theme, and get a fully illustrated, personalized story in just a few minutes. Your child appears as the main character on every page."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How long does it take?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Your first free story is ready in under 3 minutes. The text and all illustrations are generated automatically."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What age is MagicalStory suitable for?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Stories can be created for children of any age. Content and complexity are adapted to the age you specify."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I add several characters?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! You can add the whole family, friends, or pets as characters in the story. Every character gets their own personalized illustrations."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What does MagicalStory cost?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Your first story is completely free. After that, stories are created using credits. Printed books start at CHF 33 as a high-quality hardcover."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is my data safe?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Your photos are used exclusively to create the illustrations and are never shared with third parties. We take data protection seriously and comply with Swiss data protection laws."
+        }
+      }
+    ],
+    "fr": [
+      {
+        "@type": "Question",
+        "name": "Comment fonctionne MagicalStory ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Téléchargez une photo de votre enfant, choisissez un thème d'histoire et obtenez en quelques minutes une histoire personnalisée entièrement illustrée. Votre enfant apparaît comme personnage principal sur chaque page."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Combien de temps cela prend-il ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Votre première histoire gratuite est prête en moins de 3 minutes. Le texte et toutes les illustrations sont générés automatiquement."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Pour quel âge MagicalStory convient-il ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Les histoires peuvent être créées pour des enfants de tout âge. Le contenu et la complexité sont adaptés à l'âge indiqué."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Puis-je ajouter plusieurs personnages ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Oui ! Vous pouvez ajouter toute la famille, des amis ou des animaux de compagnie comme personnages de l'histoire. Chaque personnage reçoit ses propres illustrations personnalisées."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Combien coûte MagicalStory ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Votre première histoire est entièrement gratuite. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés sont disponibles à partir de CHF 33 en couverture rigide de haute qualité."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Mes données sont-elles en sécurité ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Oui. Vos photos sont utilisées exclusivement pour créer les illustrations et ne sont jamais transmises à des tiers. Nous prenons la protection des données au sérieux et respectons les lois suisses en la matière."
+        }
+      }
+    ],
+    "it": [
+      {
+        "@type": "Question",
+        "name": "Come funziona MagicalStory?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Carica una foto di tuo figlio, scegli un tema per la storia e ottieni in pochi minuti una storia personalizzata completamente illustrata. Tuo figlio appare come protagonista in ogni pagina."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Quanto tempo ci vuole?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "La tua prima storia gratuita è pronta in meno di 3 minuti. Il testo e tutte le illustrazioni vengono generati automaticamente."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Per quale età è adatto MagicalStory?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Le storie possono essere create per bambini di qualsiasi età. Contenuto e complessità vengono adattati all'età indicata."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Posso aggiungere più personaggi?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Sì! Puoi aggiungere tutta la famiglia, amici o animali domestici come personaggi della storia. Ogni personaggio riceve le proprie illustrazioni personalizzate."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Quanto costa MagicalStory?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "La tua prima storia è completamente gratuita. Dopodiché, le storie vengono create usando crediti. I libri stampati partono da CHF 33 in copertina rigida di alta qualità."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "I miei dati sono al sicuro?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Sì. Le tue foto vengono usate esclusivamente per creare le illustrazioni e non vengono mai condivise con terzi. Prendiamo sul serio la protezione dei dati e rispettiamo le leggi svizzere sulla protezione dei dati."
+        }
+      }
+    ]
+  };
+
+// FAQ markup earns the expandable Q&A rows in search results, so it must be
+// in the language of the page carrying it.
+function buildFaqJsonLd(lang) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ_BY_LANG[lang] || FAQ_BY_LANG.en,
+  };
+}
 
 function buildBreadcrumbJsonLd(items) {
   return {
@@ -771,12 +954,38 @@ function buildBreadcrumbJsonLd(items) {
   };
 }
 
-function buildProductJsonLdForTheme(themeName, category, themeId) {
+function buildProductJsonLdForTheme(themeName, category, themeId, lang) {
+  const copy = {
+    de: {
+      name: `Personalisiertes Kinderbuch: ${themeName}`,
+      description: `KI-illustriertes ${themeName}-Kinderbuch mit deinem Kind als Held.`,
+      offer: 'Erste Geschichte kostenlos. Hardcover ab CHF 33.',
+    },
+    en: {
+      name: `Personalized children's book: ${themeName}`,
+      description: `AI-illustrated ${themeName} children's book with your child as the hero.`,
+      offer: 'First story free. Hardcover from CHF 33.',
+    },
+    fr: {
+      name: `Livre pour enfants personnalisé : ${themeName}`,
+      description: `Livre ${themeName} illustré par IA avec votre enfant comme héros.`,
+      offer: 'Première histoire gratuite. Couverture rigide dès CHF 33.',
+    },
+    it: {
+      name: `Libro per bambini personalizzato: ${themeName}`,
+      description: `Libro ${themeName} illustrato con l'IA e tuo figlio come protagonista.`,
+      offer: 'Prima storia gratuita. Cartonato da CHF 33.',
+    },
+  }[lang] || {
+    name: `Personalized children's book: ${themeName}`,
+    description: `AI-illustrated ${themeName} children's book with your child as the hero.`,
+    offer: 'First story free. Hardcover from CHF 33.',
+  };
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: `Personalisiertes Kinderbuch: ${themeName}`,
-    description: `KI-illustriertes ${themeName}-Kinderbuch mit deinem Kind als Held.`,
+    name: copy.name,
+    description: copy.description,
     brand: { '@type': 'Brand', name: 'MagicalStory' },
     url: `${BASE_URL}/themes/${category}/${themeId}`,
     offers: {
@@ -784,9 +993,9 @@ function buildProductJsonLdForTheme(themeName, category, themeId) {
       price: '0',
       priceCurrency: 'CHF',
       availability: 'https://schema.org/InStock',
-      description: 'Erste Geschichte kostenlos. Hardcover ab CHF 33.',
+      description: copy.offer,
     },
-    category: 'Personalized Children\'s Books',
+    category: "Personalized Children's Books",
   };
 }
 
@@ -820,7 +1029,7 @@ function buildHowToJsonLd(lang) {
     name: lang === 'de' ? 'Personalisiertes Kinderbuch erstellen' : lang === 'fr' ? 'Créer un livre personnalisé' : lang === 'it' ? 'Creare un libro personalizzato per bambini' : 'Create a Personalized Children\'s Book',
     description: lang === 'de' ? 'In 3 einfachen Schritten zum personalisierten Kinderbuch' : lang === 'fr' ? 'En 3 étapes simples vers votre livre personnalisé' : lang === 'it' ? 'Il tuo libro personalizzato in 3 semplici passi' : 'Create your personalized book in 3 simple steps',
     totalTime: 'PT3M',
-    tool: { '@type': 'HowToTool', name: lang === 'de' ? 'Ein Foto deines Kindes' : lang === 'it' ? 'Una foto del tuo bambino' : 'A photo of your child' },
+    tool: { '@type': 'HowToTool', name: lang === 'de' ? 'Ein Foto deines Kindes' : lang === 'fr' ? 'Une photo de votre enfant' : lang === 'it' ? 'Una foto del tuo bambino' : 'A photo of your child' },
     step: s.map((step, i) => ({
       '@type': 'HowToStep',
       position: i + 1,
@@ -904,12 +1113,12 @@ function getMetaForRoute(routePath, lang) {
     if (cleanPath === '/') {
       meta.jsonLd = [
         ORGANIZATION_JSON_LD,
-        PRODUCT_JSON_LD,
+        buildProductJsonLd(lang),
         buildBreadcrumbJsonLd([{ name: 'Home' }]),
       ];
     } else if (cleanPath === '/faq') {
       meta.jsonLd = [
-        FAQ_JSON_LD,
+        buildFaqJsonLd(lang),
         buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: 'FAQ' }]),
       ];
     } else if (cleanPath === '/about') {
@@ -919,7 +1128,7 @@ function getMetaForRoute(routePath, lang) {
       ];
     } else if (cleanPath === '/pricing') {
       meta.jsonLd = [
-        PRODUCT_JSON_LD,
+        buildProductJsonLd(lang),
         buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Preise' : lang === 'fr' ? 'Tarifs' : lang === 'it' ? 'Prezzi' : 'Pricing' }]),
       ];
     } else if (cleanPath === '/try') {
@@ -999,7 +1208,7 @@ function getMetaForRoute(routePath, lang) {
         noindex: false,
         hreflang: buildHreflang(cleanPath),
         jsonLd: [
-          buildProductJsonLdForTheme(themeName, categoryId, themeId),
+          buildProductJsonLdForTheme(themeName, categoryId, themeId, lang),
           buildBreadcrumbJsonLd([
             { name: 'Home', url: '/' },
             { name: lang === 'de' ? 'Themen' : lang === 'fr' ? 'Thèmes' : lang === 'it' ? 'Temi' : 'Themes', url: '/themes' },
@@ -1112,7 +1321,7 @@ function getMetaForRoute(routePath, lang) {
         noindex: false,
         hreflang: buildHreflang(cleanPath),
         jsonLd: [
-          PRODUCT_JSON_LD,
+          buildProductJsonLd(lang),
           buildBreadcrumbJsonLd([
             { name: 'Home', url: '/' },
             { name: lang === 'de' ? 'Anlässe' : lang === 'fr' ? 'Occasions' : lang === 'it' ? 'Occasioni' : 'Occasions', url: '/anlass' },
@@ -1138,7 +1347,7 @@ function getMetaForRoute(routePath, lang) {
         noindex: false,
         hreflang: buildHreflang(cleanPath),
         jsonLd: [
-          PRODUCT_JSON_LD,
+          buildProductJsonLd(lang),
           buildBreadcrumbJsonLd([
             { name: 'Home', url: '/' },
             { name: lang === 'de' ? 'Geschenkideen' : lang === 'fr' ? 'Idées cadeaux' : lang === 'it' ? 'Idee regalo' : 'Gift Ideas', url: '/geschenk' },
