@@ -30084,3 +30084,48 @@ The corruption itself (the style anchor's cast blending into the sheet;
 `prompts/sheet-row-heads-eval.txt`, `prompts/sheet-row-bodies-eval.txt`,
 `prompts/sheet-2x4-evaluation.txt`, `tests/unit/avatar-sheet-eval-gate.test.ts`
 **Status:** ✅ active
+
+## The Pass-2 style anchor is attached only when the sheet can be judged (2026-09-07)
+**Context:** Staging trial `job_1788763045123_z8so79ngb` (Emma, 5, de) shipped a
+styled 2×4 avatar sheet that was one merged crowd instead of 8 cells, with a
+boy, a woman and an elderly man painted over the child. The three strangers are
+not the story's cast: they are the figures in `server/assets/style-anchor-watercolor.jpg`,
+attached as Grok reference slot 2 by `runStyleTransferPass`. Every page then got
+a geometric slice of that crowd as the child's identity reference (four of six a
+HEADLESS torso), and apparent age drifted p3 ≈ 3 / p2 ≈ 8–9 / others ≈ 5 despite
+an identical age cue in all six page prompts. Pass 1 was perfect — the stored
+`realisticImageData` is a clean 8-cell sheet — so the whole defect is Pass 2.
+This is the SAME failure mode as `job_1787252581387_6sn8z0nh2` (2026-08-20),
+which is why the anchor-dropping retry and the fall-back-to-Pass-1 gate exist.
+Both of those key off the Gemini styled-sheet verdict. A trial passes
+`skipQualityEval`, so the loop breaks on attempt 1 with no verdict: neither
+defence could fire, and the sheet shipped. The clean control
+`job_1788725396265_p3dh87hsv` (Lily, staging, 2026-09-06 20:09 CH) was equally
+unjudged and equally anchored — it simply did not blend. Prod control
+`job_1788698812047_q5b1vuds7` (Amian) likewise looked fine. So this is not a
+regression from any commit in the 20:09 → 06:37 window: identical prompts,
+inputs and `grok-imagine-image` model in the broken and clean staging runs, and
+staging was already on Imagine 2.0 before the clean control, which eliminates
+the 76d4055d5 / c07cd70fc tier switch. It is a stochastic contamination that was
+never guarded on the unjudged path.
+**Decision:** The style anchor is attached only when `GEMINI_API_KEY` is set AND
+`skipQualityEval` is false — i.e. only when a verdict can reject the result and
+a retry can drop the anchor. Test Lab `promptOverride` runs keep it, since an
+A/B must measure its exact reference set. Separately, `quickLayoutCheck` now runs
+on every Pass-2 output and `log.error`s a failed sheet, recording `layoutValid`
+on the attempt record — **advisory only**: `docs/image-routing.md` measured
+painterly false-positives (oil sheets at 25.3% and 57.4% were structurally fine)
+and forbids wiring it as a Pass-2 gate, so it decides nothing.
+**Rationale:** The anchor lifts style fidelity and is clean in the large
+majority of runs, so removing it everywhere would cost quality for a
+low-probability defect. But an unjudged, un-retryable run has no safety net at
+all, and the sheet it produces is the identity reference for every page of the
+story — the most expensive image in the pipeline to get wrong. Style fidelity is
+worth a re-roll; it is not worth an unguarded roll. The per-page cropper is NOT
+at fault: re-running `cropAvatarCell` on the stored sheet reproduces the stored
+p2 slice byte-for-byte (181952 bytes), and the same crop on the clean Lily sheet
+and on Emma's own Pass-1 sheet yields a whole single figure. It sliced a corrupt
+sheet correctly.
+**Touched:** `server/lib/character2x4Sheet.js` (`runStyleTransferPass`),
+`tests/unit/avatar-sheet-anchor-guard.test.ts`, `docs/image-routing.md`
+**Status:** ✅ active

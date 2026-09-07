@@ -1411,6 +1411,10 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   // Unscored (null) ranks below any judged attempt, so a skipped or failed eval
   // can never win best-of-N by pretending to be a perfect score.
   const rank = (v) => (typeof v === 'number' ? v : -1);
+  // Can this run act on a verdict at all? Both retries and the Gemini judge
+  // are off in a trial, and both of the anchor-contamination defences below
+  // hang off them — see the anchor comment in the loop.
+  const canJudge = !!process.env.GEMINI_API_KEY && !skipQualityEval;
 
   const trackUsage = (result) => {
     if (usageTracker && result.usage) {
@@ -1441,9 +1445,21 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // promptOverride is a Test Lab A/B: that run is measuring one exact prompt
     // against one exact reference set, so the anchor-drop stays off there —
     // changing the inputs under the experiment would corrupt its own result.
-    const anchorForAttempt = (attempt === 1 || promptOverride) ? styleAnchor : null;
+    //
+    // AND THE ANCHOR IS NEVER ATTACHED WHEN NOTHING CAN JUDGE THE RESULT
+    // (2026-09-07). Both defences above — the reject-and-fall-back-to-Pass-1
+    // gate and the anchor-dropping retry — key off the Gemini verdict. A trial
+    // passes skipQualityEval, so the loop breaks on attempt 1 with no verdict:
+    // the dice are rolled once, with the contaminant attached, and whatever
+    // comes back ships as the character's identity reference on every page.
+    // That is staging job_1788763045123_z8so79ngb — Pass 1 was a clean 8-cell
+    // sheet, Pass 2 came back as one merged crowd carrying the watercolor
+    // anchor's boy, woman and elderly man, and each page then got a mis-cropped
+    // slice of it (four pages a HEADLESS torso). Style fidelity is worth a
+    // re-roll; it is not worth an unguarded one.
+    const anchorForAttempt = promptOverride ? styleAnchor : ((attempt === 1 && canJudge) ? styleAnchor : null);
     const prompt = anchorForAttempt ? promptWithAnchor : promptNoAnchor;
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}${styleAnchor && !anchorForAttempt ? ' — anchor dropped after failed attempt' : ''}`);
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}${styleAnchor && !anchorForAttempt ? (canJudge ? ' — anchor dropped after failed attempt' : ' — anchor dropped: nothing can judge or retry this sheet') : ''}`);
     // A thrown backend call consumes ONE attempt — it must never escape this
     // loop. Previously this line was unprotected: one Gemini IMAGE_OTHER
     // safety refusal (photorealistic ADULT face on the Pass-1 sheet) threw
@@ -1462,6 +1478,33 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     }
     trackUsage(result);
 
+    // STRUCTURAL CHECK ON THE STYLED SHEET — LOUD, NOT A GATE (2026-09-07).
+    // Pass 1 has run quickLayoutCheck since the split-sheet bug; Pass 2 ran
+    // nothing deterministic, so a sheet whose cells had merged into one crowd
+    // shipped in silence (job_1788763045123_z8so79ngb). It is recorded and
+    // log.error'd here so no such sheet is ever quiet again.
+    //
+    // It does NOT decide anything. docs/image-routing.md: quickLayoutCheck
+    // measures gutter WHITENESS, so painterly styles false-positive on a
+    // structurally correct sheet (measured: oil sheets at 25.3% and 57.4% were
+    // fine) — "do NOT wire it as a hard gate on Pass-2 / styled sheets".
+    // Making it decisive would ship realistic sheets into painted stories.
+    // `layoutValid` rides the audit record; the ship/reject decision stays with
+    // the Gemini styled-sheet eval, and the contamination itself is prevented
+    // upstream by not attaching the anchor on an unjudgeable run.
+    let layoutValid = true;
+    try {
+      const layout = await quickLayoutCheck(result.imageData);
+      layoutValid = layout.valid !== false;
+      if (!layoutValid) {
+        log.error(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} FAILED the structural check — ${layout.reason}. The 2×4 grid may be gone; a merged sheet cannot serve as an identity reference. ADVISORY (painterly styles false-positive here) — the verdict below decides.`);
+      }
+    } catch (err) {
+      // Unknown, never a pass — and never a reason to lose the style transfer.
+      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 structural check threw: ${err.message} — layout unknown`);
+      layoutValid = null;
+    }
+
     // skipQualityEval covers pass 2 as well: the caller asked for no reviews
     // (trial has no repair stage and cannot act on a verdict), so accept the
     // first style transfer instead of scoring and retrying it.
@@ -1470,8 +1513,8 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       // score null, NOT 10 — an unjudged style transfer must not be stored as a
       // perfect one (job_1788763045123_z8so79ngb shipped a corrupt sheet at 10/10
       // this way). `valid` below stays true, so the sheet still ships.
-      best = { result, attempt, score: null, evaluated: false, verdict: null, prompt };
-      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: null, evaluated: false, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
+      best = { result, attempt, score: null, evaluated: false, verdict: null, prompt, layoutValid };
+      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: null, evaluated: false, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt, layoutValid });
       break;
     }
 
@@ -1494,7 +1537,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       // neutrally and continue so a later attempt that DOES eval successfully
       // can win the best-of-N comparison.
       log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
-      const candidate = { result, attempt, score: 5, verdict: null, prompt };
+      const candidate = { result, attempt, score: 5, verdict: null, prompt, layoutValid };
       attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
       if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
       continue;
@@ -1515,8 +1558,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
       usedAnchor: !!anchorForAttempt,
+      layoutValid,
     });
-    const candidate = { result, attempt, score, verdict, prompt };
+    const candidate = { result, attempt, score, verdict, prompt, layoutValid };
     if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
     if (verdict.valid) break;
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
