@@ -59,6 +59,8 @@ If `matches[]` is empty or absent while figures exist in QUALITY_FIGURES or VISI
 **STEP 1b: SCENE CHECK**
 
 - Extra inventory figures with no pairing: flag only if ORIGINAL_PROMPT describes a solo or small-group scene; ignore for crowd/marketplace/villagers.
+- An animal in `objects` with `complete: false` → `figure_completeness`, CRITICAL, naming it; never `unverified_absence`.
+- Animals live in `objects`, never in `figures`; an animal present in `objects` is present.
 - Are all requested objects/animals/landmarks present per VISION_INVENTORY? The inventory lists what it judged NOTABLE, so a small or partly hidden prop can be real and unlisted. An item you cannot find there is `unverified_absence` — per the ABSENCE RULE above — never `missing_element`. If the inventory DOES name it and describes it wrongly (wrong object, wrong place, wrong size), that is a comparison you can actually make: report it at its own type.
 - Supporting figures the prompt explicitly places with a role and location (guards inside a vehicle, a sentry at a gate, a crowd surrounding the hero) not found in the inventory → `unverified_absence`; you are inferring their absence from a list, not seeing an empty gate. Ambient decoration ("a few passersby", "busy street") absent → no deduction at all.
 - Is the setting/environment correct? Judge it in the ART STYLE the ORIGINAL_PROMPT names — rendering the style calls for (palette, glow, atmosphere, light sources, and physical ambience the style mandates, e.g. era machinery woven into walls, architecture and fixtures) is never a setting mismatch. This holds for real, named landmarks too: the landmark must stay recognizable, but style elements added onto it are intended, never a deviation from its description.
