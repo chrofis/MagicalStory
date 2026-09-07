@@ -5279,8 +5279,11 @@ function arcLengthRange(pageCount) {
  * five-page toddler book. At 6+ no band applies, so the reading level stands in
  * as the maturity proxy.
  *
- * Invented-named-figure allowance: flat per band minus half the commissioned
- * cast, clamped 0..3. Page count no longer buys invented figures at all.
+ * Invented-named-figure allowance: a per-band ceiling minus half the commissioned
+ * cast, floored at 2 — a story structurally needs an antagonist and a helper, so
+ * a large cast may reduce the allowance but never below two. The ceiling rises
+ * with the band (and with the reading level at 6+); page count does not enter
+ * the calculation at all.
  *
  * ACTION budget (2026-09-07): an event may hold any number of actions, but
  * words are spent per ACTION, so the event budget alone does not bound page
@@ -5305,14 +5308,21 @@ const EVENT_BUDGETS_STANDARD = {
   standard: { lo: 3, hi: 2 },
   advanced: { lo: 2, hi: 1.5 },
 };
-// Invented named figures the band tolerates before the cast deduction.
+// Invented named figures the band tolerates before the cast deduction. Floor 2
+// — an antagonist and a helper are structural, not optional — so a large cast
+// may reduce the allowance but never below two.
 const INVENTED_FIGURE_BASE = {
-  routine: 0,
-  quest: 0,
-  tries: 1,
-  'fear-choice': 1,
-  journey: 2,
-  standard: 3,
+  routine: 2,
+  quest: 2,
+  tries: 2,
+  'fear-choice': 2,
+  journey: 3,
+};
+// At 6+ no band applies; the ceiling rises with the reading level, not length.
+const INVENTED_FIGURE_BASE_STANDARD = {
+  '1st-grade': 3,
+  standard: 6,
+  advanced: 9,
 };
 
 function buildArcBudgetSection(inputData, pageCount) {
@@ -5334,8 +5344,10 @@ function buildArcBudgetSection(inputData, pageCount) {
   hi = Math.max(lo, hi);
   const events = lo === hi ? `${lo} event${lo === 1 ? '' : 's'}` : `${lo}-${hi} events`;
   const cast = (inputData?.characters || []).length || 1;
-  const base = INVENTED_FIGURE_BASE[band] ?? INVENTED_FIGURE_BASE.standard;
-  const allowance = Math.max(0, Math.min(3, base - Math.floor(cast / 2)));
+  const base = INVENTED_FIGURE_BASE[band]
+    ?? INVENTED_FIGURE_BASE_STANDARD[lvl]
+    ?? INVENTED_FIGURE_BASE_STANDARD.standard;
+  const allowance = Math.max(2, base - Math.floor(cast / 2));
   const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
   const [aMin, aMax] = lvl === '1st-grade' ? [1, 2] : lvl === 'advanced' ? [5, 8] : [2, 4];
   const actions = pages * aMax;
@@ -5345,7 +5357,7 @@ function buildArcBudgetSection(inputData, pageCount) {
     ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
     `- This book carries at most ${actions} actions, ${aMin}-${aMax} to a page. An action is one thing a character does that changes something — a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`,
     ...(lvl === '1st-grade' ? ['- This book is read aloud to a 3-5 year old and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.'] : []),
-    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line in the arc stating why the story cannot work without them.`,
+    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast — enough for the story's opposition and its help; each one past that carries one line in the arc stating why the story cannot work without them.`,
   ].join('\n');
 }
 
