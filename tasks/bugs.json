@@ -676,7 +676,7 @@
       "reportedAt": "2026-09-07",
       "source": "Reproduced this session on arc config F (age 4, fear-choice, 18 pages) with gemini-3.1-pro: the stored judge record scratchpad/arcloop/F_judges.json carries notes == \"[object Object]\". Cause: server/lib/testlab.js runArcRoundsStage judgeOnce did notes: String(parsed.arc.notes || ''), and String(obj) is \"[object Object]\". The dims survive (so the mean is unaffected) but the panel-solutions block handed to buildArcRetellPrompt contains that panelist's notes as \"[object Object]\", i.e. no feedback at all. Intermittent and model-shaped - the same model returns a plain string on other configs. The sibling scoreFromDims() in storyScorecard.js had the same class of loss (notes: typeof given.notes === 'string' ? given.notes : ''), silently dropping object notes to an empty string.",
       "status": "fixed",
-      "fixedIn": "PENDING",
+      "fixedIn": "c903b6473",
       "note": "FIX: new exported helper sc.flattenNotes() in server/lib/storyScorecard.js - strings pass through, arrays join, objects render as 'key: value' lines (recursively), JSON.stringify as the last resort, null/undefined -> ''. Used at both sites: testlab.js judgeOnce and storyScorecard.js scoreFromDims. Grepped every other String(parsed...) site (coverTitlePaint, referenceSheets, styleAnalysis, testlab:6630 analysis) - those fields are contractually strings in their prompts and are not judge notes; left alone."
     }
   ]
