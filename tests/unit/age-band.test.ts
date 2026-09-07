@@ -136,7 +136,11 @@ describe('buildStoryShapeSection', () => {
     expect(shape).toMatch(/Challenges: one, small/);
     expect(shape).toMatch(/Feelings: three different ones/);
     expect(shape).not.toMatch(/major challenge/);
-    expect(shape).toMatch(/6 distinct events/);
+    // The routine band's per-page units are MOMENTS, not events: saying "N distinct
+    // events" here collided with this band's own budget of "at most 1 event"
+    // (buildArcBudgetSection), and both blocks reach the model in one prompt.
+    expect(shape).toMatch(/6 pages, a different moment on each/);
+    expect(shape).not.toMatch(/distinct events/);
   });
 
   it('gives the quest band one tiny goal and a repeated search', () => {
