@@ -1,6 +1,6 @@
 A rewriter has revised pages of a {LANGUAGE} children's book. You see each revised page as BEFORE and AFTER. Judge only the AFTER text, and only against its BEFORE.
 
-The rewrite may change how a page reads. It may not make the page worse or wrong. Report where it did: a meaning changed or lost, a fact dropped or contradicted, a phrase no fluent speaker of {LANGUAGE} would say, a new grammar or word-choice fault. Say nothing about style, pacing, or a change that is merely different.
+The rewrite may change how a page reads. It may not make the page worse or wrong. Report where it did: a meaning changed or lost, a fact dropped or contradicted, a phrase no fluent speaker of {LANGUAGE} would say, a new grammar or word-choice fault. Then read the AFTER on its own, in order, and report anything in it that now lands on the wrong person, thing or moment. Say nothing about style, pacing, or a change that is merely different.
 
 # PAGES
 
