@@ -730,7 +730,7 @@
       "source": "Reproduced from stored evidence on staging story job_1788816451791_25b31uqlp p13: brief row {object:'the large blue scale', hands:true}, objects [LOC007,CHR002,ART010.1,ART011,ART001.2]; bible ART010 'Large dragon scale' .1 delta 'lying flat and still inside the dry stone trough, no hands touching it'. visualBible.pageHoldsObject matched a row only by VB id or rowLower.includes(nameLower); the include is false, naming=[] -> false -> resolveObjectState saw no contradiction -> the assembled prompt (dry replay of the stored brief) still carried 'no hands touching it' - the delta that put the chip in the air on two earlier renders. The fix built in a7c413022 could not fire on the page it was built for.",
       "status": "fixed",
       "note": "FIX: one deterministic matcher visualBible.entryNamedByRow - id in row first, else token overlap where a candidate is named by a token no other cited entry carries (ambiguous -> null, never a guess); candidates = entry + the brief's objects[] entries (citedEntries), visualBible threaded through resolveObjectState/elementRefCell. Same matcher now drives vbElementBudget.rankPageElements focal (was an exact upper-cased string compare). Measured: stored bible (no `held`) matches right but cannot contradict - the flag is missing, not the match; with held:false on ART010.1 the p13 WARN fires and the clause is dropped. Unit: tests/unit/vb-object-states.test.ts 69/69, suite 880/880.",
-      "fixedIn": "PENDING"
+      "fixedIn": "503321471"
     }
   ]
 }
