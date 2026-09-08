@@ -53,6 +53,12 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **Cover gaze is code-owned: always at the viewer**; `gazes at:` is banned from cover hints.
 - **Cover title text: model-baked EVERYWHERE — `coverTitleMode` = 'baked' (2026-09-06, supersedes the 2026-08-29 per-environment split).** The front cover renders the title INTO the artwork in ONE call on `coverTitleBakedModel` (`grok-imagine-2`); back and initial covers stay textless art. The flag reads through ONE resolver (`resolveCoverTitleMode`) so first generation, trials and every later repaint agree. Promotion to production was the owner's reversal call under the rule "production equals staging except repair rounds", with evidence: the 2026-08-29 5-story/5-style sample and the nine 2026-09-06 staging trial covers, all spelled correctly incl. umlauts and possessives (decisions.md 2026-09-06). `composited` (app-painted from a real font, spelling safe by construction) remains available as the fallback mode; returning production to it is a reversal and needs the full protocol.
 - **Test Lab sets are generic, never per-stage** (a parallel title_sets mechanism was reverted).
+- **Three Visual Bible elements per page — and LOCATIONS ARE NOT ELEMENTS** (owner, 2026-09-08, superseding the
+  2026-09-06 count that included invented locations: "Do not count it as it is the empty scene not an artifact").
+  `VB_ELEMENT_BUDGET` counts secondary characters, animals, artifacts and vehicles; a LOC, real or invented, never
+  counts — the location is the plate the cast is composited into. The page's location cell rides LAST, at most one,
+  3 + 1 = Grok's `VB_SLOT_MAX_ELEMENTS` of 4. The budget is enforced at ASSIGNMENT (`trimVbAssignments`, plan-line
+  authority) as well as at the Art Director; do not re-add locations to `ELEMENT_COLLECTIONS` or to the AD's "all count" line.
 
 ## Data & infrastructure
 

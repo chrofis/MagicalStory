@@ -704,6 +704,15 @@
       "status": "fixed",
       "fixedIn": "86ea3d9ab",
       "note": "FIX: storyJobPipeline.js passes only a dev-mode USER override (inputData.modelOverrides?.qualityModel || null) as qualityModelOverride. evaluateImageQuality already resolves a null override to MODEL_DEFAULTS.qualityEval, so the quality judge is unchanged; the inventory now reads runtime `inventoryModel` on story jobs as designed."
+    },
+    {
+      "id": "vb-pages-not-earned-by-plan-line",
+      "title": "The Visual Bible assigned pages the plan line never earned (a worn item on 11-15 pages, named in 0 plan lines; 10-12 of 18 pages over the element budget at birth) and nothing enforced the template rule; the scene review could see the overflow but never fix it (briefFixable:false)",
+      "reportedAt": "2026-09-08",
+      "source": "Reproduced from stored evidence on staging story job_1788816451791_25b31uqlp. Stored bible: ART013 (worn backpack) pages [2,5,6,7,9,10,11,12,13,14,15], LOC007 pages 11-17; 10/18 pages carried more than 3 counted elements at birth (rankPageElements over appearsInPages alone). Fresh re-derivation with the same template: backpack on 15 pages, named in none of the 18 plan lines; 12/18 pages over, p13 at 7. Downstream: vb_element_overflow on 11 pages, scene review rewrote twice, sceneReviewReport.rewriteToZeroUnfixed named all 11 as briefFixable:false. Cause: prompts/story-bible-from-beats.txt:68 stated the rule (pages is earned by the plan line) with no post-check; outlineParser/unified.js copied pages to appearsInPages verbatim and beatsPipeline.js accepted the bible with only the peer-age and section-marker checks.",
+      "status": "fixed",
+      "fixedIn": "PENDING",
+      "note": "FIX: vbElementBudget.trimVbAssignments runs right after extractVisualBible() in beatsPipeline.js: per over-budget page, entries whose name/properName tokens occur in that page's plan line keep it, the rest yield in rankPageElements order; the page is stripped from appearsInPages AND pages (six readers prefer pages) and from states[].pages, an emptied state is dropped and the survivors re-minted; one WARN per stripped (element, page); beatsReviewReport.vbAssignmentTrim carries the outcome; never a kill. Prompt rule strengthened in place with {VB_ELEMENT_BUDGET} filled from the constant. Same commit, owner ruling via AskUserQuestion: locations (real or invented) are not elements and do not count; getElementReferenceImagesForPage hands the page its location cell last, 3 + 1 = VB_SLOT_MAX_ELEMENTS. Replay: stored bible 9 -> 0 pages over (11 stripped), fresh bible 10 -> 0 (19 stripped); p11 keeps chip, scale, trough."
     }
   ]
 }

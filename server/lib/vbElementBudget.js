@@ -7,24 +7,27 @@
  *
  * A Visual Bible ELEMENT is a bible entry that becomes a reference image packed
  * into the page's Grok slot — the same set `getElementReferenceImagesForPage`
- * (visualBible.js) selects: secondary characters, animals, artifacts, vehicles,
- * and INVENTED locations. Real landmarks are excluded there (they ship as real
- * photographs, not generated references) and are excluded here, so a page may
- * cite its landmark LOC and still hold three elements.
+ * (visualBible.js) selects: secondary characters, animals, artifacts and
+ * vehicles. LOCATIONS DO NOT COUNT — none of them (owner ruling, 2026-09-08,
+ * superseding the 2026-09-06 wording: "Do not count it as it is the empty scene
+ * not an artifact"). A real landmark ships as a photograph, and an invented
+ * location is what the empty-scene plate is built from — the backdrop the
+ * characters are composited into, not a prop competing for a slot. Counting it
+ * spent it twice. The selection still hands the page its location cell, LAST
+ * and at most one, so the slot holds at most VB_ELEMENT_BUDGET + 1 = 4 cells,
+ * which is exactly Grok's VB_SLOT_MAX_ELEMENTS.
  *
  * Two sources put an element on a page, and both are counted, because both feed
  * the selection: the brief's own `objects[]` (an id the Art Director asked for)
- * and the bible entry's `appearsInPages` (the bible's own answer). Locations are
- * the one exception — selection admits them by `appearsInPages` only, so the
- * count does too.
+ * and the bible entry's `appearsInPages` (the bible's own answer).
  *
  * RANKING (the "least important" the ruling drops). Data, never prose:
  *   0. a recurring creature — pinned first, exactly as visualBible.js pins it.
- *   1. type: character < animal < artifact < vehicle < location. This is the
- *      priority order the selection already sorts by (visualBible.js:2202-2224,
- *      mirrored in grok.js VB_TYPE_PRIORITY) — using any other order here would
- *      make the code-side truncation and the downstream cap keep different
- *      elements.
+ *   1. type: character < animal < artifact < vehicle. This is the priority
+ *      order the selection already sorts by (visualBible.js
+ *      getElementReferenceImagesForPage, mirrored in grok.js VB_TYPE_PRIORITY)
+ *      — using any other order here would make the code-side truncation and
+ *      the downstream cap keep different elements.
  *   2. focal on this page: the element is an actor or the object of a row in
  *      the brief's `interactions[]`. The page is about what is being handled.
  *   3. asked for: named in `objects[]` beats present only via `appearsInPages`.
@@ -56,13 +59,12 @@ const { getRecurringCreatureIds } = require('./visualBible');
 /** The owner's number. One source of truth for prompt, check and truncation. */
 const VB_ELEMENT_BUDGET = 3;
 
-/** Selection's priority order, by collection. Locations are `appearsInPages` only. */
+/** Selection's priority order, by collection. Locations are not elements (header). */
 const ELEMENT_COLLECTIONS = [
   { key: 'secondaryCharacters', type: 'character', priority: 1, viaObjects: true },
   { key: 'animals', type: 'animal', priority: 2, viaObjects: true },
   { key: 'artifacts', type: 'artifact', priority: 3, viaObjects: true },
   { key: 'vehicles', type: 'vehicle', priority: 4, viaObjects: true },
-  { key: 'locations', type: 'location', priority: 5, viaObjects: false },
 ];
 
 /**
@@ -118,7 +120,6 @@ function rankPageElements(pageNumber, metadata, visualBible) {
     const entries = visualBible[col.key];
     for (const entry of (Array.isArray(entries) ? entries : [])) {
       if (!entry || !entry.id) continue;
-      if (col.key === 'locations' && entry.isRealLandmark) continue;
       const id = baseId(entry.id) || String(entry.id).trim().toUpperCase();
       const onPage = Array.isArray(entry.appearsInPages) && entry.appearsInPages.includes(pageNumber);
       const named = col.viaObjects && asked.has(id);
@@ -243,8 +244,183 @@ ${JSON.stringify(metadata, null, 2)}`,
   };
 }
 
+/**
+ * ASSIGNMENT TRIM — the budget enforced where the pages are ASSIGNED.
+ *
+ * `story-bible-from-beats.txt` says `pages` is earned by the plan line, and
+ * the model does not obey it: measured on staging job_1788816451791_25b31uqlp
+ * a worn backpack claimed 11 pages (a re-derivation: 15, named in 0 plan
+ * lines) and 10-12 of 18 pages were over the budget at birth. Nothing checked
+ * it. Downstream the scene review found `vb_element_overflow` on 11 pages and
+ * could fix none of them, because a brief cannot withdraw what the bible
+ * placed (`briefFixable:false`). This is the deterministic post-check the
+ * prompt rule never had, run once on the freshly parsed bible, before the Art
+ * Director sees it.
+ *
+ * Per page, counting EXACTLY what `rankPageElements` counts (no brief exists
+ * yet, so it is `appearsInPages` alone; locations are not counted there, so a
+ * location — real or invented — is never stripped here): when more than
+ * VB_ELEMENT_BUDGET entries claim the page, keep
+ *   (a) entries whose name/properName tokens occur in that page's PLAN LINE,
+ *   (b) then the rest in `rankPageElements` order,
+ * and strip the page from every loser's `appearsInPages` (and its `pages`
+ * twin — the parser keeps both and several readers prefer `pages`).
+ *
+ * Token matching is mechanical and lexical, on the plan line only — never
+ * prose classification, never the story text: a name is split into words of
+ * four letters or more, a trailing parenthetical is ignored ("(face to
+ * camera)"), a short function-word list is dropped, and for anything that is
+ * not itself a person or creature the cast's own names are dropped too, so
+ * "<owner>'s satchel" is named by "satchel", never by the owner riding along
+ * on every page. A token matches as a word prefix ("scale" matches "scales").
+ *
+ * STATE CONTRACT: `objectStateForPage` assumes every page of an entry lies in
+ * exactly one state's `pages[]`. A page stripped from an entry is stripped
+ * from its states too; a state left with no page is dropped and the remaining
+ * states are re-minted through `normaliseObjectStates` so the dotted ids stay
+ * dense (nothing has cited a handle yet — this runs before the briefs exist).
+ *
+ * Never throws, never fails the run: a bible with no plan lines is returned
+ * untouched with an empty report.
+ *
+ * @param {Object} visualBible  parsed bible (MUTATED in place)
+ * @param {Array<{pageNumber:number, planLine:string}>} planPages
+ * @param {{castNames?: string[], budget?: number}} [opts]
+ * @returns {{pagesOverBudgetBefore:number, pagesOverBudgetAfter:number,
+ *   stripped:Array<{id:string,page:number,reason:string}>,
+ *   droppedStates:Array<{id:string,parent:string}>}}
+ */
+const TRIM_STOPWORDS = new Set([
+  'with', 'from', 'that', 'this', 'into', 'onto', 'over', 'under', 'seen', 'them',
+  'their', 'there', 'where', 'when', 'what', 'which', 'small', 'large', 'little',
+  'turned', 'away', 'face', 'camera', 'side', 'view',
+]);
+
+/** Lower-cased word tokens (>= 4 letters) of a name, parentheticals removed. */
+function nameTokens(text) {
+  return String(text || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(t => t.length >= 4 && !TRIM_STOPWORDS.has(t));
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Does the plan line contain any of the tokens as a word prefix? */
+function planLineNames(planLine, tokens) {
+  const line = String(planLine || '').toLowerCase();
+  if (!line || tokens.length === 0) return false;
+  return tokens.some(t => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(t)}`, 'u').test(line));
+}
+
+/** Remove one page from an entry's page lists and from each state's pages. */
+function stripPage(entry, page, hadPages) {
+  const drop = (arr) => (Array.isArray(arr) ? arr.filter(p => Number(p) !== page) : arr);
+  entry.appearsInPages = drop(entry.appearsInPages);
+  if (Array.isArray(entry.pages)) entry.pages = drop(entry.pages);
+  for (const st of (Array.isArray(entry.states) ? entry.states : [])) {
+    if (!st || !Array.isArray(st.pages)) continue;
+    if (!hadPages.has(st)) hadPages.set(st, st.pages.length > 0);
+    st.pages = drop(st.pages);
+  }
+}
+
+function trimVbAssignments(visualBible, planPages = [], { castNames = [], budget = VB_ELEMENT_BUDGET } = {}) {
+  const report = { pagesOverBudgetBefore: 0, pagesOverBudgetAfter: 0, stripped: [], droppedStates: [] };
+  if (!visualBible || typeof visualBible !== 'object') return report;
+  const { log } = require('../utils/logger');
+  const { normaliseObjectStates } = require('./visualBible');
+
+  const planByPage = new Map();
+  for (const p of (Array.isArray(planPages) ? planPages : [])) {
+    const n = Number(p && p.pageNumber);
+    if (Number.isFinite(n)) planByPage.set(n, String(p.planLine || ''));
+  }
+
+  // Every counted entry by base id, with the collection it lives in.
+  const byId = new Map();
+  for (const col of ELEMENT_COLLECTIONS) {
+    for (const entry of (Array.isArray(visualBible[col.key]) ? visualBible[col.key] : [])) {
+      if (!entry || !entry.id) continue;
+      byId.set(baseId(entry.id) || String(entry.id).trim().toUpperCase(), { entry, col });
+    }
+  }
+
+  // Cast tokens: commissioned names plus the bible's own people and creatures.
+  const castTokens = new Set();
+  for (const n of (Array.isArray(castNames) ? castNames : [])) for (const t of nameTokens(n)) castTokens.add(t);
+  for (const key of ['secondaryCharacters', 'animals']) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      for (const t of nameTokens(e && e.name)) castTokens.add(t);
+    }
+  }
+  const tokensOf = ({ entry, col }) => {
+    const toks = [...new Set([...nameTokens(entry.name), ...nameTokens(entry.properName)])];
+    return (col.type === 'character' || col.type === 'animal') ? toks : toks.filter(t => !castTokens.has(t));
+  };
+
+  // Pages to check: every page any counted entry claims.
+  const pages = new Set();
+  for (const { entry } of byId.values()) {
+    for (const p of (Array.isArray(entry.appearsInPages) ? entry.appearsInPages : [])) {
+      const n = Number(p);
+      if (Number.isFinite(n)) pages.add(n);
+    }
+  }
+
+  const touched = new Set();
+  const hadPages = new Map(); // state row -> had at least one page before any strip
+  for (const page of [...pages].sort((a, b) => a - b)) {
+    const ranked = rankPageElements(page, {}, visualBible);
+    if (ranked.length <= budget) continue;
+    report.pagesOverBudgetBefore++;
+    const planLine = planByPage.get(page) || '';
+    const named = [];
+    const rest = [];
+    for (const e of ranked) {
+      const rec = byId.get(e.id);
+      (rec && planLineNames(planLine, tokensOf(rec)) ? named : rest).push(e);
+    }
+    const keep = new Set([...named, ...rest].slice(0, budget).map(e => e.id));
+    for (const e of ranked) {
+      if (keep.has(e.id)) continue;
+      const rec = byId.get(e.id);
+      if (!rec) continue;
+      const reason = named.includes(e)
+        ? `named in the plan line but outranked: ${ranked.length} elements claim page ${page}, budget ${budget}`
+        : (planLine
+          ? `not named in page ${page}'s plan line; ${ranked.length} elements claim the page, budget ${budget}`
+          : `page ${page} has no plan line; ${ranked.length} elements claim it, budget ${budget}`);
+      stripPage(rec.entry, page, hadPages);
+      touched.add(e.id);
+      report.stripped.push({ id: e.id, page, reason });
+      log.warn(`[VB-TRIM] ${e.id} "${rec.entry.name || ''}" loses page ${page} — ${reason}`);
+    }
+  }
+
+  // State contract: a state with no page left is meaningless; drop and re-mint.
+  for (const id of touched) {
+    const { entry } = byId.get(id);
+    if (!Array.isArray(entry.states) || entry.states.length === 0) continue;
+    const emptied = entry.states.filter(st => st && hadPages.get(st) === true && Array.isArray(st.pages) && st.pages.length === 0);
+    if (emptied.length === 0) continue;
+    for (const st of emptied) {
+      report.droppedStates.push({ id: st.id, parent: id });
+      log.warn(`[VB-TRIM] ${st.id} "${st.name || ''}" dropped — every page of this state was stripped from ${id}`);
+    }
+    entry.states = normaliseObjectStates(entry.states.filter(st => !emptied.includes(st)), entry.id);
+  }
+
+  for (const page of pages) {
+    if (rankPageElements(page, {}, visualBible).length > budget) report.pagesOverBudgetAfter++;
+  }
+  return report;
+}
+
 module.exports = {
   VB_ELEMENT_BUDGET,
+  trimVbAssignments,
   rankPageElements,
   checkVbElementBudget,
   buildVbElementFindings,

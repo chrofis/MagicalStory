@@ -923,6 +923,25 @@ async function generateStoryViaBeats(inputData, opts = {}) {
             });
           }
         }
+        // The bible's `pages` are earned by the plan line (template rule) and
+        // the model does not obey it: a worn item claimed 11-15 pages named in
+        // no plan line and 10-12 of 18 pages were over the element budget at
+        // birth (job_1788816451791_25b31uqlp) — an overflow the scene review
+        // downstream can see but never fix, because a brief cannot withdraw a
+        // bible placement. Deterministic post-check, same shape as the age
+        // clamp above: plan-line-named entries keep the page, the rest yield
+        // in rankPageElements order, states trim in step. Never a kill.
+        if (visualBible) {
+          const { trimVbAssignments, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+          const trim = trimVbAssignments(visualBible, beats, {
+            castNames: (inputData.characters || []).map(c => c && c.name).filter(Boolean),
+          });
+          if (beatsReviewReport) beatsReviewReport.vbAssignmentTrim = trim;
+          if (trim.stripped.length > 0) {
+            const states = trim.droppedStates.length ? `, ${trim.droppedStates.length} empty state(s) dropped` : '';
+            gl.warn('beats_vb_assignment_trimmed', `${trim.pagesOverBudgetBefore} page(s) over the ${VB_ELEMENT_BUDGET}-element budget at assignment → ${trim.pagesOverBudgetAfter}; ${trim.stripped.length} (element, page) claim(s) stripped${states}`, null, trim);
+          }
+        }
         const vbCount = visualBible
           ? Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)
           : 0;

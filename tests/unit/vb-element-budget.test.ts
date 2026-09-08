@@ -35,12 +35,14 @@ function bible(overrides: any = {}) {
 }
 
 describe('rankPageElements', () => {
-  it('ranks by the reference-selection priority order, real landmarks excluded', () => {
+  it('ranks by the reference-selection priority order, locations excluded', () => {
     const ranked = rankPageElements(3, { objects: [] }, bible());
     expect(ranked.map((e: any) => e.id)).toEqual([
-      'CHR001', 'CHR002', 'ANI001', 'ART001', 'ART002', 'VEH001', 'LOC001',
+      'CHR001', 'CHR002', 'ANI001', 'ART001', 'ART002', 'VEH001',
     ]);
-    // The real landmark ships as a photograph, never as a packed element.
+    // Locations are not elements (owner, 2026-09-08): the real landmark ships
+    // as a photograph, the invented one is the plate the cast stands in.
+    expect(ranked.map((e: any) => e.id)).not.toContain('LOC001');
     expect(ranked.map((e: any) => e.id)).not.toContain('LOC002');
   });
 
@@ -71,10 +73,10 @@ describe('rankPageElements', () => {
       .toEqual(['ART003', 'ART001', 'ART002']);
   });
 
-  it('admits a location only through appearsInPages, never through objects[]', () => {
+  it('never counts a location, neither through appearsInPages nor through objects[]', () => {
     const vb = { locations: [{ id: 'LOC009', name: 'the invented cellar', appearsInPages: [8] }] };
-    expect(rankPageElements(3, { objects: ['LOC009'] }, vb)).toEqual([]);
-    expect(rankPageElements(8, { objects: [] }, vb).map((e: any) => e.id)).toEqual(['LOC009']);
+    expect(rankPageElements(8, { objects: ['LOC009'] }, vb)).toEqual([]);
+    expect(rankPageElements(8, { objects: [] }, vb)).toEqual([]);
   });
 });
 
@@ -96,18 +98,19 @@ describe('checkVbElementBudget', () => {
       secondaryCharacters: [{ id: 'CHR001', name: 'the ferryman', appearsInPages: [3] }],
       animals: [{ id: 'ANI001', name: 'the goat', appearsInPages: [3] }],
       artifacts: [{ id: 'ART001', name: 'the lantern', appearsInPages: [3] }],
-      vehicles: [{ id: 'VEH001', name: 'the cart', appearsInPages: [3] }],
+      vehicles: [{ id: 'VEH001', name: 'the cart', appearsInPages: [3] }, { id: 'VEH002', name: 'the barge', appearsInPages: [3] }],
+      // Not an element: the invented location is the plate, and never counts.
       locations: [{ id: 'LOC001', name: 'the invented mill', appearsInPages: [3] }],
     };
     const f: any = checkVbElementBudget(3, { objects: [] }, vb);
     expect(f.type).toBe('vb_element_overflow');
-    expect(f.requested).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001', 'LOC001']);
+    expect(f.requested).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001', 'VEH002']);
     expect(f.kept).toEqual(['CHR001', 'ANI001', 'ART001']);
-    expect(f.dropped).toEqual(['VEH001', 'LOC001']);
+    expect(f.dropped).toEqual(['VEH001', 'VEH002']);
     expect(f.detail).toContain('references 5 Visual Bible elements');
     expect(f.detail).toContain('keep at most 3');
     expect(f.detail).toContain('the cart (VEH001, vehicle)');
-    expect(f.detail).toContain('the invented mill (LOC001, location)');
+    expect(f.detail).not.toContain('LOC001');
   });
 
   it('reaches the scene review as a sent brief fault', () => {

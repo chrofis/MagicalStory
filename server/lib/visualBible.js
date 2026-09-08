@@ -2703,9 +2703,19 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — declared off-body, the plate is its only reference`);
   }
 
-  // Sort by priority and limit
+  // Sort by priority and limit. LOCATIONS ARE NOT ELEMENTS (owner ruling,
+  // 2026-09-08: "Do not count it as it is the empty scene not an artifact") —
+  // an invented location is the plate the cast is composited into, so it is
+  // not one of the `maxRefs` elements; it rides along LAST, at most one, so
+  // the page holds at most maxRefs + 1 cells (3 + 1 = 4 = VB_SLOT_MAX_ELEMENTS
+  // on the page path). Real landmarks never reached this list at all.
   relevantRefs.sort((a, b) => a.priority - b.priority);
-  const kept = relevantRefs.slice(0, maxRefs);
+  const elements = relevantRefs.filter(r => r.type !== 'location');
+  const locations = relevantRefs.filter(r => r.type === 'location');
+  if (locations.length > 1) {
+    log.warn(`[VB-REFS] Page ${pageNumber}: ${locations.length} invented locations claim this page (${locations.map(l => l.id).join(', ')}) — only ${locations[0].id} rides as the location cell`);
+  }
+  const kept = [...elements.slice(0, maxRefs), ...locations.slice(0, 1)];
   const pinned = kept.filter(r => r.recurring).map(r => `${r.name} (${r.id})`);
   if (pinned.length > 0) {
     log.info(`🔲 [VB-REFS] Page ${pageNumber}: recurring creature pinned to the element refs — ${pinned.join(', ')}`);

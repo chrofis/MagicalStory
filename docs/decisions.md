@@ -30545,3 +30545,80 @@ follow the brief; the two measured cases split 1-1, so this is a coin the owner 
 `server/lib/promptBuilders.js` (REQUIRED OBJECTS state selection), `tests/unit/vb-object-states.test.ts`,
 `tasks/bugs.json` (`vb-object-state-contradicts-page-instant`, fixed), `tasks/BACKLOG.md`.
 **Status:** ✅ active on `staging` (not pushed at time of writing).
+
+---
+
+## 2026-09-08 — Visual Bible page assignment is trimmed to the element budget at birth; LOCATIONS ARE NOT ELEMENTS (supersedes "Three Visual Bible elements per page, enforced at the Art Director", 2026-09-06)
+
+**Context:** `prompts/story-bible-from-beats.txt:68` says `pages` is earned — only the pages whose
+plan line contains the element. The model does not obey it and nothing checked it. Measured on staging
+`job_1788816451791_25b31uqlp` (18 pages): the stored bible gave `ART013` (a worn backpack) 11 pages
+and `LOC007` (the invented summit) pages 11-17; **10 of 18 pages carried more than 3 elements at
+birth**. A fresh re-derivation with the same template put the backpack on 15 pages while **no plan line
+named it**, with 12/18 pages over and p13 at 7. Downstream the Art Director reported
+`vb_element_overflow` on 11 pages, the scene review rewrote twice and shipped `briefUnfixed: 11` —
+`briefFixable:false`, because a brief cannot withdraw a bible placement (the 2026-09-08 rewrite-until-zero
+entry recorded exactly this gap and left it as the owner's call). Reader sweep: the parser keeps BOTH
+`pages` and `appearsInPages` on every entry, and six readers prefer `pages` (`promptBuilders.js:626,3055`,
+`sceneMetadata.js:1609`, `prompts.js:526`, `visualBible.js:1392`, `entityConsistency.js:1498`) — a trim
+that touched only `appearsInPages` would have been invisible to them.
+
+**Decision, part 1 — the trim.** `vbElementBudget.trimVbAssignments(visualBible, planPages, {castNames})`
+runs once, right after `extractVisualBible()` in `beatsPipeline.js` (beside the peer-age clamp), before
+the Art Director sees the bible. Per page, counting exactly what `rankPageElements` counts: when more than
+`VB_ELEMENT_BUDGET` entries claim the page, entries whose name/`properName` tokens occur in that page's
+PLAN LINE keep it, then the rest in `rankPageElements` order; every loser loses the page from
+`appearsInPages` AND `pages`, one WARN per (element, page). Token matching is lexical on the plan line
+only — words of four letters or more, parentheticals dropped, a short function-word list dropped, and
+for anything that is not itself a person or creature the cast's names are dropped too ("<owner>'s
+satchel" is named by "satchel", never by the owner on every page). Never prose classification, never the
+story text. **State contract kept:** a stripped page leaves the entry's `states[].pages` too; a state
+left with no page is dropped with a WARN and the survivors re-minted through `normaliseObjectStates`
+(dense dotted ids — nothing has cited a handle yet at this point). Outcome is visible on the story record:
+`beatsReviewReport.vbAssignmentTrim = {pagesOverBudgetBefore, pagesOverBudgetAfter, stripped:[{id,page,reason}], droppedStates}`
+plus a `beats_vb_assignment_trimmed` generation-log warning. Never fails the run. The prompt rule at
+line 68 is strengthened in place (physical presence is not earning; `{VB_ELEMENT_BUDGET}` now filled
+from the constant) — one chokepoint, no second copy.
+
+**Decision, part 2 — the reversal.** Owner ruling 2026-09-08, via `AskUserQuestion` this session,
+verbatim: **"Do not count it as it is the empty scene not an artifact."** An invented location is what
+the empty-scene plate is built from — the backdrop the cast is composited into, not a prop competing for a
+reference slot; counting it spent it twice. So **locations — real or invented — do not count against the
+per-page element budget**, extending the `isRealLandmark` exemption to the whole `locations` collection.
+This supersedes the 2026-09-06 wording ("never more than 3 VB elements per scene", which counted invented
+locations) — the number 3 stands; what it counts changes: secondary characters, animals, artifacts and
+vehicles. Evidence for the reversal: the measurements above (10/18 and 12/18 pages over at birth, the
+invented `LOC007` holding a slot on pages 11-17, `briefUnfixed: 11` with `briefFixable:false`).
+Sites: `vbElementBudget.rankPageElements` (the `locations` collection removed from `ELEMENT_COLLECTIONS`);
+`visualBible.getElementReferenceImagesForPage` now returns up to `maxRefs` non-location cells PLUS at
+most one location cell, LAST — 3 + 1 = 4 = `VB_SLOT_MAX_ELEMENTS`, so Grok's cap can never be exceeded on
+the page path and the packer's own priority sort (location = 5) keeps it last there too; both
+scene-expansion templates say "a LOC does not, real or invented". Plate construction and routing are
+unchanged (with a plate set, `referenceSheets.js` already dropped location cells from the composite refs).
+A page claiming two invented locations rides the first and WARNs.
+
+**Rationale:** The 2026-09-06 entry had two enforcers — the brief check and the page-gen selection — and
+neither could touch the half that actually overflowed: the bible's own placement. Enforcing at assignment
+closes that half where it is born, with the plan line as the deterministic authority the template already
+named. Locations were the largest single source of false overflow (one on nearly every page by
+construction) and are rendered as the plate anyway.
+
+**Replay (static, stored data, $0).** Stored dragon bible: 9 pages over → 0 (10 → 0 under the old
+count); 11 (element, page) claims stripped; p11 keeps the chip, the large scale and the stone trough (all
+three named in its plan line) and drops the backpack and the summit panel; no state emptied. Fresh
+`bible_response.txt`: 10 → 0 (12 → 0 old count); 19 stripped; the backpack falls from 15 pages to the 7
+where the page had room; three states emptied and dropped (`ART013.1/.2`, `ART003.2`), survivors
+re-minted. Note honestly: p11 still has five non-location claimants (chip, scale, trough, backpack, panel),
+so the location exemption alone does not make it fit — the plan-line trim is what keeps the right three.
+
+**Verified:** `tests/unit/vb-assignment-trim.test.ts` (11 new), `vb-element-budget.test.ts` and
+`recurring-creature-slot.test.ts` updated to the new count; whole suite green; `check-settled.js` OK.
+
+**Touched:** `server/lib/vbElementBudget.js` (`trimVbAssignments`, `ELEMENT_COLLECTIONS`, header),
+`server/lib/visualBible.js` (`getElementReferenceImagesForPage` tail), `server/lib/beatsPipeline.js`
+(post-check + `vbAssignmentTrim`), `server/lib/promptBuilders.js` (`{VB_ELEMENT_BUDGET}` in the bible
+prompt), `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `tests/unit/vb-assignment-trim.test.ts`,
+`tests/unit/vb-element-budget.test.ts`, `tests/unit/recurring-creature-slot.test.ts`, `docs/SETTLED.md`,
+`tasks/bugs.json` (`vb-pages-not-earned-by-plan-line`), `tasks/BACKLOG.md`.
+**Status:** ✅ active on `staging` (not pushed at time of writing).
