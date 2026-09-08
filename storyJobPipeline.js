@@ -5616,7 +5616,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // clamped so a request can never ask for MORE than configured.
           maxRegenAttempts: enableFullRepair ? repairPasses : 0,
           evalConcurrency: 500,
-          qualityModelOverride: modelOverrides.qualityModel,
+          // Only a dev-mode USER override reaches the eval as an override. The
+          // resolved default (modelOverrides.qualityModel = MODEL_DEFAULTS.qualityEval)
+          // used to be passed here, and runVisualInventory lets an override beat
+          // `inventoryModel` — so the staging Qwen inventory never ran on a
+          // story job (every stored stage-1 call carried 2.5 Flash's 1990-token
+          // signature; bugs.json inventory-model-shadowed-by-default-override).
+          qualityModelOverride: inputData.modelOverrides?.qualityModel || null,
           useIteratePage: true  // Use iterate (re-expansion) for better redo quality
         });
 

@@ -695,6 +695,15 @@
       "status": "fixed",
       "fixedIn": "a7c413022",
       "note": "FIX: (a) prompts/story-bible-from-beats.txt - a state's delta is read off THAT page's plan line; a page whose instant handles or joins the object never receives a resting look; each state carries a structured `held` flag. (b) visualBible.resolveObjectState is the ONE resolver for both the REQUIRED OBJECTS clause and the reference cell: a chosen state whose `held` disagrees with the brief's interactions[] (hands:true rows naming the object) is `contradicted` and buildImagePrompt drops its delta with a WARN naming page, state id and the authored delta. (c) When the cited handle and the bible's page table disagree, the page contact arbitrates; with no verdict the table wins; both cases WARN with both ids. Bibles without `held` (every stored story) never contradict. Limit, recorded honestly: the AD's interactions[] are character-to-object rows only, so 'two objects meeting' (p11's scale, which no row names) and 'open palm vs pressed' are not structurally detectable in code - for those the prompt-side derivation rule (a) is the fix."
+    },
+    {
+      "id": "inventory-model-shadowed-by-default-override",
+      "title": "The staging Qwen3-VL blind inventory never ran on a story job: processUnifiedStoryJob passed the resolved DEFAULT quality model as qualityModelOverride, and runVisualInventory lets any override beat runtime `inventoryModel`",
+      "reportedAt": "2026-09-08",
+      "source": "Reproduced from stored evidence on staging stories job_1788816451791_25b31uqlp (18 pages, 26 evaluated versions) and job_1788820396445_9erw6xc01 (16 pages, 19 versions), both generated after commit d64cf25c9 went live. Every stored threeStageResult.usage.stage1_input_tokens is 1990 - the gemini-2.5-flash signature measured in Lab experiments 1054/1060/1061 - while qwen3-vl measures 2692 on the same template (experiments 1049/1053). The stored inventories are word-for-word identical to Lab experiments 1060/1061 (2.5 Flash, temperature 0). Cause: storyJobPipeline.js builds modelOverrides with qualityModel: MODEL_DEFAULTS.qualityEval and hands it to the repair pipeline as qualityModelOverride; evalPipeline.js line ~1019 resolves the inventory model as qualityModelOverride || MODEL_DEFAULTS.inventoryModel, so the default shadowed the inventory key on every page. The Lab quality_eval stage passes no override, which is why experiment 1056 did run Qwen and why the 2026-09-07 closure note wrongly said the first staging story 'ran clean with no fallback'.",
+      "status": "fixed",
+      "fixedIn": "",
+      "note": "FIX: storyJobPipeline.js passes only a dev-mode USER override (inputData.modelOverrides?.qualityModel || null) as qualityModelOverride. evaluateImageQuality already resolves a null override to MODEL_DEFAULTS.qualityEval, so the quality judge is unchanged; the inventory now reads runtime `inventoryModel` on story jobs as designed."
     }
   ]
 }
