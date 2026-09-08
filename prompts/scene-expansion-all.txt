@@ -212,6 +212,8 @@ Omit entirely (do not include with `false`): pure ground/floor/path contact, lea
 
 Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side" — the visible grip belongs in the prose (rule 7b). Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
+`receiver` (optional): when the action's result later arrives at a second object — a basin under a spout, a bucket under a pump, a pool below — its VB id or plain name. `target` (optional): what the tool acts on, as a short noun phrase ("the crack in the rock face"). The page shows the result at the contact; the builder places the receiver clear of the tool.
+
 `hands`: `true` when the character's hands are on the object. One object takes one pair of hands: when a second character reaches for the same object, one holds it out and the other reaches — their hands never share the grip.
 
 `action`: required on every row, in English whatever the story language. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.

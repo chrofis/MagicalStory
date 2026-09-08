@@ -241,6 +241,15 @@ function sanitizeInteractions(rawInteractions) {
     // `where` prose. Only an explicit true is kept: absent means "not declared",
     // which must never read as a violation on briefs written before the field.
     if (i.hands === true) out.hands = true;
+    // `receiver` names the second object the action's RESULT later arrives at
+    // (a basin under a spout); `target` names what the tool acts on. Both are
+    // opaque strings passed through verbatim — the prompt builder strips the
+    // receiver's state clause and emits a fixed placement sentence from them
+    // (decisions.md 2026-09-08, "result at the contact, receiver clear").
+    const receiver = String(i.receiver || '').trim();
+    if (receiver) out.receiver = receiver.slice(0, 80);
+    const target = String(i.target || '').trim();
+    if (target) out.target = target.slice(0, 120);
     kept.push(out);
   }
   if (dropped.length > 0) {

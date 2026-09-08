@@ -48,6 +48,7 @@ The plan line's instant is a single drawable moment:
 - Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.
 - Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.
 - The action at the moment it happens, never the state that follows it.
+- One action per page. A deed is one action; its effect is another; where the effect goes is a third. When a plan line holds more than one, the later ones move to the next page.
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
 - Never compose the frame — what fills it, how large something looks, where it sits; the shot type is enough.
 

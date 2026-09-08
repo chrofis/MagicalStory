@@ -3492,6 +3492,25 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // level — don't re-add a duplicate emitter here. Page 12 of the Miller
   // showcase wasted ~1050 chars triple-counting Sofia before this removal.
 
+  // RESULT AT THE CONTACT, RECEIVER CLEAR. An interactions[] row may name a
+  // `receiver`: the second object the action's result later arrives at (a
+  // basin under a spout). Measured over six renders of one such instant
+  // (decisions.md 2026-09-08): every prompt that let the receiver carry the
+  // effect ("water jetting into the interior") or sit "nearby" drew the water
+  // out of the TOOL into the receiver; the one prompt that put the tip INTO
+  // the target and the receiver "several steps in front, well clear" drew it
+  // out of the target. Prose rules to that effect did not bind; this is the
+  // structured version — a fixed sentence the model cannot rewrite, and the
+  // receiver's state clause dropped for this page (the strip site is in the
+  // artifact loop below).
+  const receiverRows = (Array.isArray(metadata?.interactions) ? metadata.interactions : [])
+    .filter(r => r && typeof r.receiver === 'string' && r.receiver.trim() && r.object);
+  const receiverPlacement = buildReceiverPlacement(receiverRows);
+  if (receiverPlacement) {
+    cleanSceneDescription += `\n\n${receiverPlacement}`;
+    log.info(`[RECEIVER] Page ${pageNumber}: placement sentence emitted — "${receiverPlacement}"`);
+  }
+
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
   // Supports lookup by name OR identifier (e.g., "CLO001", "ART002", etc.)
@@ -3582,6 +3601,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         let state = resolved.state;
         if (resolved.contradicted) {
           log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") says the object is ${state.held ? 'in hand' : 'untouched'} but the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
+          state = null;
+        }
+        // The RECEIVER of another row's result never carries a state clause
+        // on the acting page: the bible writes the effect onto it ("water
+        // jetting into the interior"), and that clause is what pulls the
+        // result to the receiver instead of the contact. Same drop mechanism
+        // as the `held` contradiction above; the object itself stays listed.
+        const receiverRow = state ? receiverRows.find(r => matchesEntry(artifact, r.receiver)) : null;
+        if (receiverRow) {
+          log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${state.id} ("${state.name}") is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
           state = null;
         }
         requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state });
@@ -4044,6 +4073,33 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     }
   }
   return out.join('\n');
+}
+
+/**
+ * The fixed "result at the contact, receiver clear" sentence for every
+ * interactions[] row carrying a `receiver`. Deterministic string assembly from
+ * the row's own fields — `object` is the tool, `target` (or, failing that, the
+ * row's `where` text) is what it acts on, `receiver` is what later takes the
+ * result. VB ids are left in place; the final sanitiser resolves them to the
+ * same English refs the rest of the prompt uses. No prose is classified here.
+ *
+ * @param {Array} rows - interactions rows with a non-empty `receiver`
+ * @returns {string} '' when no row qualifies
+ */
+function buildReceiverPlacement(rows) {
+  const lines = [];
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    const tool = String(r?.object || '').trim();
+    const receiver = String(r?.receiver || '').trim();
+    if (!tool || !receiver) continue;
+    const target = String(r?.target || '').trim();
+    const where = String(r?.where || '').trim();
+    const contact = target
+      ? `where ${tool} meets ${target}`
+      : (where ? `at the point where ${tool} makes contact (${where})` : `at the point where ${tool} makes contact`);
+    lines.push(`The result of this action appears only ${contact}; ${receiver} stands well clear of ${tool}, several steps away, never under or beside its tip.`);
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -7012,6 +7068,7 @@ module.exports = {
   sanitizeVbIdsInPrompt,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
+  buildReceiverPlacement,
   SPLIT_REVIEW_ANALYSIS_STUB,
   sliceAnalysisAspect,
   stripReviewAspectMarkers,

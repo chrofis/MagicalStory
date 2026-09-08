@@ -192,6 +192,8 @@ Field shape: `{character, object, where, action, hands, storyRelevant, priority}
 
 
 
+`receiver` (optional): when the action's result later arrives at a second object — a basin under a spout, a bucket under a pump, a pool below — its VB id or plain name. `target` (optional): what the tool acts on, as a short noun phrase ("the crack in the rock face"). The page shows the result at the contact; the builder places the receiver clear of the tool.
+
 `hands`: `true` when the character's hands are on the object. One object takes one pair of hands: when a second character reaches for the same object, one holds it out and the other reaches — their hands never share the grip.
 
 `action`: required on every row, in English whatever the story language. Name the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves. Rows performing the same activity carry the same label, however many characters that is. Use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present; neither counts as the page action.
