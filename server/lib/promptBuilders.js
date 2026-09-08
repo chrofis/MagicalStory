@@ -3578,7 +3578,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // whose instant pressed two halves together — the render obeyed the
         // state twice). Its delta is dropped from this line, loudly; the
         // object itself stays listed.
-        const resolved = resolveObjectState(artifact, handle, pageNumber, metadata);
+        const resolved = resolveObjectState(artifact, handle, pageNumber, metadata, { visualBible });
         let state = resolved.state;
         if (resolved.contradicted) {
           log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") says the object is ${state.held ? 'in hand' : 'untouched'} but the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);

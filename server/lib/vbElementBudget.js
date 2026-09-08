@@ -54,7 +54,7 @@
  */
 
 const { extractSceneMetadata, parseProseMetadataFormat } = require('./sceneMetadata');
-const { getRecurringCreatureIds } = require('./visualBible');
+const { getRecurringCreatureIds, entryNamedByRow } = require('./visualBible');
 
 /** The owner's number. One source of truth for prompt, check and truncation. */
 const VB_ELEMENT_BUDGET = 3;
@@ -88,14 +88,14 @@ function objectIds(objects = []) {
   return ids;
 }
 
-/** Every name/id the brief's interactions[] touch, upper-cased, for the focal test. */
-function interactionTokens(metadata) {
+/** The `character` / `object` strings of the brief's interactions[], for the focal test. */
+function interactionFields(metadata) {
   const rows = (metadata && Array.isArray(metadata.interactions)) ? metadata.interactions : [];
-  const out = new Set();
+  const out = [];
   for (const row of rows) {
     for (const field of ['character', 'object']) {
-      const v = String((row && row[field]) || '').trim().toUpperCase();
-      if (v) out.add(v);
+      const v = String((row && row[field]) || '').trim();
+      if (v) out.push(v);
     }
   }
   return out;
@@ -113,7 +113,7 @@ function interactionTokens(metadata) {
 function rankPageElements(pageNumber, metadata, visualBible) {
   if (!visualBible) return [];
   const asked = new Set(objectIds(metadata && metadata.objects));
-  const tokens = interactionTokens(metadata);
+  const fields = interactionFields(metadata);
   const recurring = new Set(getRecurringCreatureIds(visualBible).map(id => String(id).toUpperCase()));
   const rows = [];
   for (const col of ELEMENT_COLLECTIONS) {
@@ -131,11 +131,20 @@ function rankPageElements(pageNumber, metadata, visualBible) {
         type: col.type,
         recurring: recurring.has(id),
         priority: recurring.has(id) ? 0 : col.priority,
-        focal: tokens.has(id) || (!!name && tokens.has(name.toUpperCase())),
+        focal: false,
+        entry,
         fromObjects: !!named,
         appearsCount: Array.isArray(entry.appearsInPages) ? entry.appearsInPages.length : 0,
       });
     }
+  }
+  // Focal = an interactions[] row names the element — the ONE row→entry
+  // matcher (visualBible.entryNamedByRow), disambiguated against every other
+  // element on this page, so a paraphrased name still counts.
+  const candidates = rows.map(r => r.entry);
+  for (const r of rows) {
+    r.focal = fields.some(f => entryNamedByRow(f, candidates) === r.entry);
+    delete r.entry;
   }
   return rows.sort((a, b) => (
     (a.priority - b.priority)

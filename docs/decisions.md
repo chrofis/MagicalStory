@@ -30709,3 +30709,41 @@ and is left for the owner to call.
 `server/lib/beatsPipeline.js` (round-2 options, page-0 filter, subset beats), `server/lib/promptBuilders.js`
 (`buildSceneReviewPrompt` verbatim plan lines), `tasks/bugs.json`, `tasks/BACKLOG.md`. Commits `52ba34d61`,
 `4086fff75`. Harness: `scratchpad/encode_/rerun_beats_ad.js` (session-local). **Status:** on `staging`, not pushed.
+
+## 2026-09-08 — A brief's interactions[] row names a bible entry by TOKEN OVERLAP, not substring (extends "The page instant outranks a contradicting object state", same day)
+
+**Context.** The resolver above (`a7c413022`) reads the page's contact from `interactions[]` rows whose `object`
+string names the entry. Its first matcher was `rowLower.includes(nameLower)`. Reproduced on the page it was built
+for: staging `job_1788816451791_25b31uqlp` p13, row `object: "the large blue scale", hands: true` against `ART010`
+"Large dragon scale" — `"the large blue scale".includes("large dragon scale")` is false, so `pageHoldsObject` saw
+no row for the scale, returned `false`, `resolveObjectState` reported no contradiction, and the assembled prompt still
+carried `.1`'s "no hands touching it" (the delta that put the chip in the air on two earlier renders). The Art
+Director PARAPHRASES names as a matter of course; a substring rule fails on exactly the rows that matter.
+
+**Decision.** One matcher, `visualBible.entryNamedByRow(rowField, candidates)`, used everywhere a row is tied to an
+entry (`pageHoldsObject` → `resolveObjectState` → the REQUIRED OBJECTS clause and `elementRefCell`; and
+`vbElementBudget.rankPageElements`' `focal` flag, which compared upper-cased whole strings — same blind spot). Rules:
+(1) a VB id in the row wins; (2) otherwise the row and each candidate are tokenised (lower-case letters, ≥ 4 chars,
+a function-word list — size and colour words are deliberately KEPT, unlike `ENTITY_MATCH_STOPWORDS` /
+`TRIM_STOPWORDS`, which drop "large"/"small" for their own jobs), and a candidate is named when the row shares with
+it at least one token no OTHER candidate carries. Candidates are the entry under test plus every entry the brief's
+`objects[]` cites (`citedEntries`; `visualBible` is now threaded through `resolveObjectState` / `elementRefCell` for
+that). "the large blue scale" → shares *scale* with scale and chip, *large* with the scale alone → `ART010`;
+"the chip" → `ART001`; "the dragon scale" → only shared tokens → `null`, never a guess. No prose classification.
+
+**Measured behaviour of `held === null`, recorded so nobody re-derives it.** Stored bibles carry no `held`, so on
+the stored p13 bible the match is now right (`held: true` for `ART010`) but `contradicted` stays false — the flag,
+not the match, is what is missing; the clause survives (arm A of the dry replay). Stamp `held:false` on `ART010.1`
+as a fresh bible would and the page fires: `⚠️ [VB-STATE] Page 13: ART010.1 ("in trough") says the object is
+untouched but the brief's interactions put hands on it — state clause dropped`, "no hands touching it" gone (arm B).
+`ART001.2` "open upturned palm" stays on both arms (no row names the chip, no `held` stored); on a fresh bible with
+`held:true` on it the reverse rule drops it too, because the page declares its contacts and none touches the chip.
+The chip really is in Levin's hand on p13 — the AD wrote the scale as the row's object — so a fresh-bible p13 would
+lose a correct clause. Object→object / "held while fitting" rows are the open AD-schema question already recorded
+in the 2026-09-08 entry above; not changed here.
+
+**Touched:** `server/lib/visualBible.js` (`entryNamedByRow`, `citedEntries`, `rowMatchTokens`, `pageHoldsObject`,
+`resolveObjectState`, `elementRefCell`), `server/lib/promptBuilders.js` (passes `visualBible`),
+`server/lib/vbElementBudget.js` (`rankPageElements` focal via the shared matcher), `tests/unit/vb-object-states.test.ts`,
+`tasks/bugs.json` `vb-row-matcher-substring-misses-paraphrase`. Replay harness: `scratchpad/replay_p13_dry.js`
+(session-local, dry). **Status:** on `staging`, not pushed.

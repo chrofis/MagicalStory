@@ -615,6 +615,89 @@ describe('resolveObjectState — the page instant outranks a contradicting state
     expect(pageHoldsObject(e, meta([{ character: 'Ada', object: 'ART001', where: 'looks at it' }]))).toBeNull();
   });
 
+  // ── Row → entry matching. The Art Director PARAPHRASES object names, so the
+  // first matcher (substring of the entry name in the row) never fired on the
+  // page the resolver was built for. Staging job_1788816451791_25b31uqlp p13.
+  describe('entryNamedByRow — paraphrased rows resolve by token overlap, never by guess', () => {
+    const { entryNamedByRow } = require_('../../server/lib/visualBible');
+    const SCALE = { id: 'ART010', name: 'Large dragon scale', states: [
+      { id: 'ART010.1', name: 'in trough', delta: 'lying flat and still inside the dry stone trough, no hands touching it', pages: [11, 12, 13, 14], held: false },
+    ] };
+    const CHIP = { id: 'ART001', name: 'Dragon scale chip', states: [
+      // no `held` - exactly as the stored bible has it
+      { id: 'ART001.2', name: 'held', delta: 'resting in an open upturned palm, fully visible from above', pages: [6, 11] },
+    ] };
+    const TROUGH = { id: 'ART011', name: 'Stone trough' };
+    const P13_BIBLE = { mainCharacters: [], secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [], artifacts: [SCALE, CHIP, TROUGH] };
+    // The stored p13 row, verbatim.
+    const P13_ROW = { character: 'Levin', object: 'the large blue scale', where: 'reaches past the ibex to fit the chip against the scale inside the trough', action: 'reaching for the scale', hands: true, storyRelevant: true, priority: 'essential' };
+    const P13_META = { objects: ['LOC007', 'CHR002', 'ART010.1', 'ART011', 'ART001.2'], interactions: [P13_ROW] };
+
+    it('THE DEFECT: "the large blue scale" names the scale, not the chip - "large" is the scale\'s alone', () => {
+      expect(entryNamedByRow('the large blue scale', [SCALE, CHIP, TROUGH])).toBe(SCALE);
+    });
+    it('"the chip" names the chip', () => {
+      expect(entryNamedByRow('the chip', [SCALE, CHIP, TROUGH])).toBe(CHIP);
+    });
+    it('a row ambiguous between two cited entries is null, never a guess', () => {
+      expect(entryNamedByRow('the dragon scale', [SCALE, CHIP])).toBeNull();
+      expect(entryNamedByRow('the scale', [SCALE, CHIP])).toBeNull();
+    });
+    it('an id in the row wins over every token, whatever the prose says', () => {
+      expect(entryNamedByRow('the chip [ART010.1]', [SCALE, CHIP])).toBe(SCALE);
+      expect(entryNamedByRow('ART001.2', [SCALE, CHIP])).toBe(CHIP);
+    });
+    it('the old substring cases still hold: exact name, name inside a longer row, single candidate', () => {
+      const e = HELD_BIBLE().artifacts[0];
+      expect(entryNamedByRow('hollowed carved vessel with a lid', [e])).toBe(e);
+      expect(entryNamedByRow('the hollowed carved vessel with a lid', [e])).toBe(e);
+      expect(entryNamedByRow('the vessel', [e])).toBe(e);
+      expect(entryNamedByRow('her own sleeve', [e])).toBeNull();
+      expect(entryNamedByRow('', [e])).toBeNull();
+    });
+    it('pageHoldsObject on the stored p13 brief: scale held (true), chip has no row (false)', () => {
+      expect(pageHoldsObject(SCALE, P13_META, P13_BIBLE)).toBe(true);
+      expect(pageHoldsObject(CHIP, P13_META, P13_BIBLE)).toBe(false);
+      expect(pageHoldsObject(TROUGH, P13_META, P13_BIBLE)).toBe(false);
+    });
+    it('resolveObjectState on p13: ART010.1 "no hands touching it" is contradicted and the clause is dropped, loudly', () => {
+      const warnings: string[] = [];
+      const r = captureWarns(warnings, () => resolveObjectState(SCALE, 'ART010.1', 13, P13_META, { visualBible: P13_BIBLE }));
+      expect(r.state.id).toBe('ART010.1');
+      expect(r.held).toBe(true);
+      expect(r.contradicted).toBe(true);
+      const brief = `A summit.\n\n---METADATA---\n${JSON.stringify({ sceneIntent: 'test', characters: [{ name: 'Levin', position: 'left foreground', depth: 'foreground' }], shot: 'medium', ...P13_META, textPosition: 'bottom-left' })}`;
+      const block = captureWarns(warnings, () => requiredObjectsBlock(buildImagePrompt(brief, { language: 'en' }, null, P13_BIBLE, 13, null, {})));
+      expect(block).not.toMatch(/no hands touching it/);
+      // ART001.2 (the chip) has no row of its own and no `held` flag on the stored bible: its clause stays.
+      expect(block).toMatch(/open upturned palm/);
+      expect(warnings.join('\n')).toMatch(/Page 13: ART010\.1 \("in trough"\) says the object is untouched but the brief's interactions put hands on it/);
+    });
+    it('a fresh bible stamping held:true on the chip state drops "open upturned palm" on p13 too - no row puts hands on the chip', () => {
+      // The existing reverse rule, reported as measured: the p13 row names the
+      // scale only, so the page declares no hands on the chip.
+      const chip = JSON.parse(JSON.stringify(CHIP));
+      chip.states[0].held = true;
+      const r = resolveObjectState(chip, 'ART001.2', 13, P13_META, { visualBible: P13_BIBLE, silent: true });
+      expect(r.held).toBe(false);
+      expect(r.contradicted).toBe(true);
+    });
+    it('without `held` on the bible (every stored story) the same page does NOT fire - the flag, not the match, is missing', () => {
+      const stored = JSON.parse(JSON.stringify(SCALE));
+      delete stored.states[0].held;
+      const r = resolveObjectState(stored, 'ART010.1', 13, P13_META, { visualBible: P13_BIBLE });
+      expect(r.held).toBe(true);
+      expect(r.contradicted).toBe(false);
+    });
+    it('the element ranking marks a paraphrased row\'s object as focal', () => {
+      const { rankPageElements } = require_('../../server/lib/vbElementBudget');
+      const vb = JSON.parse(JSON.stringify(P13_BIBLE));
+      for (const a of vb.artifacts) a.appearsInPages = [13];
+      const focal = rankPageElements(13, P13_META, vb).filter((e: any) => e.focal).map((e: any) => e.id);
+      expect(focal).toEqual(['ART010']);
+    });
+  });
+
   it('THE DEFECT: an untouched state on a page whose brief puts hands on the object is DROPPED, loudly', () => {
     const warnings: string[] = [];
     const line = lineFor(HELD_BIBLE(), 5, ['ART001.1'], handsOn('ART001.1'), warnings);

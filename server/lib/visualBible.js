@@ -124,32 +124,117 @@ function defaultObjectState(entry) {
 
 const hasRefImage = (o) => !!(o?.referenceImageData || o?.referenceImageUrl);
 
+// Function words only. Size and colour words ("large", "blue") are DELIBERATELY
+// kept: they are exactly what tells "the large blue scale" from "the scale chip"
+// when both are on the page. (The two other stopword lists in the repo —
+// ENTITY_MATCH_STOPWORDS here and TRIM_STOPWORDS in vbElementBudget — drop
+// "large"/"small" on purpose for their own jobs, so they are not shared.)
+const ROW_MATCH_STOPWORDS = new Set([
+  'with', 'from', 'that', 'this', 'into', 'onto', 'over', 'under', 'them', 'their', 'there',
+  'where', 'when', 'what', 'which', 'than', 'then', 'some', 'same', 'each', 'also', 'very',
+  'upon', 'near', 'beside', 'behind', 'inside', 'outside', 'between', 'across', 'against',
+  'through', 'along', 'around', 'above', 'below', 'about', 'still', 'just', 'only',
+  'eine', 'einen', 'einem', 'einer', 'sein', 'seine', 'seinen', 'ihre', 'ihren', 'dass',
+  'dans', 'avec', 'pour', 'sous', 'leur', 'leurs', 'elle', 'elles', 'cette', 'cela',
+]);
+
+/** Lower-cased letter tokens (>= 4 letters, function words dropped) of a name or row. */
+function rowMatchTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^\p{L}]+/u)
+      .filter(t => t.length >= 4 && !ROW_MATCH_STOPWORDS.has(t))
+  );
+}
+
+/** The bible entries a brief's `objects[]` cites (any collection), by base id. */
+function citedEntries(visualBible, sceneMetadata) {
+  const ids = new Set(
+    (Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [])
+      .map(o => baseVbId(typeof o === 'string' ? o : o?.id))
+      .filter(Boolean)
+  );
+  if (ids.size === 0 || !visualBible) return [];
+  const out = [];
+  for (const key of ['mainCharacters', 'secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing']) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (e && ids.has(baseVbId(e.id))) out.push(e);
+    }
+  }
+  return out;
+}
+
+/**
+ * THE ONE matcher from an interactions[] row's `object` (or `character`)
+ * string to a bible entry. Deterministic, no prose classification.
+ *
+ * Rules, in order:
+ *   1. A VB id in the row → the candidate with that base id (strongest).
+ *   2. Token overlap. The Art Director paraphrases names ("the large blue
+ *      scale" for "Large dragon scale"), so a substring test fails on the very
+ *      rows that matter. A candidate is named when the row shares with it at
+ *      least one token that NO OTHER candidate carries: "the large blue scale"
+ *      shares scale with both the scale and the chip but large with the scale
+ *      alone → the scale; "the chip" → the chip; "the dragon scale" → shared
+ *      tokens only → ambiguous → null, never a guess. With a single candidate
+ *      every one of its tokens is unique, so any overlap names it.
+ *
+ * @param {string} rowField   the row's `object` (or `character`) string
+ * @param {Array} candidates  every entry the row could mean — the entry under
+ *   test plus the brief's cited entries (`citedEntries`)
+ * @returns {Object|null} the ONE entry named, or null (none / ambiguous)
+ */
+function entryNamedByRow(rowField, candidates) {
+  const raw = String(rowField || '').trim();
+  if (!raw || !Array.isArray(candidates) || candidates.length === 0) return null;
+  const seen = new Set();
+  const cands = candidates.filter(c => {
+    const b = baseVbId(c?.id);
+    if (!b || seen.has(b)) return false;
+    seen.add(b);
+    return true;
+  });
+  const idInRow = raw.match(/[A-Z]{3}\d{3}(?:\.\d+)?/);
+  if (idInRow) {
+    const base = baseVbId(idInRow[0]);
+    return cands.find(c => baseVbId(c.id) === base) || null;
+  }
+  const rowTokens = rowMatchTokens(raw);
+  if (rowTokens.size === 0) return null;
+  const tokensOf = new Map(cands.map(c => [c, rowMatchTokens(`${c.name || ''} ${c.properName || ''}`)]));
+  const named = cands.filter(c => {
+    const mine = tokensOf.get(c);
+    for (const t of rowTokens) {
+      if (!mine.has(t)) continue;
+      if (![...tokensOf].some(([o, toks]) => o !== c && toks.has(t))) return true;
+    }
+    return false;
+  });
+  return named.length === 1 ? named[0] : null;
+}
+
 /**
  * Does the page's brief put a character's HANDS on this object?
  *
  * Read from the brief's structured `interactions[]` (character → object rows
- * with an explicit `hands: true`), never from prose. A row names the object by
- * its VB id (any facet of it) or by the entry's name.
+ * with an explicit `hands: true`), never from prose. A row is tied to the
+ * entry by `entryNamedByRow`, disambiguated against the other entries the
+ * brief's `objects[]` cites (`visualBible` is needed for that; without it the
+ * entry is the only candidate).
  *
  * @returns {boolean|null} true — a row has hands on it; false — the brief
  *   declared its interactions and none touches this object; null — no
  *   interactions declared at all, or the object is named in a row that does
  *   not say whether hands are on it (no verdict either way).
  */
-function pageHoldsObject(entry, sceneMetadata) {
+function pageHoldsObject(entry, sceneMetadata, visualBible = null) {
   const rows = Array.isArray(sceneMetadata?.interactions) ? sceneMetadata.interactions : [];
   if (rows.length === 0) return null;
   const entryBase = baseVbId(entry?.id);
-  const nameLower = String(entry?.name || '').trim().toLowerCase();
-  const namesEntry = (objectField) => {
-    const raw = String(objectField || '').trim();
-    if (!raw) return false;
-    const idInRow = raw.match(/[A-Z]{3}\d{3}(?:\.\d+)?/);
-    if (idInRow && entryBase && baseVbId(idInRow[0]) === entryBase) return true;
-    const rowLower = raw.toLowerCase();
-    return nameLower.length >= 3 && (rowLower === nameLower || rowLower.includes(nameLower));
-  };
-  const naming = rows.filter(r => namesEntry(r?.object));
+  if (!entryBase) return null;
+  const candidates = [entry, ...citedEntries(visualBible, sceneMetadata).filter(e => baseVbId(e.id) !== entryBase)];
+  const naming = rows.filter(r => entryNamedByRow(r?.object, candidates) === entry);
   if (naming.some(r => r.hands === true)) return true;
   if (naming.length > 0) return null;
   return false;
@@ -179,10 +264,10 @@ function pageHoldsObject(entry, sceneMetadata) {
  *
  * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean}}
  */
-function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false } = {}) {
+function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false, visualBible = null } = {}) {
   const cited = handle ? objectStateFor(entry, handle) : null;
   const declared = objectStateForPage(entry, pageNumber);
-  const held = pageHoldsObject(entry, sceneMetadata);
+  const held = pageHoldsObject(entry, sceneMetadata, visualBible);
   const agrees = (st) => typeof held === 'boolean' && typeof st?.held === 'boolean' && st.held === held;
   let state;
   if (cited && declared && cited !== declared) {
@@ -225,11 +310,11 @@ function hasElementReference(entry) {
  *   resolves to the state the bible declares for that page
  * @returns {{cell: Object, state: Object|null, cited: Object|null, substituted: Object|null}}
  */
-function elementRefCell(entry, handle = null, pageNumber = null, sceneMetadata = null) {
+function elementRefCell(entry, handle = null, pageNumber = null, sceneMetadata = null, visualBible = null) {
   // One resolver for the cell and for the REQUIRED OBJECTS clause, so the
   // reference picture and the prompt text can never name different states.
   // The prompt path is the logging site; this one is silent.
-  const { state, cited } = resolveObjectState(entry, handle, pageNumber, sceneMetadata, { silent: true });
+  const { state, cited } = resolveObjectState(entry, handle, pageNumber, sceneMetadata, { silent: true, visualBible });
   if (state && hasRefImage(state)) return { cell: state, state, cited, substituted: null };
   if (hasRefImage(entry)) return { cell: entry, state, cited, substituted: null };
   // The wanted state has no cell and there is no base render (a stated object
@@ -2600,7 +2685,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       // none: the object's identity is right either way.
       // A BARE citation (or none at all) resolves to the DEFAULT state — the
       // first row — because a stated object has no base cell to hand over.
-      const { cell, state, cited, substituted } = elementRefCell(entry, handle, pageNumber, sceneMetadata);
+      const { cell, state, cited, substituted } = elementRefCell(entry, handle, pageNumber, sceneMetadata, visualBible);
       if (cited && cell === entry) {
         log.warn(`[VB-REF] Page ${pageNumber}: ${handle} ("${state.name}") has no state cell — using ${parentId}'s base render`);
       } else if (state && !cited && onPage && !objectStateForPage(entry, pageNumber)) {
@@ -2934,6 +3019,8 @@ module.exports = {
   objectStateForPage,
   defaultObjectState,
   pageHoldsObject,
+  entryNamedByRow,
+  citedEntries,
   resolveObjectState,
   hasElementReference,
   elementRefCell,
