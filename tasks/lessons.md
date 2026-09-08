@@ -706,3 +706,27 @@ nothing else, which is what ruled out a rogue scope and pointed at undeclared-sc
 
 **What happened:** I told the owner Gemini 3.7 Flash was cost-neutral against 2.5 Flash, taking "$0.38/$1.88 per 1M" from a comment in `server/config/models.js`. The owner doubted it. The vendor pages say $0.75/$3.75 (Flex, Google list through 2026) and $1.50/$7.50 (standard route, list from 2027): 1.8-3.5x per call, not neutral.
 **Rule:** any cost comparison put in front of the owner is computed from a vendor page fetched that day (ai.google.dev pricing, openrouter.ai model page, x.ai pricing), with the source named in the table. Repo comments, memory and model-card summaries are leads, never the number. Include the date-bound price when the vendor announces a change.
+
+## 2026-09-08 — "All 4 fixed" after viewing 2
+
+Reported four page re-renders as fixed having looked at two of them. The owner
+opened the other two: one was improved-but-wrong (a scale drawn as a dish of
+scales), one was not fixed at all (the trapped woman could reach the rim; a model
+pose where the beat needed distress). Same failure class as
+`feedback_view_actual_pixels_not_metadata` and
+`feedback_evaluate_every_picture_after_run`, one level up: an agent's summary of
+an image is not the image either.
+
+Rule: a claim that N things are fixed requires N looks — mine, not the agent's.
+Report per item ("2 fixed, 1 improved, 1 not") before any group verdict. A
+group verdict issued on a sample is a guess wearing a conclusion's clothes.
+
+Second lesson from the same page: the trapped figure was drawn reaching the rim
+because the BEAT said "gripping its rim". A beat that puts an exit within a
+trapped character's reach has contradicted its own story; downstream stages
+drew it faithfully. When an image is "wrong", read the beat before blaming the
+Art Director or the renderer — the earliest stage that states the contradiction
+owns it.
+
+## 2026-09-08 — "No fallback logged" is not "the model ran"
+Claimed the first staging story ran under the Qwen inventory because no fallback warning appeared. It never ran: the pipeline passed the default quality model as an override, which beat the inventory key. The absence of a failure log says nothing about which model answered. Rule: before claiming model X ran, read a stored per-call signature (token count, modelId, response shape) on the actual rows — and compare it to a Lab run of X where the model is known.
