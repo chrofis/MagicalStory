@@ -30747,3 +30747,10 @@ in the 2026-09-08 entry above; not changed here.
 `server/lib/vbElementBudget.js` (`rankPageElements` focal via the shared matcher), `tests/unit/vb-object-states.test.ts`,
 `tasks/bugs.json` `vb-row-matcher-substring-misses-paraphrase`. Replay harness: `scratchpad/replay_p13_dry.js`
 (session-local, dry). **Status:** on `staging`, not pushed.
+
+### 2026-09-08 — Art Director rule 7f: tip on the target, receiver clear
+
+**Context:** A page whose moment is "a tool acts on one thing and a second thing receives the result" (a lever in a crack freeing water that runs to a basin) rendered the result coming out of the tool — water pouring from a stick into the trough while the crack stayed sealed. Measured twice on the same page: once through the pipeline (stale VB state contributed), and once with NO Visual Bible at all (`scratchpad/refix_out/refix6_dragon_branch_a1`): given a stick and a receiving basin, the renderer's default is to connect them. One sentence in the prose fixed it on the next render (`refix6_…_a2`): the tip pressed INTO the crack at the base of the stone, the trough several steps clear of the branch. Owner ruling: encode it, as simple and general as possible.
+**Decision:** Rule 7f in `prompts/scene-expansion-all.txt` and its sibling `prompts/scene-expansion.txt`, beside the contact/force/support rules: the prose states where the tool's tip touches the target, the receiver stands clear of the tool and never between actor and target, and the result appears where the tool touches. No numbers, no story words.
+**Rationale:** Same shape as the containment rule — a spatial fact the model cannot reinterpret, stated where the figure is described. A reviewer check was NOT added (owner asked for the simplest form); if the AD ignores 7f the way it ignored R2/R3 as prose, it becomes a `scene-review.txt` finding like `plate_contains_effect`.
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `docs/decisions.md`.
