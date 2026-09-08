@@ -345,6 +345,7 @@ measurement, is lost).
 
 ## Growth, ads, product
 
+- [ ] **Trial funnel "Bezahlt" filter says "Keine Trial-Ereignisse in diesem Zeitraum" when it means no PAID visits (2026-09-07).** Measured on prod: `source=all` 22 visits, `paid` 0, so the empty-state copy misleads. Two related gaps: the `paid` bucket ignores the stored `gclid` column (an auto-tagged ad click with stripped UTMs lands in "Direkt"); after an email claim `generation_completed` posts on a fresh visit_id with `user_id NULL` (seen 2026-09-03, 2026-09-07). Context: 5 of 8 trials in 3 weeks came from chatgpt.com — worth a source bucket of its own. → `server/routes/trial.js:541` paid clause, `client/src/pages/AdminDashboard.tsx:1007` empty state
 - [x] (2026-09-06, e37e3194a) **E1 — confirm the GA4 conversion event actually fires** — CONFIRMED:
       `client/src/utils/gtagConversion.ts` defines 3 Ads conversions, wired in `TrialWizard.tsx` +
       `TrialGenerationPage.tsx`; `decisions.md:1500` records a conversion-goal decision taken ON real
