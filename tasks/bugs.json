@@ -720,8 +720,8 @@
       "reportedAt": "2026-09-08",
       "source": "Confirmed by reading server/lib/beatsPipeline.js (targeted second round, ~L1621): the pre-review check and the post-round-1 re-check both pass { textZoneRules: textZoneRulesActive(inputData) } and filter pageNumber !== 0; the post-round-2 call passed neither. With text-zone rules active, a page entering round 2 for textzone_character_collision was reported clean by round 2 without the collision being looked at, and briefUnfixed/briefSecondRound.after under-counted. Flagged unverified by the previous agent's rerun notes (scratchpad encode_/*COMPARE.md); verified this session.",
       "status": "fixed",
-      "note": "Round-2 re-check now passes the same options as the two earlier checks and excludes page 0 like round 1 does. The fixing commit's hash is recorded in the follow-up chore commit, same pattern as the entries above.",
-      "fixedIn": "pending"
+      "note": "Round-2 re-check now passes the same options as the two earlier checks and excludes page 0 like round 1 does.",
+      "fixedIn": "52ba34d61"
     }
   ]
 }

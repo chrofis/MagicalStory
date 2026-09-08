@@ -437,6 +437,13 @@ measurement, is lost).
 
 ## Verification pending (code shipped, proof not taken)
 
+- [ ] **`vb_element_overflow` at birth is 5/5 pages, not ~0, after the assignment trim — the check counts the UNION of
+      trimmed bible claims and the Art Director's `objects[]` citations (pirate p12: 3 + 3 = 6), and `briefFixable`
+      is false on 8/10 pages although the brief could withdraw its citations; round 2 ADDED ids on dragon p12/13/16.
+      Decide: count only one side, or make the AD cite from the trimmed claims. → `docs/decisions.md` 2026-09-08 "Art Director second pass"
+- [ ] **`facing_not_per_character` fixes are partial on crowded pages** — dragon p18 (Max, Kiaan) and pirate p16 (three
+      background figures) still had no facing clause after the reviewer's own rewrite. Re-measure on the next two
+      stories before touching the check. → `docs/decisions.md` 2026-09-08 "Art Director second pass"
 - [ ] Run a full trial on staging as admin; query `trial_events` for the complete ordered row
       trail for one `visit_id` → `tasks/todo.md:49`
 - [ ] Confirm the admin card renders the funnel with real staging rows → `tasks/todo.md:51`
@@ -476,6 +483,12 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
+- [ ] **Round 2 of the scene review still re-introduces a code-detected fault round 1 cleared (dragon p1, 1 of 18 after
+      the plan-line-authority fix; was 3).** Options: (a) ship flagged as today (`rewriteToZeroUnfixed` reports it);
+      (b) mechanical guard — revert a round-2 page whose rewrite introduces a REVIEWABLE finding absent after round 1
+      (code-detected types only, no prose classification); (c) let the reviewer's own tag lines (`[plate_contains_effect]`,
+      `[facing_not_per_character]`, …) drive the round-2 subset — today only `sceneBriefCheck` types do.
+      → `docs/decisions.md` 2026-09-08 "Art Director second pass"
 - [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
 - [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
       `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every 100 with

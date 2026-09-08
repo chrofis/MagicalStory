@@ -30629,3 +30629,81 @@ prompt), `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`,
 `tests/unit/vb-element-budget.test.ts`, `tests/unit/recurring-creature-slot.test.ts`, `docs/SETTLED.md`,
 `tasks/bugs.json` (`vb-pages-not-earned-by-plan-line`), `tasks/BACKLOG.md`.
 **Status:** ✅ active on `staging` (not pushed at time of writing).
+
+## 2026-09-08 — Art Director second pass: the plate never carries the action's effect; per-clause facing and plate-effect become REVIEWER findings; the plan line is the authority a rewrite may not contradict
+
+**Context.** Commit `115333de6` added two Art Director rules as prompt prose: the plate is "the world before the
+action, no effects" (R2) and each character's facing is written inside their own clause (rule 8c, R3). Measured on a
+beats+AD rerun of two stored stories (`job_1788816451791_25b31uqlp` dragon, `job_1788820396445_9erw6xc01` pirate,
+same models as stored, no output cap), **neither bound**: the dragon water page's plate read "A clear jet of water
+shoots straight out from a narrow vertical crack" pre-review AND final, and the pirate back-view page declared
+`back view` on all five `characters[]` while the prose stated facing only collectively ("all five are seen from
+behind"). R2 failed because rule 1 of the same template said "every physical fact the plan line states … is in the
+brief" — the plan line names the water, so that clause pulled the EFFECT into the plate; two rules competed and the
+wrong one won. The scene review's targeted second round also REGRESSED round 1: `interaction_multiple_actions`
+3 → 0 after round 1 → 3 after round 2, and on the trough page round 2 moved the scale onto the grass while the plan
+line said "the scale stays in the trough".
+
+**Decision.**
+1. *Rule conflict resolved at the source* (`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`; ONE
+   sentence used in both rule 1 and the plate rule so they cannot compete): "The page's action and its effect — a jet
+   of water, a splash, a break, smoke, a fall — belong with the characters, in the prose and `sceneIntent`; the
+   `emptyScenePrompt` is the world the instant before and never carries them." "Never call a space empty" is scoped
+   to a space the plan line puts something in.
+2. *R2 and R3 are reviewer-checked findings now, not prose the Art Director is trusted to obey*
+   (`prompts/scene-review.txt`): `[plate_contains_effect]` (10a) and `[facing_not_per_character]` (8bb). Classification
+   stays with the reviewer model (SETTLED: classification is the prompt's job). Stated plainly because the brief
+   assumed otherwise: scene-review tags are NOT parsed into typed findings anywhere in code — only the `FAULTED PAGES:`
+   line is read (`beatsPipeline.js`), and the round-2 subset plus the rewrite-until-zero verdict are driven solely by
+   the deterministic `sceneBriefCheck` types; `mergeAuditFindings` belongs to the lector (`textRefine.js`). So the two
+   new types are enforced like the other 25 tags: round 1 on every page, round 2 on the pages the code check re-sent.
+   Whether reviewer tags should also drive the round-2 subset is an open owner decision (BACKLOG); no parser was built.
+3. *Plan line as authority, unconditional* (item C): the task preamble of `scene-review.txt` says a rewrite never
+   moves an object the plan line places, never drops a character it puts in frame, never adds an action it does not
+   name — when a fix would need that, simplify inside the plan line; check 4's rewrite REMOVES the action the plan
+   line does not name, never adds one. `buildSceneReviewPrompt` renders plan lines verbatim (the 300-char cut lost the
+   "what is true after" segment on long lines) and round 2 passes only the beats of the pages under review. The
+   "rule-block carry" hypothesised for round 2 does not exist as a mechanism: round 2 is built from the SAME template
+   by the SAME builder, so it already renders the identical check block — there was nothing to carry.
+4. *Bug* (`tasks/bugs.json` `round2-recheck-drops-textzone-findings`): the round-2 re-check called `checkBriefs`
+   without `{ textZoneRules }` and never excluded page 0; fixed to match the two earlier calls.
+
+**Measured after the change (same harness, everything in incl. `a7c413022`/`a8e7c009c`; USD 0.55 + 0.73 = 1.28).**
+- Dragon (18 pages; the planner re-divided, so the water page is now p16 and the trough page p12): p16 plate "narrow
+  vertical fissure … completely dry and tightly sealed with red gravel … untouched stone" — the jet lives only in
+  `sceneIntent` (R2 absent). p12/p13 plate "a large teardrop-shaped blue-grey object rests inside a dry stone trough"
+  AFTER a round-2 rewrite of both pages — the plan-line authority held. Code-check counts before → after r1 → after
+  r2: `interaction_multiple_actions` 5 → 0 → **1** (p1: round 1 merged "riding bicycles", round 2 split it back into
+  "riding bicycle" / "riding balance bike"); `vb_element_overflow` 5 → 5 → 5; `interaction_object_shared_hands`
+  2 → 1 → 0. `briefUnfixed` 6 (previous rerun: 15). Reviewer tags: `plate_contains_effect` none/none;
+  `facing_not_per_character` p18 in r1 (fixed for two of four figures — Max and Kiaan still have no facing clause),
+  none in r2; `interaction_multiple_actions` named on 8 pages in r1, none in r2. `vbAssignmentTrim` 9 → 0 pages
+  over budget, 11 claims stripped, 1 emptied state dropped.
+- Pirate (16 pages): p8 (the five-figure back-view page) — each clause now carries "seen from behind" (R3 absent,
+  fixed by the reviewer in round 1 on its own `facing_not_per_character` finding); p9 and p13 clean. Counts:
+  `interaction_multiple_actions` 1 → 0 → 0; `vb_element_overflow` 5 → 5 → 5; `cast_unlisted` 3 → 0 → 0;
+  `interaction_object_shared_hands` 1 → 0 → 0. `briefUnfixed` 5 (previous rerun: 13). Reviewer tags r1:
+  `plate_contains_effect` p1 (an "empty" sea chest = the map already lifted out → final plate "the old cloth map still
+  resting inside it") and p5 (stacked casks = the stacking done → final "the hold waits empty", i.e. the fix produced
+  the word the negation check dislikes); `facing_not_per_character` p8, p16 (p16's three background figures still lack
+  a facing clause after the fix). Both new types none in r2. `vbAssignmentTrim` 4 → 0, 6 stripped.
+- "empty" in plates: dragon 7, pirate 1 — every one a sky, a path or the cleared figure band, none a space the plan
+  line fills; the scoped rule holds as written.
+- **Overflow at birth is NOT near zero: 5 and 5 (was 11 and 12).** Cause, read from `rankPageElements`: the trim keeps
+  the ≤3 bible claims the plan line names, and the Art Director then cites up to 3 OTHER ids in `objects[]`; the
+  check counts the UNION (pirate p12: bible ART005/ART004/ART008 + brief CHR001/ART003/ART009 = 6). Round 2 made
+  this worse on dragon p12/p13/p16 by ADDING the trough's id. `briefFixable` (objectsAsked > 3) is therefore
+  mislabelled on 8 of 10 pages — the brief could withdraw its citations. Open item, not fixed here.
+
+**Rationale.** A rule the generator ignores twice in a row is not a rule; a reviewer finding with a rewrite is. The
+conflict fix is the actual root cause of R2; the findings are the enforcement. Round 2's regression is now ONE page
+instead of three; the evidence says the remaining case is the reviewer re-splitting one shared action into two
+vehicle-specific labels despite the authority sentence — a prompt cannot forbid that harder than it already does, so
+the next step (if wanted) is mechanical: revert a round-2 page whose rewrite introduces a code-detected REVIEWABLE
+finding the page did not have after round 1. That is a code change on code-detected types (no prose classification)
+and is left for the owner to call.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `prompts/scene-review.txt`,
+`server/lib/beatsPipeline.js` (round-2 options, page-0 filter, subset beats), `server/lib/promptBuilders.js`
+(`buildSceneReviewPrompt` verbatim plan lines), `tasks/bugs.json`, `tasks/BACKLOG.md`. Commits `52ba34d61`,
+`4086fff75`. Harness: `scratchpad/encode_/rerun_beats_ad.js` (session-local). **Status:** on `staging`, not pushed.
