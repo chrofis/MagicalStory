@@ -1502,9 +1502,9 @@ const LANGUAGE_LEVELS = {
   '1st-grade': {
     description: 'Simple words and very short sentences for early readers',
     wordsPerPageMin: 25,
-    wordsPerPageMax: 50,
-    sentencesPerPage: '2-4',
-    pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count.',
+    wordsPerPageMax: 70,
+    sentencesPerPage: '3-6',
+    pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count. The extra room buys more sentences, never longer ones: keep sentences short, one idea each.',
   },
   'standard': {
     description: 'Age-appropriate vocabulary for elementary school children',

@@ -150,7 +150,7 @@ function runtime(name) {
  *
  * DERIVATION — the two facts that decide it:
  *   1. How much text a page carries is the reading level (LANGUAGE_LEVELS,
- *      promptBuilders.js): 1st-grade 25–50 words, standard 40–150,
+ *      promptBuilders.js): 1st-grade 25–70 words, standard 40–150,
  *      advanced 250–300.
  *   2. Where that text lands is resolveLayout() (server/lib/layout.js). Since
  *      2026-09-05 EVERY level resolves to `square-below` — text typeset in a

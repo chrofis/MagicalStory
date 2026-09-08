@@ -291,14 +291,14 @@ export function WizardStep3BookSettings({
       label: t.firstGrade,
       desc: t.firstGradeDesc,
       icon: Baby,
-      wordRange: `~20-35 ${wordsLabel}`,
+      wordRange: `~25-70 ${wordsLabel}`,
     },
     {
       value: 'standard' as LanguageLevel,
       label: t.standard,
       desc: t.standardDesc,
       icon: Book,
-      wordRange: `~120-150 ${wordsLabel}`,
+      wordRange: `~40-150 ${wordsLabel}`,
     },
     {
       value: 'advanced' as LanguageLevel,

@@ -29016,6 +29016,10 @@ silent, 181/150 fires; the original 71-vs-50 motivating case still fires
 - `server/lib/textRefine.js` (`WORD_BUDGET_TOLERANCE`, `buildWordBudgetFindings`)
 - `prompts/story-text-proofread.txt`
 
+> 🗄 **Numbers superseded 2026-09-08** — the 1st-grade band this tolerance was
+> calibrated against moves to 25–70 words / 3–6 sentences; see the 2026-09-08 entry
+> at the end of this file. The mechanism described here is unchanged.
+
 **Status:** ✅ active. Supersedes the tolerance-free half of `cf10d7cd9`
 (2026-09-05); the counter itself, its `LANGUAGE_LEVELS` single source of truth
 and its 'counter' merge source are unchanged.
@@ -30211,6 +30215,11 @@ templates render with zero unfilled placeholders.
   `WORD_BUDGET_TOLERANCE_UNDER`, `buildWordBudgetFindings`)
 - `tasks/action-budget-2026-09-07.md`
 
+> 🗄 **Item 3 superseded 2026-09-08** — the upstream fix it called for landed as a
+> 1st-grade budget raise (25–70 words / 3–6 sentences); the `OVER = 0.5` tolerance
+> itself is KEPT by explicit owner decision. See the 2026-09-08 entry at the end of
+> this file.
+
 **Status:** ✅ active. **Extends** the 2026-09-05 event-budget entry (search
 "buildArcBudgetSection computes an event budget") — the event budget stands
 unchanged; this adds a second, finer unit beside it. **Supersedes** the
@@ -30754,3 +30763,76 @@ in the 2026-09-08 entry above; not changed here.
 **Decision:** Rule 7f in `prompts/scene-expansion-all.txt` and its sibling `prompts/scene-expansion.txt`, beside the contact/force/support rules: the prose states where the tool's tip touches the target, the receiver stands clear of the tool and never between actor and target, and the result appears where the tool touches. No numbers, no story words.
 **Rationale:** Same shape as the containment rule — a spatial fact the model cannot reinterpret, stated where the figure is described. A reviewer check `[result_not_at_contact]` was added in `prompts/scene-review.txt` beside `plate_contains_effect` the same evening — the owner asked why it was omitted, and the evidence of the night (plate-effect and per-character facing both failed as prose and bound only as reviewer findings) gave no reason to expect 7f to differ.
 **Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `docs/decisions.md`.
+
+---
+
+## 2026-09-08 — The 1st-grade word budget is raised to 25–70 words / 3–6 sentences; the counter's 0.5 over-tolerance deliberately stays
+
+**Context:** The `1st-grade` band in `LANGUAGE_LEVELS` (`server/lib/promptBuilders.js`)
+asked for 25–50 words and 2–4 sentences per page. Measured against what the writer
+actually produces at that level on staging — 3 stories, 53 pages — the band was not a
+budget the writer ever met: mean ~84 words/page, per-story medians 61 / 89 / 94, worst
+page 128. **48 of 53 pages (91%) exceeded the 50-word max, and 34 of 53 exceeded even
+the tolerated 75.** The `standard` band over the same corpus is calibrated by contrast:
+1 page out of 63 past tolerance.
+
+The cost showed up downstream. LENGTH findings were **43–50% of ALL findings** on
+1st-grade stories versus 0–36% on standard; on `job_1788614817116_vxnu60yjg` **all 18
+pages carried a LENGTH fault**. And the faults did damage: on
+`job_1788816451791_25b31uqlp` page 4 (128 words, LENGTH finding) the repair compressed
+the page to 95 words and in doing so reordered paragraphs and stranded a pronoun. A
+budget the writer cannot hit turns the refiner into a paragraph shredder.
+
+**Decision:** Raise the `1st-grade` band ONLY:
+- `wordsPerPageMax`: 50 → **70**
+- `sentencesPerPage`: `'2-4'` → **`'3-6'`** — the sentence count must move with the
+  words, or 70 words over 2–4 sentences implies 17–35 words/sentence, wrong for a first
+  reader. The `pacing` string gains one clause saying the extra room buys more
+  sentences, never longer ones.
+- `wordsPerPageMin` stays **25**; `standard` and `advanced` are untouched.
+- **`WORD_BUDGET_TOLERANCE_OVER` stays 0.5** (fault fires at 105 words) and
+  `WORD_BUDGET_TOLERANCE_UNDER` stays 0.2. This is the owner's explicit choice: the
+  counter is meant to catch only runaway pages, and it is left deliberately loose rather
+  than re-tightened to track the new budget.
+
+**Rationale:** The 2026-09-07 asymmetric-tolerance entry said outright that "the real fix
+is upstream… the text stage merely stops making the impossible demand." This is that
+upstream fix: the demand itself was wrong, so the tolerance was doing the work of a
+mis-set budget. Re-running the deterministic `buildWordBudgetFindings` in-process over
+the STORED writer text (`textRefineReport.pages[].before`) of 30 staging stories — free,
+no model calls — the 1st-grade LENGTH faults drop **34 → 8 across 96 pages** (8 stories),
+while `standard` is unchanged at **1 → 1 across 235 pages**. Per story: 14→4, 16→2, 4→2
+on the three recent 18/18/17-page runs; the five older 1st-grade stories were already at
+0 and stay at 0. Keeping OVER at 0.5 on top of the new ceiling means a page is only
+faulted past 105 words — an accepted looseness, not an oversight.
+
+**Side effect worth recording:** `server/lib/layout.js` argues every reading level is
+forced to `square-below` because no word budget fits the overlay calm zone, and cited
+1st-grade's 50-word ceiling as "already eating 94% of the smaller zone" — the one case
+still near-fitting. At 70 words (≈97,930 px² at 14pt) that ceiling now **overflows** the
+smaller zone (74,675 px²) outright and reaches ≈99% of even the full-width band
+(99,360 px²). Behaviour does not change today (`square-below` is already universal), but
+this removes the last remaining case for `a4-overlay`: no level's ceiling fits any zone
+the text-region pass offers.
+
+**Also corrected:** `client/src/pages/wizard/WizardStep3BookSettings.tsx` advertised
+`~20-35 words per page` for 1st-grade — already wrong against the old 25–50 band, and
+absurd against 70. It also advertised `~120-150` for standard against the code's 40–150.
+Both UI strings now match the code; **no band numbers changed for standard**.
+`prompts/story-trial.txt` keeps its own hardcoded 100–140 — the trial writes in one call
+via `buildTrialStoryPrompt` and never reads `LANGUAGE_LEVELS` (verified), so it is
+untouched.
+
+**Supersedes:** 2026-09-05 "Per-page word budget is counted in code and fed to the
+text-review chain" (cf10d7cd9), 2026-09-06 "The word-budget counter gets a 20% grace
+band", and item 3 of the 2026-09-07 arc-action-budget entry — all three remain accurate
+about the mechanism; only the 1st-grade numbers they were calibrated against change here.
+`docs/SETTLED.md` carries no word-budget line, so this is not a SETTLED reversal.
+
+**Touched:**
+- `server/lib/promptBuilders.js` (`LANGUAGE_LEVELS['1st-grade']`)
+- `client/src/pages/wizard/WizardStep3BookSettings.tsx` (both `wordRange` strings)
+- `server/lib/layout.js`, `server/lib/pdf.js`, `server/config/runtime.js` (comments made truthful)
+- `server/lib/textRefine.js` — **unchanged, deliberately**
+
+**Status:** ✅ active

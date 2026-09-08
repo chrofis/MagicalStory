@@ -12,9 +12,12 @@
  * prices a word at ~1399 px² at 14pt and ~1028 px² at 12pt. The largest zone the
  * text-region pass actually offers is ~99,360 px² (a full-width band; a corner or
  * half zone is ~74,675 px²) — about 71 and 53 words at 14pt. Against the
- * LANGUAGE_LEVELS budgets (1st-grade 25–50 words, standard 40–150, advanced
- * 250–300) only 1st-grade's FLOOR fits with room to spare; its 50-word ceiling
- * already eats 94% of the smaller zone, and standard/advanced cannot fit at all.
+ * LANGUAGE_LEVELS budgets (1st-grade 25–70 words, standard 40–150, advanced
+ * 250–300) only 1st-grade's FLOOR fits with room to spare; its ceiling now
+ * OVERFLOWS the smaller zone outright (70 words ≈ 97,930 px² vs 74,675) and
+ * ≈99% of even the full-width band, and standard/advanced cannot fit at all.
+ * The 2026-09-08 raise from 50 to 70 words therefore removes the last case for
+ * `a4-overlay`: no level's ceiling fits any offered zone.
  * A budget whose top end has no headroom is not a layout that can be the default:
  * `job_1788614817116_vxnu60yjg` (1st-grade, 18 pages) came in at 73–118 words a
  * page and failed the text-fit check on 18 pages out of 18.
