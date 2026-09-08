@@ -30469,3 +30469,77 @@ letterforms, not the band.
 **Status:** ✅ active on staging; production pending owner promotion.
 **Follow-up the same evening (Lab 1055):** with Qwen live, the inventory returned `complete: false` for the headless animal and the compliance judge filed nothing — the rule lived only in the STEP 4 severity list, which the judge reads after it has chosen its findings. It is now a STEP 1b scene-check step (`prompts/image-prompt-compliance.txt`), together with "animals live in `objects`, never `figures`": the same run filed a false `unverified_absence` because the judge looked for the animal among the figures. Also observed on one control page: Qwen described two short-haired children as shoulder-length, which the judge turned into a MAJOR identity finding (page 40 → 0). One page; watch hair-length findings on staging stories before promoting.
 **Closed 2026-09-08 (owner: stop here, keep Qwen on staging, record it).** Five runs of the same headless-animal page through the Qwen inventory at temperature 0 (experiments 1049, 1055, 1057 → `complete: false`; 1058, 1059 → `complete: true`): 3 catches in 5, the OpenRouter upstream is not deterministic. When the flag was false (1057) the compliance judge (qwen3-max) filed nothing despite the STEP 1b rule; in 1058 it filed the animal as `missing_character` against the rule that says animals live in `objects`. The judge prompt is ~30k characters and both judges treat a rule a third of the way in as noise. The deterministic alternative — code turning the typed `complete: false` field into a `figure_completeness` finding — was offered and declined for now. Net: Qwen stays the staging inventory for its verified gains (ghost figures on the crowded set, ~4x cheaper, boxes normalised, Gemini fallback); the animal-completeness check remains documentation of intent and ships no finding in either environment. The first staging story evaluated under Qwen (job_1788816451791, 18 pages) completed with no fallback logged and scores in the normal range. `quality_eval` Lab results now carry `complianceRaw` so the next judge investigation can see what the judge wrote.
+
+## 2026-09-08 — The page instant outranks a contradicting object state; one resolver picks a page's state for clause and cell
+
+**Context (extends "An object the story alters is ONE Visual Bible entry with `states[]`", 2026-09-06 — not a reversal).**
+Staging `job_1788816451791_25b31uqlp`, page 11. Plan line: *"Kiaan holds the small chip against the big scale
+resting in the dry stone trough, the broken edges fitting together"*. The stored bible gave the chip
+(`ART001`) state `.2` "resting in an open upturned palm, fully visible from above" for pages [6,11] and the
+scale (`ART010`) state `.1` "lying flat and still inside the dry stone trough, **no hands touching it**" for
+pages [11-14]. No state existed for the instant the beat names. The p11 brief cited both; the code took each
+delta and appended it verbatim to the REQUIRED OBJECTS line — precedence at the time was
+`state: objectStateFor(artifact, handle) || objectStateForPage(artifact, pageNumber)` then
+`stateNote = " — " + trimStateClause(state.delta)` (`promptBuilders.buildImagePrompt`), with nothing comparing
+a delta to the page. The render obeyed the states across two attempts (chip held up in a palm, edges never
+met); only a hand-edited brief citing neither state fixed it.
+Second defect on the same path: the cited handle was trusted first at BOTH sites (prompt clause and
+`elementRefCell`), silently. p2 cited `ART001.2` against a table declaring `.1`; p12 cited `ART010.2`
+(on the horns, pages 16-17) against a table declaring `.1`. Measured against the plan lines, **neither
+channel is reliably right**: p2's plan line *"holds up a warm blue chip in his open palm"* — the BRIEF was
+right and the table wrong; p12's *"Gian planted unmoving in front of the scale"* — the TABLE was right and
+the brief wrong. What is reliable is the page's own instant.
+Root of the p11 table: `story-bible-from-beats.txt` asked for a delta per state but never said the delta is
+read off THAT page's plan line, so the model filed p11 under a neighbouring page's untouched look.
+
+**Decision:**
+1. **Prompt (the root).** `story-bible-from-beats.txt`: a state's `delta` is read off THAT page's plan line,
+   never copied from a neighbouring page; a page whose instant has the object in someone's hands, or pressed
+   against or fitted to another object, gets a state that says so and never a resting/untouched look. Each
+   state carries a structured **`held`** flag (true = hands on it in that look, false = nothing touches it).
+2. **Schema.** `states[].held: boolean|null`, minted in `normaliseObjectStates` (the one live minter, via
+   `extractVisualBible`). `null` on every bible authored before the field, never a guess. Readers swept:
+   `normaliseObjectStates` (writes it), `resolveObjectState` (reads it), `pageHoldsObject`; the reference-sheet
+   cell builder (`expandElementStateCells`) and the Art Director's `States:` line read only `delta`/`name` and
+   are unchanged; no client code reads `states[]`.
+3. **One resolver.** `visualBible.resolveObjectState(entry, handle, pageNumber, sceneMetadata)` is the ONE
+   place a page's state is decided, used by both the REQUIRED OBJECTS clause and `elementRefCell`, so the
+   reference picture and the prompt text can never name different states. Order: cited and declared agree
+   (or only one exists) → that state; they disagree → the one whose `held` matches the page's declared
+   contact, else the bible's page table, with a WARN naming both ids and the reason; neither → default.
+   The page's contact comes from `pageHoldsObject`: the brief's structured `interactions[]` rows with
+   `hands: true` whose `object` names the entry by id (any facet) or name — never from prose. Rows exist but
+   none names the object → false; no rows, or the object named without a hands verdict → null.
+4. **The instant outranks the state.** A chosen state whose `held` disagrees with the page's contact is
+   `contradicted`: `buildImagePrompt` drops its delta from the line with
+   `⚠️ [VB-STATE] Page N: ART###.n ("name") says the object is untouched|in hand but the brief's
+   interactions put hands on it|declare no hands on it — state clause dropped, the page's instant wins.
+   Delta was: "…"`. The object stays listed; the reference cell is kept (identity is right either way).
+5. **Cited-vs-table precedence changes** from "cited → table → default" (2026-09-07 entry above) to
+   "agreement, else the contact-consistent one, else the TABLE". The 2026-09-07 rationale — the brief usually
+   writes the bare id — still holds; this only decides the disagreement case, which that entry never measured.
+
+**Verified.** Static replay of the stored p2/p11/p12 briefs through the current builders: with the stored
+bible (no `held`) p2 `ART001.2 → ART001.1` and p12 `ART010.2 → ART010.1` both WARN and follow the table;
+p11 is unchanged (see limit below). With `held` flags as the template now emits them, p2 resolves to the
+cited `.2` ("the brief's interactions match the cited state"). ONE paid bible-from-beats call from the 18
+stored plan lines (claude-sonnet-4-6, the model the run used; 7.5k in / 6.8k out, ≈$0.13, no output cap)
+produced: `ART001.1 resting — lying flat on an open palm, untouched by any other hand — held:true — [2,3,5,6]`;
+**`ART001.2 matched — pressed edge-to-edge against ART002, broken edges aligned — held:true — [11]`**;
+`ART002.1 in trough — lying flat inside the stone trough, untouched — held:false — [11-15]`; `ART002.2 lifted
+free — raised out of the trough by Gian's horns — held:false — [16,17]`. The p11 instant now has its own
+state. Unit: `tests/unit/vb-object-states.test.ts` 59/59 (10 new), whole suite 845/845.
+
+**Limit, recorded rather than papered over.** The AD's `interactions[]` are character→object rows only. So
+"two objects meeting" (p11's SCALE, which no row names — its untouched state passes the structural check)
+and "open palm vs pressed" are NOT detectable in code without reading prose, which is banned. For those the
+prompt-side derivation rule is the guard. An object→object interaction row would live in
+`scene-expansion-all.txt`, owned by a parallel session today — on `tasks/BACKLOG.md` for the owner.
+On a stored bible without `held`, a cited-vs-table disagreement now follows the table where it used to
+follow the brief; the two measured cases split 1-1, so this is a coin the owner may re-flip with evidence.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `server/lib/visualBible.js` (`normaliseObjectStates`,
+`pageHoldsObject`, `resolveObjectState`, `elementRefCell`, `getElementReferenceImagesForPage`),
+`server/lib/promptBuilders.js` (REQUIRED OBJECTS state selection), `tests/unit/vb-object-states.test.ts`,
+`tasks/bugs.json` (`vb-object-state-contradicts-page-instant`, fixed), `tasks/BACKLOG.md`.
+**Status:** ✅ active on `staging` (not pushed at time of writing).

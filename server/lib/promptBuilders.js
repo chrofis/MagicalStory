@@ -12,7 +12,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, objectStateFor, objectStateForPage } = require('./visualBible');
+const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState } = require('./visualBible');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -3569,14 +3569,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // id, or a match on the name, resolves to no state and the object's
         // unaltered look stands.
         const handle = typeof objName === 'string' ? objName : (objName && objName.id);
-        requiredObjects.push({
-          name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact,
-          // The cited handle first, then the state the bible declares for this
-          // page. The Art Director usually writes the bare parent id, so
-          // without the page fallback the page's own state delta ("corner torn
-          // away, flower missing") never reached the render at all.
-          state: objectStateFor(artifact, handle) || objectStateForPage(artifact, pageNumber),
-        });
+        // ONE resolver (visualBible.resolveObjectState) picks the state from
+        // the cited handle, the bible's page table and the page's declared
+        // contact — the same call the reference cell is picked with. THE
+        // INSTANT OUTRANKS THE STATE: a state whose `held` flag disagrees with
+        // the brief's interactions[] is a neighbouring page's look (staging
+        // job_1788816451791_25b31uqlp p11: "no hands touching it" on the page
+        // whose instant pressed two halves together — the render obeyed the
+        // state twice). Its delta is dropped from this line, loudly; the
+        // object itself stays listed.
+        const resolved = resolveObjectState(artifact, handle, pageNumber, metadata);
+        let state = resolved.state;
+        if (resolved.contradicted) {
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") says the object is ${state.held ? 'in hand' : 'untouched'} but the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
+          state = null;
+        }
+        requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state });
         continue;
       }
 

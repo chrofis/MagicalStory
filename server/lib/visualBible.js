@@ -62,6 +62,12 @@ function normaliseObjectStates(raw, parentId) {
       name: String(s.name || `state ${n}`).trim(),
       delta,
       pages: Array.isArray(s.pages) ? s.pages.filter(p => Number.isFinite(Number(p))).map(Number) : [],
+      // STRUCTURED contact flag: true when a character's hands are on the
+      // object in this look, false when nothing touches it. It is what lets
+      // `resolveObjectState` detect a state that contradicts the page's own
+      // declared interactions WITHOUT reading the delta prose. Absent on every
+      // bible authored before the field existed — null, never a guess.
+      held: typeof s.held === 'boolean' ? s.held : null,
       referenceImageData: null,
       referenceImageUrl: null,
     });
@@ -119,6 +125,85 @@ function defaultObjectState(entry) {
 const hasRefImage = (o) => !!(o?.referenceImageData || o?.referenceImageUrl);
 
 /**
+ * Does the page's brief put a character's HANDS on this object?
+ *
+ * Read from the brief's structured `interactions[]` (character → object rows
+ * with an explicit `hands: true`), never from prose. A row names the object by
+ * its VB id (any facet of it) or by the entry's name.
+ *
+ * @returns {boolean|null} true — a row has hands on it; false — the brief
+ *   declared its interactions and none touches this object; null — no
+ *   interactions declared at all, or the object is named in a row that does
+ *   not say whether hands are on it (no verdict either way).
+ */
+function pageHoldsObject(entry, sceneMetadata) {
+  const rows = Array.isArray(sceneMetadata?.interactions) ? sceneMetadata.interactions : [];
+  if (rows.length === 0) return null;
+  const entryBase = baseVbId(entry?.id);
+  const nameLower = String(entry?.name || '').trim().toLowerCase();
+  const namesEntry = (objectField) => {
+    const raw = String(objectField || '').trim();
+    if (!raw) return false;
+    const idInRow = raw.match(/[A-Z]{3}\d{3}(?:\.\d+)?/);
+    if (idInRow && entryBase && baseVbId(idInRow[0]) === entryBase) return true;
+    const rowLower = raw.toLowerCase();
+    return nameLower.length >= 3 && (rowLower === nameLower || rowLower.includes(nameLower));
+  };
+  const naming = rows.filter(r => namesEntry(r?.object));
+  if (naming.some(r => r.hands === true)) return true;
+  if (naming.length > 0) return null;
+  return false;
+}
+
+/**
+ * THE ONE PLACE a page's state of an object is decided.
+ *
+ * Three channels can disagree: the dotted handle the brief cited, the state
+ * the bible's own page table declares for this page, and the page's declared
+ * contact with the object. Measured on staging job_1788816451791_25b31uqlp
+ * neither of the first two is reliably right — p2's brief cited the held state
+ * against a bible table that (wrongly) declared "on the ground" for p2, while
+ * p12's brief cited "on the horns" against a table that (rightly) declared it
+ * resting. What IS reliable is the page's own instant: a state whose `held`
+ * flag disagrees with the brief's `interactions[]` is wrong for this page.
+ *
+ * Rules, in order:
+ *   1. Cited and declared agree, or only one exists → that state.
+ *   2. They disagree → the one whose `held` matches the page's contact; on no
+ *      verdict, the bible's table (the brief has already been shown to cite a
+ *      neighbouring page's state), with a WARN naming both.
+ *   3. Neither → the default (first) state.
+ * `contradicted` is set when the chosen state's `held` still disagrees with
+ * the page — the caller drops the state's delta from the prompt (the instant
+ * outranks the state) but keeps the cell (identity is right either way).
+ *
+ * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean}}
+ */
+function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false } = {}) {
+  const cited = handle ? objectStateFor(entry, handle) : null;
+  const declared = objectStateForPage(entry, pageNumber);
+  const held = pageHoldsObject(entry, sceneMetadata);
+  const agrees = (st) => typeof held === 'boolean' && typeof st?.held === 'boolean' && st.held === held;
+  let state;
+  if (cited && declared && cited !== declared) {
+    let why;
+    if (agrees(cited) && !agrees(declared)) { state = cited; why = "the brief's interactions match the cited state"; }
+    else if (agrees(declared) && !agrees(cited)) { state = declared; why = "the brief's interactions match the bible's state"; }
+    else { state = declared; why = "no contact verdict — the bible's page table stands"; }
+    if (!silent) {
+      log.warn(`[VB-STATE] Page ${pageNumber}: brief cites ${cited.id} ("${cited.name}", pages ${JSON.stringify(cited.pages)}) but the bible assigns ${declared.id} ("${declared.name}") to this page — using ${state.id}: ${why}`);
+    }
+  } else if (cited && !declared && !silent && objectStates(entry).length > 0) {
+    log.warn(`[VB-STATE] Page ${pageNumber}: brief cites ${cited.id} ("${cited.name}") on a page that none of ${baseVbId(entry.id)}'s states declares — using it as cited`);
+    state = cited;
+  } else {
+    state = cited || declared || defaultObjectState(entry);
+  }
+  const contradicted = !!(state && typeof held === 'boolean' && typeof state.held === 'boolean' && state.held !== held);
+  return { state, cited, declared, held, contradicted };
+}
+
+/**
  * Does this entry have a reference render anywhere?
  *
  * A stated object has NO base cell — its states ARE the cells — so its render
@@ -140,11 +225,11 @@ function hasElementReference(entry) {
  *   resolves to the state the bible declares for that page
  * @returns {{cell: Object, state: Object|null, cited: Object|null, substituted: Object|null}}
  */
-function elementRefCell(entry, handle = null, pageNumber = null) {
-  const cited = handle ? objectStateFor(entry, handle) : null;
-  // Resolution order: the handle the brief cited, then the state the BIBLE
-  // declares for this page, then the default (first) state.
-  const state = cited || objectStateForPage(entry, pageNumber) || defaultObjectState(entry);
+function elementRefCell(entry, handle = null, pageNumber = null, sceneMetadata = null) {
+  // One resolver for the cell and for the REQUIRED OBJECTS clause, so the
+  // reference picture and the prompt text can never name different states.
+  // The prompt path is the logging site; this one is silent.
+  const { state, cited } = resolveObjectState(entry, handle, pageNumber, sceneMetadata, { silent: true });
   if (state && hasRefImage(state)) return { cell: state, state, cited, substituted: null };
   if (hasRefImage(entry)) return { cell: entry, state, cited, substituted: null };
   // The wanted state has no cell and there is no base render (a stated object
@@ -2515,7 +2600,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       // none: the object's identity is right either way.
       // A BARE citation (or none at all) resolves to the DEFAULT state — the
       // first row — because a stated object has no base cell to hand over.
-      const { cell, state, cited, substituted } = elementRefCell(entry, handle, pageNumber);
+      const { cell, state, cited, substituted } = elementRefCell(entry, handle, pageNumber, sceneMetadata);
       if (cited && cell === entry) {
         log.warn(`[VB-REF] Page ${pageNumber}: ${handle} ("${state.name}") has no state cell — using ${parentId}'s base render`);
       } else if (state && !cited && onPage && !objectStateForPage(entry, pageNumber)) {
@@ -2838,6 +2923,8 @@ module.exports = {
   objectStateFor,
   objectStateForPage,
   defaultObjectState,
+  pageHoldsObject,
+  resolveObjectState,
   hasElementReference,
   elementRefCell,
   getEmptySceneElementReferences,

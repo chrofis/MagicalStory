@@ -484,10 +484,14 @@ describe('state cell → page resolution', () => {
     }
   });
 
-  it('a cited dotted handle outranks the page declaration', () => {
+  it('a cited handle that disagrees with the page table loses to the table when the page gives no contact verdict', () => {
+    // Supersedes "a cited dotted handle outranks the page declaration"
+    // (2026-09-08): measured on staging job_1788816451791_25b31uqlp p12, the
+    // brief cited a state the table assigned to pages 16-17. With no
+    // interactions to arbitrate, the bible's own page table stands.
     const vb = rendered();
     const refs = getElementReferenceImagesForPage(vb, 5, 4, ['ART001.3'], null);
-    expect(refs.find((r: any) => r.id === 'ART001').stateName).toBe('lit');
+    expect(refs.find((r: any) => r.id === 'ART001').stateName).toBe('cracked');
   });
 
   it('a page no state declares falls back to the DEFAULT (first) state', () => {
@@ -559,5 +563,113 @@ describe('state cell → page resolution', () => {
     try { cells = expandElementStateCells(legacy); } finally { removeLogListener(listener); }
     expect(cells.map(c => c.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3']);
     expect(errors.join('\n')).toMatch(/state\(s\) with no id/);
+  });
+});
+
+// ── 6. THE INSTANT OUTRANKS THE STATE (2026-09-08) ──────────────────────────
+// Staging job_1788816451791_25b31uqlp p11: the bible assigned an "untouched"
+// state to the page whose plan-line instant pressed the object against another,
+// the delta ("no hands touching it") rode the REQUIRED OBJECTS line, and the
+// render obeyed the state twice. The state now carries a structured `held`
+// flag; a page whose interactions[] put hands on the object drops a state that
+// says untouched (and vice versa), and the brief's cited handle is arbitrated
+// against the bible's page table by that same flag.
+describe('resolveObjectState — the page instant outranks a contradicting state', () => {
+  const { resolveObjectState, pageHoldsObject } = require_('../../server/lib/visualBible');
+
+  const HELD_BIBLE = () => {
+    const vb = bible();
+    vb.artifacts[0].states = [
+      { id: 'ART001.1', name: 'resting', delta: 'lying flat on the shelf, nothing touching it', held: false, pages: [5, 6] },
+      { id: 'ART001.2', name: 'in hand', delta: 'gripped in one hand, tilted toward the viewer', held: true, pages: [7, 8] },
+    ];
+    return vb;
+  };
+  const meta = (interactions: any[] | null) => (interactions ? { interactions } : {});
+  const handsOn = (object: string) => [{ character: 'Ada', object, where: 'holds it', hands: true }];
+  const noHands = () => [{ character: 'Ada', object: 'her own sleeve', where: 'tugs it', hands: true }];
+  const sceneWith = (objects: string[], interactions: any[]) =>
+    `A quiet room.\n\n---METADATA---\n${JSON.stringify({ sceneIntent: 'test', characters: [{ name: 'Ada', position: 'center', depth: 'midground' }], shot: 'medium', objects, interactions, textPosition: 'bottom-left' })}`;
+  const captureWarns = <T,>(warnings: string[], fn: () => T): T => {
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    try { return fn(); } finally { removeLogListener(listener); }
+  };
+  const lineFor = (vb: any, page: number, objects: string[], interactions: any[], warnings: string[] = []) =>
+    captureWarns(warnings, () => requiredObjectsBlock(buildImagePrompt(sceneWith(objects, interactions), { language: 'en' }, null, vb, page, null, {}))
+      .split('\n').find(l => l.includes('hollowed carved vessel'))!);
+
+  it('normaliseObjectStates keeps `held` as a boolean and leaves it null when unauthored', () => {
+    const out = normaliseObjectStates([{ delta: 'a', held: true }, { delta: 'b', held: false }, { delta: 'c' }, { delta: 'd', held: 'yes' }], 'ART001');
+    expect(out.map(s => s.held)).toEqual([true, false, null, null]);
+  });
+
+  it('pageHoldsObject: hands row by id -> true, by name -> true, rows but none for it -> false, no rows -> null', () => {
+    const e = HELD_BIBLE().artifacts[0];
+    expect(pageHoldsObject(e, meta(handsOn('ART001.1')))).toBe(true);
+    expect(pageHoldsObject(e, meta(handsOn('the hollowed carved vessel with a lid')))).toBe(true);
+    expect(pageHoldsObject(e, meta(noHands()))).toBe(false);
+    expect(pageHoldsObject(e, meta(null))).toBeNull();
+    expect(pageHoldsObject(e, meta([]))).toBeNull();
+    // named in a row that does not say whether hands are on it -> no verdict
+    expect(pageHoldsObject(e, meta([{ character: 'Ada', object: 'ART001', where: 'looks at it' }]))).toBeNull();
+  });
+
+  it('THE DEFECT: an untouched state on a page whose brief puts hands on the object is DROPPED, loudly', () => {
+    const warnings: string[] = [];
+    const line = lineFor(HELD_BIBLE(), 5, ['ART001.1'], handsOn('ART001.1'), warnings);
+    expect(line).toContain('hollowed carved vessel');       // the object stays listed
+    expect(line).not.toMatch(/nothing touching it/);         // the contradicting delta is gone
+    expect(warnings.join('\n')).toMatch(/Page 5: ART001\.1 \("resting"\) says the object is untouched but the brief's interactions put hands on it/);
+  });
+
+  it('the reverse: an in-hand state on a page that declares its contacts and has no hands on it is dropped too', () => {
+    const warnings: string[] = [];
+    const line = lineFor(HELD_BIBLE(), 7, ['ART001'], noHands(), warnings);
+    expect(line).not.toMatch(/gripped in one hand/);
+    expect(warnings.join('\n')).toMatch(/ART001\.2 \("in hand"\) says the object is in hand but the brief's interactions declare no hands on it/);
+  });
+
+  it('a consistent state rides the line untouched, with no warning', () => {
+    const warnings: string[] = [];
+    const line = lineFor(HELD_BIBLE(), 7, ['ART001.2'], handsOn('ART001.2'), warnings);
+    expect(line).toMatch(/gripped in one hand/);
+    expect(warnings.filter(w => /VB-STATE/.test(w))).toEqual([]);
+  });
+
+  it('cited vs table: the page contact ARBITRATES - a cited in-hand state beats a table that says resting when hands are on it', () => {
+    // job_1788816451791_25b31uqlp p2: the brief cited the held state, the table
+    // (wrongly) declared "on the ground" for that page, the plan line held it up.
+    const r = resolveObjectState(HELD_BIBLE().artifacts[0], 'ART001.2', 5, meta(handsOn('ART001.2')));
+    expect(r.state.name).toBe('in hand');
+    expect(r.contradicted).toBe(false);
+  });
+
+  it('cited vs table: with no contact verdict the table wins and the disagreement is WARNED with both ids', () => {
+    const warnings: string[] = [];
+    const r = captureWarns(warnings, () => resolveObjectState(HELD_BIBLE().artifacts[0], 'ART001.2', 5, null));
+    expect(r.state.name).toBe('resting');
+    expect(warnings.join('\n')).toMatch(/Page 5: brief cites ART001\.2 .* but the bible assigns ART001\.1/);
+  });
+
+  it('a cited state on a page NO state declares is kept as cited, with a WARN', () => {
+    const warnings: string[] = [];
+    const r = captureWarns(warnings, () => resolveObjectState(HELD_BIBLE().artifacts[0], 'ART001.2', 9, null));
+    expect(r.state.name).toBe('in hand');
+    expect(warnings.join('\n')).toMatch(/Page 9: brief cites ART001\.2 .* none of ART001's states declares/);
+  });
+
+  it('the reference CELL follows the same resolution as the prompt clause', () => {
+    const vb = HELD_BIBLE();
+    for (const st of vb.artifacts[0].states) updateElementReferenceImage(vb, st.id, 'data:image/png;base64,xx', `https://r2/${st.id}.jpg`);
+    const card = getElementReferenceImagesForPage(vb, 5, 4, ['ART001.2'], meta(handsOn('ART001.2'))).find((r: any) => r.id === 'ART001');
+    expect(card.stateName).toBe('in hand');
+  });
+
+  it('BACKWARD COMPAT - a bible with no `held` flags never contradicts, whatever the brief declares', () => {
+    const warnings: string[] = [];
+    const line = lineFor(bible(), 5, ['ART001.1'], handsOn('ART001.1'), warnings);
+    expect(line).toMatch(/jagged vertical split/);
+    expect(warnings.filter(w => /state clause dropped/.test(w))).toEqual([]);
   });
 });
