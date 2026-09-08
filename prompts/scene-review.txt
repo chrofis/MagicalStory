@@ -30,7 +30,7 @@ One line per page — the picture each brief must stage: shot, who is in frame, 
 
 # YOUR TASK
 
-Answer each check, naming pages. Then rewrite only the pages a check faulted. The PAGE PLAN line is the authority for its page: a rewrite keeps every object where the plan line puts it and adds no action the plan line does not name. A page faulted for two actions loses the action the plan line does not name — it never gains a third. A fault you name must change a page: end your analysis with a line per named fault — the fault, then the page(s) your rewrite fixes it on, or the reason it stands. A named fault with neither is a failed review.
+Answer each check, naming pages. Then rewrite only the pages a check faulted. The PAGE PLAN line is the authority for its page: a rewrite never moves an object the plan line places, never drops a character the plan line puts in frame, and never adds an action the plan line does not name. When a finding's fix would require any of those, simplify inside the plan line instead — a page faulted for two actions loses the action the plan line does not name, it never gains a third. A fault you name must change a page: end your analysis with a line per named fault — the fault, then the page(s) your rewrite fixes it on, or the reason it stands. A named fault with neither is a failed review.
 
 Every check carries a tag in square brackets. Open each answer with that tag, then the pages: `[gaze_budget] pages 4, 9` or `[gaze_budget] none`. One line per tag, every tag answered.
 

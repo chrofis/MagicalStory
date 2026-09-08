@@ -6082,11 +6082,15 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
   // Per-page plan lines so check 5 (character on the page but absent from the
   // brief) has the division to compare against — without them the check was
   // dead (ALL_SCENES + STORY_BRIEF never carried it). One line per page,
-  // truncated; "(no plan data)" tells the reviewer to skip the comparison
-  // instead of hallucinating one (non-beats callers pass none).
+  // verbatim; "(no plan data)" tells the reviewer to skip the comparison
+  // instead of hallucinating one (non-beats callers pass none). Verbatim
+  // since 2026-09-08: the line is the authority a rewrite may not contradict
+  // (task preamble in scene-review.txt), and a line cut at 300 chars lost
+  // its "what is true after" segment on the longer pages. Round 2 passes
+  // only the pages under review, so the block shows exactly those lines.
   const planLines = (Array.isArray(options.beats) ? options.beats : [])
     .filter(b => b && b.pageNumber != null && String(b.planLine || '').trim())
-    .map(b => `Page ${b.pageNumber}: ${String(b.planLine).replace(/\s+/g, ' ').trim().slice(0, 300)}`);
+    .map(b => `Page ${b.pageNumber}: ${String(b.planLine).replace(/\s+/g, ' ').trim()}`);
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: scenes.length,

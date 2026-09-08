@@ -1596,10 +1596,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           const subsetByPage = new Map();
           for (const [pn, list] of after.byPage) if (faultPages.has(pn)) subsetByPage.set(pn, list);
           const { renderFindingsBlock: renderBriefBlock2 } = require('./sceneBriefCheck');
+          // Same template, same check block and the same plan-line authority as
+          // round 1; the plan lines are those of the pages under review, verbatim.
           const rrPrompt = buildSceneReviewPrompt(
             inputData,
             subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-            { briefFindings: renderBriefBlock2(subsetByPage), beats }
+            { briefFindings: renderBriefBlock2(subsetByPage), beats: beats.filter(b => b && faultPages.has(b.pageNumber)) }
           );
           if (rrPrompt) {
             try {
