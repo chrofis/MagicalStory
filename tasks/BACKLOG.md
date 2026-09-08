@@ -46,6 +46,8 @@ Last full sweep: **2026-09-06**.
 
 ## Image quality — unresolved render defects
 
+- [ ] **Planner obeys "one action per page" for the instant but parks the effect in the after-segment instead of a new page** — dragon rerun 2026-09-09: strike line clean, no release page, water never arrives in any instant; next step if wanted = code-side clause counter on the instant segment → `docs/decisions.md` (2026-09-09 one-action entry, Measured)
+- [ ] **Plates come back letterboxed inside the 1:1 canvas** (painted margins on all three refix8 plates; the location reference cell is 2:1) and the plate copies props from the location reference cell that the `emptyScenePrompt` omits (trough on the strike page) → `docs/decisions.md` (2026-09-09 one-action entry, Measured)
 - [ ] **Baden eval B4 — duplicate/ghost props undetected** (hat twice p3, pompom p12, kettle on the
       initial page); no prop-multiplicity / prop-vs-VB check → `tasks/baden-eval-2026-09-06.md:B4`
 - [x] **Baden eval B5 — closed 2026-09-06: staging runs a single repair pass on purpose (owner)** → `tasks/baden-eval-2026-09-06.md:B5`

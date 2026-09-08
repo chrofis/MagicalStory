@@ -731,6 +731,15 @@
       "status": "fixed",
       "note": "FIX: one deterministic matcher visualBible.entryNamedByRow - id in row first, else token overlap where a candidate is named by a token no other cited entry carries (ambiguous -> null, never a guess); candidates = entry + the brief's objects[] entries (citedEntries), visualBible threaded through resolveObjectState/elementRefCell. Same matcher now drives vbElementBudget.rankPageElements focal (was an exact upper-cased string compare). Measured: stored bible (no `held`) matches right but cannot contradict - the flag is missing, not the match; with held:false on ART010.1 the p13 WARN fires and the clause is dropped. Unit: tests/unit/vb-object-states.test.ts 69/69, suite 880/880.",
       "fixedIn": "503321471"
+    },
+    {
+      "id": "beats-plan-line-holds-deed-effect-destination",
+      "title": "The beats planner passed a plan line holding a deed, its effect and where the effect goes as ONE action, so the receiver of the result (a trough) was seeded into the striking page at every later stage and five of six renders drew the effect out of the tool into the receiver",
+      "reportedAt": "2026-09-08",
+      "source": "Reproduced from stored artefacts of staging story job_1788816451791_25b31uqlp p16: plan line (encode_ NEW.plan.json final[15]) \"drives the branch tip hard into the crack in the rock face with both hands, water beginning to jet from the base - the spring is freed; water runs toward the hollow beside the trough\"; bible ART007.2 delta \"water jetting into the interior from the direction of the rock face crack\"; AD sceneIntent \"water jets out violently into the trough\"; assembled prompt REQUIRED OBJECTS line carried that delta verbatim. Renders: 5 FAIL (water out of the branch tip into a trough under it) / 1 PASS (hand brief, tip in the crack, trough several steps clear). Owner diagnosis: 4-5 actions in the one mandated action.",
+      "status": "fixed",
+      "note": "FIX (caff24ac0): story-beats.txt + plan-check.txt rule, verbatim: One action per page. A deed is one action; its effect is another; where the effect goes is a third. When a plan line holds more than one, the later ones move to the next page. Bible rule: a state is the object own look, never an arrival. Fallback: interactions[].receiver/target -> builder drops the receiver state clause ([RECEIVER]) and appends a fixed placement sentence. Measured: beats rerun (USD 0.117) emitted the strike alone (\"he rams the branch into the crack and heaves down on it with both arms - water shoots out of the crack\") but parked the effect in the after-segment rather than a release page (BACKLOG); render attempt 3 with the receiver row PASSED (water out of the rock, trough clear) - scratchpad/refix8_*. Unit: tests/unit/receiver-placement.test.ts 6/6, suite 886/886.",
+      "fixedIn": "caff24ac0"
     }
   ]
 }
