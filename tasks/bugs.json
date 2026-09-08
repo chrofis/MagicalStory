@@ -678,6 +678,14 @@
       "status": "fixed",
       "fixedIn": "c903b6473",
       "note": "FIX: new exported helper sc.flattenNotes() in server/lib/storyScorecard.js - strings pass through, arrays join, objects render as 'key: value' lines (recursively), JSON.stringify as the last resort, null/undefined -> ''. Used at both sites: testlab.js judgeOnce and storyScorecard.js scoreFromDims. Grepped every other String(parsed...) site (coverTitlePaint, referenceSheets, styleAnalysis, testlab:6630 analysis) - those fields are contractually strings in their prompts and are not judge notes; left alone."
+    },
+    {
+      "id": "iterate-rebuilds-season-from-render-date",
+      "title": "The iterate/repair path re-derives the story's SEASON from the render date, so every iterated page rendered in autumn carries autumn foliage regardless of the story's stored season",
+      "reportedAt": "2026-09-08",
+      "source": "Reproduced from stored evidence on two staging stories, both stored season:'summer' — job_1788816451791_25b31uqlp (dragon) and job_1788820396445_9erw6xc01 (pirate). All four iterate-round-* image versions across the two runs carried '**SEASON:** Autumn' in their rebuilt prompts; every first-pass version carried Summer. Visible result: the pirate p13 climax renders its almond tree in full autumn orange while p15 and p16 render the same tree green — an internal continuity contradiction inside one book. Cause: pipelineStoryData (storyJobPipeline.js, unified image phase) never carried `season` or `createdAt`, and server/lib/season.js resolveSeason() falls back to `inputData.createdAt || new Date()`. The fallback is by design for a missing season, but the field simply never reached the object, so the fallback fired on every iterate. season.js's own doc comment states the intended behaviour it could not deliver: 'never from now at render time — a repair run months later must resolve the same season the pages were drawn in.' Hits every iterated page of every story rendered Sep–Nov, and equivalently in any other season.",
+      "status": "fixed",
+      "note": "FIX: new exported helper sc.flattenNotes() in server/lib/storyScorecard.js - strings pass through, arrays join, objects render as 'key: value' lines (recursively), JSON.stringify as the last resort, null/undefined -> ''. Used at both sites: testlab.js judgeOnce and storyScorecard.js scoreFromDims. Grepped every other String(parsed...) site (coverTitlePaint, referenceSheets, styleAnalysis, testlab:6630 analysis) - those fields are contractually strings in their prompts and are not judge notes; left alone."
     }
   ]
 }

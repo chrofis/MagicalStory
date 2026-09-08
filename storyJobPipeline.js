@@ -5535,6 +5535,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBible,
           artStyle: inputData.artStyle,
           language: inputData.language,
+          // Season, or the iterate path re-derives it from the RENDER date.
+          // resolveSeason() falls back to `inputData.createdAt || new Date()`,
+          // and neither field reached this object — so every iterate-round page
+          // rebuilt its prompt with whatever season the server was living in.
+          // Measured 2026-09-08 on two stories stored `season: 'summer'`: all
+          // four `iterate-round-*` versions carried **SEASON: Autumn** (it was
+          // September) while every first-pass version carried Summer, which is
+          // the autumn almond tree on the pirate p13 climax. createdAt rides
+          // along so a repair months later still resolves the drawn season —
+          // the behaviour season.js already documents and could not deliver.
+          season: inputData.season,
+          createdAt: inputData.createdAt,
           clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
           // Preserve per-scene layout fields (imageAspect, textInImage) so any
