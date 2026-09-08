@@ -1221,6 +1221,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let briefUnfixedList = [];
   let briefIntroducedList = [];
   let briefSecondRound = null;
+  // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
+  // actions, and a page over the three-element budget. Both ride the targeted
+  // second round with every other reviewable fault; what this adds is a
+  // VISIBLE verdict when they outlive the round budget — page numbers per type,
+  // and for the budget which pages the brief itself could not have fixed
+  // (the bible's `appearsInPages` places elements the brief never cited, and
+  // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
+  // Null when both types ended at zero. Never kills the run.
+  let rewriteToZeroUnfixed = null;
   try {
     const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
     const checkPages = expansions.map(x => {
@@ -1617,6 +1626,43 @@ async function generateStoryViaBeats(inputData, opts = {}) {
             }
           }
         }
+
+        // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
+        // last round this budget allows. Measured on staging
+        // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
+        // two rounds, and on every one of them the brief's own objects[] was
+        // already within three — the surplus came from the bible's
+        // appearsInPages, which no rewrite can withdraw. Saying so per page is
+        // the difference between "the reviewer ignored the fault" and "the
+        // fault is not the reviewer's to fix".
+        const ZERO_TYPES = ['interaction_multiple_actions', 'vb_element_overflow'];
+        const zeroLeft = briefUnfixedList.filter(f => ZERO_TYPES.includes(f.type) && f.pageNumber !== 0);
+        if (zeroLeft.length > 0) {
+          const { rankPageElements, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+          const pagesOf = (type) => [...new Set(zeroLeft.filter(f => f.type === type).map(f => f.pageNumber))].sort((a, b) => a - b);
+          const overflowDetail = pagesOf('vb_element_overflow').map((pn) => {
+            const x = expansions.find(e => e.pageNumber === pn);
+            const meta = x ? (extractSceneMetadata(x.brief) || {}) : {};
+            const ranked = rankPageElements(pn, meta, visualBible);
+            const objectsAsked = ranked.filter(e => e.fromObjects).length;
+            return { pageNumber: pn, elements: ranked.length, objectsAsked, briefFixable: objectsAsked > VB_ELEMENT_BUDGET };
+          });
+          rewriteToZeroUnfixed = {
+            interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
+            vb_element_overflow: pagesOf('vb_element_overflow'),
+            vbOverflowDetail: overflowDetail,
+            rounds: briefSecondRound ? 2 : 1,
+          };
+          const parts = [];
+          if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
+          if (rewriteToZeroUnfixed.vb_element_overflow.length) {
+            const bibleSide = overflowDetail.filter(d => !d.briefFixable).map(d => d.pageNumber);
+            parts.push(`over the ${VB_ELEMENT_BUDGET}-element budget on page(s) ${rewriteToZeroUnfixed.vb_element_overflow.join(', ')}`
+              + (bibleSide.length ? ` (bible-side on ${bibleSide.join(', ')} — the brief cites ≤${VB_ELEMENT_BUDGET}, the surplus is appearsInPages)` : ''));
+          }
+          log.warn(`⚠️ [BEATS] rewrite-until-zero NOT reached after ${rewriteToZeroUnfixed.rounds} round(s): ${parts.join('; ')} — shipping flagged`);
+          gl.warn('beats_one_moment_unfixed', `Briefs still ${parts.join('; ')} after the review's round budget — shipped flagged, never killed`, null, rewriteToZeroUnfixed);
+        }
       } catch (rcErr) {
         log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
       }
@@ -1642,6 +1688,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
         briefSecondRound,
+        rewriteToZeroUnfixed,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: srRes.modelId || sceneReviewModel,
