@@ -1263,6 +1263,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (modelConfig?.provider === 'xai') {
         return require('./images').callGrokVisionAPI(model, modelConfig.modelId || model, parts, evaluationPrompt);
       }
+      // OpenRouter vision judge (Qwen3-VL etc.): same Gemini-shaped response
+      // as the Grok path, so the parsing below is provider-blind. Lab A/B of
+      // the quality judge (2026-09-08); no fallback here — a failed call
+      // returns non-2xx and the eval is skipped like any other API error.
+      if (modelConfig?.provider === 'openrouter') {
+        return require('./images').callOpenRouterVisionAPI(model, modelConfig.modelId || model, parts, evaluationPrompt);
+      }
       return withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         return fetch(url, {
@@ -1759,6 +1766,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // matches: [{figure, reference (char name), confidence, face_bbox, issues}]
       let figures = parsedJson.figures || [];
       let matches = parsedJson.matches || [];
+      // Boxes on both lists go through the same normaliser as the inventory:
+      // a 0-1 box passes unchanged, Qwen's mixed 0-1000 values are rescaled.
+      {
+        const { normaliseInventoryBoxes } = require('./inventoryBoxes');
+        const bs = normaliseInventoryBoxes({ figures: [...figures, ...matches] });
+        if (bs.fixed || bs.dropped) log.info(`📊 [EVAL] ${modelId}: normalised ${bs.fixed} box(es) from 0-1000 scale, dropped ${bs.dropped} malformed`);
+      }
       if (matches.length > 0) {
         log.info(`📊 [EVAL] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
       }

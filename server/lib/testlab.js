@@ -699,7 +699,9 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   const t0 = Date.now();
   const result = await evaluateImageQuality(
     imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
-    null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    // Quality-judge A/B (2026-09-08): params.model swaps the P2 judge (and,
+    // because an override wins there too, the P1 inventory) for one experiment.
+    params.model || null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
     ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
     {
       evalTemplateOverride: promptOverride || null,
@@ -737,6 +739,10 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     // the inventory said `complete: false`, the prompt carried the rule, and
     // nothing arrived — no way to tell which side lost it).
     complianceRaw: result.threeStageResult?.complianceResult || null,
+    // What RAN, not what was asked: the judge key and the per-stage token
+    // counts (a model's input-token signature is how a swap is verified).
+    modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
+    usage: result.threeStageResult?.usage || null,
     storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, semanticScore: ctx.scene.semanticScore ?? null },
   };
 }
