@@ -742,7 +742,7 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     // What RAN, not what was asked: the judge key and the per-stage token
     // counts (a model's input-token signature is how a swap is verified).
     modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
-    usage: result.threeStageResult?.usage || null,
+    usage: { ...(result.threeStageResult?.usage || {}), quality_input_tokens: result.usage?.input_tokens ?? null, quality_output_tokens: result.usage?.output_tokens ?? null },
     storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, semanticScore: ctx.scene.semanticScore ?? null },
   };
 }
