@@ -5215,6 +5215,7 @@ function buildReplanSection(pagePlan, findingLines) {
     '# RE-DIVIDE',
     '',
     'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Output the full plan again.',
+    'When a page is named for holding more than one action, the fix is a second page for the later action. Moving it into "what is true after" is not a fix. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
