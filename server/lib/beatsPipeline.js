@@ -1618,12 +1618,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
                   rrChanged.push(x.pageNumber);
                 }
               }
+              // Same options as the two checks above. Until 2026-09-08 this
+              // call passed no `textZoneRules`, so every text-zone finding
+              // vanished from the round-2 left-list whenever those rules were
+              // active — a page could enter round 2 for a text-zone collision
+              // and be reported clean without the collision being looked at.
+              // Page 0 (the whole-book tally) is excluded for the same reason
+              // round 1 excludes it: it is reported above and never re-sent.
               const after2 = checkBriefs(
                 expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
                 briefCastNames,
-                visualBible
+                visualBible,
+                { textZoneRules: textZoneRulesActive(inputData) }
               );
-              const left2 = after2.findings.filter(f => REVIEWABLE.has(f.type));
+              const left2 = after2.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
               briefUnfixedList = left2;
               briefSecondRound = {
                 pages: [...faultPages].sort((a, b) => a - b),
