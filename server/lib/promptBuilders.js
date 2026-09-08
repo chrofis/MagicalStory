@@ -5443,6 +5443,7 @@ function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
       ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
       : '- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request.',
     '- Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.',
+    '- A figure who can speak never records what it could say: backstory a present character knows is spoken aloud, never carved, written, scratched or drawn for the cast to read.',
     '- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.',
     ...(simple ? [] : ['- A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.']),
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
@@ -6254,6 +6255,9 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
+    // The owner's per-page element ceiling, from its one source of truth — the
+    // same number `trimVbAssignments` enforces on the parsed bible.
+    VB_ELEMENT_BUDGET,
     // The contract's descriptions are copied verbatim into image prompts, so
     // the bible must know the rendering style — a style-blind contract wrote
     // luminous/iridescent fantasy specs into a photorealistic book
