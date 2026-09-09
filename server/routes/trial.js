@@ -2121,7 +2121,17 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // base it dragged the make-believe idea to the real lake as well.
     // Both branch instructions used to invite dressing up unconditionally, which
     // is what asked a costume-less theme for a worn costume.
-    const localIdea = `\n${landmarksText}\nSet this idea in the child's own town, at the real local places named above. ${themeShows} — the play is the story, never a trip somewhere else.`;
+    // The town was never NAMED in the prompt - only its landmarks were listed, as
+    // bare names. A model that recognises one of those landmarks but not the town
+    // around it fills the rest of the geography in from general knowledge, and
+    // gets it wrong (a real trial put a town on the wrong river). Name the town,
+    // and let no other place be invented beside the ones supplied.
+    const townName = userLocation?.city || '';
+    const townClause = townName ? `in ${townName}` : `in the child's own town`;
+    const noInventedPlaces = landmarksText
+      ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
+      : '';
+    const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
     const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
     const prompt1Local = prompt1 + localIdea;
     const prompt2 = prompt1 + fantasyIdea;
