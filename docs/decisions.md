@@ -31086,7 +31086,11 @@ fused onto the animal carrying it, and "pressed to wing" rendered a wing: the pa
 wing sources (the cell and the dragon's own reference) and drew the scale AS a wing, and on a
 repeat put a spare wing where the dragon's head was. Line 62, one line above, already said the
 right thing ("lit, broken, mended, opened, filled") and was contradicted by 63.
-**Decision:**  Owner ruling. `states[]` exist only for a change to the object ITSELF — broken,
+**Decision:**  Owner ruling, and the test, in the owner's words: the bible shows the object and
+nothing else — take away everything that is not the object (the hands, the hole, the wing, the
+shelf) and if what is left looks the same, it is not a state. A flower wilts, a bottle breaks, a
+canvas gets painted: states. Held, carried, set down, in front of something: the same object.
+`states[]` exist only for a change to the object ITSELF — broken,
 lit, opened, filled, wet, torn, mended. Where it is, who holds it and what it touches are never
 states; the page's brief stages that. A delta describes the altered look and nothing else: no
 place, no figure, no body part, no other element. The `held` flag is dropped from the schema —
