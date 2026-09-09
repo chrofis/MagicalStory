@@ -31048,3 +31048,53 @@ round discarded (must-fix 6 → 2), zero duplicates shipped.
 **Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js` (`findingPages`,
 `buildReplanSection`), `server/lib/storyHelpers.js` (facade re-export)
 **Status:**    ✅ active
+
+## An object's reference cell draws the object, never whoever is holding it (2026-09-09)
+**Context:**   A state cell's caption is the object's base description plus that state's
+`delta`, and `prompts/story-bible-from-beats.txt` asked for deltas written as "gripped in one
+hand" / "held edge to edge against ...". Rendered, that caption asks for an object AND a body
+part, and the model supplies the body the part belongs to. Measured on a staging story: the
+"carried up" cell of an object came back as the object fused onto a four-legged furry body with
+claws and a tail. The page prompt says "match its look", so the render copied it faithfully.
+**Decision:**  `expandElementStateCells` strips the holder from a state cell's caption
+(`objectLookOnly`): a clause naming a gripping body part, or naming any figure in the book, is
+not part of the object's own look. What survives is how the object itself sits — "partly above
+ground", "flat across the opening". If a delta says nothing else, the cell falls back to the
+base description. The bible prompt no longer asks for holder-naming deltas either; `held`
+already records that something has hold of it, and the page's brief says whose.
+**Rationale:** A reference image is ground truth for every downstream check — the quality eval,
+the semantic eval and the three-stage check all compare the render against it. When the
+reference lies, a faithful render matches it and scores well: that page scored 85/80 with zero
+findings, while a *better* page on the same object was flagged CRITICAL three times. No checker
+anywhere looks at a reference image and asks whether it depicts the thing its own description
+describes, so this fault class is invisible by construction and has to be prevented at birth.
+Stripping is preferred over a QC gate on rendered cells because it removes the cause rather
+than sampling for the symptom, and costs no extra call.
+**Touched:**   `server/lib/referenceSheets.js` (`objectLookOnly`, `expandElementStateCells`,
+`buildReferenceSheetBatches`), `prompts/story-bible-from-beats.txt`,
+`tests/unit/ref-sheet-state-holder.test.ts`
+**Status:**    ✅ active
+
+## The page repair may be shown the object a finding names (2026-09-09)
+**Context:**   `inpaintPage` attached a visual-bible reference only for findings of type
+`missing_character` / `missing_element` that carried a structured `item` field. The semantic
+evaluator emits neither: it names the object in prose ("the large, rigid, deep teal and ochre
+dragon scale ... is missing") and its strongest verdict on a wrong action is
+`action_interaction`, a type the block did not consider at all. So the pages that most needed a
+picture of the object were handed none and asked to paint it from a name.
+**Decision:**  `elementRefsFromText` (option on `inpaintPage`, A/B knob on the Lab inpaint
+stage, OFF by default) resolves the element from the finding's own wording via
+`vbNameInText`, across `missing_element`, `missing_character`, `action_interaction` and
+`object_presence`. It matches the HEAD of a bible name (prose writes "dragon scale", the bible
+says "Dragon scale — large (kept by marmots)") and settles two entries of one kind by which one
+appears on the page being repaired. The artifact branch now resolves the cell for the state
+THIS page cites, not the object's first look.
+**Rationale:** Measured on three faulted pages of one story: every repair attempt scored equal
+to or worse than the render it was fixing (70→20, 10→10, −40→−30), and none of the three had a
+reference attached. Owner's reading, confirmed in the code: a repair cannot add an element it
+has never been shown. Default OFF until an A/B on those same three pages shows it helps —
+adding references to a repair is not free of risk, since a reference is also something the
+model can paste in the wrong place.
+**Touched:**   `server/lib/images.js` (`inpaintPage`), `server/lib/visualBible.js`
+(`vbNameInText`), `server/lib/testlab.js`, `tests/unit/vb-name-in-text.test.ts`
+**Status:**    🟡 conditional — shipped behind a default-off flag, pending the A/B
