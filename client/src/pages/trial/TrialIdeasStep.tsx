@@ -23,6 +23,17 @@ interface Props {
   onLocationChange?: (location: { city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null }) => void;
 }
 
+// One candidate town from /api/user/verify-location. `label` already carries
+// the canton that tells same-named towns apart ("Bremgarten, Aargau").
+interface CityMatch {
+  city: string;
+  region?: string | null;
+  country?: string | null;
+  label: string;
+  lat?: number | null;
+  lon?: number | null;
+}
+
 interface StreamingIdea {
   text: string;
   isStreaming: boolean;
@@ -43,6 +54,7 @@ const strings: Record<string, {
   worldFantasy: string;
   changeCity: string;
   cityNotFound: string;
+  chooseCity: string;
   createStory: string;
   regenerate: string;
   back: string;
@@ -61,6 +73,7 @@ const strings: Record<string, {
     worldFantasy: 'Fantasy world',
     changeCity: 'Change city',
     cityNotFound: 'City not found. Please check the spelling.',
+    chooseCity: 'Several places share that name — which one?',
     createStory: 'Create My Story',
     regenerate: 'Generate New Ideas',
     back: 'Back',
@@ -79,6 +92,7 @@ const strings: Record<string, {
     worldFantasy: 'Fantasiewelt',
     changeCity: 'Ort ändern',
     cityNotFound: 'Ort nicht gefunden. Bitte Schreibweise prüfen.',
+    chooseCity: 'Mehrere Orte heissen so — welcher ist es?',
     createStory: 'Meine Geschichte erstellen',
     regenerate: 'Neue Ideen erstellen',
     back: 'Zurück',
@@ -97,6 +111,7 @@ const strings: Record<string, {
     worldFantasy: 'Monde fantastique',
     changeCity: 'Modifier la ville',
     cityNotFound: "Ville introuvable. Vérifie l'orthographe.",
+    chooseCity: 'Plusieurs lieux portent ce nom — lequel ?',
     createStory: 'Créer mon histoire',
     regenerate: 'Générer de nouvelles idées',
     back: 'Retour',
@@ -115,6 +130,7 @@ const strings: Record<string, {
     worldFantasy: 'Mondo fantastico',
     changeCity: 'Cambia città',
     cityNotFound: 'Città non trovata. Controlla come è scritta.',
+    chooseCity: 'Più località hanno questo nome — quale?',
     createStory: 'Crea la mia storia',
     regenerate: 'Genera nuove idee',
     back: 'Indietro',
@@ -350,8 +366,19 @@ export default function TrialIdeasStep({
   const [editingCity, setEditingCity] = useState(false);
   const [cityDraft, setCityDraft] = useState('');
   const [cityState, setCityState] = useState<'idle' | 'checking' | 'fail'>('idle');
+  // A typed name can belong to several real towns ("Bremgarten" is both a Bern
+  // suburb and an Aargau town; "Buchs" is three). The endpoint returns them
+  // all; when there is more than one the user picks before any idea is made.
+  const [cityMatches, setCityMatches] = useState<CityMatch[]>([]);
   const regenAfterCityRef = useRef(false);
-  const startCityEdit = () => { setCityDraft(userLocation?.city || ''); setCityState('idle'); setEditingCity(true); };
+  const startCityEdit = () => { setCityDraft(userLocation?.city || ''); setCityState('idle'); setCityMatches([]); setEditingCity(true); };
+  const applyCity = (m: CityMatch) => {
+    regenAfterCityRef.current = true;
+    onLocationChange!({ city: m.city, region: m.region ?? null, country: m.country ?? null, latitude: m.lat ?? null, longitude: m.lon ?? null });
+    setCityMatches([]);
+    setEditingCity(false);
+    setCityState('idle');
+  };
   const saveCity = async () => {
     const draft = cityDraft.trim();
     if (!draft || !onLocationChange) { setEditingCity(false); return; }
@@ -363,10 +390,16 @@ export default function TrialIdeasStep({
       });
       const data = await res.json();
       if (!data?.verified) { setCityState('fail'); return; }
-      regenAfterCityRef.current = true;
-      onLocationChange({ city: data.city || draft, region: null, country: data.country || null, latitude: data.lat ?? null, longitude: data.lon ?? null });
-      setEditingCity(false);
-      setCityState('idle');
+      const matches: CityMatch[] = Array.isArray(data.matches) && data.matches.length
+        ? data.matches
+        : [{ city: data.city || draft, region: null, country: data.country ?? null, label: data.city || draft, lat: data.lat ?? null, lon: data.lon ?? null }];
+      if (matches.length > 1) {
+        // Ambiguous — show the choices and wait. Nothing is regenerated yet.
+        setCityMatches(matches);
+        setCityState('idle');
+        return;
+      }
+      applyCity(matches[0]);
     } catch {
       setCityState('fail');
     }
@@ -413,6 +446,21 @@ export default function TrialIdeasStep({
                 <X size={14} />
               </button>
               {cityState === 'fail' && <span className="basis-full text-center text-xs text-red-600">{t.cityNotFound}</span>}
+              {cityMatches.length > 1 && (
+                <div className="basis-full flex flex-col items-center gap-1 mt-1">
+                  <span className="text-xs text-gray-500">{t.chooseCity}</span>
+                  {cityMatches.map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      onClick={() => applyCity(m)}
+                      className="w-56 px-3 py-1.5 rounded-md border border-gray-200 bg-white text-sm text-gray-800 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <>
