@@ -1005,7 +1005,9 @@ export default function AdminDashboard() {
                 </div>
 
                 {trialStepFunnel.totalVisits === 0 ? (
-                  <p className="text-sm text-gray-500 italic">{texts.trialStepFunnelEmpty}</p>
+                  <p className="text-sm text-gray-500 italic">
+                    {trialStepFunnel.allSourcesVisits > 0 ? texts.trialStepFunnelEmptySource : texts.trialStepFunnelEmpty}
+                  </p>
                 ) : (
                   <>
                     <div className="overflow-x-auto">
