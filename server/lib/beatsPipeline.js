@@ -74,6 +74,7 @@ const {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
@@ -374,8 +375,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // Hard cap at 3 (owner, 2026-08-30): the iteration study peaked at v3 and
   // regressed at v4. The adaptive early stop below usually ends sooner.
   const arcRoundsRequested = parseInt(modelOverrides.arcRounds, 10) || MODEL_DEFAULTS.arcRounds || 1;
-  const arcRounds = Math.max(1, Math.min(3, arcRoundsRequested));
-  if (arcRoundsRequested > 3) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to 3 (owner cap 2026-08-30 — iteration study regressed at round 4)`);
+  const arcRoundsMax = MODEL_DEFAULTS.arcRoundsMax || 3;
+  const arcRounds = Math.max(1, Math.min(arcRoundsMax, arcRoundsRequested));
+  if (arcRoundsRequested > arcRoundsMax) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to ${arcRoundsMax} (owner cap 2026-08-30 — iteration study regressed at round 4)`);
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
   const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
@@ -416,6 +418,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ISSUE → CHANGE lines on the final arc. They ride into the beats prompt
   // (applied while dividing) and the text writer (the text supports them).
   let arcHints = '';
+  // The arc's own declared invented-figure list and the allowance it was given.
+  // Both travel to the plan counters as a REPORTING-ONLY cross-check.
+  let arcInventedNames = null;
+  let arcInventedLimit = null;
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
@@ -485,7 +491,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // critique for round 1, then each round's fresh critique.
     let prevCritique = commit.critique;
     const roundReports = [];
-    for (let round = 1; round <= arcRounds; round++) {
+    // The invented-figure allowance this commission carries, and the list the
+    // arc declares against it. Code re-counts the DECLARED LIST only — never
+    // the arc prose (planCounters.js:227 documents why a regex cast extraction
+    // over narrative is banned).
+    const inventedAllowance = arcInventedAllowance(inputData);
+    arcInventedLimit = inventedAllowance;
+    let arcInvented = commit.invented || { present: false, names: [] };
+    if (arcInvented.present) arcInventedNames = arcInvented.names;
+    // A forced round may extend the budget by one, never past the clamp, and
+    // at most once per story.
+    let roundBudget = arcRounds;
+    let inventedRoundForced = false;
+    for (let round = 1; round <= roundBudget; round++) {
+      let forceAnotherRound = false;
       await checkCancellation();
       await stage(2, 'Convening the story panel...', { next: 2, ms: 120000 });
       const panelPrompt = buildArcPanelPrompt(inputData, currentBlock);
@@ -552,6 +571,30 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // Worst surviving fault (untagged lines count as MAJOR, so pre-tag
       // output keeps working); null = the critique names no faults at all.
       const maxSeverity = critiqueMaxSeverity(retold.critique);
+      // INVENTED-FIGURE RE-COUNT (2026-09-09). The arc used to grade its own
+      // cast inside the same call and self-certify: job_1788903616404_iqvhj4l8m
+      // wrote four invented figures on an allowance of two and reported
+      // "Invented figures past allowance: none — Fenno and Nolo, exactly two".
+      // Arithmetic on the model's own emitted list, nothing else.
+      arcInvented = retold.invented && retold.invented.present ? retold.invented : arcInvented;
+      const inventedCount = (arcInvented.names || []).length;
+      if (arcInvented.present) arcInventedNames = arcInvented.names;
+      if (MODEL_DEFAULTS.arcForceRoundOnInventedOvercount && arcInvented.present && inventedCount > inventedAllowance) {
+        const detail = { round, names: arcInvented.names, counted: inventedCount, allowance: inventedAllowance, declaredWritten: arcInvented.written, declaredAllowed: arcInvented.allowed };
+        if (inventedRoundForced) {
+          log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — a round was already forced for this story; shipping with the overrun`);
+          gl.warn('arc_invented_overcount', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — one round was already forced; the arc ships with the overrun`, null, detail);
+        } else if (round >= roundBudget && roundBudget >= arcRoundsMax) {
+          log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — cannot force another round at the clamp of ${arcRoundsMax}; shipping with the overrun`);
+          gl.warn('arc_invented_overcount_declined', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — the round clamp of ${arcRoundsMax} is reached, so no round is forced; the arc ships with the overrun`, null, detail);
+        } else {
+          inventedRoundForced = true;
+          forceAnotherRound = true;
+          if (round >= roundBudget) roundBudget = Math.min(arcRoundsMax, roundBudget + 1);
+          log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — forcing one more re-telling round (budget now ${roundBudget}/${arcRoundsMax})`);
+          gl.warn('arc_invented_overcount_forced', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — forcing one more panel + re-telling round`, null, { ...detail, roundBudget });
+        }
+      }
       roundReports.push({
         round,
         panel,
@@ -570,8 +613,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // ADAPTIVE EARLY STOP (owner, 2026-08-30): another round only earns its
       // cost while a CRITICAL or MAJOR fault survives. When nothing above
       // MINOR remains, more rounds are where the study's regression came from.
-      if (round < arcRounds && (maxSeverity === null || maxSeverity === 'MINOR')) {
-        gl.info('arc_rounds_early_stop', `Round ${round}: critique has nothing above MINOR — skipping ${arcRounds - round} remaining round(s)`, null, {
+      if (!forceAnotherRound && round < roundBudget && (maxSeverity === null || maxSeverity === 'MINOR')) {
+        gl.info('arc_rounds_early_stop', `Round ${round}: critique has nothing above MINOR — skipping ${roundBudget - round} remaining round(s)`, null, {
           round, maxSeverity, reason: 'nothing above MINOR',
         });
         break;
@@ -583,8 +626,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // critique it answered, the arc has stopped materially changing —
       // another round cannot earn its cost. Tolerant: unparseable Fixing
       // never stops on this trigger.
-      if (round < arcRounds && fixingBelowMajor(retold.fixing, prevCritique)) {
-        gl.info('arc_rounds_early_stop', `Round ${round}: Fixing addressed nothing above MINOR — skipping ${arcRounds - round} remaining round(s)`, null, {
+      if (!forceAnotherRound && round < roundBudget && fixingBelowMajor(retold.fixing, prevCritique)) {
+        gl.info('arc_rounds_early_stop', `Round ${round}: Fixing addressed nothing above MINOR — skipping ${roundBudget - round} remaining round(s)`, null, {
           round, maxSeverity, reason: 'fixing_below_major',
         });
         break;
@@ -739,7 +782,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * rather than skipping the check entirely.
    */
   const runCheck = async (label, pages, planText) => {
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount) });
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount), declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit });
     let modelFindings = [];
     let checkModelId = null;
     let prompt = null;
@@ -1064,6 +1107,23 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // Deliberately OUTSIDE the bible try/catch: a throw from the caller's hook
   // must abort the run, not be swallowed into "ships with an empty bible".
   if (onVisualBible && visualBible) await onVisualBible(visualBible);
+  // The landmark photo VARIANTS must be on the bible before the Art Director
+  // reads it: buildVbLocationLines prints a "Photo variants:" line per real
+  // landmark so a brief can cite a viewpoint that exists, and the resolver
+  // serves the variant a brief's landmarkView asks for. The fill was started
+  // as an un-awaited promise in the caller's onVisualBible ("scene expansion
+  // will wait for this") — a contract only the legacy path honoured. Here it
+  // raced the single AD call and lost: on job_1788957347999_ijseol49a the AD
+  // context carried no variants for either landmark, the AD wrote
+  // landmarkView "distant" blind, and a street-level façade was served for a
+  // skyline page. Idempotent and one query, so awaiting it twice is free.
+  if (visualBible) {
+    try {
+      await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
+    } catch (err) {
+      log.warn(`⚠️ [BEATS] Landmark photo variants did not load before scene expansion: ${err.message} — briefs will not see them`);
+    }
+  }
 
   // ── Step 3b: wardrobe review, BEFORE the avatars are kicked off ───────────
   // The bible writes clothingRequirements and nothing checked it: a costume

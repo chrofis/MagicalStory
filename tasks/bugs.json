@@ -758,6 +758,15 @@
       "status": "fixed",
       "fixedAt": "2026-09-09",
       "fix": "pagePlan is now derived from the merged `beats` array instead of the response text, so the string and the array cannot diverge (server/lib/beatsPipeline.js, in the re-plan round)."
+    },
+    {
+      "id": "beats-ad-runs-before-landmark-variants-load",
+      "title": "In the beats pipeline the Art Director ran before the landmark photo variants were loaded, so briefs never saw a \"Photo variants:\" line and landmarkView was chosen blind",
+      "reportedAt": "2026-09-09",
+      "source": "Confirmed on staging job_1788957347999_ijseol49a p18. storyJobPipeline onVisualBible starts loadLandmarkPhotoDescriptions as an un-awaited promise with the comment \"scene expansion will wait for this\"; beatsPipeline never references that promise and calls buildSceneExpansionAllPrompt in the same generateStoryViaBeats call. The stored AD context for p18 lists LOC001 and LOC007 with no \"Photo variants:\" line (the branch buildVbLocationLines takes only when photoVariants is empty), while the stored bible ends the run with 4 and 3 variants respectively. The AD wrote landmarkView \"distant\"; the resolver had no distant photo and served the only exterior, a street-level waterfront façade, for a hilltop skyline page.",
+      "status": "fixed",
+      "fixedAt": "2026-09-09",
+      "fix": "beatsPipeline awaits loadLandmarkPhotoDescriptions(visualBible) immediately after onVisualBible and before scene expansion (idempotent; one query). Companion prompt change: the writer's REAL LANDMARKS section now lists each landmark's photos and binds the bible to a photographed viewpoint."
     }
   ]
 }

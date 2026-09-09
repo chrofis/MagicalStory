@@ -31236,3 +31236,32 @@ not pulled back in by the garment-colour path), `server/utils/config.js` +
 `client/src/config/repairDefaults.ts` (comment; the client already said 60),
 `tests/unit/repair-gate-cap.test.ts`.
 **Status:** ✅ active
+
+## The writer sees each landmark's photos, and the Art Director waits for them (2026-09-09)
+**Context:**   p18 of a staging story asked for a hilltop skyline with the Hauptbahnhof and the
+Grossmünster below. The bible had named the station "distant aerial view"; the landmark index
+holds three photos of it — one street-level waterfront façade and two interiors — and the
+resolver served the façade. Two consumers were deciding blind. (1) The writer/bible: its REAL
+LANDMARKS section printed name, type and Wikipedia extract only, with a comment excluding photo
+descriptions on purpose — so it authored a viewpoint no photo shows. (2) The Art Director: it is
+meant to see a "Photo variants:" line per real landmark (`buildVbLocationLines`), but in the
+beats pipeline the variant fill started as an un-awaited promise in `onVisualBible` and the
+single AD call ran before it resolved; the stored AD context carried no variants for either
+landmark, and `landmarkView: "distant"` was chosen without knowing no such photo existed.
+**Decision:**  Owner's call: both. `beatsPipeline` awaits `loadLandmarkPhotoDescriptions`
+right after `onVisualBible`, before scene expansion (the race is a clear bug —
+`tasks/bugs.json`). `buildAvailableLandmarksSection` adds a PHOTOS line per landmark — one
+clause per reference photo, its kind and a short description, indexer tag stripped — and a rule:
+a landmark is drawn from one of its photos, so a location or vantage of it may only be named
+from a viewpoint one of them shows; if no photo shows what a page needs, that landmark is not
+available for that page. The Wikipedia extract stays for what the landmark IS.
+**Rationale:** The photos are the landmark as far as the pictures are concerned; a viewpoint
+the index cannot supply renders from prose whatever else is right. Reverses the "Wikipedia
+extract only" choice recorded in the builder's comment: that choice kept photo wording out of
+the story text, which the "DESCRIPTION is reference, not wording" rule already handles, and it
+cost the one thing the writer needed to know. The AD fix alone would leave the bible free to
+promise an unphotographable view; the bible fix alone would leave the AD blind whenever the
+race is lost.
+**Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`
+(`buildAvailableLandmarksSection`), `tests/unit/available-landmarks-photos.test.ts`
+**Status:**    ✅ active

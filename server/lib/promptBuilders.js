@@ -5538,6 +5538,22 @@ const READER_AGE_BY_BAND = {
   standard: 'a 3-5 year old',
 };
 
+/**
+ * The invented-named-figure allowance for a commission: the band (or reading
+ * level at 6+) sets the base, a large cast reduces it, and the floor of 2 holds
+ * — an antagonist and a helper are structural (owner, 2026-09-07). ONE source of
+ * truth: the budget section, the arc panel and the code re-count all read this.
+ */
+function arcInventedAllowance(inputData) {
+  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
+  const band = resolveAgeBand(inputData);
+  const cast = (inputData?.characters || []).length || 1;
+  const base = INVENTED_FIGURE_BASE[band]
+    ?? INVENTED_FIGURE_BASE_STANDARD[lvl]
+    ?? INVENTED_FIGURE_BASE_STANDARD.standard;
+  return Math.max(2, base - Math.floor(cast / 2));
+}
+
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
@@ -5556,11 +5572,7 @@ function buildArcBudgetSection(inputData, pageCount) {
   }
   hi = Math.max(lo, hi);
   const events = lo === hi ? `${lo} event${lo === 1 ? '' : 's'}` : `${lo}-${hi} events`;
-  const cast = (inputData?.characters || []).length || 1;
-  const base = INVENTED_FIGURE_BASE[band]
-    ?? INVENTED_FIGURE_BASE_STANDARD[lvl]
-    ?? INVENTED_FIGURE_BASE_STANDARD.standard;
-  const allowance = Math.max(2, base - Math.floor(cast / 2));
+  const allowance = arcInventedAllowance(inputData);
   const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
   // Per-page SHAPE, never a book total: a total is an arithmetic claim the
   // model re-granulates until it passes (two models self-certified compliance
@@ -5575,7 +5587,10 @@ function buildArcBudgetSection(inputData, pageCount) {
     ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
     actionsLine,
     ...(lvl === '1st-grade' ? [`- This book is read aloud to ${READER_AGE_BY_BAND[band] || READER_AGE_BY_BAND.standard} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
-    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast — enough for the story's opposition and its help; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
+    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
+    '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
+    '- Not counted: anyone the commission named, including any animal or companion it supplied; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; a figure given no name and referred to only by what it is.',
+    '- A figure the story needs and cannot drop stays on the list; taking its name away is not a way off it.',
   ].join('\n');
 }
 
@@ -5669,6 +5684,10 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     STORY_BRIEF: ctx.STORY_BRIEF,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     COMMITTED_ARC: String(committedBlock || '').trim(),
+    // The panel is the only INDEPENDENT reader of the arc; until 2026-09-09 it
+    // was never told the allowance, so nobody but the author (grading itself in
+    // the same call) could audit the invented cast.
+    INVENTED_ALLOWANCE: arcInventedAllowance(inputData),
   });
 }
 
@@ -5727,6 +5746,43 @@ function parseArcHints(raw) {
 }
 
 /**
+ * Read the "Invented figures:" block the arc critique emits (2026-09-09). The
+ * block is UNNUMBERED by contract — `critiqueMaxSeverity` reads numbered lines
+ * only, and a numbered list here would mint phantom MAJOR faults — and it sits
+ * in the head, beside the other contract lines, so it never leaks into the arc
+ * text. Same block-read shape as "Challenges taken:". Optional: an absent block
+ * yields an empty reading and the caller degrades to the pre-2026-09-09
+ * behaviour; nothing here throws.
+ */
+const INVENTED_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Fixing|Keeping|Challenges taken|Used|FINAL ARC|CRITIQUE|ARC\s*\d)\s*:?/mi;
+
+function parseInventedFigures(raw) {
+  const src = String(raw || '');
+  const idx = src.search(/^\s*(?:\*\*)?Invented figures\s*:/mi);
+  if (idx < 0) return { present: false, names: [], allowed: null, written: null };
+  const tail = src.slice(idx).replace(/^\s*(?:\*\*)?Invented figures\s*:\**[^\n]*\n?/i, '');
+  const stop = tail.search(INVENTED_BLOCK_STOP);
+  const block = stop >= 0 ? tail.slice(0, stop) : tail;
+  const names = [];
+  for (const line of block.split('\n')) {
+    const t = line.replace(/\*\*/g, '').trim();
+    if (!t) continue;
+    if (/^Allowed\s*:/i.test(t)) break;
+    const m = t.match(/^[-–—*•]\s*(.+)$/);
+    if (!m) break;
+    const name = m[1].split(/\s+[—–]\s+|\s+-\s+/)[0].replace(/[.,;:]+$/, '').trim();
+    if (name && !/^(?:none|no one|nobody)$/i.test(name)) names.push(name);
+  }
+  const am = block.match(/Allowed\s*:\s*(\d+)[^\d]{0,12}Written\s*:\s*(\d+)/i);
+  return {
+    present: true,
+    names,
+    allowed: am ? parseInt(am[1], 10) : null,
+    written: am ? parseInt(am[2], 10) : null,
+  };
+}
+
+/**
  * Parse the arc-create output: "ARC 1:" + CRITIQUE, "ARC 2:" + CRITIQUE, then
  * a "Stronger: Arc N — why" commitment line. Throws on a missing commitment or
  * boundary — the caller re-creates once, then gives up.
@@ -5754,6 +5810,7 @@ function parseArcCreate(raw) {
       .replace(/^\s*(?:\*\*|#+\s*)?ARC\s*\d\s*:?\**\s*/i, '')
       .trim(),
     critique: critIdx >= 0 ? chosen.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim() : '',
+    invented: parseInventedFigures(chosen),
   };
 }
 
@@ -5802,7 +5859,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping };
+  return { finalArc, used, critique, fixing, keeping, invented: parseInventedFigures(head) };
 }
 
 /**
@@ -7016,21 +7073,34 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '') {
     return '';
   }
 
-  // Format with Wikipedia descriptions (what the landmark IS, not what photos look like)
-  // "- Kurpark (Baden) [Park]: A historic spa park in the town center..."
+  // Two lines per landmark. DESCRIPTION is the Wikipedia extract — what the
+  // landmark IS, for the story. PHOTOS is what we can actually show of it: one
+  // clause per reference photo, its kind and a short description. The writer
+  // used to get only the first, and authored viewpoints no photo shows —
+  // "distant aerial view" of a station whose only exterior is a street-level
+  // façade — so the page rendered the landmark from words. The photos ARE the
+  // landmark as far as the pictures are concerned, and the bible may only
+  // name a viewpoint one of them shows.
+  const photoLine = (l) => {
+    const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
+    const clauses = variants
+      .map(v => `(${v.kind || v.vantage || 'exterior'}) ${String(v.description || '').replace(/^\[[^\]]*\]\s*/, '').trim() || 'reference photo'}`)
+      .map(c => c.length > 110 ? c.slice(0, 107).replace(/\s+\S*$/, '') + '…' : c);
+    return clauses.length ? `\n  PHOTOS: ${clauses.join('; ')}` : '';
+  };
   const landmarkList = landmarks
     .map(l => {
       let entry = `- ${l.name}`;
       if (l.type) entry += ` [${l.type}]`;
-      // Use Wikipedia extract for outline (describes what landmark IS)
-      // NOT photo description (describes what a photo looks like)
       const description = l.wikipediaExtract || l.wikipedia_extract;
       if (description) entry += `\n  DESCRIPTION: ${description}`;
+      entry += photoLine(l);
       return entry;
     })
     .join('\n');
 
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
+  const hasPhotos = landmarks.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
 
   return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
 ${retryNote ? `\n${retryNote}\n` : ''}
@@ -7041,6 +7111,7 @@ When you use a landmark from the list (even if you rename it in your story):
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
 ${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
 - The DESCRIPTION is reference for you, not wording for the page. Never carry an abbreviation, acronym or technical term from it into the story — name the thing the way a child would say it` : ''}
+${hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none` : ''}
 
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {
@@ -7208,6 +7279,8 @@ module.exports = {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  parseInventedFigures,
+  arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
