@@ -78,6 +78,7 @@ const {
   buildPlanCheckPrompt,
   parsePlanCheck,
   buildReplanSection,
+  replanRank,
   buildClothingReviewPrompt,
   parseClothingReview,
   parsePlanResponse,
