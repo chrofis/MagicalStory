@@ -648,7 +648,7 @@ const GIFT_PAGES = {
   'fuer-kinder': { de: 'Einzigartiges Geschenk für Kinder', en: 'Unique Gift for Kids', fr: 'Cadeau unique pour enfants', it: 'Regalo unico per bambini' },
   'fuer-enkel': { de: 'Das perfekte Geschenk für Enkel', en: 'The Perfect Gift for Grandchildren', fr: 'Le cadeau parfait pour les petits-enfants', it: 'Il regalo perfetto per i nipoti' },
   'fuer-nichte-neffe': { de: 'Geschenk für Nichte & Neffe', en: 'Gift for Niece & Nephew', fr: 'Cadeau pour nièce et neveu', it: 'Regalo per nipote (nipotina/nipotino)' },
-  'fuer-patenkind': { de: 'Geschenk für Patenkind', en: 'Gift for Godchild', fr: 'Cadeau pour filleul(e)', it: 'Regalo per figlioccio/a' },
+  'fuer-patenkind': { de: 'Geschenk für Patenkind & Göttikind', en: 'Gift for Godchild', fr: 'Cadeau pour filleul(e)', it: 'Regalo per figlioccio/a' },
   'geschenk-von-grosseltern': { de: 'Geschenk von Grosseltern', en: 'Gift from Grandparents', fr: 'Cadeau des grands-parents', it: 'Regalo dai nonni' },
   'ostergeschenk': { de: 'Ostergeschenk für Kinder', en: 'Easter Gift for Kids', fr: 'Cadeau de Pâques pour enfants', it: 'Regalo di Pasqua per bambini' },
   'weihnachtsgeschenk': { de: 'Weihnachtsgeschenk für Kinder', en: 'Christmas Gift for Kids', fr: 'Cadeau de Noël pour enfants', it: 'Regalo di Natale per bambini' },
