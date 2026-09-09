@@ -1107,21 +1107,32 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // Deliberately OUTSIDE the bible try/catch: a throw from the caller's hook
   // must abort the run, not be swallowed into "ships with an empty bible".
   if (onVisualBible && visualBible) await onVisualBible(visualBible);
-  // The landmark photo VARIANTS must be on the bible before the Art Director
-  // reads it: buildVbLocationLines prints a "Photo variants:" line per real
-  // landmark so a brief can cite a viewpoint that exists, and the resolver
-  // serves the variant a brief's landmarkView asks for. The fill was started
-  // as an un-awaited promise in the caller's onVisualBible ("scene expansion
-  // will wait for this") — a contract only the legacy path honoured. Here it
-  // raced the single AD call and lost: on job_1788957347999_ijseol49a the AD
-  // context carried no variants for either landmark, the AD wrote
-  // landmarkView "distant" blind, and a street-level façade was served for a
-  // skyline page. Idempotent and one query, so awaiting it twice is free.
+  // The Art Director must see each real landmark's PHOTO VARIANTS:
+  // buildVbLocationLines prints a "Photo variants:" line per landmark so a
+  // brief can cite a viewpoint that exists, and the resolver then serves the
+  // variant the brief's landmarkView asks for. Two steps put them on the
+  // bible, and until 2026-09-09 BOTH ran in the caller only after this
+  // function returned: linking each real landmark to its pre-discovered index
+  // entry (storyJobPipeline, after the writer), then loading the variant
+  // descriptions. A first fix awaited only the second step here, which found
+  // nothing linked yet and did nothing — measured on
+  // job_1788983823620_csjcyp1q9: the bible ended the run linked with four
+  // variants, the AD context carried none, and landmarkView was chosen blind
+  // again. Both steps run here now. Both are cheap (in-memory matching; one
+  // DB query) and idempotent, so the caller repeating them costs nothing.
   if (visualBible) {
     try {
+      if (inputData.availableLandmarks?.length) {
+        require('./visualBible').linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
+      }
       await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
+      const realLandmarks = (visualBible.locations || []).filter(l => l.isRealLandmark);
+      if (realLandmarks.length > 0) {
+        const withVariants = realLandmarks.filter(l => l.photoVariants?.length).length;
+        log.info(`🌍 [BEATS] Landmark photo variants before scene expansion: ${withVariants}/${realLandmarks.length} real landmark(s) carry variants`);
+      }
     } catch (err) {
-      log.warn(`⚠️ [BEATS] Landmark photo variants did not load before scene expansion: ${err.message} — briefs will not see them`);
+      log.warn(`⚠️ [BEATS] Landmark linking/variants did not load before scene expansion: ${err.message} — briefs will not see them`);
     }
   }
 

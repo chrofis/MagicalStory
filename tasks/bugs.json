@@ -761,12 +761,21 @@
     },
     {
       "id": "beats-ad-runs-before-landmark-variants-load",
-      "title": "In the beats pipeline the Art Director ran before the landmark photo variants were loaded, so briefs never saw a \"Photo variants:\" line and landmarkView was chosen blind",
+      "title": "In the beats pipeline the Art Director ran before real landmarks were linked to the index and their photo variants loaded, so briefs never saw a \"Photo variants:\" line and landmarkView was chosen blind",
       "reportedAt": "2026-09-09",
-      "source": "Confirmed on staging job_1788957347999_ijseol49a p18. storyJobPipeline onVisualBible starts loadLandmarkPhotoDescriptions as an un-awaited promise with the comment \"scene expansion will wait for this\"; beatsPipeline never references that promise and calls buildSceneExpansionAllPrompt in the same generateStoryViaBeats call. The stored AD context for p18 lists LOC001 and LOC007 with no \"Photo variants:\" line (the branch buildVbLocationLines takes only when photoVariants is empty), while the stored bible ends the run with 4 and 3 variants respectively. The AD wrote landmarkView \"distant\"; the resolver had no distant photo and served the only exterior, a street-level waterfront façade, for a hilltop skyline page.",
+      "source": "Confirmed on staging job_1788957347999_ijseol49a p18 and again on job_1788983823620_csjcyp1q9 p1. Not a race: storyJobPipeline links real landmarks to the pre-discovered index entries (linkPreDiscoveredLandmarks, line ~2925) and loads variant descriptions (~2957) only AFTER generateStoryViaBeats returns, and the only onVisualBible beats receives is the landmark-minimum check. The stored bible ends each run linked with variants; the stored AD context lists the same landmarks with no \"Photo variants:\" line.",
       "status": "fixed",
       "fixedAt": "2026-09-09",
-      "fix": "beatsPipeline awaits loadLandmarkPhotoDescriptions(visualBible) immediately after onVisualBible and before scene expansion (idempotent; one query). Companion prompt change: the writer's REAL LANDMARKS section now lists each landmark's photos and binds the bible to a photographed viewpoint."
+      "fix": "v1 (845dc38bb) awaited loadLandmarkPhotoDescriptions inside beats — a no-op, since nothing was linked yet; measured ineffective on the next run. v2: beats runs linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks) and then loadLandmarkPhotoDescriptions right after onVisualBible, before scene expansion, and logs \"N/M real landmark(s) carry variants\" so the next run proves it. The writer-side PHOTOS line from v1 stands."
+    },
+    {
+      "id": "beats-plan-prompt-calls-every-cast-children",
+      "title": "The plan prompt hardcoded \"children\" for every cast; for a 22-25-year-old cast the plan wrote \"all five children\" and the semantic evaluator then penalised the CORRECT adult render",
+      "reportedAt": "2026-09-09",
+      "source": "Confirmed on staging job_1788983823620_csjcyp1q9. Cast ages 22-25. prompts/story-beats.txt line 17 read \"# CHARACTER DETAILS (source of truth for who these children are ...)\" and line 70 \"with the children just outside the frame\". The plan lines for p2 and p3 said \"all five children\"; the Art Director (whose prompt forbids age collectives) wrote young adults; the render shows adults; the semantic evaluator compared SCENE_HINT (\"all five children\") against the render and scored p2 55/50 for it.",
+      "status": "fixed",
+      "fixedAt": "2026-09-09",
+      "fix": "Both lines now say \"characters\" (\"their ages included\" on line 17). No code change; the evaluator was right to compare, the plan was wrong to say it."
     }
   ]
 }

@@ -31419,6 +31419,13 @@ race is lost.
 **Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`
 (`buildAvailableLandmarksSection`), `tests/unit/available-landmarks-photos.test.ts`
 **Status:**    ✅ active
+**Correction (same day):** the "race" diagnosis was wrong and the first code fix was a no-op.
+Linking real landmarks to their index entries and loading their variants both happen in the
+caller AFTER `generateStoryViaBeats` returns; awaiting only the loader inside beats found nothing
+linked. Measured on the next run (job_1788983823620_csjcyp1q9): bible linked with four variants
+at the end, AD context with none. Beats now runs `linkPreDiscoveredLandmarks` and then
+`loadLandmarkPhotoDescriptions` itself before scene expansion, and logs how many real landmarks
+carry variants at that point so the next run proves it. The PHOTOS line for the writer stands.
 
 ## The arc ENUMERATES the figures it invented; code re-counts the list and may force one more round (2026-09-09)
 **Context:**   `job_1788903616404_iqvhj4l8m` was commissioned for four children with photos
