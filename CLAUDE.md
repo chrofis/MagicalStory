@@ -378,7 +378,7 @@ All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`.
 - `character-repair-cutout.txt` - Grok cutout repair prompt
 - `character-repair-blended.txt` - Grok blended repair prompt
 - `bbox-refine.txt` - Bounding box refinement (2-pass detection)
-- `front-cover.txt`, `back-cover.txt`, `initial-page-*.txt` - Cover generation
+- `cover-composition.txt` - Cover generation. NOTE: the former `front-cover.txt` / `back-cover.txt` / `initial-page-*.txt` templates no longer exist; covers are assembled from the outline's structured cover hint in JS (`buildCoverSceneFromHint`, `server/lib/coverIterate.js`) plus this template.
 
 **Note**: `image-generation.txt` is the single image-prompt template. Legacy `image-generation-storybook.txt` was merged into it, and the per-language (`-de`, `-fr`) plus `-sequential` variants were deleted along with the `isStorybook` / `isSequential` flags on `buildImagePrompt()` — unified mode is the only generation pipeline.
 

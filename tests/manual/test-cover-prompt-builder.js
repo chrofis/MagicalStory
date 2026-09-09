@@ -133,48 +133,15 @@ check(!/GROUP scene|AROUND/.test(g2) && /EXACTLY the two/.test(g2), '2 chars: no
 check(!/GROUP scene|AROUND/.test(g1) && /single character/.test(g1), '1 char: no group boilerplate');
 check(/GROUP scene/.test(g3) && /CENTER/.test(g3) && /AROUND/.test(g3), '3 chars: group boilerplate present');
 
-// ---- 4+5. Templates: single full-bleed/no-text statement; textless derivation ----
-(async () => {
-  await loadPromptTemplates();
-  console.log('\n--- template dedupe + textless variants ---');
-  const tpls = {
-    frontCover: PROMPT_TEMPLATES.frontCover,
-    backCover: PROMPT_TEMPLATES.backCover,
-    initialPageNoDedication: PROMPT_TEMPLATES.initialPageNoDedication,
-    initialPageWithDedication: PROMPT_TEMPLATES.initialPageWithDedication,
-  };
-  for (const [name, tpl] of Object.entries(tpls)) {
-    check(count(tpl, /\*\*FRAMING:\*\*/g) === 0, `${name}: FRAMING section merged away`);
-    check(count(tpl, /full-bleed/gi) === 1, `${name}: exactly one full-bleed statement`);
-    check(count(tpl, /torn-paper/gi) === 1, `${name}: framing specifics stated once`);
-  }
-  check(count(tpls.initialPageNoDedication, /no title/gi) === 1, 'initial-no-dedication: no-text rule stated once');
-  check(!/\*\*Notes:\*\*/.test(tpls.initialPageNoDedication), 'initial-no-dedication: Notes section merged away');
-  check(tpls.initialPageNoDedication.includes('{GROUP_COMPOSITION}')
-    && tpls.initialPageWithDedication.includes('{GROUP_COMPOSITION}'), 'initial templates carry GROUP_COMPOSITION placeholder');
+// Sections 4 and 5 (cover TEMPLATE dedupe + textless derivations + an assembled
+// initial-page prompt) were removed 2026-09-09. They asserted on PROMPT_TEMPLATES
+// keys frontCover / backCover / initialPageNoDedication / initialPageWithDedication
+// / frontCoverTextless / backCoverTextless, all six of which no longer exist: covers
+// are now assembled from the structured cover hint in JS (buildCoverSceneFromHint)
+// plus prompts/cover-composition.txt, and the four per-cover template files were
+// deleted in an earlier refactor. The block threw on `count(undefined, ...)` before
+// reaching its first real assertion, which made this script look like it was
+// reporting a cover bug when it was only reporting its own staleness.
 
-  // Textless derivations must still strip the text-baking section (it is now
-  // the LAST **section** before {VISUAL_BIBLE}).
-  check(!/Paint "/.test(PROMPT_TEMPLATES.frontCoverTextless) && /\*\*NO TEXT:\*\*/.test(PROMPT_TEMPLATES.frontCoverTextless),
-    'frontCoverTextless: TITLE section replaced by NO TEXT');
-  check(PROMPT_TEMPLATES.frontCoverTextless.includes('{VISUAL_BIBLE}'), 'frontCoverTextless keeps VISUAL_BIBLE placeholder');
-  check(!/magicalstory\.ch/.test(PROMPT_TEMPLATES.backCoverTextless) && /\*\*NO TEXT:\*\*/.test(PROMPT_TEMPLATES.backCoverTextless),
-    'backCoverTextless: TEXT section replaced by NO TEXT');
-
-  // ---- End-to-end: assembled initial-page prompt for a 2-character German cover ----
-  console.log('\n--- assembled initial-page prompt (2 chars, de) ---');
-  const prompt = fillTemplate(tpls.initialPageNoDedication, {
-    INITIAL_PAGE_SCENE: sceneDe,
-    STYLE_DESCRIPTION: 'test style',
-    CHARACTER_REFERENCE_LIST: '\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below):** [Child], [Parent]\n',
-    GROUP_COMPOSITION: g2,
-    VISUAL_BIBLE: vbFiltered,
-  });
-  check(count(prompt, /full-bleed/gi) === 1, 'assembled prompt: one full-bleed statement');
-  check(!/GROUP scene|arranged AROUND/.test(prompt), 'assembled prompt: no group boilerplate at 2 chars');
-  check(!/Roter Umhang|Zauberschere|Abenteuer/.test(prompt), 'assembled prompt: no German VB name / mood');
-  check(!/\d+-year-old/.test(prompt), 'assembled prompt: no numeric age');
-
-  console.log(failures === 0 ? '\n✓ all assertions passed' : `\n✗ ${failures} assertion(s) FAILED`);
-  process.exit(failures === 0 ? 0 : 1);
-})();
+console.log(failures === 0 ? '\n✓ all assertions passed' : `\n✗ ${failures} assertion(s) FAILED`);
+process.exit(failures === 0 ? 0 : 1);
