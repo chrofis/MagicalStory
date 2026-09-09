@@ -1665,11 +1665,18 @@ function buildGiftDescription(giftSlug, lang) {
  * @param {object} meta - Meta object from getMetaForRoute()
  * @returns {string} - Modified HTML
  */
+// BCP-47 tag for the <html lang> attribute, mirroring buildHreflang().
+const HTML_LANG = { de: 'de-CH', fr: 'fr-CH', it: 'it-CH', en: 'en' };
+
 function injectMeta(html, meta, lang = 'de') {
   let result = html;
 
-  // Replace <html lang="..."> to match content language
-  const htmlLang = lang === 'fr' ? 'fr' : lang === 'en' ? 'en' : lang === 'it' ? 'it' : 'de';
+  // Replace <html lang="..."> to match content language. The regional variant
+  // is used wherever one exists, so the attribute agrees with what og:locale
+  // (de_CH) and buildHreflang (de-CH/fr-CH/it-CH) already declare — the site is
+  // written in Swiss German, Swiss French and Swiss Italian. English has no
+  // regional variant declared anywhere, so it stays plain.
+  const htmlLang = HTML_LANG[lang] || HTML_LANG.de;
   result = result.replace(/<html\s+lang="[^"]*"/, `<html lang="${htmlLang}"`);
 
   // Replace <title>
@@ -1952,4 +1959,4 @@ function escapeXml(str) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { getMetaForRoute, injectMeta, generateSitemap };
+module.exports = { getMetaForRoute, injectMeta, generateSitemap, HTML_LANG };

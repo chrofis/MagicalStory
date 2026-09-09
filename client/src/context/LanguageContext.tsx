@@ -16,6 +16,13 @@ const isLanguage = (v: unknown): v is Language => typeof v === 'string' && SUPPO
 
 const isBrowser = typeof window !== 'undefined';
 
+// BCP-47 tag for the <html lang> attribute. The regional variant is used
+// wherever one exists, matching og:locale (de_CH) and the hreflang table
+// (de-CH/fr-CH/it-CH) — the site is written in Swiss German, Swiss French and
+// Swiss Italian. Kept in sync with HTML_LANG in server/lib/seoMeta.js; without
+// it here, hydration overwrote the server's de-CH back to a bare "de".
+const HTML_LANG: Record<Language, string> = { de: 'de-CH', fr: 'fr-CH', it: 'it-CH', en: 'en' };
+
 function detectUrlLanguage(): Language | null {
   if (!isBrowser) return null;
   const params = new URLSearchParams(window.location.search);
@@ -77,7 +84,7 @@ export function LanguageProvider({ children, initialLanguage }: LanguageProvider
     try {
       localStorage.setItem(STORAGE_KEY, language);
     } catch { /* ignore quota errors */ }
-    document.documentElement.lang = language;
+    document.documentElement.lang = HTML_LANG[language];
   }, [language]);
 
   // Listen for language changes from other tabs / components.
