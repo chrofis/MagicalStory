@@ -31148,3 +31148,27 @@ separate sentences.
 **Touched:**   `server/lib/promptBuilders.js` (`CREATURE_TONE_LEVELS`, all three levels),
 `tests/manual/test-creature-tone.js`
 **Status:**    ✅ active
+
+## Animals and invented figures may carry `states[]`; almost none do (2026-09-09)
+**Context:**   `states[]` existed only on artifacts. A creature whose look the story changes —
+a dragon with one wing broken, then whole — had no way to say so, so its reference showed the
+unaltered look on every page, every render started from a whole animal, and the judge's finding
+("the wing does not show the gap") had nothing a repair could be shown for.
+**Decision:**  Owner ruling. `states[]` is allowed on `animals` and `secondaryCharacters`, under
+the same test as objects: take away everything that is not the thing itself and, if what is
+left looks the same, it is not a state. A wing broken then whole, a coat lost then found:
+states. The field is for the rare thing the story itself changes — the bible prompt says so in
+words ("almost every entry has no states at all"), and no rule is added beyond the test.
+Commissioned (main) characters do not get `states[]`: their look changes are clothing, which
+already has its own per-page system.
+**Rationale:** The parser (`outlineParser/unified.js`), the reference sheet
+(`expandElementStateCells`), the per-page cell resolver (`elementRefCell`) and the page reference
+walk were already pool-agnostic; the only artifact-only code was the Art Director's element
+list, which now prints a `States:` line for animals and secondary characters too, so a brief can
+cite `ANI001.2`. Both scene-expansion builders edited in step; the "all" builder also gained the
+artifact `States:` line it had been missing. Shipped in two commits (deb77cce9 and the one
+carrying this entry) because a chained push ran ahead of its own gate — the tree was green both
+times, verified after the fact.
+**Touched:**   `prompts/story-bible-from-beats.txt` (rule 62, `states` on two schema blocks),
+`server/lib/promptBuilders.js` (both recurring-elements builders)
+**Status:**    ✅ active

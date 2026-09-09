@@ -2731,6 +2731,12 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const artifact of visualBible.artifacts) {
         const description = artifact.extractedDescription || artifact.description;
         recurringElements += `* **${artifact.name}** [${artifact.id}] (object): ${description}\n`;
+        {
+          const states = objectStates(artifact);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          }
+        }
       }
     }
     // Add ALL clothing/costumes
