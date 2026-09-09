@@ -31345,3 +31345,72 @@ race is lost.
 **Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`
 (`buildAvailableLandmarksSection`), `tests/unit/available-landmarks-photos.test.ts`
 **Status:**    ✅ active
+
+## The arc ENUMERATES the figures it invented; code re-counts the list and may force one more round (2026-09-09)
+**Context:**   `job_1788903616404_iqvhj4l8m` was commissioned for four children with photos
+(allowance 2, journey band, cast 4). The arc invented four named figures — a dragon, a mountain
+creature, a **mother** with a wholly fabricated face on pages 2 and 18, and a dog — and its own
+critique reported, verbatim: `"Invented figures past allowance: none — Fenno and Nolo, exactly two"`.
+Nobody caught it, for four independent reasons, all verified in source. (1) `buildArcBudgetSection`
+never defined what COUNTS: its only gloss was "enough for the story's opposition and its help",
+which names the roles the allowance is FOR, not what counts against it — so the model read the
+dragon as help, the creature as opposition, and excluded the mother and the dog as neither.
+(2) The critique dimension was a self-certifiable verdict ("does every figure past the allowance
+carry justification?"), answerable "none past allowance" without ever writing a list.
+(3) The three independent readers were never told the allowance — `buildArcPanelPrompt` and
+`buildArcHintsPrompt` filled only brief/characters/arc, and `arc-panel.txt` had no allowance
+placeholder. Only the author, grading itself inside the same call, knew the number.
+(4) Nothing in code re-counted anything.
+**Decision:**  Four changes, no number touched.
+1. **Membership is defined by SOURCE, not by role.** A figure is invented when the STORY named it
+   and the COMMISSION did not — persons, animals and creatures alike, including a one-page figure,
+   a non-speaking one, and a framing adult (parent, grandparent, teacher, shopkeeper, neighbour who
+   sets a rule, waits, permits or welcomes). Excluded: anyone the commission named **including any
+   animal or companion it supplied** (this owner's brief named the dog), places/buildings/landmarks/
+   vehicles/objects however named, a group named collectively, and a figure referred to only by what
+   it is. The de-naming dodge is closed explicitly.
+2. **The critique EMITS a list, not a verdict** — `Invented figures:` then one dash line per figure
+   (`- <name> — <what it is in the story, three words>`), then `Allowed: <N>. Written: <M>.`
+   **Unnumbered** by contract (`critiqueMaxSeverity` reads `/^\s*\d+[.)]/` and defaults untagged
+   numbered lines to MAJOR — a numbered list would mint phantom MAJORs and break the arc-round early
+   stop), **head-positioned** (before `Fixing:` in arc-retell so `parseArcRetell`'s head slice keeps
+   it out of `finalArc`; at the head of the CRITIQUE in arc-create so it stays out of `commit.arc`),
+   and **optional** — an absent block yields an empty reading and the run degrades to the old
+   behaviour. Read by `parseInventedFigures`, the same block-read shape as `Challenges taken:`.
+3. **The panel is briefed.** `buildArcPanelPrompt` now fills `{INVENTED_ALLOWANCE}` and
+   `arc-panel.txt` carries a seventh lens, CAST, asking the panel to audit the author's list against
+   the arc it is reading. Three models already run every round, so this costs nothing.
+   NOT added to `buildArcHintsPrompt`: hints ride forward into the beats and text prompts, where
+   removing a character is architecturally forbidden — a hint nothing can act on is noise.
+4. **Code re-counts and may force ONE more round.** Arithmetic over the model's own emitted list
+   against the code allowance (`arcInventedAllowance`, now the single source of truth for the budget
+   section, the panel and the re-count). On an overcount the two arc-round early stops are suppressed
+   and another panel + re-telling round runs — a re-telling rewrites the whole story and is the only
+   mechanism that can remove a figure spanning several pages. At most ONE forced round per story,
+   never past `arcRoundsMax` (3, owner cap 2026-08-30); at the clamp it logs and ships with a warning,
+   per "gates are guidelines". Switchable: `MODEL_DEFAULTS.arcForceRoundOnInventedOvercount`.
+5. **Beats cross-check, reporting only.** `runPlanCounters` compares the arc's declared list against
+   the `cast.invented` it already derives from the plan lines and emits `ARC_INVENTED_UNDECLARED` /
+   `ARC_INVENTED_OVER_ALLOWANCE`. Deliberately NOT in `REPLAN_MUST_FIX_CODES`: a re-plan is
+   architecturally forbidden from removing a character (`story-beats.txt` tells the stage the arc is
+   finished), so enforcement there would demand something the stage cannot do.
+**Rationale:** An enumeration cannot be self-certified — a model that must write the names writes
+them, and a list is arithmetic a judge and a piece of code can both check. The role gloss was the
+actual hole: it is a description of purpose, and purpose is exactly the axis a model reasons its way
+around. **No regex runs over the arc prose** — `planCounters.js:227-248` records why (German
+capitalises every noun; "Deck", "Karte", "Truhe" became cast members), and it is the same banned
+class as the mirror-guard removed 2026-08-09. **The allowance NUMBER is unchanged**: the floor of 2
+set 2026-09-07 citing this exact story shape (journey, cast 4) still holds, page-count scaling is
+still gone, and `arcInventedAllowance` computes byte-identical values to the inline code it
+replaced. Defining membership, enumerating, briefing the panel and re-counting are additions to how
+a number is applied, not a reversal of the number — `docs/SETTLED.md` carries no line on invented
+figures (re-verified 2026-09-09). The arc prompts do not pass through `shrinkPromptForModel` (it is
+called only from `images.js`, `grok.js` and `sceneComposite.js`, all image paths), so head-block
+deletion is not a hazard here.
+**Touched:**   `server/lib/promptBuilders.js` (`arcInventedAllowance`, `buildArcBudgetSection`,
+`parseInventedFigures`, `parseArcCreate`, `parseArcRetell`, `buildArcPanelPrompt`),
+`prompts/arc-create.txt`, `prompts/arc-retell.txt`, `prompts/arc-panel.txt`,
+`server/config/models.js` (`arcRoundsMax`, `arcForceRoundOnInventedOvercount`),
+`server/lib/beatsPipeline.js` (arc round loop), `server/lib/planCounters.js`,
+`server/lib/storyHelpers.js` (facade), `tests/unit/arc-invented-figures.test.ts`
+**Status:**    ✅ active

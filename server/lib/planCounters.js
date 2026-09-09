@@ -329,7 +329,7 @@ function consecutiveRuns(sorted) {
  * @param {number} [args.highActionPages] the high-action page budget the planner was given
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, highActionPages = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, highActionPages = null, declaredInvented = null, inventedAllowance = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -423,6 +423,28 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     add('INVENTED_DOMINANT_CONSECUTIVE', run,
       'consecutive pages carried by invented characters');
   }
+  // 6b. CROSS-CHECK the arc's own declared invented list against the one this
+  //     module derives from the plan lines (2026-09-09). REPORTING ONLY, and
+  //     deliberately not in REPLAN_MUST_FIX_CODES: a re-plan is architecturally
+  //     forbidden from removing a character (prompts/story-beats.txt tells the
+  //     stage the arc is finished), so enforcement here would ask for something
+  //     the stage cannot do. A discrepancy means the arc under-declared — which
+  //     is exactly how job_1788903616404_iqvhj4l8m shipped four invented
+  //     figures on an allowance of two — and it must at least be visible.
+  if (Array.isArray(declaredInvented)) {
+    const declared = declaredInvented.map(n => String(n || '').trim()).filter(Boolean);
+    const lower = new Set(declared.map(n => n.toLowerCase()));
+    const undeclared = cast.invented.filter(n => !lower.has(String(n).toLowerCase()));
+    if (undeclared.length) {
+      add('ARC_INVENTED_UNDECLARED', [],
+        `the plan names invented ${undeclared.length === 1 ? 'figure' : 'figures'} ${undeclared.join(', ')} that the arc's own invented list does not carry (arc declared: ${declared.length ? declared.join(', ') : 'none'})`);
+    }
+    if (inventedAllowance != null && declared.length > inventedAllowance) {
+      add('ARC_INVENTED_OVER_ALLOWANCE', [],
+        `the arc declares ${declared.length} invented figures (${declared.join(', ')}) against an allowance of ${inventedAllowance}`);
+    }
+  }
+
   const noCommissioned = rows.filter(r => r.peopled && r.commissionedPresent.length === 0).map(r => r.pageNumber);
   if (noCommissioned.length) {
     add('NO_COMMISSIONED_ON_PAGE', noCommissioned,

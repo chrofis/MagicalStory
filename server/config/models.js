@@ -304,6 +304,15 @@ const MODEL_DEFAULTS = {
   // holds nothing above MINOR, or once a re-telling's Fixing line addressed
   // only MINOR faults. ARC_ROUNDS for staging A/B.
   arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 1),
+  // The hard ceiling on arc rounds, forced ones included (owner cap
+  // 2026-08-30 — the iteration study regressed at round 4).
+  arcRoundsMax: 3,
+  // ONE extra round when the arc's own invented-figure list overruns the
+  // allowance (2026-09-09, job_1788903616404_iqvhj4l8m). A re-telling rewrites
+  // the whole story and is the only mechanism that can remove a figure
+  // spanning several pages; the re-plan cannot. At most one forced round per
+  // story, never past arcRoundsMax. Set false to turn the forcing off.
+  arcForceRoundOnInventedOvercount: process.env.ARC_FORCE_ROUND_ON_INVENTED_OVERCOUNT !== 'false',
   // The lean flow's hint pass (owner, 2026-09-01): after the final re-telling,
   // one outside model names the top remaining issues as ISSUE → CHANGE hints.
   // The hints ride into the beats and text-writer prompts; nothing re-tells.
