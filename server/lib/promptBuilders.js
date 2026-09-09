@@ -4777,6 +4777,8 @@ function buildAgeModeSection(inputData = {}) {
  * buildStoryShapeSection) because it flattened `fear-choice` and `journey`;
  * this block is the narrow replacement that does not.
  *
+ * Size is a RECOMMENDATION, not a cap: each level leans toward a default scale and
+ * yields to what the story needs of the creature (ridden, carrying, blocking).
  * Owner boundaries (2026-09-09): 0-4 really cute, 5-6 not menacing, 7+ formidable
  * where the story means it to be — a ceiling that is lifted, never a floor: a
  * gentle creature stays gentle at every level.
@@ -4791,9 +4793,9 @@ function buildAgeModeSection(inputData = {}) {
  * brow ridges, deep-set eyes, jutting chin, hunched) beside a 5-year-old.
  */
 const CREATURE_TONE_LEVELS = {
-  cute: 'Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth, no bared teeth, no displayed claws, an open upright posture, warm colours. A non-human character reads as a playmate. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child and never with the child dwarfed beside it, and never frame it leaning or towering over a child.',
-  'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth. Teeth and claws may exist but are not bared, raised or displayed. A being may be large — state its size in metres, not as a multiple of a child, and frame it at the child's eye level rather than looming over them.",
-  formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets.",
+  cute: "Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth, no bared teeth, no displayed claws, an open upright posture, warm colours. A non-human character reads as a playmate. For size, lean toward a creature near the child's own size — a scale a child could stand beside or hug — and go bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child and never with the child dwarfed beside it, and never frame it leaning or towering over a child.",
+  'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth. Teeth and claws may exist but are not bared, raised or displayed. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child, and frame it at the child's eye level rather than looming over them.",
+  formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
 
 function creatureToneLevel(inputData = {}) {

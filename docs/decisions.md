@@ -31126,3 +31126,25 @@ Completes the "🟡 open" half of the entry above ("Holder-in-cell and repair-re
 `server/lib/vbIdGuard.js` (`formatElementsBlock`), `server/lib/images.js` (`inpaintPage`),
 `server/lib/repairPipeline.js`, `server/lib/testlab.js` (both pass `sceneMetadata`)
 **Status:**    ✅ active
+
+## Creature size in the VB is an age-scaled RECOMMENDATION, never a cap (2026-09-09)
+**Context:**   The creature-tone block (commit `05ba6c706`) governs how non-human cast LOOK per
+focus age, including how size is PHRASED. It said nothing about what size to pick, so a young
+child could still get an enormous creature. Owner asked for age-scaled size — "not a rule but a
+recommendation".
+**Decision:**  Each of the three levels gains one size-preference sentence, worded as a lean:
+0-4 prefers a creature near the child's own size; 5-6 prefers one clearly bigger but still
+in-frame and approachable rather than overwhelming; 7+ says size may be whatever the story
+wants. Every level states that the story's own needs win — a being that is ridden, carries
+characters or blocks a way is that size. No "must"/"never" is used for the size itself; the
+existing size-PHRASING rules (metres not child-multiples, no looming at levels 1-2) are
+unchanged and sit after the new sentence.
+**Rationale:** A hard cap would make already-planned pages unrenderable. Evidence:
+`job_1788903616404_iqvhj4l8m` (focus child age 5, level 2) has a creature carrying four
+children and their bicycles on its back in flight — the arc fixed that beat before the bible is
+written, so a mandated small creature contradicts the plot. Preference-with-override gives the
+default scale without breaking the story. Phrasing and choice are separate concerns and stay in
+separate sentences.
+**Touched:**   `server/lib/promptBuilders.js` (`CREATURE_TONE_LEVELS`, all three levels),
+`tests/manual/test-creature-tone.js`
+**Status:**    ✅ active

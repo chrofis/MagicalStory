@@ -17,6 +17,7 @@ for (const age of cases) {
   };
   const band = pb.resolveAgeBand(inputData);
   const tone = pb.buildCreatureToneSection(inputData);
+  console.log(`\n=== ${age === null ? '(missing age)' : `age ${age}`} ===`);
   console.log(`age=${age === null ? '(missing)' : age}  band=${band}  tone=${tone ? `${tone.length} chars` : '(EMPTY — no instruction)'}`);
   if (tone) console.log(`    ${tone}`);
 }
