@@ -979,11 +979,33 @@ const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.e
 const REPAIR_MAX_PASSES = require('./runtime').runtime('repairMaxPasses');
 
 const REPAIR_DEFAULTS = {
-  scoreThreshold: 50,       // Pages scoring below this need redo (0-100). Lowered
-                            // from 60 (2026-08-09): measured, a page entering
-                            // repair at 50-59 was regenerated and came back
-                            // WORSE far more often than better.
+  scoreThreshold: 60,       // Pages scoring below this need redo (0-100).
+                            // 2026-09-09 (owner): back to 60, superseding ONLY the
+                            // 60 -> 50 rider inside the 2026-08-09 decisions.md entry
+                            // (iterateSalvageFloor and the four numeric gates there
+                            // are untouched). The 2026-08-09 lowering was argued from
+                            // REGENERATION outcomes, but a 50-59 page today routes to
+                            // local repair, not to a full regen. Measured over 53
+                            // recent staging stories, pages entering repair at 50-59
+                            // improved 48% of the time (+8.0 avg) -- the best
+                            // cost/benefit band left above 0. 60-69 improves only 24%
+                            // (+4.7), which is why the floor is 60 and not 70.
+                            // Blast radius: +24 pages (+3.9%).
+                            // NOTE: the MANUAL admin repair workflow does NOT move with
+                            // this -- IMAGE_QUALITY_THRESHOLD is pinned at 50 in
+                            // server/utils/config.js and server/lib/evalPipeline.js.
   issueThreshold: 5,        // Pages with this many fixable issues need redo
+  // PER-ROUND REPAIR CAP (owner, 2026-09-09). Measured over 53 staging stories:
+  // 6.4 of 14.3 pages repaired per story (45%), 19 of 53 stories repaired MORE THAN
+  // HALF their pages, and one 14-page story repaired all 14 pages in round 2 AND all
+  // 14 again in round 3. A round may therefore work on at most this SHARE of the
+  // story's pages; the rest are DEFERRED to the next round, never dropped. Rounded so
+  // a 20-page story gives 10 then 6 (the owner's worked example).
+  maxRepairShareRound1: 0.5,
+  maxRepairShareLaterRounds: 0.3,
+  minRepairPagesPerRound: 3,  // ...but a short story still repairs at least this many
+                              // (or all its bad pages, if fewer). Gates are guidelines:
+                              // the cap limits work per round, it never fails a job.
   maxPasses: REPAIR_MAX_PASSES,  // Global passes over all pages — 1 on staging, 3 on prod
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
   // Char-repair Grok tier — PINNED to Imagine 1.x ('grok-imagine-image',

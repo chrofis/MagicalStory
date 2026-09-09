@@ -30,7 +30,7 @@ const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
-const { TEXT_MODELS, REPAIR_DEFAULTS } = require('../config/models');
+const { TEXT_MODELS } = require('../config/models');
 const r2Lib = require('./r2');
 
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
@@ -56,7 +56,13 @@ const { EVAL_TEMPERATURE } = require('../config/models');
 const EVAL_THINKING_BUDGET = process.env.EVAL_THINKING_BUDGET != null ? Number(process.env.EVAL_THINKING_BUDGET) : 0;
 
 // Quality threshold from environment or default
-const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || REPAIR_DEFAULTS.scoreThreshold;
+// MANUAL admin repair workflow STOP condition -- PINNED at 50, deliberately NOT
+// REPAIR_DEFAULTS.scoreThreshold (owner, 2026-09-09). The pipeline floor moved
+// 50 -> 60 for AUTOMATIC repair rounds; deriving this from it would silently make
+// operator-driven "repair until good" grind every page up to 60 and multiply the
+// cost of a manual session. Operator behaviour is unchanged.
+const MANUAL_REPAIR_STOP_SCORE = 50;
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || MANUAL_REPAIR_STOP_SCORE;
 
 /**
  * Run P1 Visual Inventory — honest figure/age detection without seeing the original prompt.

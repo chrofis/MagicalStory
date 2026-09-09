@@ -60,13 +60,99 @@ function findBadPages(evalPages, options = {}) {
       log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a CRITICAL finding — marking bad for repair`);
     }
 
-    if (score < scoreThreshold || issueCount >= issueThreshold || critical) {
-      bad.push({ pageNum, critical });
+    // TYPE RESCUE (owner, 2026-09-09). A page above the floor still gets one
+    // round of work when it carries a MAJOR-or-worse finding whose DECLARED type
+    // is one local repair reliably fixes — an absent object, a missing prop, a
+    // wrong count, a wrong expression. Those are additive, local edits with a
+    // known-good route; leaving them because the arithmetic landed at 62 is how
+    // job_1788903616404_iqvhj4l8m p3 shipped with three MAJOR findings and zero
+    // repair attempts. Declared `type` only — never the description prose.
+    const rescue = !critical && score >= scoreThreshold && issueCount < issueThreshold
+      ? findSafeRepairableFinding(result) : null;
+    if (rescue) {
+      log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a ${rescue.severity.toUpperCase()} ${rescue.type} finding (${rescue.pool}) — type rescue, marking bad for repair`);
+    }
+
+    if (score < scoreThreshold || issueCount >= issueThreshold || critical || rescue) {
+      bad.push({ pageNum, critical, score });
     }
   }
-  // CRITICAL-carrying pages first, then by page number within each group.
-  bad.sort((a, b) => (b.critical - a.critical) || (a.pageNum - b.pageNum));
+  // CRITICAL-carrying pages first (owner ruling 2026-09-04, item 15 — a CRITICAL
+  // finding outranks a merely low score), then WORST-FIRST by ascending score
+  // within each group, then page number. Ordering matters because the per-round
+  // cap below consumes this list from the front.
+  bad.sort((a, b) => (b.critical - a.critical)
+    || ((a.score ?? 0) - (b.score ?? 0))
+    || (a.pageNum - b.pageNum));
   return bad.map(b => b.pageNum);
+}
+
+/**
+ * The first MAJOR-or-worse finding on this eval whose declared type is in
+ * SAFE_REPAIRABLE_TYPES, or null.
+ *
+ * ENTITY-SOURCED FINDINGS ARE NEVER ADMITTED HERE. The 2026-09-04 owner ruling
+ * stands: a MAJOR entity (character) finding gets no automatic repair — not
+ * char-fix, not inpaint. This path must not become a back door around it.
+ */
+function findSafeRepairableFinding(result) {
+  const pools = [
+    ['quality', result?.fixableIssues],
+    ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+    ['consolidated', result?.consolidatedPlan?.deduped_issues],
+  ];
+  for (const [pool, list] of pools) {
+    if (!Array.isArray(list)) continue;
+    for (const i of list) {
+      const severity = String(i?.severity || '').toLowerCase();
+      if (!/^(major|critical|catastrophic)$/.test(severity)) continue;
+      const type = String(i?.type || i?.category || '').toLowerCase();
+      if (!SAFE_REPAIRABLE_TYPES.has(type)) continue;
+      // Entity-sourced → refused (2026-09-04). Same source read as the
+      // clothing-precedence gate in decideRepairMethod.
+      const sources = Array.isArray(i?.sources) ? i.sources.map(s => String(s).toLowerCase()) : [];
+      if (pool === 'entity' || (sources.length && sources.every(s => s === 'entity'))) continue;
+      return { type, severity, pool };
+    }
+  }
+  return null;
+}
+
+/**
+ * PER-ROUND REPAIR CAP (owner, 2026-09-09).
+ *
+ * Limits how many of a story's pages a single repair round may work on: round 1
+ * gets `maxRepairShareRound1` of the page count, later rounds
+ * `maxRepairShareLaterRounds` — 20 pages → 10, then 6. A short story still gets
+ * `minRepairPagesPerRound` (or all its bad pages, if fewer), so the cap can never
+ * stop a small story repairing at all.
+ *
+ * Pages over the cap are DEFERRED, not dropped: they are still bad next round and
+ * findBadPages returns them again. The cap never fails a job — it only bounds the
+ * work (and the spend) per round.
+ *
+ * @param {number[]} orderedPageNums - Bad pages, WORST FIRST (findBadPages order)
+ * @param {Object} opts
+ * @param {number} opts.round - 1-based round number
+ * @param {number} opts.totalPages - Pages in the story
+ * @returns {{ admitted: number[], deferred: number[], cap: number }}
+ */
+function applyRoundCap(orderedPageNums, opts = {}) {
+  const pages = Array.isArray(orderedPageNums) ? orderedPageNums : [];
+  const round = opts.round || 1;
+  const totalPages = opts.totalPages || pages.length;
+  const share = round <= 1
+    ? (REPAIR_DEFAULTS.maxRepairShareRound1 ?? 0.5)
+    : (REPAIR_DEFAULTS.maxRepairShareLaterRounds ?? 0.3);
+  const minPages = REPAIR_DEFAULTS.minRepairPagesPerRound ?? 3;
+  const cap = Math.max(Math.round(totalPages * share), Math.min(minPages, pages.length));
+
+  if (pages.length <= cap) return { admitted: pages, deferred: [], cap };
+
+  const admitted = pages.slice(0, cap);
+  const deferred = pages.slice(cap);
+  log.warn(`🚧 [REPAIR-CAP] Round ${round}: ${pages.length} page(s) eligible for repair on a ${totalPages}-page story — cap is ${cap} (${Math.round(share * 100)}%). Admitting ${admitted.length} worst-first: ${admitted.join(', ')}. DEFERRED to a later round: ${deferred.join(', ')}`);
+  return { admitted, deferred, cap };
 }
 
 /**
@@ -536,4 +622,19 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'scale',
 ]);
 
-module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+/**
+ * Types local repair (inpaint) handles well: additive or local edits to objects,
+ * props, counts and expression. Deliberately NARROW — anything in
+ * NOT_INPAINTABLE_TYPES is excluded by construction below, and composition /
+ * camera / staging defects are absent because no local repair can fix them.
+ */
+const SAFE_REPAIRABLE_TYPES = new Set([
+  'object_presence',
+  'missing_element',
+  'accessory_missing',
+  'object_count',
+  'emotion',
+  'viewer_address',
+].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
+
+module.exports = { findBadPages, applyRoundCap, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

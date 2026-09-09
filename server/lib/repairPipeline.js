@@ -1890,15 +1890,33 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         };
     }
 
-    const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
+    let badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
+    // PER-ROUND CAP (owner, 2026-09-09): a round may work on at most 50% (round 1)
+    // / 30% (later rounds) of the story's pages, worst first. Capped-out pages are
+    // DEFERRED — they are still bad next round and come back. Never fails a job.
+    const { applyRoundCap } = require('./repairLogic');
+    const cappedRound = applyRoundCap(badPageNums, {
+      round,
+      totalPages: Object.keys(roundEvalPages).length,
+    });
+    badPageNums = cappedRound.admitted;
     // A page whose ONLY fault is garment colour scores fine — colour carries no
     // severity by design — so findBadPages never returns it and it would never
     // be touched. A flagged garment is a reason to work on a page.
     const garmentWork = MODEL_DEFAULTS.garmentColourFix
       ? collectGarmentWork(currentEntityReport) : new Map();
-    const colourOnlyNums = [...garmentWork.keys()].filter(pn => !badPageNums.includes(pn));
-    const badPages = rawImages.filter(img =>
-      badPageNums.includes(img.pageNumber) || colourOnlyNums.includes(img.pageNumber));
+    // A page DEFERRED by the cap is excluded here too — otherwise a deferred page
+    // that also carries a garment-colour flag would be pulled straight back in and
+    // the cap would not hold.
+    const colourOnlyNums = [...garmentWork.keys()].filter(pn =>
+      !badPageNums.includes(pn) && !cappedRound.deferred.includes(pn));
+    // Worst-first ORDER is preserved (findBadPages ranks, applyRoundCap slices):
+    // a plain rawImages.filter would silently re-sort back to page order, which
+    // matters wherever a downstream budget consumes this list from the front.
+    const byPageNumber = new Map(rawImages.map(img => [img.pageNumber, img]));
+    const badPages = [...badPageNums, ...colourOnlyNums]
+      .map(pn => byPageNumber.get(pn))
+      .filter(Boolean);
     if (colourOnlyNums.length) {
       log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${colourOnlyNums.length} colour-only page(s) pulled in: ${colourOnlyNums.join(', ')}`);
     }

@@ -31172,3 +31172,67 @@ times, verified after the fact.
 **Touched:**   `prompts/story-bible-from-beats.txt` (rule 62, `states` on two schema blocks),
 `server/lib/promptBuilders.js` (both recurring-elements builders)
 **Status:**    ✅ active
+
+## The repair admission gate: floor back to 60, a type rescue above it, and a PER-ROUND CAP on how many pages a round may repair (2026-09-09)
+**Context:** Two opposite faults, measured on the same 53 recent staging stories
+(avg 14.3 pages).
+
+*Too little repair, in a dead band.* `job_1788903616404_iqvhj4l8m` page 3 shipped at
+finalScore 55 with THREE MAJOR findings and ZERO repair attempts: three-stage
+`clothing`, three-stage `action_interaction`, semantic `missing_element`.
+`findBadPages` admitted a page only on `score < 50` OR `issueCount >= 5` OR a
+CRITICAL — 55 / 2 findings / no CRITICAL matched nothing.
+
+*Too much repair, everywhere else.* 6.4 pages repaired per story (45% of all pages);
+**19 of 53 stories repaired more than half their pages**; worst case a 14-page story
+repaired all 14 pages in round 2 AND all 14 again in round 3. Nothing in the round
+loop bounded per-round work.
+
+**Decision:** Three changes, one owner decision.
+1. `REPAIR_DEFAULTS.scoreThreshold` **50 → 60**.
+2. **Type rescue** — a page above the floor is admitted when it carries a
+   MAJOR-or-worse finding whose DECLARED type is in `SAFE_REPAIRABLE_TYPES`
+   (`object_presence`, `missing_element`, `accessory_missing`, `object_count`,
+   `emotion`, `viewer_address`), minus anything in `NOT_INPAINTABLE_TYPES`.
+   **Entity-sourced findings are never admitted by this path.**
+3. **Per-round cap** — a round may work on at most 50% (round 1) / 30% (rounds 2+)
+   of the story's pages: 20 pages → 10, then 6. Floor of 3 pages (or all bad pages,
+   if fewer) so short stories still repair. Over-cap pages are **deferred, not
+   dropped** — they are still bad next round and come back. `findBadPages` now
+   orders worst-first (CRITICAL-carrying pages first per the 2026-09-04 ruling,
+   then ascending finalScore) because the cap consumes that list from the front.
+   The cap logs at WARN naming eligible / admitted / deferred page numbers, and
+   never fails a job ("gates are guidelines").
+
+**Rationale:** The floor's 2026-08-09 lowering to 50 was argued from REGENERATION
+outcomes, but a 50-59 page today routes to LOCAL repair, not a full regen. Measured
+repair value by entry score on pages with >1 stored version: <0 → 71% improved;
+0-49 → 63%; **50-59 → 48% (+8.0 avg)**; 60-69 → 24% (+4.7); 70-79 → 9% (+0.3);
+80+ → 5%. 50-59 is the best band left above 0, and 60-69 is not — hence 60, not 70.
+Blast radius: floor +24 pages (+3.9%), type rescue +63, combined ≈ +70 at ~$0.06 per
+page per round on a ~$4.66 story. `pickBestVersionIndex` already discards a repair
+that scored worse, so the risk of extra admissions is cost, not quality. The cap is
+the highest-value part: the runaway it guards against is already occurring, and a
+50%/30% taper spends each round's budget on the worst pages instead of grinding the
+whole book three times.
+
+This **supersedes ONLY the 60 → 50 `scoreThreshold` rider inside the 2026-08-09
+entry**. `iterateSalvageFloor` and the four numeric gates in that entry are
+untouched. There is no `docs/SETTLED.md` line on `scoreThreshold` (verified).
+
+The MANUAL admin repair workflow does NOT move with the floor: `IMAGE_QUALITY_THRESHOLD`
+is now pinned to an explicit `MANUAL_REPAIR_STOP_SCORE = 50` instead of being derived
+from `REPAIR_DEFAULTS.scoreThreshold`. Deriving it would have silently made
+operator-driven "repair until good" grind every page up to 60 and multiplied the cost
+of a manual session — a change nobody asked for, in a flow a human is already pacing.
+
+**Touched:** `server/config/models.js` (scoreThreshold, `maxRepairShareRound1`,
+`maxRepairShareLaterRounds`, `minRepairPagesPerRound`), `server/lib/repairLogic.js`
+(`findBadPages` rescue + worst-first order, `SAFE_REPAIRABLE_TYPES`,
+`findSafeRepairableFinding`, `applyRoundCap`), `server/lib/repairPipeline.js` (cap
+wired into the round loop; bad-page list keeps worst-first order; a deferred page is
+not pulled back in by the garment-colour path), `server/utils/config.js` +
+`server/lib/evalPipeline.js` (`MANUAL_REPAIR_STOP_SCORE`),
+`client/src/config/repairDefaults.ts` (comment; the client already said 60),
+`tests/unit/repair-gate-cap.test.ts`.
+**Status:** ✅ active
