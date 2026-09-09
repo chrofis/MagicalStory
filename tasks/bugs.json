@@ -740,6 +740,15 @@
       "status": "fixed",
       "note": "FIX (caff24ac0): story-beats.txt + plan-check.txt rule, verbatim: One action per page. A deed is one action; its effect is another; where the effect goes is a third. When a plan line holds more than one, the later ones move to the next page. Bible rule: a state is the object own look, never an arrival. Fallback: interactions[].receiver/target -> builder drops the receiver state clause ([RECEIVER]) and appends a fixed placement sentence. Measured: beats rerun (USD 0.117) emitted the strike alone (\"he rams the branch into the crack and heaves down on it with both arms - water shoots out of the crack\") but parked the effect in the after-segment rather than a release page (BACKLOG); render attempt 3 with the receiver row PASSED (water out of the rock, trough clear) - scratchpad/refix8_*. Unit: tests/unit/receiver-placement.test.ts 6/6, suite 886/886.",
       "fixedIn": "caff24ac0"
+    },
+    {
+      "id": "cover-scene-names-undefined-vb-entity",
+      "title": "A VB entity NAMED in a cover scene description reached the image model with no definition and no reference image — the model painted a phantom figure for it",
+      "reportedAt": "2026-09-09",
+      "source": "Confirmed on staging story job_1788903616404_iqvhj4l8m, front cover. ANI001 \"Nia\" is a DOG. buildCoverSceneFromHint (server/lib/coverIterate.js) pastes the outline's per-character `position` free text verbatim — only `holds:` is id-resolved — so the assembled description read \"Max, a preschooler little boy, stands in the right of Levin, leaning forward with Nia beside him\". KEY STORY ELEMENTS is gated by collectCoverHintElementIds (hint.objects union holds), which did not contain ANI001, and the VB reference grid's name-match safety net in buildCoverReferences was gated behind `if (elementRefs.length === 0)` — the dragon and the scale had already filled the grid, so it never ran. The cover prompt therefore carried the name \"Nia\" with no definition and no reference; the model painted a fifth human child (girl, pigtails, purple dress) among the four boys, and the evaluator free-matched her to the name at 0.9 confidence and passed the cover 100/100.",
+      "status": "fixed",
+      "note": "Cover NAME invariant: an entity named in the assembled cover description is either FULLY SENT (definition in KEY STORY ELEMENTS + reference image in the VB grid) or its name is stripped from the description. One matcher (matchVbEntitiesInText, exported from coverIterate.js) feeds both sides; the grid's name-match block is now an always-run union instead of a length===0 fallback. Wired on all three cover prompt paths (first-gen, iterate/repaint, trial) plus the shared buildCoverReferences grid. Budget respected (COVER_ELEMENT_REF_CAP=6 cover grid cells, locations excluded); VB_ELEMENT_BUDGET and VB_SLOT_MAX_ELEMENTS unchanged. Tests: tests/unit/cover-name-invariant.test.ts (14 passing).",
+      "fixedIn": "4203d99bd"
     }
   ]
 }

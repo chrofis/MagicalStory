@@ -1631,13 +1631,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const hintElementIds = collectCoverHintElementIds(hint);
         const { photos: clothingDedupedPhotos, excludeElementIds } =
           applyCoverWornHeldDedupe(coverPhotos, hint, streamingVisualBible);
-        const visualBibleText = streamingVisualBible
-          ? buildFullVisualBiblePrompt(streamingVisualBible, {
-              skipMainCharacters: true,
-              allowedElementIds: hintElementIds,
-              excludeElementIds,
-            })
-          : '';
+        // visualBibleText is built AFTER the scene description below — the
+        // KEY STORY ELEMENTS gate has to see which entities the assembled
+        // description actually names (cover NAME invariant).
         // Same block as every other cover path and as pages: garment bound to
         // its wearer, plus the legend saying which framed card is whom.
         let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true })
@@ -1664,8 +1660,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // with wide-eyed discovery"), losing the explicit holds: ART005 spec.
         const initialCoverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
         const initialCoverBackend = IMAGE_MODELS[initialCoverModel]?.backend || null;
-        const { buildCoverSceneFromHint } = require('./server/lib/coverIterate');
+        const { buildCoverSceneFromHint, reconcileCoverSceneEntities } = require('./server/lib/coverIterate');
         sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover, { language: inputData.language || 'en' });
+        // COVER NAME INVARIANT — buildCoverSceneFromHint pastes the outline's
+        // per-character `position` free text verbatim, so any entity NAME the
+        // writer put there arrives here. Either it is fully sent (definition
+        // in KEY STORY ELEMENTS + reference image in the VB grid, which
+        // buildCoverReferences re-derives with the same matcher) or its name
+        // is stripped. job_1788903616404_iqvhj4l8m front cover: the dog "Nia"
+        // reached the model undefined and was painted as a phantom child.
+        const coverNameFix = reconcileCoverSceneEntities({
+          sceneDescription,
+          visualBible: streamingVisualBible,
+          elementIds: hintElementIds,
+          label: `${coverType} FIRST-GEN`,
+        });
+        sceneDescription = coverNameFix.sceneDescription;
+        const visualBibleText = streamingVisualBible
+          ? buildFullVisualBiblePrompt(streamingVisualBible, {
+              skipMainCharacters: true,
+              allowedElementIds: coverNameFix.elementIds,
+              excludeElementIds,
+            })
+          : '';
         const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
 
         const coverLabel = coverType === 'frontCover' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
@@ -2143,7 +2160,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
 
             // Build scene description from the cover hint JSON
-            const sceneDescription = '```json\n' + JSON.stringify(coverScene, null, 2) + '\n```';
+            // `let`: the cover NAME invariant may strip an unsendable entity
+            // name from this blob (token-mode strip — JSON-safe).
+            let sceneDescription = '```json\n' + JSON.stringify(coverScene, null, 2) + '\n```';
 
             // Determine which characters appear in the cover scene
             let coverCharacters = [];
@@ -2204,9 +2223,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const trialCoverIds = (coverScene.objects || [])
               .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|ANI|VEH|CHR|LOC)\d+)/i)?.[1]?.toUpperCase() : (obj?.id ? String(obj.id).toUpperCase() : null))
               .filter(Boolean);
+            // COVER NAME INVARIANT — same helper as the full-account cover
+            // paths: an entity named in the trial cover's description is
+            // fully sent or its name is stripped.
+            const { reconcileCoverSceneEntities: reconcileTrialCoverEntities } = require('./server/lib/coverIterate');
+            const trialNameFix = reconcileTrialCoverEntities({
+              sceneDescription,
+              visualBible: streamingVisualBible,
+              elementIds: trialCoverIds.length > 0 ? trialCoverIds : null,
+              label: 'TRIAL FRONT COVER',
+              stripMode: 'token', // the trial cover description is a JSON blob
+            });
+            sceneDescription = trialNameFix.sceneDescription;
             const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, {
               skipMainCharacters: true,
-              allowedElementIds: trialCoverIds.length > 0 ? trialCoverIds : null,
+              allowedElementIds: trialNameFix.elementIds,
             });
 
             // Textless when covers are typeset app-side — same rule the

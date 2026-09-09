@@ -30879,3 +30879,82 @@ about the mechanism; only the 1st-grade numbers they were calibrated against cha
 3. Q9 as its own check, must-fix, plus "watching, standing and being present are not actions" in both the rule and the check: must-fix findings fell to 5, and the planner split the moment itself — `p15 … drives it deep into the crack … the attempt is under way` / `p16 water pours from the crack into the hollow`.
 **Also fixed:** the plan loop was check → re-plan → recheck → ship, so a fault the RE-PLAN introduced was named by the recheck and never repaired — which is how the deed+effect page was created in the first place. It is now a bounded loop: another round only while a MUST-FIX finding survives, at most two re-plans, and an unfixed must-fix ships with a `beats_replan_unfixed` warning naming it (a division is never withheld from a paid run).
 **Touched:** `prompts/plan-check.txt` (check 9 appended — existing numbers untouched, the parser reads the leading number), `prompts/story-beats.txt` (one-action rule), `server/lib/promptBuilders.js` (`REPLAN_MUST_FIX_CHECKS` → 4, 8, 9), `server/lib/beatsPipeline.js` (re-plan rounds), `tests/unit/plan-replan-ranking.test.ts`.
+
+---
+
+## 2026-09-09 — The cover NAME invariant: an entity named in a cover scene description is FULLY SENT, or its name does not appear
+
+**Context:** Staging story `job_1788903616404_iqvhj4l8m`, front cover. Visual Bible
+entry `ANI001` is "Nia", a **dog**. The assembled cover scene description contained
+`"Max, a preschooler little boy, stands in the right of Levin, leaning forward with
+Nia beside him"`. The cover prompt carried **no definition** for Nia and **no
+reference image** of her. The image model painted a fifth *human* child (girl,
+pigtails, purple dress) standing with the four boys; the evaluator then free-matched
+that girl to the name "Nia" at 0.9 confidence and passed the cover at 100/100.
+
+Three mechanisms had to line up for this:
+
+1. `buildCoverSceneFromHint()` is pure JS templating. The per-character sentence
+   pastes the outline's `position` field **verbatim and uninspected** (`stands ${pos}`);
+   only `holds:` is id-resolved (`resolveHoldable`). Any entity NAME the writer puts
+   in that free text reaches the image prompt undefined.
+2. KEY STORY ELEMENTS is filtered by `collectCoverHintElementIds()` — `coverHint.objects[]`
+   ∪ each character's `holds:` id. `ANI001` was in neither, so its definition was gated out.
+3. The VB reference grid's name-match safety net in `buildCoverReferences()` existed,
+   but was gated behind `if (elementRefs.length === 0)`. The dragon and the scale had
+   already filled the grid, so the net never ran.
+
+The planner is not at fault: `prompts/story-unified.txt` asks the cover hint for
+`LOC### + the story's central ANI### + 1-2 ART###`; the central animal (the dragon)
+WAS included. Nia is a *second* animal, legitimately absent from the hint. No prompt
+was changed.
+
+**Decision:** A Visual Bible entity whose name appears in the assembled cover scene
+description is either **fully sent** — (a) its definition emitted in KEY STORY ELEMENTS
+**and** (b) its reference image in the VB grid — or **its name is stripped from the
+description** before the prompt is built.
+
+- One matcher is the source of truth: `matchVbEntitiesInText(text, visualBible)` in
+  `coverIterate.js`. Case-insensitive, whole-word (Unicode boundaries, so "Nia" does not
+  match inside "Niamh"), skips nameless entries, scans `secondaryCharacters` / `animals` /
+  `artifacts` / `vehicles` only — **not locations** (a location is the plate, not an
+  element — SETTLED 2026-09-08) and not main characters (they ride as character reference
+  cards).
+- `reconcileCoverSceneEntities()` unions resolvable ids into the `allowedElementIds` that
+  gate KEY STORY ELEMENTS; `buildCoverReferences()` re-derives the same matches for the
+  grid, its name-match block promoted from a `length === 0` fallback to an **always-run
+  union**.
+- Enforcement: an entity that cannot be fully sent — no reference image, or the cover
+  reference budget is already full — has its name **stripped** (whole companion clause
+  first, so the prose stays grammatical), with a WARN naming the id, the name and the
+  reason. Conservative exception: a name that is not proper-noun-shaped (a generic
+  lowercase noun like "rope") is warned about but never cut out of prose — a generic
+  noun does not summon a phantom named figure.
+- The trial cover's description is a fenced JSON blob, so it strips in `stripMode: 'token'`
+  (the name word only) — clause surgery there would break the JSON.
+- Budget: the cover grid cap is now the named `COVER_ELEMENT_REF_CAP = 6` (previously two
+  bare `6` literals in `buildCoverReferences`), and the reconcile pass makes the same budget
+  decision the grid does. `VB_ELEMENT_BUDGET` (3) and Grok's `VB_SLOT_MAX_ELEMENTS` (4) are
+  **untouched** — the Grok packer remains the net downstream of whatever this produces.
+
+**Rationale:** The failure is not "the writer named an extra animal" — that is legitimate
+prose. The failure is a prompt that names something it does not define or show: an image
+model asked for a name with no referent invents one, and a free-matching evaluator then
+certifies the invention. Injecting the definition + reference is the right answer whenever
+it fits; stripping is the only safe answer when it does not. Doing this at the description
+level (rather than pattern-matching in the evaluator) means it holds for every cover path
+and needs no eval change — evaluator logic, scoring and repair gates are deliberately
+untouched here.
+
+**Touched:**
+- `server/lib/coverIterate.js` — `COVER_ELEMENT_REF_CAP`, `COVER_NAME_MATCH_POOLS`,
+  `matchVbEntitiesInText`, `stripEntityNameFromDescription`, `reconcileCoverSceneEntities`
+  (new, exported); `iterateCover` reconcile + `let sceneDescription`; `buildCoverReferences`
+  name-match promoted to an always-run union under the cap.
+- `storyJobPipeline.js` — first-generation cover path (scene built before the VB text so the
+  gate sees the assembled names) and the trial cover path (token-mode strip).
+- `tests/unit/cover-name-invariant.test.ts` — 14 tests: matching, injection, strip fallback,
+  budget, JSON safety.
+- `tasks/bugs.json` — `cover-scene-names-undefined-vb-entity`.
+
+**Status:** ✅ active

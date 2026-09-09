@@ -114,6 +114,201 @@ function collectCoverHintElementIds(coverHint) {
   return ids.length > 0 ? [...new Set(ids)] : null;
 }
 
+/**
+ * Cover VB reference-grid cap. Historically a bare `6` in buildCoverReferences
+ * (two literals: the getElementReferenceImagesForPage maxRefs and the merge
+ * slice). Named here because the name-resolution pass below has to make the
+ * same budget decision the grid does — an entity that would not fit the grid
+ * must not survive in the description either.
+ *
+ * NOT a change to VB_ELEMENT_BUDGET (3, pages) or Grok's VB_SLOT_MAX_ELEMENTS
+ * (4, the packer's net, applied downstream to whatever this produces). Both
+ * are settled values and are untouched.
+ */
+const COVER_ELEMENT_REF_CAP = 6;
+
+// Pools scanned when resolving a NAME found in a cover scene description.
+// Locations are excluded (a location is the plate, not an element — SETTLED
+// 2026-09-08) and so are main characters (they ride as character reference
+// cards, not as VB elements). Priority mirrors the reference-grid ordering.
+const COVER_NAME_MATCH_POOLS = [
+  ['secondaryCharacters', 'character', 1],
+  ['animals', 'animal', 2],
+  ['artifacts', 'artifact', 3],
+  ['vehicles', 'vehicle', 4],
+];
+
+const hasEntityReference = (entry) => Boolean(entry?.referenceImageData || entry?.referenceImageUrl);
+
+/** Word-boundary, case-insensitive matcher for one entity name. */
+function entityNameRegex(name, flags = 'i') {
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, `${flags}u`);
+}
+
+/**
+ * SINGLE SOURCE OF TRUTH for "which Visual Bible entities does this cover
+ * scene description name?".
+ *
+ * Used by BOTH sides of the cover invariant:
+ *   (a) the KEY STORY ELEMENTS gate (allowedElementIds), and
+ *   (b) the VB reference grid in buildCoverReferences.
+ *
+ * Why it exists: buildCoverSceneFromHint pastes the outline's per-character
+ * `position` free text verbatim, so the writer can name any entity there
+ * ("stands to the right of Levin with Nia beside him"). Only `holds:` was
+ * id-resolved, so such a name reached the image model with NO definition and
+ * NO reference image — on job_1788903616404_iqvhj4l8m's front cover the model
+ * invented a fifth human child for the dog "Nia" and the evaluator free-matched
+ * her at 0.9 confidence.
+ *
+ * @returns {Array<Object>} matched entries, priority-sorted, deduped by id.
+ */
+function matchVbEntitiesInText(text, visualBible) {
+  const str = typeof text === 'string' ? text : '';
+  if (!str.trim() || !visualBible) return [];
+  const seen = new Set();
+  const matched = [];
+  for (const [pool, type, priority] of COVER_NAME_MATCH_POOLS) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      const name = typeof entry?.name === 'string' ? entry.name.trim() : '';
+      if (!name) continue;                       // skip entries with no name
+      const id = entry.id ? String(entry.id).toUpperCase() : null;
+      if (id && seen.has(id)) continue;
+      if (!entityNameRegex(name).test(str)) continue;
+      if (id) seen.add(id);
+      matched.push({
+        id,
+        name,
+        type,
+        priority,
+        description: entry.extractedDescription || entry.description,
+        referenceImageData: entry.referenceImageData,
+        referenceImageUrl: entry.referenceImageUrl,
+        hasReference: hasEntityReference(entry),
+        entry,
+      });
+    }
+  }
+  return matched.sort((a, b) => a.priority - b.priority);
+}
+
+/**
+ * Remove one entity NAME from a cover scene description, preferring to drop
+ * the whole clause that mentions it so the prose stays grammatical.
+ * Guarantees the name is gone from the result.
+ */
+function stripEntityNameFromDescription(description, name, opts = {}) {
+  const original = typeof description === 'string' ? description : '';
+  if (!original || !name) return original;
+  // 'token' mode removes ONLY the name word. Used when the description is a
+  // structured blob (the trial cover ships a fenced JSON object as its
+  // description) — clause surgery there would break the JSON.
+  const tokenOnly = opts.stripMode === 'token';
+  const esc = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const B = `(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`;
+  const tidy = (s) => s
+    .replace(/\s*,\s*,/g, ',')
+    .replace(/\s+,/g, ',')
+    .replace(/,\s*\./g, '.')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+\./g, '.')
+    .trim();
+
+  if (tokenOnly) {
+    return original.replace(new RegExp(`\\s*(?:the\\s+)?${B}`, 'giu'), '');
+  }
+
+  // 1. A trailing companion clause: ", with Nia beside him" / " and Nia".
+  let out = original.replace(
+    new RegExp(`\\s*,?\\s+(?:with|and|alongside|beside|next to|accompanied by|together with)\\s+[^,.]*${B}[^,.]*`, 'giu'),
+    ''
+  );
+  // 2. Any remaining comma-delimited clause naming it.
+  if (entityNameRegex(name).test(out)) {
+    out = out.replace(new RegExp(`\\s*,\\s*[^,.]*${B}[^,.]*(?=[,.])`, 'giu'), '');
+  }
+  // 3. Whole sentence.
+  if (entityNameRegex(name).test(out)) {
+    out = out.split(/(?<=\.)\s+/).filter(s => !entityNameRegex(name).test(s)).join(' ');
+  }
+  // 4. Last resort — the bare word, so the name can never survive.
+  if (!tidy(out) || entityNameRegex(name).test(out)) {
+    const base = tidy(out) ? out : original;
+    out = base.replace(new RegExp(`\\s*(?:the\\s+)?${B}`, 'giu'), '');
+  }
+  return tidy(out);
+}
+
+/**
+ * THE COVER NAME INVARIANT.
+ *
+ * "A Visual Bible entity whose name appears in the assembled cover scene
+ * description is either FULLY SENT — its definition in KEY STORY ELEMENTS and
+ * its reference image in the VB grid — or its name does not appear."
+ *
+ * Named entities that can be fully sent are unioned into the element-id list
+ * (which gates KEY STORY ELEMENTS and is re-derived identically by
+ * buildCoverReferences for the grid). Entities that cannot — no reference
+ * image, or the cover reference budget is already full — have their name
+ * stripped from the description, loudly.
+ *
+ * Conservative on the destructive side: a name that is not proper-noun-shaped
+ * (a generic lowercase noun like "rope") is never cut out of prose; it is
+ * warned about instead, because a generic noun does not summon a phantom
+ * named figure the way an undefined proper name does.
+ *
+ * @returns {{sceneDescription:string, elementIds:Array<string>|null,
+ *            injected:Array<Object>, stripped:Array<Object>}}
+ */
+function reconcileCoverSceneEntities({
+  sceneDescription,
+  visualBible,
+  elementIds = null,
+  label = 'COVER',
+  cap = COVER_ELEMENT_REF_CAP,
+  stripMode = 'clause',
+} = {}) {
+  let desc = typeof sceneDescription === 'string' ? sceneDescription : '';
+  const known = new Set((elementIds || []).map(id => String(id).toUpperCase()));
+  if (!visualBible || !desc.trim()) {
+    return { sceneDescription: desc, elementIds, injected: [], stripped: [] };
+  }
+  // Locations are not elements (SETTLED 2026-09-08) — they never consume budget.
+  let used = [...known].filter(id => !/^LOC/i.test(id)).length;
+  const injected = [];
+  const stripped = [];
+
+  for (const hit of matchVbEntitiesInText(desc, visualBible)) {
+    if (hit.id && known.has(hit.id)) continue;          // already fully sent
+    let reason = null;
+    if (!hit.hasReference) reason = 'no reference image in the Visual Bible';
+    else if (!hit.id) reason = 'Visual Bible entry has no id';
+    else if (used >= cap) reason = `cover element budget full (${cap})`;
+    if (!reason) {
+      known.add(hit.id);
+      used += 1;
+      injected.push(hit);
+      continue;
+    }
+    const properNoun = /^[\p{Lu}]/u.test(hit.name);
+    if (!properNoun) {
+      log.warn(`⚠️ [COVER-VB-NAME] ${label}: "${hit.name}" (${hit.id || 'no id'}) named in the cover description cannot be sent — ${reason}; left in place (generic noun, not a proper name)`);
+      continue;
+    }
+    const before = desc;
+    desc = stripEntityNameFromDescription(desc, hit.name, { stripMode });
+    stripped.push({ id: hit.id, name: hit.name, type: hit.type, reason });
+    log.warn(`⚠️ [COVER-VB-NAME] ${label}: stripped "${hit.name}" (${hit.id || 'no id'}, ${hit.type}) from the cover description — ${reason}. An undefined name must never reach the image model.${before === desc ? ' (NO-OP — name not removable!)' : ''}`);
+  }
+
+  if (injected.length > 0) {
+    log.info(`🔗 [COVER-VB-NAME] ${label}: named in the description and now fully sent: ${injected.map(i => `${i.name} (${i.id})`).join(', ')}`);
+  }
+  const outIds = (elementIds || injected.length > 0) ? [...known] : null;
+  return { sceneDescription: desc, elementIds: outIds, injected, stripped };
+}
+
 // Tokenizer for matching a VB artifact against a clothing description —
 // shared canon in visualBible.js (significantEntityTokens, imported above).
 const significantTokens = significantEntityTokens;
@@ -577,7 +772,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     return stripped;
   };
   const rawSceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
-  const sceneDescription = stripCoverAnnotations(rawSceneDescription);
+  // `let`: the cover NAME invariant below may strip an unsendable entity name.
+  let sceneDescription = stripCoverAnnotations(rawSceneDescription);
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Using stored description (${sceneDescription.length} chars)`);
 
   // --- Art style ---
@@ -760,12 +956,24 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // (objects ∪ holds); worn-vs-held dedupe resolves the "same item as both
   // clothing and artifact" contradiction before any text block is built.
   const hintElementIds = collectCoverHintElementIds(coverHint);
+  // COVER NAME INVARIANT — an entity NAMED in the description is either fully
+  // sent (definition + reference image) or its name is stripped. Same helper
+  // the first-generation and trial cover paths use; buildCoverReferences
+  // re-derives the same matches for the reference grid.
+  const coverNameFix = reconcileCoverSceneEntities({
+    sceneDescription,
+    visualBible,
+    elementIds: hintElementIds,
+    label: `${coverKey} ITERATE`,
+  });
+  sceneDescription = coverNameFix.sceneDescription;
+  const coverElementIds = coverNameFix.elementIds;
   const { photos: clothingDedupedPhotos, excludeElementIds } =
     applyCoverWornHeldDedupe(coverCharacterPhotos, coverHint, visualBible);
   const visualBiblePrompt = visualBible
     ? buildFullVisualBiblePrompt(visualBible, {
         skipMainCharacters: true,
-        allowedElementIds: hintElementIds,
+        allowedElementIds: coverElementIds,
         excludeElementIds,
       })
     : '';
@@ -1511,7 +1719,7 @@ async function buildCoverReferences({
   // --- Build VB grid ---
   let visualBibleGrid = null;
   if (visualBible) {
-    let elementRefs = getElementReferenceImagesForPage(visualBible, coverPageNumber, 6);
+    let elementRefs = getElementReferenceImagesForPage(visualBible, coverPageNumber, COVER_ELEMENT_REF_CAP);
     if (sceneBackground) {
       elementRefs = elementRefs.filter(e => e.type !== 'location');
     }
@@ -1535,36 +1743,38 @@ async function buildCoverReferences({
       const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
       if (newRefs.length > 0) {
         log.info(`🔗 [VB-MATCH] Cover ${label}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
-        elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
+        elementRefs = [...elementRefs, ...newRefs].slice(0, COVER_ELEMENT_REF_CAP);
       }
     }
-    // Safety net: name-match VB entries against the description when nothing else matched.
-    if (elementRefs.length === 0) {
-      const descLower = (sceneDescription || '').toLowerCase();
-      const nameMatched = [];
-      const checkEntries = (entries, type, priority) => {
-        for (const entry of entries || []) {
-          if ((!entry.referenceImageData && !entry.referenceImageUrl) || !entry.name) continue;
-          if (!descLower.includes(entry.name.toLowerCase())) continue;
-          nameMatched.push({
-            id: entry.id,
-            name: entry.name,
-            type,
-            description: entry.extractedDescription || entry.description,
-            referenceImageData: entry.referenceImageData,
-            referenceImageUrl: entry.referenceImageUrl,
-            priority,
-          });
+    // NAME match — ALWAYS a union, never only a `length === 0` fallback.
+    // It used to be gated behind "nothing else matched", so on a cover whose
+    // grid was already filled by the hint's objects the net never ran and an
+    // entity named in the prose (job_1788903616404_iqvhj4l8m: the dog "Nia",
+    // pasted verbatim out of the outline's `position` free text) shipped with
+    // no definition and no reference — the model painted a phantom child.
+    // Same matcher the KEY STORY ELEMENTS gate uses (one source of truth).
+    {
+      const nameMatched = matchVbEntitiesInText(sceneDescription, visualBible)
+        .filter(e => e.hasReference)
+        .map(e => ({
+          id: e.id, name: e.name, type: e.type, description: e.description,
+          referenceImageData: e.referenceImageData,
+          referenceImageUrl: e.referenceImageUrl,
+          priority: e.priority,
+        }));
+      const have = new Set(elementRefs.map(r => String(r.id || r.name).toUpperCase()));
+      const addable = nameMatched.filter(r => !have.has(String(r.id || r.name).toUpperCase()));
+      if (addable.length > 0) {
+        const room = Math.max(0, COVER_ELEMENT_REF_CAP - elementRefs.length);
+        const added = addable.slice(0, room);
+        const skipped = addable.slice(room);
+        if (added.length > 0) {
+          elementRefs = [...elementRefs, ...added];
+          log.info(`🔗 [VB-NAME-MATCH] Cover ${label}: Added ${added.length} VB entry(ies) named in the description: ${added.map(r => r.id || r.name).join(', ')}`);
         }
-      };
-      checkEntries(visualBible.secondaryCharacters, 'character', 1);
-      checkEntries(visualBible.animals, 'animal', 2);
-      checkEntries(visualBible.artifacts, 'artifact', 3);
-      checkEntries(visualBible.vehicles, 'vehicle', 4);
-      if (nameMatched.length > 0) {
-        nameMatched.sort((a, b) => a.priority - b.priority);
-        elementRefs = nameMatched.slice(0, 6);
-        log.info(`🔗 [VB-NAME-MATCH] Cover ${label}: Matched ${elementRefs.length} VB entries by name: ${elementRefs.map(r => r.id || r.name).join(', ')}`);
+        if (skipped.length > 0) {
+          log.warn(`⚠️ [VB-NAME-MATCH] Cover ${label}: ${skipped.length} named entity(ies) did not fit the ${COVER_ELEMENT_REF_CAP}-cell cover reference cap: ${skipped.map(r => r.id || r.name).join(', ')}`);
+        }
       }
     }
     const secondaryLandmarks = landmarkPhotos.slice(1);
@@ -1733,6 +1943,12 @@ module.exports = {
   MAX_COVER_CHARACTERS,
   // Cover-prompt hygiene helpers (shared with the streaming initial-gen path)
   collectCoverHintElementIds,
+  // Cover NAME invariant — one matcher, used by the KEY STORY ELEMENTS gate
+  // and by the reference grid (see reconcileCoverSceneEntities).
+  matchVbEntitiesInText,
+  stripEntityNameFromDescription,
+  reconcileCoverSceneEntities,
+  COVER_ELEMENT_REF_CAP,
   applyCoverWornHeldDedupe,
   buildInitialPageComposition,
   englishEntityRef,
