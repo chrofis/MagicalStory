@@ -537,11 +537,7 @@ export function WizardStep6Summary({
 
                   {/* World badge — which world this idea plays in (shown above the idea text) */}
                   {world && (
-                    <div className={`px-4 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
-                      world.world === 'location'
-                        ? 'bg-sky-50 text-sky-700'
-                        : 'bg-purple-50 text-purple-700'
-                    }`}>
+                    <div className="px-4 py-1.5 text-xs font-semibold flex items-center gap-1.5 bg-indigo-50 text-indigo-700">
                       {world.world === 'location' ? <MapPin size={12} /> : <Sparkles size={12} />}
                       <span>{getWorldLabel(world)}</span>
                     </div>
