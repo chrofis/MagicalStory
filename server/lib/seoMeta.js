@@ -1545,7 +1545,7 @@ function buildGiftDescription(giftSlug, lang) {
       it: 'Sorprendi tua nipote o tuo nipote con un libro personalizzato — sono loro il protagonista. Da CHF 33, prima storia gratuita.',
     },
     'fuer-patenkind': {
-      de: 'Ein besonderes Geschenk vom Götti oder der Gotte: ein personalisiertes Kinderbuch mit dem Foto deines Patenkinds. Ab CHF 33.',
+      de: 'Geschenk für Göttikind oder Patenkind: ein personalisiertes Kinderbuch vom Götti oder der Gotte, mit Göttibub oder Göttimeitli als Held. Ab CHF 33.',
       en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 33, first story free.',
       fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 33.',
       it: 'Un regalo speciale dal padrino o dalla madrina: un libro personalizzato con la foto del tuo figlioccio. Da CHF 33, prima storia gratuita.',
