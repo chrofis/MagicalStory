@@ -3054,7 +3054,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       if (bytes) {
         referenceImages.push(`data:image/jpeg;base64,${bytes}`);
         referenceImageSources.push(`vb-animal:${missing.item}`);
-        log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item}"`);
+        log.info(`[INPAINT PAGE] Adding VB animal reference for missing "${missing.item || itemName}"`);
         continue;
       }
     }
@@ -3064,7 +3064,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       if (bytes) {
         referenceImages.push(`data:image/jpeg;base64,${bytes}`);
         referenceImageSources.push(`vb-char:${missing.item}`);
-        log.info(`[INPAINT PAGE] Adding VB secondary character reference for missing "${missing.item}"`);
+        log.info(`[INPAINT PAGE] Adding VB secondary character reference for missing "${missing.item || itemName}"`);
         continue;
       }
     }
@@ -3078,7 +3078,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       if (bytes) {
         referenceImages.push(`data:image/jpeg;base64,${bytes}`);
         referenceImageSources.push(`vb-artifact:${missing.item}`);
-        log.info(`[INPAINT PAGE] Adding VB artifact reference for missing "${missing.item}"`);
+        log.info(`[INPAINT PAGE] Adding VB artifact reference for missing "${missing.item || itemName}"`);
         continue;
       }
     }
@@ -3095,7 +3095,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image') && !referenceImages.includes(photoUrl)) {
           referenceImages.push(photoUrl);
           referenceImageSources.push(`avatar-missing:${missing.item}:${pageClothing}`);
-          log.info(`[INPAINT PAGE] Adding ${pageClothing} avatar for missing "${missing.item}" (style=${artStyle || 'watercolor'})`);
+          log.info(`[INPAINT PAGE] Adding ${pageClothing} avatar for missing "${missing.item || itemName}" (style=${artStyle || 'watercolor'})`);
         }
       }
     }
