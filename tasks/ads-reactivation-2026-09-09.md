@@ -21,8 +21,8 @@ Keyword `kinderbuch selbst gestalten` is KEPT (best converter) and gets its own 
 - **Target: as many clicks as possible below CHF 0.20, then see what converts.** Cheap volume first,
   conversion attribution via `scripts/ads/attribution-report.js` decides what stays.
 
-- [ ] S5. `scripts/ads/apply-audit-changes.js` — dry-run by default, `--apply` flag, idempotent;
+- [x] (dae88fba3, dry-run only) S5. `scripts/ads/apply-audit-changes.js` — dry-run by default, `--apply` flag, idempotent;
       implements the audit's 11-step list.
-- [ ] S6. Cheap-click plan: candidate keywords with planner CPC < CHF 0.20 (age-gift cluster,
+- [x] (dae88fba3, dry-run only) S6. Cheap-click plan: candidate keywords with planner CPC < CHF 0.20 (age-gift cluster,
       Göttikind, Einschulung, Geschwister) → proposed campaign `Search-Cheap-CH`, max CPC 0.20,
       negatives for the direction traps. Dry-run creation script.
