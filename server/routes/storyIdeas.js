@@ -45,7 +45,8 @@ const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
 async function buildIdeasPromptContext({
   storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
   language, languageLevel = 'standard', characters, relationships,
-  pages = 10, userLocationInstruction = '', availableLandmarksSection = ''
+  pages = 10, userLocationInstruction = '', availableLandmarksSection = '',
+  seasonInstruction = ''
 }) {
   const { getLanguageInstruction } = require('../lib/languages');
 
@@ -303,6 +304,12 @@ ${adventureGuideContent}`
     TOPIC_GUIDE: topicGuideText,
     ADVENTURE_SETTING_GUIDE: adventureSettingGuide,
     USER_LOCATION_INSTRUCTION: userLocationInstruction,
+    // Season is its OWN placeholder, never part of the location block. A
+    // fantasy idea blanks USER_LOCATION_INSTRUCTION so the real city cannot
+    // leak into a made-up world — and while the season lived inside that
+    // block it was blanked too, so a story set in Herbst came back as
+    // "in einem Sommer vor langer Zeit".
+    SEASON_INSTRUCTION: seasonInstruction,
     AVAILABLE_LANDMARKS: availableLandmarksSection,
     STORY_LENGTH_CATEGORY: storyLengthCategory,
     CHALLENGE_CATALOGUE: challengeCatalogueSection,
@@ -425,11 +432,14 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     if (locationForPrompt?.city && effectiveCategory_loc !== 'historical') {
       const locationParts = [locationForPrompt.city, locationForPrompt.region, locationForPrompt.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
-      const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
-      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel && effectiveCategory_loc !== 'historical') {
-      userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
+    // The season holds for BOTH ideas, the made-up world included — it is what
+    // the reader picked. Keeping it out of the location block is what lets it
+    // survive the fantasy blanking below.
+    const seasonInstruction = (seasonLabel && effectiveCategory_loc !== 'historical')
+      ? `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season — in an invented world too.`
+      : '';
 
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
@@ -456,7 +466,7 @@ ${landmarkEntries}`;
     const ctx = await buildIdeasPromptContext({
       storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
       language, languageLevel, characters, relationships, pages,
-      userLocationInstruction, availableLandmarksSection
+      userLocationInstruction, availableLandmarksSection, seasonInstruction
     });
 
     // Resolve which world each idea plays in (null = legacy split, no labels)
@@ -594,11 +604,14 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     if (locationForPrompt?.city && effectiveCategory_loc !== 'historical') {
       const locationParts = [locationForPrompt.city, locationForPrompt.region, locationForPrompt.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
-      const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
-      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel && effectiveCategory_loc !== 'historical') {
-      userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
+    // The season holds for BOTH ideas, the made-up world included — it is what
+    // the reader picked. Keeping it out of the location block is what lets it
+    // survive the fantasy blanking below.
+    const seasonInstruction = (seasonLabel && effectiveCategory_loc !== 'historical')
+      ? `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season — in an invented world too.`
+      : '';
 
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
@@ -625,7 +638,7 @@ ${landmarkEntries}`;
     const ctx = await buildIdeasPromptContext({
       storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
       language, languageLevel, characters, relationships, pages,
-      userLocationInstruction, availableLandmarksSection
+      userLocationInstruction, availableLandmarksSection, seasonInstruction
     });
 
     // Get model to use
