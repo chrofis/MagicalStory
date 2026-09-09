@@ -72,6 +72,7 @@ Scan the page plan and list every element that must stay consistent across illus
 
 Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
 
+{CREATURE_TONE}
 Every description — characters, creatures, clothing, objects — must render in the named illustration style. A photorealistic style gets physically plausible beings, materials and colours (no glowing, luminous, or iridescent features, no impossible anatomy); a stylised style may use its idiom.
 
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:

@@ -30958,3 +30958,53 @@ untouched here.
 - `tasks/bugs.json` — `cover-scene-names-undefined-vb-entity`.
 
 **Status:** ✅ active
+
+## Creature appearance is softened by the focus child's age — appearance only, never plot (2026-09-09)
+**Context:** Staging story `job_1788903616404_iqvhj4l8m` (focus main aged 5, other mains 3,
+reading level `1st-grade`). The Visual Bible designed `ANI002` "a dragon" as *"very large — body
+length roughly equivalent to two city buses end to end… children appear tiny beside him… two
+backward-swept curved horns"*, and `CHR002` (a 400-year-old secondary) as *"pale grey skin, small
+deep-set amber eyes under heavy brow ridges… jutting square chin"*, *"stout, hunched"*. Rendered,
+they read as a menacing reptile and a troll looming over a small child. No reader-age or tone
+signal reached Visual Bible entity design at all: `{READING_LEVEL}` is a sentence-length statement,
+`{CHILD_AGE_BAND}` constrains only how old an invented PEER CHILD may be (a 400-year-old is
+unconstrained), and `{AGE_MODE}` — the plot-shape block — is not in this template. The bible's own
+creature instructions are specificity-only (`story-bible-from-beats.txt:73/75`), and the output
+schema for `animals` / `secondaryCharacters` has no tone or expression field.
+**Decision:** A new `{CREATURE_TONE}` block in `prompts/story-bible-from-beats.txt` (inside
+`# VISUAL BIBLE`, next to the render-in-the-named-style line), filled by
+`buildCreatureToneSection(inputData)`. Three levels keyed on the focus main character's AGE
+(owner, 2026-09-09): 0-4 "really cute", 5-6 "not menacing", 7+ "formidable where the story means
+it to be" — claws and teeth shown, physical weight and presence, no toy-like softening; it may
+loom and its size may be stated against a child. An unparseable or missing age emits NOTHING at
+all. The block governs facial features (brow, eye shape, mouth), bared teeth and displayed claws,
+posture, and how size is stated relative to a child. It does NOT forbid a creature being large,
+nor a story having a frightening moment.
+
+**Level 3 is a ceiling, not a floor.** It licenses a formidable look only where the story's own
+nature for that creature is powerful, wild or formidable; a pet, a domestic animal or a comic one
+stays gentle and friendly-looking at every level. The story's intent decides, the reader's age only
+lifts what is permitted. An unknown age therefore emits nothing rather than defaulting into level
+3, which would harden creatures in stories whose reader age we cannot read.
+**Rationale:** Keyed on age rather than on the band name because `AGE_BANDS` collapses everything
+from 6 upward into `standard` and so cannot express the owner's boundary at 7; the same age source
+(`pickMainCharacters(inputData).focus?.age`) keeps one source of truth for whose age counts.
+`AGE_BANDS` / `resolveAgeBand` are untouched — they stay the plot-shape driver.
+**Scope is appearance only, deliberately.** `server/lib/promptBuilders.js` (comment above
+`bandDifficulty` in `buildStoryShapeSection`) records that a blanket "the focus child is under six,
+so keep it simple" softener was removed on purpose, because it flattened exactly the `fear-choice`
+(4) and `journey` (5) bands that are meant to carry a real fear and a real low point. Those two
+ages are precisely the ones that still need soft visuals, so the softening had to be split from
+the plot: a 5-year-old still gets the `journey` shape with a real low point — it just gets a
+friendly-looking creature. The prompt text says so explicitly so a future model does not
+over-apply it. Injection point is the Visual Bible only (owner's call): not the image prompt, not
+scene expansion, not the evaluator. Reverses no `docs/SETTLED.md` line — SETTLED has nothing on
+creature design, tone or visual age-appropriateness; this is a new rule.
+**Touched:**
+- `server/lib/promptBuilders.js` — `CREATURE_TONE_LEVELS`, `creatureToneLevel()`,
+  `buildCreatureToneSection()` (next to `resolveAgeBand`/`buildAgeModeSection`), exported; wired
+  into `buildStoryBibleFromBeatsPrompt`'s `fillTemplate` as `CREATURE_TONE`.
+- `prompts/story-bible-from-beats.txt` — `{CREATURE_TONE}` placeholder.
+- `tests/manual/test-creature-tone.js` — age → band → tone resolution, ages 1/3/4/5/6/7/8 and a
+  missing age. Free, no API calls.
+**Status:** ✅ active

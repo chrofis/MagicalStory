@@ -4768,6 +4768,47 @@ function buildAgeModeSection(inputData = {}) {
 }
 
 /**
+ * How non-human and invented cast MAY LOOK for the focus child's age. Scope is
+ * appearance only — face, expression, teeth and claws, posture, and how size is
+ * stated relative to a child. It never touches plot difficulty, stakes, the low
+ * point or what happens: a 5-year-old still gets the `journey` plot shape with
+ * a real low point, drawn with a friendly-looking creature. The blanket "focus
+ * is under six, so keep it simple" soften was removed on purpose (see
+ * buildStoryShapeSection) because it flattened `fear-choice` and `journey`;
+ * this block is the narrow replacement that does not.
+ *
+ * Owner boundaries (2026-09-09): 0-4 really cute, 5-6 not menacing, 7+ formidable
+ * where the story means it to be — a ceiling that is lifted, never a floor: a
+ * gentle creature stays gentle at every level.
+ * Keyed on the AGE, not the band name — `AGE_BANDS` collapses everything from 6
+ * upward into `standard` and so cannot separate 6 from 7. Same age source as
+ * `resolveAgeBand` (`pickMainCharacters(inputData).focus?.age`).
+ * An unparseable or missing age emits NOTHING — it must not harden creatures in
+ * a story whose reader age we cannot read.
+ *
+ * Evidence: job_1788903616404_iqvhj4l8m, ANI002 (a creature sized in city-bus
+ * lengths, children tiny beside it, backward-swept horns) and CHR002 (heavy
+ * brow ridges, deep-set eyes, jutting chin, hunched) beside a 5-year-old.
+ */
+const CREATURE_TONE_LEVELS = {
+  cute: 'Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth, no bared teeth, no displayed claws, an open upright posture, warm colours. A non-human character reads as a playmate. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child and never with the child dwarfed beside it, and never frame it leaning or towering over a child.',
+  'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth. Teeth and claws may exist but are not bared, raised or displayed. A being may be large — state its size in metres, not as a multiple of a child, and frame it at the child's eye level rather than looming over them.",
+  formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets.",
+};
+
+function creatureToneLevel(inputData = {}) {
+  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  if (!Number.isFinite(age) || age < 0) return null;
+  if (age <= 4) return 'cute';
+  if (age <= 6) return 'not-menacing';
+  return 'formidable';
+}
+
+function buildCreatureToneSection(inputData = {}) {
+  return CREATURE_TONE_LEVELS[creatureToneLevel(inputData)] || '';
+}
+
+/**
  * Which catalogue age bands (prompts/challenge-catalogue.txt column 5) a story
  * may draw obstacles from. The three simple bands take none — their single
  * obstacle, where they have one, comes from their own band file. The peril
@@ -6348,6 +6389,9 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
     // (job_1788641639919_mpjwlzkf1, CHR001, p5). Empty for an all-adult
     // commission: there is no band to state.
     CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
+    // How non-human cast may LOOK for the focus child's age band — appearance
+    // only, never plot difficulty. Empty at 6 and up.
+    CREATURE_TONE: buildCreatureToneSection(inputData),
     PLAN_LINES: planBlocks(beats),
   });
 }
@@ -7117,6 +7161,7 @@ module.exports = {
   pickMainCharacters,
   resolveAgeBand,
   buildAgeModeSection,
+  buildCreatureToneSection,
   challengeCatalogueBands,
   parseArcReview,
   buildClothingReviewPrompt,
