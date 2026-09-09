@@ -149,6 +149,7 @@ export const adminTranslations = {
     trialStepFunnelColOfPrev: '% of previous',
     trialStepFunnelColDropped: 'Lost here',
     trialStepFunnelEmpty: 'No trial events recorded in this window.',
+    trialStepFunnelEmptySource: 'No visits from this traffic source in this window (other sources have visits).',
     trialStepFunnelBotNote: 'Landing includes crawlers; the first human click is “intro start”.',
     // Failed Jobs Tab
     failedJobs: 'Failed Jobs',
@@ -299,6 +300,7 @@ export const adminTranslations = {
     trialStepFunnelColOfPrev: '% vom vorherigen',
     trialStepFunnelColDropped: 'Hier verloren',
     trialStepFunnelEmpty: 'Keine Trial-Ereignisse in diesem Zeitraum.',
+    trialStepFunnelEmptySource: 'Keine Besuche aus dieser Quelle in diesem Zeitraum (andere Quellen haben Besuche).',
     trialStepFunnelBotNote: 'Landing enthält Crawler; der erste menschliche Klick ist «Intro Start».',
     // Failed Jobs Tab
     failedJobs: 'Fehlgeschlagene Jobs',
@@ -449,6 +451,7 @@ export const adminTranslations = {
     trialStepFunnelColOfPrev: '% de la précédente',
     trialStepFunnelColDropped: 'Perdus ici',
     trialStepFunnelEmpty: 'Aucun événement d\'essai dans cette fenêtre.',
+    trialStepFunnelEmptySource: 'Aucune visite de cette source dans cette fenêtre (d\'autres sources en ont).',
     trialStepFunnelBotNote: 'Landing inclut les robots ; le premier clic humain est «intro start».',
     // Failed Jobs Tab
     failedJobs: 'Jobs échoués',

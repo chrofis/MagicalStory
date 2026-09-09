@@ -16,6 +16,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { lookupIpLocation } = require('../lib/ipLocation');
+const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
 // failure it alarms and lets the write proceed (see its JSDoc).
@@ -538,20 +539,15 @@ router.post('/event', trialEventLimiter, async (req, res) => {
  * @param {string} source - all | paid | organic | direct
  */
 async function getTrialStepFunnel(days = 30, source = 'all') {
-  const empty = { days, source, steps: [], totalVisits: 0 };
+  const empty = { days, source, steps: [], totalVisits: 0, allSourcesVisits: 0 };
   try {
     const { getPool } = require('../services/database');
     const pool = getPool();
     if (!pool) return empty;
 
-    const clauses = ["created_at >= NOW() - ($1 || ' days')::INTERVAL"];
-    if (source === 'paid') {
-      clauses.push("(utm_medium IN ('cpc','ppc','paid','search') OR utm_source IN ('google','bing','meta','facebook'))");
-    } else if (source === 'organic') {
-      clauses.push("utm_source IS NOT NULL AND utm_medium IS DISTINCT FROM 'cpc' AND utm_source NOT IN ('google','bing','meta','facebook')");
-    } else if (source === 'direct') {
-      clauses.push('utm_source IS NULL');
-    }
+    const windowClause = "created_at >= NOW() - ($1 || ' days')::INTERVAL";
+    const sourceClause = trialSourceWhereClause(source);
+    const clauses = sourceClause ? [windowClause, sourceClause] : [windowClause];
 
     const { rows } = await pool.query(
       `SELECT step, COUNT(DISTINCT visit_id)::int AS visits
@@ -563,6 +559,20 @@ async function getTrialStepFunnel(days = 30, source = 'all') {
 
     const byStep = new Map(rows.map((r) => [r.step, r.visits]));
     const first = byStep.get(TRIAL_FUNNEL_STEPS[0]) || 0;
+
+    // Visits in the window regardless of source, so the admin card can tell
+    // "no visits at all" from "no visits from THIS source" — with a filter
+    // active, an empty table used to read as if nothing had been recorded.
+    let allSourcesVisits = first;
+    if (sourceClause) {
+      const all = await pool.query(
+        `SELECT COUNT(DISTINCT visit_id)::int AS visits
+           FROM trial_events
+          WHERE ${windowClause} AND step = $2`,
+        [String(days), TRIAL_FUNNEL_STEPS[0]]
+      );
+      allSourcesVisits = all.rows[0]?.visits || 0;
+    }
 
     let prev = null;
     const steps = TRIAL_FUNNEL_STEPS.map((step) => {
@@ -584,7 +594,7 @@ async function getTrialStepFunnel(days = 30, source = 'all') {
       return entry;
     });
 
-    return { days, source, steps, totalVisits: first };
+    return { days, source, steps, totalVisits: first, allSourcesVisits };
   } catch (err) {
     log.warn(`[TRIAL FUNNEL] Failed to compute step funnel: ${err.message}`);
     return empty;

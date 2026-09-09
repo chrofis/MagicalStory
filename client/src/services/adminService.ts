@@ -59,7 +59,10 @@ export interface TrialStepFunnel {
   days: number;
   source: string;
   steps: TrialStepFunnelEntry[];
+  /** Visits (landing step) matching the active source filter. */
   totalVisits: number;
+  /** Visits in the window regardless of source — separates "nothing recorded" from "nothing from this source". */
+  allSourcesVisits: number;
 }
 
 export interface AdminUser {

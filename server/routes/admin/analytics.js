@@ -13,6 +13,7 @@ const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING } = require('../../config/models');
 const { getTrialStats, getTrialStatsHistory, getTrialFunnel, getTrialStepFunnel } = require('../trial');
+const { TRIAL_SOURCES } = require('../../lib/trialSource');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -797,7 +798,7 @@ router.get('/trial-step-funnel', authenticateToken, requireAdmin, async (req, re
       return res.status(400).json({ error: 'Trial step funnel requires database mode' });
     }
     const days = parseInt(req.query.days) || 30;
-    const source = ['all', 'paid', 'organic', 'direct'].includes(req.query.source) ? req.query.source : 'all';
+    const source = TRIAL_SOURCES.includes(req.query.source) ? req.query.source : 'all';
     const funnel = await getTrialStepFunnel(days, source);
     res.json(funnel);
   } catch (err) {
