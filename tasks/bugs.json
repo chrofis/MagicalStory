@@ -749,6 +749,15 @@
       "status": "fixed",
       "note": "Cover NAME invariant: an entity named in the assembled cover description is either FULLY SENT (definition in KEY STORY ELEMENTS + reference image in the VB grid) or its name is stripped from the description. One matcher (matchVbEntitiesInText, exported from coverIterate.js) feeds both sides; the grid's name-match block is now an always-run union instead of a length===0 fallback. Wired on all three cover prompt paths (first-gen, iterate/repaint, trial) plus the shared buildCoverReferences grid. Budget respected (COVER_ELEMENT_REF_CAP=6 cover grid cells, locations excluded); VB_ELEMENT_BUDGET and VB_SLOT_MAX_ELEMENTS unchanged. Tests: tests/unit/cover-name-invariant.test.ts (14 passing).",
       "fixedIn": "53f7a9b62"
+    },
+    {
+      "id": "replan-pageplan-text-diverges-from-merged-pages",
+      "title": "After a re-plan round, the stored plan TEXT was the raw model response while the plan ARRAY was the guard-merged one, so the two disagreed on every restored page",
+      "reportedAt": "2026-09-09",
+      "source": "Measured on staging story job_1788957347999_ijseol49a. beatsPipeline set `beats = second.parsed.pages` (merged: pages no finding named restored from the standing division) but `pagePlan = second.pagePlan` (the re-plan's raw text, unmerged). Page 2 of 18 diverged: the array said 'close-up - Julian alone' (the standing line, correctly restored) while the stored text said 'medium - Levin and Julian'. The array is what the Art Director and the scene review actually used, so the render was right; the report was wrong, and reading it led to a page being judged against a line that never ran.",
+      "status": "fixed",
+      "fixedAt": "2026-09-09",
+      "fix": "pagePlan is now derived from the merged `beats` array instead of the response text, so the string and the array cannot diverge (server/lib/beatsPipeline.js, in the re-plan round)."
     }
   ]
 }

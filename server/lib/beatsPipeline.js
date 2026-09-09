@@ -870,7 +870,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
           .map(p => p.pageNumber);
         beats = second.parsed.pages;
-        pagePlan = second.pagePlan || pagePlan;
+        // Rebuild the plan TEXT from the merged pages. `second.pagePlan` is the
+        // raw re-plan response, so on any page the merge restored, the string
+        // and the array disagreed — and the string is what every report, every
+        // later reader and the recheck see. Measured 2026-09-09: one page of
+        // eighteen, and it was one of the pages a reviewer then judged against
+        // a line that had never been used. Deriving it from the pages makes the
+        // two representations incapable of diverging.
+        pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
         replannedPages = [...new Set([...replannedPages, ...changedThisRound])].sort((a, b) => a - b);
         gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
           round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
