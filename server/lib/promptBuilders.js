@@ -5221,17 +5221,24 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  * lost its reunion because the Q4 finding against page 17 arrived as one
  * unranked line among twelve, beside counter findings pulling the other way.
  *
- * Q9 (deed and effect on one page) joined them 2026-09-09, as its own check
- * rather than inside Q5. As an "also noted" line the fault was named and
- * ignored twice on the same page: the planner answered it by demoting the
- * effect into the after-segment, then by deleting it outright — never by
- * spending a page. Forcing the WHOLE of Q5 was measured and rejected the same
+ * Q9 (deed and effect on one page) was tried here 2026-09-09 and is NOT in
+ * the set. As an "also noted" line the fault was named and ignored twice on
+ * the same page: the planner answered it by demoting the effect into the
+ * after-segment, then by deleting it outright — never by spending a page.
+ * Forcing the WHOLE of Q5 was measured and rejected the same
  * day: Q5 also covers presence-only and after-state instants, so ranking it
  * must-fix put 12-16 pages under must-fix, churned every page of the division,
  * and cost the book its Q4 wanted pictures and its Q8 ending — the exact loss
- * this set exists to prevent. Q9 names only the deed-and-effect page.
+ * this set exists to prevent. Q9 names only the deed-and-effect page, and
+ * was measured as must-fix and reverted the same day: on one 18-page story
+ * the planner answered a named climax page by deleting it, by demoting it
+ * into the after-segment, and by overwriting it with a verbatim copy of its
+ * neighbour - three configurations, three ways of losing the page where the
+ * quest object was put back. The check detects the fault reliably; this
+ * planner does not repair it, and a mild visible fault is not worth a silent
+ * severe one. Q9 stays a visible finding, not a mandate.
  */
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 9]);
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
 
 /**
  * Counter codes that outrank the rest: a commissioned character the division
@@ -5255,6 +5262,25 @@ function replanRank(finding) {
   return 'also';
 }
 
+/**
+ * The pages a finding names. Counters carry `pages` structurally; a model
+ * finding is a line whose format is fixed by prompts/plan-check.txt ("names the
+ * page"), so the page NUMBER is read off it — never its prose meaning, which is
+ * what this codebase forbids. Used to merge a re-plan that returns only the
+ * named pages back over the division that stands.
+ */
+function findingPages(finding) {
+  if (!finding || typeof finding === 'string') {
+    const out = new Set();
+    for (const m of String(finding || '').matchAll(/pages?\s+([\d\s,and]+)/gi)) {
+      for (const n of m[1].match(/\d+/g) || []) out.add(Number(n));
+    }
+    return [...out];
+  }
+  if (Array.isArray(finding.pages) && finding.pages.length) return finding.pages.map(Number).filter(Number.isFinite);
+  return findingPages(String(finding.line || ''));
+}
+
 function buildReplanSection(pagePlan, findingLines) {
   const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
@@ -5265,8 +5291,8 @@ function buildReplanSection(pagePlan, findingLines) {
   return [
     '# RE-DIVIDE',
     '',
-    'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Output the full plan again.',
-    'When a page is named for holding more than one action, the fix is a second page for the later action. Moving it into "what is true after" is not a fix. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.',
+    'You divided this story once. Your plan and the findings against it follow. Return ONLY the pages a finding names, one line each in the same format, and nothing else — every other page stands exactly as it is and must not be repeated. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Output the full plan again.',
+    'When a page is named for holding more than one action, its instant keeps the first action alone. What follows from it belongs in "what is true after", or on its own page when it earns a picture of its own. Dropping the action is not a fix: every action in the division above is still in the division you return. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
@@ -7147,6 +7173,7 @@ module.exports = {
   parsePlanCheck,
   buildReplanSection,
   replanRank,
+  findingPages,
   buildArcReviewPrompt,
   buildArcAuditPrompt,
   buildChildCriticPrompt,

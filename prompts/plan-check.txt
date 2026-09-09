@@ -31,7 +31,7 @@ Answer only these eight:
 7. Plants and payoffs. Name every object or flaw a page plants and the later page where it pays off, and for every payoff the earlier page that planted it. A plant no later page pays off, and a payoff no earlier page planted, are findings.
 8. The last page. When the story's ending has an event of its own, say whether the last page stages that event as its instant. A last page staging a different moment while the ending's event happened earlier, off the page, or not at all is a finding.
 
-9. Deed and effect. Name every page whose instant shows an action and the result of that action together. A deed, its effect, and where the effect goes are three actions; a page shows one. Watching, standing and being present are not actions.
+9. Deed and effect. Name every page whose instant shows an action and the result of that action together. A deed, its effect, and where the effect goes are three actions; the instant shows one, and what follows it belongs in what is true after. Watching, standing and being present are not actions.
 
 # OUTPUT FORMAT
 

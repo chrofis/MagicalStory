@@ -31008,3 +31008,43 @@ creature design, tone or visual age-appropriateness; this is a new rule.
 - `tests/manual/test-creature-tone.js` — age → band → tone resolution, ages 1/3/4/5/6/7/8 and a
   missing age. Free, no API calls.
 **Status:** ✅ active
+
+## Plan-check Q9 (deed and effect) stays advisory — the planner detects it but destroys the page when forced (2026-09-09)
+**Context:**   A single plan line holding a deed, its effect and the effect's destination
+produced six consecutive renders of water pouring out of a stick. Check 9 was added to
+`prompts/plan-check.txt` to name every page whose instant shows an action together with its
+result, and was then ranked must-fix so the beats re-plan would split it.
+**Decision:**  Check 9 ships, and `REPLAN_MUST_FIX_CHECKS` stays `{4, 8}`. Q9 is a visible
+"also noted" finding that the planner may act on, never a mandate that forces another round.
+**Rationale:** Measured on an 18-page story across four consecutive re-plan configurations.
+The check names the right page every time. The planner's answer to being told that page holds
+two actions was, in turn: demote the effect into "what is true after"; delete the moment
+outright; return a verbatim duplicate of the preceding page. In every case the page where the
+quest object was returned — the book's climax — was gone, and no other check noticed, because
+a division with no climax violates nothing a counter measures. Forcing the whole of Q5 was
+rejected the same day for the neighbouring reason (12-16 must-fix pages, whole-book churn, Q4
+and Q8 pictures lost). The trade is asymmetric: a deed-and-effect page is a mild fault a reader
+sees, a missing climax is a severe fault nobody sees. Detection without forced repair keeps the
+first and avoids the second. The five guards built while testing this all stay — they are
+correct regardless of what is ranked must-fix, and they are what made the corruption legible.
+**Touched:**   `server/lib/promptBuilders.js` (`REPLAN_MUST_FIX_CHECKS` + rationale block),
+`tests/unit/plan-replan-ranking.test.ts`, `prompts/plan-check.txt` (check 9 kept)
+**Status:**    ✅ active
+
+## The beats re-plan may only change the pages a finding named (2026-09-09)
+**Context:**   The re-plan returned the whole division every round, and the planner rewrote
+15-18 of 18 pages each time — including pages nothing was wrong with.
+**Decision:**  Five guards in `beatsPipeline.js`: (1) merge only the pages a finding named,
+restoring every other page from the standing division; (2) bounded rounds
+(`MAX_REPLAN_ROUNDS = 2`); (3) monotonic discard — a round that leaves more must-fix findings
+than the best so far is thrown away and the previous division stands; (4) a duplicate-plan-line
+guard, since two pages with the same instant is corruption, not a fix; (5) `findingPages()`
+reads a finding's structured `.pages`, falling back to page numbers parsed out of its text.
+Each fires a `gl.warn` counter (`beats_replan_unnamed_pages`, `beats_replan_discarded`,
+`beats_replan_duplicate`, `beats_replan_unfixed`) so the behaviour is measurable in a run.
+**Rationale:** A re-plan round should be able to change only what it was asked to change.
+Measured on one story: 11 unasked-for page rewrites restored across two rounds, one regressing
+round discarded (must-fix 6 → 2), zero duplicates shipped.
+**Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js` (`findingPages`,
+`buildReplanSection`), `server/lib/storyHelpers.js` (facade re-export)
+**Status:**    ✅ active

@@ -730,3 +730,28 @@ owns it.
 
 ## 2026-09-08 — "No fallback logged" is not "the model ran"
 Claimed the first staging story ran under the Qwen inventory because no fallback warning appeared. It never ran: the pipeline passed the default quality model as an override, which beat the inventory key. The absence of a failure log says nothing about which model answered. Rule: before claiming model X ran, read a stored per-call signature (token count, modelId, response shape) on the actual rows — and compare it to a Lab run of X where the model is known.
+
+## 2026-09-08 — A rule drafted from one failure comes out as that failure's jargon
+
+Sent the owner a beats rule for the "stick levers water into the trough" page
+written in the vocabulary of that page: tool, target, receiver, strike, release.
+He rejected it: not generic, and unreadable English. The generic rule already
+existed ("one moment — no before-and-after"); the gap was only that the action
+count let cause + effect pass as one. The fix was one plain line: a deed is one
+action, its effect another, where the effect goes a third; extra ones move to
+the next page.
+
+Rule: before sending any prompt rule, rewrite it with zero words from the
+motivating page, then read it against two unrelated pages (a door pushed open
+onto a room; a chip pressed to a scale while someone refuses). If it only
+makes sense for the page that broke, it is not a rule yet. Short sentences,
+no em-dash chains.
+
+## A prompt check that detects reliably is not a prompt check that repairs (2026-09-09)
+
+Adding a check to a critique prompt proves the model can SEE a fault. It proves nothing about
+whether the model can FIX it. Fourteen paid attempts went into forcing a planner to split a page
+it correctly identified as holding two actions; every attempt it answered by destroying the page
+instead. Before promoting a new check to must-fix, ask what the model does when it is told to
+repair that fault, and what the worst repair looks like next to the original fault. If the worst
+repair is silent and the fault is visible, leave the check advisory.

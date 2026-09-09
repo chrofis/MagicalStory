@@ -79,6 +79,7 @@ const {
   parsePlanCheck,
   buildReplanSection,
   replanRank,
+  findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
   parsePlanResponse,
@@ -791,6 +792,17 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // cheapest call in the stage and a third round has never been needed.
       const MAX_REPLAN_ROUNDS = 2;
       let pendingCheck = check1;
+      // A round must EARN its keep. Measured 2026-09-09 on
+      // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear
+      // three must-fix findings and minted five new ones (findings 26 -> 13 ->
+      // 23). The planner re-emits the whole division each round, so a round
+      // that does not reduce the must-fix count is not converging — it is
+      // rolling the dice on every page at once. Such a round is DISCARDED and
+      // the previous division stands, which makes the loop monotonic.
+      const mustFixCount = c => (c.findings || []).filter(f => replanRank(f) === 'must').length;
+      let bestBeats = beats;
+      let bestPagePlan = pagePlan;
+      let bestMustFix = mustFixCount(check1);
       for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
         await checkCancellation();
         await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
@@ -803,6 +815,51 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
         const second = readPlan(rpRes.text);
         if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
+        // MERGE, don't replace. The re-plan is asked for ONLY the pages a
+        // finding names; every other page stands. Until 2026-09-09 it returned
+        // the whole division, and the planner rewrote 15-18 of 18 pages every
+        // round — which is how a story lost the page where its quest object was
+        // put back (job_1788903616404_iqvhj4l8m: check 9 named the page, the
+        // re-plan answered by deleting the moment, and no check noticed it had
+        // gone). Pages no finding named are restored from the division that
+        // stands, so a round can only change what it was asked to change.
+        const namedPages = new Set();
+        for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
+        if (namedPages.size > 0) {
+          const standing = new Map(beats.map(b => [b.pageNumber, b]));
+          const kept = [];
+          for (const pg of second.parsed.pages) {
+            if (namedPages.has(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
+            else kept.push(standing.get(pg.pageNumber));
+          }
+          for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
+          kept.sort((a, b) => a.pageNumber - b.pageNumber);
+          const overridden = second.parsed.pages.filter(pg => !namedPages.has(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+          if (overridden > 0) {
+            log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named - restored from the standing division`);
+            gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) no finding named; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b) });
+          }
+          second.parsed.pages = kept;
+          second.parsed.missing = [];
+        }
+        // A re-plan that answers "this page holds two actions" by copying a
+        // neighbouring page has destroyed the page, not fixed it. Measured
+        // 2026-09-09 on job_1788903616404_iqvhj4l8m: the page staging the
+        // quest object's return came back as a verbatim duplicate of the page
+        // before it, and the story lost its climax with no check firing.
+        // Two pages with the same instant is corruption, so the round is
+        // discarded and the division that stands is kept.
+        {
+          const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
+          const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
+          if (dupe) {
+            log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
+            gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
+            beats = bestBeats;
+            pagePlan = bestPagePlan;
+            break;
+          }
+        }
         if (second.parsed.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
           gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
@@ -820,6 +877,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         });
         check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
         const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
+        if (stillMustFix.length >= bestMustFix && round > 1) {
+          log.warn(`⚠️ [BEATS] Round ${round} did not reduce must-fix (${bestMustFix} → ${stillMustFix.length}) — discarding it, the previous division stands`);
+          gl.warn('beats_replan_discarded', `Round ${round} did not reduce must-fix findings (${bestMustFix} → ${stillMustFix.length}) — the round was discarded and the previous division stands`, null, {
+            round, before: bestMustFix, after: stillMustFix.length,
+          });
+          beats = bestBeats;
+          pagePlan = bestPagePlan;
+          break;
+        }
+        bestBeats = beats;
+        bestPagePlan = pagePlan;
+        bestMustFix = stillMustFix.length;
         if (stillMustFix.length === 0) break;
         if (round === MAX_REPLAN_ROUNDS) {
           // Ships with the fault named. A division is never withheld from a

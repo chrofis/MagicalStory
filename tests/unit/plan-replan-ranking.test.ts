@@ -59,8 +59,9 @@ describe('re-plan ranking', () => {
     // Q5 stays advisory: it bundles presence-only and after-state instants, and
     // ranking all of it must-fix churned every page and cost the Q4/Q8 pictures.
     expect(replanRank({ kind: 'check', check: 5 })).toBe('also');
-    // Q9 is the deed-and-effect page alone, and is must-fix.
-    expect(replanRank({ kind: 'check', check: 9 })).toBe('must');
+    // Q9 detects the deed-and-effect page reliably, but the planner answers a
+    // named climax page by destroying it rather than splitting it, so advisory.
+    expect(replanRank({ kind: 'check', check: 9 })).toBe('also');
     expect(replanRank({ kind: 'counter', code: 'NO_FOCAL_PAGE' })).toBe('must');
     expect(replanRank({ kind: 'counter', code: 'SHOT_VARIETY' })).toBe('also');
     expect(replanRank('a legacy string')).toBe('also');
