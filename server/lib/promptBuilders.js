@@ -2228,6 +2228,14 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(sc)) continue;
         const description = sc.extractedDescription || sc.description;
         recurringElements += `* **${sc.name}** [${sc.id}] (secondary character): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(sc);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          }
+        }
       }
     }
     if (visualBible.locations && visualBible.locations.length > 0) {
@@ -2248,6 +2256,14 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(animal)) continue;
         const description = animal.extractedDescription || animal.description;
         recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(animal);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          }
+        }
       }
     }
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
@@ -2672,6 +2688,14 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const sc of visualBible.secondaryCharacters) {
         const description = sc.extractedDescription || sc.description;
         recurringElements += `* **${sc.name}** [${sc.id}] (secondary character): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(sc);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          }
+        }
       }
     }
     // Add ALL locations - with photo variants for real landmarks
@@ -2692,6 +2716,14 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const animal of visualBible.animals) {
         const description = animal.extractedDescription || animal.description;
         recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(animal);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          }
+        }
       }
     }
     // Add ALL artifacts

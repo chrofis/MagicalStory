@@ -59,7 +59,7 @@ Scan the page plan and list every element that must stay consistent across illus
 - Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`); the wearer's clothing requirement describes the same item in that slot, in the same words.
-- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta with its own `pages`, because each state is drawn as its own reference cell. Two entries for one object give it two canonical descriptions and two reference renders that disagree on how it is built.
+- A change to an object, an animal or an invented figure is a state, not a second entry. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled; a wing broken then whole; a coat lost then found. Almost every entry has no states at all: the field exists for the rare thing the story itself changes, and an entry without one is the normal case. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta with its own `pages`, because each state is drawn as its own reference cell. Two entries for one object give it two canonical descriptions and two reference renders that disagree on how it is built.
 - The bible shows the OBJECT and nothing else. The test for a state: take away everything that is not the object — the hands, the hole, the wing, the shelf — and if what is left looks the same, it is not a state. Held, set down, carried, pressed against something, standing in front of something: always the same object, no state. A state is only when the thing itself changes — a flower wilts, a bottle breaks, a canvas gets painted, a lantern is lit, a jar is filled. A state's cell draws the object alone; a state defined by contact with another element cannot be drawn without that element and drags it into the cell.
 - A `delta` describes the object's own altered look and nothing else: no place, no figure, no body part, no other element.
 - A state describes the object's OWN look — never what arrives at it from elsewhere on that page (water jetting in, a shadow falling on it, a thing thrown toward it). The arrival is the action's result and belongs to the acting page's character stage.
@@ -147,7 +147,8 @@ Only the three blocks below. No preamble, no commentary.
       "hair": "[colour, style, length]",
       "face": "[eye colour, distinctive features; for adults state facial hair]",
       "signatureLook": "[one memorable visual element]",
-      "clothing": "[specific colours and details]"
+      "clothing": "[specific colours and details]",
+      "states": "[OMIT unless the story changes this one's own look — a wing broken then whole, a coat lost then found. Almost never present. When present, the COMPLETE set of looks, the unaltered look FIRST, at most 4: {\"name\": \"[one or two words]\", \"delta\": \"[the change to it, one clause, at most 15 words — never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
     }
   ],
   "animals": [
@@ -158,7 +159,8 @@ Only the three blocks below. No preamble, no commentary.
       "species": "[type and breed]",
       "coloring": "[exact colours and full pattern]",
       "size": "[relative size]",
-      "features": "[collar, markings, accessories]"
+      "features": "[collar, markings, accessories]",
+      "states": "[OMIT unless the story changes this one's own look — a wing broken then whole, a coat lost then found. Almost never present. When present, the COMPLETE set of looks, the unaltered look FIRST, at most 4: {\"name\": \"[one or two words]\", \"delta\": \"[the change to it, one clause, at most 15 words — never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
     }
   ],
   "artifacts": [
