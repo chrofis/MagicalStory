@@ -23,7 +23,12 @@
  * pipeline's single resolver (server/lib/season.js) derives it from this job's
  * own creation date. `--season=` overrides that, for tests that need a fixed one.
  *
- *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--yes]
+ * The source job is looked up in PRODUCTION by default. A story that was born
+ * on staging (a rerun of a rerun, a Lab-launched run) never existed in prod, so
+ * `--source=staging` reads its inputs from the staging database instead. The
+ * characters are read from staging either way.
+ *
+ *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--source=prod|staging] [--yes]
  */
 'use strict';
 
@@ -40,7 +45,10 @@ const pagesOverride = args.find((a) => a.startsWith('--pages='));
 const seasonFlag = args.find((a) => a.startsWith('--season='));
 const BASE = 'https://staging.magicalstory.ch';
 
-const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--yes]';
+const sourceFlag = args.find((a) => a.startsWith('--source='));
+const SOURCE = sourceFlag ? sourceFlag.split('=')[1] : 'prod';
+const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--source=prod|staging] [--yes]';
+if (!['prod', 'staging'].includes(SOURCE)) { console.error(`--source="${SOURCE}" is not a database. Use prod or staging.`); process.exit(1); }
 if (!storyId || args.includes('--help') || args.includes('-h')) { console.error(USAGE); process.exit(storyId ? 0 : 1); }
 
 let seasonOverride = null;
@@ -89,9 +97,10 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   const prod = new Pool({ connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   const stg = new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-  // 1) Original inputs, straight from the production job.
-  const j = await prod.query('SELECT input_data, user_id FROM story_jobs WHERE id = $1', [storyId]);
-  if (!j.rows.length) { console.error(`No story_jobs row for ${storyId} — inputs are not replayable.`); process.exit(1); }
+  // 1) Original inputs, straight from the source job.
+  const from = SOURCE === 'staging' ? stg : prod;
+  const j = await from.query('SELECT input_data, user_id FROM story_jobs WHERE id = $1', [storyId]);
+  if (!j.rows.length) { console.error(`No story_jobs row for ${storyId} in ${SOURCE} — inputs are not replayable.`); process.exit(1); }
   const src = typeof j.rows[0].input_data === 'string' ? JSON.parse(j.rows[0].input_data) : j.rows[0].input_data;
   const prodUser = j.rows[0].user_id;
 
@@ -130,7 +139,7 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   const season = seasonOverride || resolveSeason({}, { now: new Date() });
 
   const withAvatars = characters.filter((c) => c.avatars?.standardUrl || c.avatars?.summerUrl || c.avatars?.winterUrl).length;
-  console.log(`Story    : ${storyId}`);
+  console.log(`Story    : ${storyId} (inputs from ${SOURCE})`);
   console.log(`Inputs   : ${inputs.pages}p, ${inputs.language}, ${inputs.artStyle}, ${inputs.storyCategory}/${inputs.storyType}`);
   console.log(`Characters: ${characters.map((c) => c.name).join(', ')} (${withAvatars}/${characters.length} carry avatar sheets)`);
   console.log(`Season   : ${season}${seasonOverride ? ' (--season override)' : " (derived from today's date by the pipeline)"}`);
