@@ -755,3 +755,12 @@ it correctly identified as holding two actions; every attempt it answered by des
 instead. Before promoting a new check to must-fix, ask what the model does when it is told to
 repair that fault, and what the worst repair looks like next to the original fault. If the worst
 repair is silent and the fault is visible, leave the check advisory.
+
+## A heredoc ends the && chain (2026-09-09)
+
+A `cat >> file <<EOF` inside an `a && b && c` chain terminates the chain at the heredoc: every
+command on the lines after the closing EOF runs UNCONDITIONALLY. That is how a commit and a push
+to staging ran after step one of the chain had already failed — the tree happened to be green,
+verified afterwards, but the gate did not run before the push. Rule: a heredoc is always the
+ONLY command in its Bash call. Write the file first, on its own; run the guarded chain second,
+with `-m` flags and no heredocs in it.
