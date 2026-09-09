@@ -558,6 +558,24 @@ endpoints).
 fantasy keeps the season and leaks no city, location keeps both, no placeholder
 left unsubstituted. Not yet confirmed with a live idea generation.
 
+**Follow-up (same day): /try gets a season too, and all four paths share one
+builder.** The trial asks the visitor nothing about the season, so its idea and
+its story text carried none at all — while its IMAGES already rendered one,
+because `buildSeasonNote` runs through `resolveSeason`, which defaults to the
+story's own date. Pictures in autumn, words in whatever the model chose. Both
+trial templates now take a `{SEASON}` placeholder, filled from the same
+date-derived default the images use (`buildSeasonInstruction({})`), so prose and
+pictures agree by construction. The instruction wording moved into
+`server/lib/season.js` as `buildSeasonInstruction` — the text-side sibling of
+`buildSeasonNote` — and the two duplicated `seasonLabels` maps in
+`storyIdeas.js` were deleted in favour of it, so an absent wizard season now
+resolves to the date instead of dropping the line, as season.js documents.
+Historical stories still get no season line on any path. Touched additionally:
+`prompts/trial-idea.txt`, `prompts/story-trial.txt`, `server/lib/season.js`,
+`server/lib/promptBuilders.js` (`buildTrialStoryPrompt`), `server/routes/trial.js`.
+Verified by rendering all four: trial idea ✅, trial story ✅, wizard fantasy ✅
+(no city leak), wizard local ✅.
+
 ---
 
 ## The trial idea prompt names the town and forbids invented places (2026-09-09)

@@ -5,6 +5,8 @@ Character: {CHARACTER}. {CATEGORY_CONTEXT}
 
 {LANDMARKS}
 
+{SEASON}
+
 {AGE_MODE}
 
 Center the idea on the main character. Keep the cast minimal — add another person only when the story needs one.{COSTUME_RULE}

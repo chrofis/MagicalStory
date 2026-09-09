@@ -2103,7 +2103,16 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
     if (!ideaCostume) log.debug(`  [COSTUME] none configured for ${storyCategory}/${storyTheme || storyTopic} — ideas stay costume-free`);
 
+    // /try asks the visitor nothing about the season, so it resolves from the
+    // date — the same default resolveSeason() already gives the trial's IMAGES
+    // (buildSeasonNote), which is what the premise has to agree with. Without
+    // this the pictures were autumn and the words were whatever the model felt
+    // like.
+    const { buildSeasonInstruction } = require('../lib/season');
+    const seasonInstruction = storyCategory === 'historical' ? '' : buildSeasonInstruction({});
+
     const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
+      SEASON: seasonInstruction,
       CHARACTER: charDesc,
       CATEGORY_CONTEXT: categoryContext,
       TITLE: trialTitle || '',

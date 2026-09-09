@@ -92,7 +92,22 @@ function buildSeasonNote(inputData = {}, opts = {}) {
   return `**SEASON:** ${label}. Foliage, ground cover, sky and daylight colour are ${label.toLowerCase()}'s throughout the book — identical from page to page for the same place, and matching ${label.toLowerCase()} even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.`;
 }
 
+/**
+ * The TEXT-side instruction: what the writer of the premise/story is told.
+ * `buildSeasonNote` is its image-side sibling. Kept here so the trial idea, the
+ * trial story and the wizard's two idea endpoints cannot drift apart, and so
+ * the season is never welded into another prompt block again (a fantasy idea
+ * blanks the location block, which used to blank the season with it —
+ * decisions.md 2026-09-09).
+ */
+function buildSeasonInstruction(inputData = {}, opts = {}) {
+  const label = seasonLabel(inputData, opts);
+  if (!label) return '';
+  return `**SEASON**: The story takes place in ${label}. Include seasonal details like weather, activities, and atmosphere typical for this season — in an invented world too.`;
+}
+
 module.exports = {
+  buildSeasonInstruction,
   SEASONS,
   SEASON_LABELS,
   seasonForDate,

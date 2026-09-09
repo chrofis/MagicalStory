@@ -22,7 +22,7 @@ const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
-const { seasonLabel, buildSeasonNote } = require('./season');
+const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { highActionPagesPhrase } = require('./planCounters');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
@@ -7020,6 +7020,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       COVER_CLOTHING_NOTE: coverClothingNote,
       COVER_CLOTHING: coverClothing,
       LANDMARKS: landmarksInstruction,
+      // Same resolver the trial's images use, so prose and pictures agree.
+      SEASON: buildSeasonInstruction(inputData),
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
     });
   }

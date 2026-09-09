@@ -32,6 +32,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 {LANDMARKS}
 
+{SEASON}
+
 # Scene Hint Format
 
 Each scene hint is a JSON block for direct image generation (no further expansion).

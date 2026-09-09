@@ -42,6 +42,8 @@ const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
  * @param {string} [params.availableLandmarksSection] - pre-built landmarks section (empty for trial)
  * @returns {Promise<Object>} { promptReplacements, storyRequirements1, storyRequirements2, singlePromptTemplate }
  */
+const { buildSeasonInstruction } = require('../lib/season');
+
 async function buildIdeasPromptContext({
   storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
   language, languageLevel = 'standard', characters, relationships,
@@ -424,8 +426,6 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
 
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
     const effectiveCategory_loc = storyCategory || 'adventure';
-    const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
-    const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
     const locationForPrompt = effectiveLocation || userLocation;
@@ -437,9 +437,12 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     // The season holds for BOTH ideas, the made-up world included — it is what
     // the reader picked. Keeping it out of the location block is what lets it
     // survive the fantasy blanking below.
-    const seasonInstruction = (seasonLabel && effectiveCategory_loc !== 'historical')
-      ? `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season — in an invented world too.`
-      : '';
+    // One builder for every path (trial idea, trial story, both idea endpoints),
+    // so the wording cannot drift and an absent season resolves to the date the
+    // way season.js documents rather than dropping the line.
+    const seasonInstruction = effectiveCategory_loc === 'historical'
+      ? ''
+      : buildSeasonInstruction({ season });
 
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
@@ -596,8 +599,6 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
 
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
     const effectiveCategory_loc = storyCategory || 'adventure';
-    const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
-    const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
     const locationForPrompt = effectiveLocation || userLocation;
@@ -609,9 +610,12 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // The season holds for BOTH ideas, the made-up world included — it is what
     // the reader picked. Keeping it out of the location block is what lets it
     // survive the fantasy blanking below.
-    const seasonInstruction = (seasonLabel && effectiveCategory_loc !== 'historical')
-      ? `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season — in an invented world too.`
-      : '';
+    // One builder for every path (trial idea, trial story, both idea endpoints),
+    // so the wording cannot drift and an absent season resolves to the date the
+    // way season.js documents rather than dropping the line.
+    const seasonInstruction = effectiveCategory_loc === 'historical'
+      ? ''
+      : buildSeasonInstruction({ season });
 
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
