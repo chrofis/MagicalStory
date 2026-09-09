@@ -777,31 +777,59 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let replannedPages = [];
   if (check1.lines.length > 0) {
     try {
-      await checkCancellation();
-      await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
-      const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
-        finalArc: approvedArc,
-        arcHints,
-        replan: buildReplanSection(pagePlan, check1.findings),
-      });
-      if (!replanPrompt) throw new Error('story-beats template unavailable');
-      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
-      const second = readPlan(rpRes.text);
-      if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
-      if (second.parsed.missing.length > 0) {
-        log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — first division kept`);
-        gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — first division kept`);
-      } else {
-        const before = new Map(plan.pages.map(p => [p.pageNumber, p.planLine || '']));
-        replannedPages = second.parsed.pages
+      // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
+      // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
+      // recheck and never fixed. Measured on the dragon story: the first
+      // division buried the spring's release inside a four-action page; the
+      // re-plan correctly split it out and left the new page holding the deed
+      // AND its effect ("rams the branch into the crack, water shoots out").
+      // The recheck said so in those words and the story shipped that way.
+      // A second round runs only when a MUST-FIX finding survives — the
+      // ranking `replanRank` already computes, so an "also noted" line can
+      // never spend a round. Bounded at two re-plans; the plan model is the
+      // cheapest call in the stage and a third round has never been needed.
+      const MAX_REPLAN_ROUNDS = 2;
+      let pendingCheck = check1;
+      for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
+        await checkCancellation();
+        await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+        const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
+          finalArc: approvedArc,
+          arcHints,
+          replan: buildReplanSection(pagePlan, pendingCheck.findings),
+        });
+        if (!replanPrompt) throw new Error('story-beats template unavailable');
+        const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
+        const second = readPlan(rpRes.text);
+        if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
+        if (second.parsed.missing.length > 0) {
+          log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+          gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+          break;
+        }
+        const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
+        const changedThisRound = second.parsed.pages
           .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
           .map(p => p.pageNumber);
         beats = second.parsed.pages;
         pagePlan = second.pagePlan || pagePlan;
-        gl.info('beats_replan', `Planner re-divided ${replannedPages.length} page(s) for ${check1.lines.length} finding(s)`, null, {
-          replannedPages, findings: check1.lines.length,
+        replannedPages = [...new Set([...replannedPages, ...changedThisRound])].sort((a, b) => a - b);
+        gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
+          round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
         });
-        check2 = await runCheck('plan_recheck', beats, pagePlan);
+        check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+        const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
+        if (stillMustFix.length === 0) break;
+        if (round === MAX_REPLAN_ROUNDS) {
+          // Ships with the fault named. A division is never withheld from a
+          // paid run over a plan finding (gates are guidelines).
+          log.warn(`⚠️ [BEATS] ${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} re-plan round(s) — the division ships as it stands`);
+          gl.warn('beats_replan_unfixed', `${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} round(s): ${stillMustFix.map(f => f.line).join(' | ')}`, null, {
+            rounds: MAX_REPLAN_ROUNDS, unfixed: stillMustFix.map(f => f.line),
+          });
+          break;
+        }
+        pendingCheck = check2;
       }
     } catch (err) {
       // Never block a story on the check: the first division is a complete plan.

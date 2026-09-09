@@ -5179,8 +5179,18 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  * the two things a book is remembered for. Story job_1788614817116_vxnu60yjg
  * lost its reunion because the Q4 finding against page 17 arrived as one
  * unranked line among twelve, beside counter findings pulling the other way.
+ *
+ * Q9 (deed and effect on one page) joined them 2026-09-09, as its own check
+ * rather than inside Q5. As an "also noted" line the fault was named and
+ * ignored twice on the same page: the planner answered it by demoting the
+ * effect into the after-segment, then by deleting it outright — never by
+ * spending a page. Forcing the WHOLE of Q5 was measured and rejected the same
+ * day: Q5 also covers presence-only and after-state instants, so ranking it
+ * must-fix put 12-16 pages under must-fix, churned every page of the division,
+ * and cost the book its Q4 wanted pictures and its Q8 ending — the exact loss
+ * this set exists to prevent. Q9 names only the deed-and-effect page.
  */
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 9]);
 
 /**
  * Counter codes that outrank the rest: a commissioned character the division
