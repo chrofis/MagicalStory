@@ -627,6 +627,62 @@ Bremgarten 2, Baden 1, Zuerich 1, nonsense `verified:false`.
 
 ---
 
+## A visitor with no ?lang= is redirected to their browser language (2026-09-09)
+**Context:** `server.js` picked the pre-rendered file with
+`SUPPORTED_LANGS.has(req.query.lang) ? req.query.lang : 'de'` — `Accept-Language`
+was read nowhere in the codebase. The client DOES detect the browser language
+(`detectBrowserLanguage()` walking `navigator.languages`), but on a pre-rendered
+route `initialLanguage` overrides it by design so SSR HTML and hydration agree.
+Net effect: browser detection was dead on exactly the pages that receive organic
+traffic. An Italian or French speaker arriving at the homepage from a search
+result or an ad got German unless the link carried `?lang=`. Verified against
+production: `GET /` with `Accept-Language: fr-CH,fr;q=0.9` returned the German
+page. Owner: "If a user does an italian google search he must land on an italian
+webpage."
+**Decision:** When a request carries no `?lang=`, the best supported match from
+`Accept-Language` is resolved (q-values honoured, primary subtag only, same rule
+as the client) and, if it is not German AND a pre-rendered file exists for it,
+the request is 302-redirected to the same URL with `?lang=xx`. The redirect
+carries `Cache-Control: no-store` and `Vary: Accept-Language`. An explicit
+`?lang=` always wins, so the redirect cannot loop. App routes are unaffected —
+the redirect is gated on a pre-rendered file existing for that path.
+**Rationale:** Redirecting keeps ONE URL PER LANGUAGE, so hreflang, the
+self-referencing canonicals and the 24h `s-maxage` CDN cache on the HTML all
+stay valid. Serving a different language on the same URL was rejected:
+Cloudflare does not vary cached HTML on `Accept-Language`, so the first
+visitor's language would be pinned for everyone, and avoiding that means
+dropping CDN caching on all HTML. Client-side switching after hydration was
+rejected too — it flashes German first and leaves the HTML that Google and link
+previews see unchanged. Googlebot sends no `Accept-Language` (or `en`), so it
+still crawls the German x-default and reaches every alternate through hreflang.
+**Touched:** `server.js` (`preferredLangFromHeader`, the SPA fallback handler).
+**Status:** ✅ active — parser unit-tested against 11 header shapes (q-value
+ordering, unsupported primaries, `*`, empty, absent, `q=0`). Live behaviour not
+yet confirmed on staging.
+
+---
+
+## The <html lang> attribute carries the Swiss regional variant (2026-09-09)
+**Context:** `og:locale` already emitted `de_CH` and `buildHreflang()` already
+listed `de-CH` / `fr-CH` / `it-CH`, while the served HTML said `lang="de"` — the
+one inconsistent language signal left. Owner's rule: use the regional variant
+wherever the field can express one, leave the plain code where it cannot.
+**Decision:** One `HTML_LANG` map (`de: 'de-CH'`, `fr: 'fr-CH'`, `it: 'it-CH'`,
+`en: 'en'`) drives the attribute. English keeps the plain tag because no `en-XX`
+variant is declared anywhere in the hreflang table. The `?lang=` query codes and
+the internal `Language` union stay two-letter — they are our own enum, not a
+BCP-47 field.
+**Rationale:** Three sites had to change together or each would have reverted
+the others: `injectMeta` for pre-rendered pages, `client/index.html` for the raw
+SPA shell that app routes are served verbatim, and `LanguageContext`'s
+`document.documentElement.lang` assignment, which overwrote the server's value
+on hydration.
+**Touched:** `server/lib/seoMeta.js` (`HTML_LANG`, `injectMeta`),
+`client/index.html`, `client/src/context/LanguageContext.tsx`.
+**Status:** ✅ active.
+
+---
+
 ## Email
 
 ### Cover hero in transactional emails — R2 URLs only, never base64
