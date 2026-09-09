@@ -224,9 +224,9 @@ const STATIC_ROUTES = {
       it: 'Magical Story – Il tuo bambino protagonista della sua storia',
     },
     description: {
-      en: 'Make your child the hero of their own story. Upload a photo, pick a theme, create your first story free.',
-      de: 'Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
-      fr: 'Faites de votre enfant le héros de sa propre histoire. Téléchargez une photo, choisissez un thème, créez votre première histoire gratuitement.',
+      en: 'A personalized children\'s book where your child is the hero. Upload a photo, pick a theme, create your first story free.',
+      de: 'Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
+      fr: 'Un livre pour enfant personnalisé où votre enfant est le héros. Téléchargez une photo, choisissez un thème, créez votre première histoire gratuitement.',
       it: 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.',
     },
   },
@@ -1422,10 +1422,10 @@ function getMetaForRoute(routePath, lang) {
     description: lang === 'it'
       ? 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.'
       : lang === 'fr'
-        ? 'Faites de votre enfant le héros de sa propre histoire. Chargez une photo, choisissez un thème, créez la première histoire gratuitement.'
+        ? 'Un livre pour enfant personnalisé où votre enfant est le héros. Téléchargez une photo, choisissez un thème, créez votre première histoire gratuitement.'
         : lang === 'en'
-          ? 'Make your child the hero of their own story. Upload a photo, pick a theme, create your first story free.'
-          : 'Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
+          ? "A personalized children's book where your child is the hero. Upload a photo, pick a theme, create your first story free."
+          : 'Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
     canonical: canonicalUrl,
     path: cleanPath,
     noindex: false,

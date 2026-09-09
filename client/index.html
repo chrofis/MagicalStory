@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="de">
   <head>
+    <!-- charset + viewport first: the HTML spec wants the charset declaration
+         inside the first 1024 bytes; behind the gtag comment + snippet it sat
+         past that boundary (Lighthouse "charset declared late"). -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
     <!-- Google tag (gtag.js) with Consent Mode v2.
          Defaults GRANTED (decision 2026-06-12): ads target Switzerland only
          (not EEA/UK, where Google's EU User Consent Policy would require a
@@ -22,7 +28,6 @@
       gtag('config', 'AW-17995593741');
     </script>
 
-    <meta charset="UTF-8" />
     <!-- Icon split by size: 16/32 (+ico) = sparkles — a book is unreadable at
          tab size. 48+ = the book — Google Search fetches >=48px for results. -->
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
@@ -32,12 +37,11 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1f2937" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="description" content="Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen." />
+    <meta name="description" content="Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen." />
     <title>Magical Story – Dein Kind als Held seiner eigenen Geschichte</title>
 
     <!-- Canonical URL -->
@@ -47,7 +51,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://magicalstory.ch/" />
     <meta property="og:title" content="Magical Story – Dein Kind als Held seiner eigenen Geschichte" />
-    <meta property="og:description" content="Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen." />
+    <meta property="og:description" content="Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen." />
     <meta property="og:image" content="https://magicalstory.ch/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -60,7 +64,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://magicalstory.ch/" />
     <meta name="twitter:title" content="Magical Story – Dein Kind als Held seiner eigenen Geschichte" />
-    <meta name="twitter:description" content="Mach dein Kind zum Helden seiner eigenen Geschichte. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen." />
+    <meta name="twitter:description" content="Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen." />
     <meta name="twitter:image" content="https://magicalstory.ch/og-image.png" />
 
     <!-- Additional SEO -->
