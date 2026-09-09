@@ -237,17 +237,17 @@ export const giftPages: GiftPageData[] = [
     name: { en: 'For Godchild', de: 'Für Patenkind', fr: 'Pour filleul(e)' },
     title: {
       en: 'A Magical Gift for Your Godchild',
-      de: 'Geschenk für Patenkind — magisch und persönlich',
+      de: 'Geschenk für Patenkind & Göttikind — magisch und persönlich',
       fr: 'Un cadeau magique pour votre filleul(e)',
     },
     description: {
       en: 'As a godparent, your gift should reflect the special bond you share. A personalized storybook is a meaningful, lasting gift that shows your godchild how much they mean to you.',
-      de: 'Als Gotte oder Götti soll dein Geschenk die besondere Verbindung widerspiegeln. Ein personalisiertes Geschichtenbuch ist ein bedeutungsvolles, bleibendes Geschenk, das deinem Patenkind zeigt, wie viel es dir bedeutet.',
+      de: 'Als Gotte oder Götti soll dein Geschenk die besondere Verbindung widerspiegeln. Ein personalisiertes Geschichtenbuch ist ein bedeutungsvolles, bleibendes Geschenk, das deinem Göttikind zeigt, wie viel es dir bedeutet.',
       fr: 'En tant que parrain ou marraine, votre cadeau devrait refléter le lien spécial qui vous unit. Un livre personnalisé est un cadeau significatif et durable qui montre à votre filleul(e) combien il/elle compte pour vous.',
     },
     intro: {
       en: 'Being a godparent is a lifelong commitment — and finding the right gift for your godchild can be a challenge. You want something meaningful, not just another plastic toy that ends up in a drawer. A personalized storybook from MagicalStory captures the unique bond between godparent and godchild. Your godchild becomes the hero of an adventure created just for them, with their own face on every page. It\'s a gift they\'ll keep on their bookshelf for years, always remembering the person who gave it to them.',
-      de: 'Gotte oder Götti zu sein ist eine lebenslange Verbindung — und das richtige Geschenk für dein Patenkind zu finden, kann eine Herausforderung sein. Du willst etwas Bedeutungsvolles, nicht einfach noch ein Plastikspielzeug, das in der Schublade landet. Ein personalisiertes Geschichtenbuch von MagicalStory fängt die besondere Verbindung zwischen Gotte/Götti und Patenkind ein. Dein Patenkind wird zum Helden eines Abenteuers, das nur für es geschaffen wurde, mit dem eigenen Gesicht auf jeder Seite. Es ist ein Geschenk, das jahrelang im Bücherregal steht — und immer an die Person erinnert, die es geschenkt hat.',
+      de: 'Gotte oder Götti zu sein ist eine lebenslange Verbindung — und das richtige Geschenk für dein Göttikind zu finden, kann eine Herausforderung sein. Du willst etwas Bedeutungsvolles, nicht einfach noch ein Plastikspielzeug, das in der Schublade landet. Ein personalisiertes Geschichtenbuch von MagicalStory fängt die besondere Verbindung zwischen Gotte/Götti und Patenkind ein. Dein Göttibub oder dein Göttimeitli wird zum Helden eines Abenteuers, das nur für ihn oder sie geschaffen wurde, mit dem eigenen Gesicht auf jeder Seite. Es ist ein Geschenk, das jahrelang im Bücherregal steht — und immer an die Person erinnert, die es geschenkt hat.',
       fr: 'Être parrain ou marraine est un engagement à vie — et trouver le bon cadeau peut être un défi. Un livre personnalisé de MagicalStory capture le lien unique entre parrain/marraine et filleul(e). Votre filleul(e) devient le héros d\'une aventure créée juste pour lui/elle, avec son propre visage sur chaque page. C\'est un cadeau qui restera sur l\'étagère pendant des années.',
     },
     tips: {
@@ -284,15 +284,15 @@ export const giftPages: GiftPageData[] = [
     },
     faq: [
       {
-        q: { en: 'What do godparents give as a gift?', de: 'Was schenkt man als Gotte oder Götti?', fr: 'Que donnent les parrains et marraines comme cadeau ?' },
-        a: { en: 'A personalized storybook is a modern take on the traditional meaningful godparent gift. It\'s personal, creative, and something the child will treasure — much like a classic christening gift but with a magical twist.', de: 'Ein personalisiertes Geschichtenbuch ist die moderne Variante des traditionellen, bedeutungsvollen Patengeschenks. Persönlich, kreativ und etwas, das das Kind schätzen wird — wie ein klassisches Taufgeschenk, aber mit einer magischen Note.', fr: 'Un livre personnalisé est une version moderne du traditionnel cadeau significatif de parrain/marraine. Personnel, créatif et quelque chose que l\'enfant chérira.' },
+        q: { en: 'What do godparents give as a gift?', de: 'Was schenkt man als Gotte oder Götti dem Göttikind?', fr: 'Que donnent les parrains et marraines comme cadeau ?' },
+        a: { en: 'A personalized storybook is a modern take on the traditional meaningful godparent gift. It\'s personal, creative, and something the child will treasure — much like a classic christening gift but with a magical twist.', de: 'Ein personalisiertes Geschichtenbuch ist die moderne Variante des traditionellen, bedeutungsvollen Patengeschenks. Persönlich, kreativ und etwas, das Göttibueb oder Göttimeitli schätzen wird — wie ein klassisches Taufgeschenk, aber mit einer magischen Note.', fr: 'Un livre personnalisé est une version moderne du traditionnel cadeau significatif de parrain/marraine. Personnel, créatif et quelque chose que l\'enfant chérira.' },
       },
       {
         q: { en: 'Is this appropriate as a baptism gift?', de: 'Eignet sich das als Taufgeschenk?', fr: 'Est-ce approprié comme cadeau de baptême ?' },
         a: { en: 'Absolutely! Many godparents choose our books as baptism gifts. The personal dedication makes it extra special. It becomes a keepsake that grows with the child.', de: 'Auf jeden Fall! Viele Gotte und Göttis wählen unsere Bücher als Taufgeschenk. Die persönliche Widmung macht es besonders. Es wird ein Erinnerungsstück, das mit dem Kind wächst.', fr: 'Absolument ! De nombreux parrains et marraines choisissent nos livres comme cadeau de baptême. La dédicace personnelle le rend encore plus spécial.' },
       },
       {
-        q: { en: 'Can I have the book shipped directly to my godchild?', de: 'Kann das Buch direkt an mein Patenkind geschickt werden?', fr: 'Puis-je faire envoyer le livre directement à mon/ma filleul(e) ?' },
+        q: { en: 'Can I have the book shipped directly to my godchild?', de: 'Kann das Buch direkt an mein Göttikind geschickt werden?', fr: 'Puis-je faire envoyer le livre directement à mon/ma filleul(e) ?' },
         a: { en: 'Yes! You can enter any Swiss delivery address during checkout. Perfect for surprising your godchild, even if you live in a different city.', de: 'Ja! Du kannst beim Bestellen jede Schweizer Lieferadresse angeben. Perfekt, um dein Patenkind zu überraschen, auch wenn du in einer anderen Stadt wohnst.', fr: 'Oui ! Vous pouvez entrer n\'importe quelle adresse de livraison suisse. Parfait pour surprendre votre filleul(e).' },
       },
     ],

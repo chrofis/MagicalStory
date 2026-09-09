@@ -602,7 +602,7 @@ const GIFT_PAGES = {
   'fuer-kinder': { de: 'Einzigartiges Geschenk für Kinder', en: 'Unique Gift for Kids', fr: 'Cadeau unique pour enfants' },
   'fuer-enkel': { de: 'Das perfekte Geschenk für Enkel', en: 'The Perfect Gift for Grandchildren', fr: 'Le cadeau parfait pour les petits-enfants' },
   'fuer-nichte-neffe': { de: 'Geschenk für Nichte & Neffe', en: 'Gift for Niece & Nephew', fr: 'Cadeau pour nièce et neveu' },
-  'fuer-patenkind': { de: 'Geschenk für Patenkind', en: 'Gift for Godchild', fr: 'Cadeau pour filleul(e)' },
+  'fuer-patenkind': { de: 'Geschenk für Patenkind & Göttikind', en: 'Gift for Godchild', fr: 'Cadeau pour filleul(e)' },
   'geschenk-von-grosseltern': { de: 'Geschenk von Grosseltern', en: 'Gift from Grandparents', fr: 'Cadeau des grands-parents' },
   'ostergeschenk': { de: 'Ostergeschenk für Kinder', en: 'Easter Gift for Kids', fr: 'Cadeau de Pâques pour enfants' },
   'weihnachtsgeschenk': { de: 'Weihnachtsgeschenk für Kinder', en: 'Christmas Gift for Kids', fr: 'Cadeau de Noël pour enfants' },
@@ -1236,7 +1236,7 @@ function buildGiftDescription(giftSlug, lang) {
       fr: 'Surprenez votre nièce ou neveu avec un livre personnalisé — ils sont le héros. Dès CHF 33, première histoire gratuite.',
     },
     'fuer-patenkind': {
-      de: 'Ein besonderes Geschenk vom Götti oder der Gotte: ein personalisiertes Kinderbuch mit dem Foto deines Patenkinds. Ab CHF 33.',
+      de: 'Geschenk für Göttikind oder Patenkind: ein personalisiertes Kinderbuch vom Götti oder der Gotte, mit Göttibub oder Göttimeitli als Held. Ab CHF 33.',
       en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 33, first story free.',
       fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 33.',
     },
