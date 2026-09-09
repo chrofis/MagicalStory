@@ -345,7 +345,7 @@ measurement, is lost).
       → `tasks/ads-quality-score.md:64`
 - [x] (2026-09-06, a51316ad7 + 0d3fb7efd) Ads quality score A1 — ship the LCP fix to prod: both
       commits are present on `origin/master` for `client/index.html` → `tasks/ads-quality-score.md:21-61`
-- [ ] Ads quality score: 20 remaining items — A2–A6 landing, B1–B4 keyword and ad-group hygiene,
+- [ ] Ads quality score: 16 remaining items — A6 re-measure, B1–B4 keyword and ad-group hygiene,
       C1–C8 asset audit, D1–D3 weekly tracking. All Google-Ads-account-side, not repo-verifiable
       → `tasks/ads-quality-score.md:21-61`
 - [ ] Sentry error alerting; Plausible/Umami analytics → `docs/compliance-and-todo.html:87`
