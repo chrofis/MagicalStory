@@ -12,3 +12,17 @@ Keyword `kinderbuch selbst gestalten` is KEPT (best converter) and gets its own 
       + `server/lib/seoMeta.js` (+ SSR prerender if it reads those).
 - [x] (5d7d8b93f) S3. Landing page A2-A5: hero keyword match, trust signals above the fold, mobile, render-blocking trim.
 - [x] (c3028d793) S4. Trial funnel "Bezahlt" filter: paid bucket honours `gclid`; empty-state copy says "no paid visits".
+
+## Owner decisions 2026-09-09 (evening)
+- Master push: NOT yet. Everything above stays on staging.
+- Ads writes (all three groups from the audit) are APPROVED IN PRINCIPLE but must NOT be applied
+  until the S2/S3/S4 commits are on production. Prepare them as a dry-run-by-default script.
+- New `Kinderbuch-Selbst-Gestalten` ad group lands on `/kinderbuch-erstellen`.
+- **Target: as many clicks as possible below CHF 0.20, then see what converts.** Cheap volume first,
+  conversion attribution via `scripts/ads/attribution-report.js` decides what stays.
+
+- [ ] S5. `scripts/ads/apply-audit-changes.js` — dry-run by default, `--apply` flag, idempotent;
+      implements the audit's 11-step list.
+- [ ] S6. Cheap-click plan: candidate keywords with planner CPC < CHF 0.20 (age-gift cluster,
+      Göttikind, Einschulung, Geschwister) → proposed campaign `Search-Cheap-CH`, max CPC 0.20,
+      negatives for the direction traps. Dry-run creation script.
