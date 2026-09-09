@@ -463,7 +463,48 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  * @param {Object} el - a bible entry from getElementsNeedingReferenceImages
  * @returns {Array<Object>} 1 cell for an ordinary element, 1+states.length otherwise
  */
-function expandElementStateCells(el) {
+/**
+ * A state cell draws the OBJECT, never whoever is touching it.
+ *
+ * The cell's caption is the base description plus the state's delta, and a
+ * delta is free to say who is holding the thing ("gripped in the animal's
+ * forepaws"). Rendered, that caption asks for an object AND a body part, and
+ * the model supplies the body the part belongs to: one story's object sheet
+ * came back as the object fused onto a four-legged furry animal, and because a
+ * reference image is ground truth for every downstream check, the page that
+ * copied it scored well and shipped. Nothing else in the pipeline can catch
+ * that — the checks all compare the render against this image.
+ *
+ * So the holder is dropped here. A delta is read clause by clause; a clause
+ * naming a body part that grips, or naming any figure in the book, is not part
+ * of the object's own look and is left out. What survives is how the object
+ * itself sits — "partly above ground", "flat across the opening", "resting on
+ * a surface" — which is exactly what a reference cell should show. The holder
+ * still reaches the page: it is in the brief's prose and in its interactions.
+ *
+ * If a delta says nothing but who holds it, the cell falls back to the base
+ * description alone, which is always renderable.
+ *
+ * @param {string} delta - the state's authored delta
+ * @param {Array<string>} figureNames - every character/animal name in the book
+ * @returns {string} the part of the delta describing the object itself
+ */
+function objectLookOnly(delta, figureNames = []) {
+  const GRIPPING_PART = /\b(hand|hands|palm|palms|finger|fingers|fist|fists|arm|arms|paw|paws|forepaw|forepaws|claw|claws|talon|talons|mouth|jaw|jaws|teeth|beak|snout|muzzle|trunk|tail|wing|wings|lap|shoulder|shoulders|knee|knees|back)\b/i;
+  const names = figureNames.filter(Boolean).map(n => String(n).toLowerCase());
+  const kept = String(delta || '')
+    .split(',')
+    .map(c => c.trim())
+    .filter(c => {
+      if (!c) return false;
+      if (GRIPPING_PART.test(c)) return false;
+      const lower = c.toLowerCase();
+      return !names.some(n => n && lower.includes(n));
+    });
+  return kept.join(', ');
+}
+
+function expandElementStateCells(el, figureNames = []) {
   const { objectStates } = require('./visualBible');
   const { baseVbId } = require('./vbIdGuard');
   const states = objectStates(el);
@@ -494,7 +535,17 @@ function expandElementStateCells(el) {
       // by name when the model draws a different grid than asked for, and
       // every cell of one object would otherwise carry the same name.
       name: `${el.name} — ${s.name}`,
-      description: `${baseDesc}, ${s.delta}`,
+      description: (() => {
+        const look = objectLookOnly(s.delta, figureNames);
+        if (!look) {
+          log.info(`[REF-SHEET] "${el.name}" state "${s.name}": the delta describes only who holds it — cell drawn from the base look alone`);
+          return baseDesc;
+        }
+        if (look !== String(s.delta || '').trim()) {
+          log.info(`[REF-SHEET] "${el.name}" state "${s.name}": holder dropped from the cell — "${s.delta}" -> "${look}"`);
+        }
+        return `${baseDesc}, ${look}`;
+      })(),
       extractedDescription: null,
       states: [],
     })),
@@ -533,6 +584,13 @@ function assertStateCellsCoLocated(batches) {
 function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4) {
   const { vbDeclaredLetteringNames } = require('./promptBuilders');
   const letteringNames = vbDeclaredLetteringNames(visualBible);
+  // Every figure in the book, so a state cell can tell "who is holding it"
+  // apart from "how the object looks" (see objectLookOnly).
+  const figureNames = [
+    ...(visualBible?.mainCharacters || []),
+    ...(visualBible?.secondaryCharacters || []),
+    ...(visualBible?.animals || []),
+  ].map(e => String(e?.name || '').trim()).filter(Boolean);
 
   const solo = [];
   // Characters and non-characters (locations/vehicles/artifacts/animals) never
@@ -544,7 +602,7 @@ function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4
   const batchableOther = [];
   for (const el of needsReference) {
     const name = String((el && el.name) || '').trim().toLowerCase();
-    const cells = expandElementStateCells(el);
+    const cells = expandElementStateCells(el, figureNames);
     // A multi-state object takes a whole call to itself — that call IS its
     // grid, base plus every state, so the states cannot disagree. It also
     // keeps the object to one element in every downstream budget, because
@@ -1162,6 +1220,7 @@ module.exports = {
   characterAgeCue,
   buildReferenceSheetBatches,
   expandElementStateCells,
+  objectLookOnly,
   assertStateCellsCoLocated,
   generateReferenceSheet,
   buildEmptySceneVbGrid,

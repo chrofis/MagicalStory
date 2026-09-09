@@ -310,6 +310,50 @@ function hasElementReference(entry) {
  *   resolves to the state the bible declares for that page
  * @returns {{cell: Object, state: Object|null, cited: Object|null, substituted: Object|null}}
  */
+/**
+ * The visual-bible element a finding is talking about.
+ *
+ * Evaluators name a thing in prose ("the large, rigid, deep teal and ochre
+ * dragon scale is missing") and only sometimes in a structured field. Reading
+ * the prose is what lets a repair be handed a picture of the thing it is being
+ * asked to paint.
+ *
+ * A bible name carries qualifiers the prose never repeats — "Dragon scale —
+ * large (kept by marmots)" is written in a finding as "dragon scale" — so the
+ * match is on the HEAD of the name, the part before any dash, bracket or
+ * comma. Two entries of one kind ("small (shed)" and "large (kept)") share
+ * that head, so a tie is settled by the page: the entry that appears on THIS
+ * page is the one the finding means. Failing that, the longer head wins, and
+ * heads under four characters are skipped because they match by accident.
+ *
+ * @param {Object} visualBible
+ * @param {string} text - the finding's description and fix, run together
+ * @param {number|null} pageNumber - the page being repaired, to settle ties
+ * @returns {string} the matched element's full lowercased name, or ''
+ */
+function vbNameInText(visualBible, text, pageNumber = null) {
+  const hay = String(text || '').toLowerCase();
+  if (!hay) return '';
+  const head = (n) => String(n || '').toLowerCase().split(/[—\-(,;:]/)[0].trim();
+  const pools = [
+    visualBible?.artifacts, visualBible?.animals,
+    visualBible?.secondaryCharacters, visualBible?.vehicles,
+  ];
+  const hits = [];
+  for (const pool of pools) {
+    for (const e of (pool || [])) {
+      const full = String(e?.name || '').trim().toLowerCase();
+      const h = head(full);
+      if (h.length < 4 || !hay.includes(h)) continue;
+      const pages = [...(e?.pages || []), ...(e?.appearsInPages || [])].map(Number);
+      hits.push({ full, h, onPage: pageNumber != null && pages.includes(Number(pageNumber)) });
+    }
+  }
+  if (hits.length === 0) return '';
+  hits.sort((a, b) => (b.onPage - a.onPage) || (b.h.length - a.h.length));
+  return hits[0].full;
+}
+
 function elementRefCell(entry, handle = null, pageNumber = null, sceneMetadata = null, visualBible = null) {
   // One resolver for the cell and for the REQUIRED OBJECTS clause, so the
   // reference picture and the prompt text can never name different states.
@@ -3024,6 +3068,7 @@ module.exports = {
   resolveObjectState,
   hasElementReference,
   elementRefCell,
+  vbNameInText,
   getEmptySceneElementReferences,
   isRecurringCreature,
   getRecurringCreatureIds,

@@ -4269,6 +4269,10 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     // refs + its scene era, so Lab repair stages reproduce production.
     landmarkPhotos: ctx.scene.landmarkPhotos || null,
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+    sceneMetadata: ctx.scene.sceneMetadata || null,
+    // A/B knob: attach the visual-bible picture of an element a finding names
+    // only in prose. Off reproduces production exactly.
+    elementRefsFromText: params.elementRefsFromText === true,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {

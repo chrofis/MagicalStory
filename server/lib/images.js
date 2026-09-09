@@ -2699,6 +2699,14 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // whole-frame edit. See server/lib/landmarkProtection.js.
     landmarkPhotos = null,
     era = null,
+    // The page's scene metadata, so a stated object resolves to the cell for
+    // the state THIS page cites rather than the object's first look.
+    sceneMetadata = null,
+    // Resolve a visual-bible element out of a finding's PROSE when the finding
+    // carries no structured `item`, and consider the finding types that ask for
+    // an object to be handled rather than merely to exist. Off by default until
+    // measured; see the block below for what it fixes.
+    elementRefsFromText = false,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -3008,9 +3016,32 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   }
 
   // Find reference images for missing characters/animals from Visual Bible (still useful)
-  const missingItems = combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
+  //
+  // A finding only ever carried a structured `item` when the evaluator emitted
+  // `missing_*`. The semantic evaluator does not: it names the thing in prose
+  // ("the large, rigid, deep teal and ochre dragon scale ... is missing"), and
+  // its strongest verdict on a wrong action is `action_interaction`, which was
+  // not considered here at all. So the page that most needed to be shown the
+  // object was handed no picture of it, and the repair was asked to paint from
+  // a name alone — it cannot, and every attempt on such a page scored the same
+  // or worse than the render it was fixing.
+  //
+  // `elementRefsFromText` resolves the element by looking for a visual-bible
+  // name inside the finding's own words, across every finding type that asks
+  // for a thing to appear or to be handled. The cell is the one for the state
+  // THIS page cites, so the repair sees the object as this page needs it.
+  const REF_WORTHY_TYPES = new Set([
+    'missing_character', 'missing_element', 'action_interaction', 'object_presence',
+  ]);
+  const missingItems = elementRefsFromText
+    ? combinedIssues.filter(i => REF_WORTHY_TYPES.has(i.type))
+    : combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
   for (const missing of missingItems) {
-    const itemName = (missing.item || '').toLowerCase().trim();
+    let itemName = (missing.item || '').toLowerCase().trim();
+    if (!itemName && elementRefsFromText) {
+      itemName = require('./visualBible').vbNameInText(visualBible, `${missing.description || ''} ${missing.fix || ''}`, pageNumber);
+      if (itemName) log.info(`[INPAINT PAGE] P${pageNumber}: "${itemName}" read out of a ${missing.type} finding's wording — attaching its reference`);
+    }
     if (!itemName) continue;
 
     // hasElementReference, not a raw field read: a stated artifact's render
@@ -3039,7 +3070,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     }
     const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
     if (vbArtifact) {
-      const bytes = await loadVbReferenceBytes(require('./visualBible').elementRefCell(vbArtifact).cell);
+      // The page's own state, not the object's first cell: a repair shown the
+      // object in the wrong state paints the wrong thing back in.
+      const bytes = await loadVbReferenceBytes(
+        require('./visualBible').elementRefCell(vbArtifact, null, pageNumber, sceneMetadata, visualBible).cell
+      );
       if (bytes) {
         referenceImages.push(`data:image/jpeg;base64,${bytes}`);
         referenceImageSources.push(`vb-artifact:${missing.item}`);
