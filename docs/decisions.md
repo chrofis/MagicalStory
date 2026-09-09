@@ -31056,9 +31056,19 @@ hand" / "held edge to edge against ...". Rendered, that caption asks for an obje
 part, and the model supplies the body the part belongs to. Measured on a staging story: the
 "carried up" cell of an object came back as the object fused onto a four-legged furry body with
 claws and a tail. The page prompt says "match its look", so the render copied it faithfully.
-**Decision:**  `expandElementStateCells` strips the holder from a state cell's caption
-(`objectLookOnly`): a clause naming a gripping body part, or naming any figure in the book, is
-not part of the object's own look. What survives is how the object itself sits — "partly above
+**Decision:**  `expandElementStateCells` strips the FIGURE from a state cell's caption
+(`objectLookOnly`): an animal's part, a named character, or a clause saying hands are absent is
+not part of the object's own look. A mention of human hands stays, as hands and nobody's in
+particular — the two holders were measured and behave differently: an animal's paw drags the
+animal in, a bare pair of hands does not, and the one state whose delta ended "by the child's
+hands" rendered correctly as an object between two hands. Whose hands they are is the page's
+business; an object sheet that names a character leaks an identity into a picture of a thing.
+An earlier draft stripped hands as well and additionally APPENDED hands to every portable
+object's cell as a size cue; that was rejected before shipping. Its evidence was one
+unreplicated repair success (the same reference failed on the repeat), the page it was meant to
+help failed identically with and without a reference — so a missing size cue was not its cause —
+and it would have added invented hands to every object in every story, which by this entry's own
+argument is a fault class nothing downstream can catch. What survives is how the object itself sits — "partly above
 ground", "flat across the opening". If a delta says nothing else, the cell falls back to the
 base description. The bible prompt no longer asks for holder-naming deltas either; `held`
 already records that something has hold of it, and the page's brief says whose.

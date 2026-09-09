@@ -464,44 +464,52 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  * @returns {Array<Object>} 1 cell for an ordinary element, 1+states.length otherwise
  */
 /**
- * A state cell draws the OBJECT, never whoever is touching it.
+ * A state cell draws the OBJECT, and no figure that is touching it.
  *
- * The cell's caption is the base description plus the state's delta, and a
- * delta is free to say who is holding the thing ("gripped in the animal's
- * forepaws"). Rendered, that caption asks for an object AND a body part, and
- * the model supplies the body the part belongs to: one story's object sheet
- * came back as the object fused onto a four-legged furry animal, and because a
- * reference image is ground truth for every downstream check, the page that
- * copied it scored well and shipped. Nothing else in the pipeline can catch
- * that — the checks all compare the render against this image.
+ * The caption is the base description plus the state's delta, and a delta may
+ * say who has hold of the thing. Measured on one story, the two kinds of holder
+ * behave differently:
  *
- * So the holder is dropped here. A delta is read clause by clause; a clause
- * naming a body part that grips, or naming any figure in the book, is not part
- * of the object's own look and is left out. What survives is how the object
- * itself sits — "partly above ground", "flat across the opening", "resting on
- * a surface" — which is exactly what a reference cell should show. The holder
- * still reaches the page: it is in the brief's prose and in its interactions.
+ *  - An ANIMAL's part drags the animal in. "gripped in the animal's forepaws"
+ *    rendered as the object FUSED onto a four-legged furry body with claws and
+ *    a tail. A reference image is ground truth for every downstream check, so
+ *    the page that copied it scored well and shipped with nothing flagged —
+ *    no checker asks whether a reference depicts what its description says.
+ *  - A bare pair of HUMAN HANDS did not. The same object's other state, whose
+ *    delta ended "by the child's hands", rendered as the object held between
+ *    two hands and nothing else.
  *
- * If a delta says nothing but who holds it, the cell falls back to the base
- * description alone, which is always renderable.
+ * So the animal, the figure and the named person come out; a mention of hands
+ * stays, as hands and nobody's in particular. Whose they are is the page's
+ * business — the brief and its interactions say that — and an object sheet that
+ * names a character leaks an identity into a picture of a thing.
+ *
+ * A clause that says hands are ABSENT is not a holder and not a look; it is a
+ * negation of one, so it goes too, leaving the object's own look behind.
  *
  * @param {string} delta - the state's authored delta
  * @param {Array<string>} figureNames - every character/animal name in the book
- * @returns {string} the part of the delta describing the object itself
+ * @returns {string} the delta reduced to the object and, at most, plain hands
  */
 function objectLookOnly(delta, figureNames = []) {
-  const GRIPPING_PART = /\b(hand|hands|palm|palms|finger|fingers|fist|fists|arm|arms|paw|paws|forepaw|forepaws|claw|claws|talon|talons|mouth|jaw|jaws|teeth|beak|snout|muzzle|trunk|tail|wing|wings|lap|shoulder|shoulders|knee|knees|back)\b/i;
+  const HUMAN_HAND = /\b(hand|hands|palm|palms|finger|fingers|fist|fists)\b/i;
+  const NOT_HELD = /\b(no|without|not)\b[^,]*\b(hand|hands|touch|touching|holding)\b/i;
+  const OTHER_PART = /\b(paw|paws|forepaw|forepaws|claw|claws|talon|talons|beak|snout|muzzle|trunk|tail|wing|wings|hoof|hooves|arm|arms|lap|shoulder|shoulders|knee|knees|mouth|jaw|jaws|teeth)\b/i;
+  const HANDS = 'held in a pair of human hands';
   const names = figureNames.filter(Boolean).map(n => String(n).toLowerCase());
-  const kept = String(delta || '')
-    .split(',')
-    .map(c => c.trim())
-    .filter(c => {
-      if (!c) return false;
-      if (GRIPPING_PART.test(c)) return false;
-      const lower = c.toLowerCase();
-      return !names.some(n => n && lower.includes(n));
-    });
-  return kept.join(', ');
+  const out = [];
+  for (const raw of String(delta || '').split(',')) {
+    const c = raw.trim();
+    if (!c) continue;
+    const lower = c.toLowerCase();
+    if (NOT_HELD.test(c)) continue;
+    const hands = HUMAN_HAND.test(c);
+    const namesFigure = names.some(n => n && lower.includes(n));
+    if (hands) { if (!out.includes(HANDS)) out.push(HANDS); continue; }
+    if (OTHER_PART.test(c) || namesFigure) continue;
+    out.push(c);
+  }
+  return out.join(', ');
 }
 
 function expandElementStateCells(el, figureNames = []) {
