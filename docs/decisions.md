@@ -529,6 +529,86 @@ guard fires on exactly the 4 defective pages of this story and nowhere else.
 
 ---
 
+## The season is its own placeholder, not part of the location block (2026-09-09)
+**Context:** A wizard story configured Zurich + Jahreszeit Herbst came back with
+a fantasy idea reading "Im Koenigreich Valdorn, in einem Sommer vor langer
+Zeit". The season WAS sent by the client and WAS built server-side — but it was
+appended into `userLocationInstruction` as `seasonPart`. A fantasy idea blanks
+`USER_LOCATION_INSTRUCTION: ''` (and `AVAILABLE_LANDMARKS`) so the reader's real
+city cannot leak into a made-up world, which blanked the season with it. The
+fantasy card's prompt therefore carried no season at all and the model defaulted
+to summer. Both idea endpoints, streaming and non-streaming, carried the
+identical coupling.
+**Decision:** The season gets its own `{SEASON_INSTRUCTION}` placeholder in
+`prompts/generate-story-idea-single.txt` and `prompts/generate-story-ideas.txt`,
+built independently of the location and passed through
+`buildIdeasPromptContext`. The world overrides still blank location and
+landmarks only. The instruction states the season applies in an invented world
+too.
+**Rationale:** Two unrelated facts shared one placeholder, so suppressing one
+suppressed the other. Separating them is the root fix; adding the season back
+into the fantasy branch by hand would have left the same trap for the next
+field that gets welded into the location string. A made-up kingdom in Herbst is
+exactly what the reader asked for, so the season is not location-conditional.
+**Touched:** `prompts/generate-story-idea-single.txt`,
+`prompts/generate-story-ideas.txt`, `server/routes/storyIdeas.js`
+(`buildIdeasPromptContext` signature + `SEASON_INSTRUCTION` replacement, both
+endpoints).
+**Status:** ✅ active — verified by rendering both prompts for the reported case:
+fantasy keeps the season and leaks no city, location keeps both, no placeholder
+left unsubstituted. Not yet confirmed with a live idea generation.
+
+---
+
+## The trial idea prompt names the town and forbids invented places (2026-09-09)
+**Context:** A /try session in Baden produced "Der mutige Zauberlehrling Lukas
+entdeckt an der Reuss einen alten Zauberstein". Baden is on the Limmat; the
+Reuss is Bremgarten/Mellingen/Gebenstorf. The landmark lookup was innocent —
+Baden has 12 own-locality rows, above `MIN_OWN_LOCALITY_ROWS`, so
+`getIndexedLandmarks` never widens to the commune and `Reuss (Fluss)`
+(locality Gebenstorf, nearest_city Baden) was never served. The prompt gave the
+model a list of bare landmark names and the phrase "the child's own town" —
+never the town's NAME. A model that recognises one landmark but not the town
+around it fills the rest of the geography in from general knowledge.
+**Decision:** `server/routes/trial.js` names the town in the local-idea branch
+and, when landmarks were found, forbids naming any place beyond them — no other
+river, lake, mountain, street, square or building; any further setting stays
+generic.
+**Rationale:** Naming the town alone still leaves unnamed detail to invention;
+the owner chose town + no-invented-places (AskUserQuestion, 2026-09-09). The
+fantasy branch already said "no real place names", so only the local branch
+needed it.
+**Touched:** `server/routes/trial.js` (`localIdea`).
+**Status:** ✅ active — not yet confirmed with a live /try run.
+
+---
+
+## verify-location returns every matching town, not just OSM's first (2026-09-09)
+**Context:** `/api/user/verify-location` asked Nominatim for `limit=1`. A name
+belonging to several towns silently resolved to whichever OSM ranked first:
+"Bremgarten" gave Bremgarten bei Bern with no sign Bremgarten AG existed, and
+"Buchs" is three towns (SG, ZH, AG). The whole story is then set in the wrong
+place, with the user never shown that a choice existed.
+**Decision:** Ask for 10, collapse duplicate rows on name+region, drop
+Nominatim's fuzzy tail (a candidate must carry the typed name — "Buchs" also
+returned Basse-Allaine and Uffikon), and return them as `matches[]`. Top-level
+`city`/`lat`/`lon` still describe `matches[0]`, so the wizard consumer is
+unchanged. The trial city editor lists them by canton when there is more than
+one and waits for a pick before regenerating any idea; a single match keeps the
+one-step behaviour.
+**Rationale:** Additive response shape means no consumer migration. The
+name-carrying filter is required because Nominatim pads a multi-town query with
+unrelated neighbours, which would offer towns the user never typed. Scoped to
+typed cities only — the IP path returns one specific place with coordinates and
+has no ambiguity to resolve (owner's call, AskUserQuestion 2026-09-09).
+**Touched:** `server/routes/user.js` (`/verify-location`, `normalizeTown`),
+`client/src/pages/trial/TrialIdeasStep.tsx` (`CityMatch`, `applyCity`,
+`cityMatches` dropdown, `chooseCity` in 4 languages).
+**Status:** ✅ active — verified against the live Nominatim API: Buchs 3,
+Bremgarten 2, Baden 1, Zuerich 1, nonsense `verified:false`.
+
+---
+
 ## Email
 
 ### Cover hero in transactional emails — R2 URLs only, never base64
