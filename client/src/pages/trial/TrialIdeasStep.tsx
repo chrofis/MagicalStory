@@ -330,7 +330,12 @@ export default function TrialIdeasStep({
 
   // ─── Display text: use streaming or final ideas ────────────────────────────
 
-  const displayIdeas = hasFinalIdeas
+  // While a (re)generation is in flight the STREAM is the truth, even when the
+  // previous run's finals are still held by the parent. Reading the stale
+  // finals here left "Neue Ideen erstellen" with no feedback at all: the cards
+  // kept the old text, and the loading block below never fired because it asks
+  // for empty cards.
+  const displayIdeas = hasFinalIdeas && !isGenerating
     ? generatedIdeas.map((idea) => ({
         text: idea.title + (idea.summary ? '\n' + idea.summary : ''),
         isStreaming: false,
@@ -482,9 +487,7 @@ export default function TrialIdeasStep({
 
                 {/* World badge — same convention as the full wizard: card 1 plays in
                     the reader's town, card 2 in the make-believe theme world. */}
-                <div className={`mb-3 -mx-5 px-5 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
-                  index === 0 ? 'bg-sky-50 text-sky-700' : 'bg-purple-50 text-purple-700'
-                }`}>
+                <div className="mb-3 -mx-5 px-5 py-1.5 text-xs font-semibold flex items-center gap-1.5 bg-indigo-50 text-indigo-700">
                   {index === 0 ? <MapPin size={12} /> : <Sparkles size={12} />}
                   <span>{index === 0 ? worldLocationLabel : worldFantasyLabel}</span>
                 </div>

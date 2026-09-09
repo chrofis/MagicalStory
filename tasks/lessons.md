@@ -764,3 +764,10 @@ to staging ran after step one of the chain had already failed — the tree happe
 verified afterwards, but the gate did not run before the push. Rule: a heredoc is always the
 ONLY command in its Bash call. Write the file first, on its own; run the guarded chain second,
 with `-m` flags and no heredocs in it.
+
+## 2026-09-09 — a `python - <<'EOF'` heredoc still eats backslashes
+A `\n` written inside a quoted heredoc arrived at Python as a real newline, so
+every `assert old in s` against a JS template literal containing `\n` failed
+silently-looking ("no match") while the file was obviously right. Build such
+needles with `B = chr(92)` and concatenate — never rely on `\n` surviving the
+heredoc. Two wasted edit attempts before this was spotted.

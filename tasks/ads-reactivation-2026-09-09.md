@@ -8,7 +8,7 @@ Keyword `kinderbuch selbst gestalten` is KEPT (best converter) and gets its own 
       ad-group/keyword map, RSA headline counts. Output → `tasks/ads-audit-2026-09-09.md`.
       Then a DRY-RUN apply plan for C2-C4, B2-B4 (incl. the new selbst-gestalten group). No writes
       without owner OK.
-- [ ] S2. Patenkind page: Göttikind/Göttibub/Göttimeitli wording in `client/src/constants/giftData.ts`
+- [x] (d67eb7646) S2. Patenkind page: Göttikind/Göttibub/Göttimeitli wording in `client/src/constants/giftData.ts`
       + `server/lib/seoMeta.js` (+ SSR prerender if it reads those).
 - [ ] S3. Landing page A2-A5: hero keyword match, trust signals above the fold, mobile, render-blocking trim.
-- [ ] S4. Trial funnel "Bezahlt" filter: paid bucket honours `gclid`; empty-state copy says "no paid visits".
+- [x] (c3028d793) S4. Trial funnel "Bezahlt" filter: paid bucket honours `gclid`; empty-state copy says "no paid visits".
