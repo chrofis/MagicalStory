@@ -31076,3 +31076,49 @@ repeat). `elementRefsFromText` was removed with the parser.
 `server/lib/visualBible.js`, `server/lib/images.js`, `server/lib/testlab.js` (reverted to
 24d09089d)
 **Status:**    ✅ active (prompt rule) / 🟡 open (evaluator emits element ids — not built)
+
+## A state is a change to the object itself; place, holder and contact are never states (2026-09-09)
+**Context:**   The bible prompt's line 63 demanded a state for an object "carried, or pressed
+against or fitted to another object". On one story that minted four states for one unaltered
+scale — used as door, at sealed hole, carried up, pressed to wing — each rendered as its own
+reference cell. A placement state is a holder by definition, so "carried up" rendered the scale
+fused onto the animal carrying it, and "pressed to wing" rendered a wing: the page then had two
+wing sources (the cell and the dragon's own reference) and drew the scale AS a wing, and on a
+repeat put a spare wing where the dragon's head was. Line 62, one line above, already said the
+right thing ("lit, broken, mended, opened, filled") and was contradicted by 63.
+**Decision:**  Owner ruling. `states[]` exist only for a change to the object ITSELF — broken,
+lit, opened, filled, wet, torn, mended. Where it is, who holds it and what it touches are never
+states; the page's brief stages that. A delta describes the altered look and nothing else: no
+place, no figure, no body part, no other element. The `held` flag is dropped from the schema —
+it only ever existed to describe placement states, and code that read it tolerates its absence.
+**Rationale:** A state's cell must be drawable from the object alone. A state defined by contact
+with another element cannot be — it drags that element into the cell, and the renderer is then
+handed two sources for one thing. Placement is per page and already lives in the brief's prose
+and interactions; encoding it a second time in the bible produced cells that could only be wrong.
+Supersedes the same-day wording "a delta describes the OBJECT, never who is touching it", which
+treated the symptom (a named holder) rather than the category error (a placement state).
+**Touched:**   `prompts/story-bible-from-beats.txt` (rules 63-64, `states` schema field)
+**Status:**    ✅ active
+
+## The repair is handed an element's reference by id, never by name (2026-09-09)
+**Context:**   `inpaintPage` attached a bible reference only for findings carrying a structured
+`item`. The semantic judge names the object in prose and never saw a bible id — every id is
+scrubbed out of its inputs — so the repair was asked to paint an object it had never been shown.
+A Lab A/B (set 32, runs 1069-1072) measured the effect: with no picture of the object, 0 of 4
+repairs painted it; with one, 1 of 4 did (and 2 damaged the frame). A prose-matching resolver
+was built and reverted the same day (classification belongs to the prompt; code never
+pattern-matches prose).
+**Decision:**  The judge is shown PAGE ELEMENTS — a legend of the page's declared objects as
+"<id> — <name>" (`formatElementsBlock`, the one place a raw id is shown to it on purpose) — and
+copies the id onto every finding as `element`, or null. `inpaintPage` looks that id up in the
+bible, resolves the cell for THIS page's state via `elementRefCell(entry, handle, pageNumber,
+sceneMetadata)`, and attaches it; at most two element references per repair. Nothing is read
+out of prose; an id the bible does not know is skipped and logged.
+**Rationale:** The judge already emits `character` structurally; `element` is the same contract
+for things. Availability is the fix here, not reliability — the A/B shows a reference is
+necessary and not sufficient — and the reference the repair sees is now the one the page cites.
+Completes the "🟡 open" half of the entry above ("Holder-in-cell and repair-reference fixes").
+**Touched:**   `prompts/image-semantic.txt`, `server/lib/sceneValidator.js`,
+`server/lib/vbIdGuard.js` (`formatElementsBlock`), `server/lib/images.js` (`inpaintPage`),
+`server/lib/repairPipeline.js`, `server/lib/testlab.js` (both pass `sceneMetadata`)
+**Status:**    ✅ active

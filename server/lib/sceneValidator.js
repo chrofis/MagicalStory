@@ -797,13 +797,21 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   // and this block — which is the ONE place `i.object` (a raw VB id) is
   // rendered — was the exception. Shared builder now (vbIdGuard.js).
   let interactionsBlock = '(none declared)';
+  // PAGE ELEMENTS: the one place a raw id is SHOWN to this judge on purpose. It
+  // reads the page's declared objects, resolves each to its bible name, and the
+  // judge copies the id back as `element` on every finding about that thing —
+  // which is how the repair is later handed the element's picture by id.
+  let elementsBlock = '(none)';
   try {
     const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
     const sceneMeta = getSceneMetadata(imagePrompt || sceneHint || '');
     const interactions = sceneMeta?.interactions
       || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
-    interactionsBlock = require('./vbIdGuard')
-      .formatInteractionsBlock(interactions, evalContext.visualBible || null);
+    const guard = require('./vbIdGuard');
+    interactionsBlock = guard.formatInteractionsBlock(interactions, evalContext.visualBible || null);
+    const objects = sceneMeta?.objects
+      || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
+    elementsBlock = guard.formatElementsBlock(objects, evalContext.visualBible || null);
   } catch { /* silent fallback */ }
 
   // Convert image to base64 if needed
@@ -820,6 +828,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       SCENE_HINT: clean(sceneHint) || 'Not provided',
       IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
       INTERACTIONS_BLOCK: interactionsBlock,
+      ELEMENTS_BLOCK: elementsBlock,
       ART_STYLE: evalContext.artStyle || '',
       CLOTHING_CONTRACT: evalContext.clothingContract || '',
     });

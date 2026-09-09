@@ -1160,6 +1160,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // Era-aware landmark protection for inpaint's own consolidator call.
       landmarkPhotos: img.landmarkPhotos || null,
       era: resolveSceneEra(img.sceneMetadata),
+      sceneMetadata: img.sceneMetadata || null,
     });
     // Re-composite the cover text onto the repainted textless art (reuses
     // composeCover). The served image keeps its title; artImageData is the new

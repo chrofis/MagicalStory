@@ -2699,6 +2699,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // whole-frame edit. See server/lib/landmarkProtection.js.
     landmarkPhotos = null,
     era = null,
+    // The page's scene metadata, so an element cited in a state (ART002.4)
+    // resolves to the cell for the state THIS page needs.
+    sceneMetadata = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -2739,7 +2742,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       description: require('./scoring').findingText(si),
       source: 'semantic',
       type: si.type,
-      item: si.item
+      item: si.item,
+      // The bible id the judge copied off PAGE ELEMENTS; the repair attaches
+      // that element's reference by id below.
+      element: si.element || null,
     }));
 
   // Combine and deduplicate
@@ -3007,6 +3013,41 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), fallback to top-${ranked.length} of ${combinedIssues.length} issues by severity`);
   }
 
+  // References BY ID. The semantic judge is shown PAGE ELEMENTS (id — name)
+  // and copies the id onto each finding as `element`; here that id is looked
+  // up in the bible and the cell for THIS page's state of it is attached, so
+  // the repair is shown the thing it is asked to paint. Measured before this
+  // existed (Lab set 32): a repair with no picture of the object never once
+  // painted it, and with one it did — not reliably, but never without.
+  // Nothing is read out of prose; an id the bible does not know is skipped.
+  {
+    const { VB_ID_PATTERN, baseVbId } = require('./vbIdGuard');
+    const { elementRefCell } = require('./visualBible');
+    const pools = ['artifacts', 'animals', 'secondaryCharacters', 'vehicles'];
+    const attached = new Set();
+    const MAX_ELEMENT_REFS = 2;
+    const exactId = new RegExp('^' + VB_ID_PATTERN.source + '$');
+    for (const issue of combinedIssues) {
+      if (attached.size >= MAX_ELEMENT_REFS) break;
+      const handle = String(issue.element || '').trim();
+      if (!handle || !exactId.test(handle)) continue;
+      const base = baseVbId(handle);
+      if (!base || attached.has(base)) continue;
+      let entry = null;
+      for (const pool of pools) {
+        entry = (visualBible?.[pool] || []).find(e => String(e?.id || '').toUpperCase() === base.toUpperCase());
+        if (entry) break;
+      }
+      if (!entry) { log.info(`[INPAINT PAGE] P${pageNumber}: finding names ${handle} but the bible has no such element — no reference`); continue; }
+      const { cell } = elementRefCell(entry, handle, pageNumber, sceneMetadata, visualBible);
+      const bytes = await loadVbReferenceBytes(cell);
+      if (!bytes) { log.info(`[INPAINT PAGE] P${pageNumber}: ${handle} ("${entry.name}") has no rendered reference — skipped`); continue; }
+      referenceImages.push(`data:image/jpeg;base64,${bytes}`);
+      referenceImageSources.push(`vb-element:${cell?.id || base}`);
+      attached.add(base);
+      log.info(`[INPAINT PAGE] P${pageNumber}: attaching ${cell?.id || base} ("${entry.name}") — the ${issue.type} finding names it`);
+    }
+  }
   // Find reference images for missing characters/animals from Visual Bible (still useful)
   const missingItems = combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
   for (const missing of missingItems) {

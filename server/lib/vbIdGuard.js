@@ -214,6 +214,39 @@ function formatInteractionsBlock(interactions, visualBible = null) {
   return scrubVbIds(block, visualBible) || '(none declared)';
 }
 
+/**
+ * The legend an evaluator names elements from: one line per element this page
+ * is built from, "<id> — <name>". The evaluator copies an id back onto each
+ * finding as `element`, and the repair attaches that element's reference by
+ * id — no name ever travels through code. Ids are base ids (a cited state
+ * `ART002.4` is listed as `ART002`), because the repair resolves the state
+ * for the page itself. Nothing in the bible for an id → the id is left out.
+ *
+ * @param {Array<string>} objectIds - the page's declared objects (sceneMetadata.objects)
+ * @param {Object|null} visualBible
+ * @returns {string} the legend, or '(none)'
+ */
+function formatElementsBlock(objectIds, visualBible = null) {
+  const ids = Array.isArray(objectIds) ? objectIds : [];
+  if (ids.length === 0 || !visualBible) return '(none)';
+  const pools = ['artifacts', 'animals', 'secondaryCharacters', 'vehicles', 'locations', 'mainCharacters'];
+  const seen = new Set();
+  const lines = [];
+  for (const raw of ids) {
+    const base = baseVbId(String(raw || ''));
+    if (!base || seen.has(base)) continue;
+    let entry = null;
+    for (const pool of pools) {
+      entry = (visualBible[pool] || []).find(e => String(e?.id || '').toUpperCase() === base.toUpperCase());
+      if (entry) break;
+    }
+    if (!entry || !entry.name) continue;
+    seen.add(base);
+    lines.push(`${base} — ${String(entry.name).trim()}`);
+  }
+  return lines.length ? lines.join('\n') : '(none)';
+}
+
 module.exports = {
   VB_ID_POOLS,
   VB_ID_PATTERN,
@@ -226,4 +259,5 @@ module.exports = {
   VB_ID_LEGITIMATE_LABELS,
   scrubVbIds,
   formatInteractionsBlock,
+  formatElementsBlock,
 };
