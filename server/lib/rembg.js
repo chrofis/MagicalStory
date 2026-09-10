@@ -17,7 +17,21 @@ const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
 const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
-async function rembgRemoveBackground(buf, { maxSize } = {}) {
+/**
+ * One retry. The analyzer loads rembg lazily and the cold load runs past the
+ * 60 s call budget, so the FIRST call after every deploy timed out and the
+ * caller fell to a white-threshold cut-out - the whole sheet card pasted into
+ * the page (Lab exp 1084, 2026-09-10). The second call lands on the model the
+ * first one woke. A warm failure fails twice, quickly, and still returns null.
+ */
+async function rembgRemoveBackground(buf, opts = {}) {
+  const first = await _rembgOnce(buf, opts);
+  if (first) return first;
+  log.warn('[REMBG] retrying once (the first call usually wakes a cold model)');
+  return _rembgOnce(buf, opts);
+}
+
+async function _rembgOnce(buf, { maxSize } = {}) {
   try {
     const body = {
       image: `data:image/png;base64,${buf.toString('base64')}`,

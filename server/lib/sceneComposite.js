@@ -2635,6 +2635,19 @@ async function generateSceneComposite(opts) {
     }
 
     let sMeta = await sharp(scaled).metadata();
+    // sharp refuses an overlay wider than the base as well as taller; height
+    // is clipped below, width was not (a landscape phantom render that kept
+    // its background scaled to a 800px figure came out wider than the canvas
+    // and threw "must have same dimensions or smaller" outside any try -
+    // Lab exp 1089). Centre-crop to the canvas width; a figure that wide is
+    // wrong already, but a crop is a visible fault and a throw is a lost page.
+    if (sMeta.width > detection.canvasWidth) {
+      const l = Math.floor((sMeta.width - detection.canvasWidth) / 2);
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: cut-out ${sMeta.width}px wide exceeds the ${detection.canvasWidth}px canvas — centre-cropped (background removal probably kept the render's backdrop)`);
+      scaled = await sharp(scaled).extract({ left: l, top: 0, width: detection.canvasWidth, height: sMeta.height }).png().toBuffer();
+      sMeta = await sharp(scaled).metadata();
+    }
+    log.info(`[SCENE COMPOSITE]   ${c.name}: cut-out ${sMeta.width}×${sMeta.height} for target h=${targetH}${usedPhantomPose ? ' (phantom pose)' : ''}`);
     const cx = bbox.x + Math.floor(bbox.width / 2);
     const bottomY = bbox.y + bbox.height;
     const canvasH = detection.canvasHeight;

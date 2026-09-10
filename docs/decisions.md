@@ -31765,3 +31765,18 @@ it names is what disappears. The Lab knobs exist so the page-4 experiment can ru
 routine to completion without changing what production does.
 **Touched:**   server/lib/sceneComposite.js, server/lib/testlab.js, storyJobPipeline.js
 **Status:**    active
+
+## Composite: an over-wide cut-out is cropped, not thrown; rembg retries once after a cold miss (2026-09-10)
+**Context:**   Lab exp 1089 (phantom-pose composite, page 4): after both phantom renders the run died
+with sharp's "Image to composite must have same dimensions or smaller", outside any try, with no frame
+persisted. Placement clipped overlay HEIGHT to the canvas but never WIDTH. Separately, the analyzer
+loads rembg lazily and the cold load runs past the 60 s call budget, so the first remove-bg call after
+every deploy timed out (exp 1084) and the caller fell to the white-threshold cut-out - the whole sheet
+card pasted into the page.
+**Decision:**  Placement centre-crops a cut-out wider than the canvas (warn logged) and logs every
+cut-out's dimensions and target height. rembgRemoveBackground makes one retry after a failed or
+timed-out call; a warm failure still returns null and the caller's fallback is unchanged.
+**Rationale:** A crop is a visible fault, a throw is a lost page. One retry costs nothing when warm and
+is exactly the cold-load case when not - the same reasoning as the 300 s DINO budget.
+**Touched:**   server/lib/sceneComposite.js, server/lib/rembg.js
+**Status:**    active
