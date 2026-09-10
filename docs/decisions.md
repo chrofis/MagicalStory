@@ -31888,6 +31888,10 @@ recorded there against Q9: the planner detects reliably and a forced repair has 
 **Rationale:** The constraint is the renderer's and cannot be prompted away downstream (AD rule 11f
 measured ineffective the same day); the plan is the one stage that can choose a different picture.
 Advisory first; promote to must-fix only on the same evidence the Q4/Q8 set required.
+**Amended (same day, owner):** the first wording ran to 766 and 596 characters - "too complicated that
+anyone could follow it". Both cut to one breath: one level per picture; stage from one level with the
+other character out of frame, or a page per level; a whole cast carried together is one level. Same
+content, a quarter of the words.
 **Touched:**   prompts/story-beats.txt (rule 44), prompts/plan-check.txt (Q10),
 server/lib/promptBuilders.js (rationale comment only)
 **Status:**    active
