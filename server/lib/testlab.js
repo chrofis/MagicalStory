@@ -4395,7 +4395,12 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   // came back photorealistic. Both halves are load-bearing, and the budget
   // fits: ~4000 setting + ~1300 prompt head + ~250 per cast entry stays under
   // Grok's 8000-char limit for a five-character page.
-  const rawBg = String(scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '');
+  // Lab-only knob (2026-09-10): a plate description to build the silhouette
+  // plate from, instead of the page's stored emptyScenePrompt. A page that
+  // shared another page's vantage canvas stores THAT page's plate prompt,
+  // so "run the composite on the correct world" needs the correct words
+  // handed in. Production behaviour is untouched.
+  const rawBg = String(params.plateDescriptionOverride || scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '');
   const cleanBackgroundPrompt = rawBg.slice(0, 5000);
 
   const usage = [];
