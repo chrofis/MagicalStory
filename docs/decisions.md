@@ -31957,3 +31957,19 @@ server/routes/regeneration.js (re-evaluate endpoint passes `scene.sceneCharacter
 prompts/image-evaluation.txt, prompts/feedback-consolidator.txt, prompts/image-prompt-compliance.txt,
 tests/unit/extra-character-type.test.ts
 **Status:**    active (staging, not on master)
+
+## Composite cast is built from characters[] only; a secondary character named as a CHR id is invisible to it (2026-09-10)
+**Context:**   Lab exp 1101, page 4 of job_1788983823620_csjcyp1q9, production composite on the
+looksAt brief (exp 1097): cast = Fiona alone. The brief lists the secondary character as CHR001 in
+objects[] and as a `watching` interaction - correct per the AD schema, which forbids secondaries in
+characters[] - and buildCompositeCast reads characters[] only (its Visual-Bible secondary fallback
+matches NAMES of characters[] entries). The plate put the one figure into the empty boat; the final
+is the main character standing in the other character's boat, that character absent. Every
+earlier composite of this page had the secondary only because the stored brief had put her in
+characters[] against the schema.
+**Decision:**  Recorded, not changed. The gap: a `watching`/`holding` interaction whose character
+is a CHR id should seed a cast entry resolved through the bible (name, reference sheet, singleImage),
+depth from the interaction's position words or `background` when the id sits in objects[] only.
+Owner's call, because it widens what the production composite renders.
+**Touched:**   nothing (docs only)
+**Status:**    open
