@@ -1421,6 +1421,10 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
     if (!c.sheetBuf) { inPlaceLog.push({ name: c.name, skipped: 'no reference sheet' }); continue; }
     const basePrompt = buildInPlaceRenderPrompt(c, visualBible);
     const sheetDataUrl = `data:image/png;base64,${c.sheetBuf.toString('base64')}`;
+    // The silhouette's bottom edge plus a small margin. Below it lies either
+    // ground (nothing to cut) or the scenery that hides the figure.
+    const bottomLimit = bbox.y + bbox.height + Math.max(4, Math.round(0.03 * bbox.height));
+    const clippedHeight = (box, limit) => Math.max(1, Math.min(box.y + box.height, limit) - box.y);
 
     // Up to two attempts. The silhouette is the contract; the person box DINO
     // finds on the render is measured against it (height ratio, IoU). A render
@@ -1433,7 +1437,7 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
     for (let attempt = 1; attempt <= 2; attempt++) {
       let prompt = basePrompt;
       if (attempt === 2 && best) {
-        const how = best.ratio > 1.25 ? `${best.ratio.toFixed(1)} times too tall` : best.ratio < 0.8 ? 'too small' : 'not in the silhouette\'s place';
+        const how = best.ratio > 1.4 ? `${best.ratio.toFixed(1)} times too tall` : best.ratio < 0.75 ? 'too small' : 'not in the silhouette\'s place';
         prompt = `${basePrompt}\n\nA previous attempt drew ${c.name} ${how}. Match the ${c.colorName || 'coloured'} silhouette's outline exactly: same height, same footprint, same posture${c.action ? ` (${String(c.action).trim()})` : ''}.`;
       }
       let result;
@@ -1473,9 +1477,14 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       } catch (err) {
         log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
       }
-      const ratio = matched ? matched.box.height / bbox.height : 1;
+      // Height is measured only down to the silhouette's bottom edge: that
+      // edge is the feet or the line where scenery hides the figure (a
+      // bulwark, a table). A waist-up placeholder that the model completed
+      // with legs over the hull (exp 1144) is right above that line and
+      // discarded below it - not a wrong render.
+      const ratio = matched ? clippedHeight(matched.box, bottomLimit) / bbox.height : 1;
       const iou = matched ? matched.iou : 0;
-      const ok = !!mask && ratio >= 0.8 && ratio <= 1.25 && iou >= 0.45;
+      const ok = !!mask && ratio >= 0.75 && ratio <= 1.4 && iou >= 0.45;
       attempts.push({ attempt, ratio: +ratio.toFixed(2), iou: +iou.toFixed(3), ok, render: result.imageData });
       const cand = { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio };
       if (!best || iou > (best.matched ? best.matched.iou : -1)) best = cand;
@@ -1518,7 +1527,11 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
         const om = dilateMask(silhouetteMasks[other.name], W, H, 2);
         for (let i = 0; i < W * H; i++) if (om[i]) mask[i] = 0;
       }
-      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed, other silhouettes excluded`);
+      // Nothing below the silhouette's bottom edge: scenery in front of the
+      // figure stays in front (see bottomLimit above).
+      let clippedPx = 0;
+      for (let y = Math.max(0, Math.ceil(bottomLimit)); y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) { mask[y * W + x] = 0; clippedPx++; }
+      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed, other silhouettes excluded${clippedPx ? `, ${clippedPx}px below the silhouette's bottom edge dropped` : ''}`);
     }
     let cut = await cutWithMask(renderBuf, mask, W, H);
     let fitted = null;
@@ -1526,11 +1539,11 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       // Like against like: the person box on the render against the person box
       // of the silhouette (exp 1140 compared the grown mask and shrank two
       // correct figures by 20%).
-      const ratio = matched.box.height / bbox.height;
+      const ratio = clippedHeight(matched.box, bottomLimit) / bbox.height;
       const mb = maskBounds(mask, W, H);
       // Last resort only: both attempts were off. Within the accepted band the
       // render is used as drawn.
-      if (mb && (ratio > 1.25 || ratio < 0.8)) {
+      if (mb && (ratio > 1.4 || ratio < 0.75)) {
         const s = 1 / ratio;
         // Scale the whole cut-out by s about the matched box's bottom-centre, then
         // move that point onto the silhouette's bottom-centre.
