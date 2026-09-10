@@ -31570,6 +31570,18 @@ decision and is proposed separately.
 **Touched:**   `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` (11f),
 `prompts/scene-review.txt` (check 7)
 **Status:**    ✅ active
+**Measured (same day, Lab exp 1076-1080):** the rule reaches the Art Director and not the renderer. With
+11f live the AD staged the page exactly as asked (upper figure looking down, lower figure small below,
+head at rail height, ) and both native renders on the correct plate still drew the
+two at full size on one plane - one put the upper figure INTO the boat. That is 4/4 native renders
+across two briefs. Production's stratified composite on the same plate (exp 1079, 1080) kept the world
+2/2 - boat afloat below the rail, first figure at true scale - because cut-outs are pasted onto a
+finished plate and never re-drawn; but it pasted the second figure onto the ship's edge 2/2, because
+placement is left/right x depth with no vertical axis. (Exp 1079's line-and-wash look was the Lab
+override dropping the ART STYLE block, not the routine; 1080 carried it and is a proper watercolour.)
+So 11f as a camera instruction is measured INEFFECTIVE; the working directions are a plan-level rule
+(a two-level moment is two pages, or one named figure in frame) and a vertical placement anchor in the
+composite. Both await the owner's decision; the rule stands only until then.
 
 
 ## The refiner may MOVE a scene to the page whose picture shows it; a $0 shingle check catches a copy (2026-09-10)
