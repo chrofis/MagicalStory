@@ -31746,3 +31746,22 @@ worse than the duplicate this fixes.
 **Touched:**   `server/lib/planCounters.js` (`canonicalName`, `firstTokenAliases`,
 `resolveCast`, `namesIn`, `runPlanCounters` row scan, export), `tests/unit/plan-counters.test.ts`
 **Status:**    ✅ active (staging, not on master)
+
+## Composite blend prompts are scrubbed of bible ids; the Lab can render phantom poses (2026-09-10)
+**Context:**   The scene-composite blend census copied each interaction's object id verbatim, so Grok
+was told "Looking at ART001.1" (Lab exp 1084/1087, job_1788983823620_csjcyp1q9 p4); no VB-id scrub ran
+anywhere in sceneComposite.js. In exp 1087 the map that line named vanished from the figure's hands in
+the blend. Separately, the per-figure phantom-pose render (a seated silhouette gets a seated figure)
+was off by default and never exposed to the Lab, so a standing cut-out was pasted into a seated
+silhouette on every composite of that page.
+**Decision:**  Every blend prompt passes through scrubBlendPrompt (scrubVbIds + warnIfVbIds) in all
+three builders, with the Visual Bible threaded in from both call sites - through the blendPastedCanvas
+and _stratifiedBody bags, not a module-level opts (check-no-undef caught that first draft). The Lab
+composite stage gains params.phantomPoseRender, params.minDepthSpread and params.castActionOverrides,
+plateDescriptionOverride. Production passes none of them: the gate stays at the settled 2.0x and
+phantom pose stays off until measured.
+**Rationale:**  Same rule as the cover leak (2026-08): an id is noise to an image model and the object
+it names is what disappears. The Lab knobs exist so the page-4 experiment can run the production
+routine to completion without changing what production does.
+**Touched:**   server/lib/sceneComposite.js, server/lib/testlab.js, storyJobPipeline.js
+**Status:**    active
