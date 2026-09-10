@@ -4939,6 +4939,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // it a standing sheet cell is pasted into a seated
                     // silhouette (measured, Lab exp 1087). +$0.02 per figure.
                     phantomPoseRender: true,
+                    // In-place figures (owner, 2026-09-10/11): each figure is
+                    // rendered INTO the plate where its silhouette is and cut
+                    // out with DINO+SAM. Measured on the two-level page 4 of
+                    // job_1788983823620_csjcyp1q9: paste+phantom lost the pose
+                    // 2/2 (exp 1106); in-place held pose and level on its last
+                    // two runs (exp 1146, 1148). phantomPoseRender is unused
+                    // on this path and stays for the paste fallback.
+                    figureMethod: 'inPlace',
                     cast: compositeCast, frontCast, backCast,
                     scene: {
                       description: String(fdMeta.description || pageData.sceneDescription || ''),
