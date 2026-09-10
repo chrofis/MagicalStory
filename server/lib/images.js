@@ -2355,6 +2355,10 @@ async function evaluateImageBatch(images, options = {}) {
           // pipeline (landmark refs + scene era). Absent → no protection.
           landmarkPhotos: img.landmarkPhotos || null,
           era: img.era || null,
+          // Detector figure count for the EXPECTED CAST block — present on
+          // repair-round re-evaluations that carry the previous detection;
+          // null on a first-round eval, which runs before detection.
+          detectedFigureCount: Array.isArray(img.bboxDetection?.figures) ? img.bboxDetection.figures.length : null,
           storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,

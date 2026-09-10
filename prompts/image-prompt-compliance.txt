@@ -48,6 +48,8 @@ Wrongness is a finding; absence is a guess. When the inventory NAMES the item an
 
 **PRESENCE IS AN INPUT — never your judgment.** `QUALITY_FIGURES.matches[]` already identified who is in the image (via reference-photo matching upstream). A character listed there IS present and correctly identified. You may NEVER flag such a character as missing, `missing_character`, or "no inventory figure matches" — no matter how their hair, freckles, ponytail side, clothing pattern, expression, or any appearance detail differs. Appearance differences on a present character are reported in STEP 2 as per-character issues, never as absence.
 
+A `matches[]` entry whose `reference` is `unmatched` (or null) names nobody: never pair it with a prompt-named character and never report it — the quality evaluator owns that figure (`extra_character`).
+
 For each `matches[]` entry in QUALITY_FIGURES, take the figure's zone from QUALITY_FIGURES.figures[]. Find the VISION_INVENTORY figure in the same zone (or the nearest one — do not require an exact zone match) and output a pairing `{name, label, zone, vision_description}`, carrying that figure's VISION_INVENTORY label verbatim. Zone mismatch is a position note, not an absence.
 
 The ONLY case for `missing_character`: a character named in ORIGINAL_PROMPT that has NO entry in `QUALITY_FIGURES.matches[]` AND no plausibly-matching VISION figure at all. If they are in `matches[]`, they are present — stop. `missing_character` is at most MAJOR, never CRITICAL — you have not seen the image, so an absence you infer from the inputs is a report, not proof.

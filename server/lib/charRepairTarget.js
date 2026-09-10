@@ -109,6 +109,14 @@ function briefNamesForPage({ sceneCharacters = [], sceneMetadata = {} } = {}) {
 function findBorrowedLabel({ figures, sceneCharacters = [], sceneMetadata = {}, characterName = '', pageNumber = null } = {}) {
   if (!Array.isArray(figures)) return null;      // no figure list → no opinion
   const brief = briefNamesForPage({ sceneCharacters, sceneMetadata });
+  // SURPLUS is a diagnostic, never a refusal (2026-09-10): more figures than
+  // the brief names means a figure nobody wrote for — the quality evaluator's
+  // `extra_character` (image-evaluation D-04b) owns that finding. Logged here
+  // so repair targeting shows the count mismatch it used to pass over in
+  // silence (five children for a four-boy cover, job_1788903616404_iqvhj4l8m).
+  if (brief.size > 0 && figures.length > brief.size) {
+    log.warn(`[CHAR REPAIR] p${pageNumber}: ${figures.length} figure(s) drawn for a brief of ${brief.size} character(s) — ${figures.length - brief.size} surplus figure(s) nobody was written for (labels still trusted)`);
+  }
   if (brief.size <= figures.length) return null;
 
   const drew = [...new Set(figures.map(f => f.name || 'unidentified figure'))];

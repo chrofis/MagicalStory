@@ -182,6 +182,12 @@ const MAX_SEVERITY_TYPES = {
   // critical arm and puts the page in the repair queue regardless of score.
   // A cap at major reproduces job_1788681313413_xqmtk2gcs p1 exactly — the
   // defect was seen, rated MAJOR, and shipped at 80.
+  //
+  // extra_character is deliberately ABSENT too (2026-09-10): a figure that
+  // matches no EXPECTED CAST entry is a person the book never commissioned,
+  // the same rank as one entirely absent (missing_character, CRITICAL). A
+  // MAJOR cap would leave a 100-scoring five-for-four cover unrepaired, which
+  // is the case that created the type (job_1788903616404_iqvhj4l8m).
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever

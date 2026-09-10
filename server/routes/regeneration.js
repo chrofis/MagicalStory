@@ -4014,7 +4014,11 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           qualityModelOverride || null,
           pageLabel,               // pageContext
           pageText,                // storyText for semantic fidelity
-          sceneHint                // sceneHint for semantic evaluation
+          sceneHint,               // sceneHint for semantic evaluation
+          // The page's own cast as stored on the sceneImage record — the
+          // EXPECTED CAST roster. The reference list above is the WHOLE
+          // story cast, which is why it cannot serve as the roster here.
+          scene.sceneCharacters || null
         );
 
         if (!evaluation) {

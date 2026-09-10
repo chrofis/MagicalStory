@@ -857,6 +857,97 @@ const isBlockedResponse = (responseData) => {
   return false;
 };
 
+/**
+ * EXPECTED CAST — the roster the quality evaluator judges figure COUNT against
+ * (owner, 2026-09-10). The judge used to receive only ORIGINAL_PROMPT prose and
+ * reference photos: on the front cover of job_1788903616404_iqvhj4l8m it saw
+ * five children for a four-boy cast, matched the fifth to a name it read in the
+ * prose at 0.9, and returned PASS / 100. Nothing in its inputs said "four".
+ *
+ * Computed in code, injected into the critique, classified by the prompt: the
+ * page's photo-backed cast (`sceneCharacters`) plus the Visual Bible secondary
+ * characters AND animals the page metadata names — the same helper the
+ * char-repair targeting uses (`buildSecondaryExpectedCharacters`), so there is
+ * ONE cast builder. Covers add every VB person/animal the cover description
+ * names (`matchVbEntitiesInText`, the cover NAME invariant's own matcher). The
+ * detector's figure count rides along when the caller has one.
+ *
+ * Returns { block, names, count } — `block` is '' when no cast is known, and
+ * the template then tells the judge not to judge the count at all.
+ */
+function buildExpectedCastBlock({
+  sceneCharacters = null,
+  sceneHint = null,
+  originalPrompt = '',
+  visualBible = null,
+  evaluationType = 'scene',
+  detectedFigureCount = null,
+  pageLabel = '',
+} = {}) {
+  const names = [];
+  const labels = [];
+  const seen = new Set();
+  // Each roster line says WHAT the entry is. A dog named in the prose is an
+  // animal entry; a fifth human child can never satisfy it — which is exactly
+  // the substitution the cover evaluator accepted at 0.9 confidence.
+  const add = (n, kind = null) => {
+    const name = String(n || '').trim();
+    if (!name || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    names.push(name);
+    labels.push(kind ? `${name} (${kind})` : name);
+  };
+  const vbKind = (nameOrId) => {
+    const key = String(nameOrId || '').toLowerCase();
+    const byKey = (list) => (Array.isArray(list) ? list : []).find(e =>
+      String(e?.name || '').toLowerCase() === key || String(e?.id || '').toLowerCase() === key);
+    const animal = byKey(visualBible?.animals);
+    if (animal) return animal.species ? `animal, ${animal.species}` : 'animal';
+    if (byKey(visualBible?.secondaryCharacters)) return 'secondary character';
+    return null;
+  };
+  for (const c of (Array.isArray(sceneCharacters) ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
+  if (names.length === 0) return { block: '', names: [], count: 0 };
+
+  const sh = getStoryHelpers();
+  try {
+    const sceneMeta = sh.extractSceneMetadata(sceneHint || originalPrompt);
+    for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, includeAnimals: true })) add(e.name, vbKind(e.name));
+  } catch { /* a page without parseable metadata keeps its photo-backed cast */ }
+  if (evaluationType === 'cover' && visualBible) {
+    try {
+      const { matchVbEntitiesInText } = require('./coverIterate');
+      for (const hit of matchVbEntitiesInText(sceneHint || originalPrompt, visualBible)) {
+        if (hit.type === 'character' || hit.type === 'animal') add(hit.name, vbKind(hit.name));
+      }
+    } catch { /* cover keeps its commissioned cast */ }
+  }
+
+  const lines = [`EXPECTED CAST (${names.length}): ${labels.join(', ')}`];
+  const det = Number(detectedFigureCount);
+  if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
+    lines.push(`Detector figure count (GroundingDINO): ${det}`);
+  }
+  return { block: lines.join('\n'), names, count: names.length };
+}
+
+/**
+ * The evaluator's `fixable_issues[]` in the pipeline's finding shape. Pure —
+ * split out so the parse+score path can be exercised without a model call.
+ */
+function parseFixableIssues(parsedJson) {
+  if (!parsedJson || !Array.isArray(parsedJson.fixable_issues)) return [];
+  return parsedJson.fixable_issues
+    .filter(i => i && i.description)
+    .map(i => ({
+      description: i.description,
+      severity: i.severity || 'MODERATE',
+      type: i.type || 'default',
+      character: i.character || null,  // Preserved for bbox matching (incl. STEP 2C proportion issues)
+      fix: i.fix || `Fix: ${i.description}`
+    }));
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -1003,6 +1094,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
       if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
     } catch { /* silent — the judge tolerates an empty block */ }
+
+    // EXPECTED CAST roster + count (see buildExpectedCastBlock). Built once,
+    // read by the quality prompt and by the post-parse count diagnostic.
+    const expectedCast = buildExpectedCastBlock({
+      sceneCharacters,
+      sceneHint,
+      originalPrompt,
+      visualBible: evalOptions.visualBible || null,
+      evaluationType,
+      detectedFigureCount: evalOptions.detectedFigureCount ?? null,
+      pageLabel: pageContext ? `${pageContext} ` : '',
+    });
+    if (expectedCast.count > 0) {
+      log.debug(`👥 [EVAL] ${pageContext}: expected cast (${expectedCast.count}) ${expectedCast.names.join(', ')}`);
+    }
 
     // Start three-stage eval in parallel for scene evaluations.
     // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
@@ -1154,6 +1260,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           interactionsBlock,
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
+          expectedCast: expectedCast.block,
           template: evalOptions.evalTemplateOverride || undefined,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
@@ -1346,8 +1453,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             originalPrompt: fullSanitized,
             artStyle: artStyleForEval,
             interactionsBlock,
-              sceneIntent: sceneIntentBlock,
+            sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
+            expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,
           })
         : evaluationPrompt;
@@ -1515,17 +1623,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
       // Parse fixable_issues from JSON (new two-stage format - no bboxes)
       // These will be enriched with bounding boxes in a separate detection step
-      let fixableIssues = [];
-      if (parsedJson.fixable_issues && Array.isArray(parsedJson.fixable_issues)) {
-        fixableIssues = parsedJson.fixable_issues
-          .filter(i => i.description)
-          .map(i => ({
-            description: i.description,
-            severity: i.severity || 'MODERATE',
-            type: i.type || 'default',
-            character: i.character || null,  // Preserved for bbox matching (incl. STEP 2C proportion issues)
-            fix: i.fix || `Fix: ${i.description}`
-          }));
+      let fixableIssues = parseFixableIssues(parsedJson);
+      {
         if (fixableIssues.length > 0) {
           const proportionCount = fixableIssues.filter(f => f.type === 'proportion').length;
           if (proportionCount > 0) {
@@ -1781,6 +1880,19 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
       if (matches.length > 0) {
         log.info(`📊 [EVAL] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
+      }
+      // COUNT DIAGNOSTIC (2026-09-10) — log only, never a finding: the prompt
+      // owns `extra_character` (D-04b). This surfaces the case the prompt
+      // missed — more figures than roster entries and no extra_character
+      // emitted — so a repeat of the five-for-four cover is countable.
+      if (expectedCast.count > 0 && figures.length > expectedCast.count) {
+        const flagged = fixableIssues.some(i => String(i.type || '').toLowerCase() === 'extra_character');
+        const unmatched = matches.filter(m => !m.reference || String(m.reference).toLowerCase() === 'unmatched').length;
+        log.warn(`👥 [EVAL] ${pageContext}: ${figures.length} figure(s) for a roster of ${expectedCast.count} (${unmatched} unmatched) — ${flagged ? 'extra_character reported' : 'NO extra_character finding emitted'}`);
+        try {
+          const sid = evalOptions?.storyMeta?.storyId;
+          if (sid && !flagged) require('./runMetrics').forJob(sid).count('eval_figure_surplus_unflagged');
+        } catch { /* metrics are best-effort */ }
       }
 
       // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
@@ -2093,5 +2205,7 @@ module.exports = {
   evaluateThreeStage,
   sanitizeForGemini,
   evaluateImageQuality,
+  buildExpectedCastBlock,
+  parseFixableIssues,
   IMAGE_QUALITY_THRESHOLD,
 };

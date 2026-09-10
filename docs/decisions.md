@@ -31891,3 +31891,69 @@ Advisory first; promote to must-fix only on the same evidence the Q4/Q8 set requ
 **Touched:**   prompts/story-beats.txt (rule 44), prompts/plan-check.txt (Q10),
 server/lib/promptBuilders.js (rationale comment only)
 **Status:**    active
+
+## The quality evaluator gets an EXPECTED CAST roster; `extra_character` is a real CRITICAL type (2026-09-10)
+**Context:**   Front cover of `job_1788903616404_iqvhj4l8m`: four commissioned boys, FIVE children
+painted (a dog's name had leaked into the cover prose — fixed in `53f7a9b62`). The stored eval
+of that version: `figures` = 5, `matches` = Julian 0.9 / Levin 0.9 / Max 0.9 / **Nia 0.9** / Kiaan
+0.9, `fixable_issues` = [], verdict PASS, qualityScore **100/100**. The judge bound the phantom child
+to the dog's name because nothing in its inputs said what "Nia" was or how many figures to expect:
+`evaluateImageQuality` passed only `ORIGINAL_PROMPT` prose and reference photos, `sceneCharacters`
+fed the clothing contract and photo attachment only. `image-evaluation.txt` penalised MISSING (D-04)
+and DUPLICATE (D-03/D-03b); N-09 "Crowd extras" was an unconditional never-deduct; the `matches`
+spec did not constrain `reference` to a roster. `extra_character` sat in `evalBuckets.TYPE_TO_BUCKET`
+with no prompt able to emit it (orphan, BACKLOG 2026-09-06). The only count comparison in the repo,
+`findBorrowedLabel`, is repair TARGETING and returns null unless the brief has MORE names than
+figures — one-directional. SETTLED check: N-09 / crowd extras is NOT a settled line; pose-mirror is
+the only never-deduct on that page.
+**Decision:**  "Compute in code, inject into the critique, prompt classifies":
+1. `buildExpectedCastBlock` (`server/lib/evalPipeline.js`) builds, ONCE inside `evaluateImageQuality`,
+   `EXPECTED CAST (N): name, name, VBname (secondary character), VBname (animal, dog)` — the page's
+   `sceneCharacters` + the Visual Bible secondaries AND animals the page metadata names, through the
+   SAME helper char-repair targeting uses (`buildSecondaryExpectedCharacters`, new `includeAnimals`
+   opt — the detector default still excludes animals, owner 2026-08-19). Covers add every VB person /
+   animal the cover description names via `matchVbEntitiesInText` (the cover NAME invariant's matcher).
+   `evalOptions.detectedFigureCount` appends `Detector figure count (GroundingDINO): n` when the caller
+   has a prior detection (batch eval passes `img.bboxDetection.figures.length`; first-round evals run
+   before detection, so null there). Empty block when no cast is known → the template says do not
+   judge the count. New `{EXPECTED_CAST}` placeholder = INPUTS item 8 (`buildEvaluationPrompt`). The
+   eval prompt never passes through `shrinkPromptForModel` (image-gen only), so placement is safe.
+2. `prompts/image-evaluation.txt`: **D-04b `extra_character` → CRITICAL** — a person or animal figure
+   matching no EXPECTED CAST entry outside a populated setting the USER_PROMPT calls for; a person
+   never satisfies an animal entry; one entry per surplus figure, `character` = figure id. `matches.
+   reference` must be a roster name or the literal `unmatched` — never a name in neither. **N-09 was
+   narrowed**: extras are free ONLY when the USER_PROMPT itself calls for a populated setting; a cast
+   list with no crowd language has no extras.
+3. Mirrors: `feedback-consolidator.txt` closed list + "keeps its own type when merging, one entry per
+   surplus figure"; `image-prompt-compliance.txt` never pairs an `unmatched` figure with a prompt name
+   (quality owns the finding). `image-semantic.txt` untouched — it judges named characters from prose;
+   an uncommissioned figure is a quality-eval fact.
+4. Scoring: CRITICAL, deliberately ABSENT from `MAX_SEVERITY_TYPES` (comment added beside
+   `duplicate_identity`) — a MAJOR cap leaves a 100-scoring five-for-four cover unrepaired; CRITICAL
+   trips `findBadPages`' critical arm regardless of score. Bucket `character_presence` (already mapped).
+5. Diagnostics only, never findings: `evalPipeline` WARNs `N figure(s) for a roster of M (k unmatched)
+   — NO extra_character finding emitted` (+ metric `eval_figure_surplus_unflagged`); `findBorrowedLabel`
+   now also WARNs on SURPLUS (`5 figure(s) drawn for a brief of 4 … 1 surplus`) — its deficit refusal is
+   unchanged.
+**Repair route** for a CRITICAL `extra_character`: `findBadPages` critical arm → `decideRepairMethod`:
+not CATASTROPHIC, no entity finding, not clothing → step 3 **inpaint** (`extra_character` is not in
+`NOT_INPAINTABLE_TYPES`; the consolidated plan carries the `fix` "Remove this figure; the frame holds
+the EXPECTED CAST only"). No figure-removal method was built; a Grok whole-frame edit is the removal
+path. Covers (`pageNumber <= 0`) skip the entity gate and take the same inpaint route.
+**Rationale:** The roster is the count; the prompt classifies. Classification stays out of code
+(SETTLED); code adds an input and bounds nothing new. CRITICAL because MAJOR reproduces the failure.
+**Verified:**  `tests/unit/extra-character-type.test.ts` (20 tests: page + cover roster, CRITICAL
+billing through `parseFixableIssues` → `composeDeductions`, critical arm, both borrowed-label
+directions, prompt vocabulary); `npm run test:unit` 78 files / 1007 pass. Offline render of the real
+stored cover (staging `stories`, no model call): `EXPECTED CAST (5): Levin, Julian, Max, Kiaan, Nia
+(animal, dog)` / `Detector figure count (GroundingDINO): 5` — the roster now says the fifth entry is a
+dog, so a fifth child is D-04b; with `53f7a9b62` the prose no longer names her and the roster is 4.
+**Not wired:** manual page-edit / manual-repair / cover-edit / char-repair eval calls in
+`server/routes/regeneration.js` (:3413, :3612, :3707, :6108, :6475) pass no cast (their reference
+lists are the WHOLE story cast, unusable as a roster) — block empty, count not judged there.
+**Touched:**   server/lib/evalPipeline.js, server/lib/promptBuilders.js, server/services/prompts.js,
+server/lib/images.js, server/lib/charRepairTarget.js, server/lib/scoring.js (comment),
+server/routes/regeneration.js (re-evaluate endpoint passes `scene.sceneCharacters`),
+prompts/image-evaluation.txt, prompts/feedback-consolidator.txt, prompts/image-prompt-compliance.txt,
+tests/unit/extra-character-type.test.ts
+**Status:**    active (staging, not on master)

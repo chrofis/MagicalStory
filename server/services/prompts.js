@@ -671,6 +671,10 @@ function buildEvaluationPrompt(opts = {}) {
     // template then tells the model to skip clothing judgments entirely
     // rather than invent a contract from the theme.
     CLOTHING_CONTRACT: opts.clothingContract || '',
+    // Empty when the caller knows no cast for this frame — the template then
+    // tells the model not to judge the figure count (evalPipeline
+    // buildExpectedCastBlock owns the roster).
+    EXPECTED_CAST: opts.expectedCast || '',
     // Empty when the caller has no prompt to read a style from — the template
     // then tells the model to skip the style rule and judge normally.
     ART_STYLE: opts.artStyle || extractArtStyle(opts.originalPrompt) || '',
