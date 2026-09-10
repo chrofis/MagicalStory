@@ -1466,7 +1466,7 @@ SETTING DESCRIPTION:
 ${setting}
 ${sceneIntentBlock}${creatureBlock}
 
-PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
+PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures rest on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). When a cast entry's action puts the figure in or on something - a boat, a cart, a saddle, a chair, a wall, a ledge - the figure is placed IN or ON that thing, at that thing's position and level, and that thing is its surface: a figure seated in a rowing boat on the water sits inside the boat's hull, below the level of any deck or quay beside it, not on the deck next to the boat. NEVER position a silhouette with its feet on bare water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
 
 ${lines}
 

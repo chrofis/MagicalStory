@@ -31793,3 +31793,18 @@ painted. A head-only silhouette above a wall is near-square and keeps its measur
 this feeds is right when the head is real and catastrophic when it is not; one ratio separates them.
 **Touched:**   server/lib/sceneComposite.js
 **Status:**    active
+
+## Composite plate: a figure whose action puts it in or on something is placed there (2026-09-10)
+**Context:**   The populated-plate prompt said "Figures must stand on a SOLID surface (dock plank, floor,
+ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water." A cast entry
+seated in a rowing boat on the water was therefore fighting a hard rule: across five plates the
+stand-in landed in the boat twice, beside it, on the deck, and on the rail (Lab exp 1081-1091). The
+rule was written to stop floating figures, not to keep a figure out of a boat.
+**Decision:**  The rule keeps its list and its NEVER for bare water and sky, and gains: when a cast
+entry's action puts the figure in or on something - a boat, a cart, a saddle, a chair, a wall, a
+ledge - the figure is placed in or on that thing, at its position and level, and that thing is its
+surface; a figure seated in a rowing boat sits inside the hull, below any deck beside it.
+**Rationale:** Two instructions and the model picks one at random is exactly a 2-of-5. Containment is
+already stated in the action; the surface rule just has to yield to it.
+**Touched:**   server/lib/sceneComposite.js (populated-plate prompt)
+**Status:**    active
