@@ -31620,3 +31620,38 @@ re-audit stays deleted; this is its $0 replacement for that class only.
 `server/lib/textRefine.js`, `server/config/models.js`, `storyJobPipeline.js`,
 `tests/unit/text-repetition.test.ts` (new).
 **Status:**    ✅ active (staging; unverified on a live run)
+
+## The plan's own grammar marks a THING: an article- or preposition-marked name is never cast (2026-09-10)
+**Context:**   First live firing of the 2026-09-09 `ARC_INVENTED_UNDECLARED` cross-check, on
+`job_1788983823620_csjcyp1q9`, named the story's SHIP and its TOWN as undeclared invented
+figures. Both are excluded by the source-based definition (vehicles and places never count),
+but the check compares the arc's list against `resolveCast().invented`, whose
+acts-like-a-person test ("name followed by a lowercase word") promoted them: "the <ship> seen
+from the water", "<town> and its chain block the way". The story's place data
+(`collectPlaceNames`) cannot know an invented ship or harbour, so the existing exclusions did
+not reach them.
+**Decision:**  A grammatical test in `resolveCast`, beside the place-data and calendar
+exclusions (`isThingMarked`): the PAGE PLAN is English by contract, and English marks a thing
+with an article — "the <ship>", "the harbour of <town>" — while nobody writes "the <person>".
+On the IMMEDIATELY preceding token only: an occurrence is thing-marked when that token is an
+article (`the/a/an`) or one of the module's place prepositions (`of/at/through/…` — the same
+class, the same list `nameCandidates` already trusts; `through` was missing and is added). An
+occurrence acts unmarked when it has no marker and is followed by a lowercase word other than
+a coordinator (`and/or/nor` — "<town> and its chain block" is the pair's verb, not the name's).
+A name is a THING when marked at least once and never acting unmarked; a name marked once but
+acting on its own elsewhere stays a person. Commissioned names never reach the test. The
+result joins `cast.places`, so every counter is protected; `ARC_INVENTED_UNDECLARED`
+re-applies it (`thingMarkedNames`) so a thing is never listed there even for a cast it did
+not resolve. The arc-side enumeration, `ARC_INVENTED_OVER_ALLOWANCE`, and what the arc must
+list are unchanged.
+**Rationale:** Owner ruling: fix on the counter side, mechanically, and never by widening what
+the arc must list. Vocabulary matching ("ship", "harbour") is the banned prose-sniff; an
+article test is a contract of the plan's grammar, the class `planCounters.js` already relies
+on (stopwords, place prepositions, "Plan in ENGLISH"). Measured on the real plan: the ship and
+the town leave the cast, the one real invented person stays, the finding is gone. The rule
+also drops the article-marked compound landmarks blind (without place data) on the earlier
+Uetliberg case, so the place-data test there was narrowed to the bare hill it still needs.
+**Touched:**   `server/lib/planCounters.js` (`ARTICLES`, `THING_MARKERS`, `COORDINATORS`,
+`isThingMarked`, `thingMarkedNames`, `resolveCast`, the 6b cross-check; `through` in
+`PLACE_PREPOSITIONS`), `tests/unit/plan-counters.test.ts`
+**Status:**    ✅ active (staging, not on master)

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — CommonJS lib
 import planCounters from '../../server/lib/planCounters.js';
-const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames } = planCounters as any;
+const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames, thingMarkedNames } = planCounters as any;
 
 /** A well-formed plan line: shot — who — instant — change. */
 const line = (shot: string, who: string, instant = 'something happens', change = 'something is now true') =>
@@ -84,10 +84,15 @@ describe('place names are never cast (story job_1788614817116_vxnu60yjg)', () =>
     expect(cast.places).toContain('Uetliberg');
   });
 
-  it('without the place names the same lines manufacture invented-dominant findings', () => {
+  it('without the place names the same lines still leak the bare hill into the cast', () => {
     const blind = runPlanCounters({ pages: PAGES, commissionedNames: BOYS });
     expect(blind.cast.invented).toContain('Uetliberg');
-    expect(blind.findings.map((f: any) => f.code)).toContain('INVENTED_DOMINANT_EXCESS');
+    expect(blind.stats.castPerPage[0].names).toContain('Uetliberg');
+    // The article-marked compounds ("the Oppidum Uetliberg", "the Aussichtsturm
+    // Uetliberg") are already dropped by the grammar rule (2026-09-10), so the
+    // blind run no longer reaches INVENTED_DOMINANT_EXCESS; the bare "Uetliberg"
+    // ("Oppidum Uetliberg ahead") still needs the place data.
+    expect(blind.cast.places).toEqual(expect.arrayContaining(['Oppidum Uetliberg', 'Aussichtsturm Uetliberg']));
 
     const fixed = runPlanCounters({ pages: PAGES, commissionedNames: BOYS, placeNames: PLACES });
     expect(fixed.findings.map((f: any) => f.code)).not.toContain('INVENTED_DOMINANT_EXCESS');
@@ -311,5 +316,85 @@ describe('calendar nouns are excluded from the cast (I10)', () => {
     for (const loc of ['en-gb', 'de-ch', 'fr', 'ja']) {
       for (const n of calendarNamesForLocale(loc)) expect(n).toMatch(/[a-zA-ZÀ-ɏ]/);
     }
+  });
+});
+
+describe('article/preposition-marked names are things, never cast (job_1788983823620_csjcyp1q9)', () => {
+  // The measured plan: a ship and a town, both written the way English writes a
+  // THING — "the <ship>", "the harbour mouth of <town>", "through <town>" — and
+  // both promoted to invented figures by the acts-like-a-person test alone.
+  const CREW = ['Fiona', 'Sarah'];
+  const SHIP_TOWN = [
+    page(1, 'ultra-wide — the crew seen from behind on the deck of the Sturmfeder — the harbour mouth of Krummhafen with its rusty chain stretches across the water — Krummhafen and its chain block the way forward'),
+    page(2, 'medium — Fiona and Malva Grimm facing each other across the rail — Fiona holds the map while Malva Grimm looks up at it — Fiona has refused; the Krummhafen chain still blocks the harbour'),
+    page(3, 'close-up — Fiona at the harbour — Malva rows the boat away — the crew has earned passage through Krummhafen'),
+    page(4, 'medium — Sarah at the rail — a small boat pulls away from the Sturmfeder behind her — the map has been taken'),
+    page(5, 'ultra-wide — the Sturmfeder seen from the water, tiny in dense grey fog — two dolphins arc alongside the bow — the rocks are found'),
+  ];
+
+  it('the ship ("the Sturmfeder") is not cast', () => {
+    const cast = resolveCast(SHIP_TOWN, CREW);
+    expect(cast.invented).not.toContain('Sturmfeder');
+    expect(cast.places).toContain('Sturmfeder');
+  });
+
+  it('the town ("the harbour of Krummhafen", "the Krummhafen chain", "through Krummhafen") is not cast', () => {
+    const cast = resolveCast(SHIP_TOWN, CREW);
+    expect(cast.invented).not.toContain('Krummhafen');
+    expect(cast.places).toContain('Krummhafen');
+  });
+
+  it('a real invented person who acts without an article is still cast', () => {
+    const cast = resolveCast(SHIP_TOWN, CREW);
+    expect(cast.invented).toEqual(['Malva Grimm', 'Malva']);
+  });
+
+  it('a commissioned name is never put through the article test', () => {
+    // "to Fiona" is preposition-marked; commissioned names resolve first.
+    const pages = [page(1, 'medium — Fiona and Sarah — Sarah hands the map to Fiona — Fiona has it')];
+    const cast = resolveCast(pages, CREW);
+    expect(cast.commissioned).toEqual(CREW);
+    expect(cast.places).toEqual([]);
+  });
+
+  it('a name written both as "the X" and as an actor keeps its cast slot — the article is decisive only when unopposed', () => {
+    const pages = [
+      page(1, 'medium — Fiona and Rook — Rook the gull lands on the rail — Fiona laughs'),
+      page(2, 'wide — Fiona and the Rook — Rook pulls the ribbon — Fiona has lost it'),
+    ];
+    expect(resolveCast(pages, CREW).invented).toEqual(['Rook']);
+  });
+
+  it('a name written as "the X" that never acts on its own is excluded, even when it heads a coordinated subject', () => {
+    const pages = [
+      page(1, 'wide — Fiona on the quay — the Eisenmöwe rides at anchor — Eisenmöwe and its crew wait'),
+      page(2, 'medium — Fiona at the rail of the Eisenmöwe — Fiona ties a knot — the knot holds'),
+    ];
+    const cast = resolveCast(pages, CREW);
+    expect(cast.invented).toEqual([]);
+    expect(cast.places).toEqual(['Eisenmöwe']);
+  });
+
+  it('ARC_INVENTED_UNDECLARED no longer lists the ship or the town', () => {
+    const { findings, cast } = runPlanCounters({
+      pages: SHIP_TOWN, commissionedNames: CREW, declaredInvented: ['Malva Grimm', 'Malva'], inventedAllowance: 2,
+    });
+    expect(findings.find(f => f.code === 'ARC_INVENTED_UNDECLARED')).toBeUndefined();
+    expect(cast.invented).toEqual(['Malva Grimm', 'Malva']);
+  });
+
+  it('ARC_INVENTED_UNDECLARED still fires for an undeclared person', () => {
+    const { findings } = runPlanCounters({
+      pages: SHIP_TOWN, commissionedNames: CREW, declaredInvented: [], inventedAllowance: 2,
+    });
+    const f = findings.find(x => x.code === 'ARC_INVENTED_UNDECLARED');
+    expect(f).toBeDefined();
+    expect(f.detail).toContain('Malva Grimm');
+    expect(f.detail).not.toContain('Sturmfeder');
+    expect(f.detail).not.toContain('Krummhafen');
+  });
+
+  it('thingMarkedNames guards a pre-resolved cast the same way', () => {
+    expect(thingMarkedNames(SHIP_TOWN, ['Sturmfeder', 'Krummhafen', 'Malva Grimm'])).toEqual(['Sturmfeder', 'Krummhafen']);
   });
 });

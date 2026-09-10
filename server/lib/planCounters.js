@@ -53,8 +53,28 @@ const NAME_STOPWORDS = new Set([
 /** Immediately-preceding words that mark the capitalised token as a place or vessel, not a person. */
 const PLACE_PREPOSITIONS = new Set([
   'of', 'at', 'in', 'on', 'to', 'from', 'near', 'across', 'up', 'down',
-  'toward', 'towards', 'beside', 'behind', 'inside', 'outside', 'along', 'past',
+  'toward', 'towards', 'beside', 'behind', 'inside', 'outside', 'along', 'past', 'through',
 ]);
+
+/**
+ * Immediately-preceding words that mark the capitalised token as a THING.
+ *
+ * The plan is English by contract, and English marks a thing with an article:
+ * "the <ship>", "a <chain>", "the harbour of <town>". Nobody writes "the
+ * <person>". The place prepositions above are the same grammatical class (the
+ * position after "of"/"at"/"through" is where vessels and locations live), so
+ * both sets form one marker test — a GRAMMATICAL test, never a vocabulary one:
+ * no word for ship, town, chain or any other thing is ever matched.
+ */
+const ARTICLES = new Set(['the', 'a', 'an']);
+const THING_MARKERS = new Set([...ARTICLES, ...PLACE_PREPOSITIONS]);
+
+/**
+ * Coordinators: the lowercase word after a name that does NOT show the name
+ * acting on its own ("<thing> and its chain block the way" — the verb belongs
+ * to the pair). Used only by the thing-marker decision below.
+ */
+const COORDINATORS = new Set(['and', 'or', 'nor']);
 
 /** Person words that make a page peopled even with no name in frame. */
 const PERSON_WORDS = /\b(?:crew|crewman|crewmen|sailor|sailors|man|men|woman|women|boy|boys|girl|girls|child|children|figure|figures|crowd|onlookers|guard|guards|villagers?|people)\b/i;
@@ -216,6 +236,64 @@ function nameRe(name, flags = 'iu') {
   return new RegExp(`\\b${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, flags);
 }
 
+/** Escape a literal for use inside a RegExp. */
+function reEscape(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Is this capitalised name written as a THING somewhere in the plan, and never
+ * as a person outside that position?
+ *
+ * Measured on job_1788983823620_csjcyp1q9: the plan named a ship ("the
+ * <ship> seen from the water", "a small boat pulls away from the <ship>") and a
+ * town ("the harbour mouth of <town>", "through <town>", "<town> and its chain
+ * block the way"). Both passed the acts-like-a-person test — a place is named
+ * and then does something in the after-segment — and burned invented-cast
+ * slots, so the 2026-09-09 arc cross-check reported them as undeclared figures.
+ *
+ * The rule, on the IMMEDIATELY preceding token only (no adjective allowance):
+ *   - an occurrence is THING-MARKED when that token is an article or a place
+ *     preposition (THING_MARKERS);
+ *   - an occurrence ACTS UNMARKED when it has no marker and is followed by a
+ *     lowercase word that is not a coordinator ("<name> rows", not "<name> and");
+ *   - the name is a thing when it is marked at least once and never acts
+ *     unmarked. A name that is marked once and acts on its own elsewhere stays a
+ *     person — the article form is decisive only when nothing contradicts it.
+ *
+ * Commissioned names never reach this test (resolveCast resolves them first),
+ * so a child whose name happens to follow "to" keeps her cast slot.
+ *
+ * @param {string} name the candidate as nameCandidates returned it
+ * @param {string} cleanCorpus the quote-stripped plan corpus
+ * @returns {boolean}
+ */
+function isThingMarked(name, cleanCorpus) {
+  // Same line only: the word that opens the NEXT plan line does not follow this name.
+  const re = new RegExp(`(\\S+[ \\t]+)?\\b${reEscape(name)}(?:'s|s')?\\b(?:[ \\t]+([a-zäöüß]+))?`, 'gu');
+  let marked = 0;
+  let actsUnmarked = 0;
+  let m;
+  while ((m = re.exec(String(cleanCorpus || ''))) !== null) {
+    const prev = String(m[1] || '').trim().toLowerCase().replace(/[^a-zäöüß]/g, '');
+    if (THING_MARKERS.has(prev)) { marked++; continue; }
+    const next = m[2] || '';
+    if (next && !COORDINATORS.has(next)) actsUnmarked++;
+  }
+  return marked > 0 && actsUnmarked === 0;
+}
+
+/**
+ * The article/preposition-marked names in a set of plan pages — the same test
+ * `resolveCast` applies, exposed so a consumer handed a cast it did not resolve
+ * itself (the ARC_INVENTED_UNDECLARED cross-check) can still refuse to list a
+ * thing as a figure.
+ */
+function thingMarkedNames(pages, names) {
+  const clean = stripQuoted((Array.isArray(pages) ? pages : []).map(p => String(p.planLine || '')).join('\n'));
+  return (Array.isArray(names) ? names : []).filter(n => isThingMarked(n, clean));
+}
+
 /**
  * Which candidates behave like people across the whole plan.
  *
@@ -228,6 +306,13 @@ function nameRe(name, flags = 'iu') {
  * so a character sharing a token with a landmark stays a character; an invented
  * person who shares one does not, and the model half of the check sees the same
  * pages and can contradict the list.
+ *
+ * Next, the grammar of the plan itself: a name that is article- or
+ * preposition-marked ("the <ship>", "of <town>") and never acts on its own is a
+ * THING, whatever the story's place data knows (`isThingMarked`). It joins the
+ * `places` list of the result, so every consumer — the per-page counters and
+ * the arc cross-check alike — is protected, not only the check it was measured
+ * on.
  *
  * What is left: a person acts: somewhere in the book the name is followed by a
  * lowercase word (a verb — "X stands", "X pulls"). A place is named and then
@@ -255,6 +340,12 @@ function resolveCast(pages, commissionedNames = [], placeNames = []) {
     if (commissioned.some(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(cand))) continue;
     // The story's own place data outranks the acts-like-a-person heuristic.
     if (places.some(pl => pl.toLowerCase() === cand.toLowerCase() || nameRe(pl).test(cand) || nameRe(cand).test(pl))) {
+      if (!excludedPlaces.includes(cand)) excludedPlaces.push(cand);
+      continue;
+    }
+    // The plan's own grammar outranks it too: "the <ship>", "the harbour of
+    // <town>" — a thing, never a figure (job_1788983823620_csjcyp1q9).
+    if (isThingMarked(cand, clean)) {
       if (!excludedPlaces.includes(cand)) excludedPlaces.push(cand);
       continue;
     }
@@ -434,7 +525,11 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   if (Array.isArray(declaredInvented)) {
     const declared = declaredInvented.map(n => String(n || '').trim()).filter(Boolean);
     const lower = new Set(declared.map(n => n.toLowerCase()));
-    const undeclared = cast.invented.filter(n => !lower.has(String(n).toLowerCase()));
+    // Never list a thing as a figure, even for a cast resolved elsewhere: the
+    // plan's own article/preposition marking is re-applied here (2026-09-10,
+    // job_1788983823620_csjcyp1q9 — a ship and a town were reported as figures).
+    const things = new Set(thingMarkedNames(pages, cast.invented));
+    const undeclared = cast.invented.filter(n => !lower.has(String(n).toLowerCase()) && !things.has(n));
     if (undeclared.length) {
       add('ARC_INVENTED_UNDECLARED', [],
         `the plan names invented ${undeclared.length === 1 ? 'figure' : 'figures'} ${undeclared.join(', ')} that the arc's own invented list does not carry (arc declared: ${declared.length ? declared.join(', ') : 'none'})`);
@@ -525,5 +620,7 @@ module.exports = {
   classifyShot,
   nameCandidates,
   resolveCast,
+  isThingMarked,
+  thingMarkedNames,
   namesIn,
 };
