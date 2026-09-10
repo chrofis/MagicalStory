@@ -19998,7 +19998,7 @@ the background is legitimately small) was presented and not chosen; it would
 need its own plan and Lab validation if ever revisited.
 
 **Touched:** nothing — confirmation of existing code.
-**Status:** ✅ settled by owner. Don't propose lowering it on near-miss evidence.
+**Status:** 🗄 superseded 2026-09-10 — the gate is removed by owner decision (see "The depth-spread gate is removed").
 
 ---
 
@@ -32017,3 +32017,18 @@ silhouette (exp 1087).
 sides; keeping the gate while enabling the pose render would refuse the plates that are now right.
 **Touched:**   server/lib/sceneComposite.js, storyJobPipeline.js
 **Status:**    active
+
+## 2026-09-10 — The depth-spread gate is removed (owner reversal of 2026-08-25)
+**Context:**   The 2.0× floor (calibrated on Lab 707/708/709, confirmed by the owner 2026-08-25 with
+"don't propose lowering it on near-miss evidence") refused the two plates that finally staged a
+two-level page correctly: Lab exp 1103 (1.47×) and 1104 (1.33×), both with the secondary seated in
+the boat on the water and the main character at the rail above. The owner judged 1104 "great" and
+said "remove the gate". The measure was wrong for this staging, not near-missed by it: a camera
+looking up from the lower level makes the upper figure SMALLER, so tallest/shortest read the
+strongest two-level staging as "no depth". The gate's own rationale - a static-cell paste below
+the floor can only lose - no longer applies now that production renders phantom poses.
+**Decision:**  The refusal is gone. The spread is still measured, logged, and written to
+debug.depthSpread as evidence; nothing acts on it. MIN_DEPTH_SPREAD and the Lab floor knob are
+deleted. Supersedes "MIN_DEPTH_SPREAD stays at 2.0×" (2026-08-25), owner's call on this evidence.
+**Touched:**   server/lib/sceneComposite.js, server/lib/testlab.js
+**Status:**    ✅ active; 2026-08-25 entry 🗄 superseded

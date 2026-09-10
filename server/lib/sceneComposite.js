@@ -135,11 +135,6 @@ const BODY_SAT_FLOOR = 0.45;
 // whole figure does not come near it. The old colour head-band could never
 // have supported it: there, every figure on a plate sat between 2.43 and 3.05.
 const MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.75;
-// The tallest figure on the plate must be at least this many times the
-// shortest for the scene to have the depth the composite exists to fix.
-// Calibrated on three pages: 2.77 (real depth, keep), 1.73 and 1.08 (no
-// depth, abort). See the abort block in generateSceneComposite.
-const MIN_DEPTH_SPREAD = 2.0;
 
 // ─── Grok aspect preset picker ────────────────────────────────────────────
 //
@@ -2400,16 +2395,12 @@ async function generateSceneComposite(opts) {
   //     40%. If detection is wrong about WHO is where, nothing after it is
   //     worth computing.
   //
-  // (b) No depth spread. The composite exists for scenes with someone near
-  //     and someone far; it is triggered by the scene metadata DECLARING that
-  //     split. The plate shows whether the split is real. Measured across
-  //     three pages (Lab 707/708/709):
-  //       p6  tallest/shortest 2.77, foot-lines spanning 40% of canvas — real
-  //       p10 1.73, 28% — five figures in one band, three standing in water
-  //       p4  1.08, 14% — five figures round one chest, declared 3 fore + 2 back
-  //     Below 2x there is no depth to correct, so compositing can only lose:
-  //     it removes Grok's own figures and pastes standing avatars into the
-  //     spaces where the plate drew people kneeling or waist-deep in a river.
+  // (b) Depth spread is MEASURED, not gated (owner, 2026-09-10). The 2.0x
+  //     refusal (calibrated on Lab 707/708/709, confirmed 2026-08-25) refused
+  //     the two plates that staged a two-level page correctly (exp 1103,
+  //     1104): a camera looking up from the lower level makes the upper
+  //     figure smaller, so the measure read the strongest depth staging as
+  //     none. debug.depthSpread is still written for the record.
   const figureBoxes = cast.map(c => detection.results[c.name]?.bbox).filter(Boolean);
   const bogus = cast.filter((c) => {
     const b = detection.results[c.name]?.bbox;
@@ -2439,23 +2430,13 @@ async function generateSceneComposite(opts) {
     const hs = figureBoxes.map(b => b.height);
     const spread = Math.max(...hs) / Math.min(...hs);
     debug.depthSpread = Number(spread.toFixed(2));
-    // Lab-only override of the floor (opts.minDepthSpread). Production never
-    // passes it, so MIN_DEPTH_SPREAD stands (owner-settled 2026-08-25).
-    const minSpread = Number.isFinite(opts.minDepthSpread) ? opts.minDepthSpread : MIN_DEPTH_SPREAD;
-    // The gate protects the STATIC-CELL paste: below the floor, replacing the
-    // plate's own figures with standing avatars can only lose (a kneeling or
-    // waist-deep figure becomes a standing one). With phantom pose each
-    // cut-out is re-posed to its silhouette, so that loss cannot happen and
-    // the plate's staging is kept whatever the spread - measured 2026-09-10:
-    // a from-below camera put a deck figure and a boat figure at 1.47x and
-    // the gate threw away the one plate that had both in the right place.
-    if (spread < minSpread && phantomPoseRender) {
-      log.info(`[SCENE COMPOSITE] depth spread ${spread.toFixed(2)}x is under the ${minSpread}x floor, but phantom pose re-poses every cut-out to its silhouette — the plate's staging stands`);
-    } else if (spread < minSpread) {
-      throw refuse(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
-        + `(needs ${minSpread}x). Every character is at the same distance, so the declared foreground/background `
-        + 'split is not real and there is nothing for the composite to correct — the page keeps its original render');
-    }
+    // No refusal on the spread (owner, 2026-09-10 - "remove the gate"). The
+    // 2.0x floor (2026-08-25) refused the two plates that finally staged a
+    // two-level page correctly (Lab exp 1103 at 1.47x, 1104 at 1.33x): a
+    // camera looking up from the lower level makes the upper figure SMALLER,
+    // so the measure that was meant to detect depth read the strongest depth
+    // staging as none. The spread stays measured and logged as evidence.
+    log.info(`[SCENE COMPOSITE] depth spread on the plate: ${spread.toFixed(2)}x (tallest/shortest figure) — recorded, not gated`);
   }
 
   // ── Stature correction ──────────────────────────────────────────────────
