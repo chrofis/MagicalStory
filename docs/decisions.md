@@ -31977,3 +31977,23 @@ depth from the interaction's position words or `background` when the id sits in 
 Owner's call, because it widens what the production composite renders.
 **Touched:**   nothing (docs only)
 **Status:**    open
+
+## Composite casts a secondary character staged as a CHR id; the trigger counts it (2026-09-10)
+**Context:**   The Art Director schema keeps secondary characters out of characters[] (no avatar,
+no clothing category); they are a CHR id in objects[] and the `character` of an interaction. The
+composite cast was built from characters[] only, so a schema-correct two-figure page was a
+one-figure cast: Lab exp 1101 pasted the main character into the other character's empty boat.
+needsScaleRepair likewise counted characters[] only and excluded any background figure "in the
+boat" - the workaround for the plate putting boats on decks, which the containment clause now fixes.
+**Decision:**  secondaryCastSeeds (pure, exported, tested): every CHR id in objects[] or as an
+interaction's character resolves to its bible entry and joins the cast at midground with the
+row's `where` as its action and a `watching` row's object (or `looksAt`) as its gaze; the
+reference sheet is fetched exactly as the name-matched fallback does. needsScaleRepair counts those
+figures, fires on one foreground figure plus one midground or background figure, and the shared-
+vessel exclusion is removed. Production widens accordingly: pages pairing a main character with a
+staged secondary now reach the composite after their native render.
+**Rationale:** Owner: "fix the gaps, don't record it". The composite is the one path measured to
+draw a two-level page (exp 1095), and it could not see the second figure of a correct brief.
+**Touched:**   server/lib/compositeCastBuilder.js, server/lib/scaleRepair.js,
+tests/unit/composite-secondary-cast.test.ts
+**Status:**    active

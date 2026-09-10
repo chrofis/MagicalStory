@@ -59,11 +59,27 @@ function needsScaleRepair(sceneMetadata) {
     || (Array.isArray(sceneMetadata?.characters) && typeof sceneMetadata.characters[0] === 'object'
         ? sceneMetadata.characters
         : null);
-  if (!Array.isArray(chars) || chars.length < 2) return false;
+  // Secondary characters staged as CHR ids (objects[] / interactions) count
+  // as figures, at midground: the schema keeps them out of characters[],
+  // and a two-figure page with one of them read as a one-figure page
+  // (2026-09-10). Depth words come from the brief's own fields only.
+  const figures = Array.isArray(chars) ? chars.slice() : [];
+  {
+    const seen = new Set(figures.map(c => String(c?.name || '').toLowerCase()));
+    const idOf = (v) => { const m = String(v || '').trim().match(/^CHR(\d+)/i); return m ? ('CHR' + m[1]).toUpperCase() : null; };
+    const ids = new Set();
+    for (const o of (sceneMetadata?.fullData?.objects || sceneMetadata?.objects || [])) { const id = idOf(typeof o === 'string' ? o : (o?.id || o?.name)); if (id) ids.add(id); }
+    for (const it of (sceneMetadata?.fullData?.interactions || sceneMetadata?.interactions || [])) { const id = idOf(it?.character); if (id) ids.add(id); }
+    for (const id of ids) if (!seen.has(id.toLowerCase())) figures.push({ name: id, depth: 'midground', position: '' });
+  }
+  if (figures.length < 2) return false;
   const depthOf = (c) => (c.depth || '').toLowerCase();
-  const bg = chars.filter(c => depthOf(c) === 'background');
-  const fg = chars.filter(c => depthOf(c) === 'foreground');
-  if (bg.length === 0 || fg.length === 0) return false;
+  // One figure in front and one further back is the depth the composite exists
+  // to hold; midground counts as 'further back' now that a midground figure can
+  // be a secondary the plate places on its own level (a boat below a rail).
+  const fg = figures.filter(c => depthOf(c) === 'foreground');
+  const back = figures.filter(c => depthOf(c) === 'background' || depthOf(c) === 'midground');
+  if (back.length === 0 || fg.length === 0) return false;
 
   // Skip indoor scenes. Rooms have limited depth — there's no "deep
   // background" to push a character into, so the relocate-and-shrink pass
@@ -89,8 +105,9 @@ function needsScaleRepair(sceneMetadata) {
   // mounts ("mounted on a horse", "on horseback") are NOT a shared vessel —
   // they're a single bg figure on their own animal, which is exactly what
   // scale-repair handles best (page 9: Gessler on horse, distant on path).
-  const SHARED_VESSEL_RE = /\b(?:inside (?:the|a|its)|aboard (?:the|a)|in (?:the|a) (?:tilting )?(?:boat|raft|ship|vessel|cart|wagon|carriage|coach|sleigh|train|car|carriage|coach))\b/i;
-  if (bg.some(c => SHARED_VESSEL_RE.test(c.position || ''))) return false;
+  // The shared-vessel exclusion (a background figure 'in the boat' skipped the
+  // composite) is gone: the populated-plate prompt now seats a figure in what
+  // its action names, which was the failure the exclusion worked around.
 
   return true;
 }

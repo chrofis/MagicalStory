@@ -66,6 +66,46 @@ function resolveLooksAt(raw, visualBible) {
   return null;
 }
 
+/**
+ * Secondary characters the brief stages but never lists in `characters[]`.
+ *
+ * The Art Director schema forbids secondaries in characters[] (they have no
+ * avatar, so no clothing category applies); they appear as a CHR id in
+ * objects[] and as the `character` of an interaction. Until 2026-09-10 the
+ * composite read characters[] only, so a schema-correct brief lost the second
+ * figure of a two-figure page (Lab exp 1101: the main character was pasted
+ * into the other character's empty boat). Each CHR id here becomes a seed:
+ * the bible entry, its action (the interaction's `where`), what it looks at
+ * (a `watching` row's object; a `looksAt` on the row if the AD wrote one),
+ * and a midground depth - the plate decides the real distance, and the
+ * depth-spread gate measures what was painted.
+ *
+ * @param {Object} fullData - the page's parsed metadata (characters, objects, interactions)
+ * @param {Object|null} visualBible
+ * @param {Set<string>} [alreadyCast] - lowercased names already in the cast
+ * @returns {Array<{id, name, entry, action, looksAt, depth}>}
+ */
+function secondaryCastSeeds(fullData, visualBible, alreadyCast = new Set()) {
+  const secondaries = visualBible?.secondaryCharacters || [];
+  if (!secondaries.length) return [];
+  const ids = new Set();
+  const idOf = (v) => { const m = String(v || '').trim().match(/^CHR(\d+)/i); return m ? ('CHR' + m[1]).toUpperCase() : null; };
+  for (const o of (fullData?.objects || [])) { const id = idOf(typeof o === 'string' ? o : (o?.id || o?.name)); if (id) ids.add(id); }
+  const rows = Array.isArray(fullData?.interactions) ? fullData.interactions : [];
+  for (const it of rows) { const id = idOf(it?.character); if (id) ids.add(id); }
+  const seeds = [];
+  for (const id of ids) {
+    const entry = secondaries.find(e => String(e?.id || '').toUpperCase() === id);
+    if (!entry?.name) continue;
+    const name = String(entry.name);
+    if (alreadyCast.has(name.toLowerCase())) continue;
+    const row = rows.find(it => idOf(it?.character) === id) || null;
+    const looksAt = row?.looksAt || (row && String(row.action || '').toLowerCase() === 'watching' ? row.object : null) || null;
+    seeds.push({ id, name, entry, action: row?.where || null, looksAt, depth: 'midground' });
+  }
+  return seeds;
+}
+
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null, visualBible = null } = deps;
   if (!log) throw new Error('buildCompositeCast: deps.log is required');
@@ -75,7 +115,9 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
     || pageData.sceneCharacters
     || [];
   const sceneChars = Array.isArray(metaChars) ? metaChars : [];
-  if (!sceneChars.length) return null;
+  const fullDataForSeeds = pageData.sceneMetadata?.fullData || pageData.sceneMetadata || {};
+  const seedCount = secondaryCastSeeds(fullDataForSeeds, visualBible).length;
+  if (!sceneChars.length && !seedCount) return null;
 
   // Action lookup from interactions[] — essential > normal > low.
   const interactionsList = pageData.sceneMetadata?.fullData?.interactions
@@ -302,6 +344,37 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       gender: character.gender || null,
     });
   }
+  // Secondary characters named only as CHR ids (objects[] / interactions).
+  {
+    const have = new Set(out.map(c => String(c.name || '').toLowerCase()));
+    for (const seed of secondaryCastSeeds(fullDataForSeeds, visualBible, have)) {
+      const vbRef = seed.entry.referenceImageUrl || seed.entry.referenceImageData || null;
+      if (!vbRef) { log.warn(`[COMPOSITE CAST] ${seed.name} (${seed.id}): staged by the brief but no Visual Bible reference sheet — left out of the composite`); continue; }
+      let vbBuf;
+      try {
+        vbBuf = /^https?:\/\//i.test(String(vbRef))
+          ? Buffer.from(await (await fetch(vbRef)).arrayBuffer())
+          : Buffer.from(stripDataUriPrefix(String(vbRef)), 'base64');
+      } catch (err) { log.warn(`[COMPOSITE CAST] ${seed.name}: Visual Bible sheet unreadable (${err.message}) — left out`); continue; }
+      out.push({
+        name: seed.name,
+        sheetBuf: vbBuf,
+        singleImage: true,
+        pose: 'threeQuarter',
+        flip: false,
+        action: seed.action,
+        looksAt: resolveLooksAt(seed.looksAt, visualBible),
+        position: seed.action ? 'where the action places them' : 'in the scene',
+        depth: seed.depth,
+        sizeHint: seed.depth,
+        description: seed.entry.extractedDescription || seed.entry.description || null,
+        fromVisualBible: true,
+        fromObjects: true,
+      });
+      log.info(`[COMPOSITE CAST] ${seed.name} (${seed.id}): secondary character staged as a CHR id — added to the cast from the Visual Bible sheet`);
+    }
+  }
+
   return out;
 }
 
@@ -514,4 +587,4 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   return buildCompositeCast(fakePageData, fakeInputData, deps);
 }
 
-module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum };
+module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds };
