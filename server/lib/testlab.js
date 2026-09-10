@@ -4313,7 +4313,19 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   const { MODEL_DEFAULTS } = require('../config/models');
   const { storyData, userId } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const scene = ctx.scene || {};
+  // Lab-only: composite a NEW brief (e.g. a fresh Art-Director output) without a
+  // story rerun — the same knob the image stage has. The override replaces the
+  // stored brief and its metadata; everything else on the page stays as stored.
+  let scene = ctx.scene || {};
+  if (typeof params.sceneDescriptionOverride === 'string' && params.sceneDescriptionOverride.trim()) {
+    const { extractSceneMetadata } = require('./storyHelpers');
+    const meta = extractSceneMetadata(params.sceneDescriptionOverride);
+    scene = { ...scene, sceneDescription: params.sceneDescriptionOverride, sceneMetadata: meta,
+      sceneCharacters: meta?.fullData?.characters || meta?.characters || scene.sceneCharacters,
+      emptyScenePrompt: meta?.emptyScenePrompt || meta?.fullData?.emptyScenePrompt || scene.emptyScenePrompt,
+      compositeBrief: null };
+    log.info('[TESTLAB] composite: staging from sceneDescriptionOverride, not the stored brief');
+  }
   const fd = scene.sceneMetadata?.fullData || scene.sceneMetadata || {};
   const strategy = params.strategy === 'stratified' ? 'stratified' : 'uniform';
   const facing = params.facing === 'derive' ? 'derive' : 'threeQuarter';

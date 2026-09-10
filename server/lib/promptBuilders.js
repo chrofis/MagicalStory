@@ -392,9 +392,14 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
  * @param {string} pageLabel - e.g. "PAGE 4 " for logs
  * @returns {{[name: string]: { richDescription: string }}}
  */
-function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames = [], pageLabel = '') {
+function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames = [], pageLabel = '', opts = {}) {
   const out = {};
   const vb = visualBible || {};
+  // `includeAnimals` (2026-09-10): the EXPECTED CAST roster the quality
+  // evaluator reads counts every figure the page was written for, animals
+  // included — a dog written for the page is one roster entry, a fifth child
+  // painted for it is not. The detector exclusion below stays the default.
+  const { includeAnimals = false } = opts || {};
   // ANIMALS ARE NOT EXPECTED CHARACTERS (owner, 2026-08-19). DINO detects
   // `person`; a dog or a dragon can never satisfy it, so every animal in the
   // expected list is a guaranteed "missing person": it fires the undercount,
@@ -405,6 +410,7 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
   // case this function exists for) keep flowing.
   const lists = [
     { list: vb.secondaryCharacters, kind: 'secondary character' },
+    ...(includeAnimals ? [{ list: vb.animals, kind: 'animal' }] : []),
   ];
   // A malformed Visual Bible (object instead of array, missing entirely) must
   // not throw — the page still renders, it just has no secondary to add.
@@ -635,12 +641,13 @@ function buildSecondaryExpectedForPage(visualBible, pageNumber, knownNames = [])
 }
 
 function buildSecondaryExpectedCharacters(visualBible, sceneMetadata, knownNames = [], opts = {}) {
-  const { pageLabel = '', extraNames = [] } = opts;
+  const { pageLabel = '', extraNames = [], includeAnimals = false } = opts;
   const resolved = buildSecondaryCharacterDescriptions(
     visualBible,
     collectSceneCharacterNames(sceneMetadata, extraNames),
     knownNames,
-    pageLabel
+    pageLabel,
+    { includeAnimals }
   );
   return Object.entries(resolved).map(([name, d]) => ({ name, description: d.richDescription }));
 }
@@ -5292,6 +5299,14 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  * quest object was put back. The check detects the fault reliably; this
  * planner does not repair it, and a mild visible fault is not worth a silent
  * severe one. Q9 stays a visible finding, not a mandate.
+ *
+ * Q10 (two named characters at two heights) joined 2026-09-10, advisory like
+ * Q9: measured across six staging stories, the two-height pages that failed were
+ * the ones where both figures mattered (q10, and one page that collapsed 5/5
+ * across every renderer path), and the ones that passed put one figure up high
+ * with the rest a mass or tiny — which is what the rule now says to do. Kept
+ * advisory for the same reason as Q9: the planner detects reliably and a forced
+ * repair has destroyed pages before.
  */
 const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
 

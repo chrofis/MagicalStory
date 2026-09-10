@@ -31869,3 +31869,25 @@ composite already reads a `watching` row as its gaze fallback, so no code change
 **Decision:**  All three sites use horizontal whitespace only, `[ \t]+`, never `\s+`: the `acts` regex in `resolveCast`, and both groups of the capitalised-name regex in `nameCandidates`. Nothing else changes — the thing-marker rule, `canonicalName`, `stripQuoted`, the stopword list and the marker sets are untouched. Real plan of `job_1788983823620_csjcyp1q9` (commissioned Sarah, Saira, Facundo, Fiona, Lorena; arc declared `Malva Grimm`) before and after: `cast.invented` = `["Malva Grimm"]`, `cast.places` = `["Grossmünster","Sturmfeder","Krummhafen"]`, findings `MAIN_UNDER_HALF, NO_COMMISSIONED_ON_PAGE, UNDER_COVERED_CHARACTER, CONSECUTIVE_SAME_SHOT_CAST` — identical, because on that plan every line-ending name happened to be article/preposition-marked and `isThingMarked` caught it first; the defect fires on an UNMARKED line-ending name ("names the ship <ship>"), which the new unit fixtures use for exactly that reason. Same-line is now the rule for every per-name grammar test in the module: any future test that looks at a name's neighbours uses `[ \t]`.
 **Touched:**   server/lib/planCounters.js (`resolveCast` acts regex, `nameCandidates` regex), tests/unit/plan-counters.test.ts (5 fixtures, incl. the real 16-line plan)
 **Status:**    active
+
+## Two named characters at two heights is not one picture: plan rule sharpened, plan-check Q10 (2026-09-10)
+**Context:**   The plan prompt already said "Everyone stands on the ground. A figure up high only
+when the event IS that height - then one figure up there and no one else off the ground" (rule 44),
+and no plan-check question asked about it. Page 4 of job_1788983823620_csjcyp1q9 staged two named
+characters facing each other across a rail with a boat below, and five native renders across three
+briefs, two plates and a declared gaze (looksAt) collapsed both onto one level - the renderer puts
+every named figure on one plane and moves the world to fit. Measured across the last six staging
+stories (104 plan lines, 13 two-height candidates): the ones that failed were those where BOTH
+figures had to be seen (a ledge/below page at q10; this page 5/5), the ones that passed had one
+figure up high and the rest a mass or tiny (three flight pages at q100).
+**Decision:**  Rule 44 gains the WHY and the three working shapes: from the lower level with the
+upper character alone in frame; from the upper level with the lower character alone; or two pages.
+A crowd, a mount or a vehicle carrying the whole cast is one thing at one height and is exempt.
+plan-check.txt gains Q10 (two heights), advisory - not in REPLAN_MUST_FIX_CHECKS, for the reason
+recorded there against Q9: the planner detects reliably and a forced repair has destroyed pages.
+**Rationale:** The constraint is the renderer's and cannot be prompted away downstream (AD rule 11f
+measured ineffective the same day); the plan is the one stage that can choose a different picture.
+Advisory first; promote to must-fix only on the same evidence the Q4/Q8 set required.
+**Touched:**   prompts/story-beats.txt (rule 44), prompts/plan-check.txt (Q10),
+server/lib/promptBuilders.js (rationale comment only)
+**Status:**    active
