@@ -389,7 +389,7 @@ function cellGatePrompt(styleDescription = '', age = null, build = null) {
   const sexClause = buildText
     ? ` (${age ? 4 : 3}) Sex: the character is described as "${buildText}". Does the figure read as the sex that description states? A figure that reads as the other sex fails, whatever else is right.`
     : '';
-  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Is the figure's skin a plausible human skin color — not green-, gray- or blue-tinted? (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Colouring: a human figure has a plausible human skin color — not green-, gray- or blue-tinted; an animal or creature is judged on the colouring its description states instead, never on human skin. (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
 }
 
 // ── Character-cell render gate ──────────────────────────────────────────────

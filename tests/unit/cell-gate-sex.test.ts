@@ -32,7 +32,8 @@ describe('character cell gate asks about sex', () => {
 
   it('keeps the original skin and art-style checks', () => {
     const p = cellGatePrompt(style, null, null);
-    expect(p).toContain('(1) Is the figure\'s skin a plausible human skin color');
+    expect(p).toContain('(1) Colouring: a human figure has a plausible human skin color');
+    expect(p).toContain('an animal or creature is judged on the colouring its description states instead');
     expect(p).toContain('(2) Is the cell actually rendered in the declared art style');
     expect(p).toContain('"natural": true or false');
   });
