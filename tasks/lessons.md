@@ -788,3 +788,7 @@ exits with GREP's status, so two failing tests read as success and the chain com
 (34b7d7a8). Rule: `npx vitest run --reporter=dot > "$LOG" 2>&1; RC=$?; tail -3 "$LOG"; test $RC -eq 0 && ...`
 - the exit code comes from the runner, never from a filter. Applies to every command whose result
 gates the next step: run it bare or capture to a file, then filter the file.
+
+## 2026-09-11 — a stage that fails open is invisible until you count it
+The production composite aborted on every trigger for 17 days ("cleanBackgroundPrompt or scene.description required") and nobody saw it: the pipeline caught the throw, kept the direct render, and every "composite verdict" in that period was a Lab verdict. A rerun meant to validate a composite change validated nothing.
+Rules: (1) before claiming a stage ran, read the stored outcome field for the pages it should have touched (here `compositeOutcome`), not the log of the change; (2) when wiring a call from a closure, confirm each field exists ON THAT OBJECT at that point (`pageData.scene.sceneDescription`, not `pageData.sceneDescription`); (3) a fail-open stage needs an abort count in the run summary.
