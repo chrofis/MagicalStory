@@ -31860,5 +31860,6 @@ writing her `watching` row too.
 **Decision:**  Rule 8j and the reviewer's [gaze_missing]: a secondary character's gaze is a
 `watching` interaction whose object is what it looks at, with the prose saying the same. The
 composite already reads a `watching` row as its gaze fallback, so no code change.
+**Verified:**  Lab exp 1097 (page 4, commit c7837902): characters[] = Fiona looksAt CHR001; interactions[] = Fiona pressing the chart (hands) + CHR001 watching ART001.1 from the rowing boat below, gaze upward (the secondary character's gaze as a watching row). Eyes and hands in separate fields for the first time; the AD also framed the page from one level unprompted (camera below deck level, Fiona large above, boat small below).
 **Touched:**   prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt
 **Status:**    active
