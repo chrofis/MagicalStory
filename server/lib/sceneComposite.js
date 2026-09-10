@@ -2741,6 +2741,7 @@ async function generateSceneComposite(opts) {
   const blended = await blendPastedCanvas({
     compositedData, scene: { ...scene, occludedBy }, cast,
     aspectRatio, visualBibleGridImage, usageTracker, debug,
+    visualBible: opts.visualBible,
   });
   totalCost += blended.cost;
 
@@ -2767,9 +2768,9 @@ async function generateSceneComposite(opts) {
  */
 async function blendPastedCanvas({
   compositedData, scene, cast, aspectRatio, visualBibleGridImage,
-  usageTracker, promptOverride = null, debug = {},
+  usageTracker, promptOverride = null, debug = {}, visualBible = null,
 }) {
-  let blendPrompt = scrubBlendPrompt(promptOverride || buildBlendEditPrompt(scene, cast), opts.visualBible, 'uniform');
+  let blendPrompt = scrubBlendPrompt(promptOverride || buildBlendEditPrompt(scene, cast), visualBible, 'uniform');
   // The page's own prompt runs to ~7.5k on a busy page, so it can pass Grok's
   // budget once the staging clause is added. Shrink with the SAME helper page
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
@@ -2880,7 +2881,7 @@ async function generateStratifiedComposite(opts) {
   // attached so the dev panel can still show what Grok produced up to the
   // point of failure (anchor plate, depopulate output, etc.).
   try {
-    return await _stratifiedBody({ debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage });
+    return await _stratifiedBody({ visualBible: opts.visualBible, debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage });
   } catch (err) {
     err.partialDebug = debug;
     throw err;
@@ -3316,7 +3317,7 @@ async function _simpleCompositePath({ visualBible = null, emptySceneData, frontC
 }
 
 async function _stratifiedBody(ctx) {
-  let { debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage } = ctx;
+  let { debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage, visualBible = null } = ctx;
 
   // ── Step 0: empty-scene canvas
   // Stratified step 1 is a Grok EDIT so we can attach identity packs as
@@ -3353,7 +3354,7 @@ async function _stratifiedBody(ctx) {
   // a visible composited intermediate in the dev panel.
   if (backCast.length === 0) {
     return _simpleCompositePath({
-      visualBible: opts.visualBible,
+      visualBible,
       emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost,
       visualBibleGridImage,
     });
@@ -3852,7 +3853,7 @@ async function _stratifiedBody(ctx) {
 
   // ── Step 4/4: blend pass (same as uniform path)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 4/4 — blend pass');
-  const blendPrompt = scrubBlendPrompt(buildBlendEditPrompt(scene), opts.visualBible, 'stratified');
+  const blendPrompt = scrubBlendPrompt(buildBlendEditPrompt(scene), visualBible, 'stratified');
   debug.blendPrompt = blendPrompt;
   const blendRefs = visualBibleGridImage
     ? [compositedData, visualBibleGridImage]

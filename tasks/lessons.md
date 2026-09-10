@@ -771,3 +771,12 @@ every `assert old in s` against a JS template literal containing `\n` failed
 silently-looking ("no match") while the file was obviously right. Build such
 needles with `B = chr(92)` and concatenate — never rely on `\n` surviving the
 heredoc. Two wasted edit attempts before this was spotted.
+
+## A pipe masks a failed push; a wait loop needs a bound (2026-09-10)
+
+In a guarded && chain, `git push ... | grep | tail` reports TAIL's exit code, so a push the pre-push gate
+refused read as success and the chain went on to "wait for the deploy" of a commit that never left the
+machine - an unbounded `until curl ...` loop that ran until the OS killed it for memory. Two rules:
+(1) never pipe a command whose exit code guards the chain - run it bare, or `set -o pipefail`;
+(2) every wait loop gets a deadline (`for i in $(seq 1 60)` ...) and fails loudly when it expires.
+The gate itself was right (check-no-undef found three real ReferenceErrors).
