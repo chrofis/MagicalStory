@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — CommonJS lib
 import planCounters from '../../server/lib/planCounters.js';
-const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames, thingMarkedNames } = planCounters as any;
+const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames, thingMarkedNames, stripQuoted, namesIn } = planCounters as any;
 
 /** A well-formed plan line: shot — who — instant — change. */
 const line = (shot: string, who: string, instant = 'something happens', change = 'something is now true') =>
@@ -396,5 +396,44 @@ describe('article/preposition-marked names are things, never cast (job_178898382
 
   it('thingMarkedNames guards a pre-resolved cast the same way', () => {
     expect(thingMarkedNames(SHIP_TOWN, ['Sturmfeder', 'Krummhafen', 'Malva Grimm'])).toEqual(['Sturmfeder', 'Krummhafen']);
+  });
+});
+
+describe('stripQuoted: a possessive apostrophe is not an opening quote (job_1788983823620_csjcyp1q9)', () => {
+  // The old `'[^']*'` clause read "ship's … Fiona's" as one quotation and
+  // deleted everything between two possessives — 969 of 3818 plan chars (26%)
+  // on the measured plan, whole pages gone from the corpus every cast test scans.
+  it('two possessives lose nothing', () => {
+    const t = "the ship's bow and Fiona's chart";
+    expect(stripQuoted(t)).toBe(t);
+  });
+
+  it('a single possessive is untouched', () => {
+    expect(stripQuoted("Sarah's")).toBe("Sarah's");
+  });
+
+  it("a real single-quoted span loses only the span", () => {
+    expect(stripQuoted("she says 'Halt!' and runs")).toBe('she says  and runs');
+  });
+
+  it('a line-initial quote is stripped', () => {
+    expect(stripQuoted("'Go,' says Lorena")).toBe('  says Lorena');
+  });
+
+  it('guillemet and double-quote stripping are unchanged', () => {
+    expect(stripQuoted('the «Sturmfeder» sails')).toBe('the   sails');
+    expect(stripQuoted('the "Sturmfeder" sails')).toBe('the   sails');
+  });
+
+  it('resolveCast still sees a name that sits between two possessives', () => {
+    // The exact failure mode: the name on line 2 sat inside the span the old
+    // clause deleted (opened at "ship's" on line 1, closed at "Fiona's" on line 2).
+    const pages = [
+      page(1, "medium — Fiona at the ship's rail — she leans out — the chart is safe"),
+      page(2, "close-up — Malva Grimm in her rowing boat — Malva Grimm rows toward Fiona's chart — the chart is taken"),
+    ];
+    const cast = resolveCast(pages, ['Fiona']);
+    expect(cast.invented).toContain('Malva Grimm');
+    expect(namesIn(planSegments(pages[1].planLine)[1], cast.all)).toEqual(['Malva Grimm']);
   });
 });

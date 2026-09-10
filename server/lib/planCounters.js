@@ -79,9 +79,24 @@ const COORDINATORS = new Set(['and', 'or', 'nor']);
 /** Person words that make a page peopled even with no name in frame. */
 const PERSON_WORDS = /\b(?:crew|crewman|crewmen|sailor|sailors|man|men|woman|women|boy|boys|girl|girls|child|children|figure|figures|crowd|onlookers|guard|guards|villagers?|people)\b/i;
 
-/** Strip «…» / "…" quoted proper nouns — vessels and titles, never cast. */
+/**
+ * Strip «…» / "…" / '…' quoted spans — vessels, titles and speech, never cast.
+ *
+ * The single-quote clause is QUOTE-SHAPED: the opening ' sits at the start of
+ * the text or after whitespace, the closing ' is followed by whitespace,
+ * sentence punctuation or the end. A possessive has a letter directly before
+ * its apostrophe, so it can never open a match. The earlier `'[^']*'` treated
+ * "ship's … Fiona's" as one quotation and deleted everything between the two
+ * possessives — on job_1788983823620_csjcyp1q9 that was 969 of 3818 plan chars
+ * (26%, whole pages) removed from the corpus every cast test scans. Measured
+ * over the 25 most recent staging plans: 0 single-quote quotations, 127
+ * possessives.
+ */
 function stripQuoted(text) {
-  return String(text || '').replace(/«[^»]*»/g, ' ').replace(/"[^"]*"/g, ' ').replace(/'[^']*'/g, ' ');
+  return String(text || '')
+    .replace(/«[^»]*»/g, ' ')
+    .replace(/"[^"]*"/g, ' ')
+    .replace(/(^|\s)'[^']*?'(?=[\s.,;:!?)]|$)/g, ' ');
 }
 
 /** Split a plan line into its four segments; fewer than four means incomplete. */
@@ -623,4 +638,5 @@ module.exports = {
   isThingMarked,
   thingMarkedNames,
   namesIn,
+  stripQuoted,
 };

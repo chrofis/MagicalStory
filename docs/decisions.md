@@ -31667,3 +31667,33 @@ Uetliberg case, so the place-data test there was narrowed to the bare hill it st
 `isThingMarked`, `thingMarkedNames`, `resolveCast`, the 6b cross-check; `through` in
 `PLACE_PREPOSITIONS`), `tests/unit/plan-counters.test.ts`
 **Status:**    ✅ active (staging, not on master)
+
+## `stripQuoted` strips only quote-shaped single-quote spans; a possessive apostrophe never opens one (2026-09-10)
+**Context:**   `planCounters.stripQuoted` — the pre-pass every cast test in the module runs
+(`nameCandidates`, `resolveCast`, `thingMarkedNames`, `namesIn`) — had a third clause
+`'[^']*'` meant for single-quoted vessel names and speech. A possessive apostrophe matched it
+as an opening quote, so "the ship's bow … Fiona's chart" was read as ONE quotation and
+everything between the two possessives was deleted, across plan-line breaks. Measured on the
+real plan of `job_1788983823620_csjcyp1q9`: the joined 16-line corpus is 3818 chars, the old
+strip retained 2849 (969 chars = 25.4% gone, whole pages invisible to the scan). Across the 25
+most recent staging plans (198 plan lines): 0 straight single-quote quotations, 0 curly
+quotes, 20 guillemet pairs, 127 possessives — the clause has never matched a real quotation
+in production; it has only ever eaten text between two possessives.
+**Decision:**  The single-quote clause is quote-shaped:
+`/(^|\s)'[^']*?'(?=[\s.,;:!?)]|$)/g` — the opening `'` sits at the start of the text or after
+whitespace, the closing `'` is followed by whitespace, sentence punctuation or the end. A
+possessive has a letter directly before its apostrophe and can never open a match. The
+clause is NOT deleted (a genuine `'Halt!'` would otherwise leak a capitalised word into the
+cast scan) and no curly-quote handling is added (measured 0). The `«…»` and `"…"` clauses are
+unchanged; the contract (quoted span → one space) is unchanged. `stripQuoted` is now
+exported for its unit tests.
+**Rationale:** Measured on the real plan: new strip retains 3818/3818. `runPlanCounters`
+before/after produces the IDENTICAL finding list (MAIN_UNDER_HALF, NO_COMMISSIONED_ON_PAGE,
+UNDER_COVERED_CHARACTER, CONSECUTIVE_SAME_SHOT_CAST — same pages), so no finding on this
+plan was a strip artefact. What did change: the resolved cast now also carries the bare
+first name of the one invented figure ("Malva", from the previously-eaten instant segment of
+page 4, beside "Malva Grimm"), and page 4's cast count rose from 2 to 3 — a pre-existing
+`nameCandidates` duplicate (full name and its first token are separate candidates) that the
+fuller corpus now exposes; tracked in `tasks/BACKLOG.md`, not fixed here.
+**Touched:**   `server/lib/planCounters.js` (`stripQuoted`, export), `tests/unit/plan-counters.test.ts`
+**Status:**    ✅ active (staging, not on master)
