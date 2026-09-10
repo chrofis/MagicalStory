@@ -63,7 +63,7 @@ Then name the candidate to ship, judged in this order: it names the adventure or
 
 Work in two steps.
 
-Step 1 — write the analysis: one line per page naming which stretch of the story the page tells and what changed for the main character, then name any page whose text risks repeating the page before it, name any page that opens in a place, or among people, the page before it never reached, and name any fact, cause or spoken line of the story that has not yet found its page.
+Step 1 — write the analysis: one line per page naming which stretch of the story the page tells and what changed for the main character, then name any page whose text risks repeating the page before it or carries a later page's instant, name any page that opens in a place, or among people, the page before it never reached, and name any fact, cause or spoken line of the story that has not yet found its page.
 
 Step 2 — write the pages, fixing what the analysis found. A problem the analysis names must change the page it names.
 

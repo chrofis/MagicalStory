@@ -5907,6 +5907,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             analysis: (r.analysis || '').slice(0, 15000),
           })),
           changedPages: usable.changed,
+          // Cross-page repetition check after the repair pass (2026-09-10):
+          // { pairs, correctivePassRan, resolved, ... } — see textRefine.js.
+          repetition: usable.repetition || null,
           // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
           // output included so a fault can be traced to the auditor that found
           // it, plus the merged list the single repair pass actually answered.

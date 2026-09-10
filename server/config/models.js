@@ -364,6 +364,16 @@ const MODEL_DEFAULTS = {
   // cost the step still running. The old "90s cap" note here described a
   // budget that no longer exists.
   textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-opus',
+  // Cross-page REPETITION gate after the repair pass (2026-09-10): two pages
+  // trip when they share at least this many identical 5-word shingles
+  // (lowercased, punctuation stripped). Why 4: a recurring proper noun or a
+  // stock phrase ("the ship's name", "said the main character") yields one or
+  // two shared 5-grams across a book; a copied passage yields a RUN of them
+  // — the measured case (job_1788983823620_csjcyp1q9 p12/p13, one paragraph
+  // duplicated verbatim) shared 11. Four is above the noise of repeated names
+  // and below any duplicated sentence pair of ordinary length (two adjacent
+  // ~9-word sentences copied whole share 5+).
+  textRepetitionMinShingles: 4,
   // The LECTOR: dedicated grammar proofreader of the FINAL text, after the last
   // corrective round (owner ruling 2026-09-03). A sixth question on the
   // causality audit catches a different 1-2 of 4 known defects each run

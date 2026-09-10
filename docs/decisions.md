@@ -31570,3 +31570,53 @@ decision and is proposed separately.
 **Touched:**   `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` (11f),
 `prompts/scene-review.txt` (check 7)
 **Status:**    ✅ active
+
+
+## The refiner may MOVE a scene to the page whose picture shows it; a $0 shingle check catches a copy (2026-09-10)
+
+**Context:** `job_1788983823620_csjcyp1q9` ("Fiona und die Karte aus Kohle", 16p, de-ch)
+shipped pages 12 and 13 carrying the same paragraph — eleven 5-word sequences byte-identical.
+Chain, verified from `stories.data.textRefineReport` and the prompts: the page plan was right
+(p12 = one figure at the mast refusing to turn back; p13 = the chart made and pinned); the
+draft writer merged both into text-p12, so text ran one page ahead of the pictures; the
+arc-informed audit correctly flagged MISMATCH on p12/p13/p14; the repair, bound by
+`text-refine.txt` "never change what HAPPENS on it. Do not add, remove, reorder or reverse an
+event", could not take the passage OFF p12 — it wrote p13 fresh, left p12 byte-identical, and
+self-reported *"that material is now split 12/13 as the pictures demand."* Copied, not split.
+Nothing downstream could see it: the re-audit was deleted on 2026-09-03 (its accepted cost was
+exactly "a fault the repair pass introduces has nothing reading its output"), and the diff and
+lector passes judge spans inside one page, never across pages.
+
+What the 2026-08-10 rule protected against: a refiner blind to the brief rewriting EVENTS
+(`job_1786309527338` p6 — the cork stays stuck, the map is never unrolled). A move to the page
+whose plan line and picture already show the scene changes no event of the STORY, reverses
+no outcome and contradicts no picture; it restores the text to the division the plan made.
+Not on `docs/SETTLED.md`.
+
+**Decision:** two halves.
+1. `prompts/text-refine.txt` — one permitted operation: a MISMATCH whose text carries a scene
+   the next or previous page's picture shows is closed by MOVING the passage; a moved passage
+   leaves its source page; the same scene, event or spoken line never appears on two pages.
+   Ledger: recorded as "moved from p<a> to p<b>", the source page's line lists what left.
+   `story-text-from-beats.txt` Step 1 also names a page that "carries a later page's instant".
+2. `server/lib/textRefine.js` — a mechanical cross-page REPETITION check right after the
+   repair pass (the only whole-page writer): 5-word shingles, lowercased, punctuation and «»
+   and dashes stripped; a pair trips at `MODEL_DEFAULTS.textRepetitionMinShingles` = 4 shared
+   shingles (a recurring proper noun yields 1–2 per pair; the measured copy yielded 11). One
+   fed-back corrective `runRepairPass` (kind `repetition_fix`, usage label
+   `text_refine_repetition_fix`) carries the duplicated words, both page numbers and both plan
+   lines in the FAULT-line contract; the check re-runs once; a still-tripping result ships with
+   a WARN naming pages and passages — never a failed job. Exactly one pass per story, never a
+   loop; its cost is logged and stored. Order: repair → repetition check/fix → diff → lector,
+   so the diff reviews the corrective rewrite and the lector proofs it; the diff's BEFORE is
+   the writer's text for every page either pass touched. Stored as
+   `textRefineReport.repetition = { minShingles, pairs, correctivePassRan, resolved, remaining, cost }`.
+
+**Rationale:** string equality on the pages' own words is not classification — it needs no
+prompt and costs nothing, and it is the one failure class the deleted re-audit left open. The
+re-audit stays deleted; this is its $0 replacement for that class only.
+
+**Touched:** `prompts/text-refine.txt`, `prompts/story-text-from-beats.txt`,
+`server/lib/textRefine.js`, `server/config/models.js`, `storyJobPipeline.js`,
+`tests/unit/text-repetition.test.ts` (new).
+**Status:**    ✅ active (staging; unverified on a live run)

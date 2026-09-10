@@ -40,6 +40,17 @@
  * `runRepairPass` call — nothing here loops, and nothing here is dormant
  * machinery waiting for one.
  *
+ * The one such second pass that exists (2026-09-10): a $0 cross-page
+ * REPETITION check runs on the repair pass's output (findRepeatedPassages —
+ * shared 5-word shingles, string equality, no model). If two pages carry the
+ * same passage, ONE corrective `runRepairPass` carries the duplicated words and
+ * both plan lines back to the repairer; the check re-runs once and a still-
+ * tripping result ships with a WARN. Measured origin: job_1788983823620 p12/p13
+ * shipped one paragraph twice (11 shared shingles) after the repair copied a
+ * scene onto the page whose picture shows it instead of moving it, and
+ * self-reported the copy as a split. The re-audit stays deleted; this is the
+ * mechanical replacement for that one failure class.
+ *
  * Scene outlines and the arc are read-only, which is what makes the production
  * parallelism safe: illustrations are already rendering from those scenes, and
  * this stage may only change prose, never events.
@@ -414,6 +425,87 @@ function applyLectorFindings(pages = [], findings = []) {
   return { pages: next, applied, dropped };
 }
 
+// ─────────────────────── CROSS-PAGE REPETITION (mechanical) ───────────────────
+
+const SHINGLE_WORDS = 5;
+
+/**
+ * Words of a page for shingling: lowercase, punctuation and quote marks
+ * (including «» and every dash) stripped, whitespace collapsed. Letters and
+ * digits of any script survive, so German umlauts and ß compare as themselves.
+ */
+function normalizeForShingles(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Ordered list of 5-word shingles for one page (positions matter for passage rebuild). */
+function shinglesOf(text, n = SHINGLE_WORDS) {
+  const words = normalizeForShingles(text);
+  const out = [];
+  for (let i = 0; i + n <= words.length; i++) out.push(words.slice(i, i + n).join(' '));
+  return out;
+}
+
+/**
+ * Every pair of pages sharing at least `minShared` identical 5-word shingles.
+ * String equality on the pages' own words — no interpretation. Each hit carries
+ * the shared shingles and the duplicated passages rebuilt from consecutive
+ * shared shingles on the first page, so a prompt or a log can quote them.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages
+ * @param {number} minShared
+ * @returns {Array<{pages:[number,number], sharedCount:number, shingles:string[], passages:string[]}>}
+ */
+function findRepeatedPassages(pages, minShared) {
+  const list = (pages || []).map(p => ({ pageNumber: p.pageNumber, shingles: shinglesOf(p.text) }));
+  const hits = [];
+  for (let i = 0; i < list.length; i++) {
+    const setI = new Set(list[i].shingles);
+    for (let j = i + 1; j < list.length; j++) {
+      const shared = new Set(list[j].shingles.filter(sh => setI.has(sh)));
+      if (shared.size < minShared) continue;
+      // Rebuild passages: a run of consecutive shared shingles on page i is one
+      // copied stretch; each further shingle in the run appends its last word.
+      const passages = [];
+      let run = null;
+      for (const sh of list[i].shingles) {
+        if (!shared.has(sh)) { if (run) passages.push(run.join(' ')); run = null; continue; }
+        const words = sh.split(' ');
+        if (run) run.push(words[words.length - 1]); else run = words.slice();
+      }
+      if (run) passages.push(run.join(' '));
+      hits.push({
+        pages: [list[i].pageNumber, list[j].pageNumber],
+        sharedCount: shared.size,
+        shingles: Array.from(shared),
+        passages,
+      });
+    }
+  }
+  return hits;
+}
+
+/**
+ * The corrective pass's findings, in the FAULT-line contract the repair prompt
+ * already reads — so the fed-back retry carries the failure itself: the exact
+ * duplicated words, both page numbers and both pages' plan lines.
+ */
+function buildRepetitionFindings(hits, pages) {
+  const byPage = new Map((pages || []).map(p => [p.pageNumber, p]));
+  const plan = n => (byPage.get(n)?.planLine || '').trim() || '(no plan line)';
+  return hits.map(h => {
+    const [a, b] = h.pages;
+    const quoted = h.passages.map(x => `"${x}"`).join('; ');
+    return `FAULT[REPETITION]: p${a} — pages ${a} and ${b} carry the same passage (${h.sharedCount} shared 5-word sequences): ${quoted}. `
+      + `Plan p${a}: ${plan(a)} Plan p${b}: ${plan(b)} `
+      + 'Keep the passage on the one page whose plan line and picture it belongs to, rewrite the other page without it, change nothing else.';
+  }).join('\n');
+}
+
 // ───────────────────────────────── THE CHAIN ──────────────────────────────────
 
 /**
@@ -476,6 +568,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let diffFindings = [];
   let diffApplied = [];
   let diffDropped = [];
+  let repetition = null;
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -502,6 +595,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     diffFindings: diffFindings.slice(),
     diffApplied: diffApplied.slice(),
     diffDropped: diffDropped.slice(),
+    repetition,
     partial: true,
   });
   const publish = () => {
@@ -621,7 +715,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
    * decides whether to adopt it. Invoked exactly ONCE below; a second bounded
    * pass after a re-audit would be one more call here, never a loop.
    */
-  const runRepairPass = async (findingsText, base) => {
+  const runRepairPass = async (findingsText, base, kind = 'repair') => {
     let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc);
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
@@ -635,7 +729,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // throw below still turns any cap hit into a loud failure rather than a
     // silent "nothing to do".
     const MAX_OUT = TEXT_MODELS[repairModel].maxOutputTokens || 64000;
-    const r = await callTextModelStreaming(prompt, MAX_OUT, null, repairModel, { usageLabel });
+    const r = await callTextModelStreaming(prompt, MAX_OUT, null, repairModel, { usageLabel: kind === 'repair' ? usageLabel : `${usageLabel}_${kind}` });
     const elapsedMs = Date.now() - t0;
     if ((r.usage?.output_tokens || 0) >= MAX_OUT) {
       throw new Error(`output hit the ${MAX_OUT}-token cap — reply truncated, rewrites unusable`);
@@ -651,7 +745,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       next,
       entry: {
         round: rounds.length + 1,
-        kind: 'repair',
+        kind,
         ok: true,
         modelKey: repairModel,
         modelId: r.modelId || TEXT_MODELS[repairModel].modelId,
@@ -696,6 +790,47 @@ async function refineStoryText(storyData, pages, opts = {}) {
     publish();
   }
 
+  // ── CROSS-PAGE REPETITION — right after the repair, before the diff ──────────
+  //
+  // The repair pass is the only step that writes whole pages, so it is the only
+  // step that can put one passage on two pages (the diff and the lector
+  // substitute quoted spans inside a page). Checked here, mechanically, and
+  // fixed by EXACTLY ONE fed-back corrective pass — never a loop. Sitting
+  // before the diff means the diff reviews the corrective rewrite as well and
+  // the lector proofs its result. A still-tripping result ships with a WARN:
+  // gates are guidelines, a paid run is never killed for this.
+  const REP_MIN = MODEL_DEFAULTS.textRepetitionMinShingles;
+  const summarize = hits => hits.map(h => ({ pages: h.pages, sharedCount: h.sharedCount, shingles: h.shingles.slice(0, 40), passages: h.passages }));
+  let repetitionEntry = null;
+  {
+    const hits = findRepeatedPassages(current, REP_MIN);
+    repetition = { minShingles: REP_MIN, pairs: summarize(hits), correctivePassRan: false, resolved: hits.length === 0, remaining: [], cost: 0 };
+    if (hits.length) {
+      log.warn(`🔁 [TEXT-REPETITION] ${hits.map(h => `p${h.pages[0]}/p${h.pages[1]} (${h.sharedCount} shared)`).join(', ')} — one corrective pass`);
+      try {
+        const { next, entry } = await runRepairPass(buildRepetitionFindings(hits, current), current, 'repetition_fix');
+        rounds.push(entry);
+        repetitionEntry = entry;
+        current = next;
+        repetition.correctivePassRan = true;
+        repetition.cost = entry.cost || 0;
+        log.info(`🔁 [TEXT-REPETITION] corrective pass rewrote page(s) ${entry.changedPages.join(', ') || 'none'} — $${(entry.cost || 0).toFixed(4)}`);
+      } catch (err) {
+        rounds.push({ round: rounds.length + 1, kind: 'repetition_fix', ok: false, modelKey: repairModel, error: err.message });
+        log.warn(`⚠️ [TEXT-REPETITION] corrective pass failed (${err.message})`);
+      }
+      const after = findRepeatedPassages(current, REP_MIN);
+      repetition.remaining = summarize(after);
+      repetition.resolved = after.length === 0;
+      if (!repetition.resolved) {
+        for (const h of after) {
+          log.warn(`⚠️ [TEXT-REPETITION] STILL DUPLICATED after the corrective pass: pages ${h.pages[0]} and ${h.pages[1]} share ${h.sharedCount} 5-word sequences: ${h.passages.map(x => `"${x}"`).join('; ')} — shipping as is`);
+        }
+      }
+      publish();
+    }
+  }
+
   // ── THE DIFF PASS — between the repair and the lector (2026-09-06) ──────────
   //
   // WHAT IT IS: the repair pass is the only step that rewrites whole pages, and
@@ -730,10 +865,13 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // the session found. (The lector's own catch below logs at warn only; left as
   // it is rather than changed unasked — noted in the report.)
   try {
-    const changedPages = repairEntry?.changedPages || [];
-    const pairs = (repairEntry?.pages || [])
+    // Every page either whole-page pass rewrote. BEFORE = the writer's text
+    // (nothing changes a page before the repair), AFTER = the text as the
+    // corrective pass left it.
+    const changedPages = [...new Set([...(repairEntry?.changedPages || []), ...(repetitionEntry?.changedPages || [])])];
+    const pairs = current
       .filter(p => changedPages.includes(p.pageNumber))
-      .map(p => ({ pageNumber: p.pageNumber, before: p.before, after: p.after }));
+      .map(p => ({ pageNumber: p.pageNumber, before: original.find(o => o.pageNumber === p.pageNumber)?.text, after: p.text }));
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
     if (diffPrompt && TEXT_MODELS[diffModel]) {
       const t0 = Date.now();
@@ -894,6 +1032,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audits, mergedFindings, mergeStats,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
+    repetition,
     partial: false,
   };
 }
@@ -976,4 +1115,9 @@ module.exports = {
   applyLectorFindings,
   locateQuote,
   DUPLICATE_OVERLAP,
+  normalizeForShingles,
+  shinglesOf,
+  findRepeatedPassages,
+  buildRepetitionFindings,
+  SHINGLE_WORDS,
 };
