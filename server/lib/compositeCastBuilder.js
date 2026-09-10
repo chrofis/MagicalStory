@@ -48,6 +48,24 @@ function splitInteractionNames(raw) {
     .filter(Boolean);
 }
 
+/**
+ * `looksAt` for a cast entry. A Visual Bible id becomes the element's name
+ * (the plate prompt is read by an image model; an id there is noise);
+ * `camera` / `away` and plain names pass through.
+ */
+function resolveLooksAt(raw, visualBible) {
+  const t = String(raw || '').trim();
+  if (!t) return null;
+  const m = t.match(/^(CHR|ANI|ART|VEH|LOC)(\d+)/i);
+  if (!m) return t;
+  const base = (m[1] + m[2]).toUpperCase();
+  for (const pool of ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations']) {
+    const hit = (visualBible?.[pool] || []).find(e => String(e?.id || '').toUpperCase() === base);
+    if (hit?.name) return String(hit.name);
+  }
+  return null;
+}
+
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null, visualBible = null } = deps;
   if (!log) throw new Error('buildCompositeCast: deps.log is required');
@@ -145,6 +163,7 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         pose: 'threeQuarter',
         flip: sc.flip === true,
         action: actionsByChar.get(String(name).toLowerCase()) || null,
+        looksAt: resolveLooksAt(sc.looksAt, visualBible),
         position: sc.position || 'in the scene',
         depth: sc.depth || null,
         sizeHint: sc.depth || null,
@@ -268,6 +287,7 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       pose,
       flip,
       action: actionsByChar.get(name.toLowerCase()) || null,
+      looksAt: resolveLooksAt(sc.looksAt, visualBible),
       position: sc.position || 'in the scene',
       // Preserve raw depth flag for downstream stratum split. sizeHint is the
       // human-readable string the prompt builders consume; depth is the rank

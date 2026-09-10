@@ -1246,7 +1246,7 @@ function buildCastLines(cast) {
       profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || 'three-quarter view';
-    const actionClause = c.action ? `, ${c.action}` : '';
+    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, looking at ${c.looksAt}` : '');
     // Per-pose eye markers — black dot(s) inside the silhouette's head.
     // Front/three-quarter show two eyes; profile shows one; back shows none.
     const markerSpec = (() => {
@@ -1687,13 +1687,19 @@ function buildBlendMetadata(fullData, scene = null, clothingRequirements = null)
   const characterActions = {};
   for (const it of (fd.interactions || [])) {
     if (!it?.character) continue;
-    if (it.object) attentionTargets[it.character] = String(it.object).trim();
+    // Eyes come from `looksAt` (below), never from what a character holds.
+    // A `watching` row is the one interaction kind that IS a gaze; it fills
+    // in only for briefs written before looksAt existed.
+    if (it.object && String(it.action || '').toLowerCase() === 'watching') attentionTargets[it.character] = String(it.object).trim();
     // `where` is the interaction itself ("kneels at the gap in the railing and
     // peers down through it"). It is sent as something to perform ON THE SPOT,
     // never as a placement — the prompt's own wording carries that distinction,
     // because the same sentence inside a scene-staging prompt is what moved
     // characters across the frame in every earlier attempt.
     if (it.where) characterActions[it.character] = String(it.where).trim();
+  }
+  for (const c of chars) {
+    if (c?.name && c.looksAt) attentionTargets[c.name] = String(c.looksAt).trim();
   }
   return { characterExpressions, attentionTargets, characterActions, characterClothing };
 }
@@ -1782,7 +1788,10 @@ function buildBlendEditPrompt(scene, cast = null) {
     const lines = people.map((c) => {
       const bits = [`- ${c.name} — ${_ageWord(c.age)}, ${depthWord(c)}.`];
       if (actions[c.name]) bits.push(` ${_sentence(actions[c.name])}`);
-      if (attention[c.name]) bits.push(` Looking at ${attention[c.name]}.`);
+      if (attention[c.name]) {
+        const k = String(attention[c.name]).toLowerCase();
+        bits.push(k === 'camera' ? ' Looking at the viewer.' : k === 'away' ? ' Looking away from everyone in the frame.' : ` Looking at ${attention[c.name]}.`);
+      }
       if (expressions[c.name]) bits.push(` ${_sentence(expressions[c.name])}`);
       // Size-neutral, and the occluder is deliberately NOT named: run E of Lab
       // 695-705 named it and the result was worse.
@@ -1981,7 +1990,7 @@ function buildBackCharLines(cast) {
       profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || 'three-quarter view';
-    const actionClause = c.action ? `, ${c.action}` : '';
+    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, looking at ${c.looksAt}` : '');
     return `- ${c.name}: ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
   }).join('\n');
 }

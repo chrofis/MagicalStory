@@ -617,7 +617,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     const meta = extractSceneMetadata(sceneHint || imagePrompt);
     const interactions = meta?.interactions
       || (Array.isArray(meta?.fullData?.interactions) ? meta.fullData.interactions : null);
-    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible);
+    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible, meta?.characters || meta?.fullData?.characters || null);
   } catch { /* silent */ }
 
   // --- Stage 1: the SHARED blind inventory ---
@@ -1131,7 +1131,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
       interactionsBlock = require('./vbIdGuard')
-        .formatInteractionsBlock(interactions, evalOptions.visualBible || null);
+        .formatInteractionsBlock(interactions, evalOptions.visualBible || null, sceneMeta?.characters || sceneMeta?.fullData?.characters || null);
       const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
       if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }

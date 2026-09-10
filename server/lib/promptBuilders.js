@@ -4187,6 +4187,20 @@ function resolveVbActorName(name, visualBible) {
   return raw;
 }
 
+/**
+ * The eyes, as a phrase. `looksAt` is the one field that means gaze (AD rule
+ * 8j); a Visual Bible id in it becomes the element's name, never a raw id.
+ */
+function looksAtPhrase(target, visualBible = null) {
+  const t = String(target || '').trim();
+  if (!t) return '';
+  const k = t.toLowerCase();
+  if (k === 'camera' || k === 'the viewer' || k === 'viewer') return 'eyes on the viewer';
+  if (k === 'away') return 'eyes turned away from everyone in the frame';
+  const { scrubVbIds } = require('./vbIdGuard');
+  return `eyes on ${scrubVbIds(t, visualBible)}`;
+}
+
 function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null) {
   const interactionList = Array.isArray(interactions) ? interactions : [];
   // Even with zero declared interactions, we may still emit fill lines for
@@ -4283,12 +4297,13 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     if (!c || typeof c !== 'object') continue;
     const name = (c.name || '').trim();
     const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
-    if (!name || !expr) continue;
+    const gaze = looksAtPhrase(c.looksAt, visualBible);
+    if (!name || (!expr && !gaze)) continue;
     if (String(c.depth || '').toLowerCase() === 'background') continue;
-    exprLines.push(`- ${name}: ${expr}`);
+    exprLines.push(`- ${name}: ${[expr, gaze].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
-    ? `EXPRESSIONS (each face shows exactly this — no default smiles):\n${exprLines.join('\n')}`
+    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n${exprLines.join('\n')}`
     : '';
 
   if (lines.length === 0 && !exprBlock) return '';
@@ -7259,6 +7274,7 @@ module.exports = {
   WORN_ATTACHMENT_CLAUSE_RE,
   stripWornStateFromDescription,
   buildImagePrompt,
+  looksAtPhrase,
   sanitizeVbIdsInPrompt,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,

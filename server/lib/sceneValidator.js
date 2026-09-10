@@ -808,7 +808,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     const interactions = sceneMeta?.interactions
       || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
     const guard = require('./vbIdGuard');
-    interactionsBlock = guard.formatInteractionsBlock(interactions, evalContext.visualBible || null);
+    interactionsBlock = guard.formatInteractionsBlock(interactions, evalContext.visualBible || null, sceneMeta?.characters || sceneMeta?.fullData?.characters || null);
     const objects = sceneMeta?.objects
       || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
     elementsBlock = guard.formatElementsBlock(objects, evalContext.visualBible || null);

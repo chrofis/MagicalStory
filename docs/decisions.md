@@ -31827,3 +31827,27 @@ is pose-sensitive, is worth 5x the calls for two-level pages - or whether the pl
 or one named figure in frame) draws them for one call. Nothing here changes what production runs.
 **Touched:**   server/lib/phantomPoseRender.js, server/lib/sceneComposite.js
 **Status:**    active
+
+## `looksAt`: eyes are a field; interactions[] means hands (2026-09-10)
+**Context:**   Page 4 of job_1788983823620_csjcyp1q9 staged two characters facing each other. The
+brief carried two interactions, both targeting the map - the holder's hands and the watcher's
+gaze - and every consumer that needed to know where a character LOOKS read that one slot: the
+composite's blend census ("Looking at ART001.1"), the plate cast line, the image prompt. So a
+woman clutching a map was told to stare at it, and no field existed for the other person. History
+checked: no gaze-target field ever existed; `contact: gaze` lived 56 minutes on 2026-08-23
+(88e0f0c70 -> 76d4ffa49) as a classification of a row toward an object, replaced by `action`.
+**Decision:**  Each foreground/midground character carries `looksAt` - another character, a bible
+id, `camera`, or `away`. AD rule 8j (both siblings): eyes are this field; hands live in
+interactions[]; a holder does not look at what it holds unless the plan line says so; two named
+characters facing each other look at each other unless the plan gives one a different gaze, in
+which case the other looks at them. Consumers: the image prompt (EXPRESSIONS AND EYES), the composite
+blend census (looksAt first; a `watching` row only as fallback for older briefs) and its plate cast
+lines (ids resolved to names in compositeCastBuilder), the evaluators' INTERACTIONS block (a gaze
+line per character), and the reviewer (`[gaze_budget]` reads looksAt; new `[gaze_missing]`).
+Character rows pass through both parser paths untouched, so no parser change.
+**Rationale:** One field, one meaning. Every earlier fix smuggled gaze through a field that means
+contact; this stops inferring eyes from hands anywhere.
+**Touched:**   prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt,
+server/lib/promptBuilders.js, server/lib/sceneComposite.js, server/lib/compositeCastBuilder.js,
+server/lib/vbIdGuard.js, server/lib/sceneValidator.js, server/lib/evalPipeline.js, tests/unit/looks-at.test.ts
+**Status:**    active

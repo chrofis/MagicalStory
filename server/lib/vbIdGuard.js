@@ -205,12 +205,19 @@ function scrubVbIds(text, visualBible = null, pageNumber = null) {
  * @param {Object|null} [visualBible]
  * @returns {string} the block, or '(none declared)'.
  */
-function formatInteractionsBlock(interactions, visualBible = null) {
+// `characters` (optional): the brief's characters[]; each `looksAt` becomes a
+// gaze line, so the judges enforce a DECLARED gaze instead of inferring one
+// from what a character holds.
+function formatInteractionsBlock(interactions, visualBible = null, characters = null) {
   const list = Array.isArray(interactions) ? interactions : [];
-  if (list.length === 0) return '(none declared)';
-  const block = list
-    .map(i => `- ${i?.character || '?'} + ${i?.object || '?'}: ${i?.where || '(no placement given)'}`)
-    .join('\n');
+  const gazes = (Array.isArray(characters) ? characters : [])
+    .filter(c => c?.name && c.looksAt)
+    .map(c => `- ${c.name} looks at ${String(c.looksAt).trim()}`);
+  if (list.length === 0 && gazes.length === 0) return '(none declared)';
+  const block = [
+    ...list.map(i => `- ${i?.character || '?'} + ${i?.object || '?'}: ${i?.where || '(no placement given)'}`),
+    ...gazes,
+  ].join('\n');
   return scrubVbIds(block, visualBible) || '(none declared)';
 }
 
