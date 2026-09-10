@@ -1476,17 +1476,37 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       const sil = dilateMask(silhouetteMasks[c.name], W, H, r);
       let added = 0;
       for (let i = 0; i < W * H; i++) if (!mask[i] && (sil[i] || changed[i])) { mask[i] = 1; added++; }
-      mask = closeMask(dilateMask(mask, W, H, 1), W, H, Math.max(3, Math.round(0.03 * Math.max(bbox.width, bbox.height))));
-      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed`);
+      // Generous closing: a pixel wrongly included comes from the render, which
+      // is the plate itself away from the figure, so over-inclusion is free;
+      // a hole (white paper over the plate's white paper, exp 1140) is not.
+      mask = closeMask(dilateMask(mask, W, H, 1), W, H, Math.max(4, Math.round(0.08 * Math.max(bbox.width, bbox.height))));
+      // Never carry another figure's silhouette along.
+      for (const other of cast) {
+        if (other.name === c.name || !silhouetteMasks[other.name]) continue;
+        const om = dilateMask(silhouetteMasks[other.name], W, H, 2);
+        for (let i = 0; i < W * H; i++) if (om[i]) mask[i] = 0;
+      }
+      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed, other silhouettes excluded`);
     }
     let cut = await cutWithMask(renderBuf, mask, W, H);
     let fitted = null;
-    if (method === 'sam') {
+    if (method === 'sam' && matched) {
+      // Like against like: the person box on the render against the person box
+      // of the silhouette (exp 1140 compared the grown mask and shrank two
+      // correct figures by 20%).
+      const ratio = matched.box.height / bbox.height;
       const mb = maskBounds(mask, W, H);
-      const ratio = mb ? mb.height / bbox.height : 1;
-      if (mb && Math.abs(ratio - 1) > 0.10) {
-        cut = await fitCutToSilhouette(cut, mb, bbox, W, H);
-        fitted = { from: mb.height, to: bbox.height, ratio: +ratio.toFixed(2) };
+      if (mb && Math.abs(ratio - 1) > 0.15) {
+        const s = 1 / ratio;
+        // Scale the whole cut-out by s about the matched box's bottom-centre, then
+        // move that point onto the silhouette's bottom-centre.
+        const target = {
+          x: bbox.x + bbox.width / 2 - (mb.width * s) / 2 + ((mb.x + mb.width / 2) - (matched.box.x + matched.box.width / 2)) * s,
+          y: bbox.y + bbox.height - mb.height * s + ((mb.y + mb.height) - (matched.box.y + matched.box.height)) * s,
+          width: mb.width * s, height: mb.height * s,
+        };
+        cut = await fitCutToSilhouette(cut, mb, target, W, H);
+        fitted = { from: matched.box.height, to: bbox.height, ratio: +ratio.toFixed(2) };
         log.info(`[SCENE COMPOSITE]   ${c.name}: drawn ${ratio.toFixed(2)}x the silhouette's height — scaled to the silhouette, bottom-centre anchored`);
       }
     }
