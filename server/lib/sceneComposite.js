@@ -908,6 +908,23 @@ async function cropSheetCell(sheetBuf, cellIdx) {
   return cropSheetCellFixed(sheetBuf, cellIdx);
 }
 
+/**
+ * Does the cut-out's figure run into the bottom edge of its image? A
+ * background-removed render whose last rows are still opaque across a real
+ * span was cropped by the renderer - the feet are outside the frame - and
+ * scaling it to a silhouette that HAS feet produces a footless figure
+ * (Lab exp 1093). Checked on the untrimmed cut-out, before trim hides it.
+ */
+async function figureTouchesBottomEdge(cutBuf, rows = 3, minFraction = 0.08) {
+  const { data, info } = await sharp(cutBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  let opaque = 0, total = 0;
+  for (let y = Math.max(0, height - rows); y < height; y++) {
+    for (let x = 0; x < width; x++) { total++; if (data[(y * width + x) * channels + 3] > 128) opaque++; }
+  }
+  return total > 0 && opaque / total >= minFraction;
+}
+
 /** Background-remove via the Python rembg service; white-threshold fallback. */
 async function removeBackground(buf) {
   const out = await rembgRemoveBackground(buf);
@@ -2571,28 +2588,38 @@ async function generateSceneComposite(opts) {
         // every non-target pixel (other silhouettes AND any palette-colliding
         // background) with derived clean-BG pixels — Grok then sees ONLY the
         // target's silhouette plus the surrounding scene context.
-        const ppr = await renderCharacterInPhantomPose({
-          charSheet2x4: c.sheetBuf,
-          blockingImageBuf: populatedBuf,
-          bbox,
-          charName: c.name,
-          colorName: c.colorName,
-          action: c.action,
-          aspectRatio: '9:16',
-          model: GROK_MODELS.STANDARD,
-          usageTracker,
-          cleanBgBuf: bgBuf,
-          silhouetteMask: silhouetteMasks[c.name],
-          canvasWidth: detection.canvasWidth,
-          canvasHeight: detection.canvasHeight,
-        });
-        totalCost += ppr.usage?.cost || 0;
-        phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
-        const renderedBuf = Buffer.from(
-          stripDataUriPrefix(ppr.imageData),
-          'base64',
-        );
-        cutBuf = await removeBackground(renderedBuf);
+        // One re-render when the figure runs into the bottom edge of its
+        // render: the renderer cropped the feet, and a footless figure
+        // scaled to a silhouette that has feet is a visible fault (exp 1093).
+        let ppr = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          ppr = await renderCharacterInPhantomPose({
+            charSheet2x4: c.sheetBuf,
+            blockingImageBuf: populatedBuf,
+            bbox,
+            charName: c.name,
+            colorName: c.colorName,
+            action: c.action,
+            aspectRatio: '9:16',
+            model: GROK_MODELS.STANDARD,
+            usageTracker,
+            cleanBgBuf: bgBuf,
+            silhouetteMask: silhouetteMasks[c.name],
+            canvasWidth: detection.canvasWidth,
+            canvasHeight: detection.canvasHeight,
+          });
+          totalCost += ppr.usage?.cost || 0;
+          phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
+          const renderedBuf = Buffer.from(stripDataUriPrefix(ppr.imageData), 'base64');
+          cutBuf = await removeBackground(renderedBuf);
+          const cropped = await figureTouchesBottomEdge(cutBuf);
+          if (!cropped) break;
+          if (attempt === 1) {
+            log.warn(`[PHANTOM-POSE] ${c.name}: rendered figure runs into the bottom edge (feet cropped) — re-rendering once`);
+          } else {
+            log.warn(`[PHANTOM-POSE] ${c.name}: re-render still touches the bottom edge — accepting it; the figure will be short of its feet`);
+          }
+        }
         cutBuf = await trimTransparent(cutBuf);
         usedPhantomPose = true;
       } catch (err) {

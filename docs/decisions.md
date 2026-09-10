@@ -31808,3 +31808,22 @@ surface; a figure seated in a rowing boat sits inside the hull, below any deck b
 already stated in the action; the surface rule just has to yield to it.
 **Touched:**   server/lib/sceneComposite.js (populated-plate prompt)
 **Status:**    active
+
+## Page 4 drawn by the production composite; phantom render keeps the whole figure in frame (2026-09-10)
+**Context:**   Lab exp 1095 (job_1788983823620_csjcyp1q9 p4): the production silhouette composite,
+analyzer warm, phantom pose on, gate floor 1.5x (passed at 2.23x), the stand-in told it is seated in
+the boat, produced the page - one figure on deck at true scale, the other seated in the rowing boat on
+the water below the rail, feet in, watercolour intact. Fifteen experiments (1081-1095) each removed
+one fault; the ledger is in the entries above. 5 Grok calls, $0.10, against 1 call and $0.02 for the
+native render that drew the boat on the deck four times out of four. The only defect left is the
+male reference sheet, caught on new stories by the cell gate.
+**Decision:**  Phantom-pose prompt asks for the whole figure inside a white margin, no part touching
+a frame edge (it asked the figure to "fill most of the frame" and the boots left the frame, exp 1093);
+the composite checks the returned render for a figure touching the bottom edge and re-renders once
+before accepting it. Still unreachable in production (phantom pose is off there) and not exercised
+in the Lab yet: exp 1095 rolled the feet inside.
+**Open (owner):** whether the composite, with phantom pose, the containment clause and a gate that
+is pose-sensitive, is worth 5x the calls for two-level pages - or whether the plan rule (two pages,
+or one named figure in frame) draws them for one call. Nothing here changes what production runs.
+**Touched:**   server/lib/phantomPoseRender.js, server/lib/sceneComposite.js
+**Status:**    active
