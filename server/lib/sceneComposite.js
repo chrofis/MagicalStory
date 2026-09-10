@@ -1244,7 +1244,7 @@ function buildInPlaceRenderPrompt(c, visualBible = null) {
   const poseLine = clauses.length ? ` The figure is ${clauses.join(', ')}.` : '';
   const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. Image 2 is the reference sheet of ${name}: a grid of views used only to know what ${name} looks like. None of its panels appear in the output.
 
-Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, body orientation and pose, and exactly the silhouette's size: the figure is as tall as the silhouette, no taller.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2. The output shows exactly one ${name}.
+Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, body orientation and pose, and exactly the silhouette's size: the figure is as tall as the silhouette, no taller.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2. The output shows exactly one ${name}. Anything the silhouette holds is drawn as the real object in its natural colours, not in the placeholder colour.
 
 Everything else in Image 1 stays exactly as it is, including the other coloured silhouettes. Same art style as Image 1.`;
   return scrubBlendPrompt(prompt, visualBible, `inPlace ${name}`);
@@ -1265,7 +1265,7 @@ function _iouRects(a, b) {
  * larger than the placeholder. Returns { box: {x,y,width,height}, iou, index }
  * or null when nothing reaches `minIou`.
  */
-function matchRenderedFigureBox(personBoxes, silBbox, { expand = 0.10, minIou = 0.30, canvasWidth = Infinity, canvasHeight = Infinity } = {}) {
+function matchRenderedFigureBox(personBoxes, silBbox, { expand = 0.10, minIou = 0.30, canvasWidth = Infinity, canvasHeight = Infinity, clipBottom = Infinity } = {}) {
   if (!silBbox || !Array.isArray(personBoxes) || personBoxes.length === 0) return null;
   const dx = silBbox.width * expand, dy = silBbox.height * expand;
   const x0 = Math.max(0, silBbox.x - dx), y0 = Math.max(0, silBbox.y - dy);
@@ -1281,7 +1281,10 @@ function matchRenderedFigureBox(personBoxes, silBbox, { expand = 0.10, minIou = 
     const [bx0, by0, bx1, by1] = arr;
     const rect = { x: bx0, y: by0, width: bx1 - bx0, height: by1 - by0 };
     if (rect.width <= 0 || rect.height <= 0) return;
-    const iou = _iouRects(rect, target);
+    // Scored on the part above clipBottom: a figure the model completed below
+    // the scenery that hides it is judged on what will be kept (exp 1146).
+    const scored = by1 > clipBottom ? { ...rect, height: Math.max(1, clipBottom - by0) } : rect;
+    const iou = _iouRects(scored, target);
     if (!best || iou > best.iou) best = { box: rect, iou, index };
   });
   return best && best.iou >= minIou ? best : null;
@@ -1468,7 +1471,7 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       try {
         const det = await _gdinoDetect(renderUri, [{ name: 'person', text: 'person' }]);
         const persons = det?.figures?.[0] ? _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU) : [];
-        matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H });
+        matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H, clipBottom: bottomLimit });
         if (matched) {
           const b = matched.box;
           const m = await _mobilesamMaskFull(renderUri, [Math.round(b.x), Math.round(b.y), Math.round(b.x + b.width), Math.round(b.y + b.height)], W, H);
