@@ -4339,6 +4339,14 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   });
 
   if (!cast || !cast.length) throw new Error('composite cast is empty — page has no scene characters, or no story avatar sheets');
+  // Lab-only: replace a character's silhouette action text ({ "Name": "seated in the rowing boat" }).
+  // The silhouette line is built from cast[].action; this is how "in the boat" reaches the plate.
+  if (params.castActionOverrides && typeof params.castActionOverrides === 'object') {
+    for (const c of cast) {
+      const o = Object.entries(params.castActionOverrides).find(([n]) => String(n).toLowerCase() === String(c.name || '').toLowerCase());
+      if (o) { c.action = String(o[1]); log.info(`[TESTLAB] composite cast action override: ${c.name} -> "${c.action}"`); }
+    }
+  }
 
   // Facing. Scene-expansion emits no `pose` today (verified: 0 of 23 scene
   // characters on a real story), so production — the composite AND normal page
@@ -4537,6 +4545,8 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     compositeStrategy: strategy,
     cast, frontCast, backCast,
     scene: compositeScene,
+    // Lab-only: per-run depth-spread floor (production keeps MIN_DEPTH_SPREAD).
+    minDepthSpread: Number.isFinite(Number(params.minDepthSpread)) ? Number(params.minDepthSpread) : undefined,
     cleanBackgroundPrompt,
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     skipBlend: !wantBlend,

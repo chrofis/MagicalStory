@@ -2369,9 +2369,12 @@ async function generateSceneComposite(opts) {
     const hs = figureBoxes.map(b => b.height);
     const spread = Math.max(...hs) / Math.min(...hs);
     debug.depthSpread = Number(spread.toFixed(2));
-    if (spread < MIN_DEPTH_SPREAD) {
+    // Lab-only override of the floor (opts.minDepthSpread). Production never
+    // passes it, so MIN_DEPTH_SPREAD stands (owner-settled 2026-08-25).
+    const minSpread = Number.isFinite(opts.minDepthSpread) ? opts.minDepthSpread : MIN_DEPTH_SPREAD;
+    if (spread < minSpread) {
       throw refuse(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
-        + `(needs ${MIN_DEPTH_SPREAD}x). Every character is at the same distance, so the declared foreground/background `
+        + `(needs ${minSpread}x). Every character is at the same distance, so the declared foreground/background `
         + 'split is not real and there is nothing for the composite to correct — the page keeps its original render');
     }
   }
