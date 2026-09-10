@@ -31780,3 +31780,16 @@ timed-out call; a warm failure still returns null and the caller's fallback is u
 is exactly the cold-load case when not - the same reasoning as the 300 s DINO budget.
 **Touched:**   server/lib/sceneComposite.js, server/lib/rembg.js
 **Status:**    active
+
+## Composite: a head measured as the whole figure is rejected on geometry (2026-09-10)
+**Context:**   Lab exp 1086/1089/1091: DINO's face box on a featureless silhouette was the whole
+figure; the tint scan inside it ran crown to hands; head came out 705px on a 705px silhouette. The
+sizer read the figure as 18% visible, scaled it to 3910px and pasted a giant head (exp 1091 final).
+The same page measured 135px in exp 1087. The only existing check rejects a tint too SMALL.
+**Decision:**  Where the detector builds a result row: a head >= 60% of a silhouette whose box has
+full-body proportions (height >= 2x width) is dropped, with a warning, and the figure is sized as
+painted. A head-only silhouette above a wall is near-square and keeps its measurement.
+**Rationale:** Geometry, not prose: a head cannot be its own standing body. The occlusion sizing
+this feeds is right when the head is real and catastrophic when it is not; one ratio separates them.
+**Touched:**   server/lib/sceneComposite.js
+**Status:**    active

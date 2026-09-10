@@ -803,6 +803,15 @@
       "status": "fixed",
       "fixedAt": "2026-09-10",
       "fix": "generateSceneComposite (and the stratified/simple builders) take opts.visualBible and pass every built blend prompt through scrubVbIds(prompt, visualBible) - names when the bible is present, generic nouns otherwise. Both call sites (production storyJobPipeline, Lab testlab) pass the bible. warnIfVbIds guards the sent prompt."
+    },
+    {
+      "id": "composite-head-measured-as-whole-figure",
+      "title": "The composite sizer accepted a head measurement equal to the whole silhouette, read the figure as 18% visible and scaled it to 3910px - a giant head pasted onto the page",
+      "reportedAt": "2026-09-10",
+      "source": "Lab exp 1086, 1089, 1091 (job_1788983823620_csjcyp1q9 p4): head 705px on a 266x705 silhouette, source tint-in-face-box; exp 1087 measured the same figure correctly at 135px. DINO face box on a featureless silhouette was the whole figure; the tint scan inside it ran crown to hands; the only sanity check rejects a tint too SMALL for its box. sizeFigure then took shown = 705/3910 = 18% and returned targetH 3910 via head+occluded. Exp 1091 final: giant half-figure, blend painted a wrong coat under it.",
+      "status": "fixed",
+      "fixedAt": "2026-09-10",
+      "fix": "Geometric guard where the detector builds each result row: a head that is >= 60% of a silhouette whose box is full-body (height >= 2x width) is dropped with a warning and the figure is sized as painted. A genuinely head-only silhouette is near-square and keeps its measurement."
     }
   ]
 }

@@ -507,6 +507,23 @@ async function findSilhouettesWithDino(populatedBuf, cast, opts = {}) {
       }
     }
 
+    // A head cannot be its own body. DINO's "face" box on a featureless
+    // silhouette is sometimes the whole figure, and the tint scan inside it
+    // then runs crown to hands, so the head came out equal to the box (Lab exp
+    // 1086/1089/1091: head 705 on a 705px figure - the sizer read "18% on
+    // show", scaled the figure to 3910px and pasted a giant head; the same
+    // page measured 135px in exp 1087). The one existing check only rejects a
+    // tint too SMALL for its box. Reject the other direction on geometry: a
+    // head that is most of a figure whose box has full-body proportions. A
+    // silhouette that really is only a head above a wall is near-square and
+    // keeps its measurement, which is the case the occlusion sizing exists for.
+    {
+      const figH = maxY - minY + 1, figW = Math.max(1, maxX - minX + 1);
+      if (head && head.height >= figH * 0.6 && figH / figW >= 2.0) {
+        log.warn(`[SCENE COMPOSITE]   ${s.name}: head ${head.height}px on a ${figW}×${figH} full-body silhouette (${head.source}) is not a head — measurement dropped, figure sized as painted`);
+        head = null;
+      }
+    }
     results[s.name] = {
       bbox: { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, pixels: count },
       head,
