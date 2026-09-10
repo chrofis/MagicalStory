@@ -100,9 +100,43 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   // 1) Original inputs, straight from the source job.
   const from = SOURCE === 'staging' ? stg : prod;
   const j = await from.query('SELECT input_data, user_id FROM story_jobs WHERE id = $1', [storyId]);
-  if (!j.rows.length) { console.error(`No story_jobs row for ${storyId} in ${SOURCE} — inputs are not replayable.`); process.exit(1); }
-  const src = typeof j.rows[0].input_data === 'string' ? JSON.parse(j.rows[0].input_data) : j.rows[0].input_data;
-  const prodUser = j.rows[0].user_id;
+  let src, prodUser;
+  if (j.rows.length) {
+    src = typeof j.rows[0].input_data === 'string' ? JSON.parse(j.rows[0].input_data) : j.rows[0].input_data;
+    prodUser = j.rows[0].user_id;
+  } else {
+    // Job rows are purged by housekeeping; the finished story keeps every
+    // wizard input it was born from. Rebuild the create-story body from it.
+    const s = await from.query('SELECT user_id, data FROM stories WHERE id = $1', [storyId]);
+    if (!s.rows.length) { console.error(`Neither a story_jobs row nor a stories row for ${storyId} in ${SOURCE} — inputs are not replayable.`); process.exit(1); }
+    const d = typeof s.rows[0].data === 'string' ? JSON.parse(s.rows[0].data) : s.rows[0].data;
+    prodUser = s.rows[0].user_id;
+    const pageCount = Array.isArray(d.pages) ? d.pages.length : Number(d.pages) || (Array.isArray(d.sceneImages) ? d.sceneImages.length : 0);
+    src = {
+      pages: pageCount,
+      artStyle: d.artStyle,
+      language: d.language,
+      languageLevel: d.languageLevel,
+      storyType: d.storyType,
+      storyTypeName: d.storyTypeName,
+      storyCategory: d.storyCategory,
+      storyTheme: d.storyTheme,
+      storyTopic: d.storyTopic || '',
+      storyDetails: d.storyDetails || '',
+      dedication: d.dedication || '',
+      ideaWorld: d.ideaWorld || undefined,
+      userLocation: d.userLocation || undefined,
+      relationships: d.relationships || {},
+      relationshipTexts: d.relationshipTexts || {},
+      mainCharacters: d.mainCharacters || [],
+      characters: (d.characters || []).map((c) => ({ id: c.id, name: c.name })),
+      layout: d.layout || undefined,
+      skipText: false, skipImages: false, skipCovers: false, skipOutline: false, skipSceneDescriptions: false,
+      enableFullRepair: true, adminDraft: false,
+    };
+    for (const k of Object.keys(src)) if (src[k] === undefined) delete src[k];
+    console.log(`No story_jobs row for ${storyId} — inputs rebuilt from the stored story (${pageCount}p, ${src.characters.length} characters)`);
+  }
 
   // 2) FULL characters, from the row copy-story-to-staging.js brought over.
   const ch = await stg.query('SELECT data FROM characters WHERE id = $1', [`characters_${prodUser}`]);
