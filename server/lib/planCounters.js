@@ -127,7 +127,10 @@ function classifyShot(segment) {
 function nameCandidates(text) {
   const clean = stripQuoted(text);
   const out = [];
-  const re = /(\S+\s+)?\b([A-ZÄÖÜ][a-zäöüßéèàâç]+(?:\s+[A-ZÄÖÜ][a-zäöüßéèàâç]+)*)\b/g;
+  // Horizontal whitespace only: the preceding token and the further tokens of a
+  // multi-word name must sit on the SAME plan line. A line break never joins a
+  // name that ends one line to the word that opens the next.
+  const re = /(\S+[ \t]+)?\b([A-ZÄÖÜ][a-zäöüßéèàâç]+(?:[ \t]+[A-ZÄÖÜ][a-zäöüßéèàâç]+)*)\b/g;
   let m;
   while ((m = re.exec(clean)) !== null) {
     const prev = String(m[1] || '').trim().toLowerCase().replace(/[^a-zäöüß]/g, '');
@@ -438,7 +441,11 @@ function resolveCast(pages, commissionedNames = [], placeNames = []) {
       excludedPlaces.push(name);
       continue;
     }
-    const acts = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:'s|s')?\\s+[a-zäöüß]`, 'u').test(clean);
+    // Same line only ([ \t], never \s): the plan is one line per page, so the
+    // verb for a name is on the name's own line. With \s+ a name that ENDED a
+    // line was read as followed by the shot word opening the next line
+    // ("through <town>\nclose-up …") and promoted to a person (2026-09-10).
+    const acts = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:'s|s')?[ \\t]+[a-zäöüß]`, 'u').test(clean);
     if (acts) invented.push(name);
   }
   const all = [...commissioned, ...invented];
