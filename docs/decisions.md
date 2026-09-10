@@ -32032,3 +32032,82 @@ debug.depthSpread as evidence; nothing acts on it. MIN_DEPTH_SPREAD and the Lab 
 deleted. Supersedes "MIN_DEPTH_SPREAD stays at 2.0×" (2026-08-25), owner's call on this evidence.
 **Touched:**   server/lib/sceneComposite.js, server/lib/testlab.js
 **Status:**    ✅ active; 2026-08-25 entry 🗄 superseded
+
+---
+
+### AD model bake-off REDO on the new AD role (2026-09-10) — gemini-3.1-pro still lowest, no gap beyond noise except vs opus
+**Context:** The 2026-08-29 verdict ("Art Director model = gemini-3.1-pro", Lab
+893-953) measured the AD as it was then. Since that date the AD prompts changed
+in 36 commits (`looksAt` gaze field, one level per frame, rules 7f/7g, VB element
+budget at the AD, plate = world before the action, one-instant rules, worn-item
+states, bidirectional cast check in the review). The owner asked for a rerun
+under a hard USD 4.00 cap.
+**Method:** Lab `beats_scenes` with `plainStoredBeats: true`, `expandPages: 8`
+(the FIRST 8 stored beats, identical page set for every arm of a story),
+`sceneReviewModel: deepseek-v4-pro` passed explicitly (the production
+`sceneReviewModel`; the harness's own fallback is `outlineReviewModel` =
+grok-4.6, which is what the August arms 901-944 actually ran with — see
+limitation 3). Judge: `scene_hazard_count`, `models: gpt-5.6-sol`, `source:
+briefs`, `fromExperiment`, `artifact: raw | reviewed` — same as 905/906.
+Stories (frozen shipped beats, 2026-09-08/09 format): Der Drache, der nicht
+fliegen konnte (`job_1788903616404_iqvhj4l8m`, "dragon") and Bimo kann nicht
+fliegen (`job_1788957347999_ijseol49a`, "bimo"). The third planned story (Fiona
+und die Karte aus Kohle, `job_1788983823620_csjcyp1q9`) was CUT for budget —
+this is a **2 stories x 4 models x 8 pages** run, not 3 stories.
+Experiments — AD arms: dragon 1107 sonnet, 1108 gpt-5.6-sol, 1109 gemini-3.1-pro,
+1110 claude-opus; bimo 1121 sonnet, 1122 gpt-5.6-sol, 1123 gemini-3.1-pro, 1124
+claude-opus. Judge runs (raw/reviewed): dragon sonnet 1111/1112, gpt 1113/1114,
+gemini 1116/1117, opus 1118/1119; bimo sonnet 1127/1128, gpt 1129/1130, gemini
+1131/1132, opus 1133/1134.
+**Cost (actual, metered):** AD arms $2.805 (expansion sonnet 0.160+0.141, gpt
+0.143+0.131, gemini 0.196+0.219, opus 0.720+0.566; DeepSeek review ≈ $0.075
+each; 1110's review is unmetered — `direct_cost: 0` on the OpenRouter usage,
+review DID run and rewrote p1-3 — count ~$0.08 by analogy). Judge 16 runs
+$0.755 (≈ $0.047 each at 8 pages). **Total ≈ $3.64** of the $4.00 cap. Note:
+opus is 3.6x the other arms per story ($0.72 vs $0.14-0.20 at 8 pages; it
+wrote 24k output tokens for 8 pages).
+**Results (hazard count, 8 pages, judge gpt-5.6-sol; raw / reviewed):**
+
+| model          | dragon  | bimo    | TOTAL raw / reviewed | reviewer effect |
+|----------------|---------|---------|----------------------|-----------------|
+| claude-sonnet  | 13 / 13 | 7 / 10  | 20 / 23              | +3              |
+| gpt-5.6-sol    | 10 / 7  | 11 / 13 | 21 / 20              | −1              |
+| gemini-3.1-pro | 7 / 9   | 11 / 8  | 18 / 17              | −1              |
+| claude-opus    | 12 / 13 | 14 / 17 | 26 / 30              | +4              |
+
+Per-class totals over both stories (raw → reviewed): CROWD 0 → 0 for every
+model (the new beats rules removed it upstream, as predicted in August).
+MULTIACT sonnet 6→5, gpt 8→7, gemini 4→3, opus 8→8. GAZE sonnet 2→6, gpt 4→7,
+gemini 5→5, opus 9→10. NEG sonnet 9→11, gpt 7→4, gemini 5→4, opus 7→9.
+CONTACT 0 everywhere except gemini reviewed 1. TEMPORAL ≤1 per model. FORCE
+gemini 3→2, others ≤2. Reviewer rewrites: dragon 2/3/0/3 pages, bimo 0/6/7/6
+pages (sonnet/gpt/gemini/opus).
+**Verdict:** (1) gemini-3.1-pro is still the lowest in both raw (18) and
+reviewed (17) totals, but its lead over gpt-5.6-sol (3) and sonnet (6) is
+inside the ±5-per-cell judge noise (two cells summed); only the gap to opus
+(13 reviewed) is signal. (2) Opus is NO LONGER the cleanest raw writer — it is
+the worst raw arm (26; August: best at 40 vs gemini 49) and the most expensive.
+(3) The "reviewer degrades opus" pattern is directionally present (+4) but
+inside noise; sonnet +3, gpt −1, gemini −1 likewise. Nothing here reverses
+the August ranking at the top. Comparison with August is by ranking and
+direction only — different stories, 8 pages not 16-18, and a different
+reviewer model (deepseek here, grok-4.6 there).
+**Limitations:** (1) The hazard judge reads the prose brief only — the AD's
+new structured fields (`looksAt`, `interactions`, `emptyScenePrompt`) are
+invisible to it, so the classes the new role targets (GAZE, MULTIACT) are
+judged from the prose, not the fields. (2) Two stories, 8 pages: the totals
+are ~1/3 of August's sample; a 6-count difference is not a result. (3) The
+Lab `beats_scenes` harness defaults the scene reviewer to
+`MODEL_DEFAULTS.outlineReviewModel` (grok-4.6) while production uses
+`sceneReviewModel` (deepseek-v4-pro) — `server/lib/testlab.js` ~3825. Every
+August bake-off arm therefore measured the grok-4.6 pairing; the "deepseek
+degrades opus" wording in the 2026-08-29 entry is a grok-4.6 finding. Not
+changed here (owner's call whether the harness default should track
+production). (4) Sonnet's dragon review (1107) hit the 16,000 output-token
+cap on the DeepSeek call; its reviewed brief set may be truncated.
+**Recommendation:** Do NOT change `MODEL_DEFAULTS.sceneDescription`; the
+evidence does not justify a change in either direction. If a decision is
+wanted between gemini and gpt-5.6-sol, it needs the third story plus
+duplicate cells (≈ $2 more) — the current gap is noise.
+**Touched:** none (docs only).
+**Status:** 📋 reported, default unchanged — owner decides.
