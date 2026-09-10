@@ -31851,3 +31851,14 @@ contact; this stops inferring eyes from hands anywhere.
 server/lib/promptBuilders.js, server/lib/sceneComposite.js, server/lib/compositeCastBuilder.js,
 server/lib/vbIdGuard.js, server/lib/sceneValidator.js, server/lib/evalPipeline.js, tests/unit/looks-at.test.ts
 **Status:**    active
+
+## looksAt for secondary characters lives in a `watching` interaction (2026-09-10, addendum)
+**Context:**   The first looksAt run on page 4 (Lab exp 1096) wrote Fiona `looksAt: CHR001` -
+correct - and dropped Malva Grimm entirely: a secondary character (a CHR id in objects[]) has no
+characters[] row by schema, so the new field gave her gaze nowhere to live and the AD stopped
+writing her `watching` row too.
+**Decision:**  Rule 8j and the reviewer's [gaze_missing]: a secondary character's gaze is a
+`watching` interaction whose object is what it looks at, with the prose saying the same. The
+composite already reads a `watching` row as its gaze fallback, so no code change.
+**Touched:**   prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt
+**Status:**    active
