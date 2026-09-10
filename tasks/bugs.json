@@ -776,6 +776,15 @@
       "status": "fixed",
       "fixedAt": "2026-09-09",
       "fix": "Both lines now say \"characters\" (\"their ages included\" on line 17). No code change; the evaluator was right to compare, the plan was wrong to say it."
+    },
+    {
+      "id": "scene-review-never-checks-for-imported-cast",
+      "title": "The scene review checked only for characters MISSING from a brief, never for characters the brief ADDED that the plan line does not name — an imported whole cast passed review clean and turned a subject page into a group shot",
+      "reportedAt": "2026-09-10",
+      "source": "Confirmed on staging job_1788983823620_csjcyp1q9 p14. Plan line: the vessel tiny in fog, dolphins, three rocks — names nobody. Plate: exactly that. The Art Director's first draft put all five crew on the deck and listed them in characters[], breaching its own rules 3 and 10b. prompts/scene-review.txt rule 5 [cast_over_cap] tests only \"a character present in the plan line but absent from the brief\"; [cast_unlisted] compares prose against metadata; nothing compares brief against plan in the other direction. Review found only [scale_unanchored]. Five reference cards were then packed into the render, the vessel grew to fit the people, the evaluator judged against the brief and merely counted them (Lorena missing on v0), and iterate added her.",
+      "status": "fixed",
+      "fixedAt": "2026-09-10",
+      "fix": "New reviewer check 5a [cast_not_in_plan]: a brief listing or naming as present a character the plan line does not name is a fault; a plan line naming nobody is a subject page with an empty characters[]; the rewrite removes the imported characters and restates the subject's scale. The preamble's rewrite contract gains the same direction (\"never keeps a character the plan line does not name\"). Prompt-only; review codes are not enumerated in code."
     }
   ]
 }

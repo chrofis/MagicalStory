@@ -31495,3 +31495,27 @@ deletion is not a hazard here.
 `server/lib/beatsPipeline.js` (arc round loop), `server/lib/planCounters.js`,
 `server/lib/storyHelpers.js` (facade), `tests/unit/arc-invented-figures.test.ts`
 **Status:**    ✅ active
+
+## The scene review checks both directions of the cast: nobody missing, nobody imported (2026-09-10)
+**Context:**   A plan line staged a subject page — a vessel tiny in fog, dolphins, rocks, no one
+named. The plate rendered exactly that. The Art Director's first draft put the whole cast on the
+deck anyway (its own rules 3 and 10b forbid it), the review passed it, five reference cards
+went into the render, and the vessel grew to fit the people. Every stage after the AD executed
+the error faithfully: the evaluator judged against the brief, so it counted the people rather
+than questioning them, and the repair added the one it found missing.
+**Decision:**  `prompts/scene-review.txt` gains check 5a `[cast_not_in_plan]`: a brief that
+lists in `characters[]`, or names in its prose as present, a character the page's plan line does
+not name is a fault, however natural their presence would be; a plan line that names nobody is
+a subject page with an empty cast; the rewrite removes the imported characters and restates the
+subject's scale rather than keeping them small or far away. The preamble's rewrite contract
+gains the same clause ("never keeps a character the plan line does not name").
+**Rationale:** Rule 5 `[cast_over_cap]` tested one direction only — a character in the plan
+line but absent from the brief — and `[cast_unlisted]` compares prose against metadata, not
+brief against plan. So the review could catch a dropped character and never an added one, and
+adding is the failure mode that destroys a subject page: character references force the
+subject to human scale. The AD already has the rule; the fix is the check that enforces it,
+because the AD demonstrably breaks it when the plan line names the cast's own vessel or a
+discovery that implies discoverers. Generic by construction: it compares the brief to the plan
+line and names no story.
+**Touched:**   `prompts/scene-review.txt` (preamble, check 5a)
+**Status:**    ✅ active
