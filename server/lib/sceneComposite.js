@@ -2293,9 +2293,21 @@ async function generateSceneComposite(opts) {
   // way. 'diff' is the original: subtract the clean background, then match hue.
   const detector = figureDetect === 'diff' ? 'diff' : 'dino';
   log.info(`[SCENE COMPOSITE] step 3/5 — bbox detect (${detector})`);
-  const detection = detector === 'dino'
-    ? await findSilhouettesWithDino(populatedBuf, cast)
-    : await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  // A detector that finds nothing is a refusal like the two gates below it,
+  // and until 2026-09-10 it was the one refusal that discarded its own
+  // evidence: a plain throw carried no compositeDebug, so the populated plate
+  // the detector looked at was never persisted (Lab exp 1083). Same contract
+  // as `refuse`: attach the partial debug so the caller can save the frames.
+  let detection;
+  try {
+    detection = detector === 'dino'
+      ? await findSilhouettesWithDino(populatedBuf, cast)
+      : await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  } catch (err) {
+    debug.abortReason = String(err.message || err);
+    err.compositeDebug = debug;
+    throw err;
+  }
   debug.detector = detector;
   const bboxes = {};
   const silhouetteMasks = {};
