@@ -31545,3 +31545,28 @@ age in `buildCharacterDescription`) would make that re-render count and is propo
 **Touched:**   `server/lib/referenceSheets.js` (`cellGatePrompt`, `checkCharacterCellRender`,
 two call sites), `tests/unit/cell-gate-sex.test.ts`
 **Status:**    ✅ active
+
+## Two named figures on different levels are staged from one level, never face to face across the edge (2026-09-10)
+**Context:**   A page staged a standoff across a ship's rail: one figure on the deck, the other
+looking up from a rowing boat on the water. Every render put the boat on the deck at the first
+figure's feet. Owner asked whether a correct plate fixes it; measured in the Lab (set 33/34,
+experiments 1073-1075): a plate built from the page's own Art-Director prompt was exactly right
+(medium view across the rail, boat afloat below), and both page renders onto it hauled the boat
+up onto the deck anyway. The prompt said "below her, on the water" each time. The renderer
+draws every referenced figure on one plane and moves the world to do it — the same mechanism
+that grew a tiny ship to fit five reference cards and turned a held scale into the wing it
+touched.
+**Decision:**  Art-Director rule 11f in both sibling prompts: two named figures on different
+levels are staged from ONE level — camera on the upper level looking down, the lower figure
+small and far at background depth with its surface visibly below the edge; or camera on the
+lower level looking up, the upper figure at the edge above — never both at full size facing
+each other across the edge. Both figures stay in `characters[]`, so the review's contract
+(never drop a plan-line character) holds; the reviewer's `[drawability]` check names the
+face-to-face-across-an-edge staging and rewrites to one level.
+**Rationale:** A plate fix was the obvious repair and the experiment showed it insufficient;
+the constraint is the character pass, so the staging has to respect it. The plan-side option
+(two pages, or the moment given to one figure) is not taken here — it is a beats-prompt
+decision and is proposed separately.
+**Touched:**   `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` (11f),
+`prompts/scene-review.txt` (check 7)
+**Status:**    ✅ active
