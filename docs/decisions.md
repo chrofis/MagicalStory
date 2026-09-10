@@ -31697,3 +31697,37 @@ page 4, beside "Malva Grimm"), and page 4's cast count rose from 2 to 3 — a pr
 fuller corpus now exposes; tracked in `tasks/BACKLOG.md`, not fixed here.
 **Touched:**   `server/lib/planCounters.js` (`stripQuoted`, export), `tests/unit/plan-counters.test.ts`
 **Status:**    ✅ active (staging, not on master)
+
+## Cast resolution folds a bare first name into its one full name; two people sharing a first name are never guessed (2026-09-10)
+**Context:**   `planCounters.nameCandidates` returns a full name and its bare first token as
+two separate candidates ("Malva Grimm" in the who-column, "Malva" in the instant). Measured on
+the real plan of `job_1788983823620_csjcyp1q9` once the corpus was fully visible (after the
+`stripQuoted` fix, `e541d93b5`): `resolveCast` produced `cast.invented = ["Malva Grimm",
+"Malva"]` — one person counted twice — page 4 counted 3 in frame instead of 2, and with the
+arc's declared list (`['Malva Grimm']`) the 6b cross-check reported a false
+`ARC_INVENTED_UNDECLARED` for "Malva". `CAST_OVER_3` did not trip only because it needs >3; a
+page with three real names plus one bare-first-name mention would have. The commissioned test
+was an exact full-string compare, so a commissioned two-word name mentioned by first name
+alone was classed as invented.
+**Decision:**  A canonicalisation step in `resolveCast` (`canonicalName(cand, pool)`), applied
+to every candidate BEFORE the commissioned check so every downstream consumer sees one person.
+Pool = all multi-token candidates from the plan corpus ∪ all commissioned names. A
+single-token candidate whose token equals (case-insensitively) the FIRST token of exactly ONE
+pool name folds into that name, in the pool's spelling. Zero matches: kept as it is (a genuine
+single-name character). Two or more (two people sharing a first name): NOT folded — the bare
+token stays its own candidate and is logged once at debug level. The grammar tests
+(`isThingMarked`, acts-like-a-person) still run on the form actually written; the verdict is
+recorded under the canonical name, and the first verdict for a canonical name wins. The
+per-page scan (`namesIn`) takes `cast.aliases` (`firstTokenAliases`, the same rule) so a page
+writing both forms counts one person and a bare "Anna" is credited to neither of two Annas.
+`nameCandidates`, `stripQuoted`, the thing-marker rule and `promptBuilders.js` are untouched.
+**Rationale:** The folding belongs where the pool of names is known, not in the token scanner.
+Real-plan before/after: `cast.invented` `["Malva Grimm","Malva"]` → `["Malva Grimm"]`; page 4
+count 3 → 2; the false `ARC_INVENTED_UNDECLARED` (Malva) is gone; every other finding is
+identical (MAIN_UNDER_HALF p5,7,10,13; NO_COMMISSIONED_ON_PAGE p2,3; UNDER_COVERED_CHARACTER
+Saira p7; CONSECUTIVE_SAME_SHOT_CAST p8,9); no other page's cast count changed. Never guessing
+on a shared first name is deliberate: a wrong fold would silently merge two people, which is
+worse than the duplicate this fixes.
+**Touched:**   `server/lib/planCounters.js` (`canonicalName`, `firstTokenAliases`,
+`resolveCast`, `namesIn`, `runPlanCounters` row scan, export), `tests/unit/plan-counters.test.ts`
+**Status:**    ✅ active (staging, not on master)

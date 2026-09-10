@@ -310,6 +310,64 @@ function thingMarkedNames(pages, names) {
 }
 
 /**
+ * Fold a bare first name into the one full name it belongs to.
+ *
+ * `nameCandidates` returns a full name and its bare first token as two separate
+ * candidates ("Malva Grimm" in the who-column, "Malva" in the instant). Measured
+ * on job_1788983823620_csjcyp1q9 once the corpus was fully visible: full name
+ * and bare first name counted as two people — `cast.invented` was
+ * ["Malva Grimm", "Malva"], page 4 counted 3 in frame instead of 2, and the arc
+ * cross-check reported "Malva" as undeclared beside the declared "Malva Grimm".
+ *
+ * The rule, over a POOL of every multi-token name the plan or the commission
+ * knows (the folding lives here, not in `nameCandidates`, because only here is
+ * that pool known):
+ *   - a multi-token candidate is already canonical;
+ *   - a single token equal (case-insensitively) to the FIRST token of exactly
+ *     ONE pool name folds into that name, in the pool's spelling;
+ *   - zero matches: a genuine single-name character, returned as it is;
+ *   - two or more (two people sharing a first name): NOT folded — the bare token
+ *     is kept and flagged `ambiguous` so the caller can log it. Never guess.
+ *
+ * @param {string} cand a candidate as nameCandidates returned it
+ * @param {string[]} pool multi-token names (single-token entries are ignored)
+ * @returns {{name: string, ambiguous: boolean}}
+ */
+function canonicalName(cand, pool) {
+  const single = String(cand || '').trim();
+  if (/\s/.test(single)) return { name: single, ambiguous: false };
+  const token = single.toLowerCase();
+  const matches = [];
+  for (const full of pool) {
+    const parts = String(full || '').trim().split(/\s+/);
+    if (parts.length < 2 || parts[0].toLowerCase() !== token) continue;
+    if (!matches.some(m => m.toLowerCase() === full.toLowerCase())) matches.push(full);
+  }
+  if (matches.length === 1) return { name: matches[0], ambiguous: false };
+  return { name: single, ambiguous: matches.length > 1 };
+}
+
+/**
+ * The bare first token each multi-token cast name may also be written as, by
+ * the same rule `canonicalName` applies — only when the token folds back to
+ * that name unambiguously. Lets the per-page scan count a page that writes
+ * both "Malva Grimm" and "Malva" as one person, and refuses to count a bare
+ * "Anna" for either of two Annas.
+ *
+ * @returns {Object<string, string[]>} name → alias tokens (only names with one)
+ */
+function firstTokenAliases(names, pool) {
+  const aliases = {};
+  for (const name of names) {
+    const parts = String(name || '').trim().split(/\s+/);
+    if (parts.length < 2) continue;
+    const folded = canonicalName(parts[0], pool);
+    if (!folded.ambiguous && folded.name.toLowerCase() === name.toLowerCase()) aliases[name] = [parts[0]];
+  }
+  return aliases;
+}
+
+/**
  * Which candidates behave like people across the whole plan.
  *
  * A candidate is dropped outright when the story's own place data names it: a
@@ -348,32 +406,56 @@ function resolveCast(pages, commissionedNames = [], placeNames = []) {
   const clean = stripQuoted(corpus);
   const invented = [];
   const excludedPlaces = [];
-  for (const cand of nameCandidates(corpus)) {
-    if (commissioned.some(c => c.toLowerCase() === cand.toLowerCase())) continue;
+  const candidates = nameCandidates(corpus);
+  // Every full name the plan or the commission knows: a bare first token folds
+  // into its one owner BEFORE any test below, so every consumer downstream sees
+  // one person (job_1788983823620_csjcyp1q9: "Malva Grimm" + "Malva").
+  const pool = [...candidates.filter(c => /\s/.test(c)), ...commissioned];
+  const ambiguousLogged = new Set();
+  for (const cand of candidates) {
+    const { name, ambiguous } = canonicalName(cand, pool);
+    if (ambiguous && !ambiguousLogged.has(cand.toLowerCase())) {
+      ambiguousLogged.add(cand.toLowerCase());
+      console.debug(`[planCounters] "${cand}" is the first name of more than one full name in the plan — kept as its own candidate, not folded`);
+    }
+    // The canonical form has already been decided (its own occurrence, or an
+    // earlier alias) — the first decision wins.
+    if (invented.includes(name) || excludedPlaces.includes(name)) continue;
+    if (commissioned.some(c => c.toLowerCase() === name.toLowerCase())) continue;
     // A candidate that CONTAINS a commissioned name is that character wearing a
     // title ("Captain <name>"), never a second person.
-    if (commissioned.some(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(cand))) continue;
+    if (commissioned.some(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(name))) continue;
     // The story's own place data outranks the acts-like-a-person heuristic.
-    if (places.some(pl => pl.toLowerCase() === cand.toLowerCase() || nameRe(pl).test(cand) || nameRe(cand).test(pl))) {
-      if (!excludedPlaces.includes(cand)) excludedPlaces.push(cand);
+    if (places.some(pl => pl.toLowerCase() === name.toLowerCase() || nameRe(pl).test(name) || nameRe(name).test(pl))) {
+      excludedPlaces.push(name);
       continue;
     }
     // The plan's own grammar outranks it too: "the <ship>", "the harbour of
-    // <town>" — a thing, never a figure (job_1788983823620_csjcyp1q9).
+    // <town>" — a thing, never a figure (job_1788983823620_csjcyp1q9). The
+    // grammar tests run on the form actually written (`cand`), the verdict is
+    // recorded under the canonical name.
     if (isThingMarked(cand, clean)) {
-      if (!excludedPlaces.includes(cand)) excludedPlaces.push(cand);
+      excludedPlaces.push(name);
       continue;
     }
     const acts = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:'s|s')?\\s+[a-zäöüß]`, 'u').test(clean);
-    if (acts && !invented.includes(cand)) invented.push(cand);
+    if (acts) invented.push(name);
   }
-  return { commissioned, invented, places: excludedPlaces, all: [...commissioned, ...invented] };
+  const all = [...commissioned, ...invented];
+  return { commissioned, invented, places: excludedPlaces, all, aliases: firstTokenAliases(all, pool) };
 }
 
-/** Names from `cast` present in a piece of text (possessives count as present). */
-function namesIn(text, cast) {
+/**
+ * Names from `cast` present in a piece of text (possessives count as present).
+ * `aliases` (name → other spellings, from `resolveCast().aliases`) lets a bare
+ * first name count as its full name, so both forms on one page are one person.
+ */
+function namesIn(text, cast, aliases = {}) {
   const clean = stripQuoted(text);
-  return cast.filter(n => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:'s|s')?\\b`, 'iu').test(clean));
+  return cast.filter((n) => {
+    const forms = [n, ...(aliases[n] || [])].map(reEscape);
+    return new RegExp(`\\b(?:${forms.join('|')})(?:'s|s')?\\b`, 'iu').test(clean);
+  });
 }
 
 /**
@@ -449,7 +531,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     const segs = planSegments(p.planLine);
     const complete = segs.length >= 4;
     const who = segs.length >= 2 ? segs[1] : String(p.planLine || '');
-    const present = namesIn(who, cast.all);
+    const present = namesIn(who, cast.all, cast.aliases);
     return {
       pageNumber: p.pageNumber,
       complete,
@@ -635,6 +717,7 @@ module.exports = {
   classifyShot,
   nameCandidates,
   resolveCast,
+  canonicalName,
   isThingMarked,
   thingMarkedNames,
   namesIn,

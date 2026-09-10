@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — CommonJS lib
 import planCounters from '../../server/lib/planCounters.js';
-const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames, thingMarkedNames, stripQuoted, namesIn } = planCounters as any;
+const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames, thingMarkedNames, stripQuoted, namesIn, canonicalName } = planCounters as any;
 
 /** A well-formed plan line: shot — who — instant — change. */
 const line = (shot: string, who: string, instant = 'something happens', change = 'something is now true') =>
@@ -346,7 +346,7 @@ describe('article/preposition-marked names are things, never cast (job_178898382
 
   it('a real invented person who acts without an article is still cast', () => {
     const cast = resolveCast(SHIP_TOWN, CREW);
-    expect(cast.invented).toEqual(['Malva Grimm', 'Malva']);
+    expect(cast.invented).toEqual(['Malva Grimm']);
   });
 
   it('a commissioned name is never put through the article test', () => {
@@ -377,10 +377,11 @@ describe('article/preposition-marked names are things, never cast (job_178898382
 
   it('ARC_INVENTED_UNDECLARED no longer lists the ship or the town', () => {
     const { findings, cast } = runPlanCounters({
-      pages: SHIP_TOWN, commissionedNames: CREW, declaredInvented: ['Malva Grimm', 'Malva'], inventedAllowance: 2,
+      pages: SHIP_TOWN, commissionedNames: CREW, declaredInvented: ['Malva Grimm'], inventedAllowance: 2,
     });
     expect(findings.find(f => f.code === 'ARC_INVENTED_UNDECLARED')).toBeUndefined();
-    expect(cast.invented).toEqual(['Malva Grimm', 'Malva']);
+    // The bare "Malva" on page 3 folds into the full name — one person.
+    expect(cast.invented).toEqual(['Malva Grimm']);
   });
 
   it('ARC_INVENTED_UNDECLARED still fires for an undeclared person', () => {
@@ -435,5 +436,66 @@ describe('stripQuoted: a possessive apostrophe is not an opening quote (job_1788
     const cast = resolveCast(pages, ['Fiona']);
     expect(cast.invented).toContain('Malva Grimm');
     expect(namesIn(planSegments(pages[1].planLine)[1], cast.all)).toEqual(['Malva Grimm']);
+  });
+});
+
+describe('a bare first name folds into its full name (job_1788983823620_csjcyp1q9)', () => {
+  // The measured page 4 of that plan: "Malva Grimm" in the who-column, "Malva"
+  // in the instant. One person, previously counted twice.
+  const MALVA = [
+    page(1, 'medium — Fiona alone at the kitchen table — she presses a torn chart flat — the chest is established'),
+    page(2, 'close-up — Fiona and Malva Grimm facing each other across the rail — Fiona holds the map while Malva in her rowing boat looks up at it — Fiona has refused'),
+  ];
+
+  it('one invented person, and the page that writes both forms counts 2 not 3', () => {
+    const res = runPlanCounters({ pages: MALVA, commissionedNames: ['Fiona'] });
+    expect(res.cast.invented).toEqual(['Malva Grimm']);
+    expect(res.stats.castPerPage[1].names).toEqual(['Fiona', 'Malva Grimm']);
+    expect(res.stats.castPerPage[1].names).toHaveLength(2);
+  });
+
+  it('a commissioned two-word name mentioned by first name alone is commissioned, not invented', () => {
+    const pages = [
+      page(1, 'wide — Anna Meier on the quay — she waves — the boat has left'),
+      page(2, 'close-up — Anna at the window — Anna presses her nose to the glass — the boat is out of sight'),
+    ];
+    const res = runPlanCounters({ pages, commissionedNames: ['Anna Meier'] });
+    expect(res.cast.invented).toEqual([]);
+    expect(res.stats.castPerPage[1].names).toEqual(['Anna Meier']);
+    expect(res.findings.map((f: any) => f.code)).not.toContain('NO_COMMISSIONED_ON_PAGE');
+  });
+
+  it('two full names sharing a first token: the bare token is NOT folded, both full names stay intact', () => {
+    const pages = [
+      page(1, 'wide — Anna Meier and Anna Roth on the quay — Anna Meier waves while Anna Roth turns away — the boat has left'),
+      page(2, 'close-up — Anna at the window — Anna presses her nose to the glass — the boat is out of sight'),
+    ];
+    const cast = resolveCast(pages, []);
+    expect(cast.invented).toEqual(['Anna Meier', 'Anna Roth', 'Anna']);
+    expect(canonicalName('Anna', ['Anna Meier', 'Anna Roth'])).toEqual({ name: 'Anna', ambiguous: true });
+    // Neither full name may claim the bare token on page 2.
+    expect(namesIn(planSegments(pages[1].planLine)[1], cast.all, cast.aliases)).toEqual(['Anna']);
+  });
+
+  it('a single-token name with no full-name owner is unchanged', () => {
+    expect(canonicalName('Nolo', ['Malva Grimm', 'Anna Meier'])).toEqual({ name: 'Nolo', ambiguous: false });
+    const pages = [page(1, 'wide — Fiona and Nolo on the quay — Nolo waves — the boat has left')];
+    expect(resolveCast(pages, ['Fiona']).invented).toEqual(['Nolo']);
+  });
+
+  it('matches the token case-insensitively and keeps the full name\'s spelling', () => {
+    expect(canonicalName('MALVA', ['Malva Grimm'])).toEqual({ name: 'Malva Grimm', ambiguous: false });
+    expect(canonicalName('Malva Grimm', ['Malva Grimm'])).toEqual({ name: 'Malva Grimm', ambiguous: false });
+  });
+
+  it('ARC_INVENTED_UNDECLARED does not fire when the arc declared the full name and the plan writes the first name alone', () => {
+    const res = runPlanCounters({ pages: MALVA, commissionedNames: ['Fiona'], declaredInvented: ['Malva Grimm'] });
+    expect(res.findings.map((f: any) => f.code)).not.toContain('ARC_INVENTED_UNDECLARED');
+  });
+
+  it('the bare form acting on its own is enough to make the full name a person', () => {
+    // The who-column names her in full and punctuates; only "Malva" ever acts.
+    const pages = [page(1, 'medium — Fiona and Malva Grimm — Malva rows the boat toward Fiona — the chart is taken')];
+    expect(resolveCast(pages, ['Fiona']).invented).toEqual(['Malva Grimm']);
   });
 });
