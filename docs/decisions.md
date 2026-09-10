@@ -32125,3 +32125,10 @@ duplicate cells (≈ $2 more) — the current gap is noise.
 **Rejected:**  scaling a wrong-pose render to the silhouette (1142, 1144: a tiny standing figure is still wrong); a re-render triggered by unclipped IoU (1146: spent $0.02 on a correct figure).
 **Touched:**   storyJobPipeline.js, server/lib/sceneComposite.js, server/lib/testlab.js, docs/image-routing.md, tasks/BACKLOG.md
 **Status:**    active; validated next by the dragon-story rerun
+
+## Composite: the production call site never handed it a brief or a plate prompt (2026-09-11)
+**Context:**   Dragon rerun job_1789078732136_622wecmhj was meant to validate the in-place composite. It ran nowhere: `needsScaleRepair` fired on 13 of 18 pages and every one stored `compositeOutcome {aborted, "cleanBackgroundPrompt or scene.description required"}`. Staging census since 2026-08-25: 44 of 49 outcomes are this abort, 5 "cast empty", 0 composited. Every composite verdict recorded for production pages since 2026-08-15 was therefore a Lab verdict; production has shipped the direct render throughout.
+**Cause:**     The call site read `fdMeta.description` / `pageData.sceneDescription` and `pageData.emptyScenePrompt`; in that closure the brief is `pageData.scene.sceneDescription` and the plate prompt is `sceneBackgrounds[page].prompt` (or `sceneMetadata.emptyScenePrompt`). The composite throws when both are empty, the pipeline catches and keeps the direct render, and the warning never reached anyone.
+**Decision:**  Read the fields that exist (bugs.json `composite-aborts-on-empty-scene-fields`). The dragon story is rerun once more for the actual validation. Lesson for the record: a stage that "fails open" into the previous render needs its abort counted, not only logged - see BACKLOG.
+**Touched:**   storyJobPipeline.js, tasks/bugs.json
+**Status:**    active

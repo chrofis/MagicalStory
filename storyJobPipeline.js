@@ -4948,10 +4948,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // on this path and stays for the paste fallback.
                     figureMethod: 'inPlace',
                     cast: compositeCast, frontCast, backCast,
+                    // The brief and the plate prompt, from where this closure
+                    // actually holds them: pageData.scene.sceneDescription and
+                    // sceneBackgrounds / sceneMetadata.emptyScenePrompt.
+                    // fdMeta.description, pageData.sceneDescription and
+                    // pageData.emptyScenePrompt do not exist at this point, so
+                    // every trigger since 2026-08-25 aborted with
+                    // "cleanBackgroundPrompt or scene.description required"
+                    // before the first paid call (44 of 49 staging outcomes;
+                    // the composite never produced a production page).
                     scene: {
-                      description: String(fdMeta.description || pageData.sceneDescription || ''),
+                      description: String(fdMeta.description || pageData.scene?.sceneDescription || pageData.sceneDescription || '').split('---METADATA---')[0].trim(),
                       artStyle: inputData.artStyle || 'watercolor',
-                      pageBrief: String(fdMeta.pageBrief || pageData.sceneDescription || ''),
+                      pageBrief: String(fdMeta.pageBrief || pageData.scene?.sceneDescription || pageData.sceneDescription || '').split('---METADATA---')[0].trim(),
                       interactions: fdMeta.interactions || [],
                       // Per-character expression + attention target, the two
                       // things a pasted avatar cut-out cannot supply (it is
@@ -4961,7 +4970,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       // model re-arrange the scene it was asked to preserve.
                       ...buildBlendMetadata(fdMeta, pageData, inputData.clothingRequirements || inputData.outline?.clothingRequirements || null),
                     },
-                    cleanBackgroundPrompt: String(pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
+                    cleanBackgroundPrompt: String(sceneBackgrounds[pageData.pageNumber]?.prompt || pageData.sceneMetadata?.emptyScenePrompt || pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                     // Labelled portrait grid as Image 2 — the blend prompt calls it
                     // the authoritative face/clothing reference, and this path was
