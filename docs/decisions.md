@@ -31519,3 +31519,29 @@ discovery that implies discoverers. Generic by construction: it compares the bri
 line and names no story.
 **Touched:**   `prompts/scene-review.txt` (preamble, check 5a)
 **Status:**    ✅ active
+
+## The character-cell gate judges the reference against its own description: sex (2026-09-10)
+**Context:**   The pipeline judges identity AGAINST the reference sheet — the quality eval pairs
+each figure with a cell, the semantic eval is told identity is that system's job, the compliance
+eval may not call a matched figure CRITICAL — and nothing judged the reference against its own
+description. A secondary character the bible described as "a woman, wiry and angular…, 58"
+rendered as a man on her sheet; the sheet passed the cell gate (skin, art style, apparent age);
+every page then matched the man to "Malva" at 0.9 and shipped. The scale-sheet chimera of
+2026-09-09 was the same blind spot on an object.
+**Decision:**  Owner ruling: "we must eval vb against sex". `checkCharacterCellRender` gains a
+fourth clause, fed by the bible's `build` field verbatim — the field the bible prompt already
+requires to open with the character's sex ("a woman, broad-shouldered"). The vision model
+compares figure to sentence; code parses nothing. The gate keeps its shape (one yes/no question,
+one re-render on NO, accept what comes back). The question is built by `cellGatePrompt()`,
+exported and unit-tested.
+**Rationale:** Measured on the cell that shipped: old question → natural:true; new question with
+the real build text → natural:false, "the figure reads as male, not female"; the same cell with
+a build saying "a man" → natural:true (no false positive). A wrong reference is agreed with by
+every downstream check on every page, so the only cheap, decisive place to ask "does this
+picture match its words" is the sheet, once, before it is copied. Known limit: the one permitted
+re-render uses the same description, so it may draw the same man; the run then logs
+`vb_character_cell_still_bad` and ships. Leading the description with the sex (build before
+age in `buildCharacterDescription`) would make that re-render count and is proposed, not done.
+**Touched:**   `server/lib/referenceSheets.js` (`cellGatePrompt`, `checkCharacterCellRender`,
+two call sites), `tests/unit/cell-gate-sex.test.ts`
+**Status:**    ✅ active

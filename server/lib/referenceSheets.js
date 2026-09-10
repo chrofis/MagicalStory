@@ -365,6 +365,33 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   return sanitised;
 }
 
+/**
+ * The one question the character-cell gate asks. Pure, so it can be tested.
+ *
+ * (1) skin colour and (2) art style are the original gate (owner, 2026-08-31).
+ * (3) apparent age joined when a secondary character carried a numeric age.
+ * (4) sex joined 2026-09-10 (owner): the bible opens every secondary
+ * character's `build` with the sex ("a woman, wiry and angular"), the sheet
+ * renderer read that one word against a wall of other cues and drew a man,
+ * and nothing downstream could catch it — every later identity check compares
+ * the page to THIS cell, so a wrong cell is agreed with on every page. The
+ * `build` field is quoted verbatim; the model does the comparing. No prose is
+ * parsed in code.
+ *
+ * @param {string} styleDescription - the book's declared art style
+ * @param {number|string|null} age - the character's stated age, if any
+ * @param {string|null} build - the bible's `build` field, which opens with the sex
+ * @returns {string}
+ */
+function cellGatePrompt(styleDescription = '', age = null, build = null) {
+  const ageClause = age ? ` (3) Apparent age: does the figure look about ${age}? A visibly older or younger rendering fails.` : '';
+  const buildText = String(build || '').trim();
+  const sexClause = buildText
+    ? ` (${age ? 4 : 3}) Sex: the character is described as "${buildText}". Does the figure read as the sex that description states? A figure that reads as the other sex fails, whatever else is right.`
+    : '';
+  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Is the figure's skin a plausible human skin color — not green-, gray- or blue-tinted? (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+}
+
 // ── Character-cell render gate ──────────────────────────────────────────────
 // VB reference cells are generated with the quality evaluator deliberately
 // skipped (avatar path in images.js), yet each CHARACTER cell then feeds every
@@ -374,7 +401,7 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
 // cheapest vision-capable TEXT_MODELS entry, one re-render on NO, then accept
 // whatever came back. No scores, no thresholds, no loops; fail-open on any API
 // error — the gate may never block a story.
-async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null) {
+async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null, build = null) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
@@ -382,8 +409,7 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
   // The style anchor is load-bearing: without it flash-lite judged the known-bad
   // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
   // job_1788123310558 cell — NO with the anchor, YES without).
-  const ageClause = age ? ` (3) Apparent age: does the figure look about ${age}? A visibly older or younger rendering fails.` : '';
-  const prompt = `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Is the figure's skin a plausible human skin color — not green-, gray- or blue-tinted? (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+  const prompt = cellGatePrompt(styleDescription, age, build);
   const body = {
     contents: [{ parts: [
       { inlineData: { mimeType: 'image/png', data: cellBase64 } },
@@ -753,7 +779,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         if (element.type !== 'character' || !references[i]) continue;
         let verdict;
         try {
-          verdict = await checkCharacterCellRender(references[i], styleDescription, element.age || null);
+          verdict = await checkCharacterCellRender(references[i], styleDescription, element.age || null, element.build || null);
         } catch (err) {
           log.warn(`⚠️ [REF-SHEET] Cell render gate errored for "${element.name}" (${err.message}) — accepting cell unchecked`);
           continue;
@@ -769,7 +795,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
           if (!reCell) throw new Error('re-rendered cell extraction failed');
           references[i] = reCell;
           try {
-            const recheck = await checkCharacterCellRender(reCell, styleDescription, element.age || null);
+            const recheck = await checkCharacterCellRender(reCell, styleDescription, element.age || null, element.build || null);
             if (!recheck.natural) {
               log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
               genLog?.warn('vb_character_cell_still_bad', `Re-rendered cell still fails render gate (${recheck.reason}) — accepted anyway`, element.name);
@@ -1157,6 +1183,7 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
 
 module.exports = {
   checkCharacterCellRender,
+  cellGatePrompt,
   splitGridIntoReferences,
   buildReferenceSheetPrompt,
   characterAgeCue,

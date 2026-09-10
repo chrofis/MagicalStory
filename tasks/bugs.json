@@ -785,6 +785,15 @@
       "status": "fixed",
       "fixedAt": "2026-09-10",
       "fix": "New reviewer check 5a [cast_not_in_plan]: a brief listing or naming as present a character the plan line does not name is a fault; a plan line naming nobody is a subject page with an empty characters[]; the rewrite removes the imported characters and restates the subject's scale. The preamble's rewrite contract gains the same direction (\"never keeps a character the plan line does not name\"). Prompt-only; review codes are not enumerated in code."
+    },
+    {
+      "id": "character-cell-gate-never-checked-sex",
+      "title": "A secondary character described by the bible as a woman was rendered as a man on her reference sheet; the cell gate checked skin, style and age only, and every later identity check then agreed with the wrong sheet on every page",
+      "reportedAt": "2026-09-10",
+      "source": "Confirmed on staging job_1788983823620_csjcyp1q9, CHR001 (bible build: \"a woman, wiry and angular, slightly below average height…\", age 58). vb/CHR001.jpg is a man. Page 4: quality eval matched the figure to the sheet at 0.9; semantic eval (told \"both women\" and instructed that identity is another system's job) listed her as \"adult woman\"; the three-stage inventory saw \"the man in the brown jacket\" and, bound by \"a matched figure is never CRITICAL\", filed character_identity MODERATE; score 78 > 60, critical-only routing — shipped. Validated the fix on the stored cell: old gate natural:true; new gate with the build text natural:false (\"reads as male, not female\"); inverse control (build says a man) natural:true.",
+      "status": "fixed",
+      "fixedAt": "2026-09-10",
+      "fix": "checkCharacterCellRender takes the bible `build` field (which the bible is instructed to open with the sex) and its question gains \"(4) Sex: the character is described as \\\"<build>\\\". Does the figure read as the sex that description states?\" The prompt lives in cellGatePrompt() and is unit-tested. Both call sites pass element.build. No prose parsed in code; the vision model compares."
     }
   ]
 }
