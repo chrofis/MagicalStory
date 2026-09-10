@@ -8,11 +8,14 @@ const { formatInteractionsBlock } = require('../../server/lib/vbIdGuard');
  * nothing infers where a character looks from what they hold.
  */
 describe('looksAt', () => {
-  const vb = { artifacts: [{ id: 'ART001', name: 'hand-drawn chart' }], secondaryCharacters: [{ id: 'CHR001', name: 'Malva Grimm' }] };
+  // An artifact id renders from its DESCRIPTION (a name is story-language); a
+  // person from their name. The scrubber's contract, mirrored here.
+  const vb = { artifacts: [{ id: 'ART001', name: 'Treasure Chart', description: 'a hand-drawn navigational chart on ivory parchment' }], secondaryCharacters: [{ id: 'CHR001', name: 'Malva Grimm' }] };
 
   it('phrases a person, an object id, the camera and away', () => {
     expect(looksAtPhrase('Malva Grimm', vb)).toBe('eyes on Malva Grimm');
-    expect(looksAtPhrase('ART001', vb)).toBe('eyes on hand-drawn chart');
+    expect(looksAtPhrase('ART001', vb)).toMatch(/^eyes on .*chart/);
+    expect(looksAtPhrase('ART001', vb)).not.toMatch(/ART001/);
     expect(looksAtPhrase('camera', vb)).toBe('eyes on the viewer');
     expect(looksAtPhrase('away', vb)).toBe('eyes turned away from everyone in the frame');
     expect(looksAtPhrase('', vb)).toBe('');
@@ -29,9 +32,9 @@ describe('looksAt', () => {
       vb,
       [{ name: 'Fiona', looksAt: 'CHR001' }, { name: 'Malva Grimm', looksAt: 'ART001' }],
     );
-    expect(block).toContain('- Fiona + hand-drawn chart: presses the map flat against her coat');
+    expect(block).toMatch(/- Fiona \+ .*chart.*: presses the map flat against her coat/);
     expect(block).toContain('- Fiona looks at Malva Grimm');
-    expect(block).toContain('- Malva Grimm looks at hand-drawn chart');
+    expect(block).toMatch(/- Malva Grimm looks at .*chart/);
     expect(block).not.toMatch(/ART001|CHR001/);
   });
 

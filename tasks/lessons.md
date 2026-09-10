@@ -780,3 +780,11 @@ machine - an unbounded `until curl ...` loop that ran until the OS killed it for
 (1) never pipe a command whose exit code guards the chain - run it bare, or `set -o pipefail`;
 (2) every wait loop gets a deadline (`for i in $(seq 1 60)` ...) and fails loudly when it expires.
 The gate itself was right (check-no-undef found three real ReferenceErrors).
+
+## Never pipe the test runner in a guarded chain (2026-09-10, same day as the push lesson)
+
+Recorded this morning for git push, repeated this afternoon for vitest: `npx vitest run | grep -E "Tests |FAIL"`
+exits with GREP's status, so two failing tests read as success and the chain committed and pushed them
+(34b7d7a8). Rule: `npx vitest run --reporter=dot > "$LOG" 2>&1; RC=$?; tail -3 "$LOG"; test $RC -eq 0 && ...`
+- the exit code comes from the runner, never from a filter. Applies to every command whose result
+gates the next step: run it bare or capture to a file, then filter the file.
