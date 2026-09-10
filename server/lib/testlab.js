@@ -4547,6 +4547,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     scene: compositeScene,
     // Lab-only: per-run depth-spread floor (production keeps MIN_DEPTH_SPREAD).
     minDepthSpread: Number.isFinite(Number(params.minDepthSpread)) ? Number(params.minDepthSpread) : undefined,
+    // The bible, so the blend prompt can name what a finding cites instead of leaking an id.
+    visualBible: storyData.visualBible || null,
+    // Lab-only: per-figure phantom-pose render (a seated silhouette gets a seated figure,
+    // not a standing cell). Production never passes it; the builder's default false stands.
+    phantomPoseRender: params.phantomPoseRender === true,
     cleanBackgroundPrompt,
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     skipBlend: !wantBlend,

@@ -4954,6 +4954,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // the authoritative face/clothing reference, and this path was
                     // passing nothing, leaving identity to the pasted pixels alone.
                     visualBibleGridImage: pageData.visualBibleGrid || null,
+                    // For the blend prompt: ids in the brief's interactions become names, never leak.
+                    visualBible,
                     // Creatures declared on this page. The paste step only
                     // places cast cut-outs, so a Visual Bible animal has no
                     // way into the page unless the plate paints it — measured

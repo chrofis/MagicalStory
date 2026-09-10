@@ -44,6 +44,21 @@ const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { rembgRemoveBackground } = require('./rembg');
+const { scrubVbIds, warnIfVbIds } = require('./vbIdGuard');
+
+/**
+ * Every blend prompt goes through here before it reaches Grok. The blend
+ * census is built from the brief's interactions, whose `object` is a raw
+ * bible id, and until 2026-09-10 nothing in this module scrubbed it - the
+ * sent prompt read "Looking at ART001.1", noise to an image model (the same
+ * leak the cover path fixed in 2026-08). With a bible the id becomes its name;
+ * without one it becomes a generic noun. warnIfVbIds keeps the alarm on.
+ */
+function scrubBlendPrompt(prompt, visualBible, tag) {
+  const out = scrubVbIds(String(prompt || ''), visualBible || null);
+  warnIfVbIds(out, `scene-composite blend prompt (${tag})`, { kind: 'image' });
+  return out;
+}
 
 const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
@@ -2754,7 +2769,7 @@ async function blendPastedCanvas({
   compositedData, scene, cast, aspectRatio, visualBibleGridImage,
   usageTracker, promptOverride = null, debug = {},
 }) {
-  let blendPrompt = promptOverride || buildBlendEditPrompt(scene, cast);
+  let blendPrompt = scrubBlendPrompt(promptOverride || buildBlendEditPrompt(scene, cast), opts.visualBible, 'uniform');
   // The page's own prompt runs to ~7.5k on a busy page, so it can pass Grok's
   // budget once the staging clause is added. Shrink with the SAME helper page
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
@@ -3198,7 +3213,7 @@ function _aspectDims(aspectRatio, baseWidth = 1024) {
  * Returns the same shape generateStratifiedComposite returns so callers stay
  * agnostic about which branch ran.
  */
-async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost, visualBibleGridImage }) {
+async function _simpleCompositePath({ visualBible = null, emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost, visualBibleGridImage }) {
   const { W, H } = _aspectDims(aspectRatio, 1024);
   log.info(`[SCENE COMPOSITE/SIMPLE] start — ${frontCast.length} chars, canvas ${W}×${H}`);
 
@@ -3276,7 +3291,7 @@ async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, sc
   // default no-text behaviour. editWithGrok wants data URI strings (it does
   // r2.stripDataUriPrefix on each ref), so convert the composited buffer
   // before passing.
-  const blendPrompt = buildBlendEditPrompt(scene);
+  const blendPrompt = scrubBlendPrompt(buildBlendEditPrompt(scene), visualBible, 'simple');
   const blendRefs = [`data:image/jpeg;base64,${composited.toString('base64')}`];
   if (visualBibleGridImage) {
     const vbUri = typeof visualBibleGridImage === 'string'
@@ -3338,6 +3353,7 @@ async function _stratifiedBody(ctx) {
   // a visible composited intermediate in the dev panel.
   if (backCast.length === 0) {
     return _simpleCompositePath({
+      visualBible: opts.visualBible,
       emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost,
       visualBibleGridImage,
     });
@@ -3836,7 +3852,7 @@ async function _stratifiedBody(ctx) {
 
   // ── Step 4/4: blend pass (same as uniform path)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 4/4 — blend pass');
-  const blendPrompt = buildBlendEditPrompt(scene);
+  const blendPrompt = scrubBlendPrompt(buildBlendEditPrompt(scene), opts.visualBible, 'stratified');
   debug.blendPrompt = blendPrompt;
   const blendRefs = visualBibleGridImage
     ? [compositedData, visualBibleGridImage]

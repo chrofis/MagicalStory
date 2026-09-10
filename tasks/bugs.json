@@ -794,6 +794,15 @@
       "status": "fixed",
       "fixedAt": "2026-09-10",
       "fix": "checkCharacterCellRender takes the bible `build` field (which the bible is instructed to open with the sex) and its question gains \"(4) Sex: the character is described as \\\"<build>\\\". Does the figure read as the sex that description states?\" The prompt lives in cellGatePrompt() and is unit-tested. Both call sites pass element.build. No prose parsed in code; the vision model compares."
+    },
+    {
+      "id": "composite-blend-prompt-leaks-raw-vb-ids",
+      "title": "The scene-composite blend prompt sent raw Visual Bible ids to Grok (\"Looking at ART001.1\"); no VB-id scrub ran anywhere in sceneComposite.js",
+      "reportedAt": "2026-09-10",
+      "source": "Confirmed on staging Lab exp 1084 and 1087 (job_1788983823620_csjcyp1q9 p4): stored blendPrompt reads \"- Fiona ... Presses the map flat against her coat. Looking at ART001.1.\" buildBlendMetadata copies each interaction's `object` id verbatim into attentionTargets; buildBlendEditPrompt prints it; nothing scrubs it. To Grok the id is noise (memory: cover VB-id leak, 2026-08) - in exp 1087 the map the line refers to vanished from the character's hands in the blend. The same builder path is used by all three composite strategies.",
+      "status": "fixed",
+      "fixedAt": "2026-09-10",
+      "fix": "generateSceneComposite (and the stratified/simple builders) take opts.visualBible and pass every built blend prompt through scrubVbIds(prompt, visualBible) - names when the bible is present, generic nouns otherwise. Both call sites (production storyJobPipeline, Lab testlab) pass the bible. warnIfVbIds guards the sent prompt."
     }
   ]
 }
