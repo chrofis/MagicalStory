@@ -2024,6 +2024,7 @@ module.exports = {
   detectPersonBoxInCrop,
   recoverFaceBox,
   attachSamMasksToFigures,
+  _mobilesamMaskFull,   // raw box→mask; the scene composite's in-place cut-out
   _cleanMaskAndCheck,
   _boxAreaPx,
   _boxContainment,

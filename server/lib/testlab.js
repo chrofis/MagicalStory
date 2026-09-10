@@ -4332,7 +4332,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   const wantBlend = params.blend !== false;
   // 'paste' composites cut-outs and blends; 'charRepair' hands each silhouette
   // to the production character-repair call instead.
-  const figureMethod = params.figureMethod === 'charRepair' ? 'charRepair' : 'paste';
+  // 'inPlace' renders each figure over its silhouette on the original plate,
+  // cuts it out with DINO+SAM and pastes it (no blend).
+  const figureMethod = ['charRepair', 'inPlace'].includes(params.figureMethod) ? params.figureMethod : 'paste';
 
   const cast = await buildCompositeCast({
     sceneMetadata: scene.sceneMetadata,
@@ -4594,7 +4596,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     ['cleanBackground', '2 · depopulated (silhouettes removed)'],
     ['composited', figureMethod === 'charRepair'
       ? '3 · after character repair (all figures)'
-      : '3 · avatar cut-outs pasted (raw, pre-blend)'],
+      : figureMethod === 'inPlace'
+        ? '3 · figures rendered in place, cut and pasted'
+        : '3 · avatar cut-outs pasted (raw, pre-blend)'],
   ];
   const saveStep = async (uri, label) => {
     if (typeof uri !== 'string' || !uri.startsWith('data:image')) return;
@@ -4617,7 +4621,12 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   }
   // Phantom-pose renders when that path is on.
   for (const [name, v] of Object.entries(dbg.phantomPoseRenders || {})) {
+    await saveStep(v?.phantomCrop, `· phantom crop sent for ${name}`);
     await saveStep(v?.output, `· phantom-pose render for ${name}`);
+  }
+  // In-place renders (figureMethod 'inPlace'): the full plate with one figure painted.
+  for (const [name, v] of Object.entries(dbg.inPlaceRenders || {})) {
+    await saveStep(v?.render, `· in-place render for ${name}`);
   }
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, res.imageData, experimentId);
@@ -4631,8 +4640,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     facing,
     figureMethod,
     detector: (res.debug || {}).detector || null,
-    blended: figureMethod === 'charRepair' ? false : wantBlend,
+    blended: figureMethod === 'paste' ? wantBlend : false,
     charRepairLog: (res.debug || {}).charRepairLog || null,
+    inPlaceLog: (res.debug || {}).inPlaceLog || null,
     modelCalls: usage.length,
     cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
     cast: cast.map(c => ({

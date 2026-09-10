@@ -1226,6 +1226,208 @@ async function detectZOrderByOcclusion(populatedBuf, placements) {
  * Build the cast-line block (one line per silhouette) used by both the
  * populated-plate generate prompt and any future per-character spec.
  */
+// ─── figureMethod 'inPlace' — prompt + box-matching helpers (pure) ─────────
+/**
+ * Prompt for one in-place render: the ORIGINAL populated plate (image 1) and
+ * the character's reference sheet (image 2). The model replaces exactly one
+ * coloured placeholder; the other silhouettes stay so every figure is rendered
+ * against the same plate and cut out afterwards. Names come from the cast
+ * entry at runtime — nothing story-specific lives in the template. Owner's
+ * design, 2026-09-10.
+ */
+function buildInPlaceRenderPrompt(c, visualBible = null) {
+  const colour = c.colorName || 'coloured';
+  const name = c.name || 'the character';
+  const clauses = [];
+  if (c.action) clauses.push(String(c.action).trim());
+  if (c.looksAt) clauses.push(`looking at ${String(c.looksAt).trim()}`);
+  const poseLine = clauses.length ? ` The figure is ${clauses.join(', ')}.` : '';
+  const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. Image 2 is the reference sheet of ${name}.
+
+Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, size, body orientation and pose.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2.
+
+Everything else in Image 1 stays exactly as it is, including the other coloured silhouettes. Same art style as Image 1.`;
+  return scrubBlendPrompt(prompt, visualBible, `inPlace ${name}`);
+}
+
+function _iouRects(a, b) {
+  const ix0 = Math.max(a.x, b.x), iy0 = Math.max(a.y, b.y);
+  const ix1 = Math.min(a.x + a.width, b.x + b.width), iy1 = Math.min(a.y + a.height, b.y + b.height);
+  if (ix1 <= ix0 || iy1 <= iy0) return 0;
+  const inter = (ix1 - ix0) * (iy1 - iy0);
+  return inter / (a.width * a.height + b.width * b.height - inter);
+}
+
+/**
+ * Pick, among DINO person boxes on the render ([x0,y0,x1,y1] px), the one that
+ * best overlaps the silhouette's box. The silhouette box is expanded first
+ * (default 10% per side) because the model tends to draw the figure a little
+ * larger than the placeholder. Returns { box: {x,y,width,height}, iou, index }
+ * or null when nothing reaches `minIou`.
+ */
+function matchRenderedFigureBox(personBoxes, silBbox, { expand = 0.10, minIou = 0.30, canvasWidth = Infinity, canvasHeight = Infinity } = {}) {
+  if (!silBbox || !Array.isArray(personBoxes) || personBoxes.length === 0) return null;
+  const dx = silBbox.width * expand, dy = silBbox.height * expand;
+  const x0 = Math.max(0, silBbox.x - dx), y0 = Math.max(0, silBbox.y - dy);
+  const target = {
+    x: x0, y: y0,
+    width: Math.min(canvasWidth, silBbox.x + silBbox.width + dx) - x0,
+    height: Math.min(canvasHeight, silBbox.y + silBbox.height + dy) - y0,
+  };
+  let best = null;
+  personBoxes.forEach((b, index) => {
+    const arr = Array.isArray(b) ? b : b?.box;
+    if (!Array.isArray(arr) || arr.length !== 4) return;
+    const [bx0, by0, bx1, by1] = arr;
+    const rect = { x: bx0, y: by0, width: bx1 - bx0, height: by1 - by0 };
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const iou = _iouRects(rect, target);
+    if (!best || iou > best.iou) best = { box: rect, iou, index };
+  });
+  return best && best.iou >= minIou ? best : null;
+}
+
+/** Binary-mask dilation by `r` px (separable running max). Returns a new Uint8Array. */
+function dilateMask(mask, W, H, r) {
+  if (!(r > 0)) return mask;
+  const tmp = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      let v = 0;
+      for (let k = Math.max(0, x - r); k <= Math.min(W - 1, x + r); k++) { if (mask[row + k]) { v = 1; break; } }
+      tmp[row + x] = v;
+    }
+  }
+  const out = new Uint8Array(W * H);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      let v = 0;
+      for (let k = Math.max(0, y - r); k <= Math.min(H - 1, y + r); k++) { if (tmp[k * W + x]) { v = 1; break; } }
+      out[y * W + x] = v;
+    }
+  }
+  return out;
+}
+
+/** RGBA canvas-sized PNG of `renderBuf` (already W×H) with alpha = mask. */
+async function cutWithMask(renderBuf, mask, W, H) {
+  const { data } = await sharp(renderBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < W * H; i++) if (!mask[i]) data[i * 4 + 3] = 0;
+  return sharp(data, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+/**
+ * Bring a Grok render back onto the plate's canvas. Same size: untouched.
+ * Otherwise a centre cover-resize to the canvas — the same correction
+ * editWithGrok applies by default, done here so the caller can log it
+ * against the figure it affects (a drifted aspect shifts the cut-out).
+ */
+async function normaliseRenderToCanvas(renderBuf, W, H) {
+  const m = await sharp(renderBuf).metadata();
+  if (m.width === W && m.height === H) return { buf: renderBuf, note: null };
+  const drift = Math.abs((m.width / m.height) - (W / H)) / (W / H);
+  const buf = await sharp(renderBuf).resize(W, H, { fit: 'cover', position: 'centre' }).png().toBuffer();
+  return { buf, note: `${m.width}×${m.height} → ${W}×${H}${drift >= 0.01 ? ` (aspect drift ${(drift * 100).toFixed(1)}%, centre-cropped)` : ''}` };
+}
+
+/**
+ * figureMethod 'inPlace': one Grok edit per cast member on the ORIGINAL plate
+ * ("put A where the red silhouette is"), DINO+SAM cut-out of the rendered
+ * figure, all cut-outs pasted onto the depopulated plate back-to-front. No
+ * blend pass. Returns { imageData, cost, placed } and fills `debug`.
+ */
+async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf, aspectRatio, visualBible, usageTracker, debug }) {
+  const { _gdinoDetect, _collectNmsBoxes, GDINO_PERSON_NMS_IOU, _mobilesamMaskFull } = require('./figureDetection');
+  const W = detection.canvasWidth, H = detection.canvasHeight;
+  const renders = {};
+  const cutouts = {};
+  const inPlaceLog = [];
+  const placements = [];
+  let cost = 0;
+
+  for (const c of cast) {
+    const bbox = bboxes[c.name];
+    if (!bbox) { inPlaceLog.push({ name: c.name, skipped: 'no silhouette detected' }); continue; }
+    if (!c.sheetBuf) { inPlaceLog.push({ name: c.name, skipped: 'no reference sheet' }); continue; }
+    const prompt = buildInPlaceRenderPrompt(c, visualBible);
+    const sheetDataUrl = `data:image/png;base64,${c.sheetBuf.toString('base64')}`;
+    let result;
+    try {
+      // padInput: the plate already has the requested aspect (no-op for it);
+      // the sheet is on white, so a pad keeps every cell where a crop would
+      // slice the figure. skipOutputCrop: the render is registered against
+      // the plate below, and a crop would shift every pixel first.
+      result = await editWithGrok(prompt, [populated.imageData, sheetDataUrl], {
+        model: GROK_MODELS.STANDARD, aspectRatio, padInput: true, skipOutputCrop: true,
+      });
+    } catch (err) {
+      inPlaceLog.push({ name: c.name, skipped: `render failed: ${err.message}` });
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: in-place render threw — ${err.message}`);
+      continue;
+    }
+    if (usageTracker) usageTracker('grok', result.usage, 'scene_composite_inplace_render', result.modelId);
+    cost += result.usage?.cost || 0;
+    renders[c.name] = { prompt, render: result.imageData };
+
+    const rawBuf = Buffer.from(stripDataUriPrefix(result.imageData), 'base64');
+    const norm = await normaliseRenderToCanvas(rawBuf, W, H);
+    if (norm.note) log.warn(`[SCENE COMPOSITE]   ${c.name}: render resized ${norm.note}`);
+    const renderBuf = norm.buf;
+    const renderUri = `data:image/png;base64,${renderBuf.toString('base64')}`;
+
+    // Find the rendered figure: DINO person boxes, best IoU with the silhouette.
+    let matched = null, mask = null, method = 'sam';
+    try {
+      const det = await _gdinoDetect(renderUri, [{ name: 'person', text: 'person' }]);
+      const persons = det?.figures?.[0] ? _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU) : [];
+      matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H });
+      if (matched) {
+        const b = matched.box;
+        const m = await _mobilesamMaskFull(renderUri, [Math.round(b.x), Math.round(b.y), Math.round(b.x + b.width), Math.round(b.y + b.height)], W, H);
+        if (m?.alpha) mask = m.alpha;
+      }
+    } catch (err) {
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
+    }
+    if (!mask) {
+      // Never ship a silhouette: cut the render with the placeholder's own
+      // outline, grown a little for the figure the model drew around it.
+      method = 'silhouette-fallback';
+      const r = Math.max(2, Math.round(0.06 * Math.max(bbox.width, bbox.height)));
+      mask = dilateMask(silhouetteMasks[c.name], W, H, r);
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: no rendered figure near the silhouette (${matched ? 'SAM returned no mask' : 'no DINO box above IoU floor'}) — cutting the silhouette region dilated by ${r}px`);
+    }
+    const cut = await cutWithMask(renderBuf, mask, W, H);
+    cutouts[c.name] = `data:image/png;base64,${cut.toString('base64')}`;
+    inPlaceLog.push({
+      name: c.name, method, iou: matched ? +matched.iou.toFixed(3) : null,
+      matchedBox: matched ? { x: Math.round(matched.box.x), y: Math.round(matched.box.y), width: Math.round(matched.box.width), height: Math.round(matched.box.height) } : null,
+      resized: norm.note,
+    });
+    log.info(`[SCENE COMPOSITE]   ${c.name}: cut out via ${method}${matched ? ` (IoU ${matched.iou.toFixed(2)})` : ''}`);
+    placements.push({ input: cut, left: 0, top: 0, _footY: bbox.y + bbox.height, _name: c.name, _color: c.color, _bbox: bbox });
+  }
+
+  debug.inPlaceRenders = renders;
+  debug.cutouts = cutouts;
+  debug.inPlaceLog = inPlaceLog;
+  if (placements.length === 0) {
+    const err = new Error('[SCENE COMPOSITE] inPlace: no figure rendered for any cast entry');
+    err.compositeDebug = debug;
+    throw err;
+  }
+  // Back first — same occlusion read off the plate the paste path uses.
+  const z = await detectZOrderByOcclusion(populatedBuf, placements);
+  debug.zScores = z.scores;
+  debug.zDecisions = z.decisions;
+  log.info(`[SCENE COMPOSITE]   z-order (back → front): ${z.order.map(p => p._name).join(' → ')}`);
+  const composited = await sharp(bgBuf).composite(z.order.map(({ input, left, top }) => ({ input, left, top }))).png().toBuffer();
+  const imageData = `data:image/png;base64,${composited.toString('base64')}`;
+  debug.composited = imageData;
+  return { imageData, cost, placed: placements.length };
+}
+
 function buildCastLines(cast) {
   return cast.map((c) => {
     const sizeHint = c.sizeHint || 'about two-thirds the size of the largest figure';
@@ -1437,6 +1639,65 @@ function buildPlateCreatureBlock(sceneCreatures) {
 CREATURES IN THIS SCENE — paint each one, exactly as described:
 ${lines}
 These creatures are part of the world plate and stay in it. If the SETTING DESCRIPTION above says to leave out figures or animals, that instruction does not apply to the creatures listed here — it exists to keep the human cast out, and they arrive separately. Paint no creature, animal or person that is not named above or drawn as a silhouette below.`;
+}
+
+/**
+ * The one question the plate judge asks. Pure, so it can be tested.
+ *
+ * The measured gate (tallest/shortest figure, removed 2026-09-10) asked
+ * whether the plate had DEPTH; what matters is whether each silhouette is
+ * where and how its cast line says - in the boat, at the rail, seated,
+ * standing. The cast lines are quoted verbatim; the model compares picture
+ * to words. Nothing about the plate is parsed in code.
+ *
+ * @param {string} castLines - the cast block as sent to the plate prompt
+ * @param {string} styleDescription - the book's art style (context only)
+ * @returns {string}
+ */
+function platePlacementPrompt(castLines, styleDescription = '') {
+  return `You are checking a background plate for an illustrated children's book. It shows a setting with flat-colour silhouette figures placed in it${styleDescription ? ` (art style: "${styleDescription}")` : ''}. Each silhouette was requested as follows:
+
+${String(castLines || '').trim()}
+
+Judge only placement and posture, strictly, one silhouette at a time: (1) Is the figure of that colour present exactly once? (2) Is it WHERE its line says - on the surface or inside the thing named (a deck, a boat, a bank, a wall), not beside it, not on a different level? (3) Is its posture what the line says - seated, standing, kneeling? (4) Where a line names a level relation between figures (one below or above another), does the picture show that relation? A figure standing on a deck when its line seats it in a boat on the water fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence naming the failing colour, or \"all placed\""}`;
+}
+
+/**
+ * Ask flash-lite whether the populated plate placed every silhouette as its
+ * cast line says. Same shape as the character-cell gate: one question, JSON
+ * back, the caller decides on one re-roll. Throws on API failure; the caller
+ * fails open.
+ */
+async function judgePopulatedPlate(plateBase64, castLines, styleDescription = '') {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
+  const { TEXT_MODELS } = require('../config/models');
+  const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
+  const body = {
+    contents: [{ parts: [
+      { inlineData: { mimeType: 'image/jpeg', data: plateBase64 } },
+      { text: platePlacementPrompt(castLines, styleDescription) },
+    ] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+  };
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
+  );
+  if (!resp.ok) throw new Error(`plate judge HTTP ${resp.status}`);
+  const j = await resp.json();
+  const usage = j?.usageMetadata;
+  if (usage) {
+    const { recordTextUsage } = require('./usageContext');
+    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'composite_plate_judge', cfg.modelId);
+  }
+  const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch {
+    // Prose around the JSON: take the outermost braces.
+    parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+  }
+  return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
 }
 
 function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt, sceneCreatures = []) {
@@ -2251,6 +2512,10 @@ async function generateSceneComposite(opts) {
     //                  Grok call production already uses for identity fixes,
     //                  once per figure, so the model paints the character into
     //                  the scene instead of us compositing pixels into it.
+    //   'inPlace'    — one Grok edit per figure on the ORIGINAL plate ("put A
+    //                  where the red silhouette is"), DINO+SAM cut-out of the
+    //                  rendered figure, pasted onto the depopulated plate. No
+    //                  blend. Lab-only, unvalidated (2026-09-10).
     figureMethod = 'paste',
     // 'dino' (default) or 'diff' — see the detection step. The diff is kept
     // only so a Lab run can reproduce a pre-2026-08-15 result; it is the
@@ -2305,9 +2570,13 @@ async function generateSceneComposite(opts) {
   if (sceneCreatures.length) {
     log.info(`[SCENE COMPOSITE] plate paints ${sceneCreatures.length} VB creature(s): ${sceneCreatures.map(c => c.name).join(', ')}`);
   }
-  const populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
+  let populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', populated.usage, 'scene_composite_populated_plate', populated.modelId);
   totalCost += populated.usage?.cost || 0;
+  // Plate judge (platePlacementPrompt / judgePopulatedPlate) is NOT wired: measured
+  // 2026-09-10 on five stored plates, flash-lite and flash both answered "all
+  // placed" for the two plates a human rejected (boat figure with legs on the
+  // deck; missing cast lines). Helpers stay exported for the Lab; see decisions.md.
   const populatedBuf = Buffer.from(stripDataUriPrefix(populated.imageData), 'base64');
   debug.populatedPlate = populated.imageData;
   debug.populatedPlatePrompt = populatedPrompt;
@@ -2558,6 +2827,26 @@ async function generateSceneComposite(opts) {
     return {
       imageData: current,
       usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-charrepair' },
+      debug,
+    };
+  }
+
+  // ── Step 4 alternative: render each figure in place, cut it out, paste.
+  // Owner's design (2026-09-10): the model is asked, per figure and always on
+  // the ORIGINAL plate, to put the character where its coloured silhouette is;
+  // DINO+SAM lift the rendered figure and it is pasted onto the depopulated
+  // plate. No blend. Lab-only until measured.
+  if (figureMethod === 'inPlace') {
+    log.info(`[SCENE COMPOSITE] step 4/4 — in-place renders (${Object.keys(bboxes).length} figures)`);
+    const r = await renderFiguresInPlace({
+      cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf,
+      aspectRatio, visualBible: opts.visualBible, usageTracker, debug,
+    });
+    totalCost += r.cost;
+    log.info(`[SCENE COMPOSITE] complete (inPlace) — total cost $${totalCost.toFixed(4)}, ${r.placed}/${cast.length} characters placed`);
+    return {
+      imageData: r.imageData,
+      usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-inplace' },
       debug,
     };
   }
@@ -3949,6 +4238,8 @@ module.exports = {
     buildAgeTargets,
     cropSheetCell,
     removeBackground,
+    platePlacementPrompt,
+    judgePopulatedPlate,
     trimTransparent,
     flipHorizontal,
     scaleToHeight,
@@ -3965,5 +4256,8 @@ module.exports = {
     buildIdentityPack,
     detectZOrderByOcclusion,
     rgbToHue,
+    buildInPlaceRenderPrompt,
+    matchRenderedFigureBox,
+    dilateMask,
   },
 };

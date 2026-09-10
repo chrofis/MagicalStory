@@ -146,10 +146,11 @@ describe('editWithGrok call-site opt-outs', () => {
     // inputs for the same reason — the output must match.
     ['server/lib/character2x4Sheet.js', 'all', 'panel grid'],
     ['server/routes/avatars.js', 'all', 'whole-figure asset'],
-    // Only the three PLATE producers (depopulate / anchor / front-fill) are
-    // registration-sensitive; the three blend passes return the final scene
-    // and take the crop.
-    ['server/lib/sceneComposite.js', 3, 'plate producers only'],
+    // Only the three PLATE producers (depopulate / anchor / front-fill) plus
+    // the 'inPlace' figure render (cut out and re-registered against the
+    // plate, 2026-09-10) are registration-sensitive; the three blend passes
+    // return the final scene and take the crop.
+    ['server/lib/sceneComposite.js', 4, 'plate producers + in-place render'],
   ];
 
   it.each(OPT_OUT_SITES)('%s opts out of the output crop (%s: %s)', async (file, expected) => {
