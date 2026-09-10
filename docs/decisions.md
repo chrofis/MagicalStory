@@ -31572,7 +31572,7 @@ decision and is proposed separately.
 **Status:**    ✅ active
 **Measured (same day, Lab exp 1076-1080):** the rule reaches the Art Director and not the renderer. With
 11f live the AD staged the page exactly as asked (upper figure looking down, lower figure small below,
-head at rail height, ) and both native renders on the correct plate still drew the
+head at rail height, `depth: background`) and both native renders on the correct plate still drew the
 two at full size on one plane - one put the upper figure INTO the boat. That is 4/4 native renders
 across two briefs. Production's stratified composite on the same plate (exp 1079, 1080) kept the world
 2/2 - boat afloat below the rail, first figure at true scale - because cut-outs are pasted onto a
