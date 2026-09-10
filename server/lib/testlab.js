@@ -4626,7 +4626,13 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   }
   // In-place renders (figureMethod 'inPlace'): the full plate with one figure painted.
   for (const [name, v] of Object.entries(dbg.inPlaceRenders || {})) {
-    await saveStep(v?.render, `· in-place render for ${name}`);
+    // Every attempt, not only the kept one: a re-render is a judgement to check.
+    const tries = Array.isArray(v?.attempts) && v.attempts.length > 1 ? v.attempts : null;
+    if (tries) {
+      for (const a of tries) await saveStep(a.render, `· in-place render for ${name}, attempt ${a.attempt} (height ${a.ratio}x, IoU ${a.iou}${a.ok ? ', accepted' : ''})`);
+    } else {
+      await saveStep(v?.render, `· in-place render for ${name}`);
+    }
   }
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, res.imageData, experimentId);

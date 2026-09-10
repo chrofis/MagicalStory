@@ -1419,46 +1419,78 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
     const bbox = bboxes[c.name];
     if (!bbox) { inPlaceLog.push({ name: c.name, skipped: 'no silhouette detected' }); continue; }
     if (!c.sheetBuf) { inPlaceLog.push({ name: c.name, skipped: 'no reference sheet' }); continue; }
-    const prompt = buildInPlaceRenderPrompt(c, visualBible);
+    const basePrompt = buildInPlaceRenderPrompt(c, visualBible);
     const sheetDataUrl = `data:image/png;base64,${c.sheetBuf.toString('base64')}`;
-    let result;
-    try {
-      // padInput: the plate already has the requested aspect (no-op for it);
-      // the sheet is on white, so a pad keeps every cell where a crop would
-      // slice the figure. skipOutputCrop: the render is registered against
-      // the plate below, and a crop would shift every pixel first.
-      result = await editWithGrok(prompt, [populated.imageData, sheetDataUrl], {
-        model: GROK_MODELS.STANDARD, aspectRatio, padInput: true, skipOutputCrop: true,
-      });
-    } catch (err) {
-      inPlaceLog.push({ name: c.name, skipped: `render failed: ${err.message}` });
-      log.warn(`[SCENE COMPOSITE]   ${c.name}: in-place render threw — ${err.message}`);
+
+    // Up to two attempts. The silhouette is the contract; the person box DINO
+    // finds on the render is measured against it (height ratio, IoU). A render
+    // that ignored the silhouette - a standing figure at 2.7x for a seated
+    // placeholder (exp 1142), 1.9x (exp 1138) - is re-rendered ONCE with the
+    // failure fed back (+$0.02). The better attempt by IoU is kept; scaling a
+    // wrong-pose figure to the silhouette is never the answer.
+    let best = null;   // { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio }
+    const attempts = [];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let prompt = basePrompt;
+      if (attempt === 2 && best) {
+        const how = best.ratio > 1.25 ? `${best.ratio.toFixed(1)} times too tall` : best.ratio < 0.8 ? 'too small' : 'not in the silhouette\'s place';
+        prompt = `${basePrompt}\n\nA previous attempt drew ${c.name} ${how}. Match the ${c.colorName || 'coloured'} silhouette's outline exactly: same height, same footprint, same posture${c.action ? ` (${String(c.action).trim()})` : ''}.`;
+      }
+      let result;
+      try {
+        // padInput: the plate already has the requested aspect (no-op for it);
+        // the sheet is on white, so a pad keeps every cell where a crop would
+        // slice the figure. skipOutputCrop: the render is registered against
+        // the plate below, and a crop would shift every pixel first.
+        result = await editWithGrok(prompt, [populated.imageData, sheetDataUrl], {
+          model: GROK_MODELS.STANDARD, aspectRatio, padInput: true, skipOutputCrop: true,
+        });
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: in-place render attempt ${attempt} threw — ${err.message}`);
+        if (attempt === 1) { attempts.push({ attempt, error: err.message }); continue; }
+        break;
+      }
+      if (usageTracker) usageTracker('grok', result.usage, attempt === 1 ? 'scene_composite_inplace_render' : 'scene_composite_inplace_rerender', result.modelId);
+      cost += result.usage?.cost || 0;
+
+      const rawBuf = Buffer.from(stripDataUriPrefix(result.imageData), 'base64');
+      const norm = await normaliseRenderToCanvas(rawBuf, W, H);
+      if (norm.note) log.warn(`[SCENE COMPOSITE]   ${c.name}: render resized ${norm.note}`);
+      const renderBuf = norm.buf;
+      const renderUri = `data:image/png;base64,${renderBuf.toString('base64')}`;
+
+      // Find the rendered figure: DINO person boxes, best IoU with the silhouette.
+      let matched = null, mask = null;
+      try {
+        const det = await _gdinoDetect(renderUri, [{ name: 'person', text: 'person' }]);
+        const persons = det?.figures?.[0] ? _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU) : [];
+        matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H });
+        if (matched) {
+          const b = matched.box;
+          const m = await _mobilesamMaskFull(renderUri, [Math.round(b.x), Math.round(b.y), Math.round(b.x + b.width), Math.round(b.y + b.height)], W, H);
+          if (m?.alpha) mask = m.alpha;
+        }
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
+      }
+      const ratio = matched ? matched.box.height / bbox.height : 1;
+      const iou = matched ? matched.iou : 0;
+      const ok = !!mask && ratio >= 0.8 && ratio <= 1.25 && iou >= 0.45;
+      attempts.push({ attempt, ratio: +ratio.toFixed(2), iou: +iou.toFixed(3), ok, render: result.imageData });
+      const cand = { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio };
+      if (!best || iou > (best.matched ? best.matched.iou : -1)) best = cand;
+      if (ok) break;
+      if (attempt === 1) log.warn(`[SCENE COMPOSITE]   ${c.name}: render is off the silhouette (height ${ratio.toFixed(2)}x, IoU ${iou.toFixed(2)}) — re-rendering once with the failure fed back`);
+      else log.warn(`[SCENE COMPOSITE]   ${c.name}: re-render still off (height ${ratio.toFixed(2)}x, IoU ${iou.toFixed(2)}) — keeping the better attempt`);
+    }
+    if (!best) {
+      inPlaceLog.push({ name: c.name, skipped: `render failed: ${attempts.map(a => a.error).filter(Boolean).join(' / ')}` });
       continue;
     }
-    if (usageTracker) usageTracker('grok', result.usage, 'scene_composite_inplace_render', result.modelId);
-    cost += result.usage?.cost || 0;
-    renders[c.name] = { prompt, render: result.imageData };
-
-    const rawBuf = Buffer.from(stripDataUriPrefix(result.imageData), 'base64');
-    const norm = await normaliseRenderToCanvas(rawBuf, W, H);
-    if (norm.note) log.warn(`[SCENE COMPOSITE]   ${c.name}: render resized ${norm.note}`);
-    const renderBuf = norm.buf;
-    const renderUri = `data:image/png;base64,${renderBuf.toString('base64')}`;
-
-    // Find the rendered figure: DINO person boxes, best IoU with the silhouette.
-    let matched = null, mask = null, method = 'sam';
-    try {
-      const det = await _gdinoDetect(renderUri, [{ name: 'person', text: 'person' }]);
-      const persons = det?.figures?.[0] ? _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU) : [];
-      matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H });
-      if (matched) {
-        const b = matched.box;
-        const m = await _mobilesamMaskFull(renderUri, [Math.round(b.x), Math.round(b.y), Math.round(b.x + b.width), Math.round(b.y + b.height)], W, H);
-        if (m?.alpha) mask = m.alpha;
-      }
-    } catch (err) {
-      log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
-    }
+    renders[c.name] = { prompt: best.prompt, render: best.result.imageData, attempts };
+    const { renderBuf, matched, norm } = best;
+    let { mask } = best;
+    let method = 'sam';
     if (!mask) {
       // Never ship a silhouette: cut the render with the placeholder's own
       // outline, grown a little for the figure the model drew around it.
@@ -1496,7 +1528,9 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       // correct figures by 20%).
       const ratio = matched.box.height / bbox.height;
       const mb = maskBounds(mask, W, H);
-      if (mb && Math.abs(ratio - 1) > 0.15) {
+      // Last resort only: both attempts were off. Within the accepted band the
+      // render is used as drawn.
+      if (mb && (ratio > 1.25 || ratio < 0.8)) {
         const s = 1 / ratio;
         // Scale the whole cut-out by s about the matched box's bottom-centre, then
         // move that point onto the silhouette's bottom-centre.
