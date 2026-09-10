@@ -33,7 +33,7 @@ Answer only these eight:
 
 9. Deed and effect. Name every page whose instant shows an action and the result of that action together. A deed, its effect, and where the effect goes are three actions; the instant shows one, and what follows it belongs in what is true after. Watching, standing and being present are not actions.
 
-10. Two heights. Name every page whose instant puts two named characters at two heights — one on a deck, bank, wall, ledge or roof and the other on the water, ground or floor below — each needing to be seen. A picture holds one level: the renderer puts every named figure on one level and moves the world to fit. A crowd, a mount or a vehicle carrying the whole cast is one thing at one height and is not this. The fix is a choice, not a merge: the page from the lower level with the upper character alone in frame, the page from the upper level with the lower character alone, or two pages.
+10. Two heights. Name every page whose instant puts two named characters at different heights — deck and water, ledge and ground, roof and street. Such a page is staged from one level with the other character out of frame, or split into a page per level. A whole cast carried together on one back or one boat is one level.
 
 # OUTPUT FORMAT
 
