@@ -31997,3 +31997,23 @@ draw a two-level page (exp 1095), and it could not see the second figure of a co
 **Touched:**   server/lib/compositeCastBuilder.js, server/lib/scaleRepair.js,
 tests/unit/composite-secondary-cast.test.ts
 **Status:**    active
+
+## Composite: the depth-spread gate is skipped under phantom pose; production renders phantom poses (2026-09-10)
+**Context:**   With both figures finally in the cast (secondaryCastSeeds), two consecutive plates
+staged page 4 correctly - the secondary seated in the boat on the water, the main character at the
+rail above, looking at each other - and the depth-spread gate refused both at 1.47x and 1.33x
+(Lab exp 1103, 1104). The AD's one-level camera (from the water, looking up) makes a deck figure
+and a boat figure similar in apparent size, so the gate measured "no depth" on exactly the staging
+the rule asked for. The gate's own rationale is the STATIC-CELL paste: below the floor, replacing
+the plate's figures with standing avatars can only lose (a kneeling or waist-deep figure becomes a
+standing one).
+**Decision:**  Under phantomPoseRender the gate is skipped (info log): each cut-out is re-posed to
+its silhouette, so the loss the gate guards against cannot happen and the plate's staging stands.
+The 2.0x floor itself is untouched - not lowered, not reversed (owner-settled 2026-08-25); it still
+applies to the static-cell path. Production's composite call now passes phantomPoseRender: true
+(+$0.02 per figure on triggered pages); without it a standing cell is pasted into a seated
+silhouette (exp 1087).
+**Rationale:** Owner: fix the gaps. The gate and the pose render are one mechanism seen from two
+sides; keeping the gate while enabling the pose render would refuse the plates that are now right.
+**Touched:**   server/lib/sceneComposite.js, storyJobPipeline.js
+**Status:**    active

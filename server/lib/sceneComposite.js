@@ -2442,7 +2442,16 @@ async function generateSceneComposite(opts) {
     // Lab-only override of the floor (opts.minDepthSpread). Production never
     // passes it, so MIN_DEPTH_SPREAD stands (owner-settled 2026-08-25).
     const minSpread = Number.isFinite(opts.minDepthSpread) ? opts.minDepthSpread : MIN_DEPTH_SPREAD;
-    if (spread < minSpread) {
+    // The gate protects the STATIC-CELL paste: below the floor, replacing the
+    // plate's own figures with standing avatars can only lose (a kneeling or
+    // waist-deep figure becomes a standing one). With phantom pose each
+    // cut-out is re-posed to its silhouette, so that loss cannot happen and
+    // the plate's staging is kept whatever the spread - measured 2026-09-10:
+    // a from-below camera put a deck figure and a boat figure at 1.47x and
+    // the gate threw away the one plate that had both in the right place.
+    if (spread < minSpread && phantomPoseRender) {
+      log.info(`[SCENE COMPOSITE] depth spread ${spread.toFixed(2)}x is under the ${minSpread}x floor, but phantom pose re-poses every cut-out to its silhouette — the plate's staging stands`);
+    } else if (spread < minSpread) {
       throw refuse(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
         + `(needs ${minSpread}x). Every character is at the same distance, so the declared foreground/background `
         + 'split is not real and there is nothing for the composite to correct — the page keeps its original render');

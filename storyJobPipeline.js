@@ -4934,6 +4934,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const fdMeta = pageData.sceneMetadata?.fullData || pageData.sceneMetadata || {};
                   const compRes = await generateSceneComposite({
                     compositeStrategy: 'uniform',
+                    // Per-figure pose render: the silhouette's pose (seated,
+                    // kneeling, leaning) becomes the cut-out's pose. Without
+                    // it a standing sheet cell is pasted into a seated
+                    // silhouette (measured, Lab exp 1087). +$0.02 per figure.
+                    phantomPoseRender: true,
                     cast: compositeCast, frontCast, backCast,
                     scene: {
                       description: String(fdMeta.description || pageData.sceneDescription || ''),
