@@ -1310,6 +1310,28 @@ function dilateMask(mask, W, H, r) {
   return out;
 }
 
+/**
+ * Pixels inside the figure's box (grown by `grow` px) where the render differs
+ * from the plate. The render is the plate with one silhouette replaced, so
+ * inside that box a changed pixel is the figure or what it holds - a chart,
+ * a lantern, a bag - which a person mask alone leaves behind (exp 1136:
+ * the chart in the figure's hands stayed on the plate). Outside the box the
+ * model's global drift is ignored.
+ */
+async function changedPixelsMask(plateBuf, renderBuf, bbox, W, H, grow, threshold = 40) {
+  const a = await sharp(plateBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const b = await sharp(renderBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const x0 = Math.max(0, Math.floor(bbox.x - grow)), x1 = Math.min(W - 1, Math.ceil(bbox.x + bbox.width + grow));
+  const y0 = Math.max(0, Math.floor(bbox.y - grow)), y1 = Math.min(H - 1, Math.ceil(bbox.y + bbox.height + grow));
+  const out = new Uint8Array(W * H);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const i = (y * W + x) * 3;
+    const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+    if (d > threshold) out[y * W + x] = 1;
+  }
+  return out;
+}
+
 /** RGBA canvas-sized PNG of `renderBuf` (already W×H) with alpha = mask. */
 async function cutWithMask(renderBuf, mask, W, H) {
   const { data } = await sharp(renderBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -1397,6 +1419,18 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       const r = Math.max(2, Math.round(0.06 * Math.max(bbox.width, bbox.height)));
       mask = dilateMask(silhouetteMasks[c.name], W, H, r);
       log.warn(`[SCENE COMPOSITE]   ${c.name}: no rendered figure near the silhouette (${matched ? 'SAM returned no mask' : 'no DINO box above IoU floor'}) — cutting the silhouette region dilated by ${r}px`);
+    }
+    // The person mask is the figure; the silhouette and the changed pixels in
+    // its box add what the figure holds (exp 1136 lost a chart this way).
+    if (method === 'sam') {
+      const grow = Math.round(0.10 * Math.max(bbox.width, bbox.height));
+      const changed = await changedPixelsMask(populatedBuf, renderBuf, bbox, W, H, grow);
+      const r = Math.max(1, Math.round(0.01 * Math.max(bbox.width, bbox.height)));
+      const sil = dilateMask(silhouetteMasks[c.name], W, H, r);
+      let added = 0;
+      for (let i = 0; i < W * H; i++) if (!mask[i] && (sil[i] || changed[i])) { mask[i] = 1; added++; }
+      mask = dilateMask(mask, W, H, 1);
+      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px)`);
     }
     const cut = await cutWithMask(renderBuf, mask, W, H);
     cutouts[c.name] = `data:image/png;base64,${cut.toString('base64')}`;
