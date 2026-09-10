@@ -1242,9 +1242,9 @@ function buildInPlaceRenderPrompt(c, visualBible = null) {
   if (c.action) clauses.push(String(c.action).trim());
   if (c.looksAt) clauses.push(`looking at ${String(c.looksAt).trim()}`);
   const poseLine = clauses.length ? ` The figure is ${clauses.join(', ')}.` : '';
-  const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. Image 2 is the reference sheet of ${name}.
+  const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. Image 2 is the reference sheet of ${name}: a grid of views used only to know what ${name} looks like. None of its panels appear in the output.
 
-Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, size, body orientation and pose.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2.
+Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, body orientation and pose, and exactly the silhouette's size: the figure is as tall as the silhouette, no taller.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2. The output shows exactly one ${name}.
 
 Everything else in Image 1 stays exactly as it is, including the other coloured silhouettes. Same art style as Image 1.`;
   return scrubBlendPrompt(prompt, visualBible, `inPlace ${name}`);
@@ -1330,6 +1330,53 @@ async function changedPixelsMask(plateBuf, renderBuf, bbox, W, H, grow, threshol
     if (d > threshold) out[y * W + x] = 1;
   }
   return out;
+}
+
+/** Morphological closing: fills holes and gaps up to ~2r px (the white of a held sheet of paper that matched the plate's paper). */
+function closeMask(mask, W, H, r) {
+  if (!(r > 0)) return mask;
+  const grown = dilateMask(mask, W, H, r);
+  const inv = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) inv[i] = grown[i] ? 0 : 1;
+  const invGrown = dilateMask(inv, W, H, r);
+  const out = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) out[i] = invGrown[i] ? 0 : 1;
+  return out;
+}
+
+/** Bounding box of the set pixels of a canvas mask, or null when empty. */
+function maskBounds(mask, W, H) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return x1 < 0 ? null : { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+}
+
+/**
+ * The silhouette is the target geometry. When the model drew the figure at
+ * another height (exp 1138: a seated figure at 1.9x its silhouette), scale
+ * the cut-out uniformly so its height equals the silhouette's, keeping the
+ * bottom-centre where the silhouette's bottom-centre is. Canvas-sized RGBA in,
+ * canvas-sized RGBA out.
+ */
+async function fitCutToSilhouette(cutPng, cutBox, target, W, H) {
+  const s = target.height / cutBox.height;
+  const w = Math.max(1, Math.round(cutBox.width * s));
+  const h = Math.max(1, Math.round(cutBox.height * s));
+  const left = Math.round(target.x + target.width / 2 - w / 2);
+  const top = Math.round(target.y + target.height - h);
+  const piece = await sharp(cutPng).extract({ left: cutBox.x, top: cutBox.y, width: cutBox.width, height: cutBox.height })
+    .resize(w, h, { fit: 'fill' }).png().toBuffer();
+  // Clip to the canvas: sharp refuses an overlay that hangs off the edge.
+  const cl = Math.max(0, -left), ct = Math.max(0, -top);
+  const cw = Math.min(w - cl, W - Math.max(0, left)), ch = Math.min(h - ct, H - Math.max(0, top));
+  if (cw <= 0 || ch <= 0) return cutPng;
+  const clipped = (cl || ct || cw !== w || ch !== h)
+    ? await sharp(piece).extract({ left: cl, top: ct, width: cw, height: ch }).png().toBuffer()
+    : piece;
+  return sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: clipped, left: Math.max(0, left), top: Math.max(0, top) }]).png().toBuffer();
 }
 
 /** RGBA canvas-sized PNG of `renderBuf` (already W×H) with alpha = mask. */
@@ -1429,15 +1476,25 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       const sil = dilateMask(silhouetteMasks[c.name], W, H, r);
       let added = 0;
       for (let i = 0; i < W * H; i++) if (!mask[i] && (sil[i] || changed[i])) { mask[i] = 1; added++; }
-      mask = dilateMask(mask, W, H, 1);
-      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px)`);
+      mask = closeMask(dilateMask(mask, W, H, 1), W, H, Math.max(3, Math.round(0.03 * Math.max(bbox.width, bbox.height))));
+      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed`);
     }
-    const cut = await cutWithMask(renderBuf, mask, W, H);
+    let cut = await cutWithMask(renderBuf, mask, W, H);
+    let fitted = null;
+    if (method === 'sam') {
+      const mb = maskBounds(mask, W, H);
+      const ratio = mb ? mb.height / bbox.height : 1;
+      if (mb && Math.abs(ratio - 1) > 0.10) {
+        cut = await fitCutToSilhouette(cut, mb, bbox, W, H);
+        fitted = { from: mb.height, to: bbox.height, ratio: +ratio.toFixed(2) };
+        log.info(`[SCENE COMPOSITE]   ${c.name}: drawn ${ratio.toFixed(2)}x the silhouette's height — scaled to the silhouette, bottom-centre anchored`);
+      }
+    }
     cutouts[c.name] = `data:image/png;base64,${cut.toString('base64')}`;
     inPlaceLog.push({
       name: c.name, method, iou: matched ? +matched.iou.toFixed(3) : null,
       matchedBox: matched ? { x: Math.round(matched.box.x), y: Math.round(matched.box.y), width: Math.round(matched.box.width), height: Math.round(matched.box.height) } : null,
-      resized: norm.note,
+      resized: norm.note, fitted,
     });
     log.info(`[SCENE COMPOSITE]   ${c.name}: cut out via ${method}${matched ? ` (IoU ${matched.iou.toFixed(2)})` : ''}`);
     placements.push({ input: cut, left: 0, top: 0, _footY: bbox.y + bbox.height, _name: c.name, _color: c.color, _bbox: bbox });
