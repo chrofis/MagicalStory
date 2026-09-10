@@ -31583,6 +31583,21 @@ So 11f as a camera instruction is measured INEFFECTIVE; the working directions a
 (a two-level moment is two pages, or one named figure in frame) and a vertical placement anchor in the
 composite. Both await the owner's decision; the rule stands only until then.
 
+**Measured further (Lab exp 1081-1084, same day):** production's silhouette composite
+(`generateSceneComposite`, uniform) DOES draw the two-level page. Fed the page's own plate words,
+its populated plate put the second figure at half height on the water below the rail 3/3; with
+the silhouette line told the figure is "seated in the rowing boat" it put her IN the boat and the
+finished, blended page is correct (exp 1084, $0.06) - the only correct render of the page across
+twelve attempts. Two things stood in the way in production: (1) the depth-spread gate refused the
+first two samples at 1.95x and 1.84x against 2.0x (the run that completed measured 2.19x because
+the seated stand-in is shorter - the gate is sensitive to pose, not only to depth); (2) the
+silhouette line carries position and size but not containment, so "from her rowing boat" landed
+the stand-in beside the boat 1/3. Both fixes exist only as Lab knobs (`minDepthSpread`,
+`castActionOverrides`); production is unchanged. Also: one DINO run returned no person boxes on
+a plate it had detected minutes earlier (exp 1083; cause not established), and a detector refusal
+now keeps its plate (28cfb269c). Owner's call on carrying the gate (settled 2026-08-25) and the
+containment wording into production.
+
 
 ## The refiner may MOVE a scene to the page whose picture shows it; a $0 shingle check catches a copy (2026-09-10)
 
