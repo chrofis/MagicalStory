@@ -25,9 +25,34 @@ const visualBible = {
 };
 
 describe('buildExpectedCastBlock — page roster', () => {
-  it('is empty when the caller knows no cast', () => {
-    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0 });
-    expect(buildExpectedCastBlock({ sceneCharacters: [] }).block).toBe('');
+  it('is blank when the caller knows NO cast (null), so the evaluator does not judge the count', () => {
+    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false });
+    expect(buildExpectedCastBlock({}).block).toBe('');
+  });
+
+  it('a DECLARED cast of zero is a roster of zero, not a blank (D6, 2026-09-11)', () => {
+    // `sceneCharacters: []` is the brief saying this frame holds nobody — a
+    // creature-only page, a landscape. It used to return a blank block, and a
+    // blank EXPECTED CAST tells the evaluator not to judge the figure count at
+    // all, so the one page shape where every human figure is a defect was the
+    // one shape with no cast check (job_1789147573901_m3uam0nxi p4: three
+    // phantom children, no extra_character finding).
+    const r = buildExpectedCastBlock({ sceneCharacters: [] });
+    expect(r.declared).toBe(true);
+    expect(r.count).toBe(0);
+    expect(r.names).toEqual([]);
+    expect(r.block).toBe('EXPECTED CAST (0): none — this frame was written with no people and no animals in it');
+  });
+
+  it('a declared-empty page still picks up the VB creature its metadata names', () => {
+    // The early return used to sit ABOVE the secondary/animal expansion, so a
+    // creature-only page got nothing at all instead of its creature.
+    const sceneHint = 'A dog alone in the meadow.\n\n---METADATA---\n'
+      + JSON.stringify({ characters: [{ name: 'ANI001' }] });
+    const r = buildExpectedCastBlock({ sceneCharacters: [], sceneHint, visualBible, evaluationType: 'scene' });
+    expect(r.declared).toBe(true);
+    expect(r.names).toEqual(['ANI001']);
+    expect(r.block).toBe('EXPECTED CAST (1): ANI001 (animal, dog)');
   });
 
   it('lists sceneCharacters plus the VB secondary AND animal the page metadata names, with the count', () => {
@@ -174,9 +199,19 @@ describe('extra_character — prompt vocabulary', () => {
   });
 
   it('buildEvaluationPrompt renders the roster into the template', () => {
+    // Asserts the roster REACHES input 8, not the wording of input 8 — the
+    // sentence is prompt copy and gets edited (D6 changed it 2026-09-11).
     const p = buildEvaluationPrompt({ originalPrompt: 'x', expectedCast: 'EXPECTED CAST (4): Aaron, Ben, Carl, Dan' });
-    expect(p).toContain('8. EXPECTED CAST (every person and animal this frame was written for, with the count — empty if not supplied; when empty, do not judge the figure count): EXPECTED CAST (4): Aaron, Ben, Carl, Dan');
+    expect(p).toMatch(/^8\. EXPECTED CAST .*: EXPECTED CAST \(4\): Aaron, Ben, Carl, Dan$/m);
     expect(buildEvaluationPrompt({ originalPrompt: 'x' })).not.toContain('{EXPECTED_CAST}');
+  });
+
+  it('input 8 distinguishes a blank roster from a declared roster of zero (D6)', () => {
+    const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
+    expect(t).toMatch(/blank if not supplied, and only then do not judge the figure count/);
+    expect(t).toMatch(/"\(0\): none" is a frame written for nobody/);
+    // D-04b must agree with it — the two used to be able to drift apart.
+    expect(t).toMatch(/Skip this code only when EXPECTED CAST is blank/);
   });
 
   it('feedback-consolidator keeps the type through merging', () => {
