@@ -1,6 +1,6 @@
 Create a reference sheet showing the SAME person in 8 panels arranged as 2 rows and 4 columns. Equal panel sizes. Light grey studio background. Each panel is self-contained: the figure, hair, limbs, shadow, and any clothing graphic stay fully inside their own panel, with plain light-grey gutters between panels that nothing touches or crosses.
 
-Row 1 (top) — face only (forehead to chin), in the ORIGINAL reference photo's style. No shoulders, no clothing visible.
+Row 1 (top) — head and shoulders, in the ORIGINAL reference photo's style. Where the neckline or collar shows, it is the same garment row 2 wears — {COSTUME_DESCRIPTION} — in the same colour, with the same neckline: never a collar, placket, hood or trim row 2 does not have.
   Panel 1: face front. Panel 2: face turned 45° to camera's right. Panel 3: face profile (90° right). Panel 4: rear turn — shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek show. Not a profile, not a flat back of the head.
 
 Row 2 (bottom) — full body from head to feet, in {ART_STYLE_PROMPT} style, wearing {COSTUME_DESCRIPTION}. Plain light-grey background, figure standing. Each bottom-row figure fits entirely inside its panel with empty margin above the head and below the shoes; both feet and shoes fully visible; never cropped at the thigh, knee, or ankle.

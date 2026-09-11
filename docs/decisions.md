@@ -33170,3 +33170,40 @@ the generation side.
 that IS a grey-alien silhouette, so that render was arguably faithful to a description
 that reads differently at two builds. Worth revisiting if it recurs now the cell gate
 passes stone figures and anchors them.
+
+## The 2×4 sheet's head row may be clothed — in the SAME garment as the body row (2026-09-11)
+**Context:**  D15. A commissioned child's shirt "drifted" between a blue-collared polo
+(p1, p3, p8) and a plain red crew (the other fifteen pages and the cover). Looking at
+the styled reference sheet itself settled it: the four TOP cells wear a red shirt with
+a BLUE COLLAR, the four BOTTOM cells wear a plain red crew. The story's clothing
+contract says "A red short-sleeved cotton T-shirt" — the bottom row is right and the
+top row invented a collar that exists nowhere else. The pages were not drifting; they
+were copying whichever row they anchored on.
+**Decision:** The head row MAY show clothing (owner, 2026-09-11), and the garment is
+now checked:
+  - `prompts/styled-costumed-avatar-2x4.txt` row 1 becomes "head and shoulders", and
+    any visible neckline is bound to `{COSTUME_DESCRIPTION}` — no collar, placket, hood
+    or trim row 2 does not have.
+  - `server/lib/character2x4Sheet.js` (the hardcoded identity-sheet prompt) same change
+    for cells 1-4.
+  - `prompts/sheet-row-heads-eval.txt` TASK 3 becomes COVERAGE AND GARMENT: a visible
+    garment must be the one `REQUESTED_OUTFIT` names. The placeholder was added; the
+    filler already supplied it to both row evaluators.
+  - `prompts/sheet-2x4-evaluation.txt` gains **cross-ROW** consistency beside its
+    existing cross-cell check, and `outfitScore` is now the LOWEST of the three.
+**Rationale:** `stackRowsInto2x4(headRowData, bodyRowData)` builds the sheet from two
+INDEPENDENT generations, and every garment check ran inside one row — the bodies
+evaluator checks "all 4 cells wear the same outfit" across cells 5-8 only. Nothing ever
+compared across the seam, so two rows could disagree and both pass. The prompts also
+contradicted each other: the sheet spec said row 1 shows "no clothing" while the
+head-row evaluator awarded coverage points for a clothed shoulder and penalised a bare
+one — so a head row that overstepped into a bust shot was not failed, it was told to
+put a collar on. Allowing clothing and checking it removes the contradiction in the
+direction the owner chose.
+**Touched:** `prompts/styled-costumed-avatar-2x4.txt`, `prompts/sheet-row-heads-eval.txt`,
+`prompts/sheet-2x4-evaluation.txt`, `server/lib/character2x4Sheet.js`,
+`tests/unit/sheet-row-garment-agreement.test.ts`
+**Status:**   ✅ active. The 2×2 IDENTITY sheet (`avatar-main-prompt.txt`,
+`avatar-ace-prompt.txt`) is deliberately UNCHANGED — its top quadrants are tight
+photoreal face crops with no neck, a different artifact from the styled sheet the pages
+anchor on. A test pins that distinction so a future sweep does not "harmonise" them.

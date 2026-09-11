@@ -9,7 +9,7 @@ You receive UP TO THREE images:
 
 Image LAST is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. Intended layout:
 
-  Row 1 (cells 1–4, top):     HEAD AND NECK ONLY. No shoulders, no torso, no arms, no clothing. Four facing angles: front, three-quarter, profile, rear turn (shoulders away from camera, head rotated back to reveal one eye and cheek — never a second profile, never a flat back-of-head with no face).
+  Row 1 (cells 1–4, top):     HEAD AND SHOULDERS. No full torso, no arms. Clothing may show at the neckline, and when it does it is the requested outfit. Four facing angles: front, three-quarter, profile, rear turn (shoulders away from camera, head rotated back to reveal one eye and cheek — never a second profile, never a flat back-of-head with no face).
   Row 2 (cells 5–8, bottom):  FULL BODY head to feet, wearing the requested costume. Same four facing angles.
 
 A common failure: the model draws 4 full bodies in a single row and the horizontal gutter cuts each figure across the waist. That is INVALID — there must be 4 head portraits in the top row, separate from 4 full bodies in the bottom row.
@@ -17,7 +17,7 @@ A common failure: the model draws 4 full bodies in a single row and the horizont
 Your job: rate the sheet on FOUR checks and return a JSON verdict.
 
 TASK 1: LAYOUT
-- Top row: 4 head-and-neck portraits, no shoulders or torso. Score 1-10.
+- Top row: 4 head-and-shoulders portraits, no full torso or arms. Score 1-10.
 - Bottom row: 4 full-body figures showing the COMPLETE figure from head to feet, with both feet and shoes visible inside the cell. A bottom-row figure cropped at the thigh, knee, or ankle — feet or shoes not visible — is NOT full-body: score 1-3. Score 1-10.
 - Horizontal gutter between rows: clean white space, no figure crosses it. Score 1-10.
 - Cell containment: every figure inside its own cell with white margin on all four sides. No hair, hand, foot, or shadow extends across a cell border. A figure whose head is in the top row and feet are in the bottom row is the most common failure — score 1-2 if you see this in any cell. Score 1-10.
@@ -46,7 +46,8 @@ TASK 3: OUTFIT MATCHES REQUESTED COSTUME (item-by-item)
 - For each item, check whether the figures in cells 5-8 visibly wear it.
 - All items present = 10. ONE listed item missing = ≤4. TWO+ missing = ≤2. Wrong colour on any item = ≤5.
 - Cross-cell consistency: all 4 body cells in 5-8 wear the same outfit. If outfit varies between cells, score 1-3.
-- `outfitScore` = LOWER of item-match and cross-cell consistency.
+- Cross-ROW consistency: where cells 1-4 show clothing at the neckline, it is the same garment cells 5-8 wear — same colour, same neckline. A collar, placket, hood or trim present in the top row and absent from the bottom row (or the reverse) scores 1-3: the two rows are drawn separately and the pages copy whichever one they anchor on, so a garment that disagrees across the seam becomes a garment that changes from page to page.
+- `outfitScore` = LOWEST of item-match, cross-cell consistency and cross-row consistency.
 
 TASK 4: SOURCE PHOTO IDENTITY MATCH (per head cell, lowest wins)
 This task is SEPARATE from Task 2. Task 2 checks "does the sheet match the standard avatar"; this task checks "does the rendered character match the real person in Image 1 + the declared profile".
@@ -75,7 +76,7 @@ Return EXACTLY this JSON shape:
 
 {
   "layout": {
-    "topRowHeadsOnly":   {"score": 9, "reason": "All 4 top cells show head + neck only, no torso"},
+    "topRowHeadsOnly":   {"score": 9, "reason": "All 4 top cells show head and shoulders, no full torso or arms"},
     "bottomRowFullBody": {"score": 8, "reason": "All 4 bottom cells show complete head-to-feet figures with feet and shoes visible"},
     "cleanGutter":       {"score": 10, "reason": "Horizontal gutter is white; no figure crosses it"},
     "cellContainment":   {"score": 9, "reason": "Each figure sits inside its cell with white margin on all four sides"},
@@ -88,6 +89,7 @@ Return EXACTLY this JSON shape:
   },
   "outfit": {
     "crossCellConsistency": {"score": 9, "reason": "Vest, blouse, skirt, boots identical across cells 5-8"},
+    "crossRowConsistency":  {"score": 9, "reason": "The neckline showing in cells 1-4 is the same garment as cells 5-8"},
     "matchesRequested":     {"score": 8, "reason": "Burgundy vest + cream blouse + dark skirt matches REQUESTED_OUTFIT"},
     "outfitScore": 8
   },
