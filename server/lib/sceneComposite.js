@@ -3009,6 +3009,7 @@ async function generateSceneComposite(opts) {
       imageData: r.imageData,
       usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-inplace' },
       debug,
+      placed: r.placed,
     };
   }
 

@@ -4992,7 +4992,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     ? { imageData: compRes.imageData, modelId: 'scene-composite', prompt: compRes.debug?.populatedPlatePrompt || null, grokRefImages: null, debug: compRes.debug || null }
                     : null;
                   compositeOutcome = scaleRepairResult
-                    ? { status: 'composited', detector: compRes.debug?.detector || null, placed: (compRes.debug?.placements || []).length }
+                    ? { status: 'composited', detector: compRes.debug?.detector || null, placed: compRes.placed ?? (compRes.debug?.placements || []).length }
                     : { status: 'no-image', reason: 'the composite returned no image' };
                   compositeDebug = compRes?.debug || null;
                 }
