@@ -4645,9 +4645,10 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     // Every attempt, not only the kept one: a re-render is a judgement to check.
     const tries = Array.isArray(v?.attempts) && v.attempts.length > 1 ? v.attempts : null;
     if (tries) {
-      for (const a of tries) await saveStep(a.render, `· in-place render for ${name}, attempt ${a.attempt} (height ${a.ratio}x, IoU ${a.iou}${a.ok ? ', accepted' : ''})`);
+      for (const a of tries) await saveStep(a.render, `· in-place render for ${name}, attempt ${a.attempt} (height ${a.ratio}x, IoU ${a.iou}${a.residue ? `, unchanged ${Math.round(a.residue.unchanged * 100)}%, flat ${Math.round(a.residue.flatSaturated * 100)}%${a.residue.rejected ? ', PLACEHOLDER UNPAINTED' : ''}` : ''}${a.ok ? ', accepted' : ''})`);
     } else {
-      await saveStep(v?.render, `· in-place render for ${name}`);
+      const a = Array.isArray(v?.attempts) ? v.attempts[0] : null;
+      await saveStep(v?.render, `· in-place render for ${name}${a?.residue ? ` (unchanged ${Math.round(a.residue.unchanged * 100)}%, flat ${Math.round(a.residue.flatSaturated * 100)}%${a.residue.rejected ? ', PLACEHOLDER UNPAINTED' : ''})` : ''}`);
     }
   }
 

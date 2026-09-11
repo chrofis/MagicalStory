@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 // sharp and the Grok client through plain require().
 const require_ = createRequire(import.meta.url);
 const { _internal } = require_('../../server/lib/sceneComposite');
-const { buildInPlaceRenderPrompt, matchRenderedFigureBox, dilateMask } = _internal;
+const { buildInPlaceRenderPrompt, matchRenderedFigureBox, dilateMask, placeholderResidueFromRaw } = _internal;
 
 /**
  * figureMethod 'inPlace' (owner's design 2026-09-10): one Grok edit per figure
@@ -108,5 +108,45 @@ describe('dilateMask', () => {
     const e = new Uint8Array(W * H); e[0] = 1;
     let n2 = 0; for (const v of dilateMask(e, W, H, 1)) n2 += v;
     expect(n2).toBe(4);
+  });
+});
+
+/**
+ * Placeholder residue (Lab exp 1152): a render that left the silhouette
+ * untouched, or merely re-tinted it, must not pass as a figure.
+ */
+describe('placeholderResidueFromRaw', () => {
+  const W = 20, H = 20;
+  const mask = new Uint8Array(W * H);
+  for (let y = 5; y < 15; y++) for (let x = 5; x < 15; x++) mask[y * W + x] = 1;
+  const fill = (r: number, g: number, b: number) => {
+    const buf = Buffer.alloc(W * H * 3);
+    for (let k = 0; k < W * H; k++) { buf[k * 3] = r; buf[k * 3 + 1] = g; buf[k * 3 + 2] = b; }
+    return buf;
+  };
+  const plate = fill(230, 0, 0);   // saturated red silhouette everywhere
+
+  it('an untouched render is 100% unchanged and 100% flat saturated', () => {
+    const r = placeholderResidueFromRaw(plate, Buffer.from(plate), mask, W, H);
+    expect(r.unchanged).toBe(1);
+    expect(r.flatSaturated).toBe(1);
+  });
+
+  it('a re-tint (red to teal) is changed but still a flat saturated fill', () => {
+    const r = placeholderResidueFromRaw(plate, fill(0, 150, 150), mask, W, H);
+    expect(r.unchanged).toBe(0);
+    expect(r.flatSaturated).toBe(1);
+  });
+
+  it('a textured, desaturated render is neither', () => {
+    const render = Buffer.alloc(W * H * 3);
+    for (let k = 0; k < W * H; k++) { const v = 80 + ((k * 37) % 90); render[k * 3] = v; render[k * 3 + 1] = v - 20; render[k * 3 + 2] = v - 30; }
+    const r = placeholderResidueFromRaw(plate, render, mask, W, H);
+    expect(r.unchanged).toBe(0);
+    expect(r.flatSaturated).toBe(0);
+  });
+
+  it('only the silhouette mask is measured; an empty mask yields zeros', () => {
+    expect(placeholderResidueFromRaw(plate, plate, new Uint8Array(W * H), W, H)).toEqual({ unchanged: 0, flatSaturated: 0 });
   });
 });

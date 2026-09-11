@@ -1342,6 +1342,52 @@ async function changedPixelsMask(plateBuf, renderBuf, bbox, W, H, grow, threshol
   return out;
 }
 
+/**
+ * How much of a silhouette is still a placeholder after an in-place render.
+ * Two fractions over the silhouette mask, both pure so they can be tested:
+ *   unchanged     - pixels the render left as the plate had them (Lab exp 1152:
+ *                   Grok returned the plate untouched for one figure, and DINO
+ *                   still boxed the silhouette, so the geometry gate accepted a
+ *                   raw yellow placeholder);
+ *   flatSaturated - pixels that are a flat fill of a saturated colour (same
+ *                   run: another silhouette came back merely re-tinted blue to
+ *                   teal - changed, yet no child was painted).
+ * `a` / `b` are raw RGB buffers of plate and render at W x H.
+ */
+function placeholderResidueFromRaw(a, b, mask, W, H, { diffThreshold = 40, satFloor = 0.55, flatDelta = 12 } = {}) {
+  let total = 0, unchanged = 0, flatSaturated = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = y * W + x;
+    if (!mask[k]) continue;
+    total++;
+    const i = k * 3;
+    const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+    if (d <= diffThreshold) unchanged++;
+    const r = b[i], g = b[i + 1], bl = b[i + 2];
+    const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl);
+    const sat = mx ? (mx - mn) / mx : 0;
+    if (sat < satFloor) continue;
+    // Flat: the 4px neighbour to the right and below are (near) the same colour.
+    const j = x + 4 < W ? i + 12 : i, l = y + 4 < H ? i + 12 * W : i;
+    const dn = Math.max(
+      Math.abs(r - b[j]), Math.abs(g - b[j + 1]), Math.abs(bl - b[j + 2]),
+      Math.abs(r - b[l]), Math.abs(g - b[l + 1]), Math.abs(bl - b[l + 2]));
+    if (dn < flatDelta) flatSaturated++;
+  }
+  if (!total) return { unchanged: 0, flatSaturated: 0 };
+  return { unchanged: unchanged / total, flatSaturated: flatSaturated / total };
+}
+
+async function placeholderResidue(plateBuf, renderBuf, mask, W, H) {
+  const a = await sharp(plateBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const b = await sharp(renderBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  return placeholderResidueFromRaw(a, b, mask, W, H);
+}
+// A render is a no-op when at least this share of the silhouette is untouched,
+// and a recolour when at least this share is still a flat saturated fill.
+const RESIDUE_UNCHANGED_MAX = 0.5;
+const RESIDUE_FLAT_MAX = 0.6;
+
 /** Morphological closing: fills holes and gaps up to ~2r px (the white of a held sheet of paper that matched the plate's paper). */
 function closeMask(mask, W, H, r) {
   if (!(r > 0)) return mask;
@@ -1455,8 +1501,12 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
     for (let attempt = 1; attempt <= 2; attempt++) {
       let prompt = basePrompt;
       if (attempt === 2 && best) {
-        const how = best.ratio > 1.4 ? `${best.ratio.toFixed(1)} times too tall` : best.ratio < 0.75 ? 'too small' : 'not in the silhouette\'s place';
-        prompt = `${basePrompt}\n\nA previous attempt drew ${c.name} ${how}. Match the ${c.colorName || 'coloured'} silhouette's outline exactly: same height, same footprint, same posture${c.action ? ` (${String(c.action).trim()})` : ''}.`;
+        if (best.residue && best.residue.rejected) {
+          prompt = `${basePrompt}\n\nA previous attempt left the ${c.colorName || 'coloured'} silhouette as a flat coloured shape. Paint ${c.name} there as a real, fully rendered figure in the style of Image 1 - no flat ${c.colorName || 'coloured'} fill remains.`;
+        } else {
+          const how = best.ratio > 1.4 ? `${best.ratio.toFixed(1)} times too tall` : best.ratio < 0.75 ? 'too small' : 'not in the silhouette\'s place';
+          prompt = `${basePrompt}\n\nA previous attempt drew ${c.name} ${how}. Match the ${c.colorName || 'coloured'} silhouette's outline exactly: same height, same footprint, same posture${c.action ? ` (${String(c.action).trim()})` : ''}.`;
+        }
       }
       let result;
       try {
@@ -1481,9 +1531,22 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       const renderBuf = norm.buf;
       const renderUri = `data:image/png;base64,${renderBuf.toString('base64')}`;
 
+      // Was the placeholder painted at all? DINO boxes a raw silhouette as a
+      // person just as readily (exp 1152: an untouched plate and a re-tinted
+      // silhouette both passed the geometry gate and shipped). Measured on the
+      // silhouette's own pixels before any box is trusted.
+      let residue = null;
+      try {
+        const rz = await placeholderResidue(populatedBuf, renderBuf, silhouetteMasks[c.name], W, H);
+        residue = { ...rz, rejected: rz.unchanged >= RESIDUE_UNCHANGED_MAX || rz.flatSaturated >= RESIDUE_FLAT_MAX };
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: placeholder residue check failed — ${err.message}`);
+      }
       // Find the rendered figure: DINO person boxes, best IoU with the silhouette.
       let matched = null, mask = null;
-      try {
+      if (residue?.rejected) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: attempt ${attempt} left the placeholder unpainted (unchanged ${(residue.unchanged * 100).toFixed(0)}%, flat saturated ${(residue.flatSaturated * 100).toFixed(0)}%)`);
+      } else try {
         const det = await _gdinoDetect(renderUri, [{ name: 'person', text: 'person' }]);
         const persons = det?.figures?.[0] ? _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU) : [];
         matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H, clipBottom: bottomLimit });
@@ -1503,15 +1566,26 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       const ratio = matched ? clippedHeight(matched.box, bottomLimit) / bbox.height : 1;
       const iou = matched ? matched.iou : 0;
       const ok = !!mask && ratio >= 0.75 && ratio <= 1.4 && iou >= 0.45;
-      attempts.push({ attempt, ratio: +ratio.toFixed(2), iou: +iou.toFixed(3), ok, render: result.imageData });
-      const cand = { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio };
-      if (!best || iou > (best.matched ? best.matched.iou : -1)) best = cand;
+      attempts.push({ attempt, ratio: +ratio.toFixed(2), iou: +iou.toFixed(3), ok, render: result.imageData,
+        residue: residue ? { unchanged: +residue.unchanged.toFixed(2), flatSaturated: +residue.flatSaturated.toFixed(2), rejected: residue.rejected } : null });
+      const cand = { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio, residue };
+      // An unpainted placeholder never beats a painted figure, whatever its IoU.
+      if (!best || (best.residue?.rejected && !residue?.rejected) || (!!best.residue?.rejected === !!residue?.rejected && iou > (best.matched ? best.matched.iou : -1))) best = cand;
       if (ok) break;
       if (attempt === 1) log.warn(`[SCENE COMPOSITE]   ${c.name}: render is off the silhouette (height ${ratio.toFixed(2)}x, IoU ${iou.toFixed(2)}) — re-rendering once with the failure fed back`);
       else log.warn(`[SCENE COMPOSITE]   ${c.name}: re-render still off (height ${ratio.toFixed(2)}x, IoU ${iou.toFixed(2)}) — keeping the better attempt`);
     }
     if (!best) {
       inPlaceLog.push({ name: c.name, skipped: `render failed: ${attempts.map(a => a.error).filter(Boolean).join(' / ')}` });
+      continue;
+    }
+    if (best.residue?.rejected) {
+      // Both attempts left a flat placeholder. Nothing here can be cut out as
+      // the character; the entry is unplaced and the all-or-nothing rule
+      // keeps the direct render.
+      renders[c.name] = { prompt: best.prompt, render: best.result.imageData, attempts };
+      inPlaceLog.push({ name: c.name, skipped: `placeholder left unpainted on ${attempts.length} attempt(s)`, attempts: attempts.map(a => a.residue) });
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: placeholder left unpainted on every attempt — not placed`);
       continue;
     }
     renders[c.name] = { prompt: best.prompt, render: best.result.imageData, attempts };
@@ -4447,6 +4521,7 @@ module.exports = {
     detectZOrderByOcclusion,
     rgbToHue,
     buildInPlaceRenderPrompt,
+    placeholderResidueFromRaw,
     matchRenderedFigureBox,
     dilateMask,
   },
