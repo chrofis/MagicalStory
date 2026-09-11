@@ -803,3 +803,7 @@ Recorded so nobody re-proposes them as gaps.
 - [x] Composite `figureMethod: inPlace` — validated Lab exp 1136–1148, promoted to production 2026-09-11 → docs/decisions.md ("in-place figure render")
 - [ ] Plate judge measured blind (flash-lite and flash) on exp 1086/1091 — needs a judge that sees level relations or stays parked → docs/decisions.md ("plate judge measured blind")
 - [ ] Composite abort counter: an aborted composite must surface in the run summary / health, not only in per-page compositeOutcome (44 silent aborts went unnoticed 2026-08-25 → 09-11) → docs/decisions.md ("never handed it a brief")
+- [ ] Production composite cast omits VB secondaries (the Lab casts them via secondaryCastSeeds; production renders characters[] only) - unify the cast builder before widening the trigger again → docs/decisions.md ("lost 5 of 5")
+- [ ] In-place composite: back-view ignored (p6 four boys face camera), clipped figure with a vertical seam (p10), photoreal faces on a watercolour plate - open defects from job_1789083667794 → ~/Downloads/dragon-rerun2-analysis-1789083667794.html
+- [ ] Front cover omits the dragon on both dragon reruns (coverHints objects never carry CHR001; a secondary with states has no parent-level reference) → dragon-rerun analyses 2026-09-11
+- [ ] Scale prop (ART) drawn as figurine / dish / tray on 3-5 pages per dragon run - the one recurring deserved CRITICAL → dragon-rerun analyses 2026-09-11

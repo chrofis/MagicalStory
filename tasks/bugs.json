@@ -821,6 +821,33 @@
    "status": "fixed",
    "fixedAt": "2026-09-11",
    "fix": "Read the brief from pageData.scene.sceneDescription (metadata block stripped) and the plate prompt from sceneBackgrounds[page].prompt, then sceneMetadata.emptyScenePrompt."
+  },
+  {
+   "id": "composite-shipped-raw-silhouettes",
+   "title": "In-place composite returned a page with cast members still drawn as coloured silhouettes when their render or cut failed",
+   "reportedAt": "2026-09-11",
+   "source": "job_1789083667794_17lz946ik p18 composite version: 2 of 5 boys rendered, green/blue/purple silhouettes left on the quay; p6 red remnant + green blob. Placed count 10/14 across the five composited pages.",
+   "status": "fixed",
+   "fixedAt": "2026-09-11",
+   "fix": "renderFiguresInPlace result with placed < cast.length throws (compositeDebug attached); the pipeline keeps the direct render."
+  },
+  {
+   "id": "original-charged-with-composite-entity-findings",
+   "title": "When scale-repair/composite ran, the pre-composite original was scored with the Step-1 entity report that was computed on the composite pixels",
+   "reportedAt": "2026-09-11",
+   "source": "job_1789083667794_17lz946ik p18 v0 entityIssues quote \"stylized purple blob / featureless green silhouette\" (composite leftovers) on a version with five painted boys, 93 -> 53; p10 v0 -15 for a cropped head that exists only in the composite. repairPipeline.js rescue applied entityReport to every source=original version.",
+   "status": "fixed",
+   "fixedAt": "2026-09-11",
+   "fix": "The pre-scale-repair v0 is flagged step1Pixels:false and the rescue scores it with no entity report instead of the composite one."
+  },
+  {
+   "id": "scale-repair-trigger-counted-uncastable-secondaries",
+   "title": "needsScaleRepair counted CHR-id secondaries as figures although the production composite renders characters[] only, so it fired on pages whose second figure it could not draw",
+   "reportedAt": "2026-09-11",
+   "source": "job_1789083667794_17lz946ik p6/7/17/18 fired only because of CHR001.x (the dragon); the dragon is missing from all four composited plates; the composite lost on every one.",
+   "status": "fixed",
+   "fixedAt": "2026-09-11",
+   "fix": "CHR-id promotion removed from needsScaleRepair (the 2026-09-10 widening reverted)."
   }
  ]
 }

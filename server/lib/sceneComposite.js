@@ -3004,7 +3004,15 @@ async function generateSceneComposite(opts) {
       aspectRatio, visualBible: opts.visualBible, usageTracker, debug,
     });
     totalCost += r.cost;
-    log.info(`[SCENE COMPOSITE] complete (inPlace) — total cost $${totalCost.toFixed(4)}, ${r.placed}/${cast.length} characters placed`);
+    // All or nothing. A cast member the composite could not render stays on
+    // the page as the plate left it - job_1789083667794 p18 shipped three
+    // coloured silhouettes on a quay. The page keeps its direct render.
+    if (r.placed < cast.length) {
+      const err = new Error(`in-place composite placed ${r.placed}/${cast.length} figures — the page keeps its direct render`);
+      err.compositeDebug = debug;
+      throw err;
+    }
+    log.info(`[SCENE COMPOSITE] complete (inPlace) — total cost ${totalCost.toFixed(4)}, ${r.placed}/${cast.length} characters placed`);
     return {
       imageData: r.imageData,
       usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-inplace' },

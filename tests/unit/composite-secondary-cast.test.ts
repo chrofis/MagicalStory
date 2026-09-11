@@ -34,8 +34,8 @@ describe('secondary characters staged as CHR ids', () => {
     expect(secondaryCastSeeds(fullData, null)).toHaveLength(0);
   });
 
-  it('the trigger counts the secondary as a further-back figure', () => {
-    expect(needsScaleRepair({ fullData: { ...fullData, setting: 'outdoor' } })).toBe(true);
+  it('the trigger does NOT count a CHR-id secondary: the production composite cannot cast it (job_1789083667794, the dragon vanished from four plates)', () => {
+    expect(needsScaleRepair({ fullData: { ...fullData, setting: 'outdoor' } })).toBe(false);
     // one figure only -> no composite
     expect(needsScaleRepair({ fullData: { characters: fullData.characters, objects: ['LOC004'], interactions: [fullData.interactions[0]], setting: 'outdoor' } })).toBe(false);
   });

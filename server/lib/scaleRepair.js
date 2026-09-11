@@ -59,19 +59,12 @@ function needsScaleRepair(sceneMetadata) {
     || (Array.isArray(sceneMetadata?.characters) && typeof sceneMetadata.characters[0] === 'object'
         ? sceneMetadata.characters
         : null);
-  // Secondary characters staged as CHR ids (objects[] / interactions) count
-  // as figures, at midground: the schema keeps them out of characters[],
-  // and a two-figure page with one of them read as a one-figure page
-  // (2026-09-10). Depth words come from the brief's own fields only.
+  // Only characters[] count. CHR-id secondaries (a dragon, a shopkeeper) were
+  // counted as midground figures for one day (2026-09-10); the production
+  // composite cannot cast them - it renders characters[] only - so the
+  // trigger fired on pages whose second figure the composite could not
+  // draw, and the dragon vanished from four plates (job_1789083667794).
   const figures = Array.isArray(chars) ? chars.slice() : [];
-  {
-    const seen = new Set(figures.map(c => String(c?.name || '').toLowerCase()));
-    const idOf = (v) => { const m = String(v || '').trim().match(/^CHR(\d+)/i); return m ? ('CHR' + m[1]).toUpperCase() : null; };
-    const ids = new Set();
-    for (const o of (sceneMetadata?.fullData?.objects || sceneMetadata?.objects || [])) { const id = idOf(typeof o === 'string' ? o : (o?.id || o?.name)); if (id) ids.add(id); }
-    for (const it of (sceneMetadata?.fullData?.interactions || sceneMetadata?.interactions || [])) { const id = idOf(it?.character); if (id) ids.add(id); }
-    for (const id of ids) if (!seen.has(id.toLowerCase())) figures.push({ name: id, depth: 'midground', position: '' });
-  }
   if (figures.length < 2) return false;
   const depthOf = (c) => (c.depth || '').toLowerCase();
   // One figure in front and one further back is the depth the composite exists

@@ -841,6 +841,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           prompt: img.prompt || null,
           entityPenalty: 0,
           entityIssues: [],
+          // Step 1 ran on the scale-repair OUTPUT, never on these pixels.
+          step1Pixels: false,
           evaluatedAt: new Date().toISOString(),
         }
       : {
@@ -2634,8 +2636,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // clothing_match:true for both characters. The originals' entity
         // evidence is the STEP-1 report, which was computed on their pixels.
         const isOriginalVersion = !entry.version.source || entry.version.source === 'original';
-        const rescueEntityReport = isOriginalVersion ? (entityReport || null) : currentEntityReport;
-        if (isOriginalVersion && !entityReport) {
+        // A pre-scale-repair original (step1Pixels false) was never seen by
+        // Step 1 either: that report describes the composite. job_1789083667794
+        // p18 charged the direct render for the composite's leftover silhouettes
+        // (93 -> 53) and p10 for its clipped figure (100 -> 85).
+        const step1SawIt = entry.version.step1Pixels !== false;
+        const rescueEntityReport = isOriginalVersion ? (step1SawIt ? (entityReport || null) : null) : currentEntityReport;
+        if (isOriginalVersion && !step1SawIt) {
+          log.info(`[UNIFIED PIPELINE] Page ${ev.pageNumber}: pre-scale-repair original scored without the Step-1 entity report (it was computed on the composite)`);
+        } else if (isOriginalVersion && !entityReport) {
           log.warn(`⚠️ [UNIFIED PIPELINE] Page ${ev.pageNumber}: rescue-eval has no Step-1 entity report for the original — scoring it with no entity penalty rather than charging it the round's findings`);
         }
         const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, rescueEntityReport);
