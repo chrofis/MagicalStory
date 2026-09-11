@@ -236,6 +236,39 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     expect(t).toMatch(/Geometry serves recognition; it is never the whole description/);
   });
 
+  // Owner ruling 2026-09-11, on the cells rendered for Lab experiments
+  // 1191/1192 (staging job_1789147573901_m3uam0nxi): naming what the object
+  // attaches to is what makes it recognisable, and drew the mounting as well.
+  it('says the attachment named for recognition is never drawn', () => {
+    expect(templates['sceneExpansionAll'])
+      .toMatch(/Naming that thing identifies the object and never puts it in the picture/);
+  });
+
+  // Owner ruling 2026-09-11: two cells for the same object under different
+  // light are indistinguishable pictures. Light is the scene's, per page.
+  it.each([
+    ['sceneExpansionAll', /Light is not a state either/],
+    ['storyUnified', /A change of light is not a state/],
+    ['storyTrial', /A change of light is not a state/],
+  ])('%s excludes light from the state test', (key, re) => {
+    expect(templates[key]).toBeTruthy();
+    expect(templates[key]).toMatch(re as RegExp);
+    expect(templates[key]).not.toMatch(/lantern is lit/);
+    expect(templates[key]).not.toMatch(/alters it — lit,/);
+  });
+
+  it('keeps the rest of the state test intact', () => {
+    const t = templates['sceneExpansionAll'];
+    expect(t).toMatch(/Held, set down, carried, pressed against something/);
+    expect(t).toMatch(/when a face prop turns its other side to us/);
+    expect(t).toMatch(/cannot be drawn without that element and drags it into the cell/);
+    expect(t).toMatch(/a flower wilts, a bottle breaks, a canvas gets painted/);
+  });
+
+  it.each(['sceneExpansionAll', 'storyUnified'])('%s states schema keeps light out of a delta', (key) => {
+    expect(templates[key]).toMatch(/never light, that belongs to the scene/);
+  });
+
   it('carries the recognisability requirement into the artifact schema field', () => {
     const t = templates['sceneExpansionAll'];
     expect(t).toMatch(/"description": "\[what it is, named with the word that names it/);

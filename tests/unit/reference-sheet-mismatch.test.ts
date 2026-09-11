@@ -72,7 +72,20 @@ describe('cell prompt bans scale props', () => {
       null,
     );
     expect(prompt).toMatch(/Only the element itself is drawn/);
-    expect(prompt).toMatch(/size or scale is never drawn/);
+    expect(prompt).toMatch(/size or scale/);
+    expect(prompt).toMatch(/is never drawn/);
+  });
+
+  // Regression: staging job_1789147573901_m3uam0nxi, Lab experiments 1191/1192.
+  // Naming what an object attaches to fixed its identity — and the cell then
+  // drew the mounting too. The mention is for recognition, never for the frame.
+  it('bans drawing what the description says the element attaches to', () => {
+    const prompt = buildReferenceSheetPrompt(
+      [{ id: 'ART001', name: 'a fitting', type: 'fitting', description: 'a small housing on a bracket' }],
+      'watercolor',
+      null,
+    );
+    expect(prompt).toMatch(/attaches to, is part of, or is used with, is never drawn/);
   });
 });
 
@@ -96,7 +109,8 @@ describe('cell prompt requires the drawing to read as the named element', () => 
       'watercolor',
       null,
     );
-    expect(prompt).toMatch(/size or scale is never drawn/);
+    expect(prompt).toMatch(/size or scale/);
+    expect(prompt).toMatch(/is never drawn/);
     expect(prompt).not.toMatch(/draw the thing it is compared to/i);
   });
 });

@@ -144,7 +144,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 
 **Keep it MINIMAL for a 5-scene story:**
 - max **2 locations**
-- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta, because each state is drawn as its own reference cell. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
+- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — broken, mended, opened, filled. A change of light is not a state; the scene decides the light. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta, because each state is drawn as its own reference cell. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
 - max **2 secondary characters** (only if they appear on 2+ pages — single-scene helpers can stay nameless in prose)
 - 3-5 backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
