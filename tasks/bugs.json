@@ -8,7 +8,7 @@
       "source": "Staging story job_1789147573901_m3uam0nxi, stored generationLog: three vb_sheet_layout_mismatch events in one run ('drew 9 cells (3x3) for 3 requested', 'drew 2 cells (2x1) for 3 requested', 'drew 6 cells (3x2) for 2 requested') plus vb_sheet_element_missing for the boulder entry. On the 2x1 sheet the gutter detector merged three stacked panels into one cell; identifySheetCells named that cell for a single element and splitGridIntoReferences cropped and stored it, so that entry's reference image shows a signpost, a cave wall and a boulder at once. Every downstream prompt fed that reference is shown three objects and told they are one.",
       "status": "fixed",
       "fixedAt": "2026-09-11",
-      "fixedIn": "52b4414e6",
+      "fixedIn": "25f906c61",
       "fix": "splitGridIntoReferences now measures each MAPPED crop with detectSheetGrid (countPanelsPerCell, no model call) and rejectMultiPanelAssignments (server/lib/sheetGrid.js, pure) drops any assignment whose cell re-detects as more than one panel: that element gets NO reference (logged as vb_sheet_cell_multi_element) instead of a multi-object one. Detection failure counts as one panel, so the check can never invent a drop, and the run continues either way. Tests: tests/unit/reference-sheet-mismatch.test.ts."
     },
     {
@@ -18,7 +18,7 @@
       "source": "Staging story job_1789147573901_m3uam0nxi: vb_state_cells_rerender then vb_state_cells_still_bad with a WORD-FOR-WORD identical reason, twice ('The left wing membrane is ragged in the first image and smooth in the second image...' for one entry, 'The color of the object in the second image is a darker, more muted teal...' for another). rerenderSolo called buildReferenceSheetPrompt with exactly the arguments of the first render; the judge's reason was logged and discarded.",
       "status": "fixed",
       "fixedAt": "2026-09-11",
-      "fixedIn": "52b4414e6",
+      "fixedIn": "25f906c61",
       "fix": "buildReferenceSheetPrompt takes an optional gateReason and appends the judge's own sentence as a PREVIOUS ATTEMPT REJECTED note (quoted, never interpreted in code; sanitised with the rest of the prompt). rerenderSolo passes it on both paths - element/character cell and state-cell batch. The fail-open 'accepted anyway' behaviour is unchanged; that is an open owner decision."
     },
     {
@@ -28,7 +28,7 @@
       "source": "Staging story job_1789147573901_m3uam0nxi: both state cells of the creature entry render four children and a dog sitting on its back, because its description says 'large enough for four small children and a dog to sit across the back between the wing roots and the base of the neck'. Same class as the production ART001 prop described as 'roughly the size of two open palms', which rendered two human hands on it (tasks/BACKLOG.md). prompts/reference-sheet.txt carried the rule only under FOR OBJECTS/ARTIFACTS, and only for a 'comparison'; a creature entry never reaches that section.",
       "status": "fixed",
       "fixedAt": "2026-09-11",
-      "fixedIn": "52b4414e6",
+      "fixedIn": "25f906c61",
       "fix": "A global REQUIREMENTS line in prompts/reference-sheet.txt: 'Only the element itself is drawn. A person, animal or object the description names to convey its size or scale is never drawn' - so it binds every cell, not just the objects section. The bible prompt is untouched (owned by another session). Test: tests/unit/reference-sheet-mismatch.test.ts."
     },
     {
