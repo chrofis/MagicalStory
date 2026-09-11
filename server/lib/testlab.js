@@ -3767,7 +3767,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         { ...storyData, characters: storyData.characters || [], pageClothing: null },
         toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
         {
-          visualBible: storyData.visualBible || null,
+          // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
+          // of page 1. The stage still measures the page briefs — parseAll
+          // reads the `## Page N` blocks and ignores the leading sections.
           availableAvatars,
           maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
           clothingRequirements: storyData.clothingRequirements || null,

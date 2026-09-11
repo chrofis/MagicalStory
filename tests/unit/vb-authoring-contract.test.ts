@@ -197,12 +197,16 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
   });
 
+  // The Visual Bible moved OUT of storyBibleFromBeats and into the ALL-PAGES
+  // Art Director call on 2026-09-11 (owner): one author writes both what is in
+  // each picture and what each thing looks like, so a page cannot cite an
+  // element nobody declared. storyBibleFromBeats writes CLOTHING only now.
   it('requires sex and a NUMERIC age in a character entry', () => {
     // Beats states the age as a number, not prose, so the band computed from
     // the commissioned children is comparable (I11, 2026-09-06 — the other
     // three emitters keep the prose form, asserted below). The sex requirement
     // is unchanged; it moved from `age` to the opening of `build`.
-    const t = templates['storyBibleFromBeats'];
+    const t = templates['sceneExpansionAll'];
     expect(t).toBeTruthy();
     expect(t).toMatch(/`age` as a NUMBER of years/);
     expect(t).toMatch(/opens `build` with the character's sex/);
@@ -210,18 +214,26 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   });
 
   it('requires an earned appearsInPages range', () => {
-    expect(templates['storyBibleFromBeats']).toMatch(/`pages` is earned/);
-    expect(templates['storyBibleFromBeats']).toMatch(/never a blanket 1-\{PAGE_COUNT\} range/i);
+    expect(templates['sceneExpansionAll']).toMatch(/`pages` is earned/);
+    expect(templates['sceneExpansionAll']).toMatch(/never a blanket 1-\{PAGE_COUNT\} range/i);
   });
 
   it('requires an entry for every named vehicle or vessel', () => {
-    expect(templates['storyBibleFromBeats']).toMatch(/vehicles\b/i);
-    expect(templates['storyBibleFromBeats']).toMatch(/its own `?vehicles`? entry/i);
+    expect(templates['sceneExpansionAll']).toMatch(/vehicles\b/i);
+    expect(templates['sceneExpansionAll']).toMatch(/its own `?vehicles`? entry/i);
   });
 
   it('keeps the settled lettering gate intact', () => {
     // docs/SETTLED.md: no lettering unless the entry names the exact words.
-    expect(templates['storyBibleFromBeats']).toMatch(/No lettering unless this entry names the exact words/);
+    expect(templates['sceneExpansionAll']).toMatch(/No lettering unless this entry names the exact words/);
+  });
+
+  it('the wardrobe stage no longer authors the bible or the covers', () => {
+    const t = templates['storyBibleFromBeats'];
+    expect(t).toBeTruthy();
+    expect(t).toContain('---CLOTHING REQUIREMENTS---');
+    expect(t).not.toContain('---VISUAL BIBLE---');
+    expect(t).not.toContain('---COVER SCENE HINTS---');
   });
 
   // Every emitter of a VB character entry has to carry the sex+age rule, or a

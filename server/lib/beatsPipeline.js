@@ -24,23 +24,25 @@ const { buildCharacterDescription } = require('./visualBible');
  *   2. plan_check            counters + one cheap call: arithmetic over the
  *      DIVISION only, then at most ONE re-plan by the planner. No story
  *      checking happens at this layer by design (owner, 2026-09-01)
- *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
- *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
+ *   3. beats_story_bible     Sonnet    CLOTHING REQUIREMENTS only
+ *   4. beats_scene_expansion Sonnet    ONE call over ALL pages: the VISUAL BIBLE
+ *      and the COVER SCENE HINTS first, then every page's brief (cross-page
+ *      continuity, and no page can cite an element nobody declared)
  *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
  *   6. beats_story_text      Sonnet    page text written from the arc + the locked plan lines
  *
  * Scheduling is by data dependency, not by list order:
  *
- *   beats ─> plan check ─> bible ─┬─> styled avatars    (caller-owned, long pole)
- *                                   └─> scene expansion ─> scene review ─> page text
+ *   beats ─> plan check ─> wardrobe ─┬─> styled avatars  (caller-owned, long pole)
+ *                                    └─> scene expansion (bible + briefs)
+ *                                          ─> scene review ─> page text
  *
  * Step 6 runs AFTER the scene review and reads the FINAL briefs (owner decision
  * 2026-08-10: the scenes come first, the text must follow — see the note at the
  * old kickoff site below). Styled avatars need only clothingRequirements, so
  * they start the instant step 3 returns (via opts.onClothingRequirements) and
  * overlap everything after it — page images await briefs AND avatars, both in
- * server.js, unchanged. Step 3 is the one thing that cannot overlap: its
- * output IS step 4's input.
+ * server.js, unchanged.
  *
  * Step 7 (text_refine) already runs downstream in server.js and is untouched.
  *
@@ -48,18 +50,30 @@ const { buildCharacterDescription } = require('./visualBible');
  * uses (server/lib/testlab.js → runBeatsScenesStage); that stage stays the
  * measurement harness, this module is the production wiring.
  *
- * Step 3 closes the gap the unified call used to cover. It serves two consumers:
- *  - IN-PIPELINE: the parsed Visual Bible becomes the Art Director's
- *    {RECURRING_ELEMENTS} and the parsed clothing requirements its
- *    {AVAILABLE_AVATARS}, so scene briefs are written with VB ids and the
- *    right per-category outfits instead of blind.
- *  - DOWNSTREAM: the raw sections are spliced into `rawOutline` — which
- *    server.js feeds to UnifiedStoryParser as `unifiedResponse` — in the SAME
- *    section format the unified writer used, so extractClothingRequirements(),
- *    extractVisualBible() and extractCoverHints() work with no parsing change.
+ * Steps 3 and 4 together close the gap the unified call used to cover. The
+ * split of authorship is deliberate (owner, 2026-09-11):
+ *  - Step 3 writes the CLOTHING REQUIREMENTS, and only those. Styled avatars
+ *    are the long pole in front of every image and start the moment it returns,
+ *    so the wardrobe cannot wait for the Art Director. Clothing depends on the
+ *    cast and the setting, both already fixed by the plan.
+ *  - Step 4 — the ART DIRECTOR — writes the VISUAL BIBLE and the COVER SCENE
+ *    HINTS, ahead of page 1, then the page briefs. One author owns both what is
+ *    in each picture and what each thing looks like, so the two cannot
+ *    contradict each other, and a page's `objects[]` cannot name an entry that
+ *    was never declared. Before this, step 3 had to GUESS page assignment from
+ *    plan-line prose and on job_1789147573901_m3uam0nxi the guess emptied the
+ *    story's central prop and the lettered signpost page 10 then asked for.
+ *  - DOWNSTREAM: the raw sections from both steps are concatenated into
+ *    `rawOutline` — which server.js feeds to UnifiedStoryParser as
+ *    `unifiedResponse` — in the SAME section format and order the unified
+ *    writer used, so extractClothingRequirements(), extractVisualBible() and
+ *    extractCoverHints() work with no parsing change.
  *
- * If that one call fails the run still completes, degraded (blind briefs, empty
- * VB, null clothing, default front-cover hint) rather than aborted.
+ * If either call fails the run still completes, degraded (blind briefs, empty
+ * VB, null clothing, default front-cover hint) rather than aborted. The
+ * per-page fallback (expandOnePage) cannot author a whole-book bible and does
+ * not try: it reuses whatever the all-pages call produced, and with nothing at
+ * all it expands blind — the same degradation a failed bible stage always had.
  */
 
 const textModels = require('./textModels');
@@ -157,29 +171,44 @@ const NOOP_LOG = { info: () => {}, warn: () => {}, error: () => {}, setStage: ()
  * that UnifiedStoryParser still looks for in `unifiedResponse`:
  * extractClothingRequirements / extractVisualBible / extractCoverHints.
  * Spelling and spacing are the parser's regexes — do not "tidy" them.
+ *
+ * TWO AUTHORS since 2026-09-11. The wardrobe stage writes the first marker
+ * (the styled avatars start the moment it returns and cannot wait); the
+ * ALL-PAGES Art Director writes the other two, ahead of page 1, so no page can
+ * cite an element that was never declared. beatsPipeline concatenates the two
+ * bodies in this order, which is the order the transcript has always carried.
  */
 const BIBLE_MARKERS = ['---CLOTHING REQUIREMENTS---', '---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
+const CLOTHING_MARKERS = ['---CLOTHING REQUIREMENTS---'];
+const AD_BIBLE_MARKERS = ['---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
 
 /**
- * Strip any preamble the bible model wrote before the first section marker and
- * any trailing ---STORY PAGES--- it invented (that marker terminates the
- * cover-hints regex, so a stray one would swallow the real cover hints once
- * this block is spliced into the transcript).
+ * Strip any preamble the model wrote before the first section marker, and
+ * everything from the first thing that ENDS the section block: a stray
+ * ---STORY PAGES--- it invented, or (the Art Director's response) the real
+ * `## Page N` heading that starts the briefs. Both matter because neither
+ * terminates the cover-hints regex, so leaving them in would swallow the whole
+ * story into the cover hints once this block is spliced into the transcript.
  *
- * @returns {{body: string, found: string[]}|null} null when no section marker exists at all.
+ * @param {string} raw
+ * @param {string[]} [markers] - which section markers this caller expects.
+ * @returns {{body: string, found: string[]}|null} null when no expected marker exists at all.
  */
-function extractBibleSections(raw) {
+function extractBibleSections(raw, markers = BIBLE_MARKERS) {
   const text = String(raw || '');
-  const positions = BIBLE_MARKERS.map(m => text.indexOf(m));
+  const positions = markers.map(m => text.indexOf(m));
   const present = positions.filter(i => i >= 0);
   if (present.length === 0) return null;
 
   let body = text.slice(Math.min(...present)).trim();
-  const stray = body.search(/---\s*STORY PAGES\s*---/i);
-  if (stray >= 0) body = body.slice(0, stray).trim();
+  const ends = [
+    body.search(/---\s*STORY PAGES\s*---/i),
+    body.search(/^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*\d+/im),
+  ].filter(i => i >= 0);
+  if (ends.length) body = body.slice(0, Math.min(...ends)).trim();
   if (!body) return null;
 
-  return { body, found: BIBLE_MARKERS.filter(m => body.includes(m)) };
+  return { body, found: markers.filter(m => body.includes(m)) };
 }
 
 /**
@@ -1077,145 +1106,58 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     });
   }
 
-  // ── Step 3: visual contract from the locked beats ─────────────────────────
-  // MUST precede scene expansion: the Visual Bible fills the Art Director's
-  // {RECURRING_ELEMENTS}. Expanding a scene before it exists produces a brief
-  // with no recurring elements at all — no location, artifact, animal or
-  // secondary-character continuity — and the scene review downstream then has
-  // nothing to check it against. It also gates the avatar kickoff below.
+  // ── Step 3: WARDROBE contract from the locked beats ───────────────────────
+  // Clothing ONLY since 2026-09-11. The Visual Bible and the cover hints used
+  // to be written here and are now authored by the all-pages Art Director
+  // below, alongside the page briefs — a bible written at this point had to
+  // guess which page used which element from plan-line prose, and on
+  // job_1789147573901_m3uam0nxi that guess emptied the story's central prop and
+  // the signpost carrying the plot-critical text.
   //
-  // The call never throws: a beats run without a bible is degraded (blind scene
-  // briefs, empty VB, null clothing, default front-cover hint) but must still
-  // produce a story, exactly as it did before this stage existed.
+  // Clothing did NOT move, deliberately: the styled avatars are the long pole
+  // in front of every image and start the instant this call returns (via
+  // onClothingRequirements below). Clothing depends on the cast and the
+  // setting, both fixed by the plan, so it needs nothing the Art Director adds.
+  //
+  // The call never throws: a beats run without a wardrobe is degraded (null
+  // clothing, avatars from the stored wardrobe) but must still produce a story.
   await checkCancellation();
   const bibleModel = planModel;
+  // The transcript spliced into rawOutline. The wardrobe section lands here
+  // first; the Art Director's bible + cover sections are appended to it below.
   let bibleSections = null;
+  // Authored by the ALL-PAGES Art Director, further down. Declared here because
+  // the clothing review, the avatar kickoff and expandOnePage all close over it.
   let visualBible = null;
   let clothingRequirements = null;
   const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats);
   if (!biblePrompt) {
-    log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no Visual Bible, clothing or cover hints');
-    gl.warn('beats_story_bible_failed', 'Bible template unavailable — story ships with an empty Visual Bible');
+    log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no clothing requirements');
+    gl.warn('beats_story_bible_failed', 'Wardrobe template unavailable — story ships with no clothing contract');
   } else {
     t = Date.now();
     try {
-      await stage(18, 'Building the visual contract...', { next: 23, ms: 71000 });
+      await stage(18, 'Building the wardrobe contract...', { next: 23, ms: 71000 });
       const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
-      const sections = extractBibleSections(bibleRes.text || '');
+      const sections = extractBibleSections(bibleRes.text || '', CLOTHING_MARKERS);
       meta.timings.storyBibleMs = Date.now() - t;
       if (!sections) {
-        log.warn(`🚨 [BEATS] Bible call returned no parseable section markers (${(bibleRes.text || '').length} chars)`);
-        gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no section markers — story ships with an empty Visual Bible`);
+        log.warn(`🚨 [BEATS] Wardrobe call returned no parseable section marker (${(bibleRes.text || '').length} chars)`);
+        gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no ---CLOTHING REQUIREMENTS--- marker — story ships with no clothing contract`);
       } else {
         bibleSections = sections.body;
         // Parse with the SAME parser server.js will run over the finished
-        // transcript, so what the Art Director sees here and what the story
-        // stores downstream can never diverge.
-        const bibleParser = new UnifiedStoryParser(bibleSections);
-        visualBible = bibleParser.extractVisualBible();
-        clothingRequirements = bibleParser.extractClothingRequirements();
-        const missing = BIBLE_MARKERS.filter(m => !sections.found.includes(m));
-        if (missing.length > 0) {
-          log.warn(`⚠️ [BEATS] Bible missing section(s): ${missing.join(', ')}`);
-          gl.warn('beats_story_bible_partial', `Bible missing ${missing.map(m => m.replace(/-/g, '')).join(', ')}`);
-        }
-        // An invented child the bible declares a PEER of the commissioned
-        // children must state an age inside their band. The band went into the
-        // bible prompt above; this is the deterministic post-check over what
-        // came back — no model call, no classification, it reads the bible's
-        // own `peer` field and compares a number. Fail-soft like the rest of
-        // this stage: clamp to the nearest tolerated edge, flag the entry,
-        // warn. No retry loop and never a kill — an age constraint must not be
-        // able to end a paid run.
-        // Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy in the striped
-        // scarf" stated ten next to a commissioned 6-year-old, rendered 11-12
-        // on p5.
-        const childBand = visualBible?.secondaryCharacters?.length
-          ? commissionedChildBand(inputData.characters || [])
-          : null;
-        let ageClamps = [];
-        if (childBand) {
-          const band = childBand;
-          ageClamps = applySecondaryAgeBand(visualBible.secondaryCharacters, band, buildCharacterDescription);
-          for (const a of ageClamps) {
-            log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
-            gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${band.min}-${band.max}; clamped to ${a.clampedTo}`, null, {
-              id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: band.low, bandHigh: band.high,
-            });
-          }
-        }
-        // NO ASSIGNMENT TRIM HERE. `trimVbAssignments` used to run at this
-        // point and decide from the PLAN LINE which element belongs on which
-        // page — before any brief existed, matching prose against entry names.
-        // Plan lines describe a prop ("the big wing scale"), they do not cite
-        // ids, so the trim stripped what the story was about: on staging
-        // job_1789147573901_m3uam0nxi it removed 19 (element, page) claims and
-        // left six entries at `appearsInPages: []`, including the central prop
-        // and the signpost carrying the plot-critical text — no reference cell
-        // was rendered for any of them, while the final briefs cited exactly
-        // those ids (p10 objects: ["LOC004", "ART006"]). Usage is now derived
-        // from the FINAL briefs instead (`applyBriefUsage`, below, once the
-        // scene stage is done), and the element budget is enforced where the
-        // briefs exist (rankPageElements + truncateBriefToBudget) and at the
-        // page-gen reference selection.
-        if (visualBible) {
-          // ONE SOURCE OF TRUTH. The age clamp above mutated this module's
-          // parsed copy only; the transcript below is what every later reader
-          // re-parses (storyJobPipeline, resume, the Lab). Write the mutated
-          // fields back so every extractVisualBible() from here on agrees.
-          if (ageClamps.length > 0) {
-            const synced = syncVisualBibleSection(bibleSections, visualBible);
-            if (synced === bibleSections) {
-              log.warn('⚠️ [BEATS] Visual Bible post-checks changed the bible but the transcript has no rewritable ---VISUAL BIBLE--- JSON — downstream re-parses will read the UNTRIMMED bible');
-              gl.warn('beats_vb_sync_failed', 'Bible trim/age clamp could not be written back into the transcript — stored bible will not reflect them');
-            } else {
-              bibleSections = synced;
-            }
-          }
-        }
-        const vbCount = visualBible
-          ? Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)
-          : 0;
-        gl.info('beats_story_bible', `Visual contract by ${bibleRes.modelId || bibleModel}: ${vbCount} VB entries, ${Object.keys(clothingRequirements || {}).length} clothing reqs (${(meta.timings.storyBibleMs / 1000).toFixed(1)}s)`, null, {
-          vbEntries: vbCount, clothingChars: Object.keys(clothingRequirements || {}).length, model: bibleRes.modelId || bibleModel,
+        // transcript, so what this stage hands on and what the story stores
+        // downstream can never diverge.
+        clothingRequirements = new UnifiedStoryParser(bibleSections).extractClothingRequirements();
+        gl.info('beats_story_bible', `Wardrobe contract by ${bibleRes.modelId || bibleModel}: ${Object.keys(clothingRequirements || {}).length} clothing req(s) (${(meta.timings.storyBibleMs / 1000).toFixed(1)}s)`, null, {
+          clothingChars: Object.keys(clothingRequirements || {}).length, model: bibleRes.modelId || bibleModel,
         });
       }
     } catch (err) {
       meta.timings.storyBibleMs = Date.now() - t;
-      log.warn(`🚨 [BEATS] Bible call failed (${err.message}) — story ships with an empty Visual Bible`);
-      gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with an empty Visual Bible`);
-    }
-  }
-
-  // Deliberately OUTSIDE the bible try/catch: a throw from the caller's hook
-  // must abort the run, not be swallowed into "ships with an empty bible".
-  if (onVisualBible && visualBible) await onVisualBible(visualBible);
-  // The Art Director must see each real landmark's PHOTO VARIANTS:
-  // buildVbLocationLines prints a "Photo variants:" line per landmark so a
-  // brief can cite a viewpoint that exists, and the resolver then serves the
-  // variant the brief's landmarkView asks for. Two steps put them on the
-  // bible, and until 2026-09-09 BOTH ran in the caller only after this
-  // function returned: linking each real landmark to its pre-discovered index
-  // entry (storyJobPipeline, after the writer), then loading the variant
-  // descriptions. A first fix awaited only the second step here, which found
-  // nothing linked yet and did nothing — measured on
-  // job_1788983823620_csjcyp1q9: the bible ended the run linked with four
-  // variants, the AD context carried none, and landmarkView was chosen blind
-  // again. Both steps run here now. Both are cheap (in-memory matching; one
-  // DB query) and idempotent, so the caller repeating them costs nothing.
-  if (visualBible) {
-    try {
-      if (inputData.availableLandmarks?.length) {
-        require('./visualBible').linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
-      }
-      await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
-      const realLandmarks = (visualBible.locations || []).filter(l => l.isRealLandmark);
-      if (realLandmarks.length > 0) {
-        const withVariants = realLandmarks.filter(l => l.photoVariants?.length).length;
-        log.info(`🌍 [BEATS] Landmark photo variants before scene expansion: ${withVariants}/${realLandmarks.length} real landmark(s) carry variants`);
-      }
-    } catch (err) {
-      log.warn(`⚠️ [BEATS] Landmark linking/variants did not load before scene expansion: ${err.message} — briefs will not see them`);
+      log.warn(`🚨 [BEATS] Wardrobe call failed (${err.message}) — story ships with no clothing contract`);
+      gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with no clothing contract`);
     }
   }
 
@@ -1405,11 +1347,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   t = Date.now();
   const beatPageNumbers = beats.map(b => b.pageNumber);
   let expansions = [];
+  // The Visual Bible + cover hints the Art Director emits ahead of page 1.
+  let adBible = null;
   // No rulings travel here any more (2026-09-01): the beats reviewer that
   // produced them is gone, and the plan check never rules on anything — it
   // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
   const allPrompt = buildSceneExpansionAllPrompt(inputData, beats, {
-      visualBible,
       availableAvatars,
       maxCharactersPerScene,
       // The whole story, read-only, for the Art Director's judgment — it
@@ -1436,7 +1379,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // never rewrite pages already parsed.
     let allModelId = sceneModel;
     const byPage = new Map();
-    await stage(30, 'Writing scene briefs...', { next: 42, ms: 176000 });
+    await stage(30, 'Writing the visual bible and the scene briefs...', { next: 42, ms: 176000 });
     for (let attempt = 1; attempt <= 2; attempt++) {
       let allRaw = '';
       try {
@@ -1448,21 +1391,134 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
         break;
       }
+      // THE BIBLE RIDES IN FRONT of page 1 (2026-09-11). A response is only
+      // whole when BOTH halves parsed: a partial bible must never ship, and
+      // JSON.parse is the completeness test — a reply cut mid-JSON yields null
+      // here, not half a bible, and the retry below is the recovery.
+      if (!adBible) {
+        const sections = extractBibleSections(allRaw, AD_BIBLE_MARKERS);
+        const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
+        if (sections && parsedVb) {
+          adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: allModelId };
+        } else if (sections) {
+          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: ---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars) — treating the bible as MISSING rather than shipping a partial one`);
+        } else {
+          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: response carries no ---VISUAL BIBLE--- section (${allRaw.length} chars)`);
+        }
+      }
       const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
       for (const p of parsed.pages) {
         if (p.text && p.text.trim() && !byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
       }
-      if (byPage.size >= beats.length) break;
+      if (byPage.size >= beats.length && adBible) break;
       if (attempt === 1) {
         const missingNow = beats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
-        log.error(`🚨 [BEATS] All-pages expansion truncated: ${byPage.size}/${beats.length} briefs parsed (missing page(s) ${missingNow.join(', ')}) — retrying the batch ONCE at full cap`);
-        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${beats.length} briefs (missing page(s) ${missingNow.join(', ')}) — retrying the batch once at full output cap`);
+        const what = [
+          missingNow.length ? `missing page(s) ${missingNow.join(', ')}` : null,
+          adBible ? null : 'no parseable Visual Bible',
+        ].filter(Boolean).join(' and ');
+        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${beats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
+        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${beats.length} briefs, ${what} — retrying the batch once at full output cap`);
       }
     }
     expansions = beats
       .filter(b => byPage.has(b.pageNumber))
       .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
   }
+
+  // ── Adopt the Art Director's Visual Bible ─────────────────────────────────
+  // Runs BEFORE the per-page fallback below, so a recovered page is expanded
+  // against the same bible the batch wrote, and before the scene review and the
+  // page text, so the landmark-shortfall hook can still abort attempt 1 cheaply.
+  //
+  // With no parseable bible at all the run is degraded exactly as a failed
+  // bible stage used to be — empty VB, no cover hints, blind per-page briefs —
+  // and says so loudly. It is never a kill: a contract miss must not end a paid
+  // run (docs/SETTLED.md, gates are guidelines).
+  if (adBible) {
+    visualBible = adBible.visualBible;
+    let bibleBody = adBible.body;
+    if (!adBible.found.includes('---COVER SCENE HINTS---')) {
+      log.warn('⚠️ [BEATS] Art Director emitted no ---COVER SCENE HINTS--- section — covers fall back to the default hint');
+      gl.warn('beats_story_bible_partial', 'Art Director emitted no cover scene hints — covers use the default hint');
+    }
+
+    // An invented child the bible declares a PEER of the commissioned children
+    // must state an age inside their band. The band went into the prompt above;
+    // this is the deterministic post-check over what came back — no model call,
+    // no classification, it reads the bible's own `peer` field and compares a
+    // number. Fail-soft: clamp to the nearest tolerated edge, flag the entry,
+    // warn. No retry loop and never a kill — an age constraint must not be able
+    // to end a paid run. Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy
+    // in the striped scarf" stated ten next to a commissioned 6-year-old,
+    // rendered 11-12 on p5.
+    const childBand = visualBible?.secondaryCharacters?.length
+      ? commissionedChildBand(inputData.characters || [])
+      : null;
+    if (childBand) {
+      const ageClamps = applySecondaryAgeBand(visualBible.secondaryCharacters, childBand, buildCharacterDescription);
+      for (const a of ageClamps) {
+        log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
+        gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${childBand.min}-${childBand.max}; clamped to ${a.clampedTo}`, null, {
+          id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: childBand.low, bandHigh: childBand.high,
+        });
+      }
+      // ONE SOURCE OF TRUTH. The clamp mutated this module's parsed copy only;
+      // the transcript is what every later reader re-parses (storyJobPipeline,
+      // resume, the Lab). Write the mutated fields back so every
+      // extractVisualBible() from here on agrees.
+      if (ageClamps.length > 0) {
+        const synced = syncVisualBibleSection(bibleBody, visualBible);
+        if (synced === bibleBody) {
+          log.warn('⚠️ [BEATS] Age clamp could not be written back into the transcript — downstream re-parses will read the UNCLAMPED bible');
+          gl.warn('beats_vb_sync_failed', 'Age clamp could not be written back into the transcript — stored bible will not reflect it');
+        } else {
+          bibleBody = synced;
+        }
+      }
+    }
+
+    // Append to the wardrobe transcript in the order the transcript has always
+    // carried: CLOTHING REQUIREMENTS, VISUAL BIBLE, COVER SCENE HINTS.
+    bibleSections = bibleSections ? `${bibleSections.trimEnd()}
+
+${bibleBody}` : bibleBody;
+
+    const vbCount = Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
+    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written with the page briefs`, null, {
+      vbEntries: vbCount, sections: adBible.found,
+    });
+  } else if (allPrompt) {
+    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible, no cover hints and blind briefs');
+    gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible and no cover hints');
+  }
+
+  // The page images need each real landmark's PHOTO VARIANTS on the bible entry
+  // (the resolver serves the variant a brief's landmarkView asks for). The Art
+  // Director already chose its viewpoints from the PHOTOS lines in
+  // {AVAILABLE_LANDMARKS_SECTION}; these two steps link what it chose to the
+  // index rows. Both are cheap (in-memory matching; one DB query) and
+  // idempotent, so the caller repeating them costs nothing.
+  if (visualBible) {
+    try {
+      if (inputData.availableLandmarks?.length) {
+        require('./visualBible').linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
+      }
+      await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
+      const realLandmarks = (visualBible.locations || []).filter(l => l.isRealLandmark);
+      if (realLandmarks.length > 0) {
+        const withVariants = realLandmarks.filter(l => l.photoVariants?.length).length;
+        log.info(`🌍 [BEATS] Landmark photo variants linked: ${withVariants}/${realLandmarks.length} real landmark(s) carry variants`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [BEATS] Landmark linking/variants did not load: ${err.message}`);
+    }
+  }
+
+  // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
+  // must abort the run (the landmark-shortfall retry uses exactly that), not be
+  // swallowed into "ships with an empty bible".
+  if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
   // Page-count guard: a short response must never ship a story with pages that
   // have no brief. Only the MISSING pages are re-expanded per-page.
@@ -2296,4 +2352,4 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections };
+module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

@@ -2208,6 +2208,23 @@ function buildBasePrompt(inputData, textPageCount = null) {
 }
 
 /**
+ * The story's MAIN (or, with `main=false`, the remaining PRIMARY) character
+ * names as a comma list, or 'None'.
+ *
+ * One helper because two prompts now need the same split: the wardrobe stage
+ * prints it in its TARGET block, and the Art Director uses it to bound the
+ * cover casts it writes.
+ */
+function namedByMain(inputData = {}, main = true) {
+  const mainIds = inputData.mainCharacters || [];
+  return (inputData.characters || [])
+    .filter(c => (mainIds.includes(c.id) ? main : !main))
+    .map(c => c.name)
+    .filter(Boolean)
+    .join(', ') || 'None';
+}
+
+/**
  * Render the Visual Bible as the {RECURRING_ELEMENTS} block.
  *
  * Shared by the per-page expansion (which filters to the ids the scene hint
@@ -2311,14 +2328,19 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
  * one call. Repetition and visual arc were already reviewed set-wide; now they
  * are authored set-wide too.
  *
- * Output shape is `## Page N` + prose + METADATA per page — exactly what the
- * scene review returns — so parseRefinedText(raw, expected, 'SCENES') reads it
- * with no new parser.
+ * It also AUTHORS the Visual Bible and the cover scene hints (2026-09-11),
+ * emitted BEFORE page 1 so every page's `objects[]` can only cite an id the
+ * response already declared. One author owns both what is in each picture and
+ * what each thing looks like, so the two cannot contradict each other.
+ *
+ * Output shape is `---VISUAL BIBLE---` + `---COVER SCENE HINTS---`, then
+ * `## Page N` + prose + METADATA per page. beatsPipeline's
+ * extractBibleSections(raw, AD_BIBLE_MARKERS) takes the two leading sections and
+ * parseRefinedText(raw, expected, 'SCENES') reads the pages with no new parser.
  *
  * @param {Object} inputData
  * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
  * @param {Object} [options]
- * @param {Object} [options.visualBible]
  * @param {string} [options.availableAvatars]
  * @param {number} [options.maxCharactersPerScene]
  * @returns {string|null} null when the template is unavailable
@@ -2372,10 +2394,17 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CHARACTER_DESCRIPTIONS: characterDescriptions,
     CHARACTER_COUNT: characters.length,
     HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
-    // The whole bible, unfiltered: each page draws on a different slice and a
-    // per-page objects[] filter has nothing to key on in a single call.
-    RECURRING_ELEMENTS: buildRecurringElementsText(options.visualBible || null),
     AVAILABLE_AVATARS: options.availableAvatars || buildAvailableAvatarsForPrompt(characters),
+    // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
+    // inputs the bible rules need travel here instead of to the bible stage.
+    CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
+    MAIN_CHARACTER_NAMES: namedByMain(inputData, true),
+    PRIMARY_CHARACTER_NAMES: namedByMain(inputData, false),
+    // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
+    // them shows, and the per-page `landmarkView` is picked from the same list.
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
+    CREATURE_TONE: buildCreatureToneSection(inputData),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
     // The owner's cap of three packable Visual Bible elements per page, from
     // the same constant the mechanical check and the code-side truncation use.
@@ -6488,20 +6517,22 @@ function buildTitleRule(inputData) {
 }
 
 /**
- * Visual contract written FROM the locked beats (beats-first pipeline, step 3).
- * The unified writer emitted clothing requirements, the Visual Bible and the
- * cover scene hints as part of one call; no beats stage produced them, so a
- * beats run shipped with an empty VB, null clothing and no cover hints.
+ * WARDROBE contract written FROM the locked beats (beats-first pipeline, step 3).
  *
- * It runs BEFORE scene expansion, not after: the Visual Bible feeds
- * buildSceneExpansionPrompt's {RECURRING_ELEMENTS}, so a brief written without
- * it has no location, artifact, animal or secondary-character continuity to
- * weave in. The clothing requirements also gate the styled-avatar kickoff.
+ * It used to write the Visual Bible and the cover scene hints too. Both moved
+ * to the ALL-PAGES Art Director call on 2026-09-11: a bible written here had to
+ * GUESS which page used which element from plan-line prose, and the guess
+ * emptied a story's central prop (job_1789147573901_m3uam0nxi). The Art
+ * Director knows what is in each picture because it writes the pictures.
  *
- * The three sections use the same markers/format the unified writer used, and
- * beatsPipeline splices them into the transcript that becomes
- * `unifiedResponse` — so UnifiedStoryParser.extractClothingRequirements() /
- * extractVisualBible() / extractCoverHints() work unchanged.
+ * What stays here is exactly what the styled avatars need — they are the long
+ * pole in front of every image and start the moment this call returns, so the
+ * clothing must not wait for the Art Director. Clothing depends on the cast and
+ * the setting, both already fixed by the plan.
+ *
+ * The section uses the same marker/format the unified writer used, and
+ * beatsPipeline splices it into the transcript that becomes `unifiedResponse` —
+ * so UnifiedStoryParser.extractClothingRequirements() works unchanged.
  *
  * @param {Object} inputData
  * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
@@ -6513,38 +6544,22 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
     log.error('[PROMPT] storyBibleFromBeats template not loaded — beats visual contract unavailable');
     return null;
   }
-  const mainIds = inputData.mainCharacters || [];
   const chars = inputData.characters || [];
-  const named = (predicate) => chars.filter(predicate).map(c => c.name).join(', ') || 'None';
 
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
-    // The owner's per-page element ceiling, from its one source of truth — the
-    // same number `trimVbAssignments` enforces on the parsed bible.
-    VB_ELEMENT_BUDGET,
     // The contract's descriptions are copied verbatim into image prompts, so
     // the bible must know the rendering style — a style-blind contract wrote
     // luminous/iridescent fantasy specs into a photorealistic book
     // (job_1786737619634: 3D-render drift on every page that used them).
     ART_STYLE: resolveArtStyle(inputData.artStyle) || inputData.artStyle || 'not specified',
     STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
-    MAIN_CHARACTER_NAMES: named(c => mainIds.includes(c.id)),
-    PRIMARY_CHARACTER_NAMES: named(c => !mainIds.includes(c.id)),
+    MAIN_CHARACTER_NAMES: namedByMain(inputData, true),
+    PRIMARY_CHARACTER_NAMES: namedByMain(inputData, false),
     CHARACTER_PHYSICAL_BLOCK: chars
       .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
       .join('\n\n') || '(no character appearance available)',
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
-    // The band an invented child who is a PEER of the commissioned children
-    // must state its age inside. Computed in code from the commission — the
-    // bible had no tie to it at all, so a rival cast as the peer of a
-    // 6-year-old came out at ten and rendered 11-12 beside her
-    // (job_1788641639919_mpjwlzkf1, CHR001, p5). Empty for an all-adult
-    // commission: there is no band to state.
-    CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
-    // How non-human cast may LOOK for the focus child's age band — appearance
-    // only, never plot difficulty. Empty at 6 and up.
-    CREATURE_TONE: buildCreatureToneSection(inputData),
     PLAN_LINES: planBlocks(beats),
   });
 }

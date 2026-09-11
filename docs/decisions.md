@@ -32657,3 +32657,78 @@ all-pages call, the stage-order header), `server/lib/promptBuilders.js`
 `tests/unit/invented-age-band-wiring.test.ts`.
 
 **Status:** ✅ active
+
+### The Art Director authors the Visual Bible, ahead of the page briefs
+**Context:** The Visual Bible was written at beats stage 3
+(`beats_story_bible`, `prompts/story-bible-from-beats.txt`), BEFORE the Art
+Director wrote the scene briefs at stage 4 (`beats_scene_expansion`,
+`prompts/scene-expansion-all.txt`). The bible therefore had to GUESS which page
+uses which element, matching plan lines that name things in prose ("the big
+wing scale") against entries the bible keys by id. On staging
+`job_1789147573901_m3uam0nxi` the guess removed 19 (element, page) claims and
+left six entries at `appearsInPages: []` — including the story's central prop
+and the signpost carrying plot-critical text. No reference cell was rendered
+for any of them, while the final briefs cited exactly those ids (p10
+`objects: ["LOC004", "ART006"]`), and p10 then shipped an unrepairable critical
+("no visible letters on the signpost for him to trace"). The bible-time trim
+was dropped and page assignment rebuilt from the final briefs the same day
+(`applyBriefUsage`, `cdb334904`) — a correction to the guess, not its removal.
+
+**Decision:** The guess is gone. The EXISTING all-pages Art Director call emits
+the `---VISUAL BIBLE---` and `---COVER SCENE HINTS---` sections FIRST, before
+page 1's heading, then the page briefs. **No new model call was added** — the
+sections ride the call that was already being made. Stage 3 keeps the
+`---CLOTHING REQUIREMENTS---` section and nothing else. `applyBriefUsage` is
+KEPT as a deterministic reconciler: it is free, tested, and it credits a
+secondary named only in a page's `characters[]` row, which `objects[]` never
+carries.
+
+**Rationale:**
+- One author now owns both what is in each picture and what each thing looks
+  like, so the two cannot contradict each other.
+- The emission ORDER is the mechanism: the model declares its cast and props,
+  then stages each page citing ids that already exist, which makes it
+  structurally impossible for a page's `objects[]` to name an entry that was
+  never declared. That is the exact failure being fixed.
+- Clothing did NOT move. Styled avatars are the long pole in front of every
+  image and start the instant stage 3 returns (`opts.onClothingRequirements`);
+  making the wardrobe wait for the Art Director would push every page image
+  back by a whole stage. Clothing depends on the cast and the setting, both
+  already fixed by the plan, so it needs nothing the Art Director adds.
+- The Art Director picks landmark viewpoints from the `PHOTOS:` lines in
+  `{AVAILABLE_LANDMARKS_SECTION}` (the same descriptions `photoVariants`
+  carries), so `landmarkView` is no more blind than before; the index linking
+  and variant load now run right after the bible is parsed instead of before
+  scene expansion.
+- Truncation headroom, measured offline on that same story (18 pages, no model
+  call): the built prompt is 71,661 chars (~17.9k tokens, no unfilled
+  placeholders) and the response has to carry the stored bible JSON (40,702
+  chars, an over-estimate — the stored copy is enriched), the cover hints
+  (4,073) and every brief (63,533) — ~27k output tokens against
+  `gemini-3.1-pro`'s 65,536 cap (`maxTokens=null`, no code-side cap). A partial
+  bible is never shipped: `JSON.parse` is the completeness test, a reply cut
+  mid-JSON yields no bible at all, and the existing batch retry is the recovery.
+- The per-page fallback (`expandOnePage`) cannot author a whole-book bible and
+  does not try — it reuses whatever the all-pages call produced. With no bible
+  at all the run is degraded exactly as a failed stage-3 bible always was
+  (empty VB, no cover hints, blind briefs) and says so loudly. Never a kill.
+- TRIAL IS UNAFFECTED: trials are always `pipelineMode: 'unified'`
+  (`resolvePipelineMode`), so the streaming `onVisualBible` callback in
+  `storyJobPipeline.js` — and the trial reference-sheet kickoff inside it — is
+  on the unified path and never sees this change.
+- The landmark-shortfall early abort (`onVisualBible` in beats mode) now fires
+  after the Art Director call instead of before it, so a retried attempt burns
+  the scene-brief stage too. It still saves the scene review and the page text,
+  and it is the only known cost of the move.
+
+**Touched:** `prompts/scene-expansion-all.txt`,
+`prompts/story-bible-from-beats.txt`, `server/lib/beatsPipeline.js` (stage-3
+block, `extractBibleSections` marker sets, the bible-adoption block after the
+all-pages call, the stage-order header), `server/lib/promptBuilders.js`
+(`buildSceneExpansionAllPrompt`, `buildStoryBibleFromBeatsPrompt`,
+`namedByMain`), `server/lib/testlab.js` (`runBeatsScenesStage` call site),
+`docs/prompt-inventory.md`, `tests/unit/ad-authored-bible.test.ts`,
+`tests/unit/vb-authoring-contract.test.ts`,
+`tests/unit/invented-age-band-wiring.test.ts`.
+
+**Status:** ✅ active

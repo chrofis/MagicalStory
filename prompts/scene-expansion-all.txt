@@ -1,14 +1,20 @@
 # ALL-PAGES SCENE EXPANSION — beats pipeline only (server/lib/beatsPipeline.js,
-# via buildSceneExpansionAllPrompt). ONE call writes every page's brief with all
-# the other pages in view, so location, time of day, clothing and composition
-# cannot drift between neighbouring pages.
+# via buildSceneExpansionAllPrompt). ONE call writes the VISUAL BIBLE, the COVER
+# SCENE HINTS and every page's brief with all the other pages in view, so
+# location, time of day, clothing and composition cannot drift between
+# neighbouring pages — and so no page can cite an element nobody declared.
+#
+# The bible used to be authored one stage earlier (story-bible-from-beats.txt),
+# which left it guessing which page used which element from plan-line prose.
+# That file now writes the CLOTHING REQUIREMENTS only; everything else is here.
 #
 # scene-expansion.txt is the PER-PAGE variant and is still the unified
-# pipeline's fallback (server.js). The two share their rule set: when a rule
-# changes here it must change there too. Do not merge or repurpose either file.
+# pipeline's fallback (server.js). The two share their PAGE rule set; the bible
+# and cover sections have no per-page counterpart. Do not merge either file.
 #
-# Output is parsed by parseRefinedText(raw, expectedPages, 'SCENES') — the same
-# parser the scene review's response goes through.
+# Output is parsed by extractBibleSections(raw, AD_BIBLE_MARKERS) (the two
+# leading sections) and parseRefinedText(raw, expectedPages, 'SCENES') (the
+# pages) — the same page parser the scene review's response goes through.
 
 **ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader. You write ALL {PAGE_COUNT} pages in this one response. Each page arrives as its PLAN line (shot — who is in frame — the instant the picture shows — what is true after); stage that instant.
 
@@ -83,7 +89,7 @@ C1. **Location continuity.** Consecutive pages stay in the same place unless a p
 C2. **Monotonic time of day.** Time moves forward across the book, never backwards. Pick the lighting of page 1, then hold or advance it: morning → midday → afternoon → dusk → night. Two consecutive pages in the same scene share the same light. Only a plan line that states a jump (next morning, days later) resets it. Weather holds the same across every outdoor page unless a plan line changes it; an indoor page has no weather, and shows it only through a window.
 C3. **Clothing consistency.** A character wears the same clothing category on every page unless a plan line changes it (weather, costume, sleep). The category must come from AVAILABLE_AVATARS. Once a character changes, later pages keep the new one.
 C4. **No two consecutive pages with near-identical composition.** Neighbouring pages must differ in at least one of: camera distance (close-up / medium / wide / aerial), character grouping, or camera angle. Same location on two pages is fine; the same shot twice is not.
-C5. **Recurring elements stay identical.** A location, animal, vehicle or artifact keeps its description across pages — same colours, same shape, same markings. Take them from RECURRING VISUAL ELEMENTS and do not re-invent details per page.
+C5. **Recurring elements stay identical.** A location, animal, vehicle or artifact keeps its description across pages — same colours, same shape, same markings. Take them from the Visual Bible you write below and do not re-invent details per page.
 C6. **Visual arc.** Framing builds with the plot: the widest establishing shot near the start, the tightest and most intense framing on the page whose plan line carries the climax.
 
 ---
@@ -105,14 +111,162 @@ C6. **Visual arc.** Framing builds with the plot: the widest establishing shot n
 **AVAILABLE CLOTHING PER CHARACTER (the `clothing` value must come from this list):**
 {AVAILABLE_AVATARS}
 
-**RECURRING VISUAL ELEMENTS (when one appears in a scene, name it and weave the detail that shot actually shows into the prose — the image model reads only your prose, never this list):**
-{RECURRING_ELEMENTS}
+{AVAILABLE_LANDMARKS_SECTION}
+
+---
+
+## Visual Bible — you write it, before the pages
+
+The Visual Bible lists everything that must look the same across illustrations. You write it first, then stage each page citing the ids you declared. A page's `objects[]` may only name an id that stands in the Visual Bible you emitted.
+
+Work from the plan lines: an element a plan line only implies still needs an entry, because a page can reference only what is listed.
+
+- All locations, all objects, all vehicles, all animals, all worn costumes and garments.
+- Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
+- Every secondary-character entry carries `age` as a NUMBER of years (`8`, `34`), never prose, and opens `build` with the character's sex ("a boy, slightly tall for his age", "a woman, broad-shouldered"). Jaw and facial-hair notes carry neither.
+{CHILD_AGE_BAND}
+- Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
+- English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
+- Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`); that character's outfit above describes the same item in that slot, in the same words.
+- A change to an object, an animal or an invented figure is a state, not a second entry. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled; a wing broken then whole; a coat lost then found. Almost every entry has no states at all: the field exists for the rare thing the story itself changes, and an entry without one is the normal case. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta with its own `pages`, because each state is drawn as its own reference cell. Two entries for one object give it two canonical descriptions and two reference renders that disagree on how it is built.
+- The bible shows the OBJECT and nothing else. The test for a state: take away everything that is not the object — the hands, the hole, the wing, the shelf — and if what is left looks the same, it is not a state. Held, set down, carried, pressed against something, standing in front of something: always the same object, no state. A state is only when the thing itself changes — a flower wilts, a bottle breaks, a canvas gets painted, a lantern is lit, a jar is filled — or when a face prop turns its other side to us. A state's cell draws the object alone; a state defined by contact with another element cannot be drawn without that element and drags it into the cell.
+- A `delta` describes the object's own altered look and nothing else: no place, no figure, no body part, no other element.
+- A state describes the object's OWN look — never what arrives at it from elsewhere on that page (water jetting in, a shadow falling on it, a thing thrown toward it). The arrival is the action's result and belongs with the characters in that page's prose.
+- A part added to an object — a filling, an insert, a fitting, a lid, a cover — is a state of it. It earns its own entry only when BOTH hold: some page stages it on its own, away from the thing it belongs to, and it has a look worth specifying once separated.
+- An object's `description` is drawn literally. Material, colour, size and shape in plain terms; a size comparison is fine ("about as wide as a coin"), but never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
+- A vehicle's `description` states its real-world dimensions in everyday terms — hull or body length in metres, mast or overall height in storeys of a house.
+- As many entries as the story needs, no more. Include an element even if it appears once.
+- `pages` is earned: a page belongs to an element only when your brief for that page puts it in frame, never a blanket 1-{PAGE_COUNT} range. Being physically present is not earning: a worn satchel, a leash on a wrist, the room they stand in are on many pages and earn only the pages that make something of them. At most {VB_ELEMENT_BUDGET} elements claim any one page (locations do not count); when more could, the ones the plan line names come first and the rest leave that page. An element the story leaves behind ends its range there. An entry's `pages` and the `objects[]` of the page briefs below say the same thing.
+- Empty categories are `[]`.
+- One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id. Every character the story names is declared exactly once: a name that is neither in {CHARACTER_NAMES} nor a `secondaryCharacters` entry is a fault, and so are two entries for the same person under different names.
+
+Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
+
+{CREATURE_TONE}
+Every description — characters, creatures, clothing, objects — must render in the named illustration style. A photorealistic style gets physically plausible beings, materials and colours (no glowing, luminous, or iridescent features, no impossible anatomy); a stylised style may use its idiom.
+
+The `description` is copied verbatim into image prompts, so write it as image-prompt text:
+- Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
+- Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
+- No lettering unless this entry names the exact words it carries in `text`; every other prop's writing is called illegible / weathered / smudged. Describe an object's build by shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style").
+- A prop whose interest lies on its face — map, letter, note, chart, book, page, sign, board, plaque — is ONE entry, and which side is turned to us is a state: the side away from the viewer first (the back of the sheet, the closed cover, the outer face of the roll), then `"face to camera"`, each with its own `pages`. The `description` gives material, size, edge wear and dominant colour and says nothing about what is drawn or written on the face; words the reader must be able to read go in the entry's `text`.
+
+Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
+
+Real-world landmarks get `isRealLandmark: true` and `landmarkQuery` set to the exact name from the available landmarks list.
+
+A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Do not split for lighting, weather, time of day or a different cast. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (`wide|medium|close-up|wide-low|aerial`), a 2-3 sentence background-only `description` naming the empty foreground band for characters, and `pages`. Every page in the location's `pages` appears in exactly one vantage.
+
+---
+
+## Cover scene hints
+
+Each cover is a structured spec, not prose. The fields are the spec.
+
+- Each cover lists EXACTLY ONE LOC### in `Objects:`, first, as its backdrop — never two, never a LOC you did not put in the Visual Bible.
+- Each cover takes a different LOC as its backdrop, preferring LOCs with `isRealLandmark: true` that the story's pages already use. Never add a real landmark to the Visual Bible only for a cover; when the story uses fewer than three, reuse one or use an invented LOC.
+- The Title Page backdrop is a LOC with `isRealLandmark: true` whenever the Visual Bible holds one — never a fictional, underground or imagined LOC. With no real landmark in the bible at all, take the most story-defining invented LOC.
+- List every character by name. Never "the family", "everyone", "the group".
+- Only names from the cast lists below. No invented, descriptive or unnamed figures.
+- Clothing is one of `standard | winter | summer | costumed` and must be a category AVAILABLE CLOTHING PER CHARACTER offers that character. When any character has a costumed variant, every cover character wears theirs.
+- `holds` is exactly one ART### from `Objects:`, or the word `nothing`.
+- `priority` is `essential | normal | low`.
+- `Mood` is one phrase of 2-5 words.
+- When the story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists that `ANI###` in `Objects:` right after the LOC, and the creature appears in the cover scene.
+- No perspective or depth on covers — every figure faces the viewer and is fully visible. If the cast does not fit, drop the least essential character instead of hiding them.
+
+Title Page: only {MAIN_CHARACTER_NAMES}.
+Initial Page and Back Cover: up to 5 characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}, always including the main characters. Over 5, drop the least important primary characters entirely.
 
 ---
 
 ## OUTPUT
 
-For each page, in ascending page order, exactly:
+Three parts, in this order: the Visual Bible, the cover scene hints, then the {PAGE_COUNT} page briefs. Declaring the cast and the props first is what lets each page cite ids that already exist.
+
+First, exactly:
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "[Name]",
+      "pages": [1],
+      "age": [age in years as a number],
+      "peer": "[yes|no — yes only for an invented child who plays, competes or shares a group with the commissioned children]",
+      "build": "[height, body type]",
+      "hair": "[colour, style, length]",
+      "face": "[eye colour, distinctive features; for adults state facial hair]",
+      "signatureLook": "[one memorable visual element]",
+      "clothing": "[specific colours and details]",
+      "states": "[OMIT unless the story changes this one's own look — a wing broken then whole, a coat lost then found. Almost never present. When present, the COMPLETE set of looks, the unaltered look FIRST, at most 4: {\"name\": \"[one or two words]\", \"delta\": \"[the change to it, one clause, at most 15 words — never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "[Name]",
+      "pages": [1],
+      "species": "[type and breed]",
+      "coloring": "[exact colours and full pattern]",
+      "size": "[relative size]",
+      "features": "[collar, markings, accessories]",
+      "states": "[OMIT unless the story changes this one's own look. Same shape and limits as above.]"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "name": "[Name]",
+      "pages": [1],
+      "type": "[what kind of object]",
+      "text": "[OMIT unless words on this object must be readable in the picture (a sign, a plaque, a banner); then the exact words, at most three]",
+      "states": "[OMIT unless the story alters this object or turns a face prop's two sides to us. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, then the rest in the order the story reaches them, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[the change to the object itself, one clause, at most 15 words — never material, colour or size, those stay in description; never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]",
+      "description": "[size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries in `text`; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face is one entry, with a state per side.]"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "[Name]",
+      "pages": [1],
+      "setting": "[indoor/outdoor, type]",
+      "colors": "[specific colours]",
+      "features": "[distinctive visual elements]",
+      "signatureElement": "[one unique detail]",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "vehicles": [],
+  "clothing": []
+}
+```
+
+Then, exactly:
+
+---COVER SCENE HINTS---
+**Title Page**
+Mood: [one phrase]
+Objects: [LOC### plus 1-2 ART###]
+Characters:
+- [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+
+**Initial Page**
+Mood: [one phrase]
+Objects: [LOC### plus 1-2 ART###]
+Characters:
+- [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+
+**Back Cover**
+Mood: [one phrase]
+Objects: [LOC### plus 1-2 ART###]
+Characters:
+- [Name] ([position]): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+
+Then, for each page, in ascending page order, exactly:
 
 ```
 ## Page <number>
@@ -122,7 +276,7 @@ For each page, in ascending page order, exactly:
 <single-line JSON object>
 ```
 
-Nothing before page 1's heading, nothing after the last page's metadata. Every one of the {PAGE_COUNT} pages must appear exactly once — a missing page has no illustration.
+Nothing before the `---VISUAL BIBLE---` marker, nothing between the cover hints and page 1's heading, nothing after the last page's metadata. Every one of the {PAGE_COUNT} pages must appear exactly once — a missing page has no illustration.
 
 Each paragraph starts immediately with the main subject and main action — no preamble, headers, or bullets — and must include, interleaved naturally:
 - the main action of this page, opening the prose
