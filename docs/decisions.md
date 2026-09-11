@@ -32180,3 +32180,87 @@ cover NAME invariant, which this bug slipped past because the id WAS listed).
 `server/lib/coverIterate.js` (`hasEntityReference`),
 `tests/unit/cover-key-elements-secondary.test.ts`, `tasks/bugs.json`.
 **Status:** ✅ active
+
+---
+
+## Lab scene review was capped at 16k output tokens — 2026-09-10 redo "reviewed" cells invalid; guard + per-reviewer fan-out added (2026-09-11)
+**Context:** `server/lib/testlab.js` `beats_scenes` called the scene reviewer
+with `callStream(srPrompt, 16000, …)`. Production (`beatsPipeline.js`, scene
+review) passes `null` = model max under the owner's rule "no output caps ever"
+(2026-08-29), and `textModels.js` (:1104, :1172) already carries a comment
+naming this exact failure ("the scene reviewer hit exactly 16000"). The Lab
+harness was never updated. Measured on the 2026-09-10 AD bake-off redo
+(experiments 1107-1110, 1121-1124; reviewer deepseek-v4-pro via OpenRouter/
+BaseTen): 6 of 8 reviews report `output_tokens: 16000` exactly. 1109 and 1121
+returned a ZERO-character response and rewrote nothing; 1122 and 1124 returned
+17-18k chars cut mid-output; only 1110 (9,391 tok) and 1123 (13,809 tok)
+completed. No error was recorded anywhere: the harness kept `fromBeats` as the
+"reviewed" brief on every untouched page and `scene_hazard_count
+artifact=reviewed` judged it as reviewed. Production on the same three
+stories: 21,134 and 33,664 output tokens, 17/17 and 14/14 pages rewritten.
+Same signature in August: #879 shows `out 16,000` with `raw: ""`.
+**Consequences for prior verdicts:** (1) The 2026-09-10 redo's "reviewed"
+column is INVALID for 6 of 8 arms — it compared raw against mostly-raw. The
+BACKLOG line "scene review has a measured NULL effect on render hazards"
+(Lab 1107-1134: 27 of 64 briefs edited, +0 on touched vs +5 on untouched)
+is withdrawn; the review's effect is UNMEASURED, not null. The AD-model
+ranking in that entry (raw column) stands. (2) The August (2026-08-29) reviewed
+column was NOT truncated: all 12 AD arms (901-904, 910-913, 919-922, reviewer
+x-ai/grok-4.6) show 21,325-33,513 review output tokens, 0 of 12 at 16,000, and
+3-14 pages rewritten each. Its defect is reviewer IDENTITY — grok-4.6 (the
+harness default `outlineReviewModel`) instead of production's deepseek-v4-pro
+(already noted in the redo entry) — not the cap. One August cell, #920 (levin,
+gpt-5.6-sol AD), returned an EMPTY review (3,899 tokens, 0 chars, 0 rewrites)
+and was stored as reviewed; that is the second failure kind the guard now
+catches. (3) Stored `rawResponse` is clipped at 40,000 chars in several August
+rows — that is the harness's storage clip (`.slice(0, 40000)` for the dev
+panel), not a model truncation; `usage.output_tokens` is the truncation
+witness, not `rawResponse.length`. Left as is.
+**Decision:** (a) Every hard numeric max-tokens in `testlab.js` now passes
+`null` = model max, as production does: scene review (16000), `audit_replay`
+(16000), `scene_hazard_count` (16000), `review_writer` (64000),
+`outline_review` (32000). None carried a justifying comment; none is kept.
+(b) New `server/lib/sceneReviewGuard.js`. `assessSceneReview` marks a review
+FAILED when the text is empty, the provider `stop_reason` is
+`max_tokens`/`length` (Anthropic streams expose it; xAI/Gemini/OpenRouter
+streams do not, so the next check carries them), `output_tokens` ≥ the
+ceiling actually in force (now the model max, e.g. 64,000 for deepseek-v4-pro),
+or the response is >2,000 chars and the SCENES parser found zero pages (format
+failure, unless it reads as a "no changes" verdict). A failed reviewer is stored
+with `ok:false`, `error`, `stopReason`, `capInForce`, `rewrotePages: []`, no
+`reviewedBrief` on any page (never silently equal to raw), and a WARN log naming
+story, reviewer key, modelId, provider, tokens and cap. (c) `scene_hazard_count`
+with `fromExperiment` + `artifact=reviewed` REFUSES an experiment whose primary
+review is `ok:false`, quoting the stored error; `artifact=raw` still works.
+(d) Multi-reviewer fan-out retention for the owner's 5-reviewer bake-off
+(grok-4.6, gpt-5.6-sol, qwen3.8-max, deepseek-v4-pro, gemini-3.1-pro from ONE
+AD expansion, judged per reviewer): `beats_scenes` with
+`sceneReviewModel=a,b,c` keeps the single-reviewer behaviour byte-identical
+(first reviewer = primary → `reviewedBrief`/`reviewRewrote`) and additionally
+stores every OTHER successful reviewer's rewrite per page in
+`sceneExpansions[].reviewedBriefs[modelKey]` (the primary is not duplicated; a
+failed reviewer stores nothing). `scene_hazard_count` accepts
+`params.reviewer=<modelKey>` with `artifact=reviewed` and measures
+`reviewedBriefs[reviewer]` (or `reviewedBrief` for the primary) falling to
+`fromBeats` only on pages that reviewer did not rewrite; a reviewer absent from
+the source experiment or failed there is refused with a clear error, never
+swapped for the primary. Without `params.reviewer` behaviour is unchanged.
+**Rationale:** A truncated or empty review is a provider failure, not a review
+that "found nothing"; storing it as reviewed and judging it produced a
+NULL-effect finding that was about to drive a keep/drop decision on a
+production stage. The guard mirrors production's own three-way split
+(`beatsPipeline.js`: empty / truncated at cap / genuine no-op) and makes the
+Lab refuse to measure what it does not have. Removing the caps aligns the Lab
+with the owner's no-caps rule; nothing on `docs/SETTLED.md` concerns Lab caps,
+so this is alignment, not a reversal.
+**Drive the bake-off:** stage `beats_scenes`, params
+`sceneReviewModel=deepseek-v4-pro,grok-4.6,gpt-5.6-sol,qwen3.8-max,gemini-3.1-pro`
+(first = primary, order otherwise free); then stage `scene_hazard_count` per
+reviewer with `fromExperiment=<id>`, `source=briefs`, `artifact=reviewed`,
+`reviewer=<modelKey>` (and once with `artifact=raw` for the baseline).
+**Touched:** `server/lib/testlab.js` (5 call sites, `applyReviewerPages`,
+hazard-count selector), `server/lib/sceneReviewGuard.js` (new),
+`tests/unit/scene-review-guard.test.ts` (new, 15 tests), `tasks/bugs.json`,
+`tasks/BACKLOG.md`.
+**Status:** ✅ active; the 2026-09-10 redo entry's reviewed column and the
+2026-09-11 "NULL effect" BACKLOG finding are 🗄 withdrawn as evidence.

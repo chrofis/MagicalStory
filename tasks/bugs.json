@@ -857,6 +857,16 @@
       "status": "fixed",
       "fixedAt": "2026-09-11",
       "fix": "secondaryCharacters + vehicles join the KEY STORY ELEMENTS loop when an allowed-id list is given (CHR first against the cap); coverIterate.hasEntityReference = visualBible.hasElementReference (state-aware). Test: tests/unit/cover-key-elements-secondary.test.ts"
-    }
+    },
+  {
+     "id": "testlab-scene-review-16k-cap-silent-truncation",
+     "title": "Lab beats_scenes capped the scene reviewer at 16,000 output tokens (production passes null = model max); truncated or empty reviews were stored as reviewed with no error, and scene_hazard_count judged fromBeats as 'reviewed'",
+     "reportedAt": "2026-09-11",
+     "source": "Reproduced from stored Lab results. server/lib/testlab.js beats_scenes called callStream(srPrompt, 16000, ...) while beatsPipeline.js passes null (owner rule 'no output caps ever', 2026-08-29; textModels.js:1104/1172 comments name this exact class). 2026-09-10 AD redo, reviewer deepseek-v4-pro: 6 of 8 reviews (1107-1110, 1121-1124) report output_tokens exactly 16000; 1109 and 1121 returned 0 chars and rewrote nothing; 1122 and 1124 returned 17-18k chars cut mid-output; only 1110 (9391 tok) and 1123 (13809 tok) completed. Production on the same stories: 21,134 and 33,664 output tokens, 17/17 and 14/14 pages rewritten. August #920 (grok-4.6): 0 chars at 3,899 tokens, no cap hit, also stored as reviewed. #879: out 16,000, raw ''.",
+     "status": "fixed",
+     "fixedAt": "2026-09-11",
+     "fixedIn": "COMMIT_HASH",
+     "fix": "All five numeric maxTokens in testlab.js (scene review 16000, audit_replay 16000, scene_hazard_count 16000, review_writer 64000, outline_review 32000) now pass null = model max. New server/lib/sceneReviewGuard.js: assessSceneReview marks a review FAILED on empty text, provider stop_reason max_tokens/length, output_tokens >= the ceiling in force (model max), or a long response the SCENES parser cannot read; a failed reviewer stores ok:false + error, rewrotePages [], no reviewedBrief, and WARN-logs story/model/provider/tokens/cap. scene_hazard_count refuses artifact=reviewed on a failed review (assertReviewedArtifactUsable) and, with params.reviewer, refuses an absent or failed reviewer (pickReviewedBrief). Test: tests/unit/scene-review-guard.test.ts"
+  }
   ]
 }

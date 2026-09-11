@@ -19,6 +19,7 @@
 
 const { log } = require('../utils/logger');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
+const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
 
 // ─────────────────────────────────────────────────────────────────────
 // Context loading
@@ -3198,7 +3199,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     const t = Date.now();
     try {
       const res = await withTemplates({ [templateKey]: promptOverride }, () =>
-        callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 }));
+        callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 }));
       const raw = String(res.text || '').trim();
       return {
         model,
@@ -3278,9 +3279,16 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
       // fromBeats = the raw expansion; reviewedBrief = after the scene review
       // rewrote it. params.artifact picks the measurement: 'raw' isolates the
       // Art Director, 'reviewed' (default) measures the AD+reviewer chain.
+      // params.reviewer = '<TEXT_MODELS key>' picks ONE reviewer's rewrites out
+      // of a multi-reviewer fan-out (reviewedBriefs[modelKey]); a reviewer that
+      // is absent or failed is refused, never swapped for the primary. A failed
+      // primary review refuses 'reviewed' outright: measuring fromBeats as
+      // "reviewed" is how experiments 1109/1121/1122/1124 were misjudged.
       const useRaw = String(params.artifact || 'reviewed') === 'raw';
+      const reviewer = params.reviewer ? String(params.reviewer).trim() : null;
+      if (!useRaw && !reviewer) assertReviewedArtifactUsable(out, expId);
       pages = (out.sceneExpansions || [])
-        .map(x => ({ pageNumber: x.pageNumber, brief: useRaw ? x.fromBeats : (x.reviewedBrief || x.fromBeats) }))
+        .map(x => ({ pageNumber: x.pageNumber, brief: useRaw ? x.fromBeats : pickReviewedBrief(x, out, reviewer, expId) }))
         .filter(x => String(x.brief || '').trim());
       if (!pages.length) throw new Error(`fromExperiment ${expId}: no sceneExpansions in result`);
     }
@@ -3317,7 +3325,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
   const runs = await Promise.all(models.map(async (model) => {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_scene_hazard_count', temperature: 0 });
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_scene_hazard_count', temperature: 0 });
       const raw = String(res.text || '').trim();
       const lines = raw.split('\n').map(l => l.trim()).filter(l => /^HAZARD\[/.test(l));
       const byClass = {};
@@ -3441,7 +3449,7 @@ async function runOutlineReviewStage(target, { params = {} }) {
   // 300s headersTimeout and surfaces as "fetch failed". withRetry sees that as
   // retryable, so it burns 3 x 5 min and ends with zero results (exp #270).
   // Streaming delivers headers immediately, so the ceiling never applies.
-  const writer = await callTextModelStreaming(writerPrompt, 64000, null, writerModel, { usageLabel: 'testlab_review_writer' });
+  const writer = await callTextModelStreaming(writerPrompt, null, null, writerModel, { usageLabel: 'testlab_review_writer' });
   const writerElapsedMs = Date.now() - wt0;
   const writerOutput = writer.text || '';
   if (!writerOutput) throw new Error('Writer draft (Call 1) came back empty');
@@ -3473,7 +3481,7 @@ async function runOutlineReviewStage(target, { params = {} }) {
     // Streaming for the same headersTimeout reason as the writer above. Anthropic
     // / xAI / Gemini reviewers stream; OpenRouter has no streaming path and falls
     // back to the plain call, so those stay exposed to the 5-minute ceiling.
-    const r = await callTextModelStreaming(prompt, 32000, null, modelKey, { usageLabel: 'testlab_outline_review' });
+    const r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: 'testlab_outline_review' });
     const elapsedMs = Date.now() - t0;
     const usage = r.usage || {};
     const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
@@ -3592,6 +3600,28 @@ async function runOutlineReviewStage(target, { params = {} }) {
  *   to the plan, so a change to the idea GENERATOR can only be measured by
  *   planning the same cast and setting from a different idea.
  */
+/**
+ * Land reviewer rewrites on the expansions. The FIRST reviewer is primary and
+ * fills `reviewedBrief` / `reviewRewrote` (unchanged single-reviewer behaviour);
+ * every OTHER reviewer that passed the truncation guard stores its rewrite in
+ * `reviewedBriefs[modelKey]` so a multi-reviewer fan-out can be judged per
+ * reviewer (scene_hazard_count params.reviewer). A failed reviewer stores
+ * nothing — its pages must never read as reviewed. Pure; unit-tested.
+ */
+function applyReviewerPages(sceneExpansions, sceneReviews) {
+  sceneReviews.forEach((r, i) => {
+    if (!r || r.ok === false || !Array.isArray(r._pages)) return;
+    const byPage = new Map(r._pages.map(x => [x.pageNumber, x.text]));
+    for (const x of sceneExpansions) {
+      const fixed = byPage.get(x.pageNumber);
+      if (!fixed) continue;
+      if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
+      else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }
+    }
+  });
+  for (const r of sceneReviews) if (r) delete r._pages;
+}
+
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -3860,39 +3890,46 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();
           try {
-            const srRes = await callStream(srPrompt, 16000, null, srModel, { usageLabel: 'testlab_scene_review' });
+            // null = model max, exactly as production (beatsPipeline.js). The
+            // former 16000 cap silently truncated 6 of 8 reviews in the
+            // 2026-09-10 AD redo (1107-1124) — no error, briefs kept as raw.
+            const srRes = await callStream(srPrompt, null, null, srModel, { usageLabel: 'testlab_scene_review' });
             const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES');
+            const outTok = srRes.usage?.output_tokens ?? null;
+            const capInForce = TEXT_MODELS[srModel]?.maxOutputTokens ?? null;
+            const verdict = assessSceneReview({
+              text: srRes.text, outputTokens: outTok, stopReason: srRes.stop_reason || null,
+              capInForce, parsedPageCount: parsed.pages.length,
+            });
+            if (!verdict.ok) {
+              log.warn(`⚠️ [TESTLAB] beats_scenes scene review FAILED (story ${target.storyId}, reviewer ${srModel} → ${srRes.modelId || '?'} via ${srRes.provider || '?'}, out ${outTok ?? '?'} tok, cap ${capInForce ?? '?'}): ${verdict.error}`);
+            }
             return {
               modelKey: srModel,
               modelId: srRes.modelId,
               provider: srRes.provider || null,
+              ok: verdict.ok,
+              error: verdict.error,
               elapsedMs: Date.now() - t2,
               ttftMs: srRes.ttft ?? null,
               usage: srRes.usage,
+              stopReason: srRes.stop_reason || null,
+              capInForce,
               cost: costOf(srRes),
               promptChars: srPrompt.length,
               prompt: srPrompt,
+              // Storage clip only (dev-panel display) — not a model truncation.
               rawResponse: (srRes.text || '').slice(0, 40000),
               analysis: (parsed.analysis || '').slice(0, 40000),
-              rewrotePages: parsed.pages.map(x => x.pageNumber),
-              _pages: parsed.pages,
+              rewrotePages: verdict.ok ? parsed.pages.map(x => x.pageNumber) : [],
+              _pages: verdict.ok ? parsed.pages : [],
             };
           } catch (err) {
             return { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
           }
         };
         sceneReviews = await Promise.all(srModels.map(reviewOnce));
-        // Only the FIRST reviewer's rewrites land on the briefs — with several
-        // arms their outputs conflict, and the comparison lives in sceneReviews.
-        const primary = sceneReviews[0];
-        if (primary && primary._pages) {
-          const byPage = new Map(primary._pages.map(x => [x.pageNumber, x.text]));
-          for (const x of sceneExpansions) {
-            const fixed = byPage.get(x.pageNumber);
-            if (fixed) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
-          }
-        }
-        for (const r of sceneReviews) delete r._pages;
+        applyReviewerPages(sceneExpansions, sceneReviews);
         sceneReview = sceneReviews[0] || null;
       }
     }
@@ -7866,6 +7903,7 @@ async function checkRuleGenericity(ruleText, storyId) {
 }
 
 module.exports = {
+  applyReviewerPages,
   STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)],
   STORY_STAGES: Object.keys(STORY_STAGES),
   AVATAR_STAGE_NAMES: Object.keys(AVATAR_STAGES),
