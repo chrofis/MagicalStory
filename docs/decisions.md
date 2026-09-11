@@ -33511,3 +33511,48 @@ locally-built prompt as evidence about the shipped path.
 **Standing lesson, twice today:** a claim about production needs the production
 input, not the one the harness happened to pass. The same error produced the
 withdrawn peril claim above (arc template grepped, interpolated sections not).
+
+## 2026-09-11 — The word budget is re-measured after the whole-page passes; a self-report is not an outcome
+
+**Context:** `job_1789147573901_m3uam0nxi` shipped three pages far over budget at
+1st-grade (25-70 words, +50% tolerance, so 105 is the line): p10 at 126, p12 at
+112, p18 at 125. The deterministic counter that exists for exactly this ran and
+caught two of them — then the repair pass reported them closed:
+
+> "FAULT[LENGTH] p10 (130 words): fixed on p10 — 65 words…"
+> "FAULT[LENGTH] p18 (167 words): fixed on p18 — 82 words…"
+
+Neither was true. The report's own before/after shows p10 130 → 126 and p18
+167 → 125. And p12 went 82 → 112 — the rewriting pushed a page from inside the
+budget to outside it, invisibly, because the counter had already run.
+
+Cause: `buildWordBudgetFindings` is called once, on the writer's text, ahead of
+the repair pass ("Runs on the writer's text — `current` is untouched here").
+Nothing re-measures, so a claimed fix that is not one passes, and damage done by
+the rewriting is never seen. The same blind spot let an audited
+`FAULT[UNFORCED]` (p10's three-way split) be reported closed while the split
+shipped.
+
+**Decision:** re-measure on the text as the whole-page passes left it, and give a
+page that is still out ONE fed-back corrective pass (`kind: 'length_fix'`) —
+never a loop. Placed directly after the repetition check and before the diff, so
+the diff pass reviews this rewrite too, exactly as it does the repetition fix.
+The per-page counts and the before/after fault counts are recorded on the report
+as `wordBudget`, so a false closure is visible in stored data rather than only in
+the model's prose.
+
+**It re-measures, it does not tighten.** The findings are the counter's own, so
+the asymmetric tolerance and the "keep every action, line of dialogue and
+feeling. Losing one is a fault" wording travel unchanged. A page still over after
+the corrective pass SHIPS with a WARN: a paid run is never killed for length, and
+forcing the cut is what deleted causality before (2026-09-07).
+
+**Validation (no model call):** the story's own stored before/after text replayed
+through `buildWordBudgetFindings`. One measurement on the writer's text yields 2
+faults; the re-measure on the produced text yields 3 — p10 126, p12 112, p18 125.
+The claimed closures and the grown page are both exposed.
+
+**Touched:** `server/lib/textRefine.js` (the re-measure block, `wordBudget` on the
+snapshot and the return).
+**Status:** ✅ active — verified against stored text; the corrective pass itself
+has not yet run on a live generation.

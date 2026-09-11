@@ -253,7 +253,7 @@ p2's brief cites `["LOC002","ART011","ART012"]` - no lamp. Not a budget cut (3 a
 is unclipped - cites no objects at all. Nothing reconciles the bible's page assignments
 against the briefs, and the semantic evaluator scored p2 100.
 
-### D22. p10 is a 126-word page at 1st-grade level and its three-way group split is never paid off
+### D22. p10 is a 126-word page at 1st-grade level and its three-way group split is never paid off [length half DONE 2026-09-11]
 
 Double the page budget (run mean ~75 words). It splits the group three ways (Levin+Julian centre, Max+Nia left, Kiaan the third path) and everyone is simply back together on p12; it also has Kiaan reading the code off the third path's sign BEFORE choosing that path, which is backwards. Cutting the split costs the story nothing and fixes the length. p12 is the same class at 112 words: gate + code + summit + reunion + crack + two guards + a threat + Julian's fear in one page, exactly where the tension should land.
 
@@ -341,3 +341,18 @@ its p7 line is about not being able to FLY over the mountain, not about being un
 UNFORCED question in `story-text-audit.txt` now names the obvious-doer case, and an A/B over the
 shipped text files the fault only with the clause. The same A/B measured the audit's yield as
 unstable (5 / 4 / 9 faults over identical text) — tracked in tasks/BACKLOG.md.
+
+
+## D22 length half - fixed 2026-09-11
+
+Root cause was not the page budget or the planner: `buildWordBudgetFindings` ran ONCE, on the
+writer's text, before the repair pass, and nothing measured the result. The repairer's ledger
+claimed "fixed on p10 - 65 words" (shipped: 126) and "fixed on p18 - 82 words" (125), and p12
+was GROWN 82 -> 112 by the rewriting, drawing no finding because it was inside the budget when
+the only measurement ran. The counter now re-runs on the text the whole-page passes produced and
+gives a still-over page ONE fed-back corrective pass, placed before the diff so the diff reviews
+it. Replayed over this story's own stored before/after text: one measurement finds 2 faults, the
+re-measure finds 3 - p10 at 126, p18 at 125 and p12 at 112.
+
+Still open: the three-way split itself (D24's territory - the commission established it), and the
+overlong-page CAUSE on p12, which was the invented gate sequence.

@@ -569,6 +569,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let diffApplied = [];
   let diffDropped = [];
   let repetition = null;
+  let wordBudget = null;
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -596,6 +597,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     diffApplied: diffApplied.slice(),
     diffDropped: diffDropped.slice(),
     repetition,
+    wordBudget,
     partial: true,
   });
   const publish = () => {
@@ -837,6 +839,68 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   }
 
+  // ── WORD BUDGET, RE-MEASURED (2026-09-11) ──────────────────────────────────
+  //
+  // The counter above runs ONCE, on the writer's text, BEFORE the repair pass —
+  // and nothing measured the result. Two failures followed on
+  // job_1789147573901_m3uam0nxi, both invisible in the stored report:
+  //
+  //   1. The repairer reported closures it had not made. Its own ledger says
+  //      "fixed on p10 — 65 words" (the shipped page is 126) and "fixed on p18
+  //      — 82 words" (125). A self-report was taken as the outcome.
+  //   2. A page INSIDE the budget was pushed outside it by the rewriting. p12
+  //      went 82 → 112 words, past the tolerance, and drew no finding because
+  //      it was inside the budget when the only measurement ran.
+  //
+  // So: measure again on the text as the whole-page passes left it, and give a
+  // page that is still out ONE fed-back corrective pass — never a loop, the
+  // same shape as the repetition check above, and placed before the diff so the
+  // diff reviews this rewrite too.
+  //
+  // The findings are the counter's own, so the asymmetric tolerance and the
+  // "keep every action, line of dialogue and feeling. Losing one is a fault"
+  // wording travel with them: this re-measures, it does not tighten. A page
+  // that is still over after the corrective pass SHIPS with a WARN — a paid run
+  // is never killed for length, and forcing the cut is what deleted causality
+  // before (2026-09-07).
+  {
+    const countWords = pages => pages.map(p => ({ pageNumber: p.pageNumber, words: countPageWords(p.text) }));
+    const stillRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+    wordBudget = {
+      before: parseFaultLines(counterRaw || '').length,
+      after: parseFaultLines(stillRaw || '').length,
+      correctivePassRan: false,
+      resolved: !stillRaw,
+      remaining: [],
+      counts: countWords(current),
+      cost: 0,
+    };
+    if (stillRaw) {
+      const lines = stillRaw.split(/\n/);
+      log.warn(`🔢 [TEXT-COUNTER] ${lines.length} page(s) still outside the word budget after the whole-page passes — one corrective pass`);
+      try {
+        const { next, entry } = await runRepairPass(stillRaw, current, 'length_fix');
+        rounds.push(entry);
+        current = next;
+        wordBudget.correctivePassRan = true;
+        wordBudget.cost = entry.cost || 0;
+        log.info(`🔢 [TEXT-COUNTER] corrective pass rewrote page(s) ${entry.changedPages.join(', ') || 'none'} — $${(entry.cost || 0).toFixed(4)}`);
+      } catch (err) {
+        rounds.push({ round: rounds.length + 1, kind: 'length_fix', ok: false, modelKey: repairModel, error: err.message });
+        log.warn(`⚠️ [TEXT-COUNTER] corrective pass failed (${err.message})`);
+      }
+      const afterRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+      wordBudget.after = parseFaultLines(afterRaw || '').length;
+      wordBudget.remaining = afterRaw ? afterRaw.split(/\n/) : [];
+      wordBudget.resolved = !afterRaw;
+      wordBudget.counts = countWords(current);
+      for (const line of wordBudget.remaining) {
+        log.warn(`⚠️ [TEXT-COUNTER] STILL OUTSIDE the budget after the corrective pass: ${line} — shipping as is`);
+      }
+      publish();
+    }
+  }
+
   // ── THE DIFF PASS — between the repair and the lector (2026-09-06) ──────────
   //
   // WHAT IT IS: the repair pass is the only step that rewrites whole pages, and
@@ -1042,7 +1106,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audits, mergedFindings, mergeStats,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
-    repetition,
+    repetition, wordBudget,
     partial: false,
   };
 }
