@@ -32362,18 +32362,28 @@ plausible..."). A correct render was failed, a paid re-render was burned per
 character, and the original shipped. The 2026-09-11 creature-awareness fix
 landed on the ELEMENT gate only; a non-human SECONDARY CHARACTER still went
 down the human-skin branch because it is a character.
-**Decision:** `cellGatePrompt` now quotes the bible `description` verbatim and
-check (1) tells the judge to decide from that description whether the character
-is human: a human figure keeps the plausible-human-skin test, a character the
-description states is not human is judged on the colouring and material its own
-description states. `checkCharacterCellRender` takes the description and the
-call site passes `element.extractedDescription || element.description`.
-**Rationale:** Per CLAUDE.md the classification belongs to the PROMPT — no code
-may pattern-match "stone"/"made of" in the prose. The model already receives
-the description and decides. The human-skin check is kept intact for humans: it
-exists to catch green/grey/blue-tinted humans, a real measured failure mode.
+**Decision:** `cellGatePrompt` quotes the bible `description` verbatim and
+check (1) is a single rule against it: "do the figure's colouring and material
+match what the description states?" There is no human/non-human classification
+step and no standalone human-skin assertion. When the bible gave no
+description, check (1) reads "no description was given, so nothing is checked
+here" — the numbering of the art-style, age and sex checks stays fixed either
+way. `checkCharacterCellRender` takes the description and the call site passes
+`element.extractedDescription || element.description`.
+**Rationale:** The description IS the specification, so the cell is judged
+against it and nothing else, the way the page evaluator judges against what it
+was given. The standalone human-skin assertion only ever existed because the
+gate had no description to judge against; a description stating a skin colour
+already catches a green-tinted figure, so the branch was redundant the moment
+the description was passed in. With no description there is no specification,
+so inventing a standard for the model to apply would be worse than saying
+plainly that nothing is checked. Per CLAUDE.md the classification belongs to
+the PROMPT — no code may pattern-match "stone"/"made of" in the prose.
 Fail-open behaviour ("accepted anyway") is untouched — that is a separate open
 decision.
+**History:** shipped first (2be79f734) as a human/non-human branch inside check
+(1); the owner collapsed it to the single rule the same day, which is the shape
+above.
 **Touched:** `server/lib/referenceSheets.js` (`cellGatePrompt`,
 `checkCharacterCellRender`, the cell-gate call site),
 `tests/unit/cell-gate-sex.test.ts`

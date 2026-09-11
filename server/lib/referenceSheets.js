@@ -455,10 +455,13 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
  * `build` field is quoted verbatim; the model does the comparing. No prose is
  * parsed in code.
  *
- * The colouring check quotes the bible's own `description` (2026-09-11): a
- * secondary character need not be human, and a non-human one was failing the
- * human-skin branch for being the material its description states. The model
- * classifies from the quoted description; code never inspects the prose.
+ * (1) became a single rule against the quoted `description` (2026-09-11,
+ * owner): the description IS the specification, so the cell is judged against
+ * it and nothing else — a description stating fair skin already catches a
+ * green-tinted figure, and a character that is not human is no longer failed
+ * for being the material its description states. With no description there is
+ * no specification, so (1) says so and checks nothing; the numbering of the
+ * later checks stays fixed either way.
  *
  * @param {string} styleDescription - the book's declared art style
  * @param {number|string|null} age - the character's stated age, if any
@@ -474,7 +477,10 @@ function cellGatePrompt(styleDescription = '', age = null, build = null, descrip
     : '';
   const descText = String(description || '').trim();
   const descClause = descText ? ` The character is described as: "${descText}".` : '';
-  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}".${descClause} Judge strictly: (1) Colouring: first decide from the description whether this character is human. A human figure has a plausible human skin color — not green-, gray- or blue-tinted. A character the description states is not human — an animal, a creature, or a figure made of some other material — is judged on the colouring and material its own description states, never on human skin. (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+  const colourClause = descText
+    ? `(1) Colouring: do the figure's colouring and material match what the description states?`
+    : `(1) Colouring: no description was given, so nothing is checked here.`;
+  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}".${descClause} Judge strictly: ${colourClause} (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
 }
 
 // ── Character-cell render gate ──────────────────────────────────────────────

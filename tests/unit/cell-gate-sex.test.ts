@@ -30,41 +30,45 @@ describe('character cell gate asks about sex', () => {
     expect(p).not.toContain('Sex:');
   });
 
-  it('keeps the original skin and art-style checks', () => {
+  it('keeps the art-style check and the numbering of the later checks', () => {
     const p = cellGatePrompt(style, null, null);
-    expect(p).toContain('A human figure has a plausible human skin color');
+    expect(p).toContain('(1) Colouring:');
     expect(p).toContain('(2) Is the cell actually rendered in the declared art style');
     expect(p).toContain('"natural": true or false');
   });
 });
 
 /**
- * A secondary character is not always human. A stone golem cell was failed by
- * the gate for "not a plausible human skin color", burning a re-render per
- * character before the original was shipped anyway
- * (job_1789147573901_m3uam0nxi). The classification belongs to the model: the
- * bible description is quoted and the model decides.
+ * The description IS the specification: the cell is judged against it and
+ * nothing else. The gate used to assert human skin standalone — which failed a
+ * correctly-rendered stone figure twice and burned a paid re-render per
+ * character (job_1789147573901_m3uam0nxi) — only because it had no description
+ * to judge against. A description stating a skin colour catches a
+ * green-tinted figure without a human/non-human branch.
  */
-describe('character cell gate judges a non-human character on its own material', () => {
+describe('character cell gate judges colouring against the description alone', () => {
   const style = 'traditional watercolor';
 
-  it('quotes the description and routes classification to the model', () => {
+  it('quotes the description and asks one rule about colouring and material', () => {
     const desc = 'a figure of human shape made entirely of pale grey layered stone';
     const p = cellGatePrompt(style, null, null, desc);
     expect(p).toContain(`The character is described as: \"${desc}\".`);
-    expect(p).toContain('first decide from the description whether this character is human');
-    expect(p).toContain('is judged on the colouring and material its own description states, never on human skin');
+    expect(p).toContain("(1) Colouring: do the figure's colouring and material match what the description states?");
   });
 
-  it('still demands plausible human skin of a human figure', () => {
-    const p = cellGatePrompt(style, 8, 'a boy, slightly tall for his age', 'a boy with brown hair and freckles');
-    expect(p).toContain('A human figure has a plausible human skin color');
-    expect(p).toContain('not green-, gray- or blue-tinted');
+  it('never classifies the character as human or non-human', () => {
+    const p = cellGatePrompt(style, 8, 'a boy, slightly tall for his age', 'a boy with fair skin and brown hair');
+    expect(p).not.toContain('human skin');
+    expect(p).not.toContain('whether this character is human');
+    expect(p).not.toContain('an animal or creature');
+    expect(p).toContain("(1) Colouring: do the figure's colouring and material match what the description states?");
   });
 
-  it('omits the description sentence when the bible gave none', () => {
-    const p = cellGatePrompt(style, null, null);
+  it('says so explicitly when the bible gave no description, and keeps the numbering', () => {
+    const p = cellGatePrompt(style, 40, 'a woman, slight');
     expect(p).not.toContain('The character is described as:');
-    expect(p).toContain('(1) Colouring:');
+    expect(p).toContain('(1) Colouring: no description was given, so nothing is checked here.');
+    expect(p).toContain('(3) Apparent age');
+    expect(p).toContain('(4) Sex:');
   });
 });
