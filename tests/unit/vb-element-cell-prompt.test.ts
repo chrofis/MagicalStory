@@ -60,6 +60,8 @@ describe('elementKindSentence — the noun as prose', () => {
   it('keeps a possessive or capitalised name definite on its own', () => {
     expect(elementKindSentence(ball)).toBe("This is Julian's ball, a rubber play ball: ");
     expect(elementKindSentence({ ...scale, name: 'Nordwind', type: 'two-masted ship' })).toBe('This is Nordwind, a two-masted ship: ');
+    // A multi-word name that merely starts with a proper noun keeps its article.
+    expect(elementKindSentence({ ...scale, name: 'Windchopf sign', type: 'wooden trail sign' })).toBe('This is the Windchopf sign, a wooden trail sign: ');
   });
   it('drops a trailing parenthetical from the name and uses "an" before a vowel', () => {
     expect(elementKindSentence({ ...sign, text: null, type: 'oak plank sign' })).toBe('This is the trail sign, an oak plank sign: ');
@@ -89,7 +91,7 @@ describe('cell line shape — no heading, no bold, no quoted title', () => {
   });
   it('quotes the words for a text-bearing element, inside a sentence', () => {
     const line = elementCellText(sign);
-    expect(line).toContain('It carries the words "Windchopf" in clear, legible lettering');
+    expect(line).toContain('painted in faded dark brown. It carries the words "Windchopf" in clear, legible lettering');
     expect(line).not.toMatch(/\*\*Windchopf\*\*|^Windchopf/);
   });
 });

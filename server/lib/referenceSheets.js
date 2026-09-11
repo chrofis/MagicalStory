@@ -269,9 +269,10 @@ function elementKindSentence(el) {
   const rawType = clean(el.type);
   const type = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : '';
   if (!name && !type) return '';
-  // "the small dragon scale" / "Julian's ball" / "Nordwind" — a possessive or a
-  // capitalised name is already definite.
-  const nameClause = name ? (/^[A-Z\u00C0-\u00DE]|['\u2019]s\b/.test(name) ? name : `the ${name}`) : '';
+  // "the small dragon scale" / "the Windchopf sign" / "Julian's ball" /
+  // "Nordwind" — a possessive or a one-word proper name is already definite.
+  const definite = /['\u2019]s\b/.test(name) || (/^[A-Z\u00C0-\u00DE]/.test(name) && !/\s/.test(name));
+  const nameClause = name ? (definite ? name : `the ${name}`) : '';
   const typeClause = type && type.toLowerCase() !== name.toLowerCase() ? `${article(type)} ${type}` : '';
   const what = [nameClause, typeClause].filter(Boolean).join(', ');
   return `This is ${what}: `;
@@ -304,7 +305,10 @@ function elementTextSentence(el) {
  */
 function elementCellText(el) {
   const desc = String(el.extractedDescription || el.description || '').trim();
-  return `${elementKindSentence(el)}${desc}${elementTextSentence(el)}`;
+  const textSentence = elementTextSentence(el);
+  // The description rarely ends in a full stop; the text sentence needs one.
+  const stop = textSentence && desc && !/[.!?]$/.test(desc) ? '.' : '';
+  return `${elementKindSentence(el)}${desc}${stop}${textSentence}`;
 }
 
 /**
