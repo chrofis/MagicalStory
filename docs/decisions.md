@@ -33141,3 +33141,32 @@ not a detection problem.
 **Status:**   ✅ active. Still open and NOT addressed here: no check compares a rendered
 creature against its stated size, or against the adjacent page — D11's detection half,
 which needs a new evaluator type (owner decision, prompt-side).
+
+## A secondary character's stated height relation must reach the page prose (2026-09-11)
+**Context:**  D12 of the dragon rerun. Two stone guards drifted: p12 and p13 drew both
+as blocky boulder figures of the SAME size, p16 drew the smaller one as a slim grey
+humanoid. The bible was explicit — CHR001 "about as tall as a door", CHR002 "about two
+thirds the height of Wächter Gross" — and neither relation reached the picture.
+**Decision:** `scene-expansion.txt` / `scene-expansion-all.txt` rule 8f extends the
+size rule from creatures to secondary characters, and adds: "When an entry states its
+height against another named figure, write that relation into the prose on every page
+the two share."
+**Rationale:** Secondary characters are DELIBERATELY not emitted into the page prompt
+(`promptBuilders.js` ~3637, 2026-06-09: the CHR-id detour was removed because it
+emitted a second and sometimes third copy of each description — "the prose already
+carries them inline"). That leaves exactly two routes for a secondary's look: the
+reference cell, and the Art Director's per-page prose. The cell route was separately
+broken here — the `character_cell` gate failed BOTH guards for lacking "a plausible
+human skin color" on figures whose description says "made entirely of pale grey
+layered stone" — and is already fixed (`2be79f734`, `7b62ec8e5`, both 2026-09-11,
+three hours after this story rendered). The prose route had no rule at all: 8f covered
+vessels, buildings, vehicles and (2026-09-11) creatures, and a secondary character is
+none of those. Same family as the creature-size entry above; fixed the same way, on
+the generation side.
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`tests/unit/required-objects-label.test.ts`
+**Status:**   ✅ active. Note on the p16 "grey humanoid": CHR002's own description reads
+"lean and narrow … two dark oval recesses for eyes set wide apart" — on a slim figure
+that IS a grey-alien silhouette, so that render was arguably faithful to a description
+that reads differently at two builds. Worth revisiting if it recurs now the cell gate
+passes stone figures and anchors them.

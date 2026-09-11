@@ -208,7 +208,18 @@ describe('the Art Director is told a creature holds its size (D11)', () => {
     it(`${f} rule 8f covers creatures, not only vessels and buildings`, () => {
       const t = fs.readFileSync(path.join(process.cwd(), f), 'utf8');
       expect(t).toMatch(/A vessel, building, vehicle or creature holds its real size/);
-      expect(t).toMatch(/A creature keeps the size its entry states on every page it appears on/);
+      expect(t).toMatch(/A creature or a secondary character keeps the size its entry states on every page it appears on/);
+    });
+
+    it(`${f} tells the AD to write a stated height RELATION into the prose (D12)`, () => {
+      // job_1789147573901_m3uam0nxi: the bible said one stone guard was "about
+      // as tall as a door" and the other "about two thirds the height of"
+      // the first. Secondary characters are never emitted into the page prompt
+      // (promptBuilders: "the prose already carries them inline"), so the AD's
+      // prose is the only route for that relation - and p12 drew both guards
+      // the same size.
+      const t = fs.readFileSync(path.join(process.cwd(), f), 'utf8');
+      expect(t).toMatch(/When an entry states its height against another named figure, write that relation into the prose on every page the two share/);
     });
   }
 });
