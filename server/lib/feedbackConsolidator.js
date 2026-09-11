@@ -249,8 +249,21 @@ function flattenEntityIssues(entityReport) {
  *
  * Rule: one vote → that vote. Two → the lower. Three or more → the middle,
  * lower-middle on an even count.
+ *
+ * EXCEPT A CRITICAL VOTE, WHICH WINS (owner, 2026-09-11 — an explicit reversal
+ * of the 2026-07-30 "pure median for all severities, no lone escalation"
+ * ruling, which accepted a rare real miss in exchange for fewer false alarms).
+ * Measured on job_1789147573901_m3uam0nxi p13 and p17: quality rated an
+ * `object_presence` defect CRITICAL and semantic rated it MAJOR, the median
+ * took MAJOR, the page scored 85 — and the defect was real, a whole phantom
+ * dragon drawn where the story's central prop should have been (the same pages
+ * the D1 assignment trim broke). A page that one witness says cannot be
+ * published does not become publishable because a second witness was milder.
+ * Below CRITICAL the median still stands: that is where the false alarms the
+ * old ruling was protecting against actually live.
  */
 const SEVERITY_RANK = ['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL', 'CATASTROPHIC'];
+const ESCALATING_VOTE = new Set(['CRITICAL', 'CATASTROPHIC']);
 function medianSeverity(severities) {
   if (!severities || typeof severities !== 'object') return null;
   const votes = Object.values(severities)
@@ -258,6 +271,8 @@ function medianSeverity(severities) {
     .filter(v => SEVERITY_RANK.includes(v))
     .sort((a, b) => SEVERITY_RANK.indexOf(a) - SEVERITY_RANK.indexOf(b));
   if (!votes.length) return null;
+  // Any witness at CRITICAL or above → the highest vote, never the middle.
+  if (votes.some(v => ESCALATING_VOTE.has(v))) return votes[votes.length - 1];
   return votes[Math.floor((votes.length - 1) / 2)];
 }
 

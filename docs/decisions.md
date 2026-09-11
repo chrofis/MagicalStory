@@ -32927,3 +32927,138 @@ return an EMPTY reply with `finish_reason: length`; the guard's `stop_reason` an
 = 16384` is a declared number that this provider does not enforce — it is the
 `planCheckModel`, so the plan check's reply length is bounded by the model, not by
 us. Verifying every TEXT_MODELS ceiling against its vendor page is tracked separately.
+
+## 2026-09-11 — The commission is injected ONCE (arc stage); the text writer never sees the raw idea again
+
+**Context:** `job_1789147573901_m3uam0nxi` (dragon, 18 pages, 1st-grade) shipped a
+three-way group split on p10 and a combination-locked summit gate on p12 — the
+"obstacle course" shape the owner has complained about. Tracing all four stages
+showed the arc machine was not the author of either:
+
+- The commission (`storyDetails`, this run's is `idea_source = 'user-written'`)
+  names both: *"der Weg teilt sich in drei Pfade, und sie müssen sich trennen"*
+  and *"Kiaan liest auf einem Schild am dritten Pfad den richtigen Code für das
+  Gipfeltor"*.
+- The arc creator explicitly OVERRODE the split on age grounds — its stored
+  split justification: *"four boys aged three to five never separate on a
+  mountain — [a peer] reads the sign and all four take one path together"* — and
+  dropped the coded gate entirely. The final arc contains neither.
+- `story-text-from-beats.txt` nevertheless carried `{STORY_BRIEF}`, i.e. the raw
+  idea in `<user_input>` tags, so the writer was handed the original wish list
+  AFTER the arc had already ruled on it. It restored both.
+
+The text audit then caught the restored split (`FAULT[UNFORCED]: p10 — The group
+splits up to take all three paths even though they just identified the middle
+path as the correct way`), the repair pass reported it fixed, and the split
+shipped anyway (separate defect: the word/repair self-report is never
+re-measured — see the open item below).
+
+**Decision:** the text stage receives no commission. `{STORY_BRIEF}` is removed
+from `story-text-from-beats.txt`; `buildStoryTextFromBeatsPrompt` documents why
+at the call site. Subject, world and cast reach the writer through the arc, the
+plan lines and `CHARACTER_DETAILS`.
+
+**Rationale:** by that stage the arc IS the story, and it has already judged the
+idea's mechanics — which obstacles survive, which are unsuited to the cast's age.
+A second injection re-opens rulings the pipeline deliberately made, with no
+memory that they were made. This is the general shape, not a dragon-specific
+patch: any idea naming its own mechanics gets them reinstated past the arc.
+
+**Sites checked** (per validating-prompt-changes): `{STORY_BRIEF}` also appears
+in `arc-create/panel/retell/hints` (correct — that is the stage that reads the
+commission), `story-arc-audit`, `story-arc-review`, `story-bible-from-beats`,
+`scene-review`, `clothing-review`, `story-child-critic`, `story-text-audit` and
+`text-refine`. The last two are the remaining re-import channels — an auditor or
+refiner holding the original wish list can fault the text for dropping it. In
+this run they did not (the arc-informed audit's five faults cite no commission
+item), so they are left as they are and noted here rather than changed unasked.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `server/lib/promptBuilders.js`
+(`buildStoryTextFromBeatsPrompt`).
+**Status:** ✅ active — verified at prompt-build level (a sentinel idea string,
+the COMMISSION block and the `<user_input>` tags are all absent from the built
+prompt; the arc is present; no unreplaced placeholders). Not yet validated
+against regenerated page text.
+
+## 2026-09-11 — The idea generator must name the want, the obstacle and the cost concretely (supersedes nothing; enforces the 2026-08-19 premise rule)
+
+**Context:** The 2026-08-19 entry ("The idea generator writes a premise, not a
+walkthrough") closed with *"not yet validated against generated output; no idea
+has been generated under the new rules."* First generation under those rules
+(this session, dragon commission's own parameters): the rules hold — no solution
+named, no walkthrough, peril fine — but the output drifted vaguer than the
+prompt's OWN worked examples. Owner's verdict: *"very generic, not bad, but could
+be slightly more concrete. The story could be anything afterwards."* Measured
+example: want = "to know what it is", obstacle unnamed ("more than they can see"),
+cost absent — though the 2026-08-19 decision requires the idea to name "the
+setup, the want, what stands in the way **and what failing costs**". So this is a
+compliance gap against that entry, not a reversal of it.
+
+**Correction to the 2026-08-19 entry:** it records *"No provenance is recorded
+for an idea"* and infers "generated-then-possibly-edited" from the text's shape.
+The `stories.idea_source` column now exists and reads `user-written` for this
+story (`idea_original` null, `data.ideaGeneration` null). The shape-based
+inference was wrong: that brief was typed by a person. The generator's own output
+does not carry the one-event-per-sentence walkthrough shape.
+
+**Decision:** the want, the obstacle and the cost are each required to be a
+concrete nameable thing, with the vague forms called out by name, plus a
+self-review check ("can you name each in three words?"). The ban on naming the
+object/gate/trick that decides the outcome is UNCHANGED.
+
+**Rationale:** the failure was under-specification of the situation, not
+over-specification of the solution. Loosening the solution ban would have
+recreated exactly the prescribed-task shape the 2026-08-19 entry exists to
+prevent.
+
+**Known seam:** a concrete obstacle pulls toward stating the test the characters
+must pass, which the 2026-08-19 rule bans. Observed in one of four samples ("the
+dragon lets nobody through who has not first convinced him"). Not a solution and
+not a per-child job, so it ships — but this is where prescriptiveness will
+re-enter if it does.
+
+**Validation:** 4 ideas generated under the edited prompts against 2 under the
+old, same commission parameters, `claude-sonnet` (`MODEL_DEFAULTS.idea`). All 4
+name want + obstacle + cost; neither of the 2 old ones names a cost. Run locally
+against the edited templates via `buildIdeasPromptContext`, not through staging.
+
+**Touched:** `prompts/generate-story-ideas.txt` (paragraph-2 spec, concreteness
+rule, self-review check 8), `prompts/generate-story-idea-single.txt` (same
+concreteness rule — the sibling site the 2026-08-19 entry names).
+**Status:** ✅ active.
+
+## A CRITICAL vote wins the severity merge; the score and the repair queue read one field (2026-09-11)
+**Context:**  On `job_1789147573901_m3uam0nxi`, p13 and p17 each reported an
+unrepaired CRITICAL `object_presence` **and** a finalScore of 85. Both numbers came
+from the same shipping version. The stored finding:
+`severity: "major"`, `severities: {semantic: "MAJOR", compliance: "CRITICAL"}` —
+one defect, three evaluators, two of them disagreeing on severity. The defect was
+real: a whole phantom dragon drawn where the story's central prop should have been,
+the same pages the D1 assignment trim broke.
+**Decision:** Two changes.
+  1. `medianSeverity` (feedbackConsolidator.js) returns the HIGHEST vote whenever any
+     witness says CRITICAL or CATASTROPHIC. Below that the median still stands.
+  2. `collectCriticalFindings` (repairLogic.js) reads ONLY `consolidatedPlan.deduped_issues`
+     when the page was consolidated, falling back to the raw quality/semantic pools
+     only when it was not.
+**Rationale:** (1) **REVERSES the 2026-07-30 ruling** "pure median for all severities,
+no lone CATASTROPHIC escalation — accepts a rare 1-of-3 real miss for far fewer false
+alarms" (see `## Multi-judge eval: bucket taxonomy + median jury`). Owner sign-off
+2026-09-11, framed as a reversal, on the evidence above: a page one witness says
+cannot be published does not become publishable because a second witness was milder.
+The false alarms that ruling protected against live below CRITICAL, where the median
+is unchanged.
+(2) is not a policy change but a contradiction: `composeDeductions` empties the raw
+quality/semantic/compliance buckets whenever a consolidated plan exists, so a defect
+is charged once at its MERGED severity — and `collectCriticalFindings` was reading the
+raw pools the scorer had just emptied. The score charged MAJOR (15 → 85) while the
+repair queue saw the raw CRITICAL. Fixing (1) alone would not close this: any future
+disagreement re-opens the same gap.
+**Touched:** `server/lib/feedbackConsolidator.js` `medianSeverity`,
+`server/lib/repairLogic.js` `collectCriticalFindings`,
+`tests/unit/critical-severity-agreement.test.ts`
+**Status:**   ✅ active. Supersedes the "pure median for all severities" half of the
+2026-07-30 entry for the CONSOLIDATOR path; the 3-judge `evalJudges` merge is untouched.
+**Watch:** the repair queue now admits pages it previously scored past, so round-1
+volume may rise. If false CRITICALs become common, the fix is the evaluator prompt or a
+`MAX_SEVERITY_TYPES` ceiling — not a return to taking the lower vote.

@@ -211,11 +211,21 @@ function hasCriticalSeverityFinding(result) {
  * @returns {Array<{type: string|null, severity: string, description: string, pool: string}>}
  */
 function collectCriticalFindings(result) {
-  const pools = [
-    ['quality', result?.fixableIssues],
-    ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
-    ['consolidated', result?.consolidatedPlan?.deduped_issues],
-  ];
+  // ONE SOURCE OF TRUTH WITH THE SCORE (2026-09-11). `composeDeductions`
+  // (scoring.js) empties the raw quality/semantic/compliance buckets whenever a
+  // consolidated plan exists, so a defect three evaluators reported is charged
+  // once, at its MERGED severity. This function used to read the raw pools the
+  // scorer had just emptied, so the same finding on the same version could be
+  // CRITICAL here and MAJOR there: job_1789147573901_m3uam0nxi p13 and p17 each
+  // reported an unrepaired CRITICAL `object_presence` and a finalScore of 85.
+  // When the page has been consolidated, that merged list is the only list.
+  const deduped = result?.consolidatedPlan?.deduped_issues;
+  const pools = Array.isArray(deduped) && deduped.length > 0
+    ? [['consolidated', deduped]]
+    : [
+      ['quality', result?.fixableIssues],
+      ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+    ];
   const out = [];
   for (const [pool, list] of pools) {
     if (!Array.isArray(list)) continue;
