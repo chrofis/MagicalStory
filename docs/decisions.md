@@ -32388,3 +32388,87 @@ above.
 `checkCharacterCellRender`, the cell-gate call site),
 `tests/unit/cell-gate-sex.test.ts`
 **Status:** ✅ active
+
+### Visual Bible page assignment comes from the FINAL scene briefs, not from a bible-time guess
+**Context:** The Visual Bible is written at beats stage 3, the scene briefs at
+stage 4. Everything that decided at stage 3 which element belongs on which page
+was deciding without the evidence. `trimVbAssignments` (2026-09-08) did exactly
+that: per over-budget page it kept the entries whose NAME tokens appear in that
+page's PLAN LINE. Plan lines are prose — they describe a prop ("the big wing
+scale"), they never cite ids. Measured on staging `job_1789147573901_m3uam0nxi`:
+the trim stripped 19 (element, page) claims and left six entries at
+`appearsInPages: []` — ART003 (the story's central prop), ART006 (the signpost
+carrying the plot-critical text), ART009, ART010, ART014, ART016.
+`getElementsNeedingReferenceImages` skips an entry below the minimum page count,
+so no reference cell was rendered for any of them. The proof the trim was wrong
+is in the FINAL briefs of the same job: p10 `sceneMetadata.objects` =
+`["LOC004","ART006"]` — the brief asks by id for the entry the trim had emptied.
+**Decision:** The briefs are the single source of truth for usage.
+`applyBriefUsage(visualBible, scenes)` (`server/lib/vbElementBudget.js`) rebuilds
+every entry's `appearsInPages` from what the final briefs cite — a bare id
+(`ART006`), a dotted state/vantage handle (`ART015.1`, crediting the parent AND
+the matching `states[]`/`vantages[]` row), or a secondary character/animal a
+page's `characters[]`/`interactions[]` names by name (resolved through
+`entryNamedByRow`). It runs in `generateStoryViaBeats` once the briefs are final
+and BEFORE `rawOutline` is assembled and before the caller kicks off
+`generateReferenceSheet`, and writes the result back through
+`syncVisualBibleSection` so storyJobPipeline, the resume path and the Lab all
+re-parse the same pages. An entry no brief cites gets `[]` — a truthful "nothing
+uses this", which correctly renders no cell. `clothing` is not rebuilt (no brief
+cites a CLO id). The bible-time trim call is gone.
+**Rationale:** The schedule was already right — in full mode the reference sheet
+is kicked off after `generateStoryViaBeats` returns, so the briefs exist when
+cells are selected; only the data source was wrong. The three-element budget is
+unaffected: it is still enforced where the briefs exist (`rankPageElements` +
+`truncateBriefToBudget` in the scene review) and again at the page-gen reference
+selection, and after this rebuild `appearsInPages` and `objects[]` agree by
+construction instead of the bible half being un-withdrawable
+(`briefFixable:false`). TRIAL is deliberately left on the old early path:
+`trialReferenceSheetPromise` fires inside `onVisualBible`, before any brief
+exists, so `applyBriefUsage` is a no-op there and trial keeps the bible's guess.
+**Touched:** `server/lib/vbElementBudget.js` (`applyBriefUsage`;
+`trimVbAssignments`/`vbTrimLostPages` stay exported for their tests),
+`server/lib/beatsPipeline.js` (trim call removed, usage rebuild + write-back
+added), `storyJobPipeline.js` (the now-dead `vb_trim_lost` assertion removed),
+`tests/unit/vb-brief-usage.test.ts`
+**Status:** ✅ active. Supersedes the assignment-trim half of the 2026-09-08
+`trimVbAssignments` decision; `docs/SETTLED.md`'s three-element line is updated
+to name the brief-time enforcers.
+
+### A face prop is ONE bible entry with a state per side
+**Context:** `story-bible-from-beats.txt` required a face prop (map, letter,
+note, chart, book, page, sign, board, plaque) to be TWO entries with consecutive
+ids, one "(turned away)" and one "(face to camera)" — the 2026-08-26 design,
+which predates `states[]`. It contradicts the same template's own rule that "a
+change to an object is a state, not a second entry", doubles the id space for
+one physical thing, and on `job_1789147573901_m3uam0nxi` produced two such pairs
+(ART005/ART006, ART007/ART008) of which the assignment trim emptied one half.
+**Decision:** One entry; which side is turned to us is a `states[]` row, the
+away side first, each with its own `pages`. The readable words stay in the
+entry's `text`. The Art Director names one STATE id in `objects[]` per page (the
+turned-away state unless the page is about what the document says), which is the
+same per-page selection the pair gave — a state is rendered as its own reference
+cell and its `delta` rides the REQUIRED OBJECTS line, so both the picture channel
+and the text channel of the 2026-08-26 design survive.
+**Rationale:** Owner direction, and it removes the only rule in the template that
+said the same object may have two canonical descriptions. No plumbing is needed:
+dotted state handles are already cited, selected, rendered and prompt-fed.
+**Touched:** `prompts/story-bible-from-beats.txt` (face-prop rule, the state
+carve-out in the "test for a state", the artifacts `states`/`description` schema
+notes), `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`
+**Status:** ✅ active. Supersedes 2026-08-26 "A face-prop is TWO bible entries,
+not one entry with two views". Not yet exercised by a generated story — the
+first beats run that produces a face prop should be checked.
+
+### The Visual Bible has no minimum entry count
+**Context:** The same template demanded "At least {PAGE_COUNT} entries", a floor
+unrelated to what the story contains; it pushes the model to invent elements to
+reach a number, and every invented element then competes for a page's
+three-element budget.
+**Decision:** "As many entries as the story needs, no more." The neighbouring
+"include an element even if it appears once" stays. `{PAGE_COUNT}` is still
+substituted elsewhere in the template.
+**Rationale:** With usage now derived from the briefs, an entry no brief cites
+renders no cell — a padded bible is dead weight, not a safety margin.
+**Touched:** `prompts/story-bible-from-beats.txt`
+**Status:** ✅ active.

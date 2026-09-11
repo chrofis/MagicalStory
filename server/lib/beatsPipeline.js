@@ -1144,31 +1144,26 @@ async function generateStoryViaBeats(inputData, opts = {}) {
             });
           }
         }
-        // The bible's `pages` are earned by the plan line (template rule) and
-        // the model does not obey it: a worn item claimed 11-15 pages named in
-        // no plan line and 10-12 of 18 pages were over the element budget at
-        // birth (job_1788816451791_25b31uqlp) — an overflow the scene review
-        // downstream can see but never fix, because a brief cannot withdraw a
-        // bible placement. Deterministic post-check, same shape as the age
-        // clamp above: plan-line-named entries keep the page, the rest yield
-        // in rankPageElements order, states trim in step. Never a kill.
+        // NO ASSIGNMENT TRIM HERE. `trimVbAssignments` used to run at this
+        // point and decide from the PLAN LINE which element belongs on which
+        // page — before any brief existed, matching prose against entry names.
+        // Plan lines describe a prop ("the big wing scale"), they do not cite
+        // ids, so the trim stripped what the story was about: on staging
+        // job_1789147573901_m3uam0nxi it removed 19 (element, page) claims and
+        // left six entries at `appearsInPages: []`, including the central prop
+        // and the signpost carrying the plot-critical text — no reference cell
+        // was rendered for any of them, while the final briefs cited exactly
+        // those ids (p10 objects: ["LOC004", "ART006"]). Usage is now derived
+        // from the FINAL briefs instead (`applyBriefUsage`, below, once the
+        // scene stage is done), and the element budget is enforced where the
+        // briefs exist (rankPageElements + truncateBriefToBudget) and at the
+        // page-gen reference selection.
         if (visualBible) {
-          const { trimVbAssignments, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
-          const trim = trimVbAssignments(visualBible, beats, {
-            castNames: (inputData.characters || []).map(c => c && c.name).filter(Boolean),
-          });
-          if (beatsReviewReport) beatsReviewReport.vbAssignmentTrim = trim;
-          if (trim.stripped.length > 0) {
-            const states = trim.droppedStates.length ? `, ${trim.droppedStates.length} empty state(s) dropped` : '';
-            gl.warn('beats_vb_assignment_trimmed', `${trim.pagesOverBudgetBefore} page(s) over the ${VB_ELEMENT_BUDGET}-element budget at assignment → ${trim.pagesOverBudgetAfter}; ${trim.stripped.length} (element, page) claim(s) stripped${states}`, null, trim);
-          }
-          // ONE SOURCE OF TRUTH. Both post-checks above mutated this module's
+          // ONE SOURCE OF TRUTH. The age clamp above mutated this module's
           // parsed copy only; the transcript below is what every later reader
-          // re-parses (storyJobPipeline, resume, the Lab). Until 2026-09-11 the
-          // trim reached the Art Director and nobody else — see
-          // syncVisualBibleSection. Write the mutated fields back so every
-          // extractVisualBible() from here on yields the trimmed bible.
-          if (trim.stripped.length > 0 || ageClamps.length > 0) {
+          // re-parses (storyJobPipeline, resume, the Lab). Write the mutated
+          // fields back so every extractVisualBible() from here on agrees.
+          if (ageClamps.length > 0) {
             const synced = syncVisualBibleSection(bibleSections, visualBible);
             if (synced === bibleSections) {
               log.warn('⚠️ [BEATS] Visual Bible post-checks changed the bible but the transcript has no rewritable ---VISUAL BIBLE--- JSON — downstream re-parses will read the UNTRIMMED bible');
@@ -2194,6 +2189,45 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     });
   }
   if (pages.length === 0) throw new Error('Beats pipeline produced no usable pages');
+
+  // USAGE COMES FROM THE BRIEFS. The bible's `pages` were guessed before a
+  // single brief existed; the briefs are now final, so rebuild every entry's
+  // `appearsInPages` (and its states/vantages) from what they actually cite.
+  // This runs BEFORE rawOutline is assembled and before the caller kicks off
+  // the reference sheet (storyJobPipeline, full mode), so the cells that get
+  // rendered are the elements the story asks for — and an entry no brief cites
+  // truthfully renders none. See job_1789147573901_m3uam0nxi, where the old
+  // plan-line trim emptied the central prop and the lettered signpost that p10
+  // then asked for by id. Never a kill: a page with no parseable metadata
+  // contributes nothing, and with no briefs at all this is a no-op.
+  if (visualBible) {
+    const { applyBriefUsage } = require('./vbElementBudget');
+    const usage = applyBriefUsage(visualBible, scenes);
+    if (usage.applied) {
+      const changed = usage.entries.filter(e => e.gained.length || e.lost.length);
+      if (beatsReviewReport) beatsReviewReport.vbBriefUsage = usage;
+      const detail = changed.slice(0, 12)
+        .map(e => `${e.id} [${e.oldPages.join(',')}] → [${e.newPages.join(',')}]`).join('; ');
+      gl.info('vb_usage_from_briefs', `Visual Bible page assignment rebuilt from the final briefs: ${usage.changed}/${usage.entries.length} entr(ies) changed`
+        + (usage.revived.length ? `, ${usage.revived.length} revived (${usage.revived.join(', ')})` : '')
+        + (usage.emptied.length ? `, ${usage.emptied.length} now cited by no brief (${usage.emptied.join(', ')})` : '')
+        + (detail ? ` — ${detail}` : ''), null, usage);
+      for (const e of changed) {
+        log.info(`[VB-USAGE] ${e.id} "${e.name}" [${e.oldPages.join(',')}] → [${e.newPages.join(',')}]`);
+      }
+      // ONE SOURCE OF TRUTH: the transcript below is what storyJobPipeline,
+      // the resume path and the Lab re-parse. Write the rebuilt pages back.
+      if (usage.changed > 0 && bibleSections) {
+        const synced = syncVisualBibleSection(bibleSections, visualBible);
+        if (synced === bibleSections) {
+          log.warn('⚠️ [BEATS] Brief-derived page assignment could not be written back — the transcript has no rewritable ---VISUAL BIBLE--- JSON');
+          gl.warn('beats_vb_sync_failed', 'Brief-derived Visual Bible pages could not be written back into the transcript — stored bible keeps the bible-time guess');
+        } else {
+          bibleSections = synced;
+        }
+      }
+    }
+  }
 
   // Human-readable transcript, stored as data.outline so the dev outline view
   // shows what each stage produced — AND the string server.js hands to

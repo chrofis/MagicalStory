@@ -907,6 +907,16 @@
       "fixedAt": "2026-09-11",
       "fixedIn": "2be79f734",
       "fix": "cellGatePrompt quotes the bible description verbatim and check (1) is one rule against it: do the figure's colouring and material match what the description states. No human/non-human classification and no standalone human-skin assertion - the description is the specification (owner follow-up, same day, commit on top of 2be79f734). With no description check (1) says so and checks nothing, keeping the numbering of the later checks fixed. Fail-open behaviour unchanged. Tests: tests/unit/cell-gate-sex.test.ts."
+    },
+    {
+      "id": "vb-appears-in-pages-guessed-before-briefs-exist",
+      "title": "The bible-time plan-line trim (trimVbAssignments) emptied appearsInPages for six Visual Bible entries — the story’s central prop and the signpost carrying its plot-critical text among them — so no reference cell was rendered for any of them, while the final scene briefs asked for exactly those ids",
+      "reportedAt": "2026-09-11",
+      "source": "Staging job_1789147573901_m3uam0nxi. The Visual Bible is written at beats stage 3, the briefs at stage 4; trimVbAssignments (beatsPipeline.js:1156) decided page ownership by matching entry NAME tokens against the page PLAN LINE, which is prose and never cites ids. It stripped 19 (element,page) claims and left ART003 (central prop, a large scale), ART006 (signpost bearing the readable text), ART009, ART010, ART014 and ART016 at appearsInPages:[]. getElementsNeedingReferenceImages (visualBible.js:2314) skips an entry below the minimum page count, so those six got no reference cell and never reached a page prompt. Proof the trim was wrong: the FINAL briefs of the same job cite them by id - stored sceneImages p10 sceneMetadata.objects = [\"LOC004\",\"ART006\"].",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "PENDING",
+      "fix": "Page assignment is no longer guessed at bible time. vbElementBudget.applyBriefUsage(visualBible, scenes) rebuilds every entry appearsInPages (and its states[]/vantages[] rows) from what the FINAL briefs cite - bare ids, dotted state/vantage handles crediting parent and row, and secondary characters/animals a page names by name via entryNamedByRow - and runs in generateStoryViaBeats once the briefs are final, before rawOutline is assembled and before the caller kicks off generateReferenceSheet; the result is written back through syncVisualBibleSection so storyJobPipeline, resume and the Lab read the same pages. The trimVbAssignments call and the now-dead vb_trim_lost assertion are removed. Trial keeps the early path (no briefs exist yet, applyBriefUsage no-ops). Replayed over the stored job: ART006 [] -> [10] and LOC005 [11] -> [9,11,17]; reference cells before {ART015} / after {ART006, ART015, LOC005}. Tests: tests/unit/vb-brief-usage.test.ts. See docs/decisions.md 2026-09-11 Visual Bible page assignment comes from the FINAL scene briefs."
     }
   ]
 }

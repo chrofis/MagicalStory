@@ -2760,22 +2760,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // transcript is now kept in step too; see beatsPipeline
     // syncVisualBibleSection and docs/decisions.md 2026-09-11 "trim not persisted").
     const visualBible = (beatsMode && beatsResult.visualBible) || parser.extractVisualBible() || streamingVisualBible || {};
-    // Assertion, not a gate, run on the object that WILL be persisted at the
-    // unified_story checkpoint below, at the one point where a re-parse could
-    // diverge from the beats stage's trimmed bible (the 2026-09-11 bug). It
-    // sits here rather than at the save line on purpose: between here and the
-    // save, detectAndPatchOrphanObjectIds may legitimately ADD entries with
-    // their own appearsInPages, which is not a lost trim. A page over budget
-    // is logged (ERROR + genLog), never a kill.
-    {
-      const vbTrim = beatsResult?.beatsReviewReport?.vbAssignmentTrim || null;
-      const { vbTrimLostPages, VB_ELEMENT_BUDGET } = require('./server/lib/vbElementBudget');
-      const lost = vbTrimLostPages(visualBible, vbTrim);
-      if (lost.length > 0) {
-        log.error(`🚨 [VB-TRIM] vb_trim_lost: assignment trim reported 0 pages over the ${VB_ELEMENT_BUDGET}-element budget, but the bible about to be saved has ${lost.length} over it: page(s) ${lost.join(', ')}`);
-        genLog.warn('vb_trim_lost', `Bible being saved has ${lost.length} page(s) over the ${VB_ELEMENT_BUDGET}-element budget although the assignment trim reported none: ${lost.join(', ')}`, null, { pages: lost, trim: vbTrim });
-      }
-    }
+    // The assignment-trim assertion that used to stand here is gone with the
+    // trim itself (2026-09-11): page assignment is no longer guessed at bible
+    // time, it is rebuilt from the FINAL scene briefs inside the beats pipeline
+    // (`applyBriefUsage`), which is also what the element budget is measured
+    // against downstream. `vbTrimLostPages` stays exported for its tests.
     // Sonnet sometimes emits two secondaryCharacters entries that share the
     // same CHR id (the same person referenced by relation AND by attribute).
     // Resolve via Haiku before any downstream consumer sees the collision —

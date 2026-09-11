@@ -455,8 +455,170 @@ function vbTrimLostPages(visualBible, trimReport, budget = VB_ELEMENT_BUDGET) {
   return [...pages].sort((a, b) => a - b).filter(p => rankPageElements(p, {}, visualBible).length > budget);
 }
 
+/**
+ * USAGE FROM THE BRIEFS — the bible's `appearsInPages` rebuilt from what the
+ * FINAL scene briefs actually cite.
+ *
+ * The bible is written before the briefs exist, so every page assignment in it
+ * is the bible model's own guess. Anything that decided at bible time which
+ * element belongs on which page was deciding without the evidence: measured on
+ * staging job_1789147573901_m3uam0nxi, the plan-line trim stripped 19
+ * (element, page) claims and left six entries — the story's central prop and the
+ * signpost carrying its plot-critical text among them — with `appearsInPages:
+ * []`, so `getElementsNeedingReferenceImages` rendered no cell for them, while
+ * the final briefs asked for exactly those ids (p10 objects: ["LOC004",
+ * "ART006"]).
+ *
+ * The briefs are the single source of truth for usage. Run this once the briefs
+ * are final and before any reference cell is selected: every entry's pages
+ * become the pages whose brief cites it, and an entry no brief cites gets `[]` —
+ * a truthful "nothing uses this", which correctly renders no cell.
+ *
+ * A brief cites an element in `objects[]`, as a bare id (`ART006`) or a dotted
+ * state/vantage handle (`ART015.1`). A dotted handle credits the PARENT entry
+ * AND the matching `states[]` row (`vantages[]` for a location). A page's
+ * `characters[]` and `interactions[]` may name a secondary character or an
+ * animal by NAME rather than by id; those count too, resolved through the one
+ * row→entry matcher (`entryNamedByRow`).
+ *
+ * `clothing` is never rebuilt: no brief cites a CLO id, so deriving its pages
+ * from the briefs would only empty it.
+ *
+ * Pure apart from the in-place mutation, idempotent, and never throws: with no
+ * briefs (the legacy unified path and the trial path both reach reference-sheet
+ * generation before any brief exists) it is a no-op and reports nothing.
+ *
+ * @param {Object} visualBible  parsed bible (MUTATED in place)
+ * @param {Array} pagesWithMetadata  [{pageNumber, metadata|objects|brief|sceneDescription}]
+ * @returns {{applied:boolean, pages:number[], entries:Array<{id,collection,name,
+ *   oldPages:number[], newPages:number[], gained:number[], lost:number[]}>,
+ *   changed:number, emptied:string[], revived:string[]}}
+ */
+const USAGE_COLLECTIONS = [
+  ...ELEMENT_COLLECTIONS.map(c => c.key),
+  'locations',
+];
+
+/** Every id token a brief's metadata cites, bare or dotted, uppercased. */
+function citedHandles(metadata) {
+  const out = [];
+  const push = (t) => {
+    const s = String(t || '').trim().toUpperCase();
+    const m = s.match(/\b([A-Z]{3}\d{3})(?:\.(\d+))?\b/);
+    if (m) out.push({ id: m[1], index: m[2] ? Number(m[2]) : null });
+  };
+  for (const raw of (Array.isArray(metadata && metadata.objects) ? metadata.objects : [])) {
+    push(typeof raw === 'string' ? raw : (raw && (raw.id || raw.name)));
+  }
+  return out;
+}
+
+/** The free-text names a page's cast/interactions carry, for the by-name credit. */
+function castFields(metadata) {
+  const out = [];
+  for (const raw of (Array.isArray(metadata && metadata.characters) ? metadata.characters : [])) {
+    const v = String((typeof raw === 'string' ? raw : (raw && (raw.name || raw.id))) || '').trim();
+    if (v) out.push(v);
+  }
+  return out.concat(interactionFields(metadata));
+}
+
+function applyBriefUsage(visualBible, pagesWithMetadata = []) {
+  const report = { applied: false, pages: [], entries: [], changed: 0, emptied: [], revived: [] };
+  if (!visualBible || typeof visualBible !== 'object') return report;
+
+  // Normalise the briefs to {pageNumber, metadata}; a page with no parseable
+  // metadata block contributes nothing but does not invalidate the rest.
+  const briefs = [];
+  for (const sd of (Array.isArray(pagesWithMetadata) ? pagesWithMetadata : [])) {
+    if (!sd) continue;
+    const pageNumber = Number(sd.pageNumber ?? sd.page);
+    if (!Number.isFinite(pageNumber)) continue;
+    const metadata = sd.metadata
+      || (sd.objects ? { objects: sd.objects, characters: sd.characters, interactions: sd.interactions } : null)
+      || extractSceneMetadata(String(sd.brief || sd.sceneDescription || ''))
+      || null;
+    if (!metadata) continue;
+    briefs.push({ pageNumber, metadata });
+  }
+  if (briefs.length === 0) return report; // no briefs yet — the guess stands
+
+  report.applied = true;
+  report.pages = briefs.map(b => b.pageNumber).sort((a, b) => a - b);
+
+  // id -> {entry, collection}; the by-name pass needs the CHR/ANI entries too.
+  const byId = new Map();
+  const namedCandidates = [];
+  for (const key of USAGE_COLLECTIONS) {
+    for (const entry of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (!entry || !entry.id) continue;
+      byId.set(baseId(entry.id) || String(entry.id).trim().toUpperCase(), { entry, key });
+      if (key === 'secondaryCharacters' || key === 'animals') namedCandidates.push(entry);
+    }
+  }
+
+  const pagesFor = new Map();      // base id -> Set(pages)
+  const subPagesFor = new Map();   // `ID.N` -> Set(pages)
+  const credit = (map, key, page) => {
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(page);
+  };
+
+  for (const { pageNumber, metadata } of briefs) {
+    for (const { id, index } of citedHandles(metadata)) {
+      if (!byId.has(id)) continue;
+      credit(pagesFor, id, pageNumber);
+      if (index !== null) credit(subPagesFor, `${id}.${index}`, pageNumber);
+    }
+    // A secondary character or animal a page's cast names without an id.
+    for (const field of castFields(metadata)) {
+      const hit = entryNamedByRow(field, namedCandidates);
+      if (!hit || !hit.id) continue;
+      credit(pagesFor, baseId(hit.id) || String(hit.id).trim().toUpperCase(), pageNumber);
+    }
+  }
+
+  const sorted = (set) => [...(set || [])].map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  for (const [id, { entry, key }] of byId) {
+    const oldPages = sorted(new Set(Array.isArray(entry.appearsInPages) ? entry.appearsInPages : []));
+    const newPages = sorted(pagesFor.get(id));
+    entry.appearsInPages = newPages;
+    if (Array.isArray(entry.pages) || oldPages.length > 0) entry.pages = [...newPages];
+
+    // Sub-rows: a state (or a location's vantage) keeps the pages whose brief
+    // cited that exact handle; a handle nobody cited for a page it used to
+    // claim loses it. A sub-row is matched by its own id, then by position.
+    const subKey = key === 'locations' ? 'vantages' : 'states';
+    const subs = Array.isArray(entry[subKey]) ? entry[subKey] : null;
+    if (subs) {
+      subs.forEach((st, i) => {
+        if (!st || typeof st !== 'object') return;
+        const handle = String(st.id || '').trim().toUpperCase() || `${id}.${i + 1}`;
+        const own = sorted(subPagesFor.get(handle));
+        // A page that cited the BARE parent id belongs to the parent's default
+        // sub-row (the first) — the same rule `defaultObjectState` applies.
+        const bare = i === 0
+          ? newPages.filter(p => ![...subPagesFor.keys()]
+            .filter(k => k.startsWith(`${id}.`))
+            .some(k => (subPagesFor.get(k) || new Set()).has(p)))
+          : [];
+        st.pages = sorted(new Set([...own, ...bare]));
+      });
+    }
+
+    const gained = newPages.filter(p => !oldPages.includes(p));
+    const lost = oldPages.filter(p => !newPages.includes(p));
+    report.entries.push({ id, collection: key, name: String(entry.name || ''), oldPages, newPages, gained, lost });
+    if (gained.length || lost.length) report.changed++;
+    if (oldPages.length > 0 && newPages.length === 0) report.emptied.push(id);
+    if (oldPages.length === 0 && newPages.length > 0) report.revived.push(id);
+  }
+  return report;
+}
+
 module.exports = {
   VB_ELEMENT_BUDGET,
+  applyBriefUsage,
   trimVbAssignments,
   vbTrimLostPages,
   rankPageElements,

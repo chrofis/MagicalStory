@@ -57,8 +57,12 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
   2026-09-06 count that included invented locations: "Do not count it as it is the empty scene not an artifact").
   `VB_ELEMENT_BUDGET` counts secondary characters, animals, artifacts and vehicles; a LOC, real or invented, never
   counts — the location is the plate the cast is composited into. The page's location cell rides LAST, at most one,
-  3 + 1 = Grok's `VB_SLOT_MAX_ELEMENTS` of 4. The budget is enforced at ASSIGNMENT (`trimVbAssignments`, plan-line
-  authority) as well as at the Art Director; do not re-add locations to `ELEMENT_COLLECTIONS` or to the AD's "all count" line.
+  3 + 1 = Grok's `VB_SLOT_MAX_ELEMENTS` of 4. The budget is enforced where the BRIEFS exist — the scene review's
+  `rankPageElements` / `truncateBriefToBudget`, then the page-gen reference selection; do not re-add locations to
+  `ELEMENT_COLLECTIONS` or to the AD's "all count" line. (The bible-time `trimVbAssignments` enforcer was removed
+  2026-09-11: it decided from plan-line prose before any brief existed and emptied a story's central prop — see
+  decisions.md "Visual Bible page assignment comes from the FINAL scene briefs". The COUNT and the
+  locations-don't-count rule are unchanged and stay settled.)
 
 ## Data & infrastructure
 
