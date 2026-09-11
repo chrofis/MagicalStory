@@ -875,6 +875,7 @@
    "source": "job_1789078732136_622wecmhj (staging): ART001 'small dragon scale' and ART002 'large dragon scale' - description 'an oval, slightly convex scale...' - both stored VB cells (.../vb/ART001.jpg, ART002.jpg) are ceramic dishes; 'scale' with no noun for the object kind was read as a shape word. buildReferenceSheetPrompt (server/lib/referenceSheets.js) used el.description only, by design since a labelled 'Name (artifact) - ...' line once painted the name onto the object. Root-cause report: ~/Downloads/dragon-cover-scale-rootcause.html Q2.",
    "status": "fixed",
    "fixedAt": "2026-09-11",
+   "fixedIn": "31deb92ce",
    "fix": "Every non-character cell line opens with a plain-prose kind sentence built from the entry's name and type ('This is the small dragon scale, a single reptile scale: <description>') - never a heading, bold line or quoted title; plus an element-cell gate (kind/match/style, one re-render on NO) and a state-cells consistency gate. Unit tests: tests/unit/vb-element-cell-prompt.test.ts."
   }
   ]
