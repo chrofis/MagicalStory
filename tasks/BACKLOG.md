@@ -511,19 +511,6 @@ Nothing below should be coded until it is answered.
       The words-only fix (Lab 1191/1192) is the whole lever; the cell prompt now bans drawing whatever the
       description names as what the object attaches to, is part of, or is used with. No `mount` field is built.
       → `docs/decisions.md` 2026-09-11 "A reference cell draws only the object, never what it attaches to"
-      Original question, for the record:
-- [ ] ~~**Should a reference cell be allowed a minimal MOUNTING context for objects defined by what they attach to?**~~
-      Isolation is part of why a bare geometry reads as the wrong object (a lamp on a handlebar is unambiguous). The
-      current rule — only the element itself is drawn — is deliberate and was NOT changed. Against: the cell is the
-      reference the renderer copies, so a drawn mount can be copied onto every page holding it (the class of failure
-      the rule was added for on 2026-09-11); `composeVbSlot` shrinks each cell to as little as `VB_CELL_FLOOR_PX` 200px
-      with `fit: contain`, so a mount steals pixels from the object itself, and a 136px cell is the measured precedent
-      for the model substituting a prior; the identification call names ONE element per cell and a mounted object makes
-      that call ambiguous. For: it addresses the root cause directly for the narrow class of attachment-defined objects.
-      Middle path, cheapest first: measure the 2026-09-11 description fix (name the attachment in WORDS) before adding
-      pixels; if that class still fails, the narrow lever is a per-entry `mount` field the cell prompt renders as a faint
-      partial fragment, gated to entries whose `type` names an attachment.
-      → `docs/decisions.md` 2026-09-11 "Visual Bible descriptions must read as the named object"
 - [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
       `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every 100 with
       a second eval was offered and declined" (restated `:14904`) → `tasks/eval-variance-backlog.md`
