@@ -3844,7 +3844,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // scale anchor against the figure, which nothing else in the prompt
         // states for a held or carried prop (a shoebox-sized chest rendered
         // torso-sized on every page of staging trial job_1788712851192).
-        const sizeNote = (obj.type !== 'animal' && obj.entry?.size) ? ` — ${String(obj.entry.size).trim()}` : '';
+        //
+        // ANIMALS CARRY IT TOO (owner, 2026-09-11). They were excluded when
+        // this rider was introduced (793049e40) because that change was scoped
+        // to held props — not because a creature's size was judged harmful.
+        // A creature is the element whose scale drifts most and the one nothing
+        // else anchors: on job_1789147573901_m3uam0nxi the bible wrote
+        // ANI002 `size` = "body length approximately four metres … large enough
+        // for four small children and a dog to sit across the back", and the
+        // same dragon rendered knee-high on two pages, a bodiless wing on a
+        // third and house-sized on a fourth. The pages that restated the size
+        // in their prose were the ones that came closest; the pages that did
+        // not (p8, p18) had nothing to go on, because this line dropped it.
+        const sizeNote = obj.entry?.size ? ` — ${String(obj.entry.size).trim()}` : '';
         // OBJECT STATE - the fourth rider on this line, beside `size`, the
         // clothing `(worn by X)` suffix and a two-sided prop's orientation
         // parenthetical. It says WHICH variant of the object this page shows;
@@ -6515,6 +6527,15 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     ARC_HINTS: String(arcHints || '').trim()
       ? `# HINTS — apply these in the text where the beats have not\n\n${String(arcHints).trim()}`
       : '',
+    // NO COMMISSION HERE. The template carries no {STORY_BRIEF}: by this stage
+    // the arc IS the story, and it has already ruled on the idea's mechanics —
+    // which obstacles survive, which are dropped as unsuited to the cast's age.
+    // Showing the writer the raw idea again re-opens those rulings, and it took
+    // them: job_1789147573901_m3uam0nxi's arc collapsed the idea's three-way
+    // group split ("four boys aged three to five never separate on a mountain")
+    // and dropped its coded gate; the text stage, handed the idea a second time,
+    // restored both. Subject, world and cast reach the writer through the arc,
+    // the plan lines and CHARACTER_DETAILS.
     ...buildStoryContextFields(inputData),
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),

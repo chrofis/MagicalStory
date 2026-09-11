@@ -159,3 +159,56 @@ describe('the bible `size` rides the REQUIRED OBJECTS line as a scale anchor', (
     expect(line).not.toMatch(/—\s*$/);
   });
 });
+
+describe('an ANIMAL carries its size too (D11, owner 2026-09-11)', () => {
+  // job_1789147573901_m3uam0nxi: the bible wrote ANI002 `size` = "body length
+  // approximately four metres from snout to tail tip … large enough for four
+  // small children and a dog to sit across the back", and the REQUIRED OBJECTS
+  // line dropped it — `obj.type !== 'animal'` excluded animals from the rider
+  // added for held props (793049e40). The same dragon then rendered knee-high
+  // on two pages, a bodiless wing on a third and house-sized on a fourth; the
+  // two pages whose prose never restated the size had nothing to go on.
+  const DRAGON = {
+    id: 'ANI001',
+    name: 'Fauchi',
+    species: 'dragon',
+    size: 'body length approximately four metres from snout to tail tip; large enough for four small children to sit across the back',
+    description: 'A dragon with deep teal-green scales over its body and neck, amber eyes.',
+    appearsInPages: [3],
+  };
+
+  const withDragon = (prose: string) => buildImagePrompt(
+    scene(prose, ['ANI001']),
+    { language: 'en-gb', artStyle: 'pixar', layout: { textInImage: true } },
+    null, { ...visualBible, animals: [DRAGON] }, 3, null, {},
+  ) as string;
+
+  it('appends the creature size to its REQUIRED OBJECTS line', () => {
+    const line = requiredObjectsBlock(withDragon('Fauchi waits by the cave.'))
+      .split('\n').find((l) => /Fauchi/i.test(l))!;
+    expect(line).toContain('— body length approximately four metres');
+    expect(line).toContain('four small children to sit across the back');
+  });
+
+  it('an animal with no size still emits no dangling dash', () => {
+    const prompt = buildImagePrompt(
+      scene('Fauchi waits by the cave.', ['ANI001']),
+      { language: 'en-gb', artStyle: 'pixar', layout: { textInImage: true } },
+      null, { ...visualBible, animals: [{ ...DRAGON, size: undefined }] }, 3, null, {},
+    ) as string;
+    const line = requiredObjectsBlock(prompt).split('\n').find((l) => /Fauchi/i.test(l))!;
+    expect(line).not.toMatch(/—\s*$/);
+  });
+});
+
+describe('the Art Director is told a creature holds its size (D11)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  for (const f of ['prompts/scene-expansion.txt', 'prompts/scene-expansion-all.txt']) {
+    it(`${f} rule 8f covers creatures, not only vessels and buildings`, () => {
+      const t = fs.readFileSync(path.join(process.cwd(), f), 'utf8');
+      expect(t).toMatch(/A vessel, building, vehicle or creature holds its real size/);
+      expect(t).toMatch(/A creature keeps the size its entry states on every page it appears on/);
+    });
+  }
+});
