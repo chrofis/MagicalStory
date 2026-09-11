@@ -147,6 +147,25 @@ describe('placeholderResidueFromRaw', () => {
   });
 
   it('only the silhouette mask is measured; an empty mask yields zeros', () => {
-    expect(placeholderResidueFromRaw(plate, plate, new Uint8Array(W * H), W, H)).toEqual({ unchanged: 0, flatSaturated: 0 });
+    const r = placeholderResidueFromRaw(plate, plate, new Uint8Array(W * H), W, H);
+    expect(r.unchanged).toBe(0);
+    expect(r.flatSaturated).toBe(0);
+  });
+
+  it('marks the leftover placeholder pixels: untouched ones, and flat ones still in the placeholder hue', () => {
+    // Render: the top half of the silhouette becomes a textured, desaturated figure;
+    // the bottom half stays the plate's red (uncovered placeholder).
+    const render = Buffer.from(plate);
+    for (let y = 5; y < 10; y++) for (let x = 5; x < 15; x++) { const k = y * W + x; const v = 90 + ((k * 31) % 60); render[k * 3] = v; render[k * 3 + 1] = v - 10; render[k * 3 + 2] = v - 25; }
+    const r = placeholderResidueFromRaw(plate, render, mask, W, H, { hue: 0 });
+    expect(r.unchanged).toBeCloseTo(0.5, 1);
+    let marked = 0, markedTop = 0;
+    for (let y = 5; y < 15; y++) for (let x = 5; x < 15; x++) if (r.residueMask[y * W + x]) { marked++; if (y < 10) markedTop++; }
+    expect(marked).toBe(50);
+    expect(markedTop).toBe(0);
+    // A flat fill in a DIFFERENT hue (teal over red) is not marked as leftover red.
+    const teal = placeholderResidueFromRaw(plate, fill(0, 150, 150), mask, W, H, { hue: 0 });
+    expect(teal.flatSaturated).toBe(1);
+    expect(Array.from(teal.residueMask).reduce((a, b) => a + b, 0)).toBe(0);
   });
 });

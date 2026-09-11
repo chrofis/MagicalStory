@@ -1354,15 +1354,20 @@ async function changedPixelsMask(plateBuf, renderBuf, bbox, W, H, grow, threshol
  *                   teal - changed, yet no child was painted).
  * `a` / `b` are raw RGB buffers of plate and render at W x H.
  */
-function placeholderResidueFromRaw(a, b, mask, W, H, { diffThreshold = 40, satFloor = 0.55, flatDelta = 12 } = {}) {
+function placeholderResidueFromRaw(a, b, mask, W, H, { diffThreshold = 40, satFloor = 0.55, flatDelta = 12, hue = null, hueTolerance = 35 } = {}) {
   let total = 0, unchanged = 0, flatSaturated = 0;
+  // Per-pixel leftovers: untouched placeholder pixels, plus flat saturated
+  // pixels still in the placeholder's hue (exp 1154: the model painted a
+  // standing child over a seated silhouette and left the uncovered blue
+  // around the legs; the cut carried it onto the page).
+  const residueMask = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const k = y * W + x;
     if (!mask[k]) continue;
     total++;
     const i = k * 3;
     const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
-    if (d <= diffThreshold) unchanged++;
+    if (d <= diffThreshold) { unchanged++; residueMask[k] = 1; }
     const r = b[i], g = b[i + 1], bl = b[i + 2];
     const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl);
     const sat = mx ? (mx - mn) / mx : 0;
@@ -1372,16 +1377,25 @@ function placeholderResidueFromRaw(a, b, mask, W, H, { diffThreshold = 40, satFl
     const dn = Math.max(
       Math.abs(r - b[j]), Math.abs(g - b[j + 1]), Math.abs(bl - b[j + 2]),
       Math.abs(r - b[l]), Math.abs(g - b[l + 1]), Math.abs(bl - b[l + 2]));
-    if (dn < flatDelta) flatSaturated++;
+    if (dn < flatDelta) {
+      flatSaturated++;
+      if (hue != null) {
+        const dh = Math.abs(rgbToHue(r, g, bl) - hue);
+        if (Math.min(dh, 360 - dh) <= hueTolerance) residueMask[k] = 1;
+      }
+    }
   }
-  if (!total) return { unchanged: 0, flatSaturated: 0 };
-  return { unchanged: unchanged / total, flatSaturated: flatSaturated / total };
+  if (!total) return { unchanged: 0, flatSaturated: 0, residueMask };
+  return { unchanged: unchanged / total, flatSaturated: flatSaturated / total, residueMask };
 }
 
-async function placeholderResidue(plateBuf, renderBuf, mask, W, H) {
+async function placeholderResidue(plateBuf, renderBuf, mask, W, H, color = null) {
   const a = await sharp(plateBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const b = await sharp(renderBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-  return placeholderResidueFromRaw(a, b, mask, W, H);
+  let hue = null;
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(color || ''));
+  if (m) hue = rgbToHue(parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16));
+  return placeholderResidueFromRaw(a, b, mask, W, H, { hue });
 }
 // A render is a no-op when at least this share of the silhouette is untouched,
 // and a recolour when at least this share is still a flat saturated fill.
@@ -1537,7 +1551,7 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       // silhouette's own pixels before any box is trusted.
       let residue = null;
       try {
-        const rz = await placeholderResidue(populatedBuf, renderBuf, silhouetteMasks[c.name], W, H);
+        const rz = await placeholderResidue(populatedBuf, renderBuf, silhouetteMasks[c.name], W, H, c.color);
         residue = { ...rz, rejected: rz.unchanged >= RESIDUE_UNCHANGED_MAX || rz.flatSaturated >= RESIDUE_FLAT_MAX };
       } catch (err) {
         log.warn(`[SCENE COMPOSITE]   ${c.name}: placeholder residue check failed — ${err.message}`);
@@ -1623,7 +1637,17 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
       // figure stays in front (see bottomLimit above).
       let clippedPx = 0;
       for (let y = Math.max(0, Math.ceil(bottomLimit)); y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) { mask[y * W + x] = 0; clippedPx++; }
-      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed, other silhouettes excluded${clippedPx ? `, ${clippedPx}px below the silhouette's bottom edge dropped` : ''}`);
+      // Leftover placeholder: the part of the silhouette the figure did not
+      // cover and the model did not repaint (exp 1154: blue and yellow around
+      // the legs of two standing children drawn over seated silhouettes). Those
+      // pixels are the plate's flat colour, never the character; the depopulated
+      // plate underneath shows through instead. Grown 2px for the antialiased rim.
+      let residuePx = 0;
+      if (best.residue?.residueMask) {
+        const rm = dilateMask(best.residue.residueMask, W, H, 2);
+        for (let i = 0; i < W * H; i++) if (mask[i] && rm[i]) { mask[i] = 0; residuePx++; }
+      }
+      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed, other silhouettes excluded${clippedPx ? `, ${clippedPx}px below the silhouette's bottom edge dropped` : ''}${residuePx ? `, ${residuePx}px of leftover placeholder colour dropped` : ''}`);
     }
     let cut = await cutWithMask(renderBuf, mask, W, H);
     let fitted = null;
