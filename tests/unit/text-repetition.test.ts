@@ -120,7 +120,9 @@ describe('refineStoryText — one corrective repetition pass', () => {
     expect(fixes[0].prompt).toContain('pages 12 and 13 carry the same passage');
     expect(fixes[0].prompt).toContain('Plan p12: wide — a sailor at the mast');
     expect(fixes[0].prompt).toContain('Plan p13: close — two figures at the sailcloth');
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'repetition_fix', 'diff', 'lector']);
+    // length_fix sits between the repetition fix and the diff (2026-09-11): the
+    // word budget is re-measured on the text the whole-page passes produced.
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'repetition_fix', 'length_fix', 'diff', 'lector']);
     expect(res.repetition.pairs).toHaveLength(1);
     expect(res.repetition.pairs[0].pages).toEqual([12, 13]);
     expect(res.repetition.correctivePassRan).toBe(true);

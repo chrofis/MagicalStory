@@ -323,7 +323,7 @@ describe('refineStoryText — chain order', () => {
     const labels = calls.map(c => c.label);
     expect(labels.filter(l => l === 'text_audit' || l === 'text_audit_blind')).toHaveLength(2);
     expect(labels.slice(0, 2).sort()).toEqual(['text_audit', 'text_audit_blind']);
-    expect(labels.slice(2)).toEqual(['text_refine', 'text_lector']);
+    expect(labels.slice(2)).toEqual(['text_refine', 'text_refine_length_fix', 'text_lector']);
     // Both audits were open at the same time — the parallelism, not two
     // sequential calls that happen to come first.
     expect(maxConcurrent).toBe(2);
@@ -332,8 +332,11 @@ describe('refineStoryText — chain order', () => {
     expect(labels).not.toContain('text_audit2');
     expect(labels).not.toContain('text_lector_apply');
 
-    // Exactly one repair pass and one lector pass in the ledger.
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'lector']);
+    // Exactly one repair pass and one lector pass in the ledger — plus the
+    // word-budget re-measure's corrective pass (2026-09-11), which fires here
+    // because both stub pages sit under the floor and the repair stub does not
+    // lengthen them.
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'length_fix', 'lector']);
 
     // The audits merged to ONE finding, credited to both — and the word-budget
     // counter (third source, 2026-09-05) adds one FAULT[LENGTH] per page
@@ -420,7 +423,7 @@ describe('refineStoryText - a stalled audit is abandoned, the chain continues', 
     expect(res.mergedFindings).toHaveLength(2);
     expect(res.mergedFindings.map((f: any) => f.sources)).toEqual([['arc-informed'], ['counter']]);
     // The repair rewrote a page, so the diff pass reviews that pair (2026-09-06).
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'diff', 'lector']);
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'length_fix', 'diff', 'lector']);
     expect(res.changed).toEqual([1]);
     expect(labels).toContain('text_lector');
   });
