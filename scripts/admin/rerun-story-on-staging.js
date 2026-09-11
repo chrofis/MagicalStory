@@ -28,7 +28,13 @@
  * `--source=staging` reads its inputs from the staging database instead. The
  * characters are read from staging either way.
  *
- *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--source=prod|staging] [--yes]
+ * The premise is replayed verbatim by default — same brief in, pipeline out.
+ * `--regenerate-idea` instead asks the live idea generator for a fresh pair and
+ * keeps the one set in the reader's real city (`=fantasy` keeps the other), so
+ * the run also exercises today's idea prompt. The pair is sent along, so the
+ * story records the premise as ours rather than user-written.
+ *
+ *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--source=prod|staging] [--regenerate-idea[=location|fantasy]] [--yes]
  */
 'use strict';
 
@@ -47,7 +53,13 @@ const BASE = 'https://staging.magicalstory.ch';
 
 const sourceFlag = args.find((a) => a.startsWith('--source='));
 const SOURCE = sourceFlag ? sourceFlag.split('=')[1] : 'prod';
-const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--source=prod|staging] [--yes]';
+const ideaFlag = args.find((a) => a.startsWith('--regenerate-idea'));
+const IDEA_WORLD_WANTED = ideaFlag && ideaFlag.includes('=') ? ideaFlag.split('=')[1] : 'location';
+const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--source=prod|staging] [--regenerate-idea[=location|fantasy]] [--yes]';
+if (ideaFlag && !['location', 'fantasy'].includes(IDEA_WORLD_WANTED)) {
+  console.error(`--regenerate-idea="${IDEA_WORLD_WANTED}" is not a world. Use location (the reader's real city) or fantasy.`);
+  process.exit(1);
+}
 if (!['prod', 'staging'].includes(SOURCE)) { console.error(`--source="${SOURCE}" is not a database. Use prod or staging.`); process.exit(1); }
 if (!storyId || args.includes('--help') || args.includes('-h')) { console.error(USAGE); process.exit(storyId ? 0 : 1); }
 
@@ -171,6 +183,47 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   delete inputs.season;
   if (seasonOverride) inputs.season = seasonOverride;
   const season = seasonOverride || resolveSeason({}, { now: new Date() });
+
+  // Optional: throw away the stored premise and let the current idea generator
+  // write a new one. The endpoint always returns TWO ideas — by default one set
+  // in the reader's real city, one in the theme's fantasy world (see
+  // resolveIdeaWorlds in server/routes/storyIdeas.js) — and we keep the one
+  // whose world matches the flag. The offered pair travels on `ideaGeneration`
+  // so idea provenance records this as OUR idea, not a user-written one.
+  if (ideaFlag) {
+    const ideaBody = {
+      storyType: inputs.storyType, storyTypeName: inputs.storyTypeName,
+      storyCategory: inputs.storyCategory, storyTopic: inputs.storyTopic || '',
+      storyTheme: inputs.storyTheme, language: inputs.language,
+      languageLevel: inputs.languageLevel, pages: inputs.pages,
+      relationships: inputs.relationships || {},
+      userLocation: inputs.userLocation,
+      ...(seasonOverride ? { season: seasonOverride } : {}),
+      // Traits and names only — the prompt never reads avatars or photos, and
+      // a full row would push megabytes of base64 through the request.
+      characters: characters.map(({ avatars, photos, ...c }) => c),
+    };
+    const ir = await fetch(`${BASE}/api/generate-story-ideas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify(ideaBody),
+      signal: AbortSignal.timeout(180000),
+    });
+    const ib = await ir.json().catch(() => null);
+    if (!ir.ok) { console.error(`generate-story-ideas failed ${ir.status}: ${JSON.stringify(ib).slice(0, 400)}`); process.exit(1); }
+    const ideas = ib?.storyIdeas || [];
+    const worlds = ib?.ideaWorlds || null;
+    if (!ideas.length) { console.error('generate-story-ideas returned no idea — refusing to launch with the stale premise.'); process.exit(1); }
+    const pick = worlds ? worlds.findIndex((w) => w.world === IDEA_WORLD_WANTED) : -1;
+    if (pick < 0) {
+      console.error(`No "${IDEA_WORLD_WANTED}" idea among the ${ideas.length} returned (worlds: ${JSON.stringify(worlds)}). Refusing to guess.`);
+      process.exit(1);
+    }
+    inputs.storyDetails = ideas[pick];
+    inputs.ideaWorld = worlds[pick];
+    inputs.ideaGeneration = { output: ideas, selectedIndex: pick, model: ib.model };
+    console.log(`\nIdea regenerated (${ib.model}) — keeping idea ${pick + 1} of ${ideas.length}, world "${IDEA_WORLD_WANTED}":\n${inputs.storyDetails}\n`);
+  }
 
   const withAvatars = characters.filter((c) => c.avatars?.standardUrl || c.avatars?.summerUrl || c.avatars?.winterUrl).length;
   console.log(`Story    : ${storyId} (inputs from ${SOURCE})`);
