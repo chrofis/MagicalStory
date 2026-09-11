@@ -24,10 +24,14 @@ Last full sweep: **2026-09-06**.
 
 ## P0 — gating the production promotion
 
-- [ ] Verify on staging before promoting to master — **36 commits ahead as of 2026-09-06**
-      (`origin/master..origin/staging`; the "259 commits" figure in the source file is from
-      2026-07-20 and has since been promoted). Always compare ORIGIN refs: a naive
-      `master..staging` gives 1756 because the LOCAL master ref is stale at 2026-07-10
+- [ ] Verify on staging before promoting to master — **207 commits ahead as of 2026-09-11**
+      (`git rev-list --count origin/master..origin/staging`, measured 2026-09-11; the owner's
+      triage note that day said 205 — the two differ only by commits landed in between. The
+      "36 as of 2026-09-06" figure this line used to carry, and the "259 commits" figure in the
+      source file, are both stale). Always compare ORIGIN refs: a naive `master..staging` gives
+      a four-figure number because the LOCAL master ref is stale at 2026-07-10.
+      **The owner does the promotion himself, later** — this is the ONLY promotion item;
+      "whether the eval work goes to master" was closed into this line on 2026-09-11
       → `docs/compliance-and-todo.html:81`
 - [ ] Confirm location-verify + the landing #418 fix with a fresh showcase
       → `docs/compliance-and-todo.html:83`
@@ -497,27 +501,35 @@ Nothing below should be coded until it is answered.
 - [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
       `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every 100 with
       a second eval was offered and declined" (restated `:14904`) → `tasks/eval-variance-backlog.md`
-- [ ] Trial: generate the 2×4 costumed sheet eagerly or lazily?
-      → `tasks/story-scoped-avatars-plan.md:89`
-- [ ] Cover/page unification — **the unification SHIPPED** (`decisions.md:8998`, 2026-08-10,
-      "covers are pages with flags"); the `coverTitleMode` resolver and `iterateCover` precedence are
-      settled (SETTLED.md, wiring 2026-09-03). **Surviving risks, re-scoped: keeping trial covers
-      cheap, and the entity check on negative pages** — neither has a decisions.md entry
-      → `docs/plans/2026-08-10-cover-page-unification-review.md:193`
-- [ ] Anonymous account flow — keep or drop the ideas step; story viewing without email;
-      cleanup interval 24h vs 48h; localStorage vs sessionStorage
-      → `docs/plans/2026-03-08-anonymous-account-flow.md:244`
-- [ ] Whether any of the eval work goes to master → `tasks/eval-variance-backlog.md`
-- [ ] **T7 — spoil the payoff or risk the reader?** The arc review fixes "device acquires meaning
-      retroactively" by stating the rule where the device first appears, which spoiled this
-      story's ending 9 pages early (p9 board, then p15 Kiaan repeats it). Alternative: show a
-      character *learning* it without telling the reader what → `tasks/story-text-quality-2026-08-25.md:T7`
-- [ ] **T9(b) — should `textQualityJudge` run in the unified pipeline?** The template and
-      `server/lib/textQualityJudge.js` exist; it did not run on this story. Cost/latency call
-      → `tasks/story-text-quality-2026-08-25.md:T9`
-- [ ] **T12 — dialogue floor, and does a companion animal get a name?** ~8 spoken lines in 18
-      pages; the dragon is never named. The name rule changes story convention, not just prose
-      → `tasks/story-text-quality-2026-08-25.md:T12`
+- [x] (2026-09-11) Trial: generate the 2×4 costumed sheet eagerly or lazily? — **DECIDED: LAZILY**,
+      inside the create-story job, not up-front in the wizard. Trial abandonment is where trial
+      spend leaks; ~$0.06/character for users who never create a story costs more than the extra
+      in-job latency → `tasks/story-scoped-avatars-plan.md:89`, `docs/decisions.md` (2026-09-11 triage entry)
+- [x] (2026-09-11) Cover/page unification — entity check on negative pages: **DECIDED — a cover gets
+      the SAME entity check as a normal page, no special case.** (The unification itself SHIPPED,
+      `decisions.md:8998`, 2026-08-10, "covers are pages with flags"; `coverTitleMode` and
+      `iterateCover` precedence are settled in SETTLED.md, wiring 2026-09-03.)
+      → `docs/plans/2026-08-10-cover-page-unification-review.md:193`, `docs/decisions.md` (2026-09-11 triage entry)
+- [ ] **Keeping trial covers cheap — STILL OPEN.** The other half of the cover/page unification
+      risk list; NOT answered in the 2026-09-11 triage round, split out here so it is not lost
+      with its sibling → `docs/plans/2026-08-10-cover-page-unification-review.md:193`
+- [x] (2026-09-11) Anonymous account flow — **DROPPED.** A March 2026 plan that was never built;
+      the owner declined it on 2026-09-11 as ancient. Plan moved to
+      `docs/archive/2026-03-08-anonymous-account-flow.md`
+      → `docs/decisions.md` (2026-09-11 triage entry)
+- [x] (2026-09-11) Whether any of the eval work goes to master — **CLOSED AS STALE, not a separate
+      decision.** It is the same thing as the P0 promotion item at the top of this file (207 commits
+      ahead of `origin/master` as of 2026-09-11); the owner does that promotion himself, later
+      → the P0 item above, `tasks/eval-variance-backlog.md:67`
+- [x] (2026-09-11) **T7 — spoil the payoff or risk the reader? — DROPPED (declined).** No change to
+      `prompts/story-arc-review.txt`; the arc review keeps stating a device's rule where the device
+      first appears → `tasks/story-text-quality-2026-08-25.md:T7`, `docs/decisions.md` (2026-09-11 triage entry)
+- [x] (2026-09-11) **T9(b) — should `textQualityJudge` run in the unified pipeline? — DECIDED: NO.**
+      The reading-level re-check that shipped as T9(a) in 4b346fb0d already covers this ground
+      → `tasks/story-text-quality-2026-08-25.md:T9`, `docs/decisions.md` (2026-09-11 triage entry)
+- [x] (2026-09-11) **T12 — dialogue floor + naming the companion animal — DROPPED (declined), both
+      halves.** No dialogue-count check in `story-text-from-beats.txt`, no companion-naming rule in
+      `story-arc-review.txt` → `tasks/story-text-quality-2026-08-25.md:T12`, `docs/decisions.md` (2026-09-11 triage entry)
 - [x] (2026-09-06, b3acb951c) **T14 — must every title contain the main character's name?** —
       **ANSWERED IN CODE.** `buildTitleRule()` in `server/lib/promptBuilders.js` branches on cast size:
       1 name required, 2 both, 3+ optional ("prefer what they do together"). Shipped 2026-08-25 19:47 CH,
@@ -853,9 +865,10 @@ Recorded so nobody re-proposes them as gaps.
 - [ ] **The face-prop one-entry-with-states rule has never run** (shipped 2026-09-11, prompt-only). The first beats story containing a map/letter/sign should be checked: does the bible emit one entry with a turned-away + face-to-camera state, does the AD cite the state id, and does the face state's cell carry the `text` words? → `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion*.txt`, docs/decisions.md 2026-09-11 "A face prop is ONE bible entry"
 - [ ] **`applyBriefUsage` does not run on the trial path.** `trialReferenceSheetPromise` fires inside `onVisualBible`, before any brief exists, so trial reference cells are still selected from the bible's own page guess. Decide whether trial should defer the sheet until its briefs exist or keep the speed. → `storyJobPipeline.js` (trial ref-sheet kickoff), `server/lib/vbElementBudget.js` `applyBriefUsage`
 - [ ] **A reference sheet whose grid cannot be detected at all is still cut blind** (2026-09-11). `splitGridIntoReferences` falls back to the analyzer's `/split-reference-sheet` and then to equal-cell sharp math using the REQUESTED count; the merged-panel guard added today only protects the mismatch path, where a grid was detected. A detection failure on a sheet the model laid out differently still stores misaligned crops, silently. → `server/lib/referenceSheets.js` `splitGridIntoReferences` fallback branch
-- [ ] **A cell that fails its gate twice is still accepted and stored** (`vb_*_still_bad` — "accepted anyway"). Now that the re-render is told the reason (2026-09-11), a second identical failure is real information: the model cannot render this entry. Open owner decision: keep fail-open, drop the reference, or re-render a second time. → `server/lib/referenceSheets.js` gate blocks in `generateReferenceSheet`, docs/decisions.md 2026-09-11 re-render entry
-- [ ] **The Test Lab `beats_scenes` stage now measures a bible it also authors.** `runBeatsScenesStage` no longer passes a stored `visualBible` (the AD writes one); the stage still scores only the page briefs, so a bad bible in a Lab run is invisible. Decide whether the stage should parse and report the emitted bible too. → `server/lib/testlab.js` `runBeatsScenesStage`, `server/lib/beatsPipeline.js` `extractBibleSections`
-- [ ] **A total all-pages failure now loses the Visual Bible AND the cover hints, not just the briefs (2026-09-11).** Before, a failed AD call still had a stage-3 bible to fall back on; the per-page fallback now expands blind. Two batch attempts stand between the run and that state. Decide whether a bible-only retry (cheaper than a third full batch) is worth building. → `server/lib/beatsPipeline.js` (all-pages loop + bible-adoption block)
+- [x] (2026-09-11, owner ruling) **A cell that fails its gate twice is still accepted and stored** (`vb_*_still_bad` — "accepted anyway"). CLOSED as intended behaviour: ship it. The gate stays fail-open on the second failure; it never drops the reference and never re-renders a third time. Consistent with the standing rule that a quality gate ships-with-warning on the final strike and never kills a paid run. The re-render is now told the reason (2026-09-11), so the second attempt is informed rather than blind — that was the part worth fixing. → `server/lib/referenceSheets.js` gate blocks in `generateReferenceSheet`
+- [ ] **Action/interaction criticals survive repair, and we have not measured production's three passes against them** (2026-09-11, diagnosed not fixed). `job_1789147573901_m3uam0nxi` shipped p6 at 0 and p9 at 5 with 2 and 6 unrepaired `action_interaction` criticals. NOT a repair failure: `repairMaxPasses` is 1 on staging vs 3 on prod (`server/config/runtime.js:124`), and the single pass improved every page before the budget ended (p6 -20→0, p9 -15→5, p10 35→45). The type routes to `inpaint_or_regen` (`server/lib/evalBuckets.js:67`), i.e. re-roll the composition rather than a targeted fix. Open question: on production, do three re-rolls actually land an action fault? If not, action faults need a targeted repair. Needs evidence from prod stories, not from a staging run. Related: p10's critical ("no visible letters on the signpost for him to trace") was CAUSED by the VB trim bug fixed the same day — a page can be made physically unrepairable upstream. → `server/lib/repairPipeline.js` round loop, `server/lib/evalBuckets.js`
+- [ ] **Some Visual Bible entries finish a run with NO cell-gate record at all** (found 2026-09-11 while fixing the state-cell identity gate, `job_1789147573901_m3uam0nxi`). ART003 (the central prop) and ART015 have `cellGates: []` — no `element_cell` and no `state_cells` verdict — so no gate ever judged their reference. Two candidate causes not yet separated: the entry had no reference cell rendered at all (the `appearsInPages` trim, fixed same day in `cdb334904`), or the gate errored and the fail-open path records nothing. The fail-open path recording nothing means a gate outage is indistinguishable from a pass in stored data; consider recording an explicit `{ok: null, error}` row. → `server/lib/referenceSheets.js` gate blocks in `generateReferenceSheet`, `server/lib/visualBible.js` `recordElementCellGate`
+- [ ] **An entry with exactly ONE state is not a state batch and is gated as a plain element cell using the STATE row, not the parent description** (found 2026-09-11, `job_1789147573901_m3uam0nxi` ART015 "Felsblock", states `[blocking]`). `isStateBatch` requires `batch.length > 1`, so a single-state entry falls through to `checkElementCellRender`, which reads the cell element rather than the parent — worth confirming which description that question actually quotes before deciding if it needs the same parent-description treatment the multi-state path now gets. → `server/lib/referenceSheets.js` `isStateBatch` / `checkStateBatch`
 - [ ] **The landmark-shortfall early abort now costs a scene-expansion call (2026-09-11, side effect of the AD authoring the Visual Bible).** `onVisualBible` fired at beats stage 3, before the briefs; it now fires after the all-pages Art Director call, so a retried attempt has already paid for the briefs. It still saves the scene review and the page text. Options: abort on the bible section as it streams, or accept the cost. → `server/lib/beatsPipeline.js` (bible-adoption block), `storyJobPipeline.js` `runBeatsWriterWithLandmarkGuideline`
 - [ ] **The Test Lab `beats_scenes` stage now measures a bible it also authors.** `runBeatsScenesStage` no longer passes a stored `visualBible` (the AD writes one); the stage still scores only the page briefs, so a bad bible in a Lab run is invisible. Decide whether the stage should parse and report the emitted bible too. → `server/lib/testlab.js` `runBeatsScenesStage`, `server/lib/beatsPipeline.js` `extractBibleSections`
 - [ ] **A total all-pages failure now loses the Visual Bible AND the cover hints, not just the briefs (2026-09-11).** Before, a failed AD call still had a stage-3 bible to fall back on; the per-page fallback now expands blind. Two batch attempts stand between the run and that state. Decide whether a bible-only retry (cheaper than a third full batch) is worth building. → `server/lib/beatsPipeline.js` (all-pages loop + bible-adoption block)

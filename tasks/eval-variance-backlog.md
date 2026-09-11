@@ -64,7 +64,12 @@ subject. Do not read these as unbuilt.
 - [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
       `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every
       100 with a second eval was offered and declined" (restated `:14904`).
-- [ ] Whether any of this goes to master.
+- [x] (2026-09-11) ~~Whether any of this goes to master.~~ **CLOSED AS STALE — it was never a
+      separate decision.** It is the same thing as the standing P0 promotion item in
+      `tasks/BACKLOG.md` ("Verify on staging before promoting to master"): `origin/staging` was
+      **207 commits ahead of `origin/master`** when measured on 2026-09-11, and the eval work is
+      part of that same block. The owner does the promotion himself, later.
+      → `tasks/BACKLOG.md` (P0 section), `docs/decisions.md` (2026-09-11 triage entry)
 
 ## Done (the session that produced this backlog)
 

@@ -32537,6 +32537,75 @@ scale without a simile there is a separate, still-open backlog item.
 `tests/unit/reference-sheet-mismatch.test.ts`
 **Status:** ✅ active
 
+## Backlog triage 2026-09-11 — seven owner verdicts, five of them "we deliberately do not do this"
+**Context:** The "Decisions waiting on the owner" section of `tasks/BACKLOG.md` had accumulated
+items that were blocking nothing but were also never going to be built, plus one that had
+silently become a duplicate. The owner triaged the section on 2026-09-11. Recording the
+declines matters as much as the approvals: an undocumented decline is re-proposed by the next
+session that reads the source plan. (Two further items from the same section — killing scene
+review round 2, and the B1/B2 `subject` field — were being implemented separately and are not
+covered here.)
+
+**Decision:** Seven verdicts.
+
+1. **"Whether any of the eval work goes to master" — CLOSED AS STALE, it is not a separate
+   decision.** It is the standing P0 promotion item: `origin/staging` was **207 commits ahead
+   of `origin/master`** when measured on 2026-09-11 (`git rev-list --count
+   origin/master..origin/staging`; the owner's own note that day said 205 — the gap is commits
+   landed in between), and the eval work is inside that block. The owner does the promotion
+   himself, later. The stale "36 commits ahead as of 2026-09-06" figure on the P0 line was
+   corrected at the same time.
+
+2. **The trial's 2×4 costumed sheet is generated LAZILY — inside the create-story job, not
+   up-front in the wizard.**
+
+3. **A cover gets the same entity check as a normal page. No special case.** The other surviving
+   risk from the cover/page unification review — *keeping trial covers cheap* — was **not**
+   answered and stays open as its own backlog line.
+
+4. **The anonymous account flow is DROPPED.** A March 2026 plan that was never built; moved to
+   `docs/archive/` with a drop note. Its four open questions (ideas step, story viewing without
+   email, 24h vs 48h cleanup, localStorage vs sessionStorage) are dropped with it.
+
+5. **T7 (spoil the payoff vs risk the reader) — DECLINED.** No change to
+   `prompts/story-arc-review.txt`. The arc review keeps stating a device's rule where the device
+   first appears.
+
+6. **T9(b) — `textQualityJudge` does NOT run in the unified pipeline.** The template and
+   `server/lib/textQualityJudge.js` stay unwired from the pipeline.
+
+7. **T12 — DECLINED, both halves.** No dialogue-count check in `prompts/story-text-from-beats.txt`,
+   and no companion-animal naming rule in `prompts/story-arc-review.txt`.
+
+**Rationale:**
+- (1) Two lines tracking one promotion produce two different stale numbers; one line with a
+  measured, dated figure is the whole value of the index.
+- (2) Trial abandonment is where trial spend leaks. Paying ~$0.06/character for users who never
+  reach story creation costs more than the extra in-job latency the lazy path adds. UX parity
+  with the eager path is explicitly not worth that price.
+- (3) The shipped unification is "covers are pages with flags" — its entire point is that a cover
+  is not a separate code path. Exempting covers from the entity check would rebuild the special
+  case the unification removed.
+- (4) Six months old, never built, and the trial flow has moved on without it (prewarm + PATCH
+  sync, deferred email, the one-trial-per-user cap). Keeping it listed as an open decision only
+  generated re-reads.
+- (5) The fault T7 describes is real, but the proposed alternative trades a known-understandable
+  story for a surprise the child may simply miss; the owner is not buying that trade.
+- (6) The reading-level re-check that shipped as T9(a) in `4b346fb0d` already covers this ground,
+  so a second judge buys nothing for its cost and latency.
+- (7) A dialogue floor is a countable rule with no evidence that the count is what makes a page
+  feel alive, and naming a companion animal changes story convention, not just prose.
+
+**Touched:** `tasks/BACKLOG.md` (P0 figure corrected; six lines closed, one new line split out for
+the still-open trial-cover-cost half), `tasks/eval-variance-backlog.md`,
+`tasks/story-scoped-avatars-plan.md`, `tasks/story-text-quality-2026-08-25.md` (T7, T9(b), T12),
+`docs/plans/2026-08-10-cover-page-unification-review.md`,
+`docs/archive/2026-03-08-anonymous-account-flow.md` (moved from `docs/plans/`).
+**No application code, prompt or eval rule was changed by this entry** — five of the seven
+verdicts are decisions NOT to change one.
+
+**Status:** ✅ active
+
 ---
 
 ## A Visual Bible entry with `states[]` is asked the identity question too, not only state consistency (2026-09-11)
@@ -32580,81 +32649,6 @@ batches are a minority of entries — typically 1-3 per story, so ~1-6 extra cal
 
 **Touched:** `server/lib/referenceSheets.js` (`checkStateBatch` + the `isStateBatch` branch in
 `generateReferenceSheets`), `tests/unit/vb-state-batch-gate.test.ts`.
-
-**Status:** ✅ active
-
-### The Art Director authors the Visual Bible, ahead of the page briefs
-**Context:** The Visual Bible was written at beats stage 3
-(`beats_story_bible`, `prompts/story-bible-from-beats.txt`), BEFORE the Art
-Director wrote the scene briefs at stage 4 (`beats_scene_expansion`,
-`prompts/scene-expansion-all.txt`). The bible therefore had to GUESS which page
-uses which element, matching plan lines that name things in prose ("the big
-wing scale") against entries the bible keys by id. On staging
-`job_1789147573901_m3uam0nxi` the guess removed 19 (element, page) claims and
-left six entries at `appearsInPages: []` — including the story's central prop
-and the signpost carrying plot-critical text. No reference cell was rendered
-for any of them, while the final briefs cited exactly those ids (p10
-`objects: ["LOC004", "ART006"]`), and p10 then shipped an unrepairable critical
-("no visible letters on the signpost for him to trace"). The bible-time trim
-was dropped and page assignment rebuilt from the final briefs the same day
-(`applyBriefUsage`, `cdb334904`) — a correction to the guess, not its removal.
-
-**Decision:** The guess is gone. The EXISTING all-pages Art Director call emits
-the `---VISUAL BIBLE---` and `---COVER SCENE HINTS---` sections FIRST, before
-page 1's heading, then the page briefs. **No new model call was added** — the
-sections ride the call that was already being made. Stage 3 keeps the
-`---CLOTHING REQUIREMENTS---` section and nothing else. `applyBriefUsage` is
-KEPT as a deterministic reconciler: it is free, tested, and it credits a
-secondary named only in a page's `characters[]` row, which `objects[]` never
-carries.
-
-**Rationale:**
-- One author now owns both what is in each picture and what each thing looks
-  like, so the two cannot contradict each other.
-- The emission ORDER is the mechanism: the model declares its cast and props,
-  then stages each page citing ids that already exist, which makes it
-  structurally impossible for a page's `objects[]` to name an entry that was
-  never declared. That is the exact failure being fixed.
-- Clothing did NOT move. Styled avatars are the long pole in front of every
-  image and start the instant stage 3 returns (`opts.onClothingRequirements`);
-  making the wardrobe wait for the Art Director would push every page image
-  back by a whole stage. Clothing depends on the cast and the setting, both
-  already fixed by the plan, so it needs nothing the Art Director adds.
-- The Art Director picks landmark viewpoints from the `PHOTOS:` lines in
-  `{AVAILABLE_LANDMARKS_SECTION}` (the same descriptions `photoVariants`
-  carries), so `landmarkView` is no more blind than before; the index linking
-  and variant load now run right after the bible is parsed instead of before
-  scene expansion.
-- Truncation headroom, measured offline on that same story (18 pages, no model
-  call): the built prompt is 71,661 chars (~17.9k tokens, no unfilled
-  placeholders) and the response has to carry the stored bible JSON (40,702
-  chars, an over-estimate — the stored copy is enriched), the cover hints
-  (4,073) and every brief (63,533) — ~27k output tokens against
-  `gemini-3.1-pro`'s 65,536 cap (`maxTokens=null`, no code-side cap). A partial
-  bible is never shipped: `JSON.parse` is the completeness test, a reply cut
-  mid-JSON yields no bible at all, and the existing batch retry is the recovery.
-- The per-page fallback (`expandOnePage`) cannot author a whole-book bible and
-  does not try — it reuses whatever the all-pages call produced. With no bible
-  at all the run is degraded exactly as a failed stage-3 bible always was
-  (empty VB, no cover hints, blind briefs) and says so loudly. Never a kill.
-- TRIAL IS UNAFFECTED: trials are always `pipelineMode: 'unified'`
-  (`resolvePipelineMode`), so the streaming `onVisualBible` callback in
-  `storyJobPipeline.js` — and the trial reference-sheet kickoff inside it — is
-  on the unified path and never sees this change.
-- The landmark-shortfall early abort (`onVisualBible` in beats mode) now fires
-  after the Art Director call instead of before it, so a retried attempt burns
-  the scene-brief stage too. It still saves the scene review and the page text,
-  and it is the only known cost of the move.
-
-**Touched:** `prompts/scene-expansion-all.txt`,
-`prompts/story-bible-from-beats.txt`, `server/lib/beatsPipeline.js` (stage-3
-block, `extractBibleSections` marker sets, the bible-adoption block after the
-all-pages call, the stage-order header), `server/lib/promptBuilders.js`
-(`buildSceneExpansionAllPrompt`, `buildStoryBibleFromBeatsPrompt`,
-`namedByMain`), `server/lib/testlab.js` (`runBeatsScenesStage` call site),
-`docs/prompt-inventory.md`, `tests/unit/ad-authored-bible.test.ts`,
-`tests/unit/vb-authoring-contract.test.ts`,
-`tests/unit/invented-age-band-wiring.test.ts`.
 
 **Status:** ✅ active
 

@@ -197,8 +197,12 @@ Test Lab cover stage exercised.
 are settled (`docs/SETTLED.md`, wiring 2026-09-03). Of the eight risks listed below, only two
 still survive with no `decisions.md` entry covering them:
 
-- **keeping trial covers cheap**
-- **the entity check on negative pages**
+- **keeping trial covers cheap** — **STILL OPEN** (not answered in the 2026-09-11 triage round;
+  carried in `tasks/BACKLOG.md` as its own line so it is not lost with its sibling)
+- ~~**the entity check on negative pages**~~ — **DECIDED 2026-09-11: a cover gets the SAME entity
+  check as a normal page. No special case.** Consistent with the shipped unification ("covers are
+  pages with flags"); the whole point of that model is that a cover is not a separate code path.
+  → `docs/decisions.md` (2026-09-11 backlog-triage entry)
 
 Treat the rest as historical context, not open work.
 

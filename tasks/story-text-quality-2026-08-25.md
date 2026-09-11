@@ -217,6 +217,11 @@ the object does nothing in the challenges it would be carried through."*
 
 ## T7 — Double exposition: the rule is stated on a sign, then restated in dialogue
 
+**CLOSED 2026-09-11 — DECLINED by the owner.** No prompt change to `story-arc-review.txt`. The arc
+review keeps stating a device's rule where the device first appears; the "show a character learning
+it without telling the reader what" alternative below is dropped, not deferred.
+→ `docs/decisions.md` (2026-09-11 backlog-triage entry)
+
 **Symptom.** p9 is an information panel that explains the entire ending (dragons follow warm
 glowing fires home). p15 has Kiaan restate the same rule. The resolution is handed to the
 reader twice, once by furniture.
@@ -267,7 +272,12 @@ the action."*
 
 ## T9 — Reading level is enforced on the writer, then not re-checked
 
-**T9(a) CLOSED 2026-09-06 (4b346fb0d)** — the reading-level re-check shipped. **T9(b) (should `textQualityJudge` run in the unified pipeline?) stays OPEN — owner decision.**
+**T9(a) CLOSED 2026-09-06 (4b346fb0d)** — the reading-level re-check shipped. **T9(b) CLOSED
+2026-09-11 — DECIDED: NO, `textQualityJudge` does not run in the unified pipeline.** Owner's reason:
+the reading-level re-check shipped as T9(a) already covers this ground, so the judge would buy
+nothing for its cost and latency. The template and `server/lib/textQualityJudge.js` stay where they
+are (Lab / ad-hoc use), unwired from the pipeline.
+→ `docs/decisions.md` (2026-09-11 backlog-triage entry)
 
 **Symptom.** p9: *"Die Tafel zeigt, dass solche Tiere dem warmen Leuchten dieser Feuer folgen,
 um nach Hause zu ihrer Familie zu finden."* — 20 words, nested subordinate clause, and
@@ -334,6 +344,11 @@ One clause on p3 or p10 ("über den Alpen liegt schon ein grauer Streifen") fixe
 ---
 
 ## T12 — No dialogue floor; the dragon is never named
+
+**CLOSED 2026-09-11 — DECLINED by the owner, both halves.** No dialogue-count check in
+`story-text-from-beats.txt` (a), and no companion-naming rule in `story-arc-review.txt` (b).
+Neither is deferred — they are dropped.
+→ `docs/decisions.md` (2026-09-11 backlog-triage entry)
 
 **Symptom.** Roughly eight spoken lines across 18 pages, most of them exposition. The dragon
 — the co-protagonist a child attaches to — has no name.
@@ -439,8 +454,9 @@ a "delete the detail" option, so every fix is paid for out of the prose.
 ## Proposed order of work
 
 Prompt-only, no code, cheapest-first. **Items 1-7 below SHIPPED 2026-08-25 in 4b346fb0d
-(closed 2026-09-06). T14 was answered in code (`buildTitleRule()`, b3acb951c). T7, T9(b)
-and T12(b) still need an owner decision first (see each section).**
+(closed 2026-09-06). T14 was answered in code (`buildTitleRule()`, b3acb951c). T7, T9(b) and T12
+were triaged by the owner on 2026-09-11: T7 declined, T9(b) NO, T12 declined in both halves — none
+of them will be implemented (see each section).**
 
 1. **T3 + T5** — `text-refine.txt` gains a "remove the detail" disposition; `story-text-audit.txt`
    exempts page-turn travel. Kills the worst logic hole and the travelogue openers. Two clauses.

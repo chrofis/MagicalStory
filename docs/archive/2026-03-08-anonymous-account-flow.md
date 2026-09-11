@@ -1,3 +1,11 @@
+> **ARCHIVED 2026-09-11 — DROPPED, never built.** The owner declined this plan in the
+> 2026-09-11 backlog-triage round: it is a March 2026 design that was never implemented, and the
+> trial flow has moved on without it (prewarm + PATCH sync, deferred email, the one-trial-per-user
+> cap — see `docs/codebase-guide.md` "Trial Flow"). Its four open questions (keep or drop the ideas
+> step; story viewing without email; 24h vs 48h cleanup; localStorage vs sessionStorage) are dropped
+> with it and are **not** open work. Kept for the reasoning only.
+> → `docs/decisions.md` (2026-09-11 backlog-triage entry)
+
 # Anonymous Account Trial Flow
 
 ## Goal
