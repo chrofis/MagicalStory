@@ -5693,6 +5693,15 @@ function buildArcBudgetSection(inputData, pageCount) {
     '# BUDGETS',
     `- This book carries at most ${events}${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
     ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
+    // Telling was FREE against both limits above: a speech is one happening and
+    // changes nothing, so backstory the arc had to deliver was cheapest as one
+    // character explaining it, and the budget pushed it there. Measured on
+    // job_1789147573901_m3uam0nxi, whose arc packed the theft, the thieves,
+    // where the thing now is, when a second piece broke and why the owner is
+    // stuck into ONE event — one page, one speech. The clause routes the
+    // surplus rather than banning it: a bare ban makes the model drop facts,
+    // which is how a length rule once deleted a story's causality (2026-09-07).
+    '- One telling carries one thing the reader did not already know. Further facts arrive where they are needed — at the page that turns on them — or are found and shown rather than said.',
     actionsLine,
     ...(lvl === '1st-grade' ? [`- This book is read aloud to ${READER_AGE_BY_BAND[band] || READER_AGE_BY_BAND.standard} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,

@@ -57,7 +57,7 @@ Every word must be one a child at the reading level above already uses. Name a t
 No abbreviation or acronym reaches the page, even when the story uses one: write the thing the way a child says it — the little train up the mountain, not its initials.
 Use dialogue where it fits — speech carries feeling and decision, not only what the pictures already show.
 {TITLE_RULE}
-Then name the candidate to ship, judged in this order: it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud.
+Then name the candidate to ship, judged in this order: every word of it is true of the pages you wrote — a title naming a condition, a lack or an inability is one the story shows happening on a page, never one a character only mentions; it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud. Where no candidate is true of the pages, write a fourth that is and ship that one.
 
 Work in two steps.
 
@@ -69,14 +69,7 @@ Step 2 — write the pages, fixing what the analysis found. A problem the analys
 
 # OUTPUT FORMAT
 
-Three blocks, in this order, nothing before or after.
-
----TITLE---
-TITLE_CANDIDATES:
-1. <a title, in the story language>
-2. <a second, taking a different angle on the story>
-3. <a third, taking a different angle again>
-TITLE_PICK: <candidate number> — <one sentence>
+Three blocks, in this order, nothing before or after. The title comes last, chosen from the pages as they stand.
 
 ---ANALYSIS---
 <one line per page>
@@ -89,3 +82,10 @@ TITLE_PICK: <candidate number> — <one sentence>
 <text for page 2>
 
 (continue through page {PAGE_COUNT})
+
+---TITLE---
+TITLE_CANDIDATES:
+1. <a title, in the story language>
+2. <a second, taking a different angle on the story>
+3. <a third, taking a different angle again>
+TITLE_PICK: <candidate number> — <one sentence>

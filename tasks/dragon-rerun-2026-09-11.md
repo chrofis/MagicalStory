@@ -231,7 +231,7 @@ Text: she digs at the earth under the boulder with her front paws. The render is
 
 -> `prompts/scene-expansion.txt` creature tone, `server/config/runtime.js` CREATURE_TONE scope
 
-### D21. p2 - the ride goes the wrong way and the lamp is missing from the bike
+### D21. p2 - the ride goes the wrong way and the lamp is missing from the bike [DONE 2026-09-11, owner-closed]
 
 Text: out of the city and UP the green hill. Render: a road running downhill toward a village, with both boys stationary and their feet off the pedals. Levin's bike also has no lamp mounted, although the lamp is on the bike at this point in the story - he unclips it on p9, which is the plot point that puts it in his pocket for p16.
 
@@ -246,7 +246,8 @@ both plates through the production path. A second clause banning imported settle
 tested and REJECTED - it made the model name a city and the plate render it larger. See
 docs/decisions.md 2026-09-11 "The empty-scene plate mirrors the route's GRADIENT".
 
-**Lamp half: OPEN, and wider than one lamp.** ART001 declares `appearsInPages: [1,2,3,16]`;
+**Lamp half: closed WITH D21 by the owner (2026-09-11).** The underlying mismatch is
+tracked on its own in tasks/BACKLOG.md - it is a pipeline-wide fault, not a p2 defect: ART001 declares `appearsInPages: [1,2,3,16]`;
 p2's brief cites `["LOC002","ART011","ART012"]` - no lamp. Not a budget cut (3 artifacts,
 `VB_ELEMENT_BUDGET` is 3). The same mismatch holds on 15 of 18 pages; p9 - where the lamp
 is unclipped - cites no objects at all. Nothing reconciles the bible's page assignments
@@ -258,7 +259,7 @@ Double the page budget (run mean ~75 words). It splits the group three ways (Lev
 
 -> `prompts/story-text-from-beats.txt` page budget, the beats planner
 
-### D23. The title promises a story the book does not tell
+### D23. The title promises a story the book does not tell [DONE 2026-09-11]
 
 "Der Drache, der nicht fliegen konnte" promises a dragon who cannot fly. The dragon flies fine; he is missing a scale, and we never once see him try and fail. It is a fetch quest wearing a disability-story title, and the title is the first thing a buyer reads. `titleJudge` / `titleCandidates` scores candidates but never tests one against the arc it was drawn from.
 
@@ -270,10 +271,73 @@ A combination lock with rotating wheels on a mountain gate, with the code posted
 
 -> the beats planner, `prompts/story-arc*.txt`
 
-### D25. Smaller narrative faults, logged together
+### D25. Smaller narrative faults, logged together [(a) and (b) declined by owner; (c) DONE 2026-09-11]
 
 (a) p7's backstory is a single dragon-dialogue info-dump - two guards, the Grauhorn, the crevice, the same night, all in one breath. (b) Nia has no owner: she arrives dragging someone and it is never said whose dog she is, although the brief names her as Max's. (c) Fauchi cannot cross the Grauhorn without the scale, yet four small children walk there and back in an afternoon.
 
 -> `prompts/story-text-from-beats.txt`, the beats planner
 
 **Not regressions - keep these:** p8 (98, deserved - real expression and real sibling energy), p14 (the two scales matching, the clearest storytelling in the book), p18 (the payoff spread over Zurich with the Grossmuenster), the back cover, the initial page, and the p16-17 lamp-for-scale trade, which is a well-built resolution with a sympathetic motive for the guards. Swiss conventions are correct throughout.
+
+---
+
+## Found 2026-09-11 by re-running the text audit at temperature 0 over the SHIPPED text
+
+These are defects in the already-evaluated dragon book that the production audit did not
+file. Found while validating the D25(c) UNFORCED clause, not by reading the pages again.
+Raw output: the `d25_audit_validation` run (gemini-3.1-pro, 9 faults vs production's 5).
+
+### D26. p10 contradicts itself about which path Nia takes
+
+The text has Nia pull toward the middle arm — established as the correct way to the
+Grauhorn — and then, in the same page, has Max and Nia take the stone path to the LEFT.
+Inside the three-way split that D22/D24 already condemn, so it may disappear with them;
+it is a plain self-contradiction either way.
+
+### D27. p14 - Julian is holding the big scale with no shown path to it
+
+The big scale was last placed deep inside the crack, behind the larger guard's crossed
+arms (p13). On p14 Julian holds his small flake up beside it as proof. Nothing shows how
+it came within reach. Tagged TRANSITION.
+
+### D28. p17 and p18 - text and picture tell different moments
+
+p17: the text has all four boys carry the scale down together; the picture shows one
+carrying it while the others watch. p18: the picture shows the wing whole and smooth
+while the text still has the small piece in Julian's hand. Tagged MISMATCH — the audit's
+own text-vs-picture question, which no other stage runs.
+
+### D29. The book never shows the dragon getting home - the stated goal is dropped
+
+p7 states the quest plainly: without the big scale he cannot fly over the Grauhorn and
+cannot get home. The ending gives a joyride over Zurich and the boys cycling home; the
+dragon is never shown or said to reach home. Tagged LOADBEARING. Same wound as D23: the
+book's stated promise and what it delivers are not the same thing.
+
+
+---
+
+## D23 / D25 outcomes (2026-09-11)
+
+**D23 DONE.** No title judge existed — the text writer picked its own title inline, from three
+criteria none of which asked whether the title is true, and the ---TITLE--- block came FIRST so
+the pick preceded the story. Truth now leads the judging order and the block moved last.
+`parseRefinedText` needed an opt-in trailing-marker argument first, or the title block would have
+shipped inside the final page. Re-run on this story: candidates became "Fauchis Schuppe" /
+"Die Reise zum Grauhorn" / "Das Licht am Velo"; the false title is no longer proposed.
+See docs/decisions.md 2026-09-11 "The story title is picked AFTER the pages".
+
+**D25(a) — owner declined** (arc packs the backstory into one event). The arc-side fix was built
+anyway under a separate ask: telling now costs what showing costs. See docs/decisions.md
+2026-09-11 "Telling costs what showing costs".
+
+**D25(b) — owner declined** (no owner stated for the companion animal). Recorded for the record:
+the arc DID say it ("his dog has pulled him and Kiaan uphill all morning"); the shipped page says
+"Nia pulled US". The one word was lost in rewriting, and the Visual Bible animal entry has no
+owner field, so it lived in a single sentence.
+
+**D25(c) DONE.** Restated: the book never says why the creature does not fetch the thing itself —
+its p7 line is about not being able to FLY over the mountain, not about being unable to go. The
+UNFORCED question in `story-text-audit.txt` now names the obvious-doer case, and an A/B over the
+shipped text files the fault only with the clause. The same A/B measured the audit's yield as
+unstable (5 / 4 / 9 faults over identical text) — tracked in tasks/BACKLOG.md.

@@ -33295,3 +33295,126 @@ visible output — measured on gpt-5.6-luna-pro (300 requested, 965 returned, 94
 reasoning, zero visible characters). That set covers `planCheckModel`,
 `outlineReviewModel`/`arcReviewModel`, `textAuditModel` and `beatsAuditModel`.
 `deepseek-v4-pro` is both understated 6x and reasoning-enabled.
+
+## 2026-09-11 — The story title is picked AFTER the pages, and judged first on being true of them
+
+**Context:** `job_1789147573901_m3uam0nxi` shipped as "Der Drache, der nicht
+fliegen konnte" — a title promising a creature who cannot fly. The book never
+shows one trying and failing; the limitation is stated once, in one line of
+dialogue, and is narrower than the title ("kann ich das Grauhorn nicht
+überfliegen und nicht nach Hause" — a range limit, not an inability), and the
+creature flies on the final page carrying the whole cast. A buyer reads a
+condition the book does not tell.
+
+There is no title judge: the stored `titleJudge` is the TEXT WRITER's own
+inline pick (`beatsPipeline.js`), and its three criteria were "names the
+adventure or the bond / gives away no ending / a child of N can say it". None
+asks whether the title is TRUE, so the pick was honest against its own test. The
+discarded candidates show the cost — "Die Schuppe vom Grauhorn" is accurate and
+was rejected for naming "an object that merely carries it": the rule steered
+away from the true title toward the evocative false one. Worse, `---TITLE---`
+was the FIRST output block, so the title was committed before a word of the
+story existed and could only be guessed from the arc.
+
+**Decision:** truth leads the judging order — every word of the title is true of
+the pages as written, and a title naming a condition, a lack or an inability is
+one the story SHOWS on a page, never one a character only mentions; where no
+candidate qualifies, a fourth is written and shipped. The `---TITLE---` block
+moves to LAST, after the pages, so the pick is made against the finished story.
+
+**Parser work this forced:** `parseRefinedText` gave the last page everything to
+the end of the reply, so a trailing block would have shipped inside the final
+page of the book — the same failure its own headStart comment describes for page
+headings. Fixed with an opt-in `trailingMarkers` argument, NOT a blanket "any
+---MARKER--- ends a page": scene briefs carry ---METADATA--- inside each page, so
+a general rule would cut the last brief's metadata off. Only the text-writer call
+site passes `['TITLE']`. The title-section regex in `beatsPipeline.js` also had a
+lookahead requiring a following `---X` that no longer exists; it now accepts
+end-of-input. The synthesised `rawOutline` still emits ---TITLE--- first for the
+downstream unified parsers — unchanged, and unaffected.
+
+**Validation:** the stored text prompt for that run was re-sent to the same model
+(`claude-sonnet`, `MODEL_DEFAULTS.storyText`) with only these edits applied. All
+18 pages parsed, none missing, and the trailing block did not leak into the last
+page. New candidates: "Fauchis Schuppe" / "Die Reise zum Grauhorn" / "Das Licht
+am Velo" — the false title is no longer even proposed. Shipped pick: "Fauchis
+Schuppe". One run, not a distribution.
+
+**Known trade-off:** the winner names an OBJECT, which the second criterion
+disfavours. Truth now outranks it, so expect drift toward object titles.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `server/lib/promptBuilders.js`
+(`parseRefinedText`), `server/lib/beatsPipeline.js` (title regex + call site).
+**Status:** ✅ active.
+
+## 2026-09-11 — Telling costs what showing costs: one telling carries one new fact
+
+**Context:** `job_1789147573901_m3uam0nxi` p7 is one speech delivering five facts
+— who took the thing, while the owner slept, where it is now, that a second piece
+broke the same night, and why the owner is stuck. The writer did not invent that
+shape: the ARC packed all five into ONE numbered event, and the beats stage gave
+that event one page.
+
+The budget could not see it. `buildArcBudgetSection` limits EVENTS ("a happening
+a child would retell on its own") and ACTIONS ("one thing a character does that
+changes something"). A speech is one happening and changes nothing, so told
+information was free while shown information was rationed — the budget actively
+pushed backstory into a speech. The arc critique has the same blind spot: it
+counts distinct events and per-page action load, and nothing counts what is said.
+
+**Decision:** one telling carries one thing the reader did not already know;
+further facts arrive at the page that turns on them, or are found and shown
+rather than said. Plus the matching critique question: name any event in which
+one figure tells more than one unknown thing, AND name the page each surplus fact
+belongs on instead.
+
+**Rationale:** the clause ROUTES the surplus rather than banning it. A bare ban
+makes the model drop facts — precisely how a length rule once deleted a story's
+causality (2026-09-07, asymmetric word-budget tolerance) — and these five facts
+are the story's causal spine. "Name where it belongs instead" is what makes the
+fix redistribution rather than deletion.
+
+**Not done:** no code-side counting of facts per event. Classification belongs to
+the prompt (CLAUDE.md); a regex that recognises backstory in one story does not
+generalise.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildArcBudgetSection` — one edit
+covers both arc prompts, which share {ARC_BUDGETS}), `prompts/arc-create.txt`,
+`prompts/arc-retell.txt` (critique question, duplicated in both tellings).
+**Status:** 🟡 conditional — verified present in the built prompt, NOT yet run.
+The check that matters is that the five facts still exist somewhere in the arc
+afterwards: a shorter speech with facts deleted would look like success and be a
+regression.
+
+## 2026-09-11 — The text audit's UNFORCED question also asks why the obvious doer stays behind
+
+**Context:** the dragon story's central hole — a house-sized creature waits at
+its cave while four children aged three to five climb a mountain, face two
+guards and carry back an object big enough to patch a five-metre wing — was
+filed by nothing. UNFORCED already owned the question ("is a consequence declared
+while an easier option was visibly open?"): the creature going itself IS the
+easier option. The question simply never named that case.
+
+**Decision:** the clause folds into UNFORCED rather than becoming a thirteenth
+question — "So does the obvious doer — where the one who needs the thing, or is
+plainly the most able to fetch it, stays behind while others go, the book says on
+some page what keeps them from going."
+
+**Deliberately NOT mirrored into `story-text-audit-blind.txt`:** the two audits
+overlap only on TRANSITION and PAYOFF by design, and that non-overlap is what
+lets `mergeAuditFindings` treat same-page-same-category hits from different
+auditors as one fault. Adding UNFORCED to the blind reader would break the dedupe.
+
+**Validation (and a larger finding):** both arms run over the shipped text at
+temperature 0, one sentence apart. The target fault appears ONLY in the new arm
+("The text never explains what keeps the house-sized dragon … from simply walking
+up the mountain himself"). But the arms disagree on findings the clause cannot
+touch — old caught a p12 TRANSITION new missed, new caught p18's dropped quest
+goal old missed — so the 4→9 fault spread is NOT attributable to one sentence.
+Three runs of this audit over identical text yielded 5 (production), 4 and 9
+faults with partial overlap: whether a real defect is caught is substantially
+luck. That instability is tracked in tasks/BACKLOG.md and matters more than any
+single finding, because it bounds what this audit can be relied on for.
+
+**Touched:** `prompts/story-text-audit.txt` (question 2).
+**Status:** ✅ active.

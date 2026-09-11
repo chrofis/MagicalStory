@@ -2065,7 +2065,11 @@ ${bibleBody}` : bibleBody;
   // parseable TITLE_PICK the hash pick stands: stableCandidateIndex is the same
   // deterministic pick the unified parser uses, so cover generation and the
   // story save never diverge on the title.
-  const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z])/i) || [])[1] || '';
+  // The block runs to the next block marker or to the end of the reply — it is
+  // the LAST block since 2026-09-11 (the title is picked from the finished
+  // pages, not guessed ahead of them), and the old lookahead required a
+  // following `---X` that no longer exists.
+  const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z]|$)/i) || [])[1] || '';
   const cleanTitle = s => String(s || '')
     .replace(/^\**\s*TITLE\s*:\s*/i, '')
     .replace(/^\*{1,2}|\*{1,2}$/g, '')
@@ -2125,7 +2129,9 @@ ${bibleBody}` : bibleBody;
     for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
       try {
         const res = await textModels.callTextModelStreaming(textPrompt, null, onChunk, textModel, { usageLabel: 'beats_story_text' });
-        const candidate = parseRefinedText(res.text || '', beatPages);
+        // TITLE is the LAST block (2026-09-11) — name it so the final page's
+        // text stops there instead of swallowing it.
+        const candidate = parseRefinedText(res.text || '', beatPages, 'STORY TEXT', ['TITLE']);
         if (candidate.pages.length === 0 || candidate.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Text attempt ${attempt}: ${candidate.pages.length} page(s) parsed, missing ${candidate.missing.join(', ') || 'none'}`);
           if (attempt < 2) continue;
