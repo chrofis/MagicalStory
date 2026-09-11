@@ -1557,11 +1557,9 @@ ${bibleBody}` : bibleBody;
   let wornRound = null;
   let briefUnfixedList = [];
   let briefIntroducedList = [];
-  let briefSecondRound = null;
   // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
-  // actions, and a page over the three-element budget. Both ride the targeted
-  // second round with every other reviewable fault; what this adds is a
-  // VISIBLE verdict when they outlive the round budget — page numbers per type,
+  // actions, and a page over the three-element budget. What this adds is a
+  // VISIBLE verdict when they survive the single review round — page numbers per type,
   // and for the budget which pages the brief itself could not have fixed
   // (the bible's `appearsInPages` places elements the brief never cited, and
   // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
@@ -1881,10 +1879,8 @@ ${bibleBody}` : bibleBody;
           visualBible,
           { textZoneRules: textZoneRulesActive(inputData) }
         );
-        // pageNumber 0 is the whole-book text-position tally. It is reported,
-        // but it can never drive the targeted second round below — that round
-        // re-sends only the faulted PAGES, and rebalancing a distribution means
-        // re-sending the whole book at full cost.
+        // pageNumber 0 is the whole-book text-position tally, reported on its
+        // own line below rather than mixed into the per-page fault list.
         const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
         const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
         if (bookLevel.length > 0) {
@@ -1909,90 +1905,19 @@ ${bibleBody}` : bibleBody;
         }
         if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
 
-        // TARGETED SECOND ROUND (owner, 2026-08-25). Reporting a fault does not
-        // stop it shipping, and the page that motivated this — staging
-        // job_1787638394061_hs70901tfsn p1 — went out declaring two actions.
-        //
-        // The briefs ARE the input: 71,030 of the review's ~19,820 input tokens
-        // were the 16 briefs, so re-sending only the faulted ones costs roughly
-        // an eighth of a full round (~$0.018 against $0.14 measured on that
-        // story). buildSceneReviewPrompt already takes a page subset, so there
-        // is nothing to change in the builder.
-        //
-        // Exactly ONE extra round, ever. No loop: whatever survives it is
-        // reported and ships, which is the same contract as before, only with
-        // one cheap attempt at a fix in between.
-        if (left.length > 0) {
-          const faultPages = new Set(left.map(f => f.pageNumber));
-          const subset = expansions.filter(x => faultPages.has(x.pageNumber));
-          const subsetByPage = new Map();
-          for (const [pn, list] of after.byPage) if (faultPages.has(pn)) subsetByPage.set(pn, list);
-          const { renderFindingsBlock: renderBriefBlock2 } = require('./sceneBriefCheck');
-          // Same template, same check block and the same plan-line authority as
-          // round 1; the plan lines are those of the pages under review, verbatim.
-          const rrPrompt = buildSceneReviewPrompt(
-            inputData,
-            subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-            { briefFindings: renderBriefBlock2(subsetByPage), beats: beats.filter(b => b && faultPages.has(b.pageNumber)) }
-          );
-          if (rrPrompt) {
-            try {
-              const pagesLabel = [...faultPages].sort((a, b) => a - b).join(', ');
-              log.info(`🧩 [BEATS] second review round on page(s) ${pagesLabel} (${subset.length}/${expansions.length} briefs)`);
-              const rrRes = await textModels.callTextModelStreaming(rrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_r2' });
-              // Same rule as round 1: a cut round is a failed round (the catch
-              // below keeps the round-1 briefs).
-              if (rrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(rrRes.truncation)}`);
-              const rrParsed = parseRefinedText(rrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
-              const rrByPage = new Map(rrParsed.pages.map(p => [p.pageNumber, p.text]));
-              const rrChanged = [];
-              for (const x of subset) {
-                const fixed = rrByPage.get(x.pageNumber);
-                if (fixed && fixed.trim() && fixed !== x.brief) {
-                  sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 2 });
-                  x.brief = fixed;
-                  x.reviewRewrote = true;
-                  rrChanged.push(x.pageNumber);
-                }
-              }
-              // Same options as the two checks above. Until 2026-09-08 this
-              // call passed no `textZoneRules`, so every text-zone finding
-              // vanished from the round-2 left-list whenever those rules were
-              // active — a page could enter round 2 for a text-zone collision
-              // and be reported clean without the collision being looked at.
-              // Page 0 (the whole-book tally) is excluded for the same reason
-              // round 1 excludes it: it is reported above and never re-sent.
-              const after2 = checkBriefs(
-                expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-                briefCastNames,
-                visualBible,
-                { textZoneRules: textZoneRulesActive(inputData) }
-              );
-              const left2 = after2.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
-              briefUnfixedList = left2;
-              briefSecondRound = {
-                pages: [...faultPages].sort((a, b) => a - b),
-                rewrote: rrChanged,
-                before: left.length,
-                after: left2.length,
-                usage: rrRes.usage || null,
-              };
-              if (left2.length === 0) {
-                log.info(`🧩 [BEATS] second round resolved all ${left.length} fault(s)`);
-                gl.info('beats_brief_round2', `Second review round on page(s) ${pagesLabel} resolved all ${left.length} fault(s)`);
-              } else {
-                const d = left2.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
-                log.warn(`⚠️ [BEATS] second round: ${left2.length}/${left.length} fault(s) still present — ${d}`);
-                gl.warn('beats_brief_round2_unfixed', `Second review round left ${left2.length} fault(s): ${d}`, null, { findings: left2 });
-              }
-            } catch (r2Err) {
-              log.warn(`⚠️ [BEATS] second review round failed (${r2Err.message}) — faults ship as reported`);
-            }
-          }
-        }
+        // NO SECOND MODEL ROUND (owner, 2026-09-11). A targeted second
+        // reviewer call used to re-send the faulted pages here. Measured over
+        // two reruns it broke even: on the dragon rerun it cleared
+        // interaction_object_shared_hands and the p12/p13 trough plate but
+        // INTRODUCED interaction_multiple_actions on p1 (it split one action
+        // back into two), and on the pirate rerun it changed nothing at all.
+        // A paid call that trades one fault for another is not worth making.
+        // The deterministic re-check above stays — it costs nothing and is the
+        // diagnostic signal — so faults are reported and ship flagged, which
+        // is the same contract round 2 had on the pages it failed to fix.
 
         // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
-        // last round this budget allows. Measured on staging
+        // single review round. Measured on staging
         // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
         // two rounds, and on every one of them the brief's own objects[] was
         // already within three — the surplus came from the bible's
@@ -2015,7 +1940,7 @@ ${bibleBody}` : bibleBody;
             interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
             vb_element_overflow: pagesOf('vb_element_overflow'),
             vbOverflowDetail: overflowDetail,
-            rounds: briefSecondRound ? 2 : 1,
+            rounds: 1,
           };
           const parts = [];
           if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
@@ -2052,7 +1977,6 @@ ${bibleBody}` : bibleBody;
         wornRound,
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
-        briefSecondRound,
         rewriteToZeroUnfixed,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
@@ -2064,29 +1988,37 @@ ${bibleBody}` : bibleBody;
     }
   }
 
-  // STRIKE TWO — the VB element budget applied in code (owner, 2026-09-06).
-  // The Art Director was given the budget in its prompt, and the scene review
-  // was handed every overflow as a fault with the ids to drop named. Whatever
-  // still exceeds three is truncated HERE, lowest-ranked first, so the packer
-  // never sees a fourth element — and the page ships, flagged, never killed.
-  // Runs unconditionally: a review that failed, timed out or had no template
-  // must not be a way past the budget.
+  // VB ELEMENT BUDGET — REPORTED HERE, NEVER ENFORCED (owner, 2026-09-11).
+  // `truncateBriefToBudget` used to cut each brief's `objects[]` down to the
+  // budget at this point, lowest-ranked first. It was removed with the
+  // assignment trim above: code has no way to know which objects a page is
+  // about, and dropping a citation removes the object from the page prompt's
+  // REQUIRED OBJECTS line even though its reference cell exists — the same
+  // failure as the trim, one layer down. The budget is now enforced ONLY where
+  // it is understood: the Art Director's prompt and the scene review's fault
+  // block, both fed from VB_ELEMENT_BUDGET. An overflowing brief ships with
+  // every object it asked for.
+  // The overflow REPORT stays: it is stored per page as `vbElementOverflow`
+  // and the Lab measures reviewer behaviour with it. `dropped` now means
+  // "over budget and shipped anyway", not "removed from the brief".
   const vbOverflowByPage = new Map();
   try {
-    const { truncateBriefToBudget } = require('./vbElementBudget');
+    // Same call, same ranking — its rewritten `brief` is DISCARDED. Reusing it
+    // keeps one source of truth for what counts and what ranks lowest; only
+    // the assignment of `x.brief` is gone.
+    const { truncateBriefToBudget, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
     for (const x of expansions) {
       const t2 = truncateBriefToBudget(x.brief, visualBible, x.pageNumber);
       if (!t2) continue;
-      x.brief = t2.brief;
       vbOverflowByPage.set(x.pageNumber, { requested: t2.requested, kept: t2.kept, dropped: t2.dropped });
-      log.warn(`⚠️ [BEATS] VB element budget: page ${x.pageNumber} still referenced ${t2.requested.length} elements after the review — kept ${t2.kept.join(', ')}, dropped ${t2.dropped.join(', ')}`);
+      log.warn(`⚠️ [BEATS] VB element budget: page ${x.pageNumber} references ${t2.requested.length} elements after the review — over budget, shipping as written (lowest-ranked: ${t2.dropped.join(', ')})`);
       gl.warn('beats_vb_element_overflow',
-        `Page ${x.pageNumber} referenced ${t2.requested.length} Visual Bible elements (budget 3) after the scene review — dropped ${t2.dropped.join(', ')}`,
-        null, { pageNumber: x.pageNumber, requested: t2.requested, kept: t2.kept, dropped: t2.dropped });
+        `Page ${x.pageNumber} references ${t2.requested.length} Visual Bible elements (budget ${VB_ELEMENT_BUDGET}) after the scene review — shipped unchanged, lowest-ranked ${t2.dropped.join(', ')}`,
+        null, { pageNumber: x.pageNumber, requested: t2.requested, kept: t2.kept, dropped: t2.dropped, enforced: false });
     }
-    if (vbOverflowByPage.size === 0) log.info('🧱 [BEATS] VB element budget: every page within three elements');
+    if (vbOverflowByPage.size === 0) log.info('🧱 [BEATS] VB element budget: every page within budget');
   } catch (vbErr) {
-    log.warn(`⚠️ [BEATS] VB element budget truncation failed (${vbErr.message}) — briefs ship as written`);
+    log.warn(`⚠️ [BEATS] VB element budget check failed (${vbErr.message}) — briefs ship as written`);
   }
 
   // ── Step 6: page text — runs HERE, after the scene review, with the briefs ─
@@ -2239,8 +2171,10 @@ ${bibleBody}` : bibleBody;
       // and the Lab's stored-beats recovery all decide beats-vs-unified mode
       // from this field's shape.
       outlineExtract: `PLAN: ${b.planLine || ''}`,
-      // Present only on a page whose brief was truncated to the three-element
-      // budget: {requested, kept, dropped} ids, for the page view and the Lab.
+      // Present only on a page whose brief went OVER the element budget:
+      // {requested, kept, dropped} ids, for the page view and the Lab. Since
+      // 2026-09-11 nothing is actually dropped — the brief ships as written
+      // and `dropped` names the lowest-ranked ids that went over.
       ...(vbOverflowByPage.has(b.pageNumber) ? { vbElementOverflow: vbOverflowByPage.get(b.pageNumber) } : {}),
     });
   }
