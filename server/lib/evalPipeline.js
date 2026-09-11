@@ -921,8 +921,16 @@ function buildExpectedCastBlock({
     if (byKey(visualBible?.secondaryCharacters)) return 'secondary character';
     return null;
   };
-  for (const c of (Array.isArray(sceneCharacters) ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
-  if (names.length === 0) return { block: '', names: [], count: 0 };
+  // AN EMPTY CAST IS A NUMBER, NOT A BLANK (2026-09-11). `sceneCharacters: []`
+  // is the brief SAYING this frame holds nobody — a creature-only page, a
+  // landscape. It used to return an empty block, and an empty EXPECTED CAST
+  // tells the evaluator not to judge the figure count at all, so a page written
+  // for no people rendered three and no `extra_character` was ever emitted
+  // (job_1789147573901_m3uam0nxi p4). `null`/undefined still means UNKNOWN — no
+  // roster was supplied — and keeps the blank block.
+  const castDeclared = Array.isArray(sceneCharacters);
+  for (const c of (castDeclared ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
+  if (!castDeclared) return { block: '', names: [], count: 0, declared: false };
 
   const sh = getStoryHelpers();
   try {
@@ -938,12 +946,16 @@ function buildExpectedCastBlock({
     } catch { /* cover keeps its commissioned cast */ }
   }
 
-  const lines = [`EXPECTED CAST (${names.length}): ${labels.join(', ')}`];
+  const lines = [names.length === 0
+    // Spelled out, not an empty list: the count is the instruction, and "none"
+    // has to read as a roster of zero rather than as a missing roster.
+    ? 'EXPECTED CAST (0): none — this frame was written with no people and no animals in it'
+    : `EXPECTED CAST (${names.length}): ${labels.join(', ')}`];
   const det = Number(detectedFigureCount);
   if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
     lines.push(`Detector figure count (GroundingDINO): ${det}`);
   }
-  return { block: lines.join('\n'), names, count: names.length };
+  return { block: lines.join('\n'), names, count: names.length, declared: true };
 }
 
 /**
@@ -1915,7 +1927,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           } catch { /* metrics are best-effort */ }
         }
       }
-      if (expectedCast.count > 0 && figures.length > expectedCast.count) {
+      if (expectedCast.declared && figures.length > expectedCast.count) {
         const flagged = fixableIssues.some(i => String(i.type || '').toLowerCase() === 'extra_character');
         const unmatched = matches.filter(m => !m.reference || String(m.reference).toLowerCase() === 'unmatched').length;
         log.warn(`👥 [EVAL] ${pageContext}: ${figures.length} figure(s) for a roster of ${expectedCast.count} (${unmatched} unmatched) — ${flagged ? 'extra_character reported' : 'NO extra_character finding emitted'}`);
