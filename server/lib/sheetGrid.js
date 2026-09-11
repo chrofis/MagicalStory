@@ -333,6 +333,40 @@ function parseCellIdentification(text, elementCount, cellCount) {
   return { map, missing, unused };
 }
 
+/**
+ * Drop assignments whose cell is not a single panel.
+ *
+ * When the model draws a different grid than asked for, the detector can merge
+ * several drawn panels into one "cell" (staging job_1789147573901_m3uam0nxi:
+ * a sheet of three stacked panels plus a blank margin column was detected as
+ * 2x1, and the identification call named one of those two cells for a single
+ * element — the stored reference then showed three different objects). A crop
+ * that re-detects as more than one cell is such a merge: it cannot be trusted
+ * as one element's reference, so the element gets NO reference instead of a
+ * wrong one. A missing reference degrades; a three-object reference poisons
+ * every prompt it reaches.
+ *
+ * Pure, so the mapping is testable without an image or a model call.
+ *
+ * @param {Array<number|null>} map element index -> cell index (or null)
+ * @param {Array<number>} panelCounts per cell index, panels detected INSIDE it
+ * @returns {{ map: Array<number|null>, dropped: Array<{element:number, cell:number, panels:number}> }}
+ */
+function rejectMultiPanelAssignments(map, panelCounts) {
+  const out = map.slice();
+  const dropped = [];
+  for (let i = 0; i < out.length; i++) {
+    const cell = out[i];
+    if (cell === null || cell === undefined) continue;
+    const panels = Number(panelCounts[cell]) || 1;
+    if (panels > 1) {
+      dropped.push({ element: i, cell, panels });
+      out[i] = null;
+    }
+  }
+  return { map: out, dropped };
+}
+
 module.exports = {
   detectSheetGrid,
   detectGutterBands,
@@ -342,5 +376,6 @@ module.exports = {
   cellLabel,
   labelToIndex,
   parseCellIdentification,
+  rejectMultiPanelAssignments,
   lineStats,
 };

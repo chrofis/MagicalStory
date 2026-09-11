@@ -18,8 +18,10 @@ const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { loadVbReferenceBytes } = require('./characterPhotos');
 const { escapeXml } = require('./repairGrid');
-const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
-const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentification } = require('./sheetGrid');
+// The physical grid bound (one Grok slot, 1/n cell size) — no longer the
+// element budget, which is a prompt rule only since 2026-09-11.
+const { VB_SLOT_MAX_ELEMENTS } = require('./grok');
+const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentification, rejectMultiPanelAssignments } = require('./sheetGrid');
 
 const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForImage(...args);
 
@@ -64,6 +66,32 @@ async function identifySheetCells(buffer, cells, elements) {
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   return parseCellIdentification(raw, elements.length, cells.length);
+}
+
+/**
+ * How many panels each MAPPED crop really contains.
+ *
+ * Only crops an element was assigned to are measured (one detection per
+ * assigned cell, no model call). A crop whose own pixels show a grid is a
+ * merge of several drawn cells. Detection failure counts as one panel — the
+ * check may never invent a drop.
+ *
+ * @param {string[]} crops base64 crops, cell-indexed
+ * @param {Array<number|null>} map element index -> cell index
+ * @returns {Promise<number[]>} panels per cell index
+ */
+async function countPanelsPerCell(crops, map) {
+  const counts = new Array(crops.length).fill(1);
+  const assigned = [...new Set(map.filter(i => i !== null && i !== undefined))];
+  await Promise.all(assigned.map(async (idx) => {
+    try {
+      const sub = await detectSheetGrid(Buffer.from(crops[idx], 'base64'));
+      counts[idx] = sub.count;
+    } catch {
+      counts[idx] = 1;
+    }
+  }));
+  return counts;
 }
 
 /**
@@ -113,10 +141,28 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     const genLog = require('./generationLogger').getCurrentLogger();
     genLog?.warn('vb_sheet_layout_mismatch', `Reference sheet drew ${grid.count} cells (${grid.cols}x${grid.rows}) for ${count} requested element(s)`);
 
+    if (grid.count < count) {
+      log.warn(`⚠️ [REF-SHEET] Fewer cells than elements — at least one detected cell must hold more than one element; every crop is checked for merged panels`);
+    }
+
     if (Array.isArray(elements) && elements.length === count) {
       try {
-        const { map, missing, unused } = await identifySheetCells(buffer, grid.cells, elements);
+        const identified = await identifySheetCells(buffer, grid.cells, elements);
         const crops = await cropCells(buffer, grid.cells);
+        // A detected "cell" that itself splits into panels is a merge of
+        // several drawn cells — cropping it hands one element a picture of
+        // several. Drop those assignments; no reference beats a wrong one.
+        const panelCounts = await countPanelsPerCell(crops, identified.map);
+        const { map: safeMap, dropped } = rejectMultiPanelAssignments(identified.map, panelCounts);
+        for (const d of dropped) {
+          log.error(`❌ [REF-SHEET] Cell ${cellLabel(d.cell)} holds ${d.panels} panels — "${elements[d.element]?.name || d.element + 1}" gets NO reference rather than a crop of several elements`);
+          genLog?.warn('vb_sheet_cell_multi_element', `Cell shows ${d.panels} panels, not one element — no reference stored`, elements[d.element]?.name || `element ${d.element + 1}`);
+        }
+        const map = safeMap;
+        const droppedElements = new Set(dropped.map(d => d.element));
+        const missing = [];
+        for (let i = 0; i < count; i++) if (map[i] === null && !droppedElements.has(i)) missing.push(i);
+        const unused = identified.unused;
         for (const i of missing) {
           log.error(`❌ [REF-SHEET] Element "${elements[i]?.name || i + 1}" has no cell on the sheet — no reference image for it`);
           genLog?.warn('vb_sheet_element_missing', `No cell on the reference sheet shows this element`, elements[i]?.name || `element ${i + 1}`);
@@ -319,7 +365,7 @@ function elementCellText(el) {
  * @param {string} styleDescription - Art style description
  * @returns {string} Complete prompt for reference sheet generation
  */
-function buildReferenceSheetPrompt(elements, styleDescription, visualBible = null) {
+function buildReferenceSheetPrompt(elements, styleDescription, visualBible = null, gateReason = null) {
   const count = elements.length;
   // Only use 2x2 for exactly 4 elements. Everything else uses a single column
   // to avoid partial rows (e.g. 3 elements in a 2x2 leaves an empty cell that
@@ -413,6 +459,20 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     ? '- The only lettering anywhere in the image is the quoted words, spelled exactly as given — no other letters, labels, captions or numbers'
     : '- Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.';
 
+  // A re-render after a failed gate is told WHAT failed. Without it the second
+  // render reproduces the first verdict word for word (staging
+  // job_1789147573901_m3uam0nxi: two entries failed twice with an identical
+  // reason). The text is the judge's own sentence at runtime — quoted, never
+  // interpreted here. Carries its own leading newline so the empty case leaves
+  // no gap.
+  const reason = String(gateReason || '').trim();
+  const retryNote = reason
+    ? `
+
+**PREVIOUS ATTEMPT REJECTED:** ${reason}
+Fix exactly that; everything else stays as described above.`
+    : '';
+
   const prompt = fillTemplate(PROMPT_TEMPLATES.referenceSheet, {
     STYLE_DESCRIPTION: styleDescription,
     GRID_SHAPE_PHRASE: gridShapePhrase,
@@ -422,7 +482,7 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     GRID_SEPARATION: gridSeparation,
     CELL_LAYOUT_REQ: cellLayoutReq,
     CLOSING: closing,
-  });
+  }) + retryNote;
 
   // VB descriptions cross-reference each other by id ("shimmer matching
   // ART001"), and those ids land in the cell line verbatim. An unsanitized id
@@ -940,8 +1000,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       //   state batch     → checkStateCellsConsistency on the whole batch
       const genLog = require('./generationLogger').getCurrentLogger();
       const { recordElementCellGate } = require('./visualBible');
-      const rerenderSolo = async (cells) => {
-        const rePrompt = buildReferenceSheetPrompt(cells, styleDescription, visualBible);
+      const rerenderSolo = async (cells, gateReason = null) => {
+        const rePrompt = buildReferenceSheetPrompt(cells, styleDescription, visualBible, gateReason);
         const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, batchModel, null, '', null, [], 0, null, null, null, null, batchAspectOverride);
         if (!reResult?.imageData) throw new Error('re-render returned no image');
         const reCells = await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), cells.length, cells);
@@ -972,7 +1032,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
           genLog?.warn('vb_state_cells_rerender', `VB state cells failed gate: ${verdict.reason}`, parent.name);
           let recheck = null;
           try {
-            const reCells = await rerenderSolo(batch);
+            const reCells = await rerenderSolo(batch, verdict.reason);
             for (let i = 0; i < batch.length; i++) references[i] = reCells[i];
             try { recheck = await checkStateCellsConsistency(references, parent, batch); } catch { /* informational */ }
             if (recheck && !recheck.ok) {
@@ -1012,7 +1072,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         genLog?.warn(`vb_${gateName}_rerender`, `VB reference cell failed render gate: ${verdict.reason}`, element.name);
         let recheck = null;
         try {
-          references[i] = (await rerenderSolo([element]))[0];
+          references[i] = (await rerenderSolo([element], verdict.reason))[0];
           try { recheck = await ask(references[i]); } catch { /* re-check is informational only — accept */ }
           if (recheck && !recheck.ok) {
             log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
@@ -1172,12 +1232,15 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
   // painted. The empty-scene grid keeps its own cap of 9
   // (buildEmptySceneVbGrid) — it is a different grid, sent to a call with no
   // character slots competing for space.
-  // The cap is the owner's brief-side budget (2026-09-06): the Art Director is
-  // told at most three, the brief check reports an overflow and the pipeline
-  // truncates what survives — so the selection here bounds the SAME number,
-  // with the same priority order. A looser cap here would let an element the
-  // budget dropped back in through `appearsInPages`.
-  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, VB_ELEMENT_BUDGET, sceneObjectIds, sceneMetadata);
+  // NO LONGER the brief-side budget (owner, 2026-09-11: remove every code-side
+  // enforcement of the element budget). The budget is now a prompt rule for the
+  // Art Director and a fault in the scene review — nothing in code withdraws an
+  // element any more. What remains here is the PHYSICAL bound and nothing else:
+  // the grid shares one Grok reference slot, cell size scales as 1/n, and below
+  // VB_CELL_FLOOR_PX a face is a smear that the model replaces with a prior.
+  // That bound is Grok's own VB_SLOT_MAX_ELEMENTS (4), the same net the cover,
+  // repair and iterate paths run under.
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, VB_SLOT_MAX_ELEMENTS, sceneObjectIds, sceneMetadata);
   // Landmarks never ride in the grid — a real photograph composited among
   // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
   // landmark reaches the image only as its own reference photo, and when a

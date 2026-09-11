@@ -32472,3 +32472,67 @@ substituted elsewhere in the template.
 renders no cell — a padded bible is dead weight, not a safety margin.
 **Touched:** `prompts/story-bible-from-beats.txt`
 **Status:** ✅ active.
+
+## A reference-sheet cell that holds several drawn panels stores NO reference (2026-09-11)
+**Context:** Staging story `job_1789147573901_m3uam0nxi` logged three
+`vb_sheet_layout_mismatch` events in one run — "drew 9 cells (3x3) for 3
+requested", "drew 2 cells (2x1) for 3 requested", "drew 6 cells (3x2) for 2
+requested". On the 2x1 sheet the gutter detector merged three stacked panels
+into one cell; the identification call named that cell for a single element and
+the crop was stored as that entry's reference. The stored image shows a
+signpost, a cave wall and a boulder — three objects offered to every downstream
+prompt as one.
+**Decision:** After the identification call, every MAPPED crop is re-measured
+with `detectSheetGrid`; a crop that itself splits into more than one panel has
+its assignment dropped (`vb_sheet_cell_multi_element`) and the element gets no
+reference image. Detection failure counts as one panel, so the check can never
+invent a drop, and nothing throws — the run continues with one fewer reference.
+**Rationale:** A missing reference degrades gracefully (the entry is drawn from
+prose, as every sub-threshold entry already is); a reference showing three
+objects poisons every page prompt that receives it, silently and permanently.
+The check is deterministic, costs no model call, and reuses the detector that
+already exists. A hard failure was rejected — gates are guidelines, a paid run
+is never killed for this.
+**Touched:** `server/lib/sheetGrid.js` (`rejectMultiPanelAssignments`),
+`server/lib/referenceSheets.js` (`countPanelsPerCell`,
+`splitGridIntoReferences`), `tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active
+
+## A reference-cell re-render is told why the gate failed (2026-09-11)
+**Context:** Same story: `vb_state_cells_rerender` followed by
+`vb_state_cells_still_bad` with a word-for-word identical reason, for two
+different entries ("The left wing membrane is ragged in the first image and
+smooth in the second image…", "The color of the object in the second image is a
+darker, more muted teal…"). `rerenderSolo` rebuilt the prompt with exactly the
+first render's arguments; the judge's reason was logged and thrown away.
+**Decision:** `buildReferenceSheetPrompt` takes an optional `gateReason` and
+appends the judge's own sentence as a "PREVIOUS ATTEMPT REJECTED" note; both
+re-render paths (single element/character cell, and the state-cell batch) pass
+their verdict reason.
+**Rationale:** The project convention for retries — a retry carries the failure
+reason into the re-render prompt. The reason is runtime text from the judge,
+quoted and never parsed in code, so the prompt stays generic. The fail-open
+"accepted anyway" sites are deliberately unchanged; whether a twice-failed cell
+should ship is still the owner's open decision.
+**Touched:** `server/lib/referenceSheets.js`,
+`tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active
+
+## A cell draws the element only — never what its description compares it to (2026-09-11)
+**Context:** Same story: both state cells of the creature entry rendered four
+children and a dog sitting on its back, because the description says "large
+enough for four small children and a dog to sit across the back…". The known
+earlier instance is the production prop "roughly the size of two open palms",
+rendered with two human hands on it. `prompts/reference-sheet.txt` carried the
+rule only under FOR OBJECTS/ARTIFACTS and only for a "comparison" — a creature
+entry never reaches that section, and a scale clause is not phrased as one.
+**Decision:** One global REQUIREMENTS line binding every cell: only the element
+itself is drawn, and a person, animal or object the description names to convey
+size or scale is never drawn.
+**Rationale:** The failure is not object-specific, so the rule cannot live in
+the objects section. Prompt-side, generic, no example from any story. The bible
+prompt (`story-bible-from-beats.txt`) is deliberately untouched — phrasing
+scale without a simile there is a separate, still-open backlog item.
+**Touched:** `prompts/reference-sheet.txt`,
+`tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active

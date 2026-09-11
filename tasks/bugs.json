@@ -2,6 +2,36 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "vb-sheet-merged-cell-stored-as-one-element-reference",
+      "title": "On a grid mismatch a detected cell that merged several drawn panels was cropped and stored as ONE element's reference image",
+      "reportedAt": "2026-09-11",
+      "source": "Staging story job_1789147573901_m3uam0nxi, stored generationLog: three vb_sheet_layout_mismatch events in one run ('drew 9 cells (3x3) for 3 requested', 'drew 2 cells (2x1) for 3 requested', 'drew 6 cells (3x2) for 2 requested') plus vb_sheet_element_missing for the boulder entry. On the 2x1 sheet the gutter detector merged three stacked panels into one cell; identifySheetCells named that cell for a single element and splitGridIntoReferences cropped and stored it, so that entry's reference image shows a signpost, a cave wall and a boulder at once. Every downstream prompt fed that reference is shown three objects and told they are one.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "52b4414e6",
+      "fix": "splitGridIntoReferences now measures each MAPPED crop with detectSheetGrid (countPanelsPerCell, no model call) and rejectMultiPanelAssignments (server/lib/sheetGrid.js, pure) drops any assignment whose cell re-detects as more than one panel: that element gets NO reference (logged as vb_sheet_cell_multi_element) instead of a multi-object one. Detection failure counts as one panel, so the check can never invent a drop, and the run continues either way. Tests: tests/unit/reference-sheet-mismatch.test.ts."
+    },
+    {
+      "id": "vb-cell-rerender-not-told-the-gate-reason",
+      "title": "A reference cell re-rendered after a failed gate was given the identical prompt, so it reproduced the same failure",
+      "reportedAt": "2026-09-11",
+      "source": "Staging story job_1789147573901_m3uam0nxi: vb_state_cells_rerender then vb_state_cells_still_bad with a WORD-FOR-WORD identical reason, twice ('The left wing membrane is ragged in the first image and smooth in the second image...' for one entry, 'The color of the object in the second image is a darker, more muted teal...' for another). rerenderSolo called buildReferenceSheetPrompt with exactly the arguments of the first render; the judge's reason was logged and discarded.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "52b4414e6",
+      "fix": "buildReferenceSheetPrompt takes an optional gateReason and appends the judge's own sentence as a PREVIOUS ATTEMPT REJECTED note (quoted, never interpreted in code; sanitised with the rest of the prompt). rerenderSolo passes it on both paths - element/character cell and state-cell batch. The fail-open 'accepted anyway' behaviour is unchanged; that is an open owner decision."
+    },
+    {
+      "id": "vb-cell-draws-the-scale-comparison-as-objects",
+      "title": "A size comparison in a bible description is rendered as cast members in the element cell",
+      "reportedAt": "2026-09-11",
+      "source": "Staging story job_1789147573901_m3uam0nxi: both state cells of the creature entry render four children and a dog sitting on its back, because its description says 'large enough for four small children and a dog to sit across the back between the wing roots and the base of the neck'. Same class as the production ART001 prop described as 'roughly the size of two open palms', which rendered two human hands on it (tasks/BACKLOG.md). prompts/reference-sheet.txt carried the rule only under FOR OBJECTS/ARTIFACTS, and only for a 'comparison'; a creature entry never reaches that section.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "52b4414e6",
+      "fix": "A global REQUIREMENTS line in prompts/reference-sheet.txt: 'Only the element itself is drawn. A person, animal or object the description names to convey its size or scale is never drawn' - so it binds every cell, not just the objects section. The bible prompt is untouched (owned by another session). Test: tests/unit/reference-sheet-mismatch.test.ts."
+    },
+    {
       "id": "lector-quote-truncated-at-apostrophe",
       "title": "firstQuoted() closed a lector finding's quoted span on the NEXT apostrophe, truncating any span containing one and silently discarding the finding",
       "reportedAt": "2026-09-06",
