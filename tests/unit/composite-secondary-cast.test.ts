@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-const { secondaryCastSeeds } = require('../../server/lib/compositeCastBuilder');
+const { secondaryCastSeeds, unreferencedSecondaryCreatures } = require('../../server/lib/compositeCastBuilder');
 const { needsScaleRepair } = require('../../server/lib/scaleRepair');
 
 /**
@@ -50,5 +50,29 @@ describe('secondary characters staged as CHR ids', () => {
 
   it('indoor pages still skip the composite', () => {
     expect(needsScaleRepair({ fullData: { ...fullData, setting: 'indoor' } })).toBe(false);
+  });
+});
+
+/**
+ * A staged secondary character with no bible reference image cannot be cast;
+ * it is offered to the plate as a creature painted from its description
+ * (job_1789083667794: CHR001 the dragon, referenceImageUrl null, absent from
+ * every composited plate).
+ */
+describe('unreferencedSecondaryCreatures', () => {
+  const vb = { secondaryCharacters: [
+    { id: 'CHR001', name: 'Karu', description: 'a young dragon, about 2 metres tall at the shoulder' },
+    { id: 'CHR002', name: 'Rico', referenceImageUrl: 'https://x/CHR002.jpg', description: 'a boy' },
+  ] };
+
+  it('returns only the staged secondaries that have no reference image, in plate-creature shape', () => {
+    const out = unreferencedSecondaryCreatures({ objects: ['CHR001.1', 'CHR002', 'LOC003'] }, vb);
+    expect(out).toEqual([{ id: 'CHR001', name: 'Karu', description: 'a young dragon, about 2 metres tall at the shoulder' }]);
+  });
+
+  it('is empty when the page stages nobody without a reference', () => {
+    expect(unreferencedSecondaryCreatures({ objects: ['CHR002'] }, vb)).toEqual([]);
+    expect(unreferencedSecondaryCreatures({ objects: [] }, vb)).toEqual([]);
+    expect(unreferencedSecondaryCreatures({ objects: ['CHR001.2'] }, null)).toEqual([]);
   });
 });

@@ -44,6 +44,26 @@ describe('buildInPlaceRenderPrompt', () => {
   });
 });
 
+describe('buildInPlaceRenderPrompt refMode', () => {
+  const cast = { name: 'Mara', colorName: 'red' };
+
+  it("'sheet' (default) names a grid of views", () => {
+    const p = buildInPlaceRenderPrompt(cast);
+    expect(p).toContain('reference sheet of Mara: a grid of views');
+    expect(buildInPlaceRenderPrompt(cast, null, { refMode: 'sheet' })).toBe(p);
+  });
+
+  it("'cell' names one reference picture and pins the facing to the silhouette", () => {
+    const p = buildInPlaceRenderPrompt(cast, null, { refMode: 'cell' });
+    expect(p).toContain('Image 2 is one reference picture of Mara on a plain background');
+    expect(p).toContain('the silhouette, not Image 2, decides which way the figure faces');
+    expect(p).not.toContain('grid of views');
+    // The rest of the contract is unchanged.
+    expect(p).toContain('Replace the red silhouette with Mara from Image 2');
+    expect(p).toContain('Everything else in Image 1 stays exactly as it is, including the other coloured silhouettes.');
+  });
+});
+
 describe('matchRenderedFigureBox', () => {
   const sil = { x: 100, y: 100, width: 100, height: 200 };
 

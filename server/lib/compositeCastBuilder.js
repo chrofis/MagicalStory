@@ -106,6 +106,23 @@ function secondaryCastSeeds(fullData, visualBible, alreadyCast = new Set()) {
   return seeds;
 }
 
+/**
+ * Secondary characters staged on the page (CHR ids in objects[] / interactions)
+ * that have NO Visual Bible reference image. The cast builder cannot render
+ * them from anything, so it leaves them out - and nothing else paints them:
+ * the plate's creature block reads visualBible.animals only. Measured on
+ * job_1789083667794 p6/p7/p17/p18: CHR001 (a dragon) has referenceImageUrl
+ * null, so every composited plate lacked the dragon (2026-09-11).
+ *
+ * Returns them in the plate-creature shape ({ id, name, description }) so the
+ * plate can paint them from their description, the only door they have.
+ */
+function unreferencedSecondaryCreatures(fullData, visualBible) {
+  return secondaryCastSeeds(fullData, visualBible)
+    .filter(seed => !(seed.entry.referenceImageUrl || seed.entry.referenceImageData))
+    .map(seed => ({ id: seed.id, name: seed.name, description: String(seed.entry.extractedDescription || seed.entry.description || '').trim() }));
+}
+
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null, visualBible = null } = deps;
   if (!log) throw new Error('buildCompositeCast: deps.log is required');
@@ -587,4 +604,4 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   return buildCompositeCast(fakePageData, fakeInputData, deps);
 }
 
-module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds };
+module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures };

@@ -4335,6 +4335,14 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   // 'inPlace' renders each figure over its silhouette on the original plate,
   // cuts it out with DINO+SAM and pastes it (no blend).
   const figureMethod = ['charRepair', 'inPlace'].includes(params.figureMethod) ? params.figureMethod : 'paste';
+  // inPlace only: Image 2 is the whole 2x4 sheet ('sheet', production) or the
+  // one cell matching the cast entry's pose ('cell', owner's design 2026-09-11).
+  const refMode = params.refMode === 'cell' ? 'cell' : 'sheet';
+  // A secondary character staged on the page but without a bible reference
+  // image cannot be cast (nothing to render it from) and is not an animal, so
+  // production paints it nowhere. 'plate' hands it to the plate's creature
+  // block, painted from its description. Default 'omit' = production parity.
+  const unreferencedSecondaries = params.unreferencedSecondaries === 'plate' ? 'plate' : 'omit';
 
   const cast = await buildCompositeCast({
     sceneMetadata: scene.sceneMetadata,
@@ -4572,7 +4580,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     // plate the pipeline would build, or a composite bug shows up in one and
     // not the other.
     sceneCreatures: require('./visualBible')
-      .resolveSceneCreatures(storyData.visualBible, fd.objects || [], ctx.pageNumber),
+      .resolveSceneCreatures(storyData.visualBible, fd.objects || [], ctx.pageNumber)
+      .concat(unreferencedSecondaries === 'plate'
+        ? require('./compositeCastBuilder').unreferencedSecondaryCreatures(fd, storyData.visualBible || null)
+        : []),
+    refMode,
     figureDetect: params.figureDetect === 'diff' ? 'diff' : 'dino',
     usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
     });
@@ -4624,6 +4636,10 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     await saveStep(v?.phantomCrop, `· phantom crop sent for ${name}`);
     await saveStep(v?.output, `· phantom-pose render for ${name}`);
   }
+  // In-place: the reference actually sent as Image 2 (whole sheet, one cell, or a bible image).
+  for (const [name, v] of Object.entries(dbg.inPlaceRefs || {})) {
+    await saveStep(v?.ref, `· reference sent for ${name} (${v?.kind || 'unknown'})`);
+  }
   // In-place renders (figureMethod 'inPlace'): the full plate with one figure painted.
   for (const [name, v] of Object.entries(dbg.inPlaceRenders || {})) {
     // Every attempt, not only the kept one: a re-render is a judgement to check.
@@ -4645,6 +4661,8 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     strategy,
     facing,
     figureMethod,
+    refMode: figureMethod === 'inPlace' ? refMode : undefined,
+    unreferencedSecondaries,
     detector: (res.debug || {}).detector || null,
     blended: figureMethod === 'paste' ? wantBlend : false,
     charRepairLog: (res.debug || {}).charRepairLog || null,

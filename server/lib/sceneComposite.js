@@ -1235,14 +1235,21 @@ async function detectZOrderByOcclusion(populatedBuf, placements) {
  * entry at runtime — nothing story-specific lives in the template. Owner's
  * design, 2026-09-10.
  */
-function buildInPlaceRenderPrompt(c, visualBible = null) {
+function buildInPlaceRenderPrompt(c, visualBible = null, { refMode = 'sheet' } = {}) {
   const colour = c.colorName || 'coloured';
   const name = c.name || 'the character';
   const clauses = [];
   if (c.action) clauses.push(String(c.action).trim());
   if (c.looksAt) clauses.push(`looking at ${String(c.looksAt).trim()}`);
   const poseLine = clauses.length ? ` The figure is ${clauses.join(', ')}.` : '';
-  const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. Image 2 is the reference sheet of ${name}: a grid of views used only to know what ${name} looks like. None of its panels appear in the output.
+  // refMode 'cell' (owner's design 2026-09-11): Image 2 is ONE view cropped
+  // from the 2x4 sheet (or a single-image bible reference), not the grid. The
+  // view may not match the silhouette's angle, so orientation is pinned to the
+  // silhouette explicitly.
+  const image2 = refMode === 'cell'
+    ? `Image 2 is one reference picture of ${name} on a plain background, used only to know what ${name} looks like; it is not placed in the output, and the silhouette, not Image 2, decides which way the figure faces.`
+    : `Image 2 is the reference sheet of ${name}: a grid of views used only to know what ${name} looks like. None of its panels appear in the output.`;
+  const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. ${image2}
 
 Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, body orientation and pose, and exactly the silhouette's size: the figure is as tall as the silhouette, no taller.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2. The output shows exactly one ${name}. Anything the silhouette holds is drawn as the real object in its natural colours, not in the placeholder colour.
 
@@ -1409,11 +1416,12 @@ async function normaliseRenderToCanvas(renderBuf, W, H) {
  * figure, all cut-outs pasted onto the depopulated plate back-to-front. No
  * blend pass. Returns { imageData, cost, placed } and fills `debug`.
  */
-async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf, aspectRatio, visualBible, usageTracker, debug }) {
+async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf, aspectRatio, visualBible, usageTracker, debug, refMode = 'sheet' }) {
   const { _gdinoDetect, _collectNmsBoxes, GDINO_PERSON_NMS_IOU, _mobilesamMaskFull } = require('./figureDetection');
   const W = detection.canvasWidth, H = detection.canvasHeight;
   const renders = {};
   const cutouts = {};
+  const refs = {};
   const inPlaceLog = [];
   const placements = [];
   let cost = 0;
@@ -1422,8 +1430,15 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
     const bbox = bboxes[c.name];
     if (!bbox) { inPlaceLog.push({ name: c.name, skipped: 'no silhouette detected' }); continue; }
     if (!c.sheetBuf) { inPlaceLog.push({ name: c.name, skipped: 'no reference sheet' }); continue; }
-    const basePrompt = buildInPlaceRenderPrompt(c, visualBible);
-    const sheetDataUrl = `data:image/png;base64,${c.sheetBuf.toString('base64')}`;
+    // Image 2: the whole 2x4 sheet ('sheet'), or ONE cell matching the cast
+    // entry's pose ('cell', owner's design 2026-09-11 — the same cell the
+    // charRepair branch sends). A bible reference is a single image either
+    // way; cropping a cell out of it returns a fragment of the figure.
+    const useCell = refMode === 'cell' && !c.singleImage;
+    const refBuf = useCell ? (await cropAvatarCell(c.sheetBuf, { pose: c.pose })).body : c.sheetBuf;
+    const basePrompt = buildInPlaceRenderPrompt(c, visualBible, { refMode: (useCell || c.singleImage) ? 'cell' : 'sheet' });
+    const sheetDataUrl = `data:image/png;base64,${refBuf.toString('base64')}`;
+    refs[c.name] = { ref: sheetDataUrl, kind: c.singleImage ? 'bible-image' : useCell ? `cell ${POSE_CELL[c.pose] || POSE_CELL.threeQuarter} (${c.pose})` : 'whole sheet' };
     // The silhouette's bottom edge plus a small margin. Below it lies either
     // ground (nothing to cut) or the scenery that hides the figure.
     const bottomLimit = bbox.y + bbox.height + Math.max(4, Math.round(0.03 * bbox.height));
@@ -1571,6 +1586,7 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
   }
 
   debug.inPlaceRenders = renders;
+  debug.inPlaceRefs = refs;
   debug.cutouts = cutouts;
   debug.inPlaceLog = inPlaceLog;
   if (placements.length === 0) {
@@ -2678,6 +2694,10 @@ async function generateSceneComposite(opts) {
     //                  rendered figure, pasted onto the depopulated plate. No
     //                  blend. Lab-only, unvalidated (2026-09-10).
     figureMethod = 'paste',
+    // inPlace only: what Image 2 is — 'sheet' (the whole 2x4 grid) or 'cell'
+    // (the one cell matching the cast entry's pose; a bible reference is
+    // passed whole in both modes). Lab-only knob, 2026-09-11.
+    refMode = 'sheet',
     // 'dino' (default) or 'diff' — see the detection step. The diff is kept
     // only so a Lab run can reproduce a pre-2026-08-15 result; it is the
     // detector that mistook lawn for a character.
@@ -3001,7 +3021,7 @@ async function generateSceneComposite(opts) {
     log.info(`[SCENE COMPOSITE] step 4/4 — in-place renders (${Object.keys(bboxes).length} figures)`);
     const r = await renderFiguresInPlace({
       cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf,
-      aspectRatio, visualBible: opts.visualBible, usageTracker, debug,
+      aspectRatio, visualBible: opts.visualBible, usageTracker, debug, refMode,
     });
     totalCost += r.cost;
     // All or nothing. A cast member the composite could not render stays on
