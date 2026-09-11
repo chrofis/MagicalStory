@@ -207,6 +207,75 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
   return text.replace(re, (_m, marker) => `${marker}${body}`);
 }
 
+/**
+ * Write the in-memory bible's page assignment (and the invented-peer age clamp)
+ * back into the ---VISUAL BIBLE--- JSON of a bible transcript.
+ *
+ * Same reason as replaceClothingSection: mutating the parsed object is NOT
+ * enough. `bibleSections` is spliced into `rawOutline`, storyJobPipeline
+ * re-parses the bible out of that text (`parser.extractVisualBible()`), the
+ * resume path and the Lab's `plainStoredBeats` re-parse `data.outline` again —
+ * so every in-memory mutation done here reached exactly the Art Director and
+ * nobody else. Measured on job_1788957347999_ijseol49a: `vbAssignmentTrim`
+ * reported VEH002 stripped from pages 8 and 18, the stored bible and outline
+ * still listed both, and the scene review's `vb_element_overflow` on those
+ * pages survived every reviewer (Lab 1157/1179).
+ *
+ * The transcript JSON is the WRITER's shape (`pages`, raw `states`, `age`),
+ * and the parser's is a superset built by spreading it, so the projection is a
+ * field-by-field copy of exactly what the post-checks may change, matched by
+ * entry id: `pages` from `appearsInPages`; each state's `pages` (a state left
+ * without a page is gone from the array — `normaliseObjectStates` re-mints the
+ * dotted ids identically on re-parse); a clamped secondary's `age` plus its
+ * `secondaryAgeClamped` record. Entries the parser dropped (a real landmark
+ * staged on no page) are left as written. Nothing else in the JSON is touched.
+ *
+ * @returns {string} the transcript with the section rewritten, or unchanged
+ *   when there is no parseable section (the caller warns and keeps shipping).
+ */
+const SYNCED_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
+function syncVisualBibleSection(bibleSections, visualBible) {
+  const text = String(bibleSections || '');
+  if (!text || !visualBible || typeof visualBible !== 'object') return text;
+  const sectionRe = /(---VISUAL BIBLE---\s*)([\s\S]*?)(?=---[A-Z\s]+---|$)/i;
+  const section = text.match(sectionRe);
+  if (!section) return text;
+  const jsonMatch = section[2].match(/```json\s*([\s\S]*?)```/i);
+  if (!jsonMatch) return text;
+  let json;
+  try { json = JSON.parse(jsonMatch[1]); } catch { return text; }
+  if (!json || typeof json !== 'object') return text;
+
+  const pageList = (arr) => (Array.isArray(arr) ? arr : []).map(Number).filter(Number.isFinite);
+  for (const key of SYNCED_COLLECTIONS) {
+    const raw = json[key];
+    const parsed = visualBible[key];
+    if (!Array.isArray(raw) || !Array.isArray(parsed)) continue;
+    const byId = new Map(parsed.filter(e => e && e.id).map(e => [String(e.id).trim().toUpperCase(), e]));
+    for (const entry of raw) {
+      if (!entry || !entry.id) continue;
+      const mem = byId.get(String(entry.id).trim().toUpperCase());
+      if (!mem) continue;
+      entry.pages = pageList(mem.appearsInPages);
+      if (Array.isArray(entry.states) && Array.isArray(mem.states)) {
+        entry.states = mem.states.map(st => ({
+          name: st.name,
+          delta: st.delta,
+          pages: pageList(st.pages),
+          ...(typeof st.held === 'boolean' ? { held: st.held } : {}),
+        }));
+      }
+      if (key === 'secondaryCharacters' && mem.secondaryAgeClamped) {
+        entry.age = mem.age;
+        entry.secondaryAgeClamped = mem.secondaryAgeClamped;
+      }
+    }
+  }
+
+  const body = '```json\n' + JSON.stringify(json, null, 2) + '\n```\n\n';
+  return text.replace(sectionRe, (_m, marker) => `${marker}${body}`);
+}
+
 // ── Cross-story challenge memory ────────────────────────────────────────────
 // A family buys several books. Nothing used to stop the planner giving them the
 // same challenge twice (the lost thing found, the storm crossed, the rival
@@ -1064,10 +1133,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const childBand = visualBible?.secondaryCharacters?.length
           ? commissionedChildBand(inputData.characters || [])
           : null;
+        let ageClamps = [];
         if (childBand) {
           const band = childBand;
-          const applied = applySecondaryAgeBand(visualBible.secondaryCharacters, band, buildCharacterDescription);
-          for (const a of applied) {
+          ageClamps = applySecondaryAgeBand(visualBible.secondaryCharacters, band, buildCharacterDescription);
+          for (const a of ageClamps) {
             log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
             gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${band.min}-${band.max}; clamped to ${a.clampedTo}`, null, {
               id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: band.low, bandHigh: band.high,
@@ -1091,6 +1161,21 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           if (trim.stripped.length > 0) {
             const states = trim.droppedStates.length ? `, ${trim.droppedStates.length} empty state(s) dropped` : '';
             gl.warn('beats_vb_assignment_trimmed', `${trim.pagesOverBudgetBefore} page(s) over the ${VB_ELEMENT_BUDGET}-element budget at assignment → ${trim.pagesOverBudgetAfter}; ${trim.stripped.length} (element, page) claim(s) stripped${states}`, null, trim);
+          }
+          // ONE SOURCE OF TRUTH. Both post-checks above mutated this module's
+          // parsed copy only; the transcript below is what every later reader
+          // re-parses (storyJobPipeline, resume, the Lab). Until 2026-09-11 the
+          // trim reached the Art Director and nobody else — see
+          // syncVisualBibleSection. Write the mutated fields back so every
+          // extractVisualBible() from here on yields the trimmed bible.
+          if (trim.stripped.length > 0 || ageClamps.length > 0) {
+            const synced = syncVisualBibleSection(bibleSections, visualBible);
+            if (synced === bibleSections) {
+              log.warn('⚠️ [BEATS] Visual Bible post-checks changed the bible but the transcript has no rewritable ---VISUAL BIBLE--- JSON — downstream re-parses will read the UNTRIMMED bible');
+              gl.warn('beats_vb_sync_failed', 'Bible trim/age clamp could not be written back into the transcript — stored bible will not reflect them');
+            } else {
+              bibleSections = synced;
+            }
           }
         }
         const vbCount = visualBible
@@ -2170,7 +2255,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   };
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  // `visualBible` is the SAME object the Art Director and the reviews used —
+  // trimmed, age-clamped, landmark-linked. The caller prefers it over a
+  // re-parse of rawOutline so the two can never diverge (the transcript is
+  // kept in step by syncVisualBibleSection; the re-parse is the fallback).
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges };
+module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections };

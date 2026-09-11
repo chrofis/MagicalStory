@@ -427,9 +427,38 @@ function trimVbAssignments(visualBible, planPages = [], { castNames = [], budget
   return report;
 }
 
+/**
+ * Did the assignment trim SURVIVE to the bible that is about to be persisted?
+ *
+ * `trimVbAssignments` mutates one in-memory copy; every later reader re-parses
+ * the transcript (see beatsPipeline.syncVisualBibleSection). This is the cheap
+ * assertion the caller runs right before the story's first save: when the trim
+ * reported `pagesOverBudgetAfter === 0`, no page of the bible being saved may
+ * exceed the budget. Returns the offending pages (empty = consistent, or
+ * nothing to check). Pure — the caller logs `vb_trim_lost`; never a kill.
+ *
+ * @param {Object} visualBible the bible about to be persisted
+ * @param {{pagesOverBudgetAfter:number}|null} trimReport beatsReviewReport.vbAssignmentTrim
+ * @returns {number[]} pages over budget that the trim said were clean
+ */
+function vbTrimLostPages(visualBible, trimReport, budget = VB_ELEMENT_BUDGET) {
+  if (!visualBible || !trimReport || trimReport.pagesOverBudgetAfter !== 0) return [];
+  const pages = new Set();
+  for (const col of ELEMENT_COLLECTIONS) {
+    for (const entry of (Array.isArray(visualBible[col.key]) ? visualBible[col.key] : [])) {
+      for (const p of (Array.isArray(entry && entry.appearsInPages) ? entry.appearsInPages : [])) {
+        const n = Number(p);
+        if (Number.isFinite(n)) pages.add(n);
+      }
+    }
+  }
+  return [...pages].sort((a, b) => a - b).filter(p => rankPageElements(p, {}, visualBible).length > budget);
+}
+
 module.exports = {
   VB_ELEMENT_BUDGET,
   trimVbAssignments,
+  vbTrimLostPages,
   rankPageElements,
   checkVbElementBudget,
   buildVbElementFindings,
