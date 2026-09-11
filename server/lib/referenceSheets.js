@@ -501,7 +501,9 @@ async function askCellGate(cellsBase64, prompt) {
   const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
   const body = {
     contents: [{ parts: [
-      ...cellsBase64.map(data => ({ inlineData: { mimeType: 'image/png', data } })),
+      // Stored VB cells are JPEG (R2), fresh cuts are PNG; Gemini returns 400
+      // on a mismatched mimeType, so sniff the magic bytes.
+      ...cellsBase64.map(data => ({ inlineData: { mimeType: data.startsWith('/9j/') ? 'image/jpeg' : 'image/png', data } })),
       { text: prompt },
     ] }],
     generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' },
