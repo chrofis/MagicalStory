@@ -507,7 +507,12 @@ Nothing below should be coded until it is answered.
       `PAGE_SCOPED_BUCKETS` (`scoring.js:464-475`), which discards the subject at billing by an earlier deliberate
       decision, so objects gained a jury-merge and repair target but NOT a page penalty. Raising object deductions
       needs its own decision on that list → `tasks/eval-variance-backlog.md`
-- [ ] **Should a reference cell be allowed a minimal MOUNTING context for objects defined by what they attach to?**
+- [x] (2026-09-11, owner ruling) **ANSWERED: NO drawn mounting context** — "no handle bar. Only the thing itself."
+      The words-only fix (Lab 1191/1192) is the whole lever; the cell prompt now bans drawing whatever the
+      description names as what the object attaches to, is part of, or is used with. No `mount` field is built.
+      → `docs/decisions.md` 2026-09-11 "A reference cell draws only the object, never what it attaches to"
+      Original question, for the record:
+- [ ] ~~**Should a reference cell be allowed a minimal MOUNTING context for objects defined by what they attach to?**~~
       Isolation is part of why a bare geometry reads as the wrong object (a lamp on a handlebar is unambiguous). The
       current rule — only the element itself is drawn — is deliberate and was NOT changed. Against: the cell is the
       reference the renderer copies, so a drawn mount can be copied onto every page holding it (the class of failure
@@ -531,9 +536,12 @@ Nothing below should be coded until it is answered.
       `decisions.md:8998`, 2026-08-10, "covers are pages with flags"; `coverTitleMode` and
       `iterateCover` precedence are settled in SETTLED.md, wiring 2026-09-03.)
       → `docs/plans/2026-08-10-cover-page-unification-review.md:193`, `docs/decisions.md` (2026-09-11 triage entry)
-- [ ] **Keeping trial covers cheap — STILL OPEN.** The other half of the cover/page unification
-      risk list; NOT answered in the 2026-09-11 triage round, split out here so it is not lost
-      with its sibling → `docs/plans/2026-08-10-cover-page-unification-review.md:193`
+- [x] (2026-09-11) **Keeping trial covers cheap — CLOSED, already true.** Owner: on trial neither a
+      cover nor a page is evaluated. Verified in the tree — covers pass through the SAME
+      `skipQualityEval` gate as pages (`storyJobPipeline.js:5416`) and the skip branch drops the
+      cover pseudo-pages at `:5428`; covers never had a gen-time eval (`:1816`), and `iterateCover`'s
+      eval is reachable only from regen routes a trial never hits. No gap, no fix
+      → `docs/decisions.md` "Trial stories skip the quality-eval + repair pipeline" (amended 2026-09-11)
 - [x] (2026-09-11) Anonymous account flow — **DROPPED.** A March 2026 plan that was never built;
       the owner declined it on 2026-09-11 as ancient. Plan moved to
       `docs/archive/2026-03-08-anonymous-account-flow.md`

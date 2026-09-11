@@ -49,17 +49,38 @@ gets one taste, then claims their account to unlock the full pipeline.
 **Context:** Quality eval costs another Gemini call per page, plus the
 auto-repair loop can re-generate pages and add several minutes to wall
 time. Trial users won't wait.
-**Decision:** Trial jobs set `skipQualityEval: true` (see
-`server/routes/trial.js:2243`). `server.js:6060` short-circuits the entire
-evaluation + repair pipeline when this flag is set.
+**Decision:** Trial jobs set `skipQualityEval: true` (`server/routes/trial.js:2638`).
+One gate, `storyJobPipeline.js:5416`, short-circuits the entire evaluation +
+repair pipeline when the flag is set.
 **Rationale:** Same as draft skip — speed and cost. Trial output is "good
 enough to demonstrate the product"; full users pay for the polish.
+
+**Amended 2026-09-11 — COVERS ARE INCLUDED, and always were.** Closing the last
+open half of the cover/page unification risk list ("keeping trial covers cheap"),
+the owner confirmed: on trial, neither a cover nor a page is evaluated. Verified
+in the tree, no gap and no fix needed. Since the unification made covers
+pages-with-flags, covers are pushed into `rawImages` as pseudo-pages with
+negative page numbers at `storyJobPipeline.js:5267-5294` — but that happens
+BEFORE the gate, and the skip branch filters them straight back out at
+`storyJobPipeline.js:5428` (`pageNumber >= 0`). Covers never had a gen-time eval
+in the first place (`storyJobPipeline.js:1816`: "covers generate exactly like
+pages — generation only, no gen-time eval/bbox/retry"). The other cover-eval
+site, `iterateCover` (`server/lib/coverIterate.js:1302`, `:1377`, guarded by
+`skipEval` at `:726`), is reachable only from the post-generation regen routes,
+which a trial never reaches because it sets `enableFullRepair: false`.
+Text-region detection is disabled twice over on trial (`layout.textInImage:
+false` at `server/routes/trial.js:2630`, and it filters to `pageNumber > 0` at
+`storyJobPipeline.js:5318`). Cover avatars are ungraded like the rest
+(`storyJobPipeline.js:3117`).
+
 **Touched:**
-- `server/routes/trial.js:2243` — sets the flag
-- `server.js:5970, 6060, 6367` — short-circuits eval + repair
+- `server/routes/trial.js:2638` — sets the flag (was `:2243` before the routes split)
+- `storyJobPipeline.js:5299` — reads it; `:5416` — the gate; `:5428` — drops the
+  cover pseudo-pages in the skip branch (the old pointers `server.js:5970, 6060,
+  6367` are stale; the code moved into the pipeline module)
 - `server/lib/styledAvatars.js`, `server/lib/character2x4Sheet.js` —
   per-call `skipQualityEval` override flows through the avatar pipeline too
-**Status:** ✅ active.
+**Status:** ✅ active, covers confirmed in scope 2026-09-11.
 
 ### Phantom character recovery
 **Context:** Sonnet sometimes references a character in scene prose or
