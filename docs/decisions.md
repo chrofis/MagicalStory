@@ -32536,3 +32536,124 @@ scale without a simile there is a separate, still-open backlog item.
 **Touched:** `prompts/reference-sheet.txt`,
 `tests/unit/reference-sheet-mismatch.test.ts`
 **Status:** ✅ active
+
+---
+
+## A Visual Bible entry with `states[]` is asked the identity question too, not only state consistency (2026-09-11)
+
+**Context:** The reference-sheet cell gate had two mutually exclusive branches. A batch of state
+cells (`batch.length > 1 && every cell has stateName`) went to `checkStateCellsConsistency` — "is
+this the same object in every cell, differing only in the named state?" — and an entry that took
+that branch was NEVER asked `checkElementCellRender`'s question: does the cell depict the object its
+description describes, in the declared art style? Measured on staging story
+`job_1789147573901_m3uam0nxi`: ART001 "Levin's Velolampe", described as *"A compact rectangular
+bicycle lamp approximately as long as a child's palm, black matte plastic casing with a flat rear
+face and a slightly convex circular lens at the front centre, a U-shaped black plastic bracket
+mounted perpendicular to the underside for clipping to a handlebar, overall length about ten
+centimetres"*, rendered in both state cells as a large black broadcast/CCTV-style camera body with a
+protruding round lens housing on a stubby mount. The stored gate record is a single `state_cells`
+entry, `ok: true`, reason verbatim: *"State cells pass: The object is consistent in shape, color,
+and material, with the only difference being the state of the lamp being off or lit."* Accurate
+about consistency and blind to the object being wrong; all five pages holding that reference
+reproduced the camera faithfully. The same blind spot covered ANI002 (the dragon) and ART002 (the
+small scale) in the same story. Stateful entries are by definition the props the story changes —
+the most plot-critical objects in the book — and they were the ones skipping the identity check.
+
+**Decision:** A state batch gets BOTH questions, through one new helper `checkStateBatch`. Identity
+is asked ONCE, of the FIRST cell (the bible's convention lists the unaltered look first) with the
+parent's base description — not of every state cell, which would multiply a paid judge call for no
+information. The batch fails if either question answers NO. The failing reason (prefixed `object
+identity:` / `state consistency:`) is what `buildReferenceSheetPrompt(..., gateReason)` feeds into
+the single re-render, so an identity failure re-renders against the identity complaint. Each
+question keeps its OWN gate record through `recordElementCellGate` — the identity verdict under
+gate `element_cell`, the consistency verdict under `state_cells` — so a pass on one and a fail on
+the other can never be stored as a pass. Unchanged: one re-render on NO, one re-check for the
+record, then accept; a check that ERRORS stays unchecked; and the `*_still_bad` fail-open — a cell
+that fails twice still ships (owner, same day).
+
+**Rationale:** Consistency and identity are different questions and the cheap one was standing in
+for both. Asking identity per cell would cost one judge call per state; asking it once of the
+unaltered cell answers the same question, because the consistency gate already establishes that the
+other cells are the same object. Cost: +1 judge call per state batch on the happy path, +2 when a
+re-render happens (both questions are re-asked, since the re-render replaced both cells). State
+batches are a minority of entries — typically 1-3 per story, so ~1-6 extra calls in the worst case.
+
+**Touched:** `server/lib/referenceSheets.js` (`checkStateBatch` + the `isStateBatch` branch in
+`generateReferenceSheets`), `tests/unit/vb-state-batch-gate.test.ts`.
+
+**Status:** ✅ active
+
+### The Art Director authors the Visual Bible, ahead of the page briefs
+**Context:** The Visual Bible was written at beats stage 3
+(`beats_story_bible`, `prompts/story-bible-from-beats.txt`), BEFORE the Art
+Director wrote the scene briefs at stage 4 (`beats_scene_expansion`,
+`prompts/scene-expansion-all.txt`). The bible therefore had to GUESS which page
+uses which element, matching plan lines that name things in prose ("the big
+wing scale") against entries the bible keys by id. On staging
+`job_1789147573901_m3uam0nxi` the guess removed 19 (element, page) claims and
+left six entries at `appearsInPages: []` — including the story's central prop
+and the signpost carrying plot-critical text. No reference cell was rendered
+for any of them, while the final briefs cited exactly those ids (p10
+`objects: ["LOC004", "ART006"]`), and p10 then shipped an unrepairable critical
+("no visible letters on the signpost for him to trace"). The bible-time trim
+was dropped and page assignment rebuilt from the final briefs the same day
+(`applyBriefUsage`, `cdb334904`) — a correction to the guess, not its removal.
+
+**Decision:** The guess is gone. The EXISTING all-pages Art Director call emits
+the `---VISUAL BIBLE---` and `---COVER SCENE HINTS---` sections FIRST, before
+page 1's heading, then the page briefs. **No new model call was added** — the
+sections ride the call that was already being made. Stage 3 keeps the
+`---CLOTHING REQUIREMENTS---` section and nothing else. `applyBriefUsage` is
+KEPT as a deterministic reconciler: it is free, tested, and it credits a
+secondary named only in a page's `characters[]` row, which `objects[]` never
+carries.
+
+**Rationale:**
+- One author now owns both what is in each picture and what each thing looks
+  like, so the two cannot contradict each other.
+- The emission ORDER is the mechanism: the model declares its cast and props,
+  then stages each page citing ids that already exist, which makes it
+  structurally impossible for a page's `objects[]` to name an entry that was
+  never declared. That is the exact failure being fixed.
+- Clothing did NOT move. Styled avatars are the long pole in front of every
+  image and start the instant stage 3 returns (`opts.onClothingRequirements`);
+  making the wardrobe wait for the Art Director would push every page image
+  back by a whole stage. Clothing depends on the cast and the setting, both
+  already fixed by the plan, so it needs nothing the Art Director adds.
+- The Art Director picks landmark viewpoints from the `PHOTOS:` lines in
+  `{AVAILABLE_LANDMARKS_SECTION}` (the same descriptions `photoVariants`
+  carries), so `landmarkView` is no more blind than before; the index linking
+  and variant load now run right after the bible is parsed instead of before
+  scene expansion.
+- Truncation headroom, measured offline on that same story (18 pages, no model
+  call): the built prompt is 71,661 chars (~17.9k tokens, no unfilled
+  placeholders) and the response has to carry the stored bible JSON (40,702
+  chars, an over-estimate — the stored copy is enriched), the cover hints
+  (4,073) and every brief (63,533) — ~27k output tokens against
+  `gemini-3.1-pro`'s 65,536 cap (`maxTokens=null`, no code-side cap). A partial
+  bible is never shipped: `JSON.parse` is the completeness test, a reply cut
+  mid-JSON yields no bible at all, and the existing batch retry is the recovery.
+- The per-page fallback (`expandOnePage`) cannot author a whole-book bible and
+  does not try — it reuses whatever the all-pages call produced. With no bible
+  at all the run is degraded exactly as a failed stage-3 bible always was
+  (empty VB, no cover hints, blind briefs) and says so loudly. Never a kill.
+- TRIAL IS UNAFFECTED: trials are always `pipelineMode: 'unified'`
+  (`resolvePipelineMode`), so the streaming `onVisualBible` callback in
+  `storyJobPipeline.js` — and the trial reference-sheet kickoff inside it — is
+  on the unified path and never sees this change.
+- The landmark-shortfall early abort (`onVisualBible` in beats mode) now fires
+  after the Art Director call instead of before it, so a retried attempt burns
+  the scene-brief stage too. It still saves the scene review and the page text,
+  and it is the only known cost of the move.
+
+**Touched:** `prompts/scene-expansion-all.txt`,
+`prompts/story-bible-from-beats.txt`, `server/lib/beatsPipeline.js` (stage-3
+block, `extractBibleSections` marker sets, the bible-adoption block after the
+all-pages call, the stage-order header), `server/lib/promptBuilders.js`
+(`buildSceneExpansionAllPrompt`, `buildStoryBibleFromBeatsPrompt`,
+`namedByMain`), `server/lib/testlab.js` (`runBeatsScenesStage` call site),
+`docs/prompt-inventory.md`, `tests/unit/ad-authored-bible.test.ts`,
+`tests/unit/vb-authoring-contract.test.ts`,
+`tests/unit/invented-age-band-wiring.test.ts`.
+
+**Status:** ✅ active

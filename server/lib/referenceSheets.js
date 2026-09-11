@@ -650,6 +650,48 @@ async function checkStateCellsConsistency(cellsBase64, parent, cells) {
 }
 
 /**
+ * Both questions for a batch of state cells.
+ *
+ * A state batch used to be asked ONLY whether its cells agree with each other,
+ * so an entry with `states[]` was never asked whether it depicts the object its
+ * description describes. Measured on staging job_1789147573901_m3uam0nxi:
+ * ART001 "Levin's Velolampe" — described as a compact rectangular bicycle lamp
+ * with a handlebar bracket — rendered as a broadcast/CCTV camera body in both
+ * state cells, and the stored verdict was a PASS reading "State cells pass: The
+ * object is consistent in shape, color, and material, with the only difference
+ * being the state of the lamp being off or lit." Accurate about consistency,
+ * blind to the object being wrong; all five pages holding that reference
+ * reproduced the camera. Stateful entries are by definition the props the story
+ * changes, i.e. the most plot-critical objects in the book.
+ *
+ * So both questions are asked. IDENTITY is per-object, not per-cell: it is
+ * asked once, of the FIRST cell (the bible lists the unaltered look first) with
+ * the parent's base description, because asking it of every state multiplies
+ * cost for no information. A check that ERRORS stays unchecked (fail-open,
+ * unchanged); a check that answers NO fails the batch.
+ *
+ * @param {Array<string>} cellsBase64 - state cells in image order
+ * @param {Object} parent - the bible entry (name/kind/description/text)
+ * @param {Array<Object>} cells - the state cells (stateName, delta)
+ * @param {string} styleDescription
+ * @param {Object} [deps] - test seam: {checkIdentity, checkConsistency}
+ * @returns {Promise<{ok:boolean, reason:string, identity:Object|null, consistency:Object|null}>}
+ */
+async function checkStateBatch(cellsBase64, parent, cells, styleDescription = '', deps = {}) {
+  const askIdentity = deps.checkIdentity || checkElementCellRender;
+  const askConsistency = deps.checkConsistency || checkStateCellsConsistency;
+  const settle = (p) => p.then(v => v, () => null);
+  const [identity, consistency] = await Promise.all([
+    settle(Promise.resolve().then(() => askIdentity(cellsBase64[0], parent, styleDescription))),
+    settle(Promise.resolve().then(() => askConsistency(cellsBase64, parent, cells))),
+  ]);
+  const failed = [];
+  if (identity && !identity.ok) failed.push(`object identity: ${identity.reason}`);
+  if (consistency && !consistency.ok) failed.push(`state consistency: ${consistency.reason}`);
+  return { ok: failed.length === 0, reason: failed.join(' | '), identity, consistency };
+}
+
+/**
  * Group elements into generation batches.
  *
  * Every cell of a batch is described in ONE prompt to ONE generation call, so a
@@ -1017,34 +1059,51 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       if (isStateBatch) {
         // Every cell is one object; the question is asked of the set.
         const parent = { ...batch[0], name: batch[0].displayName, description: batch[0].baseDescription };
-        let verdict;
-        try {
-          verdict = await checkStateCellsConsistency(references, parent, batch);
-        } catch (err) {
-          log.warn(`⚠️ [REF-SHEET] State-cell gate errored for "${parent.name}" (${err.message}) — accepting cells unchecked`);
-          verdict = null;
-        }
-        if (verdict && verdict.ok) {
-          genLog?.info('vb_state_cells_gate', `State cells pass: ${verdict.reason}`, parent.name);
-          record(batch[0], { gate: 'state_cells', ok: true, reason: verdict.reason, rerendered: false });
-        } else if (verdict) {
+        // BOTH questions: is this the described object at all (identity, asked
+        // once of the first/unaltered cell), and do the states agree with each
+        // other. See checkStateBatch.
+        const verdict = await checkStateBatch(references, parent, batch, styleDescription);
+        // Each question keeps its own gate record, so a pass on one and a fail
+        // on the other is never stored as a pass.
+        const recordBoth = (rerendered, recheck) => {
+          const pairs = [['element_cell', 'identity'], ['state_cells', 'consistency']];
+          for (const [gate, key] of pairs) {
+            const v = verdict[key];
+            if (!v) continue; // errored → unchecked, as before
+            const re = recheck ? recheck[key] : null;
+            record(batch[0], {
+              gate, ok: v.ok, reason: v.reason, rerendered,
+              ...(rerendered ? { recheckOk: re ? re.ok : null, recheckReason: re?.reason || null } : {}),
+            });
+          }
+        };
+        if (!verdict.identity && !verdict.consistency) {
+          log.warn(`⚠️ [REF-SHEET] State-cell gates errored for "${parent.name}" — accepting cells unchecked`);
+        } else if (verdict.ok) {
+          genLog?.info('vb_state_cells_gate', `State cells pass: ${verdict.reason || [verdict.identity?.reason, verdict.consistency?.reason].filter(Boolean).join(' | ')}`, parent.name);
+          recordBoth(false, null);
+        } else {
           log.warn(`⚠️ [REF-SHEET] State cells for "${parent.name}" failed gate: ${verdict.reason} — re-rendering once`);
           genLog?.warn('vb_state_cells_rerender', `VB state cells failed gate: ${verdict.reason}`, parent.name);
           let recheck = null;
           try {
+            // The re-render carries the failing reason — identity or
+            // consistency, whichever answered NO.
             const reCells = await rerenderSolo(batch, verdict.reason);
             for (let i = 0; i < batch.length; i++) references[i] = reCells[i];
-            try { recheck = await checkStateCellsConsistency(references, parent, batch); } catch { /* informational */ }
-            if (recheck && !recheck.ok) {
+            recheck = await checkStateBatch(references, parent, batch, styleDescription);
+            if (!recheck.ok) {
+              // Fail-open, unchanged (owner, 2026-09-11): a cell that fails
+              // twice still ships.
               log.warn(`⚠️ [REF-SHEET] Re-rendered state cells for "${parent.name}" still fail gate (${recheck.reason}) — accepting anyway`);
               genLog?.warn('vb_state_cells_still_bad', `Re-rendered state cells still fail gate (${recheck.reason}) — accepted anyway`, parent.name);
-            } else if (recheck) {
+            } else {
               log.info(`✓ [REF-SHEET] Re-rendered state cells for "${parent.name}" pass gate`);
             }
           } catch (err) {
             log.warn(`⚠️ [REF-SHEET] Re-render failed for "${parent.name}" (${err.message}) — keeping original cells`);
           }
-          record(batch[0], { gate: 'state_cells', ok: false, reason: verdict.reason, rerendered: true, recheckOk: recheck ? recheck.ok : null, recheckReason: recheck?.reason || null });
+          recordBoth(true, recheck);
         }
       }
 
@@ -1472,6 +1531,7 @@ module.exports = {
   stateCellsGatePrompt,
   checkElementCellRender,
   checkStateCellsConsistency,
+  checkStateBatch,
   splitGridIntoReferences,
   buildReferenceSheetPrompt,
   characterAgeCue,
