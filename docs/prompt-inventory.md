@@ -140,7 +140,7 @@ Sizes measured 2026-08-09.
 | incremental-consistency-check.txt | images.js `evaluateIncrementalConsistency` | Incremental consistency |
 | ~~final-consistency-check.txt~~ | — | **DELETED 2026-07-26** — `runFinalConsistencyChecks`/`evaluateSingleBatch` chain was dead (imported, never called); removed in the Pt 10 cleanup (decisions.md) |
 | visual-bible-analysis.txt | visualBible.js `analyzeVisualBibleElements` | VB element analysis |
-| reference-sheet.txt | images.js `buildReferenceSheetPrompt` | Element reference sheet generation |
+| reference-sheet.txt | referenceSheets.js `buildReferenceSheetPrompt` | Element reference sheet generation. Cell lines open with a kind sentence (`elementKindSentence`, name + type as prose); `{TEXT_RULE}` is the blanket no-lettering line, swapped for a quoted-words-only line on a solo cell whose entry carries `text` (rendered on `MODEL_DEFAULTS.vbTextCellModel`) |
 | sheet-cell-identification.txt | referenceSheets.js `identifySheetCells` | Maps labelled sheet cells to requested elements when the model's drawn grid does not match the requested cell count |
 
 ## Repair (image)

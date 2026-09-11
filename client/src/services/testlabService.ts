@@ -558,6 +558,9 @@ export const TESTLAB_STAGES = [
   // only variable is the prompt (or the models). params.retell also re-tells
   // against the new panel output, answering "does it help" end to end.
   { id: 'arc_panel_replay', label: 'Arc panel replay (frozen arc → what does the panel catch?)', producesImage: false, overridable: true, storyLevel: true },
+  // One Visual Bible element's reference cell(s) + the cell gate's verdict.
+  // params: elementId (required), gateOnly, text, model, description.
+  { id: 'vb_element_cell', label: 'VB element cell (render + cell gate; params.elementId)', producesImage: true, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

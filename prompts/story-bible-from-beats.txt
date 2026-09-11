@@ -79,8 +79,8 @@ Every description — characters, creatures, clothing, objects — must render i
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
-- No lettering unless this entry names the exact words it carries; every other prop's writing is called illegible / weathered / smudged. Describe an object's build by shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style").
-- A prop whose interest lies on its face — map, letter, note, chart, book, page, sign, board, plaque — gets TWO entries with consecutive ids, the same object seen from two sides. The first is the side away from the viewer: the back of the sheet, the closed cover, the outer face of the roll, named `"<thing> (turned away)"`. The second shows the face, named `"<thing> (face to camera)"`. Both descriptions give the same material, size, edge wear and dominant colour so they read as one object, and differ only in which side is turned to us. What is drawn or written on the face stays out of both descriptions.
+- No lettering unless this entry names the exact words it carries in `text`; every other prop's writing is called illegible / weathered / smudged. Describe an object's build by shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style").
+- A prop whose interest lies on its face — map, letter, note, chart, book, page, sign, board, plaque — gets TWO entries with consecutive ids, the same object seen from two sides. The first is the side away from the viewer: the back of the sheet, the closed cover, the outer face of the roll, named `"<thing> (turned away)"`. The second shows the face, named `"<thing> (face to camera)"`. Both descriptions give the same material, size, edge wear and dominant colour so they read as one object, and differ only in which side is turned to us. What is drawn or written on the face stays out of both descriptions; words the reader must be able to read go in the face entry's `text`.
 
 Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
 
@@ -169,8 +169,9 @@ Only the three blocks below. No preamble, no commentary.
       "name": "[Name]",
       "pages": [1],
       "type": "[what kind of object]",
+      "text": "[OMIT unless words on this object must be readable in the picture (a sign, a plaque, a banner); then the exact words, at most three]",
       "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, then the rest in the order the story reaches them, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[the change to the object itself, one clause, at most 15 words — never material, colour or size, those stay in description; never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
-      "description": "[size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face gets two entries, one per side.]"
+      "description": "[size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries in `text`; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face gets two entries, one per side.]"
     }
   ],
   "locations": [

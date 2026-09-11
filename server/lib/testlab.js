@@ -7748,7 +7748,119 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   };
 }
 
+/**
+ * VB ELEMENT CELL — render one Visual Bible element's reference cell(s) the
+ * way generateReferenceSheet does (kind sentence, solo call, page aspect for
+ * non-characters, `text` → typography tier) and ask the cell gate the same
+ * question production asks. Target {storyId}; params.elementId required.
+ *
+ * Verdict only: the Lab shows what the gate said; the pipeline owns the one
+ * re-render. Built 2026-09-11 for the dish-instead-of-scale cell of
+ * job_1789078732136_622wecmhj.
+ *
+ * params.elementId   — bare id (ART001 / CHR001 / VEH002); a stated object renders every state
+ * params.gateOnly    — judge the STORED cell(s), no image call
+ * params.model       — IMAGE_MODELS key (default: text → vbTextCellModel, else pageImage)
+ * params.text        — readable words for the element (overrides the entry's `text`)
+ * params.description — description override
+ * promptOverride     — replaces the reference-sheet template
+ */
+async function runVbElementCellStage(target, { experimentId, promptOverride = null, params = {} }) {
+  const { loadPromptTemplates, withTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const refSheets = require('./referenceSheets');
+  const { resolveArtStyle } = require('./promptBuilders');
+  const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  const { loadVbReferenceBytes } = require('./characterPhotos');
+  const { objectStates } = require('./visualBible');
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const vb = storyData.visualBible;
+  if (!vb) throw new Error('Story has no visualBible');
+  const elementId = String(params.elementId || '').trim().toUpperCase();
+  if (!elementId) throw new Error('params.elementId is required (e.g. ART001)');
+  const POOLS = { secondaryCharacters: 'character', artifacts: 'artifact', animals: 'animal', vehicles: 'vehicle', locations: 'location' };
+  let entry = null;
+  let type = null;
+  for (const [pool, t] of Object.entries(POOLS)) {
+    const hit = (vb[pool] || []).find(e => String(e.id || '').toUpperCase() === elementId);
+    if (hit) { entry = hit; type = t; break; }
+  }
+  if (!entry) throw new Error(`${elementId} is not in this story's visual bible`);
+  const el = { ...entry, type, pageCount: (entry.appearsInPages || []).length };
+  if (params.text !== undefined) el.text = String(params.text || '').trim() || null;
+  if (params.description) el.description = String(params.description);
+  const cells = refSheets.expandElementStateCells(el);
+  const textCell = cells.length === 1 && String(cells[0].text || '').trim();
+  const modelKey = params.model || (textCell ? MODEL_DEFAULTS.vbTextCellModel : MODEL_DEFAULTS.pageImage);
+  if (!IMAGE_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}" — not an IMAGE_MODELS key`);
+  const styleDescription = resolveArtStyle(storyData.artStyle, IMAGE_MODELS[modelKey].backend) || resolveArtStyle('pixar');
+  const aspect = type === 'character' ? null : (storyData.layout?.imageAspect || MODEL_DEFAULTS.pageAspect);
+  const steps = [];
+  const addStep = async (label, dataUri) => {
+    const v = await saveTestVersion(target.storyId, 'tl_step', null, dataUri, experimentId);
+    steps.push({ label, imageType: 'tl_step', versionIndex: v });
+    return v;
+  };
+  const t0 = Date.now();
+  let prompt = null;
+  let modelId = null;
+  let cellsB64 = [];
+  if (params.gateOnly) {
+    for (const c of cells) {
+      const src = cells.length > 1 ? (objectStates(entry).find(s => s.id === c.id) || null) : entry;
+      const buf = src ? await loadVbReferenceBytes(src) : null;
+      if (!buf) throw new Error(`No stored reference for ${c.id}`);
+      cellsB64.push(Buffer.from(buf).toString('base64'));
+    }
+  } else {
+    prompt = withTemplates({ referenceSheet: promptOverride }, () => refSheets.buildReferenceSheetPrompt(cells, styleDescription, vb));
+    const { callGeminiAPIForImage } = require('./images');
+    const result = await callGeminiAPIForImage(prompt, [], null, 'avatar', null, modelKey, null, '', null, [], 0, null, null, null, null, aspect);
+    if (!result?.imageData) throw new Error('render returned no image');
+    modelId = result.modelId || modelKey;
+    const gridB64 = require('./r2').stripDataUriPrefix(result.imageData);
+    if (cells.length > 1) await addStep(`rendered sheet (${cells.length} state cells) — ${modelId}`, result.imageData);
+    cellsB64 = await refSheets.splitGridIntoReferences(gridB64, cells.length, cells);
+  }
+  let firstV = null;
+  for (let i = 0; i < cells.length; i++) {
+    if (!cellsB64[i]) continue;
+    const v = await addStep(`${params.gateOnly ? 'stored' : 'rendered'} cell ${cells[i].id}${cells[i].stateName ? ` — ${cells[i].stateName}` : ''}`, `data:image/png;base64,${cellsB64[i]}`);
+    if (firstV == null) firstV = v;
+  }
+  const gates = [];
+  if (cells.length > 1 && cellsB64.every(Boolean)) {
+    const parent = { ...cells[0], name: cells[0].displayName, description: cells[0].baseDescription };
+    const question = refSheets.stateCellsGatePrompt(parent, cells);
+    const v = await refSheets.checkStateCellsConsistency(cellsB64, parent, cells);
+    gates.push({ gate: 'state_cells', cellIds: cells.map(c => c.id), ...v, question });
+  }
+  for (let i = 0; i < cells.length; i++) {
+    if (!cellsB64[i]) continue;
+    if (type === 'character') {
+      const question = refSheets.cellGatePrompt(styleDescription, cells[i].age || null, cells[i].build || null);
+      const v = await refSheets.checkCharacterCellRender(cellsB64[i], styleDescription, cells[i].age || null, cells[i].build || null);
+      gates.push({ gate: 'character_cell', cellId: cells[i].id, ok: v.natural, reason: v.reason, question });
+    } else {
+      const question = refSheets.elementCellGatePrompt(cells[i], styleDescription);
+      const v = await refSheets.checkElementCellRender(cellsB64[i], cells[i], styleDescription);
+      gates.push({ gate: 'element_cell', cellId: cells[i].id, ...v, question });
+    }
+  }
+  return {
+    imageType: 'tl_step', versionIndex: firstV, pageNumber: null, steps,
+    elementId, elementName: entry.name, elementType: type, text: el.text || null,
+    modelId: modelId || (params.gateOnly ? 'stored cell' : modelKey), aspect, styleDescription, prompt,
+    cellLine: refSheets.elementCellText(cells[0]),
+    gates,
+    allOk: gates.every(g => g.ok),
+    issuesSummary: gates.filter(g => !g.ok).map(g => `${g.gate}: ${g.reason}`).join(' | ') || null,
+    elapsedMs: Date.now() - t0,
+  };
+}
+
 const STORY_STAGES = {
+  vb_element_cell: runVbElementCellStage,
   arc_rounds: runArcRoundsStage,
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,

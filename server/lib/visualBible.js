@@ -466,6 +466,10 @@ function tryParseVisualBibleJSON(outline) {
         appearsInPages: artifact.pages || [],
         description: artifact.description || `${artifact.type}: ${artifact.description}`,
         type: artifact.type,
+        // Words that must be READABLE on the object (a sign, a plaque). Its
+        // cell renders solo on the typography-aware tier with the words
+        // quoted in a sentence (referenceSheets.elementTextSentence).
+        text: typeof artifact.text === 'string' && artifact.text.trim() ? artifact.text.trim() : null,
         // NOTE: this parse is a WHITELIST — a field not listed here is dropped
         // silently. A `referenceView` field lived here briefly (2026-08-24/26);
         // a face-prop now gets two entries instead, one per side, so the side
@@ -2980,7 +2984,31 @@ async function dedupeSecondaryCharacterIds(visualBible, addUsage = null) {
   return visualBible;
 }
 
+/**
+ * Record a reference-cell gate verdict on the bible entry it judged, so a
+ * story analysis can read what the gate said without the Railway log. A
+ * dotted id (state cell) records on the parent. Appends; never overwrites.
+ *
+ * @param {Object} visualBible
+ * @param {string} elementId - bare or dotted id
+ * @param {Object} verdict - {gate, ok, reason, rerendered, recheckOk, recheckReason, cellId}
+ */
+function recordElementCellGate(visualBible, elementId, verdict) {
+  if (!visualBible || !elementId || !verdict) return;
+  const parentId = baseVbId(elementId) || elementId;
+  const pools = ['secondaryCharacters', 'artifacts', 'animals', 'vehicles', 'locations', 'clothing'];
+  for (const pool of pools) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      if (baseVbId(entry.id) !== parentId && entry.id !== parentId) continue;
+      if (!Array.isArray(entry.cellGates)) entry.cellGates = [];
+      entry.cellGates.push({ cellId: elementId, at: new Date().toISOString(), ...verdict });
+      return;
+    }
+  }
+}
+
 module.exports = {
+  recordElementCellGate,
   // Parsing
   parseVisualBible,
   filterMainCharactersFromVisualBible,

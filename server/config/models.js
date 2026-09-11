@@ -461,6 +461,10 @@ const MODEL_DEFAULTS = {
   // call sites used to pass the page's resolved model verbatim, so plates
   // silently inherited any page-tier change; they read this key instead.
   emptyScenePlateModel: 'grok-imagine',
+  // The tier a Visual Bible cell renders on when its entry carries `text` —
+  // words that must be readable (a sign, a plaque). Standard cannot spell;
+  // 2.0 is typography-aware. Solo cells only (buildReferenceSheetBatches).
+  vbTextCellModel: 'grok-imagine-2',
   avatar: 'grok-imagine',                    // Character avatars (clothing variants). Switched from
                                               // Gemini 2.5 Flash Image because Gemini's safety filter
                                               // rejects adult-face photos with IMAGE_OTHER, leaving

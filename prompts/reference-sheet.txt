@@ -12,7 +12,7 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}.{GRID_SEPARATION} Each cell
 - Consistent art style across ALL cells matching the style description above
 - Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
 {CELL_LAYOUT_REQ}
-- Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.
+{TEXT_RULE}
 - All content must be safe, family-friendly, and age-appropriate{BATCH_GUARD}
 
 **FOR CHARACTERS:**

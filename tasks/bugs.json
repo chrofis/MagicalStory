@@ -867,6 +867,15 @@
      "fixedAt": "2026-09-11",
      "fixedIn": "ee2d00c72",
      "fix": "All five numeric maxTokens in testlab.js (scene review 16000, audit_replay 16000, scene_hazard_count 16000, review_writer 64000, outline_review 32000) now pass null = model max. New server/lib/sceneReviewGuard.js: assessSceneReview marks a review FAILED on empty text, provider stop_reason max_tokens/length, output_tokens >= the ceiling in force (model max), or a long response the SCENES parser cannot read; a failed reviewer stores ok:false + error, rewrotePages [], no reviewedBrief, and WARN-logs story/model/provider/tokens/cap. scene_hazard_count refuses artifact=reviewed on a failed review (assertReviewedArtifactUsable) and, with params.reviewer, refuses an absent or failed reviewer (pickReviewedBrief). Test: tests/unit/scene-review-guard.test.ts"
+  },
+  {
+   "id": "vb-element-cell-no-noun-scale-rendered-as-dish",
+   "title": "Visual Bible artifact cells were rendered from the description alone (name and type dropped), so an artifact whose description never names the object rendered as a different object",
+   "reportedAt": "2026-09-11",
+   "source": "job_1789078732136_622wecmhj (staging): ART001 'small dragon scale' and ART002 'large dragon scale' - description 'an oval, slightly convex scale...' - both stored VB cells (.../vb/ART001.jpg, ART002.jpg) are ceramic dishes; 'scale' with no noun for the object kind was read as a shape word. buildReferenceSheetPrompt (server/lib/referenceSheets.js) used el.description only, by design since a labelled 'Name (artifact) - ...' line once painted the name onto the object. Root-cause report: ~/Downloads/dragon-cover-scale-rootcause.html Q2.",
+   "status": "fixed",
+   "fixedAt": "2026-09-11",
+   "fix": "Every non-character cell line opens with a plain-prose kind sentence built from the entry's name and type ('This is the small dragon scale, a single reptile scale: <description>') - never a heading, bold line or quoted title; plus an element-cell gate (kind/match/style, one re-render on NO) and a state-cells consistency gate. Unit tests: tests/unit/vb-element-cell-prompt.test.ts."
   }
   ]
 }

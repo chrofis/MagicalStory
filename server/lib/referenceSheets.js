@@ -244,6 +244,70 @@ function characterAgeCue(el) {
 }
 
 /**
+ * The kind sentence: what the object IS, as plain prose in front of its
+ * description. The cell line used to be the description alone — the name and
+ * type were dropped on purpose after a labelled line ("Name (artifact) - …")
+ * got the name painted onto the object. Description-only then failed the other
+ * way on job_1789078732136_622wecmhj: "an oval, slightly convex scale…" with no
+ * noun in sight rendered as a ceramic dish, twice. So the noun goes back in,
+ * but as a sentence (owner, 2026-09-11) — never a heading, a bold line or a
+ * quoted title, which is what invites lettering.
+ *
+ * Characters keep their own line: `build` already opens with the noun and the
+ * age cue follows. A state cell uses `displayName` (the parent's name); its
+ * identification-only name carries the state suffix.
+ *
+ * @param {Object} el
+ * @returns {string} '' or a sentence ending in ': ' ready to prefix the description
+ */
+function elementKindSentence(el) {
+  if (!el || el.type === 'character') return '';
+  const clean = (v) => String(v || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.\s]+$/, '').trim();
+  const name = clean(el.displayName || el.name);
+  // Bible entries carry a free-text `type` ("single reptile scale"); the
+  // pool label the sheet code stamps ("artifact", "vehicle", …) is not one.
+  const rawType = clean(el.type);
+  const type = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : '';
+  if (!name && !type) return '';
+  // "the small dragon scale" / "Julian's ball" / "Nordwind" — a possessive or a
+  // capitalised name is already definite.
+  const nameClause = name ? (/^[A-Z\u00C0-\u00DE]|['\u2019]s\b/.test(name) ? name : `the ${name}`) : '';
+  const typeClause = type && type.toLowerCase() !== name.toLowerCase() ? `${article(type)} ${type}` : '';
+  const what = [nameClause, typeClause].filter(Boolean).join(', ');
+  return `This is ${what}: `;
+}
+
+// The pool labels getElementsNeedingReferenceImages stamps as `type` when an
+// entry has no free-text type of its own.
+const POOL_LABELS = new Set(['artifact', 'vehicle', 'animal', 'location', 'clothing']);
+const article = (noun) => (/^[aeiou]/i.test(String(noun || '')) ? 'an' : 'a');
+
+/**
+ * The lettering sentence for an element whose bible entry carries `text` —
+ * words that must be READABLE in the picture (a sign, a plaque, a banner). The
+ * words are quoted inside a sentence; the cell renders solo on the
+ * typography-aware tier (MODEL_DEFAULTS.vbTextCellModel).
+ *
+ * @param {Object} el
+ * @returns {string} '' or a leading-space sentence
+ */
+function elementTextSentence(el) {
+  const text = String((el && el.text) || '').trim();
+  if (!text) return '';
+  return ` It carries the words "${text}" in clear, legible lettering, spelled exactly like that.`;
+}
+
+/**
+ * One cell's prose: kind sentence + description (+ lettering sentence).
+ * @param {Object} el
+ * @returns {string}
+ */
+function elementCellText(el) {
+  const desc = String(el.extractedDescription || el.description || '').trim();
+  return `${elementKindSentence(el)}${desc}${elementTextSentence(el)}`;
+}
+
+/**
  * Build reference sheet prompt for a batch of elements
  *
  * @param {Array} elements - Elements to include (from getElementsNeedingReferenceImages)
@@ -270,7 +334,7 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   const positions2x2 = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
   const gridLayoutLines = elements.map((el, i) => {
     const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
-    const desc = (el.extractedDescription || el.description) + characterAgeCue(el);
+    const desc = elementCellText(el) + characterAgeCue(el);
     // A reference image carries POSE, not just appearance: reference-conditioned
     // models reproduce a referenced object's exact appearance AND pose whatever
     // the instruction says (OminiControl arXiv:2411.15098; leakage/shortcut in
@@ -337,10 +401,18 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     ? '\n- Each cell shows only its own element, never anything described for another cell, and no lettering or readable words anywhere'
     : '';
 
+  // A solo cell whose entry carries `text` is the one place lettering is
+  // wanted; every other sheet keeps the blanket ban.
+  const textCell = count === 1 && String(elements[0]?.text || '').trim();
+  const textRule = textCell
+    ? '- The only lettering anywhere in the image is the quoted words, spelled exactly as given — no other letters, labels, captions or numbers'
+    : '- Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.';
+
   const prompt = fillTemplate(PROMPT_TEMPLATES.referenceSheet, {
     STYLE_DESCRIPTION: styleDescription,
     GRID_SHAPE_PHRASE: gridShapePhrase,
     GRID_LAYOUT: gridLayoutLines.join('\n'),
+    TEXT_RULE: textRule,
     BATCH_GUARD: batchGuard,
     GRID_SEPARATION: gridSeparation,
     CELL_LAYOUT_REQ: cellLayoutReq,
@@ -402,17 +474,30 @@ function cellGatePrompt(styleDescription = '', age = null, build = null) {
 // whatever came back. No scores, no thresholds, no loops; fail-open on any API
 // error — the gate may never block a story.
 async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null, build = null) {
+  // The style anchor is load-bearing: without it flash-lite judged the known-bad
+  // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
+  // job_1788123310558 cell — NO with the anchor, YES without).
+  const parsed = await askCellGate([cellBase64], cellGatePrompt(styleDescription, age, build));
+  return { natural: parsed.natural !== false, reason: String(parsed.reason || '') };
+}
+
+/**
+ * The one call every cell gate makes: N cell images + one question to the
+ * cheapest vision-capable TEXT_MODELS entry, JSON back. Throws on any API
+ * error; callers fail open.
+ *
+ * @param {string[]} cellsBase64
+ * @param {string} prompt
+ * @returns {Promise<Object>} the parsed JSON reply
+ */
+async function askCellGate(cellsBase64, prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
   const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
-  // The style anchor is load-bearing: without it flash-lite judged the known-bad
-  // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
-  // job_1788123310558 cell — NO with the anchor, YES without).
-  const prompt = cellGatePrompt(styleDescription, age, build);
   const body = {
     contents: [{ parts: [
-      { inlineData: { mimeType: 'image/png', data: cellBase64 } },
+      ...cellsBase64.map(data => ({ inlineData: { mimeType: 'image/png', data } })),
       { text: prompt },
     ] }],
     generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' },
@@ -431,12 +516,56 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   // flash-lite occasionally emits two JSON objects back-to-back despite
   // responseMimeType — strict parse first, then the first {…} span.
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch {
+  try { return JSON.parse(raw); } catch {
     const m = raw.match(/\{[\s\S]*?\}/);
-    parsed = JSON.parse(m ? m[0] : raw);
+    return JSON.parse(m ? m[0] : raw);
   }
-  return { natural: parsed.natural !== false, reason: String(parsed.reason || '') };
+}
+
+// ── Element-cell render gate ────────────────────────────────────────────────
+// Same shape as the character gate, for every non-character cell (owner,
+// 2026-09-11, after the dish): one question, one re-render on NO, accept
+// afterwards, fail-open. The classification lives in the question; code only
+// decides the one re-render.
+
+/**
+ * The element-cell question. Pure, so it can be tested.
+ * @param {Object} el - the cell element
+ * @param {string} styleDescription
+ * @returns {string}
+ */
+function elementCellGatePrompt(el, styleDescription = '') {
+  const rawType = String(el?.type || '').trim();
+  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : String(el?.displayName || el?.name || 'object').trim();
+  const desc = String(el?.description || '').trim();
+  const text = String(el?.text || '').trim();
+  const textClause = text ? ` (4) Lettering: the words "${text}" are readable and spelled exactly so; any other lettering fails.` : '';
+  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size? (2) Match: do its material, colour and main parts follow the description? (3) Style: is it rendered in the declared art style?${textClause} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+}
+
+/**
+ * The state-consistency question for an object rendered in several states.
+ * Pure, so it can be tested.
+ * @param {Object} parent - the bible entry (name/type/description)
+ * @param {Array<Object>} cells - the state cells in image order (stateName, delta)
+ * @returns {string}
+ */
+function stateCellsGatePrompt(parent, cells) {
+  const rawType = String(parent?.type || '').trim();
+  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : String(parent?.build || parent?.name || 'object').trim();
+  const desc = String(parent?.description || '').trim();
+  const list = cells.map((c, i) => `${i + 1}. ${c.stateName || c.name}: ${c.delta || ''}`.trim()).join(' ');
+  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Judge strictly: is it the same object in every cell — same shape, build, material and colour — differing only in the named state? Two different objects, or a change that is not the one named, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+}
+
+async function checkElementCellRender(cellBase64, el, styleDescription = '') {
+  const parsed = await askCellGate([cellBase64], elementCellGatePrompt(el, styleDescription));
+  return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
+}
+
+async function checkStateCellsConsistency(cellsBase64, parent, cells) {
+  const parsed = await askCellGate(cellsBase64, stateCellsGatePrompt(parent, cells));
+  return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
 }
 
 /**
@@ -520,6 +649,10 @@ function expandElementStateCells(el) {
       // by name when the model draws a different grid than asked for, and
       // every cell of one object would otherwise carry the same name.
       name: `${el.name} — ${s.name}`,
+      displayName: el.name,
+      baseDescription: baseDesc,
+      stateName: s.name,
+      delta: s.delta,
       description: `${baseDesc}, ${s.delta}`,
       extractedDescription: null,
       states: [],
@@ -575,7 +708,9 @@ function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4
     // grid, base plus every state, so the states cannot disagree. It also
     // keeps the object to one element in every downstream budget, because
     // every cell resolves to the same parent id.
-    if (cells.length > 1 || (name && letteringNames.has(name))) { solo.push(cells); continue; }
+    // An entry with `text` (readable words) renders solo too: its lettering
+    // must land on itself only, and it goes to the typography-aware tier.
+    if (cells.length > 1 || (name && letteringNames.has(name)) || String(el.text || '').trim()) { solo.push(cells); continue; }
     (el.type === 'character' ? batchableChars : batchableOther).push(el);
   }
 
@@ -709,6 +844,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   let generated = 0;
   let failed = 0;
   const processedElements = [];
+  // Every gate verdict of this run (also written onto the bible entries).
+  const cellGates = [];
 
   // Batch elements into grids — balanced, with declared-lettering elements
   // quarantined into solo calls (see buildReferenceSheetBatches).
@@ -745,8 +882,13 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // behaviour for one-shot reference grids) — only the aspect changes.
       const isCharacterBatch = batch[0]?.type === 'character';
       const batchAspectOverride = isCharacterBatch ? null : elementAspect;
+      // A solo cell whose entry carries `text` renders on the typography-aware
+      // tier; every other batch keeps the caller's model.
+      const textCell = batch.length === 1 && String(batch[0].text || '').trim();
+      const batchModel = textCell ? require('../config/models').MODEL_DEFAULTS.vbTextCellModel : imageModelOverride;
+      if (textCell) log.info(`[REF-SHEET] ✍️ "${batch[0].name}" carries readable text "${textCell}" — rendering on ${batchModel}`);
       const result = await callGeminiAPIForImage(
-        prompt, [], null, 'avatar', null, imageModelOverride, null, '',
+        prompt, [], null, 'avatar', null, batchModel, null, '',
         null, [], 0, null, null, null, null, batchAspectOverride
       );
 
@@ -770,42 +912,97 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // Split grid into individual references
       const references = await splitGridIntoReferences(gridImageData, batch.length, batch);
 
-      // Gate CHARACTER cells only (not artifacts/locations/animals) — see
-      // checkCharacterCellRender above. One check, one re-render on NO, one
-      // re-check for the log, then accept whatever came back.
+      // Cell gates — one question, one re-render on NO, one re-check for the
+      // record, then accept whatever came back (fail-open on any API error).
+      //   character cell  → checkCharacterCellRender (skin/style/age/sex)
+      //   other single    → checkElementCellRender (kind/match/style[/text])
+      //   state batch     → checkStateCellsConsistency on the whole batch
       const genLog = require('./generationLogger').getCurrentLogger();
-      for (let i = 0; i < batch.length; i++) {
-        const element = batch[i];
-        if (element.type !== 'character' || !references[i]) continue;
+      const { recordElementCellGate } = require('./visualBible');
+      const rerenderSolo = async (cells) => {
+        const rePrompt = buildReferenceSheetPrompt(cells, styleDescription, visualBible);
+        const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, batchModel, null, '', null, [], 0, null, null, null, null, batchAspectOverride);
+        if (!reResult?.imageData) throw new Error('re-render returned no image');
+        const reCells = await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), cells.length, cells);
+        if (reCells.length !== cells.length || reCells.some(c => !c)) throw new Error('re-rendered cell extraction failed');
+        return reCells;
+      };
+      const record = (element, verdict) => {
+        cellGates.push({ id: element.id, name: element.name, ...verdict });
+        recordElementCellGate(visualBible, element.id, verdict);
+      };
+      const isStateBatch = batch.length > 1 && batch.every(c => c.stateName) && references.every(Boolean);
+
+      if (isStateBatch) {
+        // Every cell is one object; the question is asked of the set.
+        const parent = { ...batch[0], name: batch[0].displayName, description: batch[0].baseDescription };
         let verdict;
         try {
-          verdict = await checkCharacterCellRender(references[i], styleDescription, element.age || null, element.build || null);
+          verdict = await checkStateCellsConsistency(references, parent, batch);
+        } catch (err) {
+          log.warn(`⚠️ [REF-SHEET] State-cell gate errored for "${parent.name}" (${err.message}) — accepting cells unchecked`);
+          verdict = null;
+        }
+        if (verdict && verdict.ok) {
+          genLog?.info('vb_state_cells_gate', `State cells pass: ${verdict.reason}`, parent.name);
+          record(batch[0], { gate: 'state_cells', ok: true, reason: verdict.reason, rerendered: false });
+        } else if (verdict) {
+          log.warn(`⚠️ [REF-SHEET] State cells for "${parent.name}" failed gate: ${verdict.reason} — re-rendering once`);
+          genLog?.warn('vb_state_cells_rerender', `VB state cells failed gate: ${verdict.reason}`, parent.name);
+          let recheck = null;
+          try {
+            const reCells = await rerenderSolo(batch);
+            for (let i = 0; i < batch.length; i++) references[i] = reCells[i];
+            try { recheck = await checkStateCellsConsistency(references, parent, batch); } catch { /* informational */ }
+            if (recheck && !recheck.ok) {
+              log.warn(`⚠️ [REF-SHEET] Re-rendered state cells for "${parent.name}" still fail gate (${recheck.reason}) — accepting anyway`);
+              genLog?.warn('vb_state_cells_still_bad', `Re-rendered state cells still fail gate (${recheck.reason}) — accepted anyway`, parent.name);
+            } else if (recheck) {
+              log.info(`✓ [REF-SHEET] Re-rendered state cells for "${parent.name}" pass gate`);
+            }
+          } catch (err) {
+            log.warn(`⚠️ [REF-SHEET] Re-render failed for "${parent.name}" (${err.message}) — keeping original cells`);
+          }
+          record(batch[0], { gate: 'state_cells', ok: false, reason: verdict.reason, rerendered: true, recheckOk: recheck ? recheck.ok : null, recheckReason: recheck?.reason || null });
+        }
+      }
+
+      for (let i = 0; i < batch.length && !isStateBatch; i++) {
+        const element = batch[i];
+        if (!references[i]) continue;
+        const isChar = element.type === 'character';
+        const ask = (cell) => isChar
+          ? checkCharacterCellRender(cell, styleDescription, element.age || null, element.build || null).then(v => ({ ok: v.natural, reason: v.reason }))
+          : checkElementCellRender(cell, element, styleDescription);
+        const gateName = isChar ? 'character_cell' : 'element_cell';
+        let verdict;
+        try {
+          verdict = await ask(references[i]);
         } catch (err) {
           log.warn(`⚠️ [REF-SHEET] Cell render gate errored for "${element.name}" (${err.message}) — accepting cell unchecked`);
           continue;
         }
-        if (verdict.natural) continue;
-        log.warn(`⚠️ [REF-SHEET] Character cell "${element.name}" failed render gate: ${verdict.reason} — re-rendering once`);
-        genLog?.warn('vb_character_cell_rerender', `VB reference cell failed render gate: ${verdict.reason}`, element.name);
+        if (verdict.ok) {
+          genLog?.info(`vb_${gateName}_gate`, `Cell passes gate: ${verdict.reason}`, element.name);
+          record(element, { gate: gateName, ok: true, reason: verdict.reason, rerendered: false });
+          continue;
+        }
+        log.warn(`⚠️ [REF-SHEET] ${isChar ? 'Character' : 'Element'} cell "${element.name}" failed render gate: ${verdict.reason} — re-rendering once`);
+        genLog?.warn(`vb_${gateName}_rerender`, `VB reference cell failed render gate: ${verdict.reason}`, element.name);
+        let recheck = null;
         try {
-          const rePrompt = buildReferenceSheetPrompt([element], styleDescription, visualBible);
-          const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, imageModelOverride, null, '');
-          if (!reResult?.imageData) throw new Error('re-render returned no image');
-          const reCell = (await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), 1, [element]))[0];
-          if (!reCell) throw new Error('re-rendered cell extraction failed');
-          references[i] = reCell;
-          try {
-            const recheck = await checkCharacterCellRender(reCell, styleDescription, element.age || null, element.build || null);
-            if (!recheck.natural) {
-              log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
-              genLog?.warn('vb_character_cell_still_bad', `Re-rendered cell still fails render gate (${recheck.reason}) — accepted anyway`, element.name);
-            } else {
-              log.info(`✓ [REF-SHEET] Re-rendered cell for "${element.name}" passes render gate`);
-            }
-          } catch { /* re-check is informational only — accept */ }
+          references[i] = (await rerenderSolo([element]))[0];
+          try { recheck = await ask(references[i]); } catch { /* re-check is informational only — accept */ }
+          if (recheck && !recheck.ok) {
+            log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
+            genLog?.warn(`vb_${gateName}_still_bad`, `Re-rendered cell still fails render gate (${recheck.reason}) — accepted anyway`, element.name);
+          } else if (recheck) {
+            log.info(`✓ [REF-SHEET] Re-rendered cell for "${element.name}" passes render gate`);
+          }
         } catch (err) {
           log.warn(`⚠️ [REF-SHEET] Re-render failed for "${element.name}" (${err.message}) — keeping original cell`);
         }
+        record(element, { gate: gateName, ok: false, reason: verdict.reason, rerendered: true, recheckOk: recheck ? recheck.ok : null, recheckReason: recheck?.reason || null });
       }
 
       // Update Visual Bible with extracted references. When storyId is set,
@@ -867,6 +1064,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     generated,
     failed,
     elements: processedElements,
+    cellGates,
     sourceGrids,  // Source grid images per batch — caller persists for debugging
   };
 }
@@ -1184,6 +1382,12 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
 module.exports = {
   checkCharacterCellRender,
   cellGatePrompt,
+  elementKindSentence,
+  elementCellText,
+  elementCellGatePrompt,
+  stateCellsGatePrompt,
+  checkElementCellRender,
+  checkStateCellsConsistency,
   splitGridIntoReferences,
   buildReferenceSheetPrompt,
   characterAgeCue,

@@ -133,6 +133,7 @@ const STAGE_TEMPLATE_KEYS = {
   // dedupe, MINOR definition), so its rules are the highest-leverage prompt to
   // A/B. Pair the override with params.model to vary the model applying them.
   consolidate: 'feedbackConsolidator',
+  vb_element_cell: 'referenceSheet',
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage
