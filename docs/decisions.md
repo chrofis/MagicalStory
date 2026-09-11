@@ -32726,3 +32726,61 @@ all-pages call, the stage-order header), `server/lib/promptBuilders.js`
 `tests/unit/invented-age-band-wiring.test.ts`.
 
 **Status:** ✅ active
+
+## Visual Bible descriptions must read as the named object, not as a parts list (2026-09-11)
+**Context:** Staging story `job_1789147573901_m3uam0nxi` shipped two Visual Bible
+artifacts as a DIFFERENT OBJECT, and both reproduced on fresh renders against
+current code (Test Lab experiments 1189 and 1190). ART001 "Levin's Velolampe", a
+bicycle front lamp, rendered as a black CCTV / broadcast camera on 5 of 5 page
+appearances and again on the Lab re-render — where the new identity gate PASSED
+it ("The watercolor painting depicts a black bicycle front lamp with a U-shaped
+bracket, matching the description and art style"). ART002 "Kleine Schuppe", a
+small dragon scale, rendered as a ceramic dish on the shipped pages and as a
+scallop shell on the re-render, which the identity gate DID catch ("The object is
+a seashell, not a dragon scale fragment"). The stored descriptions are accurate
+and name the object correctly. Verbatim, the lamp: *"A compact rectangular
+bicycle lamp approximately as long as a child's palm, black matte plastic casing
+with a flat rear face and a slightly convex circular lens at the front centre, a
+U-shaped black plastic bracket mounted perpendicular to the underside for
+clipping to a handlebar, overall length about ten centimetres."* The scale: *"A
+single curved scale fragment roughly the size of a large coin, deep teal-green
+with a smooth convex outer face and a concave rough inner face, the edges thin
+and slightly translucent amber, the surface marked with a fine radiating pattern
+of shallow ridges spreading from the base like a fan."* Each is a geometric parts
+list whose nearest real-world match is a different object — thirty words of
+geometry out-vote a two-word noun at render time. The bible authoring schema in
+`prompts/scene-expansion-all.txt` asked for exactly this: `described by shape and
+parts`, with no recognisability requirement to hold it in place. The same problem
+was solved for clothing and got the opposite instruction there
+(`story-bible-from-beats.txt`: "The costume must read as that costume at a
+glance").
+**Decision:** The authoring prompt gains the costume rule's counterpart for every
+entry, as the FIRST bullet of the `description` contract and inside the artifact
+schema field: the description must read as that thing at a glance, name the thing
+with the word that names it, and name the one feature that separates it from the
+everyday object its bare geometry would otherwise describe — what it attaches to,
+what it is part of, what it does. Geometry is made subordinate ("Geometry serves
+recognition; it is never the whole description") rather than removed. The cell
+prompt (`prompts/reference-sheet.txt`) gains the render-side counterpart: each
+cell reads as the element it is named as, and when the shapes and parts described
+also fit a commoner everyday object the cell shows the named one.
+**Rationale:** Prompt-side and generic, per the standing rule that classification
+belongs to the prompt. The proven precedent in this codebase for "a description
+that is accurate but reads as the wrong thing" is the costume rule, so the wording
+is modelled on it. The existing "never by a style name" constraint is kept — it
+guards a real prior bug (a prop described as "<style>-style" instead of described)
+— and is now subordinate to recognisability instead of competing with it. Three
+things were deliberately NOT done: no rule about internal proportions or stated
+dimensions governing part sizes (the owner rejected that diagnosis — the failure
+is the wrong object, not wrong sizing); the cell gate's fail-open "accepted
+anyway" behaviour is unchanged (owner, same day: a twice-failed cell still ships);
+and `server/lib/referenceSheets.js` gate logic is untouched, the identity gate
+added earlier the same evening is working and caught the scale. The stored
+descriptions of the two motivating entries are data and were not edited — this
+changes what future bibles author. Whether a reference cell should be allowed a
+minimal mounting context for objects defined by what they attach to is left open
+for the owner (`tasks/BACKLOG.md`).
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/reference-sheet.txt`,
+`tests/unit/vb-authoring-contract.test.ts`,
+`tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active

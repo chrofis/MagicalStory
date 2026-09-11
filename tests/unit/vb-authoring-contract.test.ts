@@ -223,6 +223,27 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     expect(templates['sceneExpansionAll']).toMatch(/its own `?vehicles`? entry/i);
   });
 
+  // Regression: staging job_1789147573901_m3uam0nxi, Lab experiments 1189/1190.
+  // A parts-list description renders as whatever everyday object its bare
+  // geometry describes — a lamp entry as a camera, a scale entry as a shell.
+  // The schema asked for exactly that ("described by shape and parts"), with no
+  // recognisability requirement to hold it in place.
+  it('requires the description to read as the named thing, not as its geometry', () => {
+    const t = templates['sceneExpansionAll'];
+    expect(t).toMatch(/It must read as that thing at a glance/);
+    expect(t).toMatch(/Name the thing with the word that names it/);
+    expect(t).toMatch(/separates it from the everyday object its bare geometry would otherwise describe/);
+    expect(t).toMatch(/Geometry serves recognition; it is never the whole description/);
+  });
+
+  it('carries the recognisability requirement into the artifact schema field', () => {
+    const t = templates['sceneExpansionAll'];
+    expect(t).toMatch(/"description": "\[what it is, named with the word that names it/);
+    // The style-name ban predates this and stays (a prop once described as
+    // "<style>-style" instead of described at all).
+    expect(t).toMatch(/never by a style name/);
+  });
+
   it('keeps the settled lettering gate intact', () => {
     // docs/SETTLED.md: no lettering unless the entry names the exact words.
     expect(templates['sceneExpansionAll']).toMatch(/No lettering unless this entry names the exact words/);

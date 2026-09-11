@@ -146,6 +146,7 @@ Every entry needs specific colours, one signature element, and a description tha
 Every description — characters, creatures, clothing, objects — must render in the named illustration style. A photorealistic style gets physically plausible beings, materials and colours (no glowing, luminous, or iridescent features, no impossible anatomy); a stylised style may use its idiom.
 
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:
+- **It must read as that thing at a glance.** Name the thing with the word that names it, and name the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does. Geometry serves recognition; it is never the whole description.
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
 - No lettering unless this entry names the exact words it carries in `text`; every other prop's writing is called illegible / weathered / smudged. Describe an object's build by shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style").
@@ -224,7 +225,7 @@ First, exactly:
       "type": "[what kind of object]",
       "text": "[OMIT unless words on this object must be readable in the picture (a sign, a plaque, a banner); then the exact words, at most three]",
       "states": "[OMIT unless the story alters this object or turns a face prop's two sides to us. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, then the rest in the order the story reaches them, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[the change to the object itself, one clause, at most 15 words — never material, colour or size, those stay in description; never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]",
-      "description": "[size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries in `text`; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face is one entry, with a state per side.]"
+      "description": "[what it is, named with the word that names it, and the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does; then size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries in `text`; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face is one entry, with a state per side.]"
     }
   ],
   "locations": [

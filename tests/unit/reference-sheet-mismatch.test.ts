@@ -75,3 +75,28 @@ describe('cell prompt bans scale props', () => {
     expect(prompt).toMatch(/size or scale is never drawn/);
   });
 });
+
+// Regression: staging job_1789147573901_m3uam0nxi, Lab experiments 1189/1190.
+// A cell rendered the everyday object the entry's bare geometry describes
+// rather than the object the entry names.
+describe('cell prompt requires the drawing to read as the named element', () => {
+  it('binds every cell to its own identity, not to a lookalike', () => {
+    const prompt = buildReferenceSheetPrompt(
+      [{ id: 'ART001', name: 'a hand tool', type: 'hand tool', description: 'a short shaft with a flat head' }],
+      'watercolor',
+      null,
+    );
+    expect(prompt).toMatch(/Each cell reads as the element it is named as/);
+    expect(prompt).toMatch(/also fit a commoner everyday object, the cell shows the named one/);
+  });
+
+  it('does not re-add drawing the thing a description compares the element to', () => {
+    const prompt = buildReferenceSheetPrompt(
+      [{ id: 'ART001', name: 'a piece of tableware', type: 'tableware', description: 'a shallow round dish' }],
+      'watercolor',
+      null,
+    );
+    expect(prompt).toMatch(/size or scale is never drawn/);
+    expect(prompt).not.toMatch(/draw the thing it is compared to/i);
+  });
+});
