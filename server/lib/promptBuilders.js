@@ -5974,6 +5974,37 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
  * still has its numbered lines picked up, because a lost finding is the one
  * failure that silently skips the re-plan.
  */
+/**
+ * The plan check's ROSTER block — who each page holds, as DATA.
+ *
+ * The cast used to be re-derived from the plan prose in code, by asking whether
+ * the token before a capitalised name was an article or a place preposition
+ * (`isThingMarked`, deleted 2026-09-11). That test had been patched once per
+ * story that broke it and still read a bike lamp, two bikes, a bridge and a
+ * river as cast members on job_1789147573901_m3uam0nxi. The model already reads
+ * these same pages in this same call; it answers the language question and the
+ * counters do arithmetic on the answer.
+ *
+ * "ROSTER 4: people = A, B; things = the lamp" → {4: {people:[A,B], things:[…]}}
+ * A page the model omits is absent from the map, and the caller decides what an
+ * incomplete roster means — never a silent empty cast.
+ *
+ * @returns {Map<number, {people: string[], things: string[]}>}
+ */
+function parsePlanCheckRoster(raw) {
+  const out = new Map();
+  const names = (s) => String(s || '')
+    .split(',')
+    .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').trim())
+    .filter(n => n && !/^none$/i.test(n));
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*))?$/i);
+    if (!m) continue;
+    out.set(parseInt(m[1], 10), { people: names(m[2]), things: names(m[3]) });
+  }
+  return out;
+}
+
 function parsePlanCheck(raw) {
   const text = String(raw || '').trim();
   if (!text || /^none\.?$/i.test(text)) return [];
@@ -7332,6 +7363,7 @@ module.exports = {
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
+  parsePlanCheckRoster,
   buildReplanSection,
   replanRank,
   findingPages,

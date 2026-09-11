@@ -12,11 +12,11 @@ One line per page: shot — who is in frame — the instant the picture shows �
 
 {PAGE_PLAN}
 
-# ALREADY COUNTED
+# THE ROSTER
 
-Counters have measured the division; these are their results, for reference. Do not repeat them.
+Before the checks, read each page's who column and say who is in frame. A PERSON is a human or a named animal that acts in the story; a THING is everything else the column names — a prop, a vehicle, a building, a place, a river. A name carried by a possessive or an article ("his lit lamp", "their bikes", "the stone railing") is a thing however the sentence is shaped, and a commissioned name is always a person.
 
-{COUNTER_FINDINGS}
+Report every name the who column carries, on every page, under one of the two headings — a name you leave out is counted as absent.
 
 # YOUR TASK
 
@@ -37,6 +37,10 @@ Answer only these eight:
 
 # OUTPUT FORMAT
 
-Numbered findings, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
+The roster first, one line per page, every page present and in order:
 
-When nothing is wrong anywhere, output exactly: NONE
+ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>
+
+Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
+
+When the roster is complete and nothing is wrong anywhere, write the roster and then exactly: NONE

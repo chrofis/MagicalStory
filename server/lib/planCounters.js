@@ -56,26 +56,6 @@ const PLACE_PREPOSITIONS = new Set([
   'toward', 'towards', 'beside', 'behind', 'inside', 'outside', 'along', 'past', 'through',
 ]);
 
-/**
- * Immediately-preceding words that mark the capitalised token as a THING.
- *
- * The plan is English by contract, and English marks a thing with an article:
- * "the <ship>", "a <chain>", "the harbour of <town>". Nobody writes "the
- * <person>". The place prepositions above are the same grammatical class (the
- * position after "of"/"at"/"through" is where vessels and locations live), so
- * both sets form one marker test — a GRAMMATICAL test, never a vocabulary one:
- * no word for ship, town, chain or any other thing is ever matched.
- */
-const ARTICLES = new Set(['the', 'a', 'an']);
-const THING_MARKERS = new Set([...ARTICLES, ...PLACE_PREPOSITIONS]);
-
-/**
- * Coordinators: the lowercase word after a name that does NOT show the name
- * acting on its own ("<thing> and its chain block the way" — the verb belongs
- * to the pair). Used only by the thing-marker decision below.
- */
-const COORDINATORS = new Set(['and', 'or', 'nor']);
-
 /** Person words that make a page peopled even with no name in frame. */
 const PERSON_WORDS = /\b(?:crew|crewman|crewmen|sailor|sailors|man|men|woman|women|boy|boys|girl|girls|child|children|figure|figures|crowd|onlookers|guard|guards|villagers?|people)\b/i;
 
@@ -259,58 +239,27 @@ function reEscape(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Is this capitalised name written as a THING somewhere in the plan, and never
- * as a person outside that position?
+/*
+ * THE THING-MARKER GRAMMAR IS GONE (owner, 2026-09-11: "we have AI calls for
+ * this, not some stupid Regex that we fix 1000 times").
  *
- * Measured on job_1788983823620_csjcyp1q9: the plan named a ship ("the
- * <ship> seen from the water", "a small boat pulls away from the <ship>") and a
- * town ("the harbour mouth of <town>", "through <town>", "<town> and its chain
- * block the way"). Both passed the acts-like-a-person test — a place is named
- * and then does something in the after-segment — and burned invented-cast
- * slots, so the 2026-09-09 arc cross-check reported them as undeclared figures.
+ * `isThingMarked` / `thingMarkedNames` decided whether a capitalised name was a
+ * person by looking at the single token before it (an article or a place
+ * preposition meant a thing) and the single token after it (a lowercase word
+ * meant it acted, so a person). Two surface accidents of one sentence shape,
+ * standing in for a definition. It was patched once per story that broke it —
+ * a ship and a town (job_1788983823620_csjcyp1q9), a mountain and its lookout
+ * tower (job_1788614817116_vxnu60yjg), German nouns from the beats — and still
+ * read a lamp, two bikes, a bridge and a river as cast on
+ * job_1789147573901_m3uam0nxi, because possessives, adjectives in between and
+ * noun compounds are shapes it never enumerated. One unmarked occurrence
+ * anywhere in the book flipped a name permanently.
  *
- * The rule, on the IMMEDIATELY preceding token only (no adjective allowance):
- *   - an occurrence is THING-MARKED when that token is an article or a place
- *     preposition (THING_MARKERS);
- *   - an occurrence ACTS UNMARKED when it has no marker and is followed by a
- *     lowercase word that is not a coordinator ("<name> rows", not "<name> and");
- *   - the name is a thing when it is marked at least once and never acts
- *     unmarked. A name that is marked once and acts on its own elsewhere stays a
- *     person — the article form is decisive only when nothing contradicts it.
- *
- * Commissioned names never reach this test (resolveCast resolves them first),
- * so a child whose name happens to follow "to" keeps her cast slot.
- *
- * @param {string} name the candidate as nameCandidates returned it
- * @param {string} cleanCorpus the quote-stripped plan corpus
- * @returns {boolean}
+ * The plan check already sends these same pages to a model. That call now
+ * answers the language question — who is in frame, people vs things — and this
+ * module does arithmetic on the answer. Code does math, the model does
+ * language. See `parsePlanCheckRoster` (promptBuilders.js) and `resolveCast`.
  */
-function isThingMarked(name, cleanCorpus) {
-  // Same line only: the word that opens the NEXT plan line does not follow this name.
-  const re = new RegExp(`(\\S+[ \\t]+)?\\b${reEscape(name)}(?:'s|s')?\\b(?:[ \\t]+([a-zäöüß]+))?`, 'gu');
-  let marked = 0;
-  let actsUnmarked = 0;
-  let m;
-  while ((m = re.exec(String(cleanCorpus || ''))) !== null) {
-    const prev = String(m[1] || '').trim().toLowerCase().replace(/[^a-zäöüß]/g, '');
-    if (THING_MARKERS.has(prev)) { marked++; continue; }
-    const next = m[2] || '';
-    if (next && !COORDINATORS.has(next)) actsUnmarked++;
-  }
-  return marked > 0 && actsUnmarked === 0;
-}
-
-/**
- * The article/preposition-marked names in a set of plan pages — the same test
- * `resolveCast` applies, exposed so a consumer handed a cast it did not resolve
- * itself (the ARC_INVENTED_UNDECLARED cross-check) can still refuse to list a
- * thing as a figure.
- */
-function thingMarkedNames(pages, names) {
-  const clean = stripQuoted((Array.isArray(pages) ? pages : []).map(p => String(p.planLine || '')).join('\n'));
-  return (Array.isArray(names) ? names : []).filter(n => isThingMarked(n, clean));
-}
 
 /**
  * Fold a bare first name into the one full name it belongs to.
@@ -396,57 +345,48 @@ function firstTokenAliases(names, pool) {
  * resolved list travels to the model check, which sees the same pages and can
  * contradict it.
  */
-function resolveCast(pages, commissionedNames = [], placeNames = []) {
+function resolveCast(pages, commissionedNames = [], placeNames = [], roster = null) {
   const commissioned = commissionedNames.map(n => String(n || '').trim()).filter(Boolean);
   const places = (Array.isArray(placeNames) ? placeNames : []).map(n => String(n || '').trim()).filter(Boolean);
-  // PLAN LINES ONLY — never the beats. The plan is written in English by
-  // contract (prompts/story-beats.txt: "Plan in ENGLISH"), while the beats are
-  // free to carry the book's language. German capitalises every noun, so
-  // scanning beats turned "Deck", "Karte" and "Truhe" into cast members and
-  // every cast count with them. The plan line is also the only place the cast
-  // of a PAGE is stated, which is what every counter here actually needs.
-  const corpus = pages.map(p => String(p.planLine || '')).join('\n');
-  const clean = stripQuoted(corpus);
+  // NO ROSTER, NO CAST. The plan check's model answers who each page holds; a
+  // missing or partial answer used to fall back to reading the prose in code,
+  // and that fallback is what shipped every false cast finding this module has
+  // ever produced. A counter that cannot know the cast does not run.
+  if (!(roster instanceof Map) || roster.size === 0) return null;
+  const missing = pages.map(p => Number(p.pageNumber)).filter(n => Number.isFinite(n) && !roster.has(n));
+  if (missing.length > 0) return null;
+
+  const people = [];
+  const things = [];
+  for (const p of pages) {
+    const row = roster.get(Number(p.pageNumber));
+    for (const n of (row?.people || [])) if (!people.some(x => x.toLowerCase() === n.toLowerCase())) people.push(n);
+    for (const n of (row?.things || [])) if (!things.some(x => x.toLowerCase() === n.toLowerCase())) things.push(n);
+  }
+  // Bare first token folds into its one owner so every consumer downstream sees
+  // one person ("Malva Grimm" + "Malva" — job_1788983823620_csjcyp1q9).
+  const pool = [...people.filter(c => /\s/.test(c)), ...commissioned];
   const invented = [];
-  const excludedPlaces = [];
-  const candidates = nameCandidates(corpus);
-  // Every full name the plan or the commission knows: a bare first token folds
-  // into its one owner BEFORE any test below, so every consumer downstream sees
-  // one person (job_1788983823620_csjcyp1q9: "Malva Grimm" + "Malva").
-  const pool = [...candidates.filter(c => /\s/.test(c)), ...commissioned];
+  const excludedPlaces = [...things];
   const ambiguousLogged = new Set();
-  for (const cand of candidates) {
+  for (const cand of people) {
     const { name, ambiguous } = canonicalName(cand, pool);
     if (ambiguous && !ambiguousLogged.has(cand.toLowerCase())) {
       ambiguousLogged.add(cand.toLowerCase());
       console.debug(`[planCounters] "${cand}" is the first name of more than one full name in the plan — kept as its own candidate, not folded`);
     }
-    // The canonical form has already been decided (its own occurrence, or an
-    // earlier alias) — the first decision wins.
-    if (invented.includes(name) || excludedPlaces.includes(name)) continue;
+    if (invented.includes(name)) continue;
     if (commissioned.some(c => c.toLowerCase() === name.toLowerCase())) continue;
-    // A candidate that CONTAINS a commissioned name is that character wearing a
-    // title ("Captain <name>"), never a second person.
+    // A name that CONTAINS a commissioned one is that character wearing a title
+    // ("Captain <name>"), never a second person.
     if (commissioned.some(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(name))) continue;
-    // The story's own place data outranks the acts-like-a-person heuristic.
+    // The story's own place data still outranks the roster: a landmark the
+    // planner was handed is never a figure, however the model read the line.
     if (places.some(pl => pl.toLowerCase() === name.toLowerCase() || nameRe(pl).test(name) || nameRe(name).test(pl))) {
-      excludedPlaces.push(name);
+      if (!excludedPlaces.includes(name)) excludedPlaces.push(name);
       continue;
     }
-    // The plan's own grammar outranks it too: "the <ship>", "the harbour of
-    // <town>" — a thing, never a figure (job_1788983823620_csjcyp1q9). The
-    // grammar tests run on the form actually written (`cand`), the verdict is
-    // recorded under the canonical name.
-    if (isThingMarked(cand, clean)) {
-      excludedPlaces.push(name);
-      continue;
-    }
-    // Same line only ([ \t], never \s): the plan is one line per page, so the
-    // verb for a name is on the name's own line. With \s+ a name that ENDED a
-    // line was read as followed by the shot word opening the next line
-    // ("through <town>\nclose-up …") and promoted to a person (2026-09-10).
-    const acts = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:'s|s')?[ \\t]+[a-zäöüß]`, 'u').test(clean);
-    if (acts) invented.push(name);
+    invented.push(name);
   }
   const all = [...commissioned, ...invented];
   return { commissioned, invented, places: excludedPlaces, all, aliases: firstTokenAliases(all, pool) };
@@ -522,13 +462,23 @@ function consecutiveRuns(sorted) {
  *   whatever the plan grammar looks like
  * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one whole-cast page
  * @param {number} [args.highActionPages] the high-action page budget the planner was given
- * @returns {{findings: Array, lines: string[], stats: Object, cast: Object}}
+ * @param {Map<number,{people:string[],things:string[]}>} [args.roster] the plan check's
+ *   per-page roster (`parsePlanCheckRoster`). Every counter that needs to know who is on a
+ *   page needs this; without it the counters do not run, because the only alternative was
+ *   guessing the cast out of the prose in code, which is what they were doing wrong.
+ * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, highActionPages = null, declaredInvented = null, inventedAllowance = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, highActionPages = null, declaredInvented = null, inventedAllowance = null, roster = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
-  const cast = resolveCast(pages, commissionedNames, placeNames);
+  const cast = resolveCast(pages, commissionedNames, placeNames, roster);
+  // No cast, no counters. Silence is the honest answer when the roster is
+  // missing or short a page — a fabricated cast is what produced every false
+  // finding this module has ever emitted.
+  if (!cast) {
+    return { findings: [], lines: [], stats: { pages: pages.length }, cast: null, skipped: 'no-roster' };
+  }
   const pageCount = pages.length;
 
   // Per-page derived facts. A plan line with fewer than four segments is
@@ -629,11 +579,10 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   if (Array.isArray(declaredInvented)) {
     const declared = declaredInvented.map(n => String(n || '').trim()).filter(Boolean);
     const lower = new Set(declared.map(n => n.toLowerCase()));
-    // Never list a thing as a figure, even for a cast resolved elsewhere: the
-    // plan's own article/preposition marking is re-applied here (2026-09-10,
-    // job_1788983823620_csjcyp1q9 — a ship and a town were reported as figures).
-    const things = new Set(thingMarkedNames(pages, cast.invented));
-    const undeclared = cast.invented.filter(n => !lower.has(String(n).toLowerCase()) && !things.has(n));
+    // No thing-guard needed here any more: `cast.invented` holds only names the
+    // plan check's roster reported as PEOPLE, so a ship or a town never reaches
+    // this list (2026-09-11, replacing the article/preposition marking).
+    const undeclared = cast.invented.filter(n => !lower.has(String(n).toLowerCase()));
     if (undeclared.length) {
       add('ARC_INVENTED_UNDECLARED', [],
         `the plan names invented ${undeclared.length === 1 ? 'figure' : 'figures'} ${undeclared.join(', ')} that the arc's own invented list does not carry (arc declared: ${declared.length ? declared.join(', ') : 'none'})`);
@@ -725,8 +674,6 @@ module.exports = {
   nameCandidates,
   resolveCast,
   canonicalName,
-  isThingMarked,
-  thingMarkedNames,
   namesIn,
   stripQuoted,
 };

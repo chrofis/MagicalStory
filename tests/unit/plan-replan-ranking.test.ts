@@ -26,15 +26,22 @@ describe('counters stay consistent with the allowance', () => {
     { pageNumber: 1, planLine: 'close-up — Mara — Mara grips the rail — she has decided' },
     { pageNumber: 2, planLine: 'wide — Mara and the creature — the creature lifts Mara off the ground — they are together' },
   ];
+  // The plan check's roster is what tells the counters who is a person; without
+  // it they refuse to run (the grammar that used to guess was deleted 2026-09-11).
+  const roster = new Map<number, { people: string[]; things: string[] }>([
+    [1, { people: ['Mara'], things: [] }],
+    [2, { people: ['Mara'], things: [] }],
+  ]);
+
   it('carries the budget into the stats and raises no finding against a high-action page', () => {
-    const res = runPlanCounters({ pages, commissionedNames: ['Mara'], highActionPages: 2 });
+    const res = runPlanCounters({ pages, roster, commissionedNames: ['Mara'], highActionPages: 2 });
     expect(res.stats.highActionAllowance).toBe(2);
     // Nothing here counts interlocking, elevation or creatures; only NAMES.
     expect(res.findings.some((f: any) => f.code === 'CAST_OVER_3')).toBe(false);
     expect(res.findings.some((f: any) => f.code === 'CAST_OVER_CEILING')).toBe(false);
   });
   it('defaults the allowance from the page count when the caller omits it', () => {
-    expect(runPlanCounters({ pages }).stats.highActionAllowance).toBe(1);
+    expect(runPlanCounters({ pages, roster }).stats.highActionAllowance).toBe(1);
   });
 });
 

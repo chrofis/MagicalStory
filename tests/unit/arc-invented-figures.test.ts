@@ -183,9 +183,16 @@ describe('Part 5 — the beats cross-check is reporting only', () => {
     { pageNumber: 1, planLine: 'Wide — Levin, Mama — Mama waves at Levin — Levin is outside' },
     { pageNumber: 2, planLine: 'Wide — Levin, Fenno — Fenno lands beside Levin — the dragon is here' },
   ];
+  // The plan check's roster is what tells the counters who is a person; without
+  // it they refuse to run (the grammar that used to guess was deleted 2026-09-11).
+  const roster = new Map<number, { people: string[]; things: string[] }>([
+    [1, { people: ['Levin', 'Mama'], things: [] }],
+    [2, { people: ['Levin', 'Fenno'], things: [] }],
+  ]);
+
   it('names an invented figure the arc did not declare', () => {
     const c: any = runPlanCounters({
-      pages, commissionedNames: ['Levin'], placeNames: [],
+      pages, roster, commissionedNames: ['Levin'], placeNames: [],
       declaredInvented: ['Fenno'], inventedAllowance: 2,
     });
     const f = c.findings.find((x: any) => x.code === 'ARC_INVENTED_UNDECLARED');

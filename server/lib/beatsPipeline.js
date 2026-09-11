@@ -92,6 +92,7 @@ const {
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
+  parsePlanCheckRoster,
   buildReplanSection,
   replanRank,
   findingPages,
@@ -882,13 +883,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * model half is advisory, and a lost call leaves the counters standing alone
    * rather than skipping the check entirely.
    */
+  // MODEL FIRST, COUNTERS SECOND (2026-09-11). The counters used to run first
+  // and their lines were shown to the model for reference. They cannot run
+  // first any more: who is on a page is a question about English, the model
+  // call answers it as a ROSTER, and the counters do arithmetic on that answer
+  // instead of re-deriving the cast from the prose with a grammar heuristic.
   const runCheck = async (label, pages, planText) => {
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount), declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit });
     let modelFindings = [];
+    let roster = null;
     let checkModelId = null;
     let prompt = null;
     try {
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, counters.lines);
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, []);
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,
@@ -897,9 +903,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       });
       checkModelId = res.modelId || planCheckModel;
       modelFindings = parsePlanCheck(res.text || '');
+      roster = parsePlanCheckRoster(res.text || '');
     } catch (err) {
-      log.warn(`⚠️ [BEATS] Plan check (${label}) failed (${err.message}) — the counters' findings stand alone`);
-      gl.warn(`${label}_failed`, `Plan check failed: ${err.message} — the counters' findings stand alone`);
+      log.warn(`⚠️ [BEATS] Plan check (${label}) failed (${err.message}) — no roster, so the counters do not run this round`);
+      gl.warn(`${label}_failed`, `Plan check failed: ${err.message} — no roster, the counters do not run`);
+    }
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount), declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster });
+    if (counters.skipped) {
+      const got = roster ? roster.size : 0;
+      log.warn(`⚠️ [BEATS] Plan counters (${label}) skipped — roster covers ${got} of ${pages.length} page(s)`);
+      gl.warn(`${label}_counters_skipped`, `Plan counters did not run: the check's roster covers ${got} of ${pages.length} page(s)`, null, { rosterPages: got, pages: pages.length });
     }
     // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
     // model finding the check number it answered, so buildReplanSection can rank
