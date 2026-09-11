@@ -2585,6 +2585,15 @@ initialize().then(() => {
   // clears state a crashed Node left behind. Fire-and-forget.
   require('./server/lib/analyzerClient').sessionReset();
 
+  // A restart is exactly what orphans a Test Lab experiment: the single-flight
+  // flag is in-process, so the row keeps saying 'running' while nothing runs.
+  // Reconcile here rather than waiting for someone to open the Test Lab — until
+  // 2026-09-11 that was the ONLY thing that reaped, so the row and the push
+  // gate's busy probe disagreed for as long as nobody looked (experiments 1160
+  // and 1163). Fire-and-forget; the reaper never throws.
+  require('./server/lib/testlabReaper')
+    .reapOrphanedExperiments('server restarted mid-run (reaped at boot)');
+
   // Staging-only: stop the container once it's provably idle so we stop paying
   // for ~1.2 GB of resident RAM per minute between test runs. Triple-gated and
   // a no-op in production — see server/lib/idleShutdown.js.

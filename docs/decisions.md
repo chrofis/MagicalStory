@@ -33236,3 +33236,31 @@ addressed here.
 `tests/unit/creature-tone-reaches-the-page.test.ts`
 **Status:**   ✅ active. Age boundaries unchanged (0-4 cute, 5-6 not-menacing, 7+
 formidable), and an unreadable age still emits nothing.
+
+## Orphaned Test Lab rows are reconciled at boot and by the busy probe (2026-09-11)
+**Context:**  A staging push landed mid-run on 2026-09-11 (~09:59 CH) and killed two
+paid judge experiments (1160, 1163, ≈$0.30 plus wall-clock). Afterwards both rows still
+read `status='running'` while `GET /api/health/busy` returned
+`{"busy":false,"reasons":[]}`. The Test Lab UI and the push gate gave opposite answers
+about the same two rows.
+**Decision:** One reconciler, `server/lib/testlabReaper.js`, called from THREE places:
+server boot, the busy probe (before it reports idle), and `GET /experiments` (which
+previously held the only copy). A row the probe cannot reconcile is reported BUSY, not
+idle. The 5-minute heartbeat window is unchanged.
+**Rationale:** Reaping lived inline in the experiments route, so an orphan was only
+reconciled when a human opened the Test Lab — meanwhile the probe counts only rows with
+a FRESH heartbeat (a live run beats every 30s via setInterval, so a quiet row is a dead
+row), and stopped seeing the orphan minutes after the death. Neither reader was wrong on
+its own terms; nothing made them agree. A restart is precisely what orphans these rows
+(the single-flight flag is in-process), so boot is the right moment to reconcile, and
+the probe reconciling before answering means whatever it calls idle is also marked ended
+in the database.
+The window stays at 5 minutes deliberately: the old blanket 2h rule held every push,
+staging and production, for an hour (exp747, 2026-08-19). Widening it back would trade
+this bug for that one.
+**Touched:** `server/lib/testlabReaper.js` (new), `server/lib/idleShutdown.js` (testlab
+probe), `server/routes/admin/testlab.js` (uses the shared reconciler; `HEARTBEAT_STALE`
+now has one definition), `server.js` (boot), `tests/unit/testlab-orphan-reaper.test.ts`
+**Status:**   ✅ active. NOT addressed: whether the pushing session bypassed the hook
+(`--no-verify`). This fix removes the stale-row route to a false idle; it cannot stop a
+deliberate bypass.

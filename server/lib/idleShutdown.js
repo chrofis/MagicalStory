@@ -115,7 +115,23 @@ function ensureDefaultProbes() {
       r = await dbQuery(LEGACY);
     }
     const n = r[0]?.n || 0;
-    return n > 0 ? `${n} experiment(s) running` : false;
+    if (n > 0) return `${n} experiment(s) running`;
+
+    // RECONCILE BEFORE CALLING IT IDLE (2026-09-11). A row orphaned by a restart
+    // keeps `status='running'` while its heartbeat goes quiet, so the count above
+    // stops seeing it minutes later and this probe reported idle while the Test
+    // Lab UI still listed it as running — that disagreement is how a push passed
+    // the gate on 2026-09-11 (experiments 1160, 1163). Reaping here means the two
+    // readers cannot drift: whatever the probe calls idle is also marked ended in
+    // the database. Reaping is bounded and never throws.
+    const { reapOrphanedExperiments, countStaleRunning } = require('./testlabReaper');
+    await reapOrphanedExperiments('reaped by the idle probe — no heartbeat');
+    // Anything still stale-but-running means the reap itself failed. Report it
+    // as BUSY rather than call an environment idle we cannot actually vouch for.
+    const stale = await countStaleRunning();
+    return stale > 0
+      ? `${stale} experiment(s) stuck at 'running' that could not be reconciled — treating as busy`
+      : false;
   });
 }
 

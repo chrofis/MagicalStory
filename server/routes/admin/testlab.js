@@ -492,7 +492,10 @@ let runningExperiments = 0;
 // clear of that; what it catches is a process that is GONE, which never comes
 // back and otherwise blocks every push until the old 2h bound expired.
 const HEARTBEAT_INTERVAL_MS = 30_000;
-const HEARTBEAT_STALE = '5 minutes';
+// The staleness window lives with the reaper that applies it — one definition,
+// so the beat here and the two readers (the Test Lab list, the push gate's busy
+// probe) can never disagree about when a quiet row counts as dead.
+const { HEARTBEAT_STALE } = require('../../lib/testlabReaper');
 
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
@@ -730,13 +733,12 @@ router.get('/experiments', async (req, res) => {
     // minutes instead of the old blanket 2h, which both blocked pushes for an
     // hour (exp747) and could reap a genuinely long run out from under itself.
     // Rows predating the heartbeat column have NULL and keep the 2h rule.
+    // ONE reconciler, shared with boot and the busy probe (server/lib/testlabReaper.js).
+    // It used to be inline here, so an orphaned row was only reconciled when a
+    // human opened the Test Lab — meanwhile the probe's freshness rule had
+    // already stopped counting it and reported the environment idle.
     if (runningExperiments === 0) {
-      await dbQuery(
-        `UPDATE testlab_experiments SET status = 'failed', error = 'server restarted mid-run', completed_at = NOW()
-         WHERE status = 'running'
-           AND (heartbeat_at < NOW() - INTERVAL '${HEARTBEAT_STALE}'
-             OR (heartbeat_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'))`
-      ).catch(() => {});
+      await require('../../lib/testlabReaper').reapOrphanedExperiments();
     }
     // Bounded by default. The old query took the newest 100 unconditionally AND
     // called jsonb_array_length(results) on each, which detoasts the whole blob
