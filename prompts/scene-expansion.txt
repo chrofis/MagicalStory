@@ -92,6 +92,7 @@
 {AVAILABLE_AVATARS}
 {LOCKED_PERSPECTIVES}
 {TEXT_ZONE_OVERRIDE}
+{CREATURE_TONE}
 
 **RECURRING VISUAL ELEMENTS (when one appears in the scene, name it and weave the detail this shot actually shows into the prose — the image model reads only your prose, never this list):**
 {RECURRING_ELEMENTS}

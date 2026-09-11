@@ -33207,3 +33207,32 @@ direction the owner chose.
 `avatar-ace-prompt.txt`) is deliberately UNCHANGED — its top quadrants are tight
 photoreal face crops with no neck, a different artifact from the styled sheet the pages
 anchor on. A test pins that distinction so a future sweep does not "harmonise" them.
+
+## The creature-tone rule has to reach the PAGE, not just the bible entry (2026-09-11)
+**Context:**  D20. A commissioned pet dog was drawn snarling, teeth bared, in a book
+whose reader is 5 — a tone level whose text says teeth are "not bared, raised or
+displayed". The ticket blamed scope ("CREATURE_TONE covers the dragon and the guards; a
+commissioned pet is not covered") and that was wrong: every level opens "**Animals**,
+creatures and non-human characters…", so the dog was in scope all along.
+**Decision:** Three changes, all generation-side.
+  1. `buildCreatureToneSection` appends one sentence to whichever level is in force:
+     where a creature is in frame, the PAGE's own prose states its face and expression
+     in those terms.
+  2. `prompts/scene-expansion.txt` gains the `{CREATURE_TONE}` placeholder — it had
+     none, so the per-page fallback path carried no tone rule at all.
+  3. `buildSceneExpansionPrompt` fills it, from `options.story` (the same inputData
+     source `SEASON` reads), falling back to the page's own cast.
+**Rationale:** `{CREATURE_TONE}` was injected into ONE template
+(`scene-expansion-all.txt`), in the section governing Visual Bible ENTRY descriptions.
+An animal's entry description never reaches a page: REQUIRED OBJECTS is name-only
+(2026-09-02 ruling) plus its size (2026-09-11), so the page's prose is the only place a
+creature's face is decided per page. On job_1789147573901_m3uam0nxi p11 the whole of
+that prose was "At the base of the block, Nia digs vigorously at the dirt with her
+paws" — a face left unwritten is drawn from the action alone, and effort reads as
+teeth. Neither evaluator flagged the bared teeth either; that detection gap is NOT
+addressed here.
+**Touched:** `server/lib/promptBuilders.js` (`buildCreatureToneSection`,
+`buildSceneExpansionPrompt`), `prompts/scene-expansion.txt`,
+`tests/unit/creature-tone-reaches-the-page.test.ts`
+**Status:**   ✅ active. Age boundaries unchanged (0-4 cute, 5-6 not-menacing, 7+
+formidable), and an unreadable age still emits nothing.

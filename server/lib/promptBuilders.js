@@ -2635,6 +2635,12 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     LANGUAGE_NOTE: getLanguageNote(language),
     CORRECTION_NOTES: '',
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
+    // The same creature-tone block the all-pages builder injects. Missing here
+    // entirely until 2026-09-11, so a story that fell back to per-page expansion
+    // got no tone rule at all. `options.story` is the job's inputData, the same
+    // source SEASON reads; without it the page's own cast still carries the age
+    // the level is keyed on, and an unreadable age emits nothing either way.
+    CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
     // The owner's cap of three packable Visual Bible elements per page, from
     // the same constant the mechanical check and the code-side truncation use.
     VB_ELEMENT_BUDGET,
@@ -4720,7 +4726,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
  * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
  */
-function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
+function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT', trailingMarkers = []) {
   const full = String(raw || '');
   // Built from markerName, not hardcoded: callers pass 'SCENES' for the scene
   // review. A literal /---\s*STORY TEXT\s*---/ here silently failed to match
@@ -4752,8 +4758,28 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
   while ((m = re.exec(body)) !== null) {
     marks.push({ page: parseInt(m[1], 10), headStart: m.index, bodyStart: re.lastIndex });
   }
+  // A NAMED block after the pages ends the last one. Without this the last
+  // page's text ran to the end of the reply, so a trailing block was appended to
+  // it and shipped inside the book — the same failure the headStart comment
+  // above describes for a page heading. The text writer's ---TITLE--- moved
+  // after the pages (2026-09-11) so the title is picked from the finished story
+  // rather than guessed before it exists.
+  //
+  // Opt-in per caller, never a blanket "any ---MARKER--- ends a page": scene
+  // briefs carry ---METADATA--- INSIDE each page, so a general rule would cut
+  // the last brief's metadata off.
+  const terminators = (Array.isArray(trailingMarkers) ? trailingMarkers : [trailingMarkers])
+    .filter(Boolean)
+    .map(n => String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+  const endRe = terminators.length
+    ? new RegExp('^[ \\t]*---\\s*(?:' + terminators.join('|') + ')\\s*---', 'im')
+    : null;
   for (let i = 0; i < marks.length; i++) {
-    const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    let end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    if (endRe && i + 1 === marks.length) {
+      const tail = body.slice(marks[i].bodyStart).match(endRe);
+      if (tail) end = marks[i].bodyStart + tail.index;
+    }
     const text = body.slice(marks[i].bodyStart, end).trim();
     if (text) pages.push({ pageNumber: marks[i].page, text });
   }
@@ -4907,8 +4933,19 @@ function creatureToneLevel(inputData = {}) {
   return 'formidable';
 }
 
+// The tone shapes the bible ENTRY, and an entry's description never reaches a
+// page: the REQUIRED OBJECTS block is name-only by the 2026-09-02 ruling, so an
+// animal arrives at the image model as a name (plus its size, since 2026-09-11)
+// and nothing else. The page's own prose is therefore the only place a
+// creature's face is decided per page — on job_1789147573901_m3uam0nxi p11 the
+// whole of it was "At the base of the block, Nia digs vigorously at the dirt
+// with her paws", and a vigorously digging dog was drawn snarling, teeth bared,
+// in a book whose tone level says teeth are "not bared, raised or displayed".
+const CREATURE_TONE_PAGE_RULE = ' Where a creature is in frame, the page\'s own prose states its face and expression in these terms — a creature\'s entry does not travel to the page, so a face left unwritten is drawn from the action alone, and effort reads as teeth.';
+
 function buildCreatureToneSection(inputData = {}) {
-  return CREATURE_TONE_LEVELS[creatureToneLevel(inputData)] || '';
+  const level = CREATURE_TONE_LEVELS[creatureToneLevel(inputData)];
+  return level ? `${level}${CREATURE_TONE_PAGE_RULE}` : '';
 }
 
 /**
@@ -6491,8 +6528,11 @@ function buildDoNotWriteSection() {
  * pictures. Beat prose used to stand between the two and was measured as the
  * lossiest stage in the chain (Lab #973, 2026-09-02 — see docs/decisions.md).
  * Emits the same ---ANALYSIS--- / ---STORY TEXT--- shape the refiner emits, so
- * parseRefinedText() reads it with no new parser. A ---TITLE--- block precedes
- * both: in a beats run no other call produces a title.
+ * parseRefinedText() reads it with no new parser. A ---TITLE--- block FOLLOWS
+ * both (2026-09-11): in a beats run no other call produces a title, and the
+ * pick is judged against the pages as written rather than guessed ahead of
+ * them. The caller passes 'TITLE' as a trailing marker so the last page's text
+ * ends there.
  */
 /**
  * @param {Object} inputData
