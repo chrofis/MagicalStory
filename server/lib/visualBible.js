@@ -1298,20 +1298,30 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
     }
   }
 
-  // Add only 2-3 key story elements (prioritize animals and important artifacts)
+  // Add only 2-3 key story elements. Secondary characters and vehicles are
+  // included ONLY when the caller filters by id (a cover hint's objects) —
+  // a hint-less legacy cover keeps the animals + artifacts it always had
+  // instead of dumping every CHR in the bible. Secondary characters go first:
+  // a creature the cast rides or stands beside is the one element the model
+  // cannot invent from context. job_1789078732136_622wecmhj front cover:
+  // the hint named CHR001 (a dragon, only state-cell renders) and every
+  // position said "on <name>'s back", but this block only read animals and
+  // artifacts, so the name reached the model with no species and the four
+  // riders were painted on the dog — the only creature defined.
+  const KEY_ELEMENT_CAP = 3;
   const keyElements = [];
-
-  // First add animals (pets, companions - usually most important)
-  for (const entry of visualBible.animals || []) {
-    if (keyElements.length < 3 && elementAllowed(entry)) {
-      keyElements.push({ ...entry, type: 'animal' });
-    }
-  }
-
-  // Then add artifacts if we have room
-  for (const entry of visualBible.artifacts || []) {
-    if (keyElements.length < 3 && elementAllowed(entry)) {
-      keyElements.push({ ...entry, type: 'artifact' });
+  const pools = [
+    ['secondaryCharacters', 'character', !!allowedIds],
+    ['animals', 'animal', true],
+    ['artifacts', 'artifact', true],
+    ['vehicles', 'vehicle', !!allowedIds],
+  ];
+  for (const [pool, type, enabled] of pools) {
+    if (!enabled) continue;
+    for (const entry of visualBible[pool] || []) {
+      if (keyElements.length < KEY_ELEMENT_CAP && elementAllowed(entry)) {
+        keyElements.push({ ...entry, type });
+      }
     }
   }
 
@@ -1323,9 +1333,14 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
       // language (a German artifact name would leak into the English prompt
       // and can even get painted as lettering), so artifacts/vehicles lead
       // with a generic English label + their description. Animals keep their
-      // proper name (a pet's name is an identity anchor, like a character's).
-      const lead = entry.type === 'animal' && entry.name
-        ? `**${entry.name}** (animal)`
+      // proper name (a pet's name is an identity anchor, like a character's),
+      // and so does a secondary character: the cover description places the
+      // cast relative to that name, and the description itself opens with
+      // what the creature is ("a dragon, …"), which is the species the model
+      // needs.
+      const named = (entry.type === 'animal' || entry.type === 'character') && entry.name;
+      const lead = named
+        ? `**${entry.name}** (${entry.type})`
         : `**${entry.type.charAt(0).toUpperCase()}${entry.type.slice(1)}**`;
       prompt += `${lead}: ${description}\n`;
     }

@@ -32138,3 +32138,45 @@ duplicate cells (≈ $2 more) — the current gap is noise.
 **Decision:**  (1) CHR-id promotion removed from needsScaleRepair - the trigger fires only for characters[] the composite can cast. (2) In-place is all or nothing: placed < cast throws and the page keeps its direct render. (3) The pre-scale-repair original is flagged step1Pixels:false and scored without the Step-1 entity report. The composite stays wired for genuine two-depth human pages; the Art Director rule that steers plans away from two-level frames stays. Bench (Lab exp 1146/1148) and production disagree: the Lab cast the VB secondary via secondaryCastSeeds, production does not - see BACKLOG.
 **Touched:**   server/lib/scaleRepair.js, server/lib/sceneComposite.js, server/lib/repairPipeline.js, tests/unit/composite-secondary-cast.test.ts, tasks/bugs.json
 **Status:**    active
+
+## Cover KEY STORY ELEMENTS includes hint-named secondary characters and vehicles; cover name check is state-aware (2026-09-11)
+**Context:** staging job_1789078732136_622wecmhj front cover drew the four
+boys riding the dog instead of the dragon. `coverHints.frontCover.objects =
+[LOC001, ANI001, CHR001]`, every position "on Fenn's back". CHR001 (the
+dragon) is a `secondaryCharacters` entry whose renders live only on its state
+cells (CHR001.1/.2). `buildFullVisualBiblePrompt` built KEY STORY ELEMENTS
+from `animals` and `artifacts` only, so the cover prompt carried "Fenn" 4×
+with no species and "dragon" 0× — the dog was the only creature defined, so
+the model put the riders on it. Rebuilt from the stored story data:
+before = `**Nia** (animal): dog, …` alone; after = `**Fenn** (character): a
+dragon, broad-chested and sturdy, … tall enough to carry four small children
+on his back …` followed by the Nia line. Latent second fault:
+`coverIterate.hasEntityReference` checked the parent-level image only, while
+the grid's `visualBible.hasElementReference` is state-aware — had the hint not
+listed CHR001, the name invariant would have STRIPPED Fenn as "no reference
+image" while the grid could have carried him.
+**Decision:** (1) `secondaryCharacters` (first) and `vehicles` (last) join
+the KEY STORY ELEMENTS loop, gated by the same `elementAllowed` filter and the
+existing 3-entry cap, but ONLY when an allowed-id list is given (a cover hint);
+a hint-less legacy cover keeps animals + artifacts exactly as before, never a
+dump of every CHR. A secondary character is emitted like an animal — proper
+name + `(character)` + its description, which opens with what it is ("a
+dragon, …"); vehicles keep the generic English `**Vehicle**:` lead.
+(2) `coverIterate.hasEntityReference` IS `visualBible.hasElementReference`
+— one predicate for "can this entity be fully sent" on both sides of the
+cover invariant.
+**Not done:** the page path's "The attached reference images include a rough
+image of …" sentence (promptBuilders.js REQUIRED OBJECTS block) is not
+emitted on covers. Covers carry no REQUIRED OBJECTS block, and in all three
+cover paths (first-gen, trial, iterate) the prompt is assembled BEFORE
+`buildCoverReferences` decides the grid (it also renders the empty-scene
+plate), so the attachment set is unknown at prompt time; claiming it from the
+hint ids would be a prediction, not the set actually sent. Reordering the
+paths is a separate change.
+**Rationale:** the hint is the cover's cast list; an id it names must be
+defined in the prompt or the name is a phantom (same class as the 2026-09-08
+cover NAME invariant, which this bug slipped past because the id WAS listed).
+**Touched:** `server/lib/visualBible.js` (`buildFullVisualBiblePrompt`),
+`server/lib/coverIterate.js` (`hasEntityReference`),
+`tests/unit/cover-key-elements-secondary.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active

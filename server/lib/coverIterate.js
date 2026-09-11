@@ -86,7 +86,7 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
 // englishEntityRef / englishLocationRef / significantEntityTokens moved to
 // visualBible.js (canonical implementations, shared with the page-prompt
 // builders in storyHelpers.js). Re-exported below for existing consumers.
-const { englishEntityRef, englishLocationRef, significantEntityTokens } = require('./visualBible');
+const { englishEntityRef, englishLocationRef, significantEntityTokens, hasElementReference } = require('./visualBible');
 
 /**
  * VB ids the cover hint actually asks for: `Objects:` list ∪ every character's
@@ -138,7 +138,12 @@ const COVER_NAME_MATCH_POOLS = [
   ['vehicles', 'vehicle', 4],
 ];
 
-const hasEntityReference = (entry) => Boolean(entry?.referenceImageData || entry?.referenceImageUrl);
+// State-aware, same predicate the VB reference grid uses
+// (getElementReferenceImagesByIds): a stated entity has its renders on its
+// state cells, not on the parent. A parent-only check here would strip a
+// named stated entity from the cover description as "no reference image"
+// while the grid would happily have carried it.
+const hasEntityReference = hasElementReference;
 
 /** Word-boundary, case-insensitive matcher for one entity name. */
 function entityNameRegex(name, flags = 'i') {
