@@ -3864,11 +3864,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // 6 cells is 4 elements' worth of unreadable.
         // Cap = the owner's brief-side VB element budget (2026-09-06): three, the
         // same number the Art Director is given and the pipeline truncates to.
-        const { VB_ELEMENT_BUDGET } = require('./server/lib/vbElementBudget');
+        // The PHYSICAL grid bound, not the element budget (owner, 2026-09-11:
+        // no code-side enforcement of the budget — it is a prompt rule for the
+        // Art Director and a scene-review fault, nothing more). One Grok slot,
+        // cell size 1/n, a face below VB_CELL_FLOOR_PX gets replaced by a prior.
+        const { VB_SLOT_MAX_ELEMENTS } = require('./server/lib/grok');
         // sceneMetadata rides along for the removable-worn-item dedupe: an item
         // the page declares WORN is already on the avatar reference, so its
         // standalone plate is dropped from the grid (server/lib/wornItems.js).
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_ELEMENT_BUDGET, sceneMetadata?.objects || null, sceneMetadata);
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_SLOT_MAX_ELEMENTS, sceneMetadata?.objects || null, sceneMetadata);
         // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
         // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
         // this pageData map (they iterate the pageDataArray it produces), so at
