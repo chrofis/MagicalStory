@@ -7831,7 +7831,9 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
       const src = cells.length > 1 ? (objectStates(entry).find(s => s.id === c.id) || null) : entry;
       const buf = src ? await loadVbReferenceBytes(src) : null;
       if (!buf) throw new Error(`No stored reference for ${c.id}`);
-      cellsB64.push(Buffer.from(buf).toString('base64'));
+      // loadVbReferenceBytes contracts a base64 STRING (characterPhotos
+      // _getOrFetch); re-encoding it double-encoded the cell (exps 1171-1174).
+      cellsB64.push(typeof buf === 'string' ? buf : Buffer.from(buf).toString('base64'));
     }
   } else {
     prompt = withTemplates({ referenceSheet: promptOverride }, () => refSheets.buildReferenceSheetPrompt(cells, styleDescription, vb));
