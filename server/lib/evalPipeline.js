@@ -1905,7 +1905,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // (D-04c). A missing/extra pair on a page whose counts reconcile is one
       // recognition failure reported twice, and the removal instruction it used
       // to produce deleted a commissioned character from a cover.
-      if (expectedCast.count > 0 && figures.length <= expectedCast.count) {
+      if (expectedCast.count > 0 && figures.length === expectedCast.count) {
         const types = fixableIssues.map(i => String(i.type || '').toLowerCase());
         if (types.includes('extra_character') && types.includes('missing_character')) {
           log.warn(`👥 [EVAL] ${pageContext}: missing_character AND extra_character on ${figures.length} figure(s) for a roster of ${expectedCast.count} — recognition failure reported as a surplus (D-04c)`);
