@@ -1017,7 +1017,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // 24 parallel scene expansions can each take 30-60s; without heartbeating,
           // the row would only get updated when the first one finishes.
           const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
-          expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
+          expansionResult = await callTextModelStreaming(expansionPrompt, null, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
           // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
           finalSceneDescription = expansionResult.text;
 
@@ -2566,7 +2566,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (beatsMode) {
       await runBeatsWriterWithLandmarkGuideline();
     } else {
-      const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
+      const unifiedResult = await callTextModelStreaming(unifiedPrompt, null, (chunk, fullText) => {
         progressiveParser.processChunk(chunk, fullText);
         unifiedHeartbeat();  // throttled — fires at most every 30s
       }, modelOverrides.outlineModel, { usageLabel: 'unified_story' });
@@ -2661,10 +2661,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         let reviewModelId = null;
         for (let attempt = 1; attempt <= 2 && !reviewText; attempt++) {
           try {
-            const reviewResult = await callTextModelStreaming(reviewPrompt, 32000, () => {
+            const reviewResult = await callTextModelStreaming(reviewPrompt, null, () => {
               unifiedHeartbeat(); // keep story_jobs.updated_at fresh during the review
             }, reviewModel, { usageLabel: 'outline_review' });
             const t = reviewResult.text || '';
+            // A review cut at the ceiling carries a partial FIXES REQUIRED list
+            // and no closing section — a failed attempt, never a shorter review
+            // (textReplyGuard.js). The retry loop runs once more, then the
+            // draft ships unpatched, exactly as on a shape failure.
+            if (reviewResult.truncation?.suspected) {
+              log.warn(`⚠️ [OUTLINE-REVIEW] attempt ${attempt}: reviewer reply ${require('./server/lib/textModels').describeTruncation(reviewResult.truncation)} — ${attempt < 2 ? 'retrying' : 'giving up'}`);
+              continue;
+            }
             // Minimal shape gate: without these markers the concatenation would
             // confuse the parsers — treat as a failed attempt.
             if (/---\s*ANALYSIS\s*---/i.test(t) && /FIXES\s+REQUIRED/i.test(t)) {
@@ -3338,7 +3346,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const langInstruction = getLanguageInstruction(lang);
           const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
           const { callTextModelStreaming } = require('./server/lib/textModels');
-          const transResult = await callTextModelStreaming(translationPrompt, 2000, null, 'claude-haiku-4-5-20251001', { usageLabel: 'scene_translation' });
+          const transResult = await callTextModelStreaming(translationPrompt, null, null, 'claude-haiku-4-5-20251001', { usageLabel: 'scene_translation' });
           if (transResult?.text) {
             const translations = transResult.text.trim().split('\n').filter(l => l.trim());
             let tIdx = 0;

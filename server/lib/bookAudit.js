@@ -130,11 +130,11 @@ async function judgeChunk(template, chunk, modelId) {
     body: JSON.stringify({
       contents: [{ parts }],
       generationConfig: {
-        // Headroom for the judge's own reasoning. Measured: a 6-page chunk
-        // spends ~9k tokens thinking before writing, and a 4000 cap truncated
-        // two chunks of three mid-sentence — a truncated audit reads as a clean
-        // one, which is the worst failure a measurement can have.
-        maxOutputTokens: 16000,
+        // No maxOutputTokens (owner rule: no output caps) — Gemini's default is
+        // the model's own ceiling. Measured: a 6-page chunk spends ~9k tokens
+        // thinking before writing, and a 4000 cap truncated two chunks of three
+        // mid-sentence — a truncated audit reads as a clean one, which is the
+        // worst failure a measurement can have.
         // Eval judges run at temperature 0, always (docs/SETTLED.md).
         temperature: 0,
       },

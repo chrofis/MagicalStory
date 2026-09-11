@@ -529,7 +529,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt,
     countFaults, faultsByCategory,
   } = require('./storyHelpers');
-  const { callTextModelStreaming } = require('./textModels');
+  const { callTextModelStreaming, describeTruncation } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
   if (!Array.isArray(pages) || pages.length === 0) {
@@ -613,23 +613,30 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (!prompt) return { source, modelKey, ok: false, error: 'template unavailable' };
     if (!TEXT_MODELS[modelKey]) return { source, modelKey, ok: false, error: `unknown model "${modelKey}"` };
     const t0 = Date.now();
-    // The model's OWN limit, never a hand-picked number (owner rule: no output
-    // caps). A reasoning model spends the budget on reasoning tokens first, so
-    // an undersized cap does not truncate the fault list, it returns ZERO
-    // visible text — the measured failure of deepseek-v4-pro and qwen3.8-max as
-    // auditors at 16384 (models.js, 2026-08-27), and the trap a fixed 12000
-    // would have set for the blind grok auditor.
-    const MAX_OUT = TEXT_MODELS[modelKey].maxOutputTokens || 32000;
+    // null = the model's OWN limit, never a hand-picked number (owner rule: no
+    // output caps). A reasoning model spends the budget on reasoning tokens
+    // first, so an undersized cap does not truncate the fault list, it returns
+    // ZERO visible text — the measured failure of deepseek-v4-pro and
+    // qwen3.8-max as auditors at 16384 (models.js, 2026-08-27), and the trap a
+    // fixed 12000 would have set for the blind grok auditor.
     try {
       // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
       // retry, same call; a second empty is reported as a failed audit.
-      let r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: label });
+      let r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label });
       if (!String(r.text || '').trim()) {
         log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey} returned empty output — retrying once`);
-        r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: label });
+        r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label });
       }
       const raw = String(r.text || '').trim();
       const elapsedMs = Date.now() - t0;
+      // A cut fault list is not a shorter fault list: a truncated audit is
+      // FAILED and its findings stay out of the merge (textReplyGuard.js).
+      if (r.truncation?.suspected) {
+        const error = `audit reply ${describeTruncation(r.truncation)} — findings unusable`;
+        log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey}: ${error}`);
+        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, elapsedMs, truncation: r.truncation,
+          usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 } };
+      }
       log.info(`🔎 [TEXT-AUDIT/${source}] ${modelKey}: ${countFaults(raw)} fault(s) ${JSON.stringify(faultsByCategory(raw))} in ${(elapsedMs / 1000).toFixed(0)}s`);
       return {
         source, modelKey, ok: raw.length > 0,
@@ -727,12 +734,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // (job_1787423677246 p1/p12). It was then clamped to 64000, which is the
     // same hand-picked cap one size up; the real bound is the model. The
     // throw below still turns any cap hit into a loud failure rather than a
-    // silent "nothing to do".
-    const MAX_OUT = TEXT_MODELS[repairModel].maxOutputTokens || 64000;
-    const r = await callTextModelStreaming(prompt, MAX_OUT, null, repairModel, { usageLabel: kind === 'repair' ? usageLabel : `${usageLabel}_${kind}` });
+    // silent "nothing to do" — the caller keeps the text it was given.
+    const r = await callTextModelStreaming(prompt, null, null, repairModel, { usageLabel: kind === 'repair' ? usageLabel : `${usageLabel}_${kind}` });
     const elapsedMs = Date.now() - t0;
-    if ((r.usage?.output_tokens || 0) >= MAX_OUT) {
-      throw new Error(`output hit the ${MAX_OUT}-token cap — reply truncated, rewrites unusable`);
+    if (r.truncation?.suspected) {
+      throw new Error(`reply ${describeTruncation(r.truncation)} — rewrites unusable`);
     }
     const parsed = parseRefinedText(r.text || '', expected);
     // Omission is the CONTRACT: only rewritten pages come back, everything else
@@ -875,14 +881,16 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
     if (diffPrompt && TEXT_MODELS[diffModel]) {
       const t0 = Date.now();
-      // The model's own limit (owner rule: no output caps).
-      const MAX_OUT = TEXT_MODELS[diffModel].maxOutputTokens || 16000;
+      // null = the model's own limit (owner rule: no output caps).
       // temperature 0, same reason as the lector: it must quote, not paraphrase.
-      let dr = await callTextModelStreaming(diffPrompt, MAX_OUT, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
+      let dr = await callTextModelStreaming(diffPrompt, null, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
       if (!String(dr.text || '').trim()) {
         log.warn(`⚠️ [TEXT-DIFF] ${diffModel} returned empty output — retrying once`);
-        dr = await callTextModelStreaming(diffPrompt, MAX_OUT, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
+        dr = await callTextModelStreaming(diffPrompt, null, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
       }
+      // A cut finding list would apply only the findings that fit — throw into
+      // the catch below, which keeps the text as the repair pass left it.
+      if (dr.truncation?.suspected) throw new Error(`diff reply ${describeTruncation(dr.truncation)} — findings unusable`);
       diffReview = String(dr.text || '').trim();
       // The SAME parser and the SAME applier as the lector — the output contract
       // is identical by design, so there is no parallel apply path.
@@ -958,10 +966,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const lectorPrompt = buildTextProofreadPrompt(storyData, current);
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
       const t0 = Date.now();
-      // The model's own limit (owner rule: no output caps). A finding list is a
-      // few hundred tokens — the cost of this call is decided by the output
-      // CONTRACT, not by the ceiling.
-      const MAX_OUT = TEXT_MODELS[lectorModel].maxOutputTokens || 16000;
+      // null = the model's own limit (owner rule: no output caps). A finding
+      // list is a few hundred tokens — the cost of this call is decided by the
+      // output CONTRACT, not by the ceiling.
       // temperature 0: the A/B measured this prompt at 0, and a lector must not
       // paraphrase the page it quotes.
       // reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
@@ -970,11 +977,14 @@ async function refineStoryText(storyData, pages, opts = {}) {
       // catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
       // so recall is a direct function of reasoning budget — do NOT lower this further.
       const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
-      let lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, LECTOR_OPTS);
+      let lr = await callTextModelStreaming(lectorPrompt, null, null, lectorModel, LECTOR_OPTS);
       if (!String(lr.text || '').trim()) {
         log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
-        lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, LECTOR_OPTS);
+        lr = await callTextModelStreaming(lectorPrompt, null, null, lectorModel, LECTOR_OPTS);
       }
+      // Same rule as the diff: a cut finding list is not applied — the catch
+      // below keeps the text as the repair pass left it.
+      if (lr.truncation?.suspected) throw new Error(`lector reply ${describeTruncation(lr.truncation)} — findings unusable`);
       proofread = String(lr.text || '').trim();
       lectorFindings = parseLectorFindings(proofread);
       const result = applyLectorFindings(current, lectorFindings);

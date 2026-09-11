@@ -160,9 +160,10 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
     }
   }
 
+  // No max_tokens (owner rule: no output caps): xAI defaults to the model's
+  // own ceiling; a truncated eval is caught downstream by finishReason.
   const body = {
     model: modelId,
-    max_tokens: 16000,
     temperature: 0.3,
     messages: [{ role: 'user', content }]
   };
@@ -230,7 +231,8 @@ async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptTex
       content.push({ type: 'text', text: part.text });
     }
   }
-  const body = { model: modelId, max_tokens: 16000, temperature: 0, messages: [{ role: 'user', content }] };
+  // No max_tokens (owner rule: no output caps): OpenRouter defaults to the upstream model's ceiling.
+  const body = { model: modelId, temperature: 0, messages: [{ role: 'user', content }] };
   const startTime = Date.now();
   const response = await withRetry(async () => fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -659,7 +661,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
       SCENE_DESCRIPTION: sceneDescription
     });
 
-    const rewriteResult = await callTextModel(rewritePrompt, 1000, require('../config/models').resolveSceneRewriteModel(), { usageLabel: 'scene_rewrite' });
+    const rewriteResult = await callTextModel(rewritePrompt, null, require('../config/models').resolveSceneRewriteModel(), { usageLabel: 'scene_rewrite' });
     const rewrittenScene = rewriteResult.text;
 
     // Log token usage
@@ -887,7 +889,7 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         let newHead = '';
         for (let attempt = 1; attempt <= 2; attempt++) {
           const over = attempt === 1 ? 0 : newHead.length;
-          const res = await callTextModel(buildInstruction(over), 12000, compressModel, callOpts);
+          const res = await callTextModel(buildInstruction(over), null, compressModel, callOpts);
           newHead = (res?.text || '').trim();
           if (newHead.length > 500 && newHead.length <= headBudget) break;
           log.warn(`✂️ [${logLabel}] Compression attempt ${attempt} by ${compressModel}: ${newHead.length} chars vs ${headBudget} allowed`);

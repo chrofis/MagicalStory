@@ -107,7 +107,7 @@ async function fetchImageBase64(url) {
 
     let raw;
     try {
-      raw = await callClaudeAPI(PROMPT(l), 120, 'claude-haiku-4-5-20251001', { images: [img] });
+      raw = await callClaudeAPI(PROMPT(l), null, 'claude-haiku-4-5-20251001', { images: [img] });
     } catch (e) { console.log(`  ${l.name}: judge failed (${e.message})`); continue; }
 
     const text = String(raw?.text || raw || '').trim();

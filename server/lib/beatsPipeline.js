@@ -451,6 +451,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         try {
           const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp) });
           if (!String(res?.text || '').trim()) throw new Error('empty response');
+          // A cut arc parses as a shorter arc (missing ARC 2, missing critique
+          // lines) — treat it as a failed attempt, never as the creator's answer.
+          if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
           return res;
         } catch (err) {
           lastErr = err;
@@ -1398,6 +1401,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────
   await checkCancellation();
   let sceneReviewAnalysis = '';
+  // Set when the review reply was truncated (textReplyGuard.js): the briefs
+  // shipped unreviewed and the report says so instead of "rewrote nothing".
+  let sceneReviewFailed = null;
   // Same contract as beatsReviewReport above: null only when the review never
   // ran; an object with empty pages[] when it ran and rewrote nothing.
   let sceneReviewReport = null;
@@ -1538,7 +1544,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
         gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
       }
-      const parsed = parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
+      // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
+      // EARLIEST pages and never reached the ones it named — adopting the pages
+      // that fit would ship a half-review as a review. Fall back to the raw
+      // briefs (the input), exactly as the Lab guard does; the failure is
+      // recorded on the story (sceneReviewFailed) and in the generation log.
+      const srTruncated = !!srRes.truncation?.suspected;
+      if (srTruncated) {
+        sceneReviewFailed = `scene review ${textModels.describeTruncation(srRes.truncation)} — briefs shipped unreviewed`;
+        log.error(`❌ [BEATS] ${sceneReviewFailed}`);
+        gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
+      }
+      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
       sceneReviewAnalysis = parsed.analysis || '';
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
       const changed = [];
@@ -1646,6 +1663,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
               try {
                 log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
                 const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
+                // A cut round is a failed round — the catch below keeps the
+                // briefs as they were and ships the pages flagged.
+                if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
                 const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
                 const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
                 for (const x of subset) {
@@ -1784,6 +1804,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
               const pagesLabel = [...faultPages].sort((a, b) => a - b).join(', ');
               log.info(`🧩 [BEATS] second review round on page(s) ${pagesLabel} (${subset.length}/${expansions.length} briefs)`);
               const rrRes = await textModels.callTextModelStreaming(rrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_r2' });
+              // Same rule as round 1: a cut round is a failed round (the catch
+              // below keeps the round-1 briefs).
+              if (rrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(rrRes.truncation)}`);
               const rrParsed = parseRefinedText(rrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
               const rrByPage = new Map(rrParsed.pages.map(p => [p.pageNumber, p.text]));
               const rrChanged = [];
@@ -1877,6 +1900,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         durationMs: meta.timings.sceneReviewMs,
         changedPages: sceneDiffs.map(d => d.pageNumber),
         namedButNotRewritten: faultedNotFixed,
+        failed: sceneReviewFailed,
         analysis: sceneReviewAnalysis,
         pages: sceneDiffs,
         // Dev-mode inspection (owner request 2026-08-09): the exact prompt the

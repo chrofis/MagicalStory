@@ -97,8 +97,7 @@ async function inspectImageForErrors(imageData) {
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1024
+          temperature: 0.2
         }
       })
     });
@@ -456,7 +455,6 @@ Output JSON only:
       }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 500,
         responseMimeType: 'application/json'
       }
     };

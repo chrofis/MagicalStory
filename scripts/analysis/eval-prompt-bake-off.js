@@ -66,7 +66,7 @@ async function runGemini(prompt, imageBuf, modelId) {
         { text: prompt },
       ],
     }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+    generationConfig: { temperature: 0.2 },
   };
   const res = await fetch(url, {
     method: 'POST',

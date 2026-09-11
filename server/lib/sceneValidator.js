@@ -655,7 +655,7 @@ async function repairScene(sceneJson, imageDescription, compositionIssues) {
   });
 
   // Call Claude to generate the repair
-  const result = await callTextModel(repairPrompt, 4000, resolveSceneValidationModel(), { prefill: '{', usageLabel: 'scene_validation' });
+  const result = await callTextModel(repairPrompt, null, resolveSceneValidationModel(), { prefill: '{', usageLabel: 'scene_validation' });
 
   const elapsed = Date.now() - startTime;
   const text = result.text;
@@ -775,13 +775,12 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   const { sanitizeForGemini, callGrokVisionAPI, GEMINI_SAFETY_SETTINGS } = require('./images');
   const { TEXT_MODELS } = require('../config/models');
   // The semantic eval emits JSON with per-scene-action checks, visible entities,
-  // expected entities, and semantic_issues — the default Gemini output limit
-  // (8192) truncated this mid-JSON on pages with many interactions. 24k keeps
-  // complete JSON even for busy scenes after Gemini 2.5 thinking overhead.
+  // expected entities, and semantic_issues. No maxOutputTokens (owner rule:
+  // no output caps) — Gemini's default is the model's own ceiling.
   const model = genAI.getGenerativeModel({
     model: VISION_MODEL,
     safetySettings: GEMINI_SAFETY_SETTINGS,
-    generationConfig: { maxOutputTokens: 24000, temperature: EVAL_TEMPERATURE }
+    generationConfig: { temperature: EVAL_TEMPERATURE }
   }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 

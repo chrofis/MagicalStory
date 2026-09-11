@@ -2414,7 +2414,7 @@ async function transcribeTextInImage(imageDataUri) {
           { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(imageDataUri) } },
           { text: 'Transcribe the large title lettering in this image character by character. Copy exactly what is drawn, including accents and umlauts, even if a letter looks malformed or misspelled — do not correct it. Return JSON: {"text": "<transcription>"}' },
         ] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
       signal: AbortSignal.timeout(45_000),
     });
@@ -5054,7 +5054,7 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
   }
 
   const t0 = Date.now();
-  const result = await callTextModel(prompt, 10000, null, { usageLabel: 'testlab_scene_expansion' });
+  const result = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_expansion' });
   const elapsedMs = Date.now() - t0;
   return {
     elapsedMs, modelId: result.modelId || null, promptUsed: prompt,
@@ -5124,8 +5124,8 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
 
   const t0 = Date.now();
   const [resA, resB] = await Promise.all([
-    callTextModel(promptA, 10000, null, { usageLabel: 'testlab_scene_expansion_ab' }),
-    callTextModel(promptB, 10000, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptA, null, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptB, null, null, { usageLabel: 'testlab_scene_expansion_ab' }),
   ]);
 
   // Render each variant's scene description through the standard image stage
@@ -5209,7 +5209,7 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
   }
 
   const t0 = Date.now();
-  const res = await callTextModel(prompt, 10000, null, { usageLabel: 'testlab_scene_variant' });
+  const res = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_variant' });
   const img = await runImageStage(
     { ...ctx, scene: { ...ctx.scene, sceneDescription: res.text } },
     { experimentId, autoEval: params.autoEval !== false, params: {} }
@@ -5261,7 +5261,7 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
   }
 
   const t0 = Date.now();
-  const result = await callClaudeAPI(prompt, 10000, resolveSceneIterationModel(), {
+  const result = await callClaudeAPI(prompt, null, resolveSceneIterationModel(), {
     prefill: '{"previewMismatches":[', usageLabel: 'testlab_scene_description',
   });
   const elapsedMs = Date.now() - t0;
@@ -6023,7 +6023,7 @@ async function runRewriteBlockedStage(ctx, { experimentId, promptOverride, param
   const prompt = fillTemplate(template, { SCENE_DESCRIPTION: ctx.scene.sceneDescription || '' });
 
   const t0 = Date.now();
-  const result = await callTextModel(prompt, 1000, null, { usageLabel: 'testlab_scene_rewrite' });
+  const result = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_rewrite' });
   return {
     elapsedMs: Date.now() - t0,
     promptUsed: prompt,
@@ -6312,7 +6312,7 @@ async function runEmptySceneAdherenceStage(ctx, { experimentId }) {
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } } }),
+    body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } } }),
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`Gemini judge HTTP ${res.status}`);
@@ -8024,7 +8024,7 @@ async function checkRuleGenericity(ruleText, storyId) {
     const { callTextModel } = require('./textModels');
     const check = await callTextModel(
       `You review a rule that will be appended to an illustration-prompt template used for EVERY story. Rule:\n"${text}"\nFlag wording that is specific to one story or scene: entity names, place names, plot objects, or phrasing that only applies to a single situation. Broad archetypes (a vehicle, a guard, the main character) are fine. Reply JSON only: {"generic": true|false, "issues": ["..."]}.`,
-      500, null, { usageLabel: 'testlab_genericity' }
+      null, null, { usageLabel: 'testlab_genericity' }
     );
     const m = String(check.text || '').match(/\{[\s\S]*\}/);
     if (m) {

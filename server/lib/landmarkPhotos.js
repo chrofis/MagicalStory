@@ -8,7 +8,7 @@
 const { log } = require('../utils/logger');
 const { compressImageToJPEG } = require('./images');
 const { getPool } = require('../services/database');
-const { callAnthropicAPI } = require('./textModels');
+const { callTextModel } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2 = require('./r2');
 const { servedPhotoUrl } = require('./landmarkPhotoStore');
@@ -166,8 +166,9 @@ Select the ${count} most DIVERSE photos - different angles, viewpoints, or featu
 Reply with ONLY ${count} numbers separated by commas (e.g., "1,4,7"). Nothing else.`;
 
   try {
-    const haikuModel = TEXT_MODELS['claude-haiku'];
-    const result = await callAnthropicAPI(prompt, 20, haikuModel.modelId);
+    // null = model max (owner rule: no output caps); the reply is a short list
+    // of numbers, and the ceiling is not what makes it short.
+    const result = await callTextModel(prompt, null, 'claude-haiku', { usageLabel: 'landmark_photo_pick' });
     const response = result.text.trim();
 
     // Parse comma-separated numbers
@@ -915,7 +916,7 @@ Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itse
           // and fed to the illustration prompt.
           //
           // Describing a picture in front of the model needs no reasoning chain.
-          maxOutputTokens: 600,
+          // No maxOutputTokens (owner rule: no output caps).
           temperature: 0.3,
           thinkingConfig: { thinkingBudget: 0 }
         }
@@ -1114,7 +1115,7 @@ IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illust
           // the budget is zero rather than larger: with thinking left on it
           // spends ~1000 thought tokens per image to return the same 75-token
           // object, and this runs over thousands of images.
-          maxOutputTokens: 600,
+          // No maxOutputTokens (owner rule: no output caps).
           temperature: 0.1,
           thinkingConfig: { thinkingBudget: 0 }
         }

@@ -877,6 +877,16 @@
    "fixedAt": "2026-09-11",
    "fixedIn": "31deb92ce",
    "fix": "Every non-character cell line opens with a plain-prose kind sentence built from the entry's name and type ('This is the small dragon scale, a single reptile scale: <description>') - never a heading, bold line or quoted title; plus an element-cell gate (kind/match/style, one re-render on NO) and a state-cells consistency gate. Unit tests: tests/unit/vb-element-cell-prompt.test.ts."
+  },
+  {
+     "id": "numeric-output-caps-remained-after-no-caps-rule",
+     "title": "Numeric output-token caps remained at ~90 sites (39 on callTextModel*/callClaudeAPI incl. the entry points' own default maxTokens = 4096, ~50 on direct Gemini/Anthropic/xAI/OpenRouter bodies) after the 2026-08-29 no-caps rule, and no shared layer detected a truncated reply",
+     "reportedAt": "2026-09-11",
+     "source": "Owner order 2026-09-11 after ee2d00c72 (Lab scene review cut at exactly 16,000 tokens in 6 of 8 arms, stored as reviewed). Repo-wide ripgrep enumeration: storyJobPipeline.js unified_story 64000 / outline_review 32000 / scene_expansion 10000; feedbackConsolidator 6000 (its own comment records 3000 truncating busy pages); entityConsistency 8192 (comment: raised from 2048 after truncation); textRefine repair 'min(64000, model max)' (16000 truncated a 16-page run, job_1787423677246); bookAudit 16000 (4000 truncated 2 of 3 chunks); character2x4Sheet 8000 (2500/4000 truncated the JSON); evalPipeline P1 32000 (Lab #817 cut mid-figure). Provider finish reasons (stop_reason / finishReason / finish_reason) were not surfaced on any path except the Anthropic stream, so a cut reply parsed as a shorter one everywhere.",
+     "status": "fixed",
+     "fixedAt": "2026-09-11",
+     "fixedIn": "COMMIT_HASH",
+     "fix": "Every callTextModel*/callClaudeAPI site passes null (= model max) and the entry points default to null; every direct provider body drops its numeric literal (Anthropic bodies use the new maxOutputTokensFor()); two documented caps kept and allow-listed (diagnostics ping max_tokens 1, bboxDetection flash-lite loop valve 2500). New server/lib/textReplyGuard.js assessTextReply runs inside both entry points: result.truncation on every reply, ERROR log + /api/health/config textTruncation counter on a suspected cut; finish reasons captured on all six provider paths. Callers wired to fall back to their input: beats scene review r1/worn/r2, arc create/retell, outline review, text audits/repair/diff/lector, three-stage compliance (evalFailed with reason), P1 inventory MAX_TOKENS. Tests: tests/unit/text-reply-guard.test.ts, tests/unit/no-output-caps.test.ts (source scan, fails on any new numeric cap), tests/unit/truncation-caller-fallbacks.test.ts. See docs/decisions.md 2026-09-11 'No output caps anywhere'."
   }
   ]
 }

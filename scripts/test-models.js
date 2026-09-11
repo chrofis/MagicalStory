@@ -201,7 +201,7 @@ async function main() {
       const tasks = Object.entries(TEST_MODELS).map(async ([modelKey]) => {
         const start = Date.now();
         try {
-          const result = await callTextModel(prompt, 10000, modelKey, { prefill });
+          const result = await callTextModel(prompt, null, modelKey, { prefill });
           const elapsed = Date.now() - start;
           const parsed = extractJson(result.text);
           return { modelKey, text: result.text, usage: result.usage, modelId: result.modelId, elapsed, parsed, error: null };

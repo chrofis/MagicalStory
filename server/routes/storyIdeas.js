@@ -495,7 +495,7 @@ ${landmarkEntries}`;
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 6000, modelToUse, { usageLabel: 'story_ideas' });
+    const result = await callTextModel(prompt, null, modelToUse, { usageLabel: 'story_ideas' });
 
     // Parse the response to extract 2 ideas
     // Support multiple formats: [FINAL_1], ## STORY 1, STORY 1:, etc.
@@ -719,7 +719,7 @@ ${landmarkEntries}`;
     log.debug('  Starting parallel story generation...');
 
     // Stream Story 1 - progressively send raw content as it arrives
-    const streamStory1 = callTextModelStreaming(prompt1, 3000, (delta, fullText) => {
+    const streamStory1 = callTextModelStreaming(prompt1, null, (delta, fullText) => {
       fullResponse1 = fullText;
       // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
       if (fullText.length > 50 && fullText.length > lastStory1Length + 50) {
@@ -746,7 +746,7 @@ ${landmarkEntries}`;
     });
 
     // Stream Story 2 - progressively send raw content as it arrives
-    const streamStory2 = callTextModelStreaming(prompt2, 3000, (delta, fullText) => {
+    const streamStory2 = callTextModelStreaming(prompt2, null, (delta, fullText) => {
       fullResponse2 = fullText;
       // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
       if (fullText.length > 50 && fullText.length > lastStory2Length + 50) {

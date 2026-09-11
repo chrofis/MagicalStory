@@ -49,7 +49,7 @@ async function callGemini(b64, prompt) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ inlineData: { mimeType: 'image/jpeg', data: b64 } }, { text: prompt }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } } }),
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } } }),
   });
   const j = await res.json();
   const block = j?.promptFeedback?.blockReason;
@@ -60,7 +60,7 @@ async function callOpenRouter(model, b64, prompt) {
   const t0 = Date.now();
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
-    body: JSON.stringify({ model, temperature: 0, max_tokens: 1500,
+    body: JSON.stringify({ model, temperature: 0,
       messages: [{ role: 'user', content: [ { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }, { type: 'text', text: prompt } ] }] }),
   });
   const j = await res.json();
@@ -71,7 +71,7 @@ async function callGrok(b64, prompt) {
   const t0 = Date.now();
   const res = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.XAI_API_KEY}` },
-    body: JSON.stringify({ model: 'grok-4', temperature: 0, max_tokens: 1500,
+    body: JSON.stringify({ model: 'grok-4', temperature: 0,
       messages: [{ role: 'user', content: [ { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }, { type: 'text', text: prompt } ] }] }),
   });
   const j = await res.json();
@@ -82,7 +82,7 @@ async function callClaude(b64, prompt) {
   const t0 = Date.now();
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: require('../../server/config/models').maxOutputTokensFor('claude-haiku-4-5-20251001'), temperature: 0,
       messages: [{ role: 'user', content: [ { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }, { type: 'text', text: prompt } ] }] }),
   });
   const j = await res.json();

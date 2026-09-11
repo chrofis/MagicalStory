@@ -4646,7 +4646,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
           // Claude vision — uses callTextModel with images option
           const { callTextModel } = require('../lib/textModels');
           const imageDataUri = `data:${overlayMime};base64,${overlayBase64}`;
-          const claudeResult = await callTextModel(refinePrompt, 16000, refineModelId, { images: [imageDataUri], usageLabel: 'regen_refine' });
+          const claudeResult = await callTextModel(refinePrompt, null, refineModelId, { images: [imageDataUri], usageLabel: 'regen_refine' });
           if (claudeResult?.text) {
             refineData = { candidates: [{ content: { parts: [{ text: claudeResult.text }] } }] };
           }
@@ -4661,7 +4661,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: refineParts }],
-              generationConfig: { maxOutputTokens: 16000, temperature: 0.5, responseMimeType: 'application/json' },
+              generationConfig: { temperature: 0.5, responseMimeType: 'application/json' },
               safetySettings: GEMINI_SAFETY_SETTINGS
             })
           });
@@ -4807,7 +4807,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
       // Claude vision — uses callTextModel with images option
       const { callTextModel } = require('../lib/textModels');
       const imageDataUri = `data:${overlayMime};base64,${overlayBase64}`;
-      const claudeResult = await callTextModel(iteratePrompt, 16000, modelId, { images: [imageDataUri], usageLabel: 'regen_iterate' });
+      const claudeResult = await callTextModel(iteratePrompt, null, modelId, { images: [imageDataUri], usageLabel: 'regen_iterate' });
       if (!claudeResult?.text) {
         return res.status(500).json({ error: `${modelId} returned no response` });
       }
@@ -4827,7 +4827,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { maxOutputTokens: 16000, temperature: 0.5, responseMimeType: 'application/json' },
+          generationConfig: { temperature: 0.5, responseMimeType: 'application/json' },
           safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });

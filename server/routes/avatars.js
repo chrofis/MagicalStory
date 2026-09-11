@@ -363,7 +363,6 @@ async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '')
           }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 4096,
             responseMimeType: 'application/json'
           }
         }),
@@ -557,7 +556,6 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       }],
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 4000,
         responseMimeType: 'application/json'
       },
       safetySettings: [
@@ -805,7 +803,6 @@ Set pass=true if:
       }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 2000,
         responseMimeType: 'application/json'
       },
       safetySettings: [

@@ -44,7 +44,6 @@ async function callGemini(base64Data, prompt) {
       ]
     }],
     generationConfig: {
-      maxOutputTokens: 2500,
       temperature: 0.5,
       responseMimeType: 'application/json',
       thinkingConfig: { thinkingBudget: 0 }

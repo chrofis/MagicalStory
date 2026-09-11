@@ -407,11 +407,10 @@ async function consolidateFeedback({
     const evalModel = modelOverride || resolveEvalModel();
     // cachePrefix caches the stable template — Anthropic-only; harmless (ignored)
     // for OpenRouter models, which don't take the cache_control block.
-    // 6000 out (was 3000): busy pages with many issues + per-fix critiques
-    // overran 3000 and truncated the JSON, which failed the parse and dropped
-    // the whole page to the legacy raw-issue fallback. Extra headroom only
-    // costs more when the output is genuinely longer (the failing case).
-    const result = await callTextModel(userInput, 6000, evalModel, {
+    // null = the model's own ceiling (owner rule: no output caps). 3000 and
+    // then 6000 both truncated busy pages' JSON, which failed the parse and
+    // dropped the page to the legacy raw-issue fallback.
+    const result = await callTextModel(userInput, null, evalModel, {
       // Judging, not writing — pinned so a rules/model A/B is reproducible.
       temperature: require('../config/models').EVAL_TEMPERATURE,
       usageLabel: 'eval_consolidation',

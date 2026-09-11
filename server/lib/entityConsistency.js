@@ -2589,8 +2589,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
   const model = genAI.getGenerativeModel({
     model: ENTITY_CHECK_MODEL,
     generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 8192  // Increased from 2048 to handle complex responses with many issues
+      temperature: 0.2  // no maxOutputTokens (owner rule: no output caps); 2048 and 8192 both truncated busy pages
     }
   });
 

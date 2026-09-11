@@ -89,7 +89,7 @@ async function analyzeImageStyle(imageData) {
 Output ONLY the style description as a single paragraph (3-5 sentences) that could be used as an art style prompt. No headers, no bullet points, no analysis structure — just the description.` }
         ]
       }],
-      generationConfig: { maxOutputTokens: 500, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } }
+      generationConfig: { temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } }
     }),
     signal: AbortSignal.timeout(45_000)
   });
@@ -179,8 +179,9 @@ JSON only: {"better": "after"|"before"|"same", "changed": ["..."], "reason": "on
       // hat. The budget must cover thinking AND the JSON: at 1200 the model
       // spent it thinking and the reply truncated mid-string, so a correctly
       // DETECTED hat swap ("the dark green tricorn hat is now a red head…")
-      // died in the JSON parse and the gate reported itself unavailable.
-      generationConfig: { temperature: 0, maxOutputTokens: 4000, responseMimeType: 'application/json' },
+      // died in the JSON parse and the gate reported itself unavailable. No
+      // maxOutputTokens at all now (owner rule: no output caps).
+      generationConfig: { temperature: 0, responseMimeType: 'application/json' },
     }),
     signal: AbortSignal.timeout(60_000),
   });
@@ -221,7 +222,7 @@ async function checkStyleMatch(imageDataA, imageDataB) {
         part(imageDataB),
         { text: 'Is Image B rendered in the SAME artistic medium and stylization CLASS as Image A? The classes: painterly/watercolor, flat vector cartoon, anime/manga, 3D render, photo. Judge ONLY the rendering technique of faces and figures; content and layout differences are irrelevant. Answer false ONLY when the class differs (e.g. a flat-vector cartoon face in a watercolor scene, an anime face in a photo). Variation WITHIN a class — smoother vs more textured watercolor, more or less visible brushstrokes, softer edges — is the SAME style: answer true. JSON only: {"sameStyle": true/false, "styleA": "...", "styleB": "..."}' },
       ] }],
-      generationConfig: { temperature: 0, maxOutputTokens: 300, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     }),
     signal: AbortSignal.timeout(45_000),
   });
@@ -255,7 +256,7 @@ async function describeHeadPose(imageDataUri) {
         { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(imageDataUri) } },
         { text: 'This crop shows one person\'s head (an illustration). Describe the head for a repainting task. All directions FROM THE VIEWER\'S PERSPECTIVE (the person\'s nose pointing toward the left edge of the image = "left"). JSON only: {"facing":"...","headTilt":"...","gaze":"...","expression":"...","mouth":"..."} — each a short phrase, e.g. "three-quarter left", "tilted slightly down", "looking down at the object in their hands", "gentle concerned smile", "closed".' },
       ] }],
-      generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     }),
     signal: AbortSignal.timeout(30_000),
   });
@@ -312,7 +313,7 @@ Return ONLY the JSON, no markdown fences.` }
       }],
       // thinkingBudget 0: 2.5-flash otherwise spends the small output budget
       // on thinking and returns empty text. responseMimeType enforces JSON.
-      generationConfig: { maxOutputTokens: 1024, temperature: 0.2, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+      generationConfig: { temperature: 0.2, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
     }),
     signal: AbortSignal.timeout(45_000)
   });

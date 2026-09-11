@@ -57,6 +57,11 @@ router.get('/health/config', (req, res) => {
         avatar: resolve(MODEL_DEFAULTS.avatar),
       };
     })(),
+    // Truncated text replies since this container started (textReplyGuard.js):
+    // every callTextModel reply is assessed, a suspected cut is logged at ERROR
+    // and counted here by reason and usageLabel, with the last one's details.
+    // Owner order 2026-09-11 — a cap-hit review used to look like a short review.
+    textTruncation: require('../lib/textReplyGuard').getTruncationStats(),
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || '(unset)',
   });
 });

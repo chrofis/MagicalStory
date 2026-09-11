@@ -46,7 +46,7 @@ async function callOpenRouterVisionAPI(modelId, geminiParts) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: modelId, max_tokens: 8192, temperature: 0, messages: [{ role: 'user', content }],
+      model: modelId, temperature: 0, messages: [{ role: 'user', content }],  // no max_tokens (owner rule: no output caps)
       provider: fastOrder ? { order: fastOrder, allow_fallbacks: true } : { sort: 'throughput' },
     }),
     signal: AbortSignal.timeout(120000),

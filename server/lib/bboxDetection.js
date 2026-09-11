@@ -520,7 +520,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Claude vision: ${modelId}`);
       const { callTextModel } = require('./textModels');
       const imageDataUri = `data:${mimeType};base64,${base64Data}`;
-      const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri], usageLabel: 'bbox_detect' });
+      const claudeResult = await callTextModel(prompt, null, modelId, { images: [imageDataUri], usageLabel: 'bbox_detect' });
       if (!claudeResult?.text) {
         log.warn('⚠️  [BBOX-DETECT] Claude returned no text response');
         return dinoUndercountResult || null;
@@ -876,9 +876,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
                     { text: refinePrompt }
                   ] }],
                   generationConfig: {
-                    // Refine pass: smaller response (just refined main character boxes),
-                    // so a tight cap is fine and prevents repetition loops.
-                    maxOutputTokens: 2500,
+                    // No output cap (owner rule 2026-09-11): the refine pass returns a
+                    // short JSON, and a ceiling is not a length instruction.
                     temperature: 0.5,
                     responseMimeType: 'application/json',
                     ...(require('./images').modelSupportsThinking(refineModelId) /* lazy back-edge into images.js (see module header) */ && { thinkingConfig: { thinkingBudget: 0 } })
@@ -1131,7 +1130,6 @@ async function detectSubRegion(characterCrop, targetElement) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 2000,
             temperature: 0.1,
             responseMimeType: 'application/json'
           },

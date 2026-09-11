@@ -134,8 +134,9 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             // there, emitting truncated JSON: measured on a 12-figure page in
             // Lab #817, where the inventory ended mid-figure at `"id": 5` after
             // only 1,280 visible output tokens and parsed to zero figures.
+            // No maxOutputTokens (owner rule: no output caps) — Gemini's default
+            // is the model's own ceiling; finishReason MAX_TOKENS is checked below.
             generationConfig: {
-              maxOutputTokens: 32000,
               temperature: EVAL_TEMPERATURE,
               thinkingConfig: { thinkingBudget: EVAL_THINKING_BUDGET },
             },
@@ -225,6 +226,12 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     const p1Text = p1Data.candidates[0]?.content?.parts?.[0]?.text?.trim();
     if (!p1Text) {
       log.warn(`⚠️ [QUALITY P1] No text response`);
+      return null;
+    }
+    // A MAX_TOKENS inventory is a cut figure list — it parsed to zero figures
+    // on Lab #817 and read as "no figures". Fail with the reason, not silently.
+    if (p1Data.candidates[0]?.finishReason === 'MAX_TOKENS') {
+      log.warn(`⚠️ [QUALITY P1] ${pageContext ? `[${pageContext}] ` : ''}evalFailed: inventory TRUNCATED (finishReason=MAX_TOKENS at ${outputTokens} output tokens) — figures unusable`);
       return null;
     }
 
@@ -462,7 +469,7 @@ Check:
 
 Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}` }
               ]}],
-              generationConfig: { maxOutputTokens: 350, temperature: 0.1, responseMimeType: 'application/json' },
+              generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
             }),
             signal: AbortSignal.timeout(15000),
@@ -700,13 +707,21 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
     // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
     const complianceModel = complianceModelOverride || require('../config/models').resolveComplianceModel();
-    const sonnetResult = await callTextModel(complianceInput, 8192, complianceModel, { usageLabel: 'semantic_compliance', temperature: EVAL_TEMPERATURE });
+    const sonnetResult = await callTextModel(complianceInput, null, complianceModel, { usageLabel: 'semantic_compliance', temperature: EVAL_TEMPERATURE });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
       output_tokens: sonnetResult.usage?.output_tokens || 0
     };
 
+    // A reply cut at the ceiling is a truncated finding list, not a verdict:
+    // record it as a FAILED eval with the reason (textReplyGuard.js), never
+    // as "no findings".
+    if (sonnetResult.truncation?.suspected) {
+      const reason = require('./textModels').describeTruncation(sonnetResult.truncation);
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 evalFailed: compliance reply ${reason}`);
+      return { evalFailed: true, evalError: `compliance reply ${reason}`, usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens } };
+    }
     // Parse JSON from compliance response
     const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
     // Gate on the STRUCTURE, not on a score — the prompt no longer returns
@@ -1390,8 +1405,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts }],
+            // No maxOutputTokens (owner rule: no output caps) — Gemini's default
+            // is the model's own ceiling; finishReason MAX_TOKENS is checked below.
             generationConfig: {
-              maxOutputTokens: 32000,
               // Evaluation is a judgment task — temperature 0 minimises the
               // run-to-run severity/detection swing (same image scored 0 vs 60
               // on consecutive runs at 0.3). thinkingBudget: 0 disables the
@@ -1991,7 +2007,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
-          if (threeStageResult?.fixableIssues?.length) {
+          if (threeStageResult?.evalFailed) {
+            // Truncated compliance reply (evaluateThreeStage): no findings are
+            // merged, the quality verdict stands, and the failure rides along
+            // in `threeStageResult` so it never reads as "compliance found nothing".
+            log.warn(`⚠️ [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}${threeStageResult.evalError}`);
+          } else if (threeStageResult?.fixableIssues?.length) {
             fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
             // Recompute visual score from merged fixable_issues (same rubric
             // as main eval). Then re-apply semantic penalty on top.
@@ -2108,7 +2129,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
-          if (threeStageResult && threeStageResult.score < finalScore) {
+          if (threeStageResult && threeStageResult.evalFailed) {
+            // Truncated compliance reply (see evaluateThreeStage): the quality
+            // verdict stands, but the page is stamped so the failure is visible
+            // and never reads as "compliance found nothing".
+            log.warn(`⚠️ [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}${threeStageResult.evalError}`);
+          } else if (threeStageResult && threeStageResult.score < finalScore) {
             log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} < quality ${finalScore} — using three-stage score`);
             finalScore = threeStageResult.score;
             issuesSummary = threeStageResult.issuesSummary

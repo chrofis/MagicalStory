@@ -35,7 +35,7 @@ const { Pool } = require('pg');
   const prompt = buildTextDiffPrompt({ language: data.language }, pairs);
   console.log(`pairs: ${pairs.map(p => p.pageNumber).join(', ')} | model ${modelKey} | prompt ${prompt.length} chars`);
   const t0 = Date.now();
-  const r = await callTextModelStreaming(prompt, TEXT_MODELS[modelKey].maxOutputTokens, null, modelKey, { temperature: 0, usageLabel: 'text_diff_dryrun' });
+  const r = await callTextModelStreaming(prompt, null, null, modelKey, { temperature: 0, usageLabel: 'text_diff_dryrun' });
   const raw = String(r.text || '').trim();
   console.log('\n===== RAW =====\n' + raw + '\n===============');
   const findings = parseLectorFindings(raw);

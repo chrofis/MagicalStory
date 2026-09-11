@@ -639,7 +639,7 @@ Reply as JSON: {"isGarment": true|false, "whatItIs": "<what the highlighted regi
       { inline_data: { mime_type: 'image/jpeg', data: overlay.toString('base64') } },
       { text: prompt },
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { temperature: 0, thinkingConfig: { thinkingBudget: 0 } },
   };
   try {
     const res = await fetch(

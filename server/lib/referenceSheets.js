@@ -49,7 +49,7 @@ async function identifySheetCells(buffer, cells, elements) {
       { inlineData: { mimeType: 'image/png', data: labelled.toString('base64') } },
       { text: prompt },
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
   };
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
@@ -507,7 +507,7 @@ async function askCellGate(cellsBase64, prompt) {
       ...cellsBase64.map(data => ({ inlineData: { mimeType: data.startsWith('/9j/') ? 'image/jpeg' : 'image/png', data } })),
       { text: prompt },
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
   };
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,

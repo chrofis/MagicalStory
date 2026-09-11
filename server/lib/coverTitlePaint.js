@@ -68,7 +68,7 @@ Decorative styling, texture, colour, letter case and hand-painted irregularity a
 The lettering sits ON TOP of the illustration, so artwork visible behind or beside a letter can never obscure it — never report a letter as hidden, covered or obscured by the picture. Judge ONLY whether the words and letters themselves are there and legible. Normal spacing between words is not a spelling error.
 Return JSON: {"matches": true|false, "problem": "<short description, or empty if it matches>"}` },
         ] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
       signal: AbortSignal.timeout(45_000),
     });

@@ -716,7 +716,10 @@ const SHEET_JUDGE_SAFETY = [
 // so the google branch stays byte-identical to the old inline fetch. Grok/Qwen
 // reuse the SAME `parts` array (images + prompt) via the existing vision
 // helpers. Returns { text, usageMetadata }.
-async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
+// `_maxOutputTokens` is unused since 2026-09-11 (owner rule: no output caps) —
+// kept in the signature so the call sites read unchanged; every judge runs at
+// the model's own ceiling.
+async function callSheetJudge(model, parts, _maxOutputTokens, geminiApiKey) {
   const { TEXT_MODELS } = require('../config/models');
   const cfg = TEXT_MODELS[model];
   const provider = cfg?.provider || 'google';
@@ -727,8 +730,9 @@ async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
       // thinkingBudget: 0 — these are structured scoring judges at temp 0, not
       // open reasoning. Thinking tokens counted against maxOutputTokens and
       // truncated the JSON; disabling them removes that failure mode at the
-      // source (and is faster/cheaper). maxOutputTokens stays high as headroom.
-      generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      // source (and is faster/cheaper). No maxOutputTokens (owner rule: no
+      // output caps) — Gemini's default is the model's own ceiling.
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       safetySettings: SHEET_JUDGE_SAFETY,
     };
     const resp = await fetch(
@@ -743,7 +747,7 @@ async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
     // cryptic "Expected ',' or '}' at position N". Name the real cause instead —
     // the retry loop then re-runs, and the caller's fail-open keeps the sheet.
     if (cand?.finishReason === 'MAX_TOKENS') {
-      throw new Error(`Gemini eval truncated (finishReason=MAX_TOKENS at ${maxOutputTokens}-tok cap) — raise maxOutputTokens`);
+      throw new Error('Gemini eval truncated (finishReason=MAX_TOKENS at the model ceiling)');
     }
     return { text: cand?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
   }
@@ -831,7 +835,7 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   parts.push({ inline_data: { mime_type: sheetMime, data: sheetB64 } });
   parts.push({ text: prompt });
 
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, geminiApiKey);
+  const { text, usageMetadata } = await callSheetJudge(model, parts, null, geminiApiKey);
   if (!text) throw new Error(`sheet eval (${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', {
@@ -934,9 +938,8 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
     return { inline_data: { mime_type: mime, data: b64 } };
   };
 
-  // 8000 not 2500: gemini-2.5 internal thinking counts toward maxOutputTokens —
-  // the TASK-5 colour enumeration makes it think longer, and a 2500 cap
-  // truncated the JSON mid-string (parse failures).
+  // No output cap (owner rule): a 2500 cap once truncated this JSON mid-string
+  // when the TASK-5 colour enumeration made the model think longer.
   const parts = [
     toInlinePart(sourcePhoto),
     toInlinePart(realisticSheet),
@@ -950,7 +953,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // <placeholder> reasons, so an echoed verdict is detectable; re-ask once,
   // then fail the eval so the retry loop treats the attempt as unjudged.
   for (let evalTry = 1; evalTry <= 2; evalTry++) {
-    const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, geminiApiKey);
+    const { text, usageMetadata } = await callSheetJudge(model, parts, null, geminiApiKey);
     if (!text) throw new Error(`style-eval (${model}) returned no text`);
     if (usageTracker && usageMetadata) {
       usageTracker('gemini_quality', {
@@ -1081,10 +1084,9 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
     });
   }
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
-  // 8000 not 4000: gemini-2.5 thinking counts toward maxOutputTokens, and the
-  // costumeReads enumeration lengthened the bodies JSON — a 4000 cap truncated
-  // it mid-string, and the throw cost three characters their whole ref sheet.
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, process.env.GEMINI_API_KEY);
+  // No cap (owner rule: no output caps): a 4000 cap once truncated the bodies
+  // JSON mid-string, and the throw cost three characters their whole ref sheet.
+  const { text, usageMetadata } = await callSheetJudge(model, parts, null, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, `character_2x4_${which}_eval`, model);
@@ -1109,9 +1111,8 @@ async function evaluateIdentity(headsCrop, opts = {}) {
   if (avatarFaces) parts.push(inlinePartOf(avatarFaces));
   parts.push(inlinePartOf(headsCrop));
   parts.push({ text: prompt });
-  // 8000: same gemini-2.5 thinking-token trap as the row/style evals — a low
-  // cap truncates the JSON. maxOutputTokens is a ceiling, not a charge.
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, process.env.GEMINI_API_KEY);
+  // No cap (owner rule: no output caps) — a low cap truncated the JSON.
+  const { text, usageMetadata } = await callSheetJudge(model, parts, null, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`identity eval (${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, 'character_2x4_identity_eval', model);

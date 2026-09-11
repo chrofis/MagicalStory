@@ -35,7 +35,7 @@ const { Pool } = require('pg');
   console.log('expansion prompt:', expansionPrompt.length, 'chars | model:', MODEL_DEFAULTS.sceneDescription);
 
   for (let n = 1; n <= 3; n++) {
-    const res = await callTextModel(expansionPrompt, 8000, MODEL_DEFAULTS.sceneDescription, { usageLabel: 'scene_descriptions', temperature: undefined });
+    const res = await callTextModel(expansionPrompt, null, MODEL_DEFAULTS.sceneDescription, { usageLabel: 'scene_descriptions', temperature: undefined });
     const brief = (res?.text || '').trim();
     const proseOnly = brief.split(/```|\{/)[0].trim();
     const words = proseOnly.split(/\s+/).length;

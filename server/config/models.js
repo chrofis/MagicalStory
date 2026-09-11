@@ -1275,10 +1275,28 @@ function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneV
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
 function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
+/**
+ * The model's own output ceiling, for the few direct provider calls that
+ * bypass textModels.js and whose API REQUIRES a max_tokens value (Anthropic).
+ * Owner rule (2026-08-29 / 2026-09-11): no output caps — the only number a call
+ * site may pass is the model's documented maximum, and it comes from here, not
+ * from a literal at the call site. Accepts a TEXT_MODELS key or a model id;
+ * throws on an unknown model rather than guessing a number.
+ */
+function maxOutputTokensFor(modelKeyOrId) {
+  const entry = TEXT_MODELS[modelKeyOrId]
+    || Object.values(TEXT_MODELS).find(m => m.modelId === modelKeyOrId);
+  if (!entry || !entry.maxOutputTokens) {
+    throw new Error(`maxOutputTokensFor: "${modelKeyOrId}" is not in TEXT_MODELS — add it with its documented maxOutputTokens`);
+  }
+  return entry.maxOutputTokens;
+}
+
 module.exports = {
   EVAL_TEMPERATURE,
   TEXT_MODELS,
   MODEL_DEFAULTS,
+  maxOutputTokensFor,
   resolveEvalModel,
   resolveComplianceModel,
   resolveSceneIterationModel,

@@ -55,7 +55,7 @@ async function _traitProbe(vendor, b64, mimeType) {
     if (!key) return null;
     const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0, max_tokens: 400,
+      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0,
         messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } }, { type: 'text', text: prompt }] }] }),
       signal: AbortSignal.timeout(30000),
     });
@@ -67,7 +67,7 @@ async function _traitProbe(vendor, b64, mimeType) {
     if (!key) return null;
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, temperature: 0,
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: require('../config/models').maxOutputTokensFor('claude-haiku-4-5-20251001'), temperature: 0,
         messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } }, { type: 'text', text: prompt }] }] }),
       signal: AbortSignal.timeout(30000),
     });

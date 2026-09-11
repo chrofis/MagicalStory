@@ -52,7 +52,7 @@ async function llmCheck(file, text) {
   const { callTextModel } = require('../server/lib/textModels');
   const res = await callTextModel(
     `You review a prompt template that runs on EVERY story of a children's-book generator. Flag wording that is specific to one story or scene: character names, place names, plot objects, or rules that only fit a single situation. Broad archetypes (a guard, the main character, a vehicle) are fine. Template:\n\n${text.slice(0, 12000)}\n\nReply JSON only: {"generic": true|false, "issues": ["..."]}.`,
-    600, null, { usageLabel: 'genericity_check' }
+    null, null, { usageLabel: 'genericity_check' }
   );
   const m = String(res.text || '').match(/\{[\s\S]*\}/);
   return m ? JSON.parse(m[0]) : { generic: true, issues: [] };

@@ -9,9 +9,16 @@
  * with no cap hit at all. These helpers make both failure kinds loud and
  * stop the downstream stage from consuming them.
  */
+const { assessTextReply, describeTruncation } = require('./textReplyGuard');
 
 /**
  * Decide whether a scene review response is usable.
+ *
+ * Thin wrapper over the shared `assessTextReply` (server/lib/textReplyGuard.js)
+ * — the same detection every callTextModel reply now carries — with the
+ * scene-review parse verdict folded in: a review that produced substantial
+ * prose but no parseable SCENES block is a format failure, not "found
+ * nothing", unless its tail reads as a "no changes" verdict.
  *
  * @param {object} p
  * @param {string} p.text             raw model output
@@ -24,23 +31,17 @@
  * @returns {{ ok: boolean, error: string|null }}
  */
 function assessSceneReview({ text, outputTokens = null, stopReason = null, capInForce = null, parsedPageCount = 0 }) {
-  const raw = String(text || '');
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return { ok: false, error: `scene review returned an EMPTY response (${outputTokens ?? '?'} output tokens)` };
-  }
-  if (stopReason && /^(max_tokens|length|MAX_TOKENS)$/.test(String(stopReason))) {
-    return { ok: false, error: `scene review TRUNCATED: stop_reason=${stopReason} at ${outputTokens ?? '?'} output tokens (cap ${capInForce ?? '?'})` };
-  }
-  if (capInForce != null && outputTokens != null && Number(outputTokens) >= Number(capInForce)) {
-    return { ok: false, error: `scene review TRUNCATED: ${outputTokens} output tokens hit the ${capInForce}-token ceiling` };
-  }
-  // A review that produced substantial prose but no parseable SCENES block is
-  // a format failure, not a "found nothing" — never let it pass as reviewed.
-  if (parsedPageCount === 0 && trimmed.length > 2000 && !/no (changes|rewrites?|faults?)/i.test(trimmed.slice(-400))) {
+  const trimmed = String(text || '').trim();
+  const saysNoChanges = /no (changes|rewrites?|faults?)/i.test(trimmed.slice(-400));
+  const t = assessTextReply(
+    { text, usage: { output_tokens: outputTokens }, stop_reason: stopReason },
+    { capInForce, minMeaningfulChars: 2000, parsedOk: parsedPageCount > 0 || saysNoChanges }
+  );
+  if (!t.suspected) return { ok: true, error: null };
+  if (t.reason === 'unparsed') {
     return { ok: false, error: `scene review returned ${trimmed.length} chars but the SCENES parser found 0 pages — format failure or cut-off` };
   }
-  return { ok: true, error: null };
+  return { ok: false, error: `scene review ${describeTruncation(t)}` };
 }
 
 /**

@@ -69,7 +69,7 @@ const { extractJsonFromText, buildCharacterPhysicalDescription } = require('../.
   // Get the page's imageData (v0) for Haiku to look at
   const imageDataUri = scene.imageVersions?.[0]?.imageData || scene.imageData || null;
 
-  const result = await callTextModel(fullPrompt, 3000, 'claude-haiku', imageDataUri ? { images: [imageDataUri] } : {});
+  const result = await callTextModel(fullPrompt, null, 'claude-haiku', imageDataUri ? { images: [imageDataUri] } : {});
 
   console.log('\n' + '='.repeat(90));
   console.log('RAW HAIKU RESPONSE');
