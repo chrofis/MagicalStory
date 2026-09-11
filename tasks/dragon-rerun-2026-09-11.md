@@ -135,3 +135,130 @@ its third arm and lettering; p16 small guard off-model.
    are in `completion_tokens`.
 6. p18 dragon teeth: the tone text governs the bible, not the page prompt; check whether the
    `not-menacing` clause reaches `image-generation.txt` for creature pages.
+
+
+---
+
+## Second pass, 2026-09-11 (owner: "we generate too much shit") - D7-D25
+
+Independent read of the same 21 images and all 18 page texts, after the D1-D6 checklist above.
+D1 and D2 are root causes for defects listed here (the prop pages and the cover); D7-D9 are the class
+the owner is pointing at - **the pipeline scored these defects, wrote accurate findings, and shipped
+them anyway**. Nothing has been written to `tasks/bugs.json`: which of D7/D8/D13 become push-blocking
+bugs is the owner's call, and D8 and D14 are prompt-vs-code decisions needing sign-off first.
+
+### D7. A page scored 0 or 5 ships into the final book, silently
+
+p6 finalScore **0** (six CRITICAL `action_interaction`, `unrepairedCritical` populated) and p9 finalScore **5** are the ACTIVE versions. Repair ran on both and moved -20 -> 0 and -15 -> 5; there is no floor, no second pass (`repairMaxPasses=1` on staging), and nothing in the run summary, the job status or the user-facing story says these pages are known-broken. `feedback_gates_are_guidelines` (never kill a paid run) is right, but "ship with a warning" currently means ship with NO warning anywhere. Owner decides the shape: a floor that forces another repair pass, a final-strike WARN surfaced in the run summary + `/api/health`, or a visible failed-pages list on the story.
+
+-> `server/lib/scoring.js`, `storyJobPipeline.js` pick-best-version
+
+### D8. `unrepairedCritical` is populated and then ignored by the score the page reports
+
+p13 and p17 each carry an unrepaired CRITICAL `object_presence` finding **and report finalScore 85**, so to every downstream consumer (pick, run summary, the owner skimming scores) they look like good pages. A CRITICAL that survives repair must cap the score, not sit beside it. Prompt-vs-code decision per CLAUDE.md (`MAX_SEVERITY_TYPES`/`ZERO_POINT_TYPES` ceiling vs an evaluator type) - propose the shape and ask BEFORE writing either. Same two pages as D1: the root cause of the defect is the ART003 trim, this is why it shipped looking fine.
+
+-> `server/lib/scoring.js`, `server/lib/evalPipeline.js`
+
+### D9. Both evaluators are blind on p5 - a missing character and a headless dragon score semantic 100
+
+Text: Julian hides behind his big brother; Levin and the dragon lock eyes, amber and warm. Rendered: **Julian is absent**, the dragon is a disembodied wing at frame-left with no body and no head, Levin looks at empty sky. quality 70, semantic **100**, zero findings - from the same two-witness pair that wrote precise findings on p6/p9/p10/p13/p17. A missing commissioned child plus the page's whole emotional beat absent is not a subtle miss. Same blind-spot class as D6 (p4 phantom cast unflagged): the cast check is not firing on creature/wing pages. Reproduce on the stored p5 v1 image before touching a prompt.
+
+-> `prompts/image-semantic.txt`, `prompts/image-evaluation.txt`, `server/lib/evalPipeline.js` `buildExpectedCastBlock`
+
+### D10. The bicycle lamp renders as a CCTV / broadcast camera in 5 of 5 appearances - probably the same trim as D1
+
+p1, p3, p5, p16 and the initial page all draw the Velolampe as a bulky black box light; **on p16 it has a pistol grip**, so the climax reads as a toddler pointing a black gun-shaped object at two figures. This prop is the story's emotional currency (Levin trades it away in the resolution) and it was never flagged once - p1 scored 85. D1 records that the assignment trim emptied ART003 **and ART009/ART010** to `pages: []`; check whether the lamp is one of those two, in which case it never had a cell or a page-prompt line either and this is one bug, not two.
+
+-> `server/lib/beatsPipeline.js` assignment trim, `server/lib/referenceSheets.js` `elementKindSentence`
+
+### D11. The dragon has no stable size across the book
+
+Text says house-sized. p4 and p7: knee-high, puppy-sized, emerging from a burrow a fox would use. p5: a wing with no body. p18: correctly house-sized. p3's cave cannot contain what comes out of it on p4. The bible fixes Fauchi at "four metres body / five metres wingspan" (checklist row 2) and nothing checks a rendered creature against that, or against the adjacent page.
+
+-> VB creature states, `prompts/image-evaluation.txt`
+
+### D12. Guard identity drifts mid-scene
+
+p12 and p13 draw the stone guards as blocky Michelin-man boulder figures; **p16 draws the second guard as a slim grey humanoid mannequin with large black eyes** (the checklist already noted it as "odd, not menacing" - it is also a different character). p12 renders both guards the same size when the text is explicit that one is door-wide and one small and narrow. Secondary consistency across pages is not covered by the entity check, which tracks `characters[]`.
+
+-> `server/lib/entityConsistency.js`, `server/lib/compositeCastBuilder.js`
+
+### D13. Visible white paper borders on p1, p3, p6, p9, p11 - the bleed rule is not holding
+
+The image prompt says verbatim "filling the canvas, bleeding off all four edges - no borders, frames, margins, white edges". Five of eighteen pages have a white paper margin on at least one edge. For a print product that is a hard defect (Gelato trims into it) and nothing detects it. Cheaply mechanical - edge-row luminance on the final image - rather than another prompt rule (`feedback_mechanical_rules_and_fed_back_retries`).
+
+-> `server/lib/images.js` post-render checks, `prompts/image-generation.txt`
+
+### D14. The whole cast renders as 2-year-olds while the text is 1st-grade with a declared-5 protagonist
+
+Levin is declared 5; every render is a toddler - round face, ~3-head proportions, no neck. Max and Kiaan (declared 3) read as 2. The semantic evaluator **wrote this finding in plain language on p3, p7, p11 and p16** ("rendered as a toddler, 3-3.5 heads tall, not the specified 4.5") and nothing acted on it. The result is a book in which 2-year-olds cycle up a mountain alone, read a signpost, memorise a lock code and lever a boulder: the visual age and the narrative agency are two different books. Highest-leverage single visual fix in this run, and predicted by memory `project_declared_age_vs_photo` (numeric age never reaches image gen; apparentAge is derived, not measured).
+
+-> `server/lib/promptBuilders.js` character description, avatar apparentAge derivation
+
+### D15. Levin's shirt drifts between a blue-collared polo and a plain red crew
+
+Polo on p1/p3/p8, plain crew on p2/p5/p12/p13/p15/p16/p17/p18 and the cover. Everything else holds across all 18 pages (Max green/brown, Kiaan orange/black, Julian yellow/grey), so this is a single-garment detail drift. Low severity, logged so it is not rediscovered.
+
+-> `server/lib/clothingResolve.js`
+
+### D16. p10 - the page is about reading and there is nothing to read
+
+Text: three arms with painted black lettering plus a code board on the third path. Render: **two blank arms pointing the same direction**, no lettering at all, Julian / Max / Nia missing, and a dry Mediterranean scrubland instead of a Swiss alpine path. This is the known "no-lettering rule vs a sign that must be legible" backlog item landing on a real page - the page's entire plot function is illegible.
+
+-> `server/lib/promptBuilders.js` REQUIRED OBJECTS, `prompts/image-generation.txt`
+
+### D17. p12 - the gate and the coded lock, the page's entire plot event, are not drawn
+
+Kiaan turns the little wheels and the iron grate springs open; the image has bare granite, no gate, no lock. Composition is otherwise the best staging in the second half, and it scored 70.
+
+-> scene brief for p12, `prompts/scene-expansion.txt` one-moment rule
+
+### D18. p15 - the image contradicts its own light
+
+Text: the sun goes behind the ridge and the summit turns cold. Render: bright midday blue sky. The guard Levin is pleading with is absent, and Julian, who is crying in the text, is absent. Emotionally the strongest image in the book, in the wrong weather. Time-of-day continuity is not checked anywhere, on any page.
+
+-> `prompts/image-semantic.txt`, scene brief lighting field
+
+### D19. p9 - Nia's red collar becomes a red bandana
+
+Accessory drift on a named animal; the collar is in the bible and is correct on p4, p6, p11, p17, p18. Only p9 swaps it for a neckerchief.
+
+-> `server/lib/entityConsistency.js` object canonicalization
+
+### D20. p11 - Nia is drawn snarling with bared teeth
+
+Text: she digs at the earth under the boulder with her front paws. The render is a dog with its lips pulled back over its teeth, which reads as aggressive in a book for 3-to-5-year-olds. The `{CREATURE_TONE}` work (checklist row 2) covers the dragon and the guards; a commissioned pet is not covered. Same page also puts the boulder beside the path rather than across it, and has Max pushing with hands and chest rather than his shoulder (both already flagged by the eval, both deferred by the D4 cap).
+
+-> `prompts/scene-expansion.txt` creature tone, `server/config/runtime.js` CREATURE_TONE scope
+
+### D21. p2 - the ride goes the wrong way and the lamp is missing from the bike
+
+Text: out of the city and UP the green hill. Render: a road running downhill toward a village, with both boys stationary and their feet off the pedals. Levin's bike also has no lamp mounted, although the lamp is on the bike at this point in the story - he unclips it on p9, which is the plot point that puts it in his pocket for p16.
+
+-> scene brief for p2, VB artifact placement
+
+### D22. p10 is a 126-word page at 1st-grade level and its three-way group split is never paid off
+
+Double the page budget (run mean ~75 words). It splits the group three ways (Levin+Julian centre, Max+Nia left, Kiaan the third path) and everyone is simply back together on p12; it also has Kiaan reading the code off the third path's sign BEFORE choosing that path, which is backwards. Cutting the split costs the story nothing and fixes the length. p12 is the same class at 112 words: gate + code + summit + reunion + crack + two guards + a threat + Julian's fear in one page, exactly where the tension should land.
+
+-> `prompts/story-text-from-beats.txt` page budget, the beats planner
+
+### D23. The title promises a story the book does not tell
+
+"Der Drache, der nicht fliegen konnte" promises a dragon who cannot fly. The dragon flies fine; he is missing a scale, and we never once see him try and fail. It is a fetch quest wearing a disability-story title, and the title is the first thing a buyer reads. `titleJudge` / `titleCandidates` scores candidates but never tests one against the arc it was drawn from.
+
+-> `server/lib/textModels.js` title judge, `prompts/` title templates
+
+### D24. The coded lock is an adult escape-room contrivance invented to give a peer a job
+
+A combination lock with rotating wheels on a mountain gate, with the code posted on a signpost further down the path, exists only so that Kiaan has something to do. Planner-level pattern: a commissioned peer who needs a beat gets a puzzle invented for them rather than a role inside the beat that already exists. Related to the `NO_COMMISSIONED_ON_PAGE` noise in D3 - the planner knows it has peers to place and solves it badly.
+
+-> the beats planner, `prompts/story-arc*.txt`
+
+### D25. Smaller narrative faults, logged together
+
+(a) p7's backstory is a single dragon-dialogue info-dump - two guards, the Grauhorn, the crevice, the same night, all in one breath. (b) Nia has no owner: she arrives dragging someone and it is never said whose dog she is, although the brief names her as Max's. (c) Fauchi cannot cross the Grauhorn without the scale, yet four small children walk there and back in an afternoon.
+
+-> `prompts/story-text-from-beats.txt`, the beats planner
+
+**Not regressions - keep these:** p8 (98, deserved - real expression and real sibling energy), p14 (the two scales matching, the clearest storytelling in the book), p18 (the payoff spread over Zurich with the Grossmuenster), the back cover, the initial page, and the p16-17 lamp-for-scale trade, which is a well-built resolution with a sympathetic motive for the guards. Swiss conventions are correct throughout.
