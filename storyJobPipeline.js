@@ -2764,7 +2764,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // trim itself (2026-09-11): page assignment is no longer guessed at bible
     // time, it is rebuilt from the FINAL scene briefs inside the beats pipeline
     // (`applyBriefUsage`), which is also what the element budget is measured
-    // against downstream. `vbTrimLostPages` stays exported for its tests.
+    // against downstream. Both `trimVbAssignments` and its `vbTrimLostPages`
+    // tripwire were deleted the same day, once nothing called either.
     // Sonnet sometimes emits two secondaryCharacters entries that share the
     // same CHR id (the same person referenced by relation AND by attribute).
     // Resolve via Haiku before any downstream consumer sees the collision —
