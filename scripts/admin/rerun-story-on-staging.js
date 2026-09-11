@@ -196,12 +196,23 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
       storyCategory: inputs.storyCategory, storyTopic: inputs.storyTopic || '',
       storyTheme: inputs.storyTheme, language: inputs.language,
       languageLevel: inputs.languageLevel, pages: inputs.pages,
-      relationships: inputs.relationships || {},
       userLocation: inputs.userLocation,
       ...(seasonOverride ? { season: seasonOverride } : {}),
-      // Traits and names only — the prompt never reads avatars or photos, and
-      // a full row would push megabytes of base64 through the request.
-      characters: characters.map(({ avatars, photos, ...c }) => c),
+      // The idea endpoint takes the wizard's shapes, not the stored ones:
+      // characters carry `isMain`, and relationships arrive as a flat list of
+      // {character1, relationship, character2} rather than the "id1-id2" map
+      // create-story persists. Traits and names only — the prompt never reads
+      // avatars or photos, and a full row would push megabytes of base64
+      // through the request.
+      characters: characters.map((c) => ({
+        id: c.id, name: c.name, age: c.age, gender: c.gender, traits: c.traits,
+        isMain: (inputs.mainCharacters || []).map(String).includes(String(c.id)),
+      })),
+      relationships: Object.entries(inputs.relationships || {}).map(([key, relationship]) => {
+        const [id1, id2] = key.split('-');
+        const name = (id) => characters.find((c) => String(c.id) === String(id))?.name || '';
+        return { character1: name(id1), character2: name(id2), relationship };
+      }).filter((r) => r.character1 && r.character2),
     };
     const ir = await fetch(`${BASE}/api/generate-story-ideas`, {
       method: 'POST',
