@@ -33448,3 +33448,49 @@ the three enforcers removed on 2026-09-11 and "never more than three"),
 `trimVbAssignments` and `vbTrimLostPages` have NO production call site since cdb334904 —
 the tests pin `budget: 3` so they keep exercising the function's own logic without
 claiming 3 is the production budget. Deleting the dead trim is a separate decision.
+
+## 2026-09-11 — The commission reaches the arc stage and stops there (audit and refiner too)
+
+**Context:** completes the same-day entry "The commission is injected ONCE",
+which removed `{STORY_BRIEF}` from the text writer and listed the two remaining
+re-import channels as noted-but-unchanged. Owner asked for them closed.
+
+`story-text-audit.txt` presented the commission under a `# BACK COVER` heading
+and its preamble promised it as an input; `text-refine.txt` carried the block
+ahead of CHARACTER DETAILS. Both run AFTER the arc has ruled on the idea's
+mechanics, and the refiner rewrites whole pages — so an auditor holding the
+original wish list can fault the text for dropping an obstacle the arc
+deliberately cut, and the refiner can put it back. The audit's own preamble
+already names the arc as the master ("The story is what the book had to
+deliver"), so the commission was a second, competing authority in the same
+prompt.
+
+**Decision:** `{STORY_BRIEF}` is removed from both. The audit's `# BACK COVER`
+heading goes with it, and its opening sentence no longer promises an input it
+does not receive ("You get the story and its page plan, each page's text, and
+what its picture shows").
+
+**Not evidence of harm, and said plainly:** in the measured run the arc-informed
+audit's five faults cite no commission item, so neither channel was observed
+firing. This closes the shape, not a reproduced defect.
+
+**Touched:** `prompts/story-text-audit.txt`, `prompts/text-refine.txt`.
+**Status:** ✅ active — verified at prompt-build level (a sentinel commission
+string, the COMMISSION and BACK COVER headings are all absent from both built
+prompts; the arc is present; no unfilled placeholders).
+
+## 2026-09-11 — WITHDRAWN: "a user-written idea is never screened for peril"
+
+Logged here because the claim was written into the backlog earlier today and is
+wrong. The peril rule is NOT confined to the idea generator: `{TELLING_RULES}`
+in arc-create and arc-retell carries it via `buildTellingRulesSection`
+(promptBuilders.js) — "Nothing in the story or its pictures is dangerous enough
+that it could lead to death — for anyone. Frightening is the right level…" —
+together with the obstacle rule that bans a puzzle door, riddle or trick lock
+"unless the commission establishes it". A user-written idea is therefore
+screened at the arc, which is what dropped the flotation-aid stream crossing
+from the dragon commission.
+
+**Cause of the error:** the arc TEMPLATE was grepped for peril wording and the
+interpolated sections were not. A rule that reaches a prompt through a builder
+is invisible to a grep of the .txt file. Owner corrected it.

@@ -15,8 +15,6 @@ A rewritten page keeps the paragraph shape: 2-4 sentences a paragraph, at most f
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 
-{STORY_BRIEF}
-
 # CHARACTER DETAILS
 
 {CHARACTER_DETAILS}
