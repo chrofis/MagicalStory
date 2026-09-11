@@ -491,13 +491,22 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
-- [ ] **Round 2 of the scene review still re-introduces a code-detected fault round 1 cleared (dragon p1, 1 of 18 after
+- [x] (2026-09-11, 27c37dfd9) **Round 2 of the scene review is GONE — owner killed it.** Net break-even when measured
+      (dragon: one fault cleared, `interaction_multiple_actions` introduced on p1; pirate: no change), so option (b)/(c)
+      were not built. The deterministic post-review `checkBriefs` re-check and its `beats_brief_introduced` /
+      `beats_brief_unfixed` reporting are KEPT — faults ship flagged. Original options (a)/(b)/(c) below are moot.
+      NOT yet measured with round 2 absent → `docs/decisions.md` 2026-09-08 "Art Director second pass"
+- [x] ~~Round 2 re-introduces a code-detected fault round 1 cleared (dragon p1, 1 of 18 after
       the plan-line-authority fix; was 3).** Options: (a) ship flagged as today (`rewriteToZeroUnfixed` reports it);
       (b) mechanical guard — revert a round-2 page whose rewrite introduces a REVIEWABLE finding absent after round 1
       (code-detected types only, no prose classification); (c) let the reviewer's own tag lines (`[plate_contains_effect]`,
       `[facing_not_per_character]`, …) drive the round-2 subset — today only `sceneBriefCheck` types do.
       → `docs/decisions.md` 2026-09-08 "Art Director second pass"
-- [ ] Approve the B1–B2 evaluator prompt change (`subject` field) → `tasks/eval-variance-backlog.md`
+- [x] (2026-09-11, 3146b3c8d) B1 APPROVED AND SHIPPED — both evaluator templates now require `character` on every
+      finding belonging to a figure. **B2 is emission-only:** `object_presence` and `setting` sit in
+      `PAGE_SCOPED_BUCKETS` (`scoring.js:464-475`), which discards the subject at billing by an earlier deliberate
+      decision, so objects gained a jury-merge and repair target but NOT a page penalty. Raising object deductions
+      needs its own decision on that list → `tasks/eval-variance-backlog.md`
 - [ ] **Should a reference cell be allowed a minimal MOUNTING context for objects defined by what they attach to?**
       Isolation is part of why a bare geometry reads as the wrong object (a lamp on a handlebar is unambiguous). The
       current rule — only the element itself is drawn — is deliberate and was NOT changed. Against: the cell is the
