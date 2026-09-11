@@ -156,6 +156,34 @@ function applyRoundCap(orderedPageNums, opts = {}) {
 }
 
 /**
+ * THE SCENE-CAST CONTRACT (2026-09-11). One reader for every site that has to
+ * pick between a version's cast and the page's.
+ *
+ *   an ARRAY — including an EMPTY one — is a DECLARATION: this is the cast.
+ *   null / undefined / anything else is UNKNOWN: fall through to the next source.
+ *
+ * The distinction is load-bearing since `buildExpectedCastBlock` started reading
+ * it (D6): a declared empty roster now means "this frame was written with no
+ * people in it, every person present is a surplus figure", while an absent one
+ * means "no roster supplied, do not judge the figure count". Getting the two
+ * confused turns every commissioned child on a page into a CRITICAL
+ * `extra_character`.
+ *
+ * It was expressed as `entry.sceneCharacters || orig.sceneCharacters`, which is
+ * the one JS idiom that cannot express it: `[]` is TRUTHY, so an empty array
+ * silently won — and `v.sceneCharacters || null` at the version write site does
+ * NOT normalise an empty array away either, for the same reason. Nothing writes
+ * `[]` today, so the trap was unsprung; it was one careless writer from firing.
+ *
+ * @param {...any} candidates  most specific first
+ * @returns {Array|null} the first declared cast, or null when none was declared
+ */
+function resolveDeclaredCast(...candidates) {
+  for (const c of candidates) if (Array.isArray(c)) return c;
+  return null;
+}
+
+/**
  * The pages that SHIP KNOWN-BROKEN, worst first (D7, 2026-09-11).
  *
  * A page qualifies when the repair budget is spent and it is still below the
@@ -685,4 +713,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
   'viewer_address',
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
-module.exports = { findBadPages, applyRoundCap, collectShippedDefective, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+module.exports = { findBadPages, applyRoundCap, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

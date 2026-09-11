@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages, collectCriticalFindings } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
@@ -404,7 +404,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: orig.characterPhotos,
       allCharacterPhotos,
       sceneDescription: entry.description || orig.sceneDescription,
-      sceneCharacters: entry.sceneCharacters || orig.sceneCharacters,
+      // An ARRAY on the entry is that version's own declaration (an iterate
+      // rewrite can legitimately empty the cast); anything else inherits the
+      // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
+      sceneCharacters: resolveDeclaredCast(entry.sceneCharacters, orig.sceneCharacters),
       sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
       pageText: orig.text,
       // Era-aware landmark protection (2026-09-05): the real-landmark refs this
@@ -1626,7 +1629,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // the Visual-Bible secondaries.
   const redetectVersionImage = async (r, roundLabel) => {
     const orig = rawImages.find(i => i.pageNumber === r.pageNumber);
-    const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
+    const sceneChars = resolveDeclaredCast(r.sceneCharacters, orig?.sceneCharacters) || [];
     const meta = r.sceneMetadata || orig?.sceneMetadata || {};
     const clothingByName = r.sceneCharacterClothing || orig?.sceneCharacterClothing || meta.characterClothing || {};
     // ONE cast builder, shared with the manual repair endpoint.
@@ -3353,7 +3356,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       description: v.description || img.sceneDescription || null,
       prompt: v.prompt || img.prompt || null,
       sceneMetadata: v.sceneMetadata || null,
-      sceneCharacters: v.sceneCharacters || null,
+      // Declared-or-unknown, never a coincidence of truthiness: `|| null`
+      // leaves an empty array intact (it is truthy), so a version could ship
+      // `[]` and override the page's real cast downstream.
+      sceneCharacters: resolveDeclaredCast(v.sceneCharacters),
       grokRefImages: v.grokRefImages || null,
       referencePhotos: v.referencePhotos || null,
       // O6: direct-path cover refs (landmark photo, VB grid) — captured by
