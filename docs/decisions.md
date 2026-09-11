@@ -33062,3 +33062,82 @@ disagreement re-opens the same gap.
 **Watch:** the repair queue now admits pages it previously scored past, so round-1
 volume may rise. If false CRITICALs become common, the fix is the evaluator prompt or a
 `MAX_SEVERITY_TYPES` ceiling — not a return to taking the lower vote.
+
+## 2026-09-11 — The empty-scene plate mirrors the route's GRADIENT, not only its direction (settlement clause tested and rejected)
+
+**Context:** `job_1789147573901_m3uam0nxi` p2. The page text rides "aus der Stadt
+hinaus und den grünen Hügel hinauf"; the render shows a road descending toward a
+village. The scene brief was NOT at fault — its prose reads "pedalling it forward
+up a pale grey-beige tarmac road curving rightward around a grassy hillside", and
+the one figure shown stationary is faithful to the text (he stops at each bend).
+The fault is in `emptyScenePrompt`, which the plate is drawn from BEFORE any
+figure is placed: "a narrow pale grey-beige tarmac road curving around a grassy
+hillside … a soft haze of distant rooftops visible far beyond the curve". No
+gradient, plus a settlement the page has no location for. The geometry-mirroring
+bullet already required "the same direction for any path, river, road…" —
+direction as a frame bearing, which a climb is not.
+
+**Decision:** the mirrored geometry now includes gradient — a route a character is
+written climbing rises away from the camera, one they descend falls away. Applied
+to both `scene-expansion.txt` (per-page fallback) and `scene-expansion-all.txt`
+(the live beats path; both carry the bullet verbatim).
+
+**Rejected — a second clause banning imported settlements.** Tested in the same
+A/B: "Distance is filled with the same landscape, not with new places… buildings,
+rooftops, towers and settlements appear in it only where the page or a Visual
+Bible location puts them." The Art Director responded by NAMING a city ("the city
+of Zürich appears as a soft, hazy expanse of muted rooftops") and the plate
+rendered it larger and more prominent than the anonymous rooftops it replaced.
+The clause is not in the shipped change. The page's own location is `LOC002`
+(an invented hill road); the city is `LOC007`, declared for the final page only —
+so the correct fix keys off THIS page's declared location, which belongs with the
+open `appearsInPages` work rather than a prose ban.
+
+**Validation:** the stored 72k-token scene-expansion prompt for that run was
+re-sent to the same model (`gemini-3.1-pro`, `MODEL_DEFAULTS.sceneDescription`)
+with only these rule edits applied, regenerating all 18 briefs in one call. p2's
+plate prose changed to "winds diagonally up from the bottom left … curving around
+a sloping hillside"; the two plates were then rendered through the production
+path (`grok-imagine-image`, `emptyScenePlateRouting`) and the after-plate reads
+uphill where the before-plate descends into a village. Across the other 17 pages
+nothing moved: gradient language appears on p2 (wanted) and p17 (already there),
+settlements on p1 and p18 (legitimate — those pages' locations ARE Zürich). Both
+plates are single samples.
+
+**Known gap, not addressed here:** the semantic evaluator scored this page 100
+with its road running opposite to its own text.
+
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`.
+**Status:** ✅ active.
+
+## A creature carries its stated size into every page prompt (2026-09-11)
+**Context:**  On `job_1789147573901_m3uam0nxi` the same dragon rendered knee-high on
+p4 and p7, a bodiless wing at the frame edge on p5, and correctly house-sized on p18.
+The Visual Bible had stated the size all along, and in a usable form —
+`ANI002.size` = *"body length approximately four metres from snout to tail tip;
+wingspan approximately five metres fully spread; large enough for four small children
+and a dog to sit across the back"*. The pages whose Art Director prose happened to
+restate it came closest; p8 and p18 restated nothing and had nothing to go on.
+**Decision:** Two generation-side changes. Nothing in the evaluators.
+  1. `promptBuilders.js` REQUIRED OBJECTS: the `size` rider no longer excludes animals
+     (`obj.type !== 'animal'` removed), so a creature's stated size rides its checklist
+     line on every page that lists it.
+  2. `prompts/scene-expansion.txt` and `scene-expansion-all.txt` rule 8f now reads
+     "a vessel, building, vehicle **or creature**", and adds that a creature keeps the
+     size its entry states on every page it appears on, whatever the shot.
+**Rationale:** The animal exclusion was SCOPE, not a ruling: `793049e40` introduced the
+rider to fix a shoebox-sized chest rendering torso-sized and covered held props only.
+A creature is the element whose scale drifts most and the one nothing else anchors —
+its size is not implied by a hand holding it, a doorway beside it, or a character's
+height. Rule 8f had the same gap, and so does the evaluator: a wrongly-sized creature
+fits neither `scale` (everyday objects, figure age) nor `structure_scale` (vessels,
+buildings, vehicles), so no evaluator can report one even while looking at it. Fixing
+generation rather than eval was the owner's call (2026-09-11) — the data existed and
+was being discarded one line before it reached the model, which is a supply problem,
+not a detection problem.
+**Touched:** `server/lib/promptBuilders.js` (REQUIRED OBJECTS `sizeNote`),
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`tests/unit/required-objects-label.test.ts`
+**Status:**   ✅ active. Still open and NOT addressed here: no check compares a rendered
+creature against its stated size, or against the adjacent page — D11's detection half,
+which needs a new evaluator type (owner decision, prompt-side).
