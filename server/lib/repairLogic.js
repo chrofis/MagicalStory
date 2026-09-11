@@ -156,6 +156,44 @@ function applyRoundCap(orderedPageNums, opts = {}) {
 }
 
 /**
+ * The pages that SHIP KNOWN-BROKEN, worst first (D7, 2026-09-11).
+ *
+ * A page qualifies when the repair budget is spent and it is still below the
+ * loop's own `regenThreshold`, or still carries a CRITICAL that repair could
+ * not clear. Measured on job_1789147573901_m3uam0nxi: p6 shipped as the ACTIVE
+ * version at finalScore 0 (six CRITICAL `action_interaction`) and p9 at 5, and
+ * the only trace was a log line — nothing in the stored run, the job status or
+ * the story said either page was known-bad.
+ *
+ * The threshold is passed in rather than re-derived: a second number here could
+ * disagree with the one `findBadPages` used, and then this list would describe a
+ * different set of pages from the one the loop tried to repair.
+ *
+ * @param {Array} results   the pipeline's per-page results (finalScore, unrepairedCritical)
+ * @param {number} regenThreshold  the score at or above which a page is acceptable
+ * @returns {Array<{pageNumber:number, finalScore:number|null, unrepairedCritical:Array}>}
+ */
+function collectShippedDefective(results, regenThreshold) {
+  // `Number(null)` is 0, not NaN — an UNSCORED page would otherwise read as a
+  // zero and be reported as the worst page in the book.
+  const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  const below = (v) => num(v) !== null && num(v) < Number(regenThreshold);
+  return (Array.isArray(results) ? results : [])
+    .filter(r => r && (below(r.finalScore) || (r.unrepairedCritical && r.unrepairedCritical.length)))
+    .map(r => ({
+      pageNumber: r.pageNumber,
+      finalScore: num(r.finalScore),
+      unrepairedCritical: (r.unrepairedCritical || []).map(f => ({
+        type: f.type || 'untyped',
+        severity: f.severity || null,
+        description: String(f.description || '').slice(0, 300),
+      })),
+    }))
+    // Worst first: an unscored page sorts last rather than pretending to be a 0.
+    .sort((a, b) => (a.finalScore ?? Number.POSITIVE_INFINITY) - (b.finalScore ?? Number.POSITIVE_INFINITY));
+}
+
+/**
  * Does this eval carry any CRITICAL or CATASTROPHIC finding? Reads the
  * structured severity field on the three finding pools (quality fixableIssues,
  * semantic issues, consolidated deduped_issues) — never the prose.
@@ -637,4 +675,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
   'viewer_address',
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
-module.exports = { findBadPages, applyRoundCap, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+module.exports = { findBadPages, applyRoundCap, collectShippedDefective, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

@@ -3502,6 +3502,30 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }
 
+  // SHIPPED DEFECTIVE (D7, 2026-09-11). The warnings above are log lines, and a
+  // page whose score never recovered but which carries no CRITICAL had no line
+  // at all: on job_1789147573901_m3uam0nxi p6 shipped at finalScore 0 and p9 at
+  // 5, both as the ACTIVE version, and nothing in the run's stored output, the
+  // job status or the story said so. A gate is a guideline and never kills a
+  // paid run — but "ship with a warning" has to produce a warning somewhere a
+  // reader will find. This is that record: structured, returned to the caller,
+  // and counted.
+  //
+  // The floor is the SAME `regenThreshold` the loop uses to call a page bad —
+  // never a second number that could disagree with it.
+  const { collectShippedDefective } = require('./repairLogic');
+  const shippedDefective = collectShippedDefective(results, regenThreshold);
+
+  if (shippedDefective.length > 0) {
+    const worst = shippedDefective.map(p => `p${p.pageNumber}=${p.finalScore ?? '?'}`).join(', ');
+    log.error(`🚨 [UNIFIED PIPELINE] ${shippedDefective.length} page(s) SHIP BELOW THE THRESHOLD (${regenThreshold}) after ${maxRegenAttempts} round${maxRegenAttempts === 1 ? '' : 's'}: ${worst}`);
+    try {
+      const m = require('./runMetrics').forJob(storyData?.id || jobId);
+      m.add('shipped_defective_pages', shippedDefective.length);
+      if (shippedDefective.some(p => p.finalScore != null && p.finalScore <= 5)) m.count('shipped_page_near_zero');
+    } catch { /* metrics are best-effort */ }
+  }
+
   // Convert charFixDetails Map to plain object for serialization.
   // Image fields can arrive in three shapes after R2 migration:
   //   - data:image/...;base64,XXX  → pass through
@@ -3534,7 +3558,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }
 
-  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds };
+  // `shippedDefective` travels with the result so the job status and the stored
+  // story can say which pages are known-broken — a log line alone is what let
+  // two pages ship at 0 and 5 unremarked (D7).
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, shippedDefective };
 }
 
 module.exports = {
