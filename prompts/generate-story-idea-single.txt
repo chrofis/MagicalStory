@@ -59,6 +59,8 @@ Generate a story idea that includes:
 2. THE SETUP: who is there and what they want.
 3. WHAT STANDS IN THE WAY and what it costs them to fail.
 
+The want, the obstacle and the cost are each a concrete thing the reader can name: one thing to reach, fetch, mend or be in time for, a stated force or condition against it, and a stated loss. Wanting to find out what something is, an unnamed something standing in the way, or more than they can see, are none of the three.
+
 Stop there. Never write how it ends, and never write the middle: no naming the object, gate, figure or trick that decides the outcome, no test the characters will have to pass, and no pairing of a character's trait with the obstacle it will meet. Say who they are, not what each of them will do about it.
 
 STORY LENGTH: {STORY_LENGTH_CATEGORY}

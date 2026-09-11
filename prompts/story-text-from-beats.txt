@@ -15,8 +15,6 @@ Each paragraph runs 2-4 sentences, a page holds at most four paragraphs, and a b
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 
-{STORY_BRIEF}
-
 # CHARACTER DETAILS (optional colour — use a trait where it fits a moment, never contradict one, never work through the list)
 
 {CHARACTER_DETAILS}

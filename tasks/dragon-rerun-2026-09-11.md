@@ -237,6 +237,21 @@ Text: out of the city and UP the green hill. Render: a road running downhill tow
 
 -> scene brief for p2, VB artifact placement
 
+**Gradient half: FIXED 2026-09-11.** Not a scene-brief fault - the brief's prose already
+read "pedalling it forward up a ... road". The gradient was lost in `emptyScenePrompt`,
+which the plate is drawn from before any figure is placed. The geometry-mirroring bullet
+in `scene-expansion.txt` / `scene-expansion-all.txt` now mirrors gradient as well as
+direction. Validated by re-sending the stored 72k prompt with only that edit and rendering
+both plates through the production path. A second clause banning imported settlements was
+tested and REJECTED - it made the model name a city and the plate render it larger. See
+docs/decisions.md 2026-09-11 "The empty-scene plate mirrors the route's GRADIENT".
+
+**Lamp half: OPEN, and wider than one lamp.** ART001 declares `appearsInPages: [1,2,3,16]`;
+p2's brief cites `["LOC002","ART011","ART012"]` - no lamp. Not a budget cut (3 artifacts,
+`VB_ELEMENT_BUDGET` is 3). The same mismatch holds on 15 of 18 pages; p9 - where the lamp
+is unclipped - cites no objects at all. Nothing reconciles the bible's page assignments
+against the briefs, and the semantic evaluator scored p2 100.
+
 ### D22. p10 is a 126-word page at 1st-grade level and its three-way group split is never paid off
 
 Double the page budget (run mean ~75 words). It splits the group three ways (Levin+Julian centre, Max+Nia left, Kiaan the third path) and everyone is simply back together on p12; it also has Kiaan reading the code off the third path's sign BEFORE choosing that path, which is backwards. Cutting the split costs the story nothing and fixes the length. p12 is the same class at 112 words: gate + code + summit + reunion + crack + two guards + a threat + Julian's fear in one page, exactly where the tension should land.
