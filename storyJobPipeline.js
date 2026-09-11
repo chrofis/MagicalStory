@@ -4816,7 +4816,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // Only the trigger is used here — the composite replaced
                 // runScaleRepair on this path (decisions.md 2026-08-15).
                 const { needsScaleRepair } = require('./server/lib/scaleRepair');
-                if (needsScaleRepair(pageData.sceneMetadata)) {
+                if (!require('./server/config/runtime').runtime('sceneCompositeEnabled')) {
+                  compositeOutcome = { status: 'disabled', reason: 'runtime.sceneCompositeEnabled is false' };
+                } else if (needsScaleRepair(pageData.sceneMetadata)) {
                   compositeOutcome = { status: 'triggered' };
                   // Resolve avatar refs only for the background characters.
                   const helpers = require('./server/lib/storyHelpers');

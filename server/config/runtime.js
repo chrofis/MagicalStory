@@ -49,6 +49,14 @@ const SETTINGS = {
   // falls back to the Gemini bbox while cold, which is deliberate resilience.
   figureDetectionBackend: 'grounding-dino',
 
+  // ── Scene composite ────────────────────────────────────────────────────
+  // OFF (owner, 2026-09-11: "disable composite if it is not working"). It had
+  // never run in production before 2026-09-11 (call-site wiring bug), and on
+  // its first real run it lost 5 of 5 pages to the direct render
+  // (job_1789083667794). The Lab keeps every figure method; production pages
+  // take the direct render until a Lab set beats it on real pages.
+  sceneCompositeEnabled: false,
+
   // ── Cover title ────────────────────────────────────────────────────────
   // 'composited' (production): art is rendered TEXTLESS and the title is
   // stamped afterwards by composeCover, then restyled on a white plate by

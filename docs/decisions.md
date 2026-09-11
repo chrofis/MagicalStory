@@ -32289,3 +32289,9 @@ Runs, `figureMethod: inPlace` + `refMode: cell`: **exp 1150 p10** (two humans, t
 **Touched:**   server/lib/sceneComposite.js (`refMode`, `placeholderResidue*`, cut subtraction), server/lib/compositeCastBuilder.js (`unreferencedSecondaryCreatures`), server/lib/testlab.js (params, steps, abort intermediates), tests/unit/composite-inplace.test.ts, tests/unit/composite-secondary-cast.test.ts, docs/image-routing.md, tasks/BACKLOG.md
 **Status:**    active (gates); refMode cell parked; Lab set 54 exps 1150-1156
 
+
+## Scene composite OFF in production (2026-09-11)
+**Context:**   Owner: "disable composite if it is not working". It had never executed in production before 2026-09-11 (call-site wiring bug since 08-25) and on its first real run lost 5 of 5 pages to the direct render (job_1789083667794); the one-cell reference variant went 1 win / 2 losses in the Lab (set 54, exp 1150-1156).
+**Decision:**  `runtime.sceneCompositeEnabled = false`; the production trigger records `compositeOutcome {status: disabled}` and the page keeps its direct render. Every figure method stays available in the Test Lab (`scene_composite` stage). Re-enable only after a Lab set on real story pages beats the direct render. Owner ruling on secondaries: no new reference sheet - a stated entity uses its Visual Bible state image as its reference (the cover check does this since 1f9dc5a0; the composite cast builder still needs it, BACKLOG). This supersedes the 2026-09-11 "in-place figures are the production method" entry.
+**Touched:**   server/config/runtime.js, storyJobPipeline.js
+**Status:**    active
