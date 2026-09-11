@@ -4589,10 +4589,29 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
         aborted.push({ label, imageType: 'tl_step', versionIndex: v });
       } catch (e) { log.warn(`[TESTLAB] abort step "${label}" not saved: ${e.message}`); }
     }
+    // In-place intermediates survive an all-or-nothing abort too: exp 1156
+    // placed 2/4 and left no trace of WHY the other two were refused - warn
+    // lines are not in logLines, and the renders were never saved.
+    const saveAborted = async (uri, label) => {
+      if (typeof uri !== 'string' || !uri.startsWith('data:image')) return;
+      try {
+        const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, uri, experimentId);
+        aborted.push({ label, imageType: 'tl_step', versionIndex: v });
+      } catch (e) { log.warn(`[TESTLAB] abort step "${label}" not saved: ${e.message}`); }
+    };
+    for (const [name, v] of Object.entries(adbg.inPlaceRefs || {})) await saveAborted(v?.ref, `· reference sent for ${name} (${v?.kind || 'unknown'})`);
+    for (const [name, v] of Object.entries(adbg.inPlaceRenders || {})) {
+      for (const a of (Array.isArray(v?.attempts) ? v.attempts : [])) {
+        const rz = a.residue ? `, unchanged ${Math.round(a.residue.unchanged * 100)}%, flat ${Math.round(a.residue.flatSaturated * 100)}%${a.residue.rejected ? ', PLACEHOLDER UNPAINTED' : ''}` : '';
+        await saveAborted(a.render, `· in-place render for ${name}, attempt ${a.attempt} (height ${a.ratio}x, IoU ${a.iou}${rz}${a.ok ? ', accepted' : ''})`);
+      }
+    }
+    for (const [name, uri] of Object.entries(adbg.cutouts || {})) await saveAborted(uri, `· cut-out used for ${name}`);
     err.partialResult = {
       ...(err.partialResult || {}),
       steps: aborted,
       aborted: true,
+      inPlaceLog: adbg.inPlaceLog || null,
       depthSpread: adbg.depthSpread ?? null,
       populatedPlatePrompt: adbg.populatedPlatePrompt || null,
       cleanBackgroundPrompt: adbg.cleanBackgroundPrompt || null,
