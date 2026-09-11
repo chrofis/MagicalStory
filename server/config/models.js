@@ -17,10 +17,17 @@ const IMAGE_ASPECTS = {
 
 // Available text models
 const TEXT_MODELS = {
+  // Ceilings below were read from the vendor on 2026-09-11: OpenRouter
+  // GET /v1/models -> top_provider.max_completion_tokens; Anthropic
+  // GET /v1/models -> max_tokens; Google v1beta/models -> outputTokenLimit.
+  // 28 of 38 entries were UNDERSTATED (nothing was overstated) — since the
+  // 2026-09-11 no-caps change these numbers ARE the ceiling every call runs
+  // at AND what textReplyGuard measures against, so an understated one both
+  // truncated real replies and reported a false cap_hit.
   'claude-sonnet': {
     provider: 'anthropic',
     modelId: 'claude-sonnet-4-6',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 128000,
     description: 'Claude Sonnet 4.6 - Best narrative quality'
   },
   'claude-opus': {
@@ -32,7 +39,7 @@ const TEXT_MODELS = {
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 64000,
     description: 'Claude Haiku 4.5 - Fast and affordable'
   },
   'gemini-2.5-pro': {
@@ -56,7 +63,7 @@ const TEXT_MODELS = {
   'gemini-2.0-flash': {
     provider: 'google',
     modelId: 'gemini-2.0-flash',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 8192, // NOT SERVED 2026-09-11 — listed under "Previous models (Shut down)" on ai.google.dev and absent from v1beta/models. This ceiling is unverifiable; the id 404s rather than caps.
     description: 'Gemini 2.0 Flash - Very fast'
   },
   'gemini-pro-latest': {
@@ -68,19 +75,19 @@ const TEXT_MODELS = {
   'grok-3-mini': {
     provider: 'xai',
     modelId: 'grok-3-mini',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 32768, // NOT SERVED 2026-09-11 — xAI lists only grok-4.20-*/4.3/4.5/4.6. xAI also publishes NO output ceiling anywhere, so any xai entry is unverifiable in principle.
     description: 'Grok 3 Mini - Fast and cheap ($0.30/$0.50 per 1M tokens)'
   },
   'grok-3': {
     provider: 'xai',
     modelId: 'grok-3',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 32768, // NOT SERVED 2026-09-11 — see grok-3-mini.
     description: 'Grok 3 - Good quality ($3.00/$15.00 per 1M tokens)'
   },
   'grok-4-fast': {
     provider: 'xai',
     modelId: 'grok-4-1-fast-non-reasoning',
-    maxOutputTokens: 65536,
+    maxOutputTokens: 65536, // NOT SERVED 2026-09-11 — see grok-3-mini.
     description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
   },
   // Latest Grok (2026-08-12) via OpenRouter. No separate 4.x "flash" exists —
@@ -88,7 +95,7 @@ const TEXT_MODELS = {
   'grok-4.6': {
     provider: 'openrouter',
     modelId: 'x-ai/grok-4.6',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 450000,
     description: 'Grok 4.6 (xAI, latest) via OpenRouter (~$2.00/$6.00 per 1M)'
   },
   // OpenRouter-hosted models (OpenAI-compatible) for A/B testing cheap
@@ -98,25 +105,25 @@ const TEXT_MODELS = {
   'qwen-max': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-max',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 8192, // NOT IN THE OPENROUTER CATALOGUE 2026-09-11 — this ceiling is unverifiable.
     description: 'Qwen-Max (Alibaba) via OpenRouter - strongest Qwen, ~$1.6/$6.4 per 1M'
   },
   'qwen-plus': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-plus',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.26/$0.78 per 1M'
   },
   // Compliance-eval candidates (A/B 2026-07-18). Stronger reasoners than
   // qwen-plus for severity discipline, still far cheaper than Sonnet.
-  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 8192, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
-  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 8192, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
-  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 8192, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
-  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 8192, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
+  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 65536, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
+  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 65536, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
+  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 16384, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
+  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 100352, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
   'qwen-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen2.5-vl-72b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 115200,
     description: 'Qwen2.5-VL 72B (vision) via OpenRouter - for image-eval A/B vs Gemini'
   },
   // Qwen3-VL (2026): strong bbox/spatial grounding, cheap. Candidate to A/B
@@ -125,37 +132,37 @@ const TEXT_MODELS = {
   'qwen3-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-32b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen3-VL 32B (vision) via OpenRouter - spatial/bbox leader, ~$0.10/$0.42 per 1M'
   },
   'qwen3-vl-235b': {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-235b-a22b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.21/$1.90 per 1M'
   },
   'gpt-4o-mini': {
     provider: 'openrouter',
     modelId: 'openai/gpt-4o-mini',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16384,
     description: 'GPT-4o mini (vision) via OpenRouter - cheap image-eval A/B (~$0.15/$0.60 per 1M)'
   },
   // GPT-5.6 family (2026-07-09) via OpenRouter. Luna = cheap tier, Sol = strong
   // tier. Pricing from the OpenRouter catalogue. For scoring/writer A/B in the Lab.
-  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 16384, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 128000, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
   // Cheap reviewer candidates (2026-08-15 beats-reviewer bake-off; see docs/decisions.md)
   // Price verified 2026-09-07 on openrouter.ai and ai.google.dev: $0.75/$3.75
   // per 1M (Flex route, Google list through 2026), $1.50/$7.50 on the standard
   // route and Google list from 2027. The earlier "$0.38/$1.88" here matched no
   // vendor page and led to a wrong cost-neutral claim.
-  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 16384, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M Flex; $1.50/$7.50 standard)' },
-  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 16384, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
-  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 16384, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
-  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.23/$0.96 per 1M, verified 2026-09-07)' },
+  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 65536, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M Flex; $1.50/$7.50 standard)' },
+  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 384000, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
+  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 182476, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
+  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 512000, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.23/$0.96 per 1M, verified 2026-09-07)' },
   // Vision-judge candidates for the blind inventory (Lab sets 25/27, 2026-09-07).
   // Prices from openrouter.ai the same day.
-  'qwen3.6-plus': { provider: 'openrouter', modelId: 'qwen/qwen3.6-plus', maxOutputTokens: 16384, description: 'Qwen3.6 Plus (text+image+video in) via OpenRouter ($0.325/$1.95 per 1M)' },
-  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 16384, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.56/$3.39 per 1M)' },
+  'qwen3.6-plus': { provider: 'openrouter', modelId: 'qwen/qwen3.6-plus', maxOutputTokens: 65536, description: 'Qwen3.6 Plus (text+image+video in) via OpenRouter ($0.325/$1.95 per 1M)' },
+  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 235929, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.56/$3.39 per 1M)' },
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
@@ -176,15 +183,16 @@ const TEXT_MODELS = {
   // confound". This is a reasoning model whose thinking tokens count against the
   // output budget, so the old caps could exhaust the budget before any visible
   // text. Untested at this new limit — no paid call has been run against it yet.
+  // NOT IN THE OPENROUTER CATALOGUE 2026-09-11. The catalogue has qwen3.8-max-0902 (131072) but NOT this bare id; per the no-inference rule they are not treated as the same model. The docs/decisions.md note about retesting qwen3.8-max at its true limit cannot run against this id. description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 131072, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
-  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 16384, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
-  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
-  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 16384, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
-  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
+  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 131072, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
+  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 128000, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
+  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16000,
     description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.26/$1.03 per 1M'
   },
   // DeepSeek V4 (GA 2026-07-20) via OpenRouter. 1M context, up to 384K output —
@@ -194,13 +202,13 @@ const TEXT_MODELS = {
   'deepseek-v4-pro': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-pro',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 384000,
     description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context (~$0.44/$0.87 per 1M)'
   },
   'deepseek-v4-flash': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-flash',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 384000,
     description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.14/$0.28 per 1M)'
   }
 };

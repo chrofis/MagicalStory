@@ -33264,3 +33264,34 @@ now has one definition), `server.js` (boot), `tests/unit/testlab-orphan-reaper.t
 **Status:**   ✅ active. NOT addressed: whether the pushing session bypassed the hook
 (`--no-verify`). This fix removes the stale-row route to a false idle; it cannot stop a
 deliberate bypass.
+
+## TEXT_MODELS ceilings raised to the vendors' real limits (2026-09-11)
+**Context:**  Since the 2026-09-11 no-caps change these numbers ARE the ceiling every
+text call runs at, and what `textReplyGuard` measures replies against. Only three were
+sourced. Verified all 38 against the vendors on 2026-09-11 — OpenRouter
+`GET /v1/models` → `top_provider.max_completion_tokens`, Anthropic `GET /v1/models` →
+`max_tokens`, Google `v1beta/models` → `outputTokenLimit`, xAI `GET /v1/models` + docs.
+**Result: 5 OK, 6 dead ids, 28 UNDERSTATED, 0 overstated.**
+**Decision:** 26 ceilings raised to the verified vendor value. Worst offenders:
+minimax-m3 16384→512000 (31x), deepseek-v4-pro-0813 16384→384000 (23x), qwen-vl
+8192→115200 (14x), kimi-k2.6 16384→235929 (14x), grok-4.6 32768→450000 (13.7x),
+kimi-k2 8192→100352 (12x), claude-haiku 8192→64000 (7.8x, the utility model),
+claude-sonnet 64000→128000 (the default idea+outline writer, at half its ceiling),
+deepseek-v4-pro 64000→384000 (the beats reviewer — its own adjacent comment said
+"up to 384K" while the code said 64000).
+**Rationale:** An understated ceiling does two things at once: it truncates real replies,
+and `outputTokens >= capInForce` then reports a false `cap_hit`. Both were live.
+**Dead ids are ANNOTATED, not changed** — retiring them is a routing decision and was not
+authorised here. They 404 rather than cap: `gemini-2.0-flash` (shut down),
+`grok-3`, `grok-3-mini`, `grok-4-1-fast-non-reasoning` (xAI serves only
+grok-4.20-*/4.3/4.5/4.6), `qwen/qwen-max`, `qwen/qwen3.8-max`. The catalogue has
+`qwen3.8-max-0902` but NOT the bare id, so the earlier decisions.md note about retesting
+qwen3.8-max "at the true limit" cannot run as written. **xAI publishes no output ceiling
+at all**, so any xai-provider entry is unverifiable in principle, not merely unverified.
+**Touched:** `server/config/models.js` TEXT_MODELS
+**Status:**   ✅ active. SEPARATE, NOT FIXED: 15 entries are reasoning models whose
+`completion_tokens` INCLUDE reasoning tokens, so `maxOutputTokens` is not comparable to
+visible output — measured on gpt-5.6-luna-pro (300 requested, 965 returned, 948 of them
+reasoning, zero visible characters). That set covers `planCheckModel`,
+`outlineReviewModel`/`arcReviewModel`, `textAuditModel` and `beatsAuditModel`.
+`deepseek-v4-pro` is both understated 6x and reasoning-enabled.
