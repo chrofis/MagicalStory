@@ -33494,3 +33494,20 @@ from the dragon commission.
 **Cause of the error:** the arc TEMPLATE was grepped for peril wording and the
 interpolated sections were not. A rule that reaches a prompt through a builder
 is invisible to a grep of the .txt file. Owner corrected it.
+
+## 2026-09-11 — WITHDRAWN: "the text audit prompt leaks Visual Bible ids"
+
+Recorded because the claim was written into the backlog earlier today and is
+wrong. The production audit does NOT carry VB ids: `storyJobPipeline.js` passes
+`arcReviewReport?.finalArc` as the audit's arc — 4,367 chars for
+`job_1789147573901_m3uam0nxi`, zero ids. The VB-ID-LEAK warning came from a
+VALIDATION HARNESS written the same day, which passed `stories.data.outline`
+(57,458 chars, including the whole `---VISUAL BIBLE---` JSON) instead.
+
+The guard behaved exactly as designed — it named the offending call label, which
+is what let the mistake be traced. What failed was reading a warning about a
+locally-built prompt as evidence about the shipped path.
+
+**Standing lesson, twice today:** a claim about production needs the production
+input, not the one the harness happened to pass. The same error produced the
+withdrawn peril claim above (arc template grepped, interpolated sections not).
