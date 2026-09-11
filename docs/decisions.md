@@ -32784,3 +32784,27 @@ for the owner (`tasks/BACKLOG.md`).
 `tests/unit/vb-authoring-contract.test.ts`,
 `tests/unit/reference-sheet-mismatch.test.ts`
 **Status:** ✅ active
+
+## Per-round repair cap: unchanged, covers included in the denominator (2026-09-11)
+**Context:**  Dragon rerun `job_1789147573901_m3uam0nxi` logged `[REPAIR-CAP] … on a
+21-page story — cap is 11` and deferred p11 and p16 (score 55). Two things were
+questioned: whether the 3 covers belong in `totalPages`, and what a deferral means
+on a run where `repairMaxPasses` is 1 (staging, local) so no later round exists —
+the cap's own wording promises the pages "come back next round". They do not; on a
+single-round run a deferred page is abandoned, and p11/p16 shipped at 55.
+**Decision:** No change. `totalPages` stays `Object.keys(roundEvalPages).length`
+(pages + covers) and the final-round deferral behaviour stays exactly as written.
+Owner ruling 2026-09-11, explicitly: keep as is, and stop asking about it.
+**Rationale:** Counting covers yields a LOOSER cap, not a tighter one — 21 × 50% =
+11 admitted versus 18 × 50% = 9 if only story pages counted. "Fixing" the
+denominator to story pages would have repaired two FEWER pages, the opposite of
+what the finding wanted. The cap exists to stop one round rewriting a whole book
+and minting new faults (measured on job_1788903616404_iqvhj4l8m: round 2 rewrote
+17 of 18 pages, findings 26 → 13 → 23), and that protection is worth an
+occasional abandoned page. The visibility of a page that ships unrepaired is
+tracked separately as D7 — a page scoring 0 or 5 shipping with no warning anywhere
+— and belongs there, not in the cap.
+**Touched:** `server/lib/repairLogic.js` `applyRoundCap`, `server/lib/repairPipeline.js:1896`,
+`server/config/runtime.js:124` (`repairMaxPasses`: 3 default, 1 staging/local)
+**Status:**   ✅ active — do not re-litigate; a future session asking this question again
+should read this entry and stop.
