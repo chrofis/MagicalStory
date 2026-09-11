@@ -1,4 +1,12 @@
 /**
+ * NOTE (2026-09-11): `trimVbAssignments` has NO call site in production.
+ * The bible-time trim was removed (cdb334904 — usage is derived from the
+ * final briefs instead), and the function is kept only for these tests.
+ * Every call below pins `budget: 3`, the size these fixtures were built
+ * for, so they keep testing the function's own logic and do NOT claim 3 is
+ * the production budget — that is 4 since 2026-09-11 (VB_ELEMENT_BUDGET).
+ */
+/**
  * VB TRIM WRITE-BACK — the assignment trim (and the invented-peer age clamp)
  * must reach the TRANSCRIPT, because every later reader re-parses it.
  *
@@ -73,13 +81,13 @@ describe('syncVisualBibleSection — the trim reaches the transcript', () => {
   it('a fresh parse of the untouched transcript is over budget (the bug precondition)', () => {
     const vb = parse(transcript());
     expect(count(vb, 2)).toBe(4);
-    expect(count(vb, 2)).toBeGreaterThan(VB_ELEMENT_BUDGET);
+    expect(count(vb, 2)).toBeGreaterThan(3); // the budget this fixture and the pinned call use
   });
 
   it('after trim + write-back, extractVisualBible() on the new transcript yields <= budget and the loser no longer lists the page', () => {
     const text = transcript();
     const vb = parse(text);
-    const trim = trimVbAssignments(vb, PLAN, { castNames: ['the girl'] });
+    const trim = trimVbAssignments(vb, PLAN, { castNames: ['the girl'], budget: 3 });
     expect(trim.pagesOverBudgetBefore).toBe(1);
     expect(trim.pagesOverBudgetAfter).toBe(0);
     // The satchel is the only entry not named in page 2's plan line.
@@ -90,7 +98,7 @@ describe('syncVisualBibleSection — the trim reaches the transcript', () => {
     expect(synced).not.toBe(text);
 
     const reparsed = parse(synced);
-    expect(count(reparsed, 2)).toBe(VB_ELEMENT_BUDGET);
+    expect(count(reparsed, 2)).toBe(3); // as above
     const satchel = reparsed.artifacts.find((a: any) => a.id === 'ART003');
     expect(satchel.appearsInPages).toEqual([1, 3]);
     expect(satchel.pages).toEqual([1, 3]);
@@ -142,15 +150,15 @@ describe('vbTrimLostPages — the pre-save assertion', () => {
   it('fires on a mismatched pair: trim says clean, the bible about to be saved is not', () => {
     const untrimmed = parse(transcript());
     const report = { pagesOverBudgetBefore: 1, pagesOverBudgetAfter: 0, stripped: [{ id: 'ART003', page: 2 }], droppedStates: [] };
-    expect(vbTrimLostPages(untrimmed, report)).toEqual([2]);
+    expect(vbTrimLostPages(untrimmed, report, 3)).toEqual([2]);
   });
 
   it('is silent on a consistent pair, and when there is nothing to check', () => {
     const text = transcript();
     const vb = parse(text);
-    const trim = trimVbAssignments(vb, PLAN, { castNames: ['the girl'] });
-    expect(vbTrimLostPages(vb, trim)).toEqual([]);
-    expect(vbTrimLostPages(parse(syncVisualBibleSection(text, vb)), trim)).toEqual([]);
+    const trim = trimVbAssignments(vb, PLAN, { castNames: ['the girl'], budget: 3 });
+    expect(vbTrimLostPages(vb, trim, 3)).toEqual([]);
+    expect(vbTrimLostPages(parse(syncVisualBibleSection(text, vb, 3)), trim)).toEqual([]);
     // No trim ran (unified path, or the bible stage failed) → nothing to assert.
     expect(vbTrimLostPages(parse(text), null)).toEqual([]);
     // The trim itself reported a page it could not clear → not a loss, not reported here.

@@ -2406,7 +2406,8 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
     CREATURE_TONE: buildCreatureToneSection(inputData),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
-    // The owner's cap of three packable Visual Bible elements per page, from
+    // The owner's cap of packable Visual Bible elements per page (four since
+    // 2026-09-11), from
     // the same constant the mechanical check and the code-side truncation use.
     VB_ELEMENT_BUDGET,
   });
@@ -2641,7 +2642,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // source SEASON reads; without it the page's own cast still carries the age
     // the level is keyed on, and an unreadable age emits nothing either way.
     CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
-    // The owner's cap of three packable Visual Bible elements per page, from
+    // The owner's cap of packable Visual Bible elements per page (four since
+    // 2026-09-11), from
     // the same constant the mechanical check and the code-side truncation use.
     VB_ELEMENT_BUDGET,
     // Season governs foliage, ground cover and daylight colour, and it must be

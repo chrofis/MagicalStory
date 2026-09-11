@@ -33418,3 +33418,33 @@ single finding, because it bounds what this audit can be relied on for.
 
 **Touched:** `prompts/story-text-audit.txt` (question 2).
 **Status:** ✅ active.
+
+## VB element budget raised to FOUR; the location cell is what gives way (2026-09-11)
+**Context:**  The owner asked for four packable Visual Bible elements per page. The
+objection I had been holding it on was prompt length, and it does not survive contact
+with the code: `shrinkPromptForModel` holds the protected tail (REQUIRED OBJECTS +
+ART STYLE) back and reattaches it verbatim, so a longer element list is safe by
+construction. The real question was cell size, and it is now measured rather than feared.
+**Decision:** `VB_ELEMENT_BUDGET` 3 → 4. Grok's `VB_SLOT_MAX_ELEMENTS` stays at **4**,
+so a page using all four elements drops its LOCATION cell (last in priority) instead of
+shrinking every cell. Owner chose this over raising the slot to 5.
+**Rationale:** MEASURED at the book's page aspect (`pageAspect: '3:4'`, A4 portrait).
+The slot renders 768x1024; the VB column is capped at a third of the width (256px); a
+cell's effective size is its shorter side, `min(256, floor(1024/n))`:
+  - 3 cells → **256px**
+  - 4 cells → **256px**  (the column WIDTH binds, not the height — the fourth element
+    costs no resolution whatsoever)
+  - 5 cells → **204px**  (four pixels above `VB_CELL_FLOOR_PX`)
+So the raise itself is free and only the fifth cell costs. Below ~200px a secondary
+character's face is a smear the model replaces with a prior (a 136x136 cell once rendered
+a rescued girl with the lead child's auburn curls), and 4px is not margin. The location
+is the one cell that is genuinely redundant: the page already receives that plate as its
+background.
+**Touched:** `server/lib/vbElementBudget.js` (constant + header, which still described
+the three enforcers removed on 2026-09-11 and "never more than three"),
+`server/lib/promptBuilders.js` (two comments), `tests/unit/vb-element-budget.test.ts`,
+`tests/unit/vb-assignment-trim.test.ts`, `tests/unit/vb-trim-persisted.test.ts`
+**Status:**   ✅ active. Note for whoever reads those two trim test files:
+`trimVbAssignments` and `vbTrimLostPages` have NO production call site since cdb334904 —
+the tests pin `budget: 3` so they keep exercising the function's own logic without
+claiming 3 is the production budget. Deleting the dead trim is a separate decision.

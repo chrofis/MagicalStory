@@ -81,13 +81,15 @@ describe('rankPageElements', () => {
 });
 
 describe('checkVbElementBudget', () => {
-  it('is silent at exactly three', () => {
+  it('is silent at exactly the budget', () => {
+    // Sized from the constant, not from the number that happened to be right in
+    // 2026-09-06 — the budget moved 3 -> 4 on 2026-09-11 and this fixture had to
+    // be rewritten by hand.
     const vb = {
       secondaryCharacters: [{ id: 'CHR001', name: 'the ferryman', appearsInPages: [3] }],
-      artifacts: [
-        { id: 'ART001', name: 'the lantern', appearsInPages: [3] },
-        { id: 'ART002', name: 'the rope coil', appearsInPages: [3] },
-      ],
+      artifacts: Array.from({ length: VB_ELEMENT_BUDGET - 1 }, (_, i) => (
+        { id: `ART00${i + 1}`, name: `artifact ${i + 1}`, appearsInPages: [3] }
+      )),
     };
     expect(rankPageElements(3, { objects: [] }, vb)).toHaveLength(VB_ELEMENT_BUDGET);
     expect(checkVbElementBudget(3, { objects: [] }, vb)).toBeNull();
@@ -105,10 +107,10 @@ describe('checkVbElementBudget', () => {
     const f: any = checkVbElementBudget(3, { objects: [] }, vb);
     expect(f.type).toBe('vb_element_overflow');
     expect(f.requested).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001', 'VEH002']);
-    expect(f.kept).toEqual(['CHR001', 'ANI001', 'ART001']);
-    expect(f.dropped).toEqual(['VEH001', 'VEH002']);
+    expect(f.kept).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001'].slice(0, VB_ELEMENT_BUDGET));
+    expect(f.dropped).toEqual(['VEH002']);
     expect(f.detail).toContain('references 5 Visual Bible elements');
-    expect(f.detail).toContain('keep at most 3');
+    expect(f.detail).toContain(`keep at most ${VB_ELEMENT_BUDGET}`);
     expect(f.detail).toContain('the cart (VEH001, vehicle)');
     expect(f.detail).not.toContain('LOC001');
   });
@@ -119,7 +121,7 @@ describe('checkVbElementBudget', () => {
     const f: any = checkVbElementBudget(3, { objects: [] }, bible());
     const block = renderFindingsBlock(new Map([[3, [f]]]));
     expect(block).toContain('[vb_element_overflow]');
-    expect(block).toContain('keep at most 3');
+    expect(block).toContain(`keep at most ${VB_ELEMENT_BUDGET}`);
   });
 });
 
@@ -139,33 +141,36 @@ describe('truncation (strike two)', () => {
     secondaryCharacters: [{ id: 'CHR001', name: 'the ferryman', appearsInPages: [3] }],
     animals: [{ id: 'ANI001', name: 'the goat', appearsInPages: [3] }],
     artifacts: [{ id: 'ART001', name: 'the lantern', appearsInPages: [3] }],
-    vehicles: [{ id: 'VEH001', name: 'the cart', appearsInPages: [3] }],
+    vehicles: [
+      { id: 'VEH001', name: 'the cart', appearsInPages: [3] },
+      { id: 'VEH002', name: 'the barrow', appearsInPages: [3] },
+    ],
   };
 
   it('drops the lowest-ranked ids from objects[] and keeps the rest verbatim', () => {
-    const metadata = { objects: ['CHR001', 'ANI001', 'ART001', 'VEH001'] };
+    const metadata = { objects: ['CHR001', 'ANI001', 'ART001', 'VEH001', 'VEH002'] };
     const out: any = truncateSceneObjects(metadata, vb, 3);
-    expect(out.dropped).toEqual(['VEH001']);
-    expect(out.objects).toEqual(['CHR001', 'ANI001', 'ART001']);
+    expect(out.dropped).toEqual(['VEH002']);
+    expect(out.objects).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001']);
   });
 
   it('rewrites the brief text so the packer never sees a fourth element', () => {
     const brief = 'The ferryman lifts the lantern.\n\n---METADATA---\n'
-      + JSON.stringify({ characters: [{ name: 'Mara' }], objects: ['CHR001', 'ANI001', 'ART001', 'VEH001'] });
+      + JSON.stringify({ characters: [{ name: 'Mara' }], objects: ['CHR001', 'ANI001', 'ART001', 'VEH001', 'VEH002'] });
     const out: any = truncateBriefToBudget(brief, vb, 3);
-    expect(out.kept).toEqual(['CHR001', 'ANI001', 'ART001']);
+    expect(out.kept).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001']);
     expect(out.brief).toContain('The ferryman lifts the lantern.');
     const meta = JSON.parse(out.brief.split('---METADATA---')[1]);
-    expect(meta.objects).toEqual(['CHR001', 'ANI001', 'ART001']);
+    expect(meta.objects).toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001']);
     expect(meta.characters).toEqual([{ name: 'Mara' }]);
     // Re-running is idempotent on the brief: VEH001 is gone from objects[], so
     // nothing further is removed. The element still counts (the bible's own
     // appearsInPages puts it on the page) — that half is bounded by the
     // page-gen selection cap, which is the same VB_ELEMENT_BUDGET.
     const again: any = truncateBriefToBudget(out.brief, vb, 3);
-    expect(again.dropped).toEqual(['VEH001']);
+    expect(again.dropped).toEqual(['VEH002']);
     expect(JSON.parse(again.brief.split('---METADATA---')[1]).objects)
-      .toEqual(['CHR001', 'ANI001', 'ART001']);
+      .toEqual(['CHR001', 'ANI001', 'ART001', 'VEH001']);
   });
 });
 
@@ -180,7 +185,7 @@ describe('the Art Director prompts carry the injected budget', () => {
     const one = buildSceneExpansionPrompt(3, 'PLAN: wide — Mara — she pushes off — the boat moves', characters, 'de');
     expect(one).toBeTruthy();
     expect(one).not.toContain('{VB_ELEMENT_BUDGET}');
-    expect(one).toContain('At most 3 Visual Bible elements per page');
+    expect(one).toContain(`At most ${VB_ELEMENT_BUDGET} Visual Bible elements per page`);
 
     const all = buildSceneExpansionAllPrompt(
       { characters, language: 'de' },
@@ -189,6 +194,6 @@ describe('the Art Director prompts carry the injected budget', () => {
     );
     expect(all).toBeTruthy();
     expect(all).not.toContain('{VB_ELEMENT_BUDGET}');
-    expect(all).toContain('At most 3 Visual Bible elements per page');
+    expect(all).toContain(`At most ${VB_ELEMENT_BUDGET} Visual Bible elements per page`);
   });
 });

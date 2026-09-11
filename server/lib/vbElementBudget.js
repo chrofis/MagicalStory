@@ -1,9 +1,10 @@
 /**
- * VB ELEMENT BUDGET — never more than three Visual Bible elements on a page.
+ * VB ELEMENT BUDGET — how many Visual Bible elements a page may claim.
  *
  * Owner ruling, 2026-09-06: "Never more than 3 VB elements per scene. Drop the
  * least important ones if more are requested. Do a mechanical check of it and
- * feed it into the feedback loop."
+ * feed it into the feedback loop." Raised to FOUR on 2026-09-11, and the
+ * "drop the least important" half was withdrawn the same day — see below.
  *
  * A Visual Bible ELEMENT is a bible entry that becomes a reference image packed
  * into the page's Grok slot — the same set `getElementReferenceImagesForPage`
@@ -14,8 +15,11 @@
  * location is what the empty-scene plate is built from — the backdrop the
  * characters are composited into, not a prop competing for a slot. Counting it
  * spent it twice. The selection still hands the page its location cell, LAST
- * and at most one, so the slot holds at most VB_ELEMENT_BUDGET + 1 = 4 cells,
- * which is exactly Grok's VB_SLOT_MAX_ELEMENTS.
+ * and at most one. With the budget at FOUR (2026-09-11) a full page WANTS
+ * VB_ELEMENT_BUDGET + 1 = 5 cells and Grok's VB_SLOT_MAX_ELEMENTS is 4, so the
+ * location — last in priority — is the cell that gives way. That is deliberate:
+ * five cells would put every crowded page on the 200px identity floor, and the
+ * page already receives the location as its background plate.
  *
  * Two sources put an element on a page, and both are counted, because both feed
  * the selection: the brief's own `objects[]` (an id the Art Director asked for)
@@ -35,29 +39,45 @@
  *      coming back to outranks a one-page prop.
  *   5. id, ascending — determinism, never insertion order.
  *
- * The check REPORTS into the scene review's fault block (sceneBriefCheck) and
- * the review's targeted second round carries it verbatim. A brief that still
- * overflows after that round SHIPS, with the lowest-ranked ids truncated out of
- * `objects[]` in code and a stored `vbElementOverflow` flag — a gate is a
- * guideline, it never kills a paid run.
+ * NOTHING IN CODE ENFORCES IT (owner, 2026-09-11: "we have AI calls for this").
+ * The budget is a rule the Art Director is given in its prompt and a fault the
+ * scene review is handed with the ids named. All three code-side enforcers were
+ * removed that day — the bible-time assignment trim, the brief truncation, and
+ * the budget-shaped selection cap — because code cannot know which objects a
+ * page is about, and withdrawing one removes it from the page prompt's REQUIRED
+ * OBJECTS line while its reference cell still exists.
  *
- * TWO HALVES, TWO ENFORCERS. Truncation can only take back what the BRIEF
- * asked for; an element the bible placed on the page through `appearsInPages`
- * is not the brief's to withdraw, so re-running the truncation on an already
- * truncated brief still counts it. That half is bounded where it actually
- * matters — the page-gen reference selection, which is called with this same
- * VB_ELEMENT_BUDGET and this same priority order (referenceSheets.js,
- * storyJobPipeline.js), so it keeps exactly the three this module ranks first.
- * Grok's own VB_SLOT_MAX_ELEMENTS stays at 4: it is the net under the paths
- * this budget does not author (covers, repair, iterate), and a page that
- * reaches it with four is a violation worth seeing rather than hiding.
+ * The check still REPORTS: an overflow lands in the scene review's fault block
+ * (sceneBriefCheck) and is stored per page as `vbElementOverflow`, where
+ * `dropped` now means "over budget and shipped anyway", not "removed".
+ *
+ * What remains is PHYSICAL, not a budget: the page-gen reference selection is
+ * bounded by Grok's VB_SLOT_MAX_ELEMENTS (4) because the grid shares one
+ * reference slot and cell size scales as 1/n. `rankPageElements` decides which
+ * cells win that space, in the priority order above.
  */
 
 const { extractSceneMetadata, parseProseMetadataFormat } = require('./sceneMetadata');
 const { getRecurringCreatureIds, entryNamedByRow } = require('./visualBible');
 
-/** The owner's number. One source of truth for prompt, check and truncation. */
-const VB_ELEMENT_BUDGET = 3;
+/**
+ * The owner's number. One source of truth for the prompts and the checks.
+ *
+ * FOUR since 2026-09-11 (owner), up from three. The raise is free at the book's
+ * page aspect: the slot renders 768x1024 (`pageAspect: '3:4'`), the VB column is
+ * capped at a third of the width, so a cell's effective size is
+ * min(256, floor(1024/n)) — 256px at THREE cells and 256px at FOUR. The column
+ * width binds, not the height, so the fourth element costs no resolution at all.
+ *
+ * The FIFTH cell is what would cost: 204px, four pixels above
+ * `VB_CELL_FLOOR_PX`, and below ~200px a secondary character's face is a smear
+ * the model replaces with a prior. So Grok's `VB_SLOT_MAX_ELEMENTS` stays at 4:
+ * a page using all four elements drops its LOCATION cell (last in priority)
+ * rather than shrinking every cell on the most crowded pages. The location is
+ * the one cell that is genuinely redundant — the page already receives that
+ * plate as its background.
+ */
+const VB_ELEMENT_BUDGET = 4;
 
 /** Selection's priority order, by collection. Locations are not elements (header). */
 const ELEMENT_COLLECTIONS = [
