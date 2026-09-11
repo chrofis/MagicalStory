@@ -5813,13 +5813,33 @@ function parseArcHints(raw) {
  * yields an empty reading and the caller degrades to the pre-2026-09-09
  * behaviour; nothing here throws.
  */
-const INVENTED_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Fixing|Keeping|Challenges taken|Used|FINAL ARC|CRITIQUE|ARC\s*\d)\s*:?/mi;
+const INVENTED_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Premise figures|Invented figures|Fixing|Keeping|Challenges taken|Used|FINAL ARC|CRITIQUE|ARC\s*\d)\s*:?/mi;
+
+/**
+ * The arc's PREMISE FIGURES — named figures the commission's own premise
+ * supplies that its character list does not (a sibling, a friend, a pet).
+ *
+ * They are commissioned, not invented: the budget rule has always said so
+ * ("Not counted: anyone the commission named, including any animal or
+ * companion it supplied"), but nothing carried their NAMES out of the arc, so
+ * the plan counters — which only ever saw `inputData.characters` — charged them
+ * against the invented allowance. Measured on job_1789147573901_m3uam0nxi: the
+ * premise reads "<child> and his dog <name>", and the dog was counted invented.
+ */
+function parsePremiseFigures(raw) {
+  return parseFigureList(raw, 'Premise figures');
+}
 
 function parseInventedFigures(raw) {
+  return parseFigureList(raw, 'Invented figures');
+}
+
+function parseFigureList(raw, heading) {
   const src = String(raw || '');
-  const idx = src.search(/^\s*(?:\*\*)?Invented figures\s*:/mi);
+  const h = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idx = src.search(new RegExp(`^\\s*(?:\\*\\*)?${h}\\s*:`, 'mi'));
   if (idx < 0) return { present: false, names: [], allowed: null, written: null };
-  const tail = src.slice(idx).replace(/^\s*(?:\*\*)?Invented figures\s*:\**[^\n]*\n?/i, '');
+  const tail = src.slice(idx).replace(new RegExp(`^\\s*(?:\\*\\*)?${h}\\s*:\\**[^\\n]*\\n?`, 'i'), '');
   const stop = tail.search(INVENTED_BLOCK_STOP);
   const block = stop >= 0 ? tail.slice(0, stop) : tail;
   const names = [];
@@ -5870,6 +5890,7 @@ function parseArcCreate(raw) {
       .trim(),
     critique: critIdx >= 0 ? chosen.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim() : '',
     invented: parseInventedFigures(chosen),
+    premiseFigures: parsePremiseFigures(chosen),
   };
 }
 
@@ -5918,7 +5939,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping, invented: parseInventedFigures(head) };
+  return { finalArc, used, critique, fixing, keeping, invented: parseInventedFigures(head), premiseFigures: parsePremiseFigures(head) };
 }
 
 /**
@@ -7359,6 +7380,7 @@ module.exports = {
   parseArcCreate,
   parseArcRetell,
   parseInventedFigures,
+  parsePremiseFigures,
   arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,

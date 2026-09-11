@@ -16,7 +16,7 @@ import fs from 'fs';
 // @ts-ignore — CommonJS lib
 import pb from '../../server/lib/promptBuilders.js';
 const {
-  parseInventedFigures, parseArcRetell, critiqueMaxSeverity,
+  parseInventedFigures, parsePremiseFigures, parseArcRetell, critiqueMaxSeverity,
   arcInventedAllowance, buildArcBudgetSection, replanRank,
 } = pb as any;
 // @ts-ignore — CommonJS lib
@@ -48,6 +48,45 @@ const RETELL = [
   'CRITIQUE:',
   '1. [MINOR] the ridge is thin.',
 ].join('\n');
+
+describe('parsePremiseFigures — a figure the commission\'s premise supplied is commissioned, not invented', () => {
+  // job_1789147573901_m3uam0nxi: the premise reads "<child> and his dog <name>".
+  // The dog is not in inputData.characters (there is no pet field), only the arc
+  // reads the premise, and nothing carried her name out — so the plan counters
+  // charged her against the invented allowance.
+  const WITH_PREMISE = [
+    'Premise figures:',
+    "- Nia — the boy's dog, tracker",
+    '- Fauchi — the wingless dragon',
+    '',
+    'Invented figures:',
+    '- Stone Guard One — summit gatekeeper',
+    '- Stone Guard Two — summit gatekeeper',
+    'Allowed: 3. Written: 2.',
+    '',
+    'Fixing: nothing.',
+    'FINAL ARC:',
+    '1. Something happens.',
+  ].join('\n');
+
+  it('reads the premise block and stops at the invented heading', () => {
+    const p = parsePremiseFigures(WITH_PREMISE);
+    expect(p.present).toBe(true);
+    expect(p.names).toEqual(['Nia', 'Fauchi']);
+  });
+
+  it('does not pull the premise figures into the invented list', () => {
+    const inv = parseInventedFigures(WITH_PREMISE);
+    expect(inv.names).toEqual(['Stone Guard One', 'Stone Guard Two']);
+    expect(inv.allowed).toBe(3);
+    expect(inv.written).toBe(2);
+  });
+
+  it('an arc with no premise block degrades safely', () => {
+    expect(() => parsePremiseFigures('')).not.toThrow();
+    expect(parsePremiseFigures('Invented figures:\n- X — a thing\nAllowed: 2. Written: 1.').present).toBe(false);
+  });
+});
 
 describe('parseInventedFigures', () => {
   it('reads the emitted block: names plus the two counts', () => {

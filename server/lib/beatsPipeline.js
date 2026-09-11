@@ -520,6 +520,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // The arc's own declared invented-figure list and the allowance it was given.
   // Both travel to the plan counters as a REPORTING-ONLY cross-check.
   let arcInventedNames = null;
+  // Named figures the commission's PREMISE supplies that its character list does
+  // not — a sibling, a friend, a pet. They are commissioned (the arc budget rule
+  // has always excluded them from the invented count), but only the arc reads
+  // the premise, so without this list the counters saw `inputData.characters`
+  // alone and charged them against the invented allowance.
+  let arcPremiseNames = [];
   let arcInventedLimit = null;
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
@@ -600,6 +606,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     const inventedAllowance = arcInventedAllowance(inputData);
     arcInventedLimit = inventedAllowance;
     let arcInvented = commit.invented || { present: false, names: [] };
+    if (commit.premiseFigures?.names?.length) arcPremiseNames = commit.premiseFigures.names;
     if (arcInvented.present) arcInventedNames = arcInvented.names;
     // A forced round may extend the budget by one, never past the clamp, and
     // at most once per story.
@@ -679,6 +686,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // "Invented figures past allowance: none — Fenno and Nolo, exactly two".
       // Arithmetic on the model's own emitted list, nothing else.
       arcInvented = retold.invented && retold.invented.present ? retold.invented : arcInvented;
+      if (retold.premiseFigures?.names?.length) arcPremiseNames = retold.premiseFigures.names;
       const inventedCount = (arcInvented.names || []).length;
       if (arcInvented.present) arcInventedNames = arcInvented.names;
       if (MODEL_DEFAULTS.arcForceRoundOnInventedOvercount && arcInvented.present && inventedCount > inventedAllowance) {
@@ -861,7 +869,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   let beats = plan.pages;
   let beatsReviewReport = null;
-  const commissionedNames = (inputData?.characters || []).map(c => c && c.name).filter(Boolean);
+  // The character list PLUS the figures the premise supplied (the arc reports
+  // them; see `arcPremiseNames`). A pet the commission named is commissioned.
+  const commissionedNames = [
+    ...(inputData?.characters || []).map(c => c && c.name).filter(Boolean),
+    ...arcPremiseNames.filter(n => n && String(n).trim()),
+  ];
+  if (arcPremiseNames.length) log.info(`👪 [BEATS] Premise figures counted as commissioned: ${arcPremiseNames.join(', ')}`);
   // The counters must never read a PLACE as a person. The names come from the
   // same authoritative data the planner itself was given — the resolved
   // landmark list, the family's town, and (historical stories) the canonical
