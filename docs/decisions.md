@@ -32829,3 +32829,101 @@ tracked separately as D7 — a page scoring 0 or 5 shipping with no warning anyw
 `server/config/runtime.js:124` (`repairMaxPasses`: 3 default, 1 staging/local)
 **Status:**   ✅ active — do not re-litigate; a future session asking this question again
 should read this entry and stop.
+
+## A reference cell draws only the object, never what it attaches to (2026-09-11)
+**Context:**  A bicycle-lamp entry in staging story `job_1789147573901_m3uam0nxi`
+rendered as a CCTV camera: its `description` was a parts list, and a parts list of
+a small box with a lens on a bracket also describes a camera. Lab experiments 1191
+and 1192 proved the fix — rewriting the description to name what the object
+attaches to made the cell come back unmistakably the right object. The rendered
+cell also DREW the mounting the words named. The owner rejected that, verbatim:
+"no handle bar. Only the thing itself." The cell prompt's existing isolation rule
+covered only a thing named to convey SIZE or SCALE, so an attachment named for
+recognition fell outside it.
+**Decision:** Owner ruling. Naming an attachment is for RECOGNITION, in words; the
+attachment itself is never DRAWN. Two rules, one in each layer:
+1. `prompts/reference-sheet.txt` REQUIREMENTS — the isolation line now also covers
+   anything the description names to say what the element "attaches to, is part of,
+   or is used with".
+2. `prompts/scene-expansion-all.txt` authoring rule — the read-as-that-thing rule
+   keeps its instruction to name what the object attaches to, and adds that naming
+   that thing "identifies the object and never puts it in the picture".
+This also CLOSES the `tasks/BACKLOG.md` question "should a cell be allowed a minimal
+MOUNTING context" with a No: the words-only lever is the whole fix, and no per-entry
+`mount` field is built.
+**Rationale:** The cell is the reference the page renderer copies. A drawn mount is
+copied onto every page that holds the object, and `composeVbSlot` shrinks a cell to
+as little as 200px with `fit: contain`, so a mount steals pixels from the object
+itself. The identification pass also names ONE element per cell, and a mounted
+object makes that call ambiguous. Words cost none of that and were measured to work.
+**Touched:** `prompts/reference-sheet.txt`, `prompts/scene-expansion-all.txt` (bible
+authoring rule), `tests/unit/reference-sheet-mismatch.test.ts`,
+`tests/unit/vb-authoring-contract.test.ts`, `tasks/BACKLOG.md`
+**Status:**  ✅ active
+
+## A change of light is not a state (2026-09-11)
+**Context:**  Same story, `job_1789147573901_m3uam0nxi`. Two entries each minted two
+states that differ only in light: `ART001` "off" / "lit" ("lens dark, no visible light
+emission" vs "lens glowing warm yellow-white"), and `ART002` "dim glow" / "plain"
+("surface emits a faint soft wash of painted light" vs "surface matte, no glow, colour
+unchanged"). Their two rendered cells are visually indistinguishable — two paid cells,
+one picture. The owner, verbatim: "Why whould glow and matte be two states, that is just
+different lighting". Our own prompts endorsed it: the state test listed "a lantern is lit"
+as an example of a state, and three copies of the one-entry rule opened their example list
+with "lit,".
+**Decision:** Owner ruling. Light is excluded from the state test. An object emitting,
+glowing, dimming, or being lit or unlit is not a state — the object itself is unchanged,
+and the scene sets the light page by page. The "a lantern is lit" example is replaced
+with a physical change ("a lid is torn off"), "lit," is dropped from the example list in
+all three copies, and the `states[].delta` schema clause gains "never light, that belongs
+to the scene" beside its existing material/colour/size clause. The rest of the test is
+unchanged: the take-away-everything test, the held/carried/set-down clause, the face-prop
+clause and the contact clause all stand. This EXTENDS "A state is a change to the object
+itself; place, holder and contact are never states" (2026-09-09) with a fourth
+non-state; it reverses nothing.
+**Rationale:** A state exists to give one object two different reference PICTURES. Light
+does not change the object, so it cannot produce a different picture of it — the two cells
+above prove that empirically. Lighting is a per-page scene decision and already lives in
+the page brief. Consequence, intended: an entry whose only states were lighting now has no
+states and renders ONE cell instead of two, halving its reference cost. Verified
+state-less is safe everywhere downstream: `expandElementStateCells` returns a single cell
+for `states.length === 0`; `objectStates` returns `[]` for a missing field;
+`objectStateFor`/`objectStateForPage`/`defaultObjectState` all return null, so
+`resolveObjectState` yields `state: null` and `elementRefCell` falls through to the
+entry's own cell; and every citation lookup keys on `baseVbId`, so even a stale dotted
+citation like `ART001.2` still resolves to the entry and its single cell. The Art Director
+is only ever shown dotted handles when states exist (the `States:` line in
+`buildRecurringElements` is omitted otherwise), so it cannot mint one for a state-less
+entry. No fallback was added and none is needed.
+**Touched:** `prompts/scene-expansion-all.txt` (state test, one-entry rule, artifacts
+`states` schema), `prompts/story-unified.txt` (one-entry rule, `states` schema),
+`prompts/story-trial.txt` (one-entry rule), `tests/unit/vb-authoring-contract.test.ts`
+**Status:**  ✅ active
+
+## Truncation guard: a reported natural stop beats token arithmetic (2026-09-11)
+**Context:**  `/api/health/config` reported two `cap_hit` truncation suspects on
+`job_1789147573901_m3uam0nxi` (labels `arc_panel`, `plan_recheck`) with
+`outputTokens 17278 ≥ capInForce 16384` — and both replies were complete,
+parsed and used normally. The guard inferred a cut purely from the token count.
+**Decision:** `cap_hit` and `near_cap` no longer fire when the provider reported
+a finish reason that is not a truncating one. An explicit `stop` is believed; the
+arithmetic rules stay as inferences for providers that report no finish reason.
+**Rationale:** MEASURED against OpenRouter `openai/gpt-5.6-luna-pro`, 2026-09-11
+(two direct calls, ~$0.001 total):
+  - `max_tokens: 200` → `finish_reason: "stop"`, `completion_tokens: 161`, of
+    which `completion_tokens_details.reasoning_tokens: 67`, for a 110-character
+    answer. **Output tokens include reasoning**, so they have no fixed relation
+    to the visible reply.
+  - `max_tokens: 300` → `finish_reason: "length"`, `completion_tokens: 965`, of
+    which `reasoning_tokens: 948`, and **zero visible characters**. **`max_tokens`
+    is not enforced on that total** — a 3.2x overrun.
+Either fact alone breaks `outputTokens >= capInForce` as a truncation test. The
+second also means a reasoning model can burn an entire allowance thinking and
+return an EMPTY reply with `finish_reason: length`; the guard's `stop_reason` and
+`empty` rules both catch that and are unchanged.
+**Touched:** `server/lib/textReplyGuard.js` `assessTextReply`,
+`tests/unit/text-reply-guard.test.ts`
+**Status:**   ✅ active. Related open item: `TEXT_MODELS['gpt-5.6-luna-pro'].maxOutputTokens
+= 16384` is a declared number that this provider does not enforce — it is the
+`planCheckModel`, so the plan check's reply length is bounded by the model, not by
+us. Verifying every TEXT_MODELS ceiling against its vendor page is tracked separately.

@@ -120,3 +120,47 @@ describe('textModels.js wiring (source-level) — the guard runs at the chokepoi
     expect(typeof tm.getTruncationStats).toBe('function');
   });
 });
+
+describe('a reported natural stop beats token arithmetic (D5, measured 2026-09-11)', () => {
+  // Measured directly against OpenRouter `openai/gpt-5.6-luna-pro`:
+  //   call 1: max_tokens 200 → finish_reason "stop", completion_tokens 161 of
+  //           which reasoning_tokens 67, for a 110-character answer.
+  //   call 2: max_tokens 300 → finish_reason "length", completion_tokens 965 of
+  //           which reasoning_tokens 948, and ZERO visible characters.
+  // So output tokens include reasoning AND overrun the requested cap, which made
+  // `outputTokens >= capInForce` fire on complete replies.
+  const { assessTextReply } = require('../../server/lib/textReplyGuard.js');
+
+  it('does not report cap_hit when the provider said it stopped naturally', () => {
+    const t = assessTextReply(
+      { text: 'a complete reply', usage: { output_tokens: 17278 }, stop_reason: 'stop' },
+      { capInForce: 16384, model: 'gpt-5.6-luna-pro' },
+    );
+    expect(t.suspected).toBe(false);
+    expect(t.reason).toBeNull();
+  });
+
+  it('still reports the cut when the provider said it ran out of room', () => {
+    const t = assessTextReply(
+      { text: 'a cut reply', usage: { output_tokens: 965 }, stop_reason: 'length' },
+      { capInForce: 300 },
+    );
+    expect(t.suspected).toBe(true);
+    expect(t.reason).toBe('stop_reason');
+  });
+
+  it('keeps inferring cap_hit when the provider reports no finish reason at all', () => {
+    const t = assessTextReply(
+      { text: 'a reply', usage: { output_tokens: 16384 } },
+      { capInForce: 16384 },
+    );
+    expect(t.suspected).toBe(true);
+    expect(t.reason).toBe('cap_hit');
+  });
+
+  it('an empty reply is still suspected however it stopped', () => {
+    const t = assessTextReply({ text: '', usage: { output_tokens: 965 }, stop_reason: 'stop' }, { capInForce: 300 });
+    expect(t.suspected).toBe(true);
+    expect(t.reason).toBe('empty');
+  });
+});

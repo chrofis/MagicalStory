@@ -62,12 +62,28 @@ function assessTextReply(result, o = {}) {
   };
   if (!trimmed) return { ...base, suspected: true, reason: 'empty' };
   if (stopReason && TRUNCATING_STOP.test(stopReason)) return { ...base, suspected: true, reason: 'stop_reason' };
-  if (base.capInForce != null && outputTokens != null && outputTokens >= base.capInForce) {
-    return { ...base, suspected: true, reason: 'cap_hit' };
-  }
-  if (!stopReason && base.capInForce != null && outputTokens != null
-      && typeof usage.direct_cost === 'number' && outputTokens >= base.capInForce * NEAR_CAP_FRACTION) {
-    return { ...base, suspected: true, reason: 'near_cap' };
+  // A REPORTED NATURAL STOP BEATS TOKEN ARITHMETIC (2026-09-11). The cap_hit and
+  // near_cap rules below are inferences for providers that report no finish
+  // reason at all; when the provider says it stopped on its own, the reply is
+  // complete and the numbers cannot overrule it.
+  //
+  // Measured against OpenRouter (`openai/gpt-5.6-luna-pro`, 2026-09-11):
+  //   - `completion_tokens` INCLUDES `completion_tokens_details.reasoning_tokens`
+  //     — 161 completion tokens for a 110-character answer, 67 of them reasoning.
+  //     Output tokens therefore have no fixed relation to the visible reply.
+  //   - `max_tokens` is NOT enforced on that total: 300 requested, 965 returned.
+  // Together those make `outputTokens >= capInForce` fire on complete replies —
+  // the two false cap_hit suspects (arc_panel, plan_recheck) on
+  // job_1789147573901_m3uam0nxi, both of whose replies were used normally.
+  const naturalStop = stopReason && !TRUNCATING_STOP.test(stopReason);
+  if (!naturalStop) {
+    if (base.capInForce != null && outputTokens != null && outputTokens >= base.capInForce) {
+      return { ...base, suspected: true, reason: 'cap_hit' };
+    }
+    if (!stopReason && base.capInForce != null && outputTokens != null
+        && typeof usage.direct_cost === 'number' && outputTokens >= base.capInForce * NEAR_CAP_FRACTION) {
+      return { ...base, suspected: true, reason: 'near_cap' };
+    }
   }
   if (parsedOk === false && trimmed.length > minMeaningfulChars) return { ...base, suspected: true, reason: 'unparsed' };
   return base;
