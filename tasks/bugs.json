@@ -897,6 +897,16 @@
       "fixedAt": "2026-09-11",
       "fixedIn": "c16838db7",
       "fix": "One source of truth: beatsPipeline.syncVisualBibleSection writes the mutated fields (pages from appearsInPages, states[].pages with emptied states removed, a clamped secondary's age + secondaryAgeClamped) back into the transcript's ---VISUAL BIBLE--- JSON after the trim and the age clamp (same pattern as replaceClothingSection), so every later extractVisualBible() yields the trimmed bible by construction; generateStoryViaBeats returns visualBible and storyJobPipeline prefers it over the re-parse (fallback only); vbElementBudget.vbTrimLostPages asserts on the picked bible before the unified_story checkpoint and logs vb_trim_lost (ERROR + genLog), never a kill. Tests: tests/unit/vb-trim-persisted.test.ts. See docs/decisions.md 2026-09-11 'Visual Bible trim was never persisted'."
-  }
+  },
+    {
+      "id": "character-cell-gate-fails-non-human-characters",
+      "title": "Character-cell render gate failed a correctly-rendered non-human secondary character for not having human skin, burning a paid re-render and shipping the original anyway",
+      "reportedAt": "2026-09-11",
+      "source": "Staging story job_1789147573901_m3uam0nxi, two stone-golem secondary characters (CHR001/CHR002, bible: 'a figure of human shape ... made entirely of pale grey layered stone'). Stored generation log: vb_character_cell_rerender - \"VB reference cell failed render gate: The figure is made of stone and does not have a plausible human skin color.\" and vb_character_cell_still_bad - \"Re-rendered cell still fails render gate (The figure is made of stone and does not have a plausible human skin color.) - accepted anyway\" (second pair: 'a pale gray, which is not a plausible...'). cellGatePrompt check (1) asked only about human skin and was never given the bible description; the 2026-09-11 creature-awareness fix covered elementCellGatePrompt only.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "82440bf20",
+      "fix": "cellGatePrompt quotes the bible description verbatim and check (1) asks the judge to decide from it whether the character is human; a non-human character is judged on the colouring and material its own description states, a human keeps the plausible-human-skin test. Classification stays in the prompt - no code inspects the prose. Fail-open behaviour unchanged. Tests: tests/unit/cell-gate-sex.test.ts."
+    }
   ]
 }

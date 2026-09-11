@@ -32347,3 +32347,34 @@ Per class, both stories, all pages (raw → reviewed): GAZE 7 → deepseek 5, gr
 **Rationale:**  Not a reversal — it makes the 2026-09-08 decision take effect. `docs/SETTLED.md` line 58-60 describes the budget "enforced at ASSIGNMENT (`trimVbAssignments`…)"; that was true for the Art Director only. Writing the object back is chosen over "stop re-parsing" because three independent readers re-parse the transcript (pipeline, resume, Lab) and the transcript is what `data.outline` stores; one source of truth means the text must carry the truth. The projection is field-by-field rather than a full re-serialisation of the parsed object because the parser's shape is a superset (spread + computed `description`, minted state ids, null reference-cell fields) and the writer's JSON must stay the writer's shape for every existing reader.
 **Touched:**   `server/lib/beatsPipeline.js` (`syncVisualBibleSection`, wiring after the trim, `visualBible` on the return, exports), `server/lib/vbElementBudget.js` (`vbTrimLostPages`), `storyJobPipeline.js` (prefer `beatsResult.visualBible`; `vb_trim_lost` assertion before the `unified_story` checkpoint), `tests/unit/vb-trim-persisted.test.ts`, `tasks/bugs.json` (`vb-trim-not-persisted-reparsed-from-outline`), `tasks/BACKLOG.md`.
 **Status:**    fixed on staging, not on master. The bake-off's `vb_element_overflow` "5/5 survive" line and BACKLOG's "the check counts the UNION … 5/5 pages, not ~0" item (line ~443) both need re-measuring on a story generated AFTER this fix before either is read as a reviewer or counting problem.
+### Character-cell gate judges a non-human character on its own stated material, not human skin
+**Context:** Staging story `job_1789147573901_m3uam0nxi` has two secondary
+characters that are stone golems (CHR001, CHR002) — the bible describes "a
+figure of human shape ... made entirely of pale grey layered stone". The
+character-cell gate (`cellGatePrompt`) asked only about human skin, and was
+given the art style, age and `build` but never the description. It logged
+`vb_character_cell_rerender` — "VB reference cell failed render gate: The
+figure is made of stone and does not have a plausible human skin color." —
+then `vb_character_cell_still_bad` — "Re-rendered cell still fails render gate
+(The figure is made of stone and does not have a plausible human skin color.)
+— accepted anyway" (and a second pair citing "a pale gray, which is not a
+plausible..."). A correct render was failed, a paid re-render was burned per
+character, and the original shipped. The 2026-09-11 creature-awareness fix
+landed on the ELEMENT gate only; a non-human SECONDARY CHARACTER still went
+down the human-skin branch because it is a character.
+**Decision:** `cellGatePrompt` now quotes the bible `description` verbatim and
+check (1) tells the judge to decide from that description whether the character
+is human: a human figure keeps the plausible-human-skin test, a character the
+description states is not human is judged on the colouring and material its own
+description states. `checkCharacterCellRender` takes the description and the
+call site passes `element.extractedDescription || element.description`.
+**Rationale:** Per CLAUDE.md the classification belongs to the PROMPT — no code
+may pattern-match "stone"/"made of" in the prose. The model already receives
+the description and decides. The human-skin check is kept intact for humans: it
+exists to catch green/grey/blue-tinted humans, a real measured failure mode.
+Fail-open behaviour ("accepted anyway") is untouched — that is a separate open
+decision.
+**Touched:** `server/lib/referenceSheets.js` (`cellGatePrompt`,
+`checkCharacterCellRender`, the cell-gate call site),
+`tests/unit/cell-gate-sex.test.ts`
+**Status:** ✅ active

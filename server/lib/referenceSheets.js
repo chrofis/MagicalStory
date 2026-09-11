@@ -455,18 +455,26 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
  * `build` field is quoted verbatim; the model does the comparing. No prose is
  * parsed in code.
  *
+ * The colouring check quotes the bible's own `description` (2026-09-11): a
+ * secondary character need not be human, and a non-human one was failing the
+ * human-skin branch for being the material its description states. The model
+ * classifies from the quoted description; code never inspects the prose.
+ *
  * @param {string} styleDescription - the book's declared art style
  * @param {number|string|null} age - the character's stated age, if any
  * @param {string|null} build - the bible's `build` field, which opens with the sex
+ * @param {string|null} description - the bible's `description` field, quoted verbatim
  * @returns {string}
  */
-function cellGatePrompt(styleDescription = '', age = null, build = null) {
+function cellGatePrompt(styleDescription = '', age = null, build = null, description = null) {
   const ageClause = age ? ` (3) Apparent age: does the figure look about ${age}? A visibly older or younger rendering fails.` : '';
   const buildText = String(build || '').trim();
   const sexClause = buildText
     ? ` (${age ? 4 : 3}) Sex: the character is described as "${buildText}". Does the figure read as the sex that description states? A figure that reads as the other sex fails, whatever else is right.`
     : '';
-  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Colouring: a human figure has a plausible human skin color — not green-, gray- or blue-tinted; an animal or creature is judged on the colouring its description states instead, never on human skin. (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+  const descText = String(description || '').trim();
+  const descClause = descText ? ` The character is described as: "${descText}".` : '';
+  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}".${descClause} Judge strictly: (1) Colouring: first decide from the description whether this character is human. A human figure has a plausible human skin color — not green-, gray- or blue-tinted. A character the description states is not human — an animal, a creature, or a figure made of some other material — is judged on the colouring and material its own description states, never on human skin. (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
 }
 
 // ── Character-cell render gate ──────────────────────────────────────────────
@@ -478,11 +486,11 @@ function cellGatePrompt(styleDescription = '', age = null, build = null) {
 // cheapest vision-capable TEXT_MODELS entry, one re-render on NO, then accept
 // whatever came back. No scores, no thresholds, no loops; fail-open on any API
 // error — the gate may never block a story.
-async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null, build = null) {
+async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null, build = null, description = null) {
   // The style anchor is load-bearing: without it flash-lite judged the known-bad
   // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
   // job_1788123310558 cell — NO with the anchor, YES without).
-  const parsed = await askCellGate([cellBase64], cellGatePrompt(styleDescription, age, build));
+  const parsed = await askCellGate([cellBase64], cellGatePrompt(styleDescription, age, build, description));
   return { natural: parsed.natural !== false, reason: String(parsed.reason || '') };
 }
 
@@ -979,7 +987,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         if (!references[i]) continue;
         const isChar = element.type === 'character';
         const ask = (cell) => isChar
-          ? checkCharacterCellRender(cell, styleDescription, element.age || null, element.build || null).then(v => ({ ok: v.natural, reason: v.reason }))
+          ? checkCharacterCellRender(cell, styleDescription, element.age || null, element.build || null, element.extractedDescription || element.description || null).then(v => ({ ok: v.natural, reason: v.reason }))
           : checkElementCellRender(cell, element, styleDescription);
         const gateName = isChar ? 'character_cell' : 'element_cell';
         let verdict;

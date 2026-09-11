@@ -32,9 +32,39 @@ describe('character cell gate asks about sex', () => {
 
   it('keeps the original skin and art-style checks', () => {
     const p = cellGatePrompt(style, null, null);
-    expect(p).toContain('(1) Colouring: a human figure has a plausible human skin color');
-    expect(p).toContain('an animal or creature is judged on the colouring its description states instead');
+    expect(p).toContain('A human figure has a plausible human skin color');
     expect(p).toContain('(2) Is the cell actually rendered in the declared art style');
     expect(p).toContain('"natural": true or false');
+  });
+});
+
+/**
+ * A secondary character is not always human. A stone golem cell was failed by
+ * the gate for "not a plausible human skin color", burning a re-render per
+ * character before the original was shipped anyway
+ * (job_1789147573901_m3uam0nxi). The classification belongs to the model: the
+ * bible description is quoted and the model decides.
+ */
+describe('character cell gate judges a non-human character on its own material', () => {
+  const style = 'traditional watercolor';
+
+  it('quotes the description and routes classification to the model', () => {
+    const desc = 'a figure of human shape made entirely of pale grey layered stone';
+    const p = cellGatePrompt(style, null, null, desc);
+    expect(p).toContain(`The character is described as: \"${desc}\".`);
+    expect(p).toContain('first decide from the description whether this character is human');
+    expect(p).toContain('is judged on the colouring and material its own description states, never on human skin');
+  });
+
+  it('still demands plausible human skin of a human figure', () => {
+    const p = cellGatePrompt(style, 8, 'a boy, slightly tall for his age', 'a boy with brown hair and freckles');
+    expect(p).toContain('A human figure has a plausible human skin color');
+    expect(p).toContain('not green-, gray- or blue-tinted');
+  });
+
+  it('omits the description sentence when the bible gave none', () => {
+    const p = cellGatePrompt(style, null, null);
+    expect(p).not.toContain('The character is described as:');
+    expect(p).toContain('(1) Colouring:');
   });
 });
