@@ -7805,7 +7805,9 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
     if (hit) { entry = hit; type = t; break; }
   }
   if (!entry) throw new Error(`${elementId} is not in this story's visual bible`);
-  const el = { ...entry, type, pageCount: (entry.appearsInPages || []).length };
+  // Same shape getElementsNeedingReferenceImages hands the sheet: pool on
+  // `type`, the bible's free-text type on `kind`.
+  const el = { ...entry, kind: typeof entry.type === 'string' && entry.type.trim() ? entry.type.trim() : null, type, pageCount: (entry.appearsInPages || []).length };
   if (params.text !== undefined) el.text = String(params.text || '').trim() || null;
   if (params.description) el.description = String(params.description);
   const cells = refSheets.expandElementStateCells(el);

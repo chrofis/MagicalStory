@@ -69,6 +69,14 @@ describe('elementKindSentence — the noun as prose', () => {
   it('ignores the pool label the sheet code stamps as type', () => {
     expect(elementKindSentence(location)).toBe('This is the hillside cave entrance: ');
   });
+  it('reads the bible type from `kind` when the pool sits on `type` (the production shape)', () => {
+    // getElementsNeedingReferenceImages stamps the pool onto `type`; without
+    // `kind` the type was silently lost (measured on Lab exp 1164: the cell
+    // line read "This is the small dragon scale:" with no "single reptile scale").
+    const prod = { ...scale, type: 'artifact', kind: 'single reptile scale' };
+    expect(elementKindSentence(prod)).toBe('This is the small dragon scale, a single reptile scale: ');
+    expect(elementCellGatePrompt(prod, 'x')).toContain('meant to show a single reptile scale');
+  });
   it('leaves characters alone', () => {
     expect(elementKindSentence(character)).toBe('');
   });

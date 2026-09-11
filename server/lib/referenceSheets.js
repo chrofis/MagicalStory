@@ -264,9 +264,10 @@ function elementKindSentence(el) {
   if (!el || el.type === 'character') return '';
   const clean = (v) => String(v || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.\s]+$/, '').trim();
   const name = clean(el.displayName || el.name);
-  // Bible entries carry a free-text `type` ("single reptile scale"); the
-  // pool label the sheet code stamps ("artifact", "vehicle", …) is not one.
-  const rawType = clean(el.type);
+  // The bible's free-text type ("single reptile scale") arrives as `kind`
+  // (getElementsNeedingReferenceImages stamps the pool onto `type`); a bare
+  // entry may still carry it on `type`, and a pool label is never a kind.
+  const rawType = clean(el.kind || el.type);
   const type = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : '';
   if (!name && !type) return '';
   // "the small dragon scale" / "the Windchopf sign" / "Julian's ball" /
@@ -541,7 +542,7 @@ async function askCellGate(cellsBase64, prompt) {
  * @returns {string}
  */
 function elementCellGatePrompt(el, styleDescription = '') {
-  const rawType = String(el?.type || '').trim();
+  const rawType = String(el?.kind || el?.type || '').trim();
   const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : String(el?.displayName || el?.name || 'object').trim();
   const desc = String(el?.description || '').trim();
   const text = String(el?.text || '').trim();
@@ -557,7 +558,7 @@ function elementCellGatePrompt(el, styleDescription = '') {
  * @returns {string}
  */
 function stateCellsGatePrompt(parent, cells) {
-  const rawType = String(parent?.type || '').trim();
+  const rawType = String(parent?.kind || parent?.type || '').trim();
   const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : String(parent?.build || parent?.name || 'object').trim();
   const desc = String(parent?.description || '').trim();
   const list = cells.map((c, i) => `${i + 1}. ${c.stateName || c.name}: ${c.delta || ''}`.trim()).join(' ');

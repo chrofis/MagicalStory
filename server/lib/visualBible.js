@@ -2326,6 +2326,10 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
 
       needsReference.push({
         ...entry,
+        // `type` is the POOL here (character/artifact/…); the bible's own
+        // free-text type ("single reptile scale") survives as `kind` — the
+        // reference-sheet kind sentence and the cell gate read it.
+        kind: typeof entry.type === 'string' && entry.type.trim() ? entry.type.trim() : null,
         type,
         pageCount: entry.appearsInPages.length
       });
@@ -2354,6 +2358,7 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
 
       needsReference.push({
         ...loc,
+        kind: typeof loc.type === 'string' && loc.type.trim() ? loc.type.trim() : null,
         type: 'location',
         pageCount: loc.appearsInPages.length
       });
