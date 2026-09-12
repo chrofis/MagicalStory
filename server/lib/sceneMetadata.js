@@ -1191,6 +1191,58 @@ function collectSceneCharacterNames(sceneMetadata, extraNames = []) {
 }
 
 /**
+ * The FIGURES a page files under `objects[]` — animals and secondary
+ * characters — resolved to their Visual Bible names.
+ *
+ * The Art Director puts every non-photo element in `objects[]` by id, figures
+ * included: page 12 of staging `job_1789163494908_kc2joi4ax` reads
+ * `characters: ["Max"], objects: ["LOC002","ANI001"]`, and ANI001 is the grey
+ * tomcat the page is about. `collectSceneCharacterNames` reads only the three
+ * cast carriers, so that cat never reached EXPECTED CAST and pages 12, 15 and
+ * 16 each took a false `extra_character` CRITICAL (75 / 50 / 54) for drawing
+ * the animal the prompt commissioned.
+ *
+ * Only `animals` and `secondaryCharacters` resolve. A location or an artifact
+ * is not a figure and must never join a cast roster — that is the whole reason
+ * this is a separate helper rather than a widening of the cast collector, whose
+ * other caller (the figure detector, images.js) must keep seeing people only.
+ *
+ * Ids arrive bare (`ANI001`) and state-suffixed (`ART002.1`); the suffix is a
+ * variant of the same entry, so it is stripped before resolving. A free-text
+ * entry that is not id-shaped is matched by name, so a brief that writes the
+ * animal's name instead of its id resolves too.
+ *
+ * @param {Object|null} sceneMetadata - extractSceneMetadata() result
+ * @param {Object|null} visualBible - story.data.visualBible
+ * @returns {string[]} Visual Bible names, deduplicated, first spelling wins
+ */
+function collectSceneObjectFigureNames(sceneMetadata, visualBible) {
+  const objects = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+  if (objects.length === 0) return [];
+  const vb = visualBible || {};
+  const asList = (v) => (Array.isArray(v) ? v : Object.values(v || {}));
+  const figures = [...asList(vb.animals), ...asList(vb.secondaryCharacters)].filter(e => e && e.name);
+  if (figures.length === 0) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of objects) {
+    const token = String(typeof raw === 'string' ? raw : (raw && (raw.id || raw.name)) || '').trim();
+    if (!token) continue;
+    // `ART002.1` → `ART002`; anything not id-shaped stays whole and is matched
+    // by name below.
+    const base = (/^[A-Za-z]{3}\d{3}(?:\.\d+)?$/.test(token) ? token.split('.')[0] : token).toLowerCase();
+    const entry = figures.find(e => String(e.id || '').toLowerCase() === base
+      || String(e.name || '').toLowerCase() === base);
+    if (!entry) continue;
+    const key = String(entry.name).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry.name);
+  }
+  return out;
+}
+
+/**
  * A name reduced to the tokens that identify a person: lower-cased, with any
  * parenthetical stripped and any possessive-marked token dropped. A possessive
  * token is a modifier, never the head — "Rossa's crew member (trapped)" is a
@@ -1815,6 +1867,7 @@ module.exports = {
   mirrorLeftRight,
   extractSceneMetadata,
   collectSceneCharacterNames,
+  collectSceneObjectFigureNames,
   findCastMissingFromMetadata,
   isSameFigureName,
   getCharactersInScene,

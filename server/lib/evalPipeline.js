@@ -936,6 +936,16 @@ function buildExpectedCastBlock({
   try {
     const sceneMeta = sh.extractSceneMetadata(sceneHint || originalPrompt);
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, includeAnimals: true })) add(e.name, vbKind(e.name));
+    // A FIGURE FILED AS AN OBJECT IS STILL A FIGURE (2026-09-12). The Art
+    // Director puts animals and secondary characters in `objects[]` by id, and
+    // the cast collector above reads only `characters` / `characterPositions` /
+    // `characterClothing` — so `includeAnimals`, added two days earlier, was
+    // dead for every animal. On job_1789163494908_kc2joi4ax the grey tomcat was
+    // commissioned on pages 12, 15 and 16 as `ANI001` in `objects[]`, never
+    // reached this roster, and each page took an `extra_character` CRITICAL for
+    // drawing it. Animals and secondaries only — a location or an artifact
+    // never joins a cast roster.
+    for (const n of require('./sceneMetadata').collectSceneObjectFigureNames(sceneMeta, visualBible)) add(n, vbKind(n));
   } catch { /* a page without parseable metadata keeps its photo-backed cast */ }
   if (evaluationType === 'cover' && visualBible) {
     try {

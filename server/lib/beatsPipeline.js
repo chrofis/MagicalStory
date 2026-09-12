@@ -1623,6 +1623,11 @@ ${bibleBody}` : bibleBody;
   // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
   // authored both halves; we must not invent a figure nobody wrote).
   let briefFindings = '';
+  // The plan line rides along for the element-coverage check: it is the page's
+  // authority on what is in the picture, and the brief's objects[] is the only
+  // route by which any of it reaches the illustrator. Hoisted — the re-check
+  // after the review must compare against the same lines.
+  const planLineOf = (pageNumber) => (beats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
   // Hoisted for the post-review re-check below, which needs the same cast list
   // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
   let briefCastNames = [];
@@ -1656,7 +1661,7 @@ ${bibleBody}` : bibleBody;
     });
     briefCastNames = castNames;
     const res = checkBriefs(
-      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
       castNames,
       visualBible,
       { textZoneRules: textZoneRulesActive(inputData) }
@@ -1901,7 +1906,7 @@ ${bibleBody}` : bibleBody;
       try {
         const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
         const after = checkBriefs(
-          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
           briefCastNames,
           visualBible,
           { textZoneRules: textZoneRulesActive(inputData) }

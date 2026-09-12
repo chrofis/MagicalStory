@@ -33642,111 +33642,62 @@ print is the review step instead.
 guard fired as designed) and read-only on production (bucket verified, exact-key
 list printed). No erasure has been executed.
 
-## 2026-09-12 — A figure filed as an object still belongs on EXPECTED CAST; page-text element coverage is not a code check
 
-**Context:** Staging `job_1789163494908_kc2joi4ax` (18 pages, de-CH). Two faults
-were triaged out of it (`tasks/vb-element-coverage-2026-09-12.md`).
+## 2026-09-12 — A figure filed as an object belongs on EXPECTED CAST; element coverage is checked against the plan line, never the page text
+
+**Context:** Staging `job_1789163494908_kc2joi4ax` (18 pages, de-CH), triaged in
+`tasks/vb-element-coverage-2026-09-12.md`. Two faults out of it.
 
 Fault 3: `buildExpectedCastBlock` asks for animals through
-`buildSecondaryExpectedCharacters(..., includeAnimals: true)`, which resolves
-names out of `collectSceneCharacterNames` — and that helper reads only
-`characters`, `characterPositions` and `characterClothing`. The Art Director
-files animals and secondary characters in `objects[]` by id (p12:
-`characters: ["Max"], objects: ["LOC002","ANI001"]`), so no animal ever reached
-the roster and pages 12, 15 and 16 each took a false `extra_character` CRITICAL
-(75 / 50 / 54) for drawing the cat their own prompt commissioned. The
-`includeAnimals` switch added 2026-09-10 was dead on arrival.
+`buildSecondaryExpectedCharacters(..., includeAnimals: true)`, which resolves names out of
+`collectSceneCharacterNames` — and that helper reads only `characters`, `characterPositions`
+and `characterClothing`. The Art Director files animals and secondary characters in `objects[]`
+by id (p12: `characters: ["Max"], objects: ["LOC002","ANI001"]`), so no animal ever reached the
+roster and pages 12, 15 and 16 each took a false `extra_character` CRITICAL (75 / 50 / 54) for
+drawing the cat their own prompt commissioned. The `includeAnimals` switch added 2026-09-10 was
+dead on arrival.
 
-Fault 1: five pages name an element in their own page TEXT that their `objects[]`
-omits, so it never enters REQUIRED OBJECTS and the evaluator — which judges the
-image against the prompt — cannot see the gap.
+Fault 1: five pages stage an element their `objects[]` never cites, so it never enters REQUIRED
+OBJECTS; the evaluator judges the image against the prompt and cannot see the gap either.
 
 **Decision:**
-1. A new helper `collectSceneObjectFigureNames` (sceneMetadata.js) resolves
-   `objects[]` ids against `visualBible.animals` and `.secondaryCharacters` only,
-   stripping a state suffix (`ART002.1` → `ART002`), and `buildExpectedCastBlock`
-   adds what it returns. `collectSceneCharacterNames` is NOT widened: its other
-   caller is the figure detector (images.js), which must keep seeing people only.
-2. `prompts/scene-review.txt` gains check 9d `[element_uncited]`: a page whose
-   plan line or prose stages a named element while `objects[]` omits that
-   element's id is faulted and rewritten by adding the id.
-3. The CODE-side page-text coverage check (item A2) is NOT built. Measured on the
-   stored run, it cannot be written: the page text does not exist when the scene
-   review runs (text is written after it, beatsPipeline step 6), there is no
-   re-plan path for briefs after that point, and the text is in the reader's
-   language while the bible is English. Two candidate matchers over the stored
-   data: whole-word VB name/type/species tokens against the page TEXT flags
-   pages 1, 2, 4, 7, 9, 10, 12, 14, 15, 16, 17, 18 (2 of the 5 wanted, 10 false)
-   and misses pages 3 and 8 entirely; the same matcher against the plan line
-   flags 13 pages. Matching the brief's own prose flags nothing at all — brief
-   prose and `objects[]` agree on every page, which is why the gap only exists
-   against the later text. A real check needs a localized keyword/synonym field
-   authored onto each Visual Bible entry, i.e. a bible-prompt change, plus a
-   post-text stage that can send a page back.
+1. New helper `collectSceneObjectFigureNames` (`sceneMetadata.js`) resolves `objects[]` ids against
+   `visualBible.animals` and `.secondaryCharacters` only — state suffix stripped (`ART002.1` →
+   `ART002`), free text matched by name — and `buildExpectedCastBlock` adds what it returns.
+   `collectSceneCharacterNames` is NOT widened: its other caller is the figure detector
+   (`images.js`), which must keep being handed people only.
+2. New brief check `element_uncited` (`sceneBriefCheck.js`), REVIEWABLE, on the existing re-plan
+   path: findings → `{BRIEF_FINDINGS}` → the scene review rewrites the page → the deterministic
+   post-review re-check reports what survived. Code never cites an id itself; composition stays
+   with the Art Director (the owner rejected auto-citing explicitly).
+3. Its source is the page's own ENGLISH plan line (`beats[].planLine`, stored per page as
+   `outlineExtract`), and only that line's `<who/what is in frame>` and `<the instant>` segments.
+   The trailing purpose clause is not read. The reader-facing page text is never read.
+4. `prompts/scene-review.txt` gains check 9d `[element_uncited]` so the reviewer applies the same
+   coverage over the material it holds — the plan line and the brief prose.
 
-**Rationale:** The roster fix is one line of resolution at the only place that
-asked for animals, and keeping it out of the cast collector protects the
-detector path that must never be handed a dog. For coverage, shipping a matcher
-tuned until it happened to name five German pages would be a matcher that works
-in one language on one story; the honest deliverable is the reviewer-side rule
-plus the measurement above.
+**Rationale:** Everything in the planning chain is English; the page text is downstream, in the
+reader's language, and is not a source for a code check. Scoping to the in-frame and instant
+segments is what makes the rule honest rather than fitted: measured over the 18 stored pages it
+names exactly one (p14, a true defect) and no false ones, while reading the purpose clause as well
+would add one true page (p12) and four false ones (p5, p6, p13, p18 — all name the object in the
+purpose clause while correctly not drawing it). Three of the five known gaps (p3, p8, p9) are
+invisible to ANY pre-text check: their brief prose and `objects[]` agree — matching the English
+brief prose against uncited entries flags 0 of 18 — and the element surfaces only in the text the
+writer produces after the scene review, from a stage that has no way to send a page back. Closing
+those needs either element continuity tracking (the object was left at this place on the previous
+page and nothing moved it) or a post-text re-plan stage; neither was built.
+
+Matcher shape: head noun of each entry's `name` plus the head of `type`/`species`; a word owned by
+more than one entry is dropped as ambiguous (in this story `dragon` — shared by the mother dragon,
+the hatchling and the Dragon Egg — and `mother`); an entry already listed in `characters[]` is cast,
+not an uncited element.
 
 **Touched files:** `server/lib/sceneMetadata.js` (`collectSceneObjectFigureNames`),
-`server/lib/evalPipeline.js` (`buildExpectedCastBlock`), `prompts/scene-review.txt`
-(check 9d), `tasks/vb-element-coverage-2026-09-12.md`.
-
-## An object's OWN light is a state; the page's instant can drop a state's delta on the appearance axis too (2026-09-12)
-
-**Context:** Staging `job_1789163494908_kc2joi4ax`. The story's central prop is an object
-whose only change across the book is its own light — it glows, goes dark, glows again, and the
-glow is the plot signal. `prompts/scene-expansion-all.txt` banned light from a state delta
-("never light, that belongs to the scene") while requiring every page of an entry to fall in
-exactly one state. The author therefore filed the emission in `description` (always-true) and
-smuggled the change in as colour: one `dark` state claiming seven pages, three of which the
-text has glowing. `defaultObjectState` documents that the first state IS the unaltered look
-"by construction" — here the first state was the altered one, so even a bare citation resolved
-to `dark`. The p10 prompt read `THIS IMAGE DEPICTS: … the egg glows brightly again` above
-`* egg (object) — its shell is opaque dark brown`, and the renders split: the prose won on two
-pages, the object clause on three. No stage compares an entry's `description` with a state's
-`delta`, so nothing caught it.
-
-**Decision:** Two changes, both owner-approved (tasks/vb-element-coverage-2026-09-12.md, items
-B1 + B2).
-1. **Light is authorable.** The template now separates the two things it was conflating: how
-   the WORLD lights an object (a lamp on it, a shadow, dusk) stays the scene's, page by page;
-   the object's OWN emission — a thing that glows and goes dark, lights up and goes out — is a
-   state like any other change, and then the emission lives in the states, never in
-   `description`.
-2. **`contradicted` grows a second axis.** `resolveObjectState` already dropped a state's delta
-   (keeping its cell) when the state's `held` flag disagreed with the page's declared
-   interactions — the page's instant outranks the bible's table. `appearanceContradiction` puts
-   the appearance case on the same road: when the sentences of `sceneIntent` that name the
-   object speak exactly one SIBLING state's distinctive vocabulary and none of the chosen
-   state's, the delta is dropped and the cell kept. `contradictedBy` ('held' | 'appearance')
-   names the axis in the one warn line.
-
-**Rationale:** The detection is deliberately narrow, because a false positive silently strips a
-legitimate delta. Only the author's own words vote — there is no hand-written vocabulary of
-appearance concepts in the code, and no prose classification; only tokens DISTINCTIVE to one
-state vote; only the intent sentences that NAME the object are read, so the intent's closing
-"…, warm lamplight, hopeful mood" clause (scene lighting, present on nearly every page) cannot
-vote; the rival must be a single state. Sibling states are what makes this decidable without
-semantics: the template requires the complete set of looks with exactly one per page, so they
-are mutually exclusive by construction — the entry's `description`, being always-true, is NOT,
-and is deliberately not a rival source. Measured on the stored story: with the glow authored as
-a state and the page table mis-assigned (the failure shape), the dark delta is dropped on the
-two glowing pages and kept on every page whose text really is dark, including the page that
-mentions the cat lying "on top of" the object. The guard is silent on the story AS STORED,
-because there the rival look was in `description` — B1 is what makes B2 able to see it. It
-under-fires by design: a wrong delta shipping is the failure we already had, a stripped good
-delta would be a new one. First draft of the matcher read tokens of 3+ characters (so "egg" or
-"cat" can name its entry) and let "the" into the vote, which made every sibling a rival on
-every page — hence the explicit three-letter function-word stoplist.
-
-**Touched files:** `prompts/scene-expansion-all.txt` (state rule + the artifact `states[]`
-field), `server/lib/visualBible.js` (`APPEARANCE_STOPWORDS`, `appearanceStem`,
-`appearanceTokens`, `appearanceContradiction`, `resolveObjectState`),
-`server/lib/promptBuilders.js` (the REQUIRED OBJECTS warn line),
+`server/lib/evalPipeline.js` (`buildExpectedCastBlock`), `server/lib/sceneBriefCheck.js`
+(`checkElementCoverage`, `coverageIndex`, REVIEWABLE), `server/lib/beatsPipeline.js` (plan lines
+passed into both brief-check rounds), `prompts/scene-review.txt` (check 9d),
 `tasks/vb-element-coverage-2026-09-12.md`.
 
-**Status:** ✅ active
+**Status:** ✅ active — verified by replaying the stored briefs of
+`job_1789163494908_kc2joi4ax`. No story rerun.

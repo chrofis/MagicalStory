@@ -184,12 +184,93 @@ function checkTextZoneDistribution(pages = []) {
   return findings;
 }
 
+// ── Element coverage ────────────────────────────────────────────────────────
+// An element the page's PLAN LINE puts in the picture, which the brief's own
+// `objects[]` never cites. The citation is the only route by which an element
+// reaches REQUIRED OBJECTS and its reference cell, so an uncited element is
+// drawn from nothing or left out — and the image evaluator, which judges the
+// picture against the PROMPT, cannot see the gap either.
+//
+// Everything compared here is ENGLISH: the plan line, the brief and the visual
+// bible all come from the planning chain. The reader-facing page text is
+// written later, in the story's language, and is deliberately not a source.
+//
+// SCOPE: the shot segment and the trailing purpose clause are excluded. A plan
+// line is `<shot> — <who/what is in frame> — <the instant> — <why this page
+// exists>`, and the purpose clause routinely names elements that are elsewhere
+// in the world ("the creature cannot reach the object inside"), which is
+// exactly where a naive whole-line match earns its false positives — measured
+// on staging job_1789163494908_kc2joi4ax, where four such pages name an object
+// the page correctly does not draw. The cost is stated plainly: a page that
+// names its element ONLY in the purpose clause is not flagged, and one of that
+// story's five known gaps is that shape. Widening to the purpose clause would
+// have traded that one page for four false ones.
+const COVERAGE_STOP = new Set(['the', 'a', 'an', 'of', 'and', 'mother', 'father', 'little', 'big', 'old', 'young', 'grey', 'gray']);
+const COVERAGE_COLLECTIONS = ['animals', 'artifacts', 'vehicles', 'clothing', 'secondaryCharacters', 'locations'];
+
+/**
+ * The word that names each visual-bible entry: the head noun of its `name`,
+ * plus the head of `type` / `species` where those exist. A word that more than
+ * one entry answers to is dropped — a bible holding both a creature and an
+ * object named after it makes that word ambiguous, and guessing between two
+ * entries is how a citation lands on the wrong one.
+ */
+function coverageIndex(visualBible) {
+  const vb = visualBible || {};
+  const head = (s) => String(s).toLowerCase().split(/[^\p{L}\p{N}]+/u)
+    .filter(t => t.length > 2 && !COVERAGE_STOP.has(t)).pop();
+  const out = [];
+  for (const key of COVERAGE_COLLECTIONS) {
+    const list = Array.isArray(vb[key]) ? vb[key] : Object.values(vb[key] || {});
+    for (const e of list) {
+      if (!e || !e.id || !e.name) continue;
+      out.push({ id: String(e.id).toUpperCase(), name: e.name, words: [...new Set([e.name, e.type, e.species].filter(Boolean).map(head).filter(Boolean))] });
+    }
+  }
+  const owners = new Map();
+  for (const e of out) for (const w of e.words) owners.set(w, (owners.get(w) || new Set()).add(e.id));
+  for (const e of out) e.words = e.words.filter(w => owners.get(w).size === 1);
+  return out.filter(e => e.words.length > 0);
+}
+
+function checkElementCoverage(page, metadata, visualBible) {
+  const plan = String((page && page.planLine) || '').replace(/^\s*PLAN:\s*/i, '').trim();
+  if (!plan) return null;
+  const segments = plan.split(/\s+[—–]\s+/);
+  // Nothing to read when the line has only a shot and a purpose.
+  const staged = segments.slice(1, 3).join(' ').toLowerCase();
+  if (!staged.trim()) return null;
+  const index = coverageIndex(visualBible);
+  if (index.length === 0) return null;
+  const cited = new Set(((metadata && Array.isArray(metadata.objects)) ? metadata.objects : [])
+    .map(o => String(typeof o === 'string' ? o : (o && o.id) || '').trim().toUpperCase().split('.')[0])
+    .filter(Boolean));
+  // A figure carried in `characters[]` is on the page already; it is cast, not
+  // an uncited element.
+  const onCast = ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])
+    .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
+  const missing = index.filter(e => !cited.has(e.id)
+    && !onCast.some(n => isSameFigureName(n, e.name))
+    && e.words.some(w => new RegExp('(^|[^\\p{L}])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\p{L}]|$)', 'u').test(staged)));
+  if (missing.length === 0) return null;
+  return {
+    pageNumber: page.pageNumber,
+    type: 'element_uncited',
+    ids: missing.map(e => e.id),
+    detail: `The plan line stages ${missing.map(e => `${e.name} (${e.id})`).join(' and ')}, and objects[] does not cite `
+      + `${missing.length > 1 ? 'those ids' : 'that id'}. An element reaches the illustrator only through its id. `
+      + `Cite it and describe it in the prose, or restage the page without it — and if the page is then over its element budget, `
+      + `withdraw the least important citation instead of going over.`,
+  };
+}
+
 /**
  * Check one page.
  *
  * @param {Object} page
  * @param {number} page.pageNumber
  * @param {string} page.brief          the full scene brief (prose + ---METADATA---)
+ * @param {string} [page.planLine]     the page's plan line, for element coverage
  * @param {Object} [page.metadata]     already-parsed metadata, when the caller has it
  * @param {string[]} castNames         the story cast
  * @param {Object} [visualBible]
@@ -346,6 +427,10 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const overflow = checkVbElementBudget(page.pageNumber, metadata, visualBible);
   if (overflow) findings.push(overflow);
 
+  // H — element coverage: the plan line stages an element the brief never cites.
+  const uncited = checkElementCoverage(page, metadata, visualBible);
+  if (uncited) findings.push(uncited);
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -419,8 +504,13 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     elements per page (2026-09-06). Mechanical, and the fix is a deletion the
 //     reviewer can make without inventing anything. SENT; what survives the
 //     review is truncated in code.
+//   element_uncited      the plan line stages an element objects[] never cites
+//     (2026-09-12). Deliberately narrow — the shot and the purpose clause are
+//     not read — so on the story it was built from it names 1 page of 18 and no
+//     false ones. The reviewer holds the plan line and the brief, so the fix is
+//     a citation it can make without inventing anything. SENT.
 const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
-  'vb_element_overflow',
+  'vb_element_overflow', 'element_uncited',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They
@@ -454,5 +544,6 @@ function renderFindingsBlock(byPage) {
 
 module.exports = {
   checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE,
+  checkElementCoverage, coverageIndex,
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
 };
