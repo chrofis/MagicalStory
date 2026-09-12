@@ -134,12 +134,23 @@ router.post('/cleanup-orphaned-data', authenticateToken, requireAdmin, async (re
         );
         deletedStories = deleteStoriesResult.rowCount;
         console.log(`✓ Deleted ${deletedStories} orphaned stories`);
+        // A story's PDFs go with the story (owner, 2026-09-12) — same mechanism
+        // as the user-facing delete. The `orders` row is never touched.
+        let pdfRows = [];
+        if (orphanIds.length > 0) {
+          // dbQuery returns the ROWS array (with rowCount attached), not a pg result.
+          pdfRows = await dbQuery(
+            `DELETE FROM files WHERE story_id = ANY($1::varchar[]) RETURNING id, file_url`,
+            [orphanIds.map((r) => r.id)],
+          );
+        }
         try {
-          const r2 = require('../../lib/r2');
+          const r2Pending = require('../../lib/r2Pending');
           let totalR2 = 0;
           for (const row of orphanIds) {
-            totalR2 += await r2.deleteStoryArtefacts(row.id);
+            totalR2 += await r2Pending.pruneStory(row.id, 'orphaned story cleanup');
           }
+          totalR2 += await r2Pending.pruneFileRows(pdfRows, 'PDFs of orphaned stories');
           if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
         } catch (r2Err) {
           console.warn(`⚠️  R2 cleanup partial: ${r2Err.message}`);
@@ -248,18 +259,25 @@ router.post('/cleanup-orphaned', authenticateToken, requireAdmin, async (req, re
     console.log('🗑️ [ADMIN] Cleaning all orphaned files...');
 
     const pool = getPool();
+    // RETURNING file_url: the row is the ONLY thing that names the R2 object
+    // behind it (orders/{files.id}.pdf). Delete the row without pruning the
+    // object and the PDF is orphaned forever — measured as 22 of 42 order PDFs
+    // on production. Prune in the same step, tracked so a failed prune retries.
     const result = await pool.query(`
       DELETE FROM files
       WHERE story_id IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM stories s WHERE s.id = story_id
         )
+      RETURNING id, file_url
     `);
 
     const cleaned = result.rowCount || 0;
-    log.info(`✅ [ADMIN] Cleaned ${cleaned} orphaned files`);
+    const prunedR2 = await require('../../lib/r2Pending')
+      .pruneFileRows(result.rows, 'orphaned files cleanup');
+    log.info(`✅ [ADMIN] Cleaned ${cleaned} orphaned files (${prunedR2} R2 objects pruned)`);
 
-    res.json({ cleaned });
+    res.json({ cleaned, prunedR2 });
   } catch (err) {
     console.error('❌ [ADMIN] Error cleaning orphaned files:', err);
     res.status(500).json({ error: err.message });
@@ -303,10 +321,15 @@ router.delete('/orphaned-files', authenticateToken, requireAdmin, async (req, re
           AND NOT EXISTS (
             SELECT 1 FROM stories s WHERE s.id = files.story_id
           )
+        RETURNING id, file_url
       `);
 
       deletedCount = result.rowCount;
-      log.info(`✅ [ADMIN] Deleted ${deletedCount} orphaned files`);
+      // The deleted row was the only reference to orders/{id}.pdf — prune it
+      // in the same step, tracked, or the object is orphaned permanently.
+      const prunedR2 = await require('../../lib/r2Pending')
+        .pruneFileRows(result.rows, 'orphaned files deletion');
+      log.info(`✅ [ADMIN] Deleted ${deletedCount} orphaned files (${prunedR2} R2 objects pruned)`);
     } else {
       console.log(`🗑️ [ADMIN] Deleting orphaned file: ${fileId}`);
 
@@ -324,7 +347,8 @@ router.delete('/orphaned-files', authenticateToken, requireAdmin, async (req, re
         return res.status(404).json({ error: 'File not found or not orphaned' });
       }
 
-      await pool.query('DELETE FROM files WHERE id = $1', [fileId]);
+      const del = await pool.query('DELETE FROM files WHERE id = $1 RETURNING id, file_url', [fileId]);
+      await require('../../lib/r2Pending').pruneFileRows(del.rows, 'orphaned file deletion');
       deletedCount = 1;
       log.info(`✅ [ADMIN] Deleted orphaned file: ${fileId}`);
     }

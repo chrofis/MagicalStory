@@ -33824,3 +33824,95 @@ they appear only once populated. `tsc --noEmit` clean, client build clean.
 `client/src/types/story.ts` (`ArcReviewReport`, new `ArcRound`/`ArcPanelist`),
 `client/src/components/generation/StoryDisplay.tsx` (the arc panel).
 **Status:** ✅ active.
+
+## 2026-09-12 — R2 orphans: a failed prune is recorded, a PDF goes with its story, and the anchor was never `story_jobs`
+
+**Context:** `scripts/admin/audit-r2-orphans.js` (built under the GDPR erasure
+ruling, 2026-09-12) measured R2 objects that no database row can reach. Two
+mechanisms were proposed. One was right, one was wrong, and the wrong one
+matters enough to record plainly.
+
+*Right:* every prune in the app deletes the row first and prunes the bucket
+afterwards, best-effort — correct, because a user's "delete my story" must not
+be blocked by R2 being down. But `r2.deleteByPrefix` / `deleteObject` log a
+failure and return a count rather than throwing, so a failed prune was
+**silent**: once the row is gone nothing in the system knows which keys it
+owned, so no retry and no audit can ever reach them again.
+
+*Wrong:* the order-PDF orphans were diagnosed as the PDF key being anchored to
+a `story_jobs` row that gets pruned aggressively (5 job rows against 127
+stories on production). **That diagnosis is incorrect.** `keyForOrderPdf`
+(`server/lib/r2.js:138`) takes a **`files.id`**; `pdf-job_<jobId>-<ts>` is
+merely the *shape* of a files.id minted by `print.js`, and the audit resolves
+`orders/{id}.pdf` against the `files` table. Pruning `story_jobs` orphans
+nothing. The actual cause: **seven code paths delete `files` rows without
+deleting the R2 object**, and the row is the only thing that names the key.
+The dominant one is `POST /api/admin/cleanup-orphaned` (and
+`DELETE /api/admin/orphaned-files`), which delete every `files` row whose
+`story_id` no longer exists — i.e. the PDF row of every deleted story. That
+endpoint, named for cleaning orphans up, was **manufacturing** the 22-of-42
+orphaned order PDFs it was later blamed for.
+
+**Decision:**
+1. **`r2_pending_deletions`** (`migrations/036`) is the recovery log. A prune
+   that does not finish records its prefix or key; the DB delete still wins.
+   `server/lib/r2Pending.js` (`prunePrefix` / `pruneStory` / `pruneObject` /
+   `pruneFileRows`) replaces every raw prune call under `server/` — there are
+   now zero direct `deleteByPrefix` / `deleteObject` calls there. `r2.js`
+   gained `deleteByPrefixDetailed()` returning `{deleted, ok, error}` so a
+   failure is *detectable*; `deleteByPrefix` delegates to it and still returns
+   the bare count, so no existing caller changed. `retryPending()` runs from
+   `runDailyHousekeeping`, **before** the JSONB offload — the reverse order
+   would delete an object the same run had just re-uploaded and referenced.
+   Rows are never deleted, only stamped `deleted_at`: the table is also the
+   audit trail of every prune that had to be retried.
+2. **A story's PDFs go with the story** (owner ruling, this date). Every path
+   where a story is deleted by or on behalf of its owner now does
+   `DELETE FROM files … RETURNING id, file_url` and prunes the object through
+   the same `pruneFileRows` mechanism. The **`orders` row is never touched** —
+   the financial record is retained ten years (Swiss OR art. 958f, ruling Q5).
+   Verified: `orders` has no column referencing `files`, and no foreign key in
+   any migration points at `files.id`, so deleting a `files` row cannot cascade
+   into `orders`.
+3. **The `migrated/` prefix mismatch.** `dbHousekeeping.offloadInlineImages`
+   mints `stories/{userId}/{storyId}/migrated/…`; story deletion pruned only
+   `stories/{storyId}/`. Different shapes — so every offloaded image survived
+   every story deletion. Both prefixes are now pruned wherever a story dies.
+   A partial offload (some uploads succeed, row left unchanged) now records the
+   succeeded keys as pending, since the row still holds the inline bytes and a
+   later pass rewrites the same deterministic keys.
+4. **`ensureStoryRow` fails loudly.** That row is the anchor for the whole
+   `stories/{jobId}/` prefix; its failure was a `log.warn`, which meant a full
+   story's worth of objects written with nothing pointing at them. Now: one
+   retry, then throw. Failing there costs nothing — no model call has happened
+   yet, and `story_images` has a foreign key to that row, so the run could not
+   have been saved anyway.
+5. **`landmarks/historical/{rowId}-{slug}` stays unfixed** — no delete path
+   exists anywhere and the audit cannot resolve it (the slug is lossy). Backlog
+   item, not closed here: fixing it means a key change or a stored-key column.
+
+**Rationale:** The DB-delete-wins ordering is deliberate and stays. What was
+missing was not strictness but a *record* — an orphan is only permanent because
+the keys die with the row. One mechanism does the recording, at every call
+site, rather than each site inventing its own. The PDF fix needed no key
+rename and no backfill once the anchor was diagnosed correctly: existing
+`orders/*.pdf` keys are live and their read path is untouched.
+`scripts/admin/delete-user-data.js` was already consistent (it derives PDF keys
+from `files.file_url` and verifies its deletes); it now calls
+`r2Pending.keyForFileRow` so the derivation is not duplicated, while keeping
+its stricter policy of throwing on a failed delete — an erasure must be proven,
+not deferred to a retry.
+
+**Touched:**
+- `migrations/036_r2_pending_deletions.sql` (new table)
+- `server/lib/r2Pending.js` (new — the one tracked-prune mechanism)
+- `server/lib/r2.js` (`deleteByPrefixDetailed`, `storyPrefix`)
+- `server/lib/dbHousekeeping.js` (retry before offload; partial-offload recording)
+- `server/lib/landmarkPhotoStore.js` (both compensating deletes tracked)
+- `server/routes/stories.js`, `server/routes/characters.js`,
+  `server/routes/files.js`, `server/routes/print.js`, `server/routes/trial.js`,
+  `server/routes/admin/users.js`, `server/routes/admin/database.js`
+- `storyJobPipeline.js` (`ensureStoryRow` retry-then-throw)
+- `scripts/admin/delete-user-data.js` (shares `keyForFileRow`)
+- `scripts/admin/audit-r2-orphans.js` — read-only, untouched
+**Status:** ✅ active.

@@ -984,8 +984,9 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
     // character orphaned its objects on R2 permanently. Best-effort — the
     // DB delete already won.
     try {
-      const r2 = require('../lib/r2');
-      const removed = await r2.deleteByPrefix(`characters/${req.user.id}/${characterIdToDelete}/`);
+      const r2Pending = require('../lib/r2Pending');
+      const removed = await r2Pending.prunePrefix(
+        `characters/${req.user.id}/${characterIdToDelete}/`, 'character deleted');
       if (removed > 0) console.log(`☁️  Deleted ${removed} R2 objects for character ${characterIdToDelete}`);
     } catch (r2Err) {
       console.warn(`R2 cleanup failed for character ${characterIdToDelete}: ${r2Err.message}`);

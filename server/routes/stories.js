@@ -3326,12 +3326,40 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         log.warn(`Could not delete story_job ${id}:`, jobErr.message);
       }
 
-      // Prune every R2 artefact for the story (active images, debug refs,
-      // retry/style-lab outputs, VB references). Never throws — DB delete
-      // already won.
+      // The story's PDFs go with the story (owner, 2026-09-12). The files row
+      // is the ONLY thing that names its R2 key (orders/{files.id}.pdf), so
+      // the row must be read as it is deleted — RETURNING file_url — and the
+      // object pruned in the same operation.
+      //
+      // The `orders` row is NOT touched: the financial record is retained for
+      // ten years (Swiss OR art. 958f). Nothing cascades — `orders` has no
+      // column referencing `files`, and no foreign key anywhere points at
+      // files.id (checked across every migration).
+      let pdfRows = [];
       try {
-        const r2 = require('../lib/r2');
-        const removed = await r2.deleteStoryArtefacts(id);
+        const pool = getPool();
+        pdfRows = (await pool.query(
+          'DELETE FROM files WHERE story_id = $1 AND user_id = $2 RETURNING id, file_url',
+          [id, req.user.id],
+        )).rows;
+      } catch (fileErr) {
+        log.warn(`Could not delete files rows for story ${id}: ${fileErr.message}`);
+      }
+
+      // Prune every R2 artefact for the story (active images, debug refs,
+      // retry/style-lab outputs, VB references) plus its PDFs. Never throws —
+      // DB delete already won — but a failed prune is RECORDED in
+      // r2_pending_deletions and retried by the daily housekeeping routine,
+      // so the objects can never become silent orphans.
+      try {
+        const r2Pending = require('../lib/r2Pending');
+        // Two prefixes, not one. The JSONB offload in dbHousekeeping mints
+        // stories/{userId}/{storyId}/migrated/… — a DIFFERENT shape from the
+        // pipeline's stories/{storyId}/…, and pruning only the latter left
+        // every migrated image behind on every story deletion.
+        const removed = await r2Pending.pruneStory(id, 'story deleted by user')
+          + await r2Pending.prunePrefix(`stories/${req.user.id}/${id}/`, 'story deleted by user (migrated subtree)')
+          + await r2Pending.pruneFileRows(pdfRows, `PDFs of deleted story ${id}`);
         if (removed > 0) console.log(`☁️  Deleted ${removed} R2 objects for story ${id}`);
       } catch (r2Err) {
         log.warn(`R2 cleanup failed for ${id}: ${r2Err.message}`);

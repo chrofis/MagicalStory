@@ -673,22 +673,30 @@ router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
     const deletedOrders = await pool.query('DELETE FROM orders WHERE user_id = $1 RETURNING id', [userIdToDelete]);
     const deletedStories = await pool.query('DELETE FROM stories WHERE user_id = $1 RETURNING id', [userIdToDelete]);
     const deletedCharacters = await pool.query('DELETE FROM characters WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-    const deletedFiles = await pool.query('DELETE FROM files WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+    // file_url too: the files row is the only reference to orders/{id}.pdf.
+    const deletedFiles = await pool.query('DELETE FROM files WHERE user_id = $1 RETURNING id, file_url', [userIdToDelete]);
 
     // Prune R2 artefacts for every story this user owned. Sequential to avoid
     // hammering R2 with 100s of parallel ListObjects calls; each story's
     // prune is itself batched in 1000-key chunks.
     try {
-      const r2 = require('../../lib/r2');
+      const r2Pending = require('../../lib/r2Pending');
       let totalR2 = 0;
       for (const row of deletedStories.rows) {
-        totalR2 += await r2.deleteStoryArtefacts(row.id);
+        totalR2 += await r2Pending.pruneStory(row.id, `user ${userIdToDelete} deleted`);
+        // Sibling prefix minted by the JSONB offload (dbHousekeeping):
+        // stories/{userId}/{storyId}/migrated/… — not under stories/{storyId}/.
+        totalR2 += await r2Pending.prunePrefix(
+          `stories/${userIdToDelete}/${row.id}/`, `user ${userIdToDelete} deleted (migrated subtree)`);
       }
       // Sibling path of the single-character delete: the user's whole
       // character namespace (photos, avatars, styled, avatar-refs) —
       // previously orphaned on every user deletion.
-      totalR2 += await r2.deleteByPrefix(`characters/${userIdToDelete}/`);
-      if (totalR2 > 0) log.info(`[ADMIN] Pruned ${totalR2} R2 objects across ${deletedStories.rows.length} stories + character namespace`);
+      totalR2 += await r2Pending.prunePrefix(`characters/${userIdToDelete}/`, `user ${userIdToDelete} deleted`);
+      // And the user's PDFs, which live under orders/ and are named only by
+      // the files rows deleted above.
+      totalR2 += await r2Pending.pruneFileRows(deletedFiles.rows, `user ${userIdToDelete} deleted`);
+      if (totalR2 > 0) log.info(`[ADMIN] Pruned ${totalR2} R2 objects across ${deletedStories.rows.length} stories + character namespace + ${deletedFiles.rows.length} files`);
     } catch (r2Err) {
       log.warn(`[ADMIN] R2 cleanup partial: ${r2Err.message}`);
     }

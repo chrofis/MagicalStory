@@ -120,7 +120,13 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
         const pdfBase64 = pdfBuffer.toString('base64');
 
         // Delete any existing print PDFs for this story first
-        await dbQuery("DELETE FROM files WHERE story_id = $1 AND file_type = 'print_pdf'", [storyId]);
+        const superseded = await dbQuery(
+          "DELETE FROM files WHERE story_id = $1 AND file_type = 'print_pdf' RETURNING id, file_url",
+          [storyId],
+        );
+        // The row named the R2 object; prune it with the row or it is orphaned.
+        // dbQuery returns the ROWS array (with rowCount attached), not a pg result.
+        await require('../lib/r2Pending').pruneFileRows(superseded, 'superseded print PDF');
 
         await dbQuery(
           'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',

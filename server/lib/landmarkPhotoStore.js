@@ -100,7 +100,10 @@ async function storeLandmarkPhoto(db, landmarkId, slot, sourceUrl, opts = {}) {
     `UPDATE landmark_index SET ${col} = $2, updated_at = NOW() WHERE id = $1 AND ${srcCol} = $3`,
     [landmarkId, url, sourceUrl]);
   if (res.rowCount !== 1) {
-    await r2.deleteObject(key);
+    // Compensating delete: the row never took the URL, so nothing references
+    // this object. Tracked — a failed delete here is exactly how an orphan is
+    // born, and it must stay retryable.
+    await require('./r2Pending').pruneObject(key, `landmark ${landmarkId} slot ${slot} compacted before the URL landed`);
     throw new Error(`slot ${slot} no longer holds ${sourceUrl} (compacted?) — object removed`);
   }
   return { url, bytes: jpeg, skipped: false };
@@ -113,9 +116,12 @@ async function storeLandmarkPhoto(db, landmarkId, slot, sourceUrl, opts = {}) {
  */
 async function deleteStoredPhotos(r2Urls) {
   let n = 0;
+  const r2Pending = require('./r2Pending');
   for (const url of r2Urls || []) {
     const key = r2.keyFromPublicUrl(url);
-    if (key && await r2.deleteObject(key)) n++;
+    // The slot that named this key is already gone, so a failed delete is a
+    // permanent orphan unless it is recorded. pruneObject records it.
+    if (key) n += await r2Pending.pruneObject(key, 'landmark photo slot dropped');
   }
   return n;
 }

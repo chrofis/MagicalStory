@@ -386,12 +386,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // minutes after the cover repairs that wanted it. The row is empty; the
   // content arrives via upsertStory at the end. An unfinished story is kept out
   // of the library by joining story_jobs status, not by a flag on the row.
-  try {
-    await require('./server/services/database').ensureStoryRow(jobId, userId, {
-      adminDraft: inputData?.adminDraft === true,
-    });
-  } catch (err) {
-    log.warn(`⚠️ [UNIFIED] Could not pre-create the story row for ${jobId}: ${err.message}`);
+  //
+  // This row is also the ANCHOR for every R2 object the job writes: they all
+  // land under `stories/{jobId}/`, and that prefix is only reachable — for
+  // serving, for erasure, for the orphan audit — through this row. Swallowing
+  // a failure here used to mean a whole story's worth of objects written with
+  // nothing pointing at them, unreachable forever. So: one retry, then fail
+  // the job. Failing here costs nothing (no model call has happened yet) and
+  // the run could not have been saved anyway — story_images has a foreign key
+  // to this row.
+  {
+    const { ensureStoryRow } = require('./server/services/database');
+    try {
+      await ensureStoryRow(jobId, userId, { adminDraft: inputData?.adminDraft === true });
+    } catch (err) {
+      log.warn(`⚠️ [UNIFIED] Could not pre-create the story row for ${jobId}: ${err.message} — retrying once`);
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        await ensureStoryRow(jobId, userId, { adminDraft: inputData?.adminDraft === true });
+      } catch (err2) {
+        throw new Error(
+          `Cannot create the story row for ${jobId} (${err2.message}). Refusing to generate: ` +
+          `every image would be written to R2 with no database row referencing it.`);
+      }
+    }
   }
 
   // Debug: Log inputData values at start of unified processing

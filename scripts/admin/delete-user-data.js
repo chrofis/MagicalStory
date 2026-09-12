@@ -46,6 +46,7 @@ const {
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 const r2 = require(path.resolve(__dirname, '..', '..', 'server', 'lib', 'r2.js'));
+const r2Pending = require(path.resolve(__dirname, '..', '..', 'server', 'lib', 'r2Pending.js'));
 const { ch, fromPgNaive } = require(path.resolve(__dirname, '..', 'lib', 'chTime.js'));
 const {
   GDPR_SENTINEL_USER_ID, GDPR_SENTINEL_USERNAME, GDPR_SENTINEL_EMAIL, GDPR_SENTINEL_PASSWORD,
@@ -523,8 +524,12 @@ async function main() {
       r2Groups.push({ prefix, label, count: objs.length, bytes: b, keys: objs.map((o) => o.key) });
       r2Total += objs.length; r2Bytes += b;
     }
-    // Order PDFs: keyed by files.id, no user prefix — reachable only via the DB rows.
-    const pdfKeys = fileRows.map((f) => (f.file_url ? r2.keyFromPublicUrl(f.file_url) : null)).filter(Boolean);
+    // Order PDFs: keyed by files.id, no user prefix — reachable only via the DB
+    // rows. Same derivation the app's delete paths use (r2Pending.keyForFileRow),
+    // so there is one mechanism, not two. This script keeps its own STRICTER
+    // policy afterwards: it throws on a failed delete instead of recording a
+    // pending retry, because an erasure must be proven, not deferred.
+    const pdfKeys = fileRows.map((f) => r2Pending.keyForFileRow(f)).filter(Boolean);
     for (const g of r2Groups) row(`    ${g.prefix}`, `${g.count} objects, ${bytes(g.bytes)}  — ${g.label}`);
     if (pdfKeys.length) row('    orders/*.pdf', `${pdfKeys.length} object(s) (via files.file_url)`);
     if (r2Groups.length === 0 && pdfKeys.length === 0) console.log('  No R2 objects found for this user.');

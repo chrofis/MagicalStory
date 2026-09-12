@@ -1797,7 +1797,10 @@ setInterval(async () => {
 
       const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`);
       const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`);
-      const filesResult = await client.query(`DELETE FROM files ${anonFilter}`);
+      // RETURNING file_url: the files row is the only reference to the PDF's
+      // R2 key (orders/{files.id}.pdf), which lives outside both prefixes
+      // pruned below.
+      const filesResult = await client.query(`DELETE FROM files ${anonFilter} RETURNING id, file_url`);
       // Delete stories too — previously orphaned. stories.user_id has no
       // cascading FK, so a purged anonymous child's story (title, dedication,
       // likeness-derived illustrations) + its story_images survived forever.
@@ -1819,16 +1822,19 @@ setInterval(async () => {
       }
 
       // Prune R2 artefacts (external storage — after commit, best-effort).
-      if (storiesResult.rowCount > 0 || usersResult.rowCount > 0) {
+      if (storiesResult.rowCount > 0 || usersResult.rowCount > 0 || filesResult.rowCount > 0) {
         try {
-          const r2 = require('../lib/r2');
+          const r2Pending = require('../lib/r2Pending');
           let totalR2 = 0;
           for (const row of storiesResult.rows) {
-            totalR2 += await r2.deleteStoryArtefacts(row.id);
+            totalR2 += await r2Pending.pruneStory(row.id, 'abandoned anon account');
           }
           for (const row of usersResult.rows) {
-            totalR2 += await r2.deleteByPrefix(`characters/${row.id}/`);
+            totalR2 += await r2Pending.prunePrefix(`characters/${row.id}/`, 'abandoned anon account');
+            // The JSONB offload's sibling prefix: stories/{userId}/{storyId}/migrated/…
+            totalR2 += await r2Pending.prunePrefix(`stories/${row.id}/`, 'abandoned anon account (migrated subtree)');
           }
+          totalR2 += await r2Pending.pruneFileRows(filesResult.rows, 'abandoned anon account');
           if (totalR2 > 0) log.info(`[TRIAL CLEANUP] Pruned ${totalR2} R2 objects for abandoned anon accounts`);
         } catch (r2Err) {
           log.warn(`[TRIAL CLEANUP] R2 prune failed (rows already deleted): ${r2Err.message}`);
