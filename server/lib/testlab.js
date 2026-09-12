@@ -696,7 +696,10 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   await loadPromptTemplates();
   const { evaluateImageQuality } = require('./images');
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // A pinned target evaluates THAT version (2026-09-12). Without this the stage
+  // always judged the active one, so two versions of a page — an original and
+  // the repair that replaced it — could not be scored against each other.
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const t0 = Date.now();
   const result = await evaluateImageQuality(
     imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
