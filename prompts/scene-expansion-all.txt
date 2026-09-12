@@ -91,6 +91,7 @@ C3. **Clothing consistency.** A character wears the same clothing category on ev
 C4. **No two consecutive pages with near-identical composition.** Neighbouring pages must differ in at least one of: camera distance (close-up / medium / wide / aerial), character grouping, or camera angle. Same location on two pages is fine; the same shot twice is not.
 C5. **Recurring elements stay identical.** A location, animal, vehicle or artifact keeps its description across pages — same colours, same shape, same markings. Take them from the Visual Bible you write below and do not re-invent details per page.
 C6. **Visual arc.** Framing builds with the plot: the widest establishing shot near the start, the tightest and most intense framing on the page whose plan line carries the climax.
+C7. **An element left at a place stays there.** When a plan line sets an element down at a location — put down, dropped, hidden, left behind — the next two or three pages set at that same location still hold it: cite its id in `objects[]` and stage it in the prose where it was left, at the visibility the shot gives it. It counts against the page's element budget like any other. The window ends at the first plan line that moves, takes or breaks it, at the first page set somewhere else, or three pages on. A page that takes in the whole place from a distance, or points its camera away from where the element lies, inherits nothing — and a plan line's closing "what is true after" clause is not a placement: an element named only there sits wherever the story last put it.
 
 ---
 

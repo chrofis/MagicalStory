@@ -33757,3 +33757,25 @@ field), `server/lib/visualBible.js` (`APPEARANCE_STOPWORDS`, `appearanceStem`,
 `tasks/vb-element-coverage-2026-09-12.md`.
 
 **Status:** ✅ active
+
+## An element left at a place stays cited for the next two-three pages at that place (2026-09-12)
+**Context:** In `job_1789163494908_kc2joi4ax` a plan line left an artifact on the ground at LOC002 on
+p11; p12, staged at the same spot the very next page, cited only the location and one animal, so the
+artifact never entered the image prompt and the beat rendered unreadable (p14 the same). The code
+check `element_uncited` cannot see it: p12's plan line names the element only in the trailing "what is
+true after" clause, and that clause is deliberately not read — four other pages name it there while
+correctly not drawing it.
+**Decision:** Prompt-side only, per the owner's 2026-09-12 ruling. `scene-expansion-all.txt` gains
+cross-page rule **C7**: an element a plan line sets down at a location is cited in `objects[]` and
+staged in the prose on the next two-three pages set at that same location, ending at the first plan
+line that moves it, the first page set elsewhere, or three pages on; a whole-place distance shot or a
+camera pointed away inherits nothing, and the "what is true after" clause is not a placement.
+`scene-review.txt` gains the matching reviewer check **9e `[element_stranded]`**, beside 9d.
+**Rationale:** The window is deliberately short — an open-ended continuity rule would drag page 1's
+props into page 15. No code check: the condition needs the placement semantics of the plan line, which
+is what the Art Director and reviewer already read. Verified over the 18 stored plan lines of the
+source run: the condition is met on p12 and p14 (the two true defects) and not on p5, p6, p13, p18 —
+p5/p6 precede the placement, p18 is past the window, p13 is the whole-square ultra-wide.
+**Touched:** `prompts/scene-expansion-all.txt` (C7), `prompts/scene-review.txt` (9e),
+`tasks/vb-element-coverage-2026-09-12.md`.
+**Status:** ✅ active
