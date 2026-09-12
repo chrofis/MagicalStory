@@ -33916,3 +33916,36 @@ not deferred to a retry.
 - `scripts/admin/delete-user-data.js` (shares `keyForFileRow`)
 - `scripts/admin/audit-r2-orphans.js` — read-only, untouched
 **Status:** ✅ active.
+
+## A creature's face is written on every page, same-kind beings are authored against each other, and gentle ones show no teeth (2026-09-12)
+**Context:** On `job_1789163494908_kc2joi4ax` (creature tone level `not-menacing`, focus age 5)
+the mother dragon was drawn as a fanged, slit-eyed predator looming over the square, and looked
+nothing like her own hatchling — she was "shimmering dark indigo scales, wedge-shaped head, long
+spiked tail", he was "bright orange scales, blunt rounded snout". Three separate causes, all
+measured: (1) pages 5, 6 and 13 carried NO face wording for her at all — no brow, eye, mouth,
+teeth or snout word — which is the case `CREATURE_TONE_PAGE_RULE` already describes ("a face left
+unwritten is drawn from the action alone, and effort reads as teeth"); (2) `{CREATURE_TONE}` sat
+only in the Visual-Bible-authoring section of `scene-expansion-all.txt`, so it shaped entries and
+never reached page prose; (3) nothing anywhere asked a parent creature and its young to look
+related — grep found no family-resemblance rule in any prompt. Separately the element cell gate
+rejected a creature for bared teeth while the prompt considered a smiling open mouth legal
+("Teeth and claws may exist but are not bared"), so gate and prompt disagreed.
+**Decision:** `{CREATURE_TONE}` is injected at BOTH sites — the bible section and a new per-page
+rule 8k ("A creature in frame has a written face") — which the loader supports because
+`prompts/services` replaces every occurrence, not the first. The bible section gains a same-kind
+rule: two or more beings of one kind are written against each other, unrelated ones differing in
+at least two glanceable dimensions, kin sharing the family look and parting only on age and size.
+The two gentle tone bands now say no teeth show at all, smiling included, and cap head
+projections at a single short pair. The `formidable` band (7+) is untouched — visible teeth and a
+rugged look are its stated purpose. `runBeatsScenesStage` now keeps the bible it authors
+(`authoredBible`), which is what made this verifiable.
+**Rationale:** Verified by re-running the Art Director on the same stored beats (Lab #1198) and
+rendering the element cells (#1201-1208): mother and hatchling came back both "European Dragon",
+both emerald green, both "open friendly face, level brow", parting on size and wing shape; her
+size is now stated in metres as the band asks. Owner ruled the horn cap and the no-teeth wording
+2026-09-12; distinctness stays the default for unrelated animals, shared identity is required
+only where the story makes them kin.
+**Touched files:** `prompts/scene-expansion-all.txt` (rule 8k + same-kind rule + second
+`{CREATURE_TONE}`), `prompts/scene-expansion.txt` (rule 8k), `server/lib/promptBuilders.js`
+(`CREATURE_TONE_LEVELS` cute + not-menacing), `server/lib/testlab.js` (`authoredBible`).
+Commits `fcd3056ca`, `a9fc72600`.
