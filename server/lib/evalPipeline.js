@@ -898,6 +898,7 @@ function buildExpectedCastBlock({
   evaluationType = 'scene',
   detectedFigureCount = null,
   pageLabel = '',
+  sceneMetadata = null,
 } = {}) {
   const names = [];
   const labels = [];
@@ -934,7 +935,15 @@ function buildExpectedCastBlock({
 
   const sh = getStoryHelpers();
   try {
-    const sceneMeta = sh.extractSceneMetadata(sceneHint || originalPrompt);
+    // THE HINT IS NOT ALWAYS THE BRIEF (2026-09-12). The repair pipeline hands
+    // the eval `scene.outlineExtract` — the PLAN line — which carries no
+    // `---METADATA---` block and therefore no `objects[]`, so every Visual
+    // Bible figure filed there vanished from the roster and the page's own
+    // secondary character came back as an `extra_character` CRITICAL
+    // (job_1789207854566_l43qgl34w p13/p15, a museum conservator the brief
+    // cites as CHR001). The parsed metadata is passed in where the caller
+    // holds it; parsing a hint stays the fallback.
+    const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, includeAnimals: true })) add(e.name, vbKind(e.name));
     // A FIGURE FILED AS AN OBJECT IS STILL A FIGURE (2026-09-12). The Art
     // Director puts animals and secondary characters in `objects[]` by id, and
@@ -1142,6 +1151,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       evaluationType,
       detectedFigureCount: evalOptions.detectedFigureCount ?? null,
       pageLabel: pageContext ? `${pageContext} ` : '',
+      sceneMetadata: evalOptions.sceneMetadata || null,
     });
     if (expectedCast.count > 0) {
       log.debug(`👥 [EVAL] ${pageContext}: expected cast (${expectedCast.count}) ${expectedCast.names.join(', ')}`);

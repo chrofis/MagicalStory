@@ -2357,6 +2357,9 @@ async function evaluateImageBatch(images, options = {}) {
           // pipeline (landmark refs + scene era). Absent → no protection.
           landmarkPhotos: img.landmarkPhotos || null,
           era: img.era || null,
+          // The page's PARSED metadata, so the EXPECTED CAST roster reads the
+          // brief's `objects[]` even when sceneHint is a plan line.
+          sceneMetadata: img.sceneMetadata || null,
           // Detector figure count for the EXPECTED CAST block — present on
           // repair-round re-evaluations that carry the previous detection;
           // null on a first-round eval, which runs before detection.
