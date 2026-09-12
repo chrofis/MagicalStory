@@ -3682,7 +3682,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const resolved = resolveObjectState(artifact, handle, pageNumber, metadata, { visualBible });
         let state = resolved.state;
         if (resolved.contradicted) {
-          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") says the object is ${state.held ? 'in hand' : 'untouched'} but the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
+          const why = resolved.contradictedBy === 'appearance'
+            ? `the page's instant asserts ${resolved.rival.id} ("${resolved.rival.name}": "${resolved.rival.delta}") instead — "${resolved.evidence}"`
+            : `the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} but the state says the object is ${state.held ? 'in hand' : 'untouched'}`;
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") — ${why} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
           state = null;
         }
         // The RECEIVER of another row's result never carries a state clause

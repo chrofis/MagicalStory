@@ -240,6 +240,113 @@ function pageHoldsObject(entry, sceneMetadata, visualBible = null) {
   return false;
 }
 
+// Relational and structural nouns on top of the row stopwords. A state's delta
+// routinely names a PART of the object ("the top of the shell"), and those
+// words turn up in staging prose for reasons that have nothing to do with the
+// object's look ("the cat lies on top of it") — they carry no appearance
+// evidence and must not vote.
+const APPEARANCE_STOPWORDS = new Set([
+  ...ROW_MATCH_STOPWORDS,
+  'top', 'bottom', 'side', 'sides', 'front', 'back', 'edge', 'edges', 'end', 'ends',
+  'middle', 'centre', 'center', 'part', 'parts', 'half', 'left', 'right', 'again',
+  'look', 'looks', 'shape', 'size', 'onto', 'into',
+  // Three-letter function words. ROW_MATCH_STOPWORDS never needed them (that
+  // matcher takes tokens of 4+); this one reads three so "egg", "cat", "cup"
+  // can name their entry, which lets "the" or "its" into the vote otherwise —
+  // measured: "the" alone made every sibling delta a rival on every page.
+  'the', 'and', 'its', 'his', 'her', 'out', 'for', 'are', 'was', 'not', 'but',
+  'has', 'had', 'one', 'two', 'all', 'any', 'own', 'off', 'she', 'him', 'you',
+  'who', 'how', 'why', 'yet', 'per', 'via', 'now', 'new', 'old', 'own',
+  'der', 'die', 'das', 'und', 'ein', 'ist', 'sie', 'ihr', 'den', 'dem', 'des',
+  'mit', 'auf', 'aus', 'les', 'des', 'une', 'est', 'son', 'sur', 'par', 'pas',
+]);
+
+/**
+ * Crude suffix stem, so the bible's "glowing" meets the brief's "glows" and
+ * "bright" meets "brightly". Only ever compared against other stems of the
+ * same helper — it is a matcher, never a display string.
+ */
+function appearanceStem(token) {
+  for (const suf of ['ing', 'edly', 'ed', 'ly', 'es', 's']) {
+    if (token.length - suf.length >= 4 && token.endsWith(suf)) return token.slice(0, -suf.length);
+  }
+  return token;
+}
+
+/** Stemmed content tokens of a string, for the appearance matcher only. */
+function appearanceTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^\p{L}]+/u)
+      .filter(t => t.length >= 3 && !APPEARANCE_STOPWORDS.has(t))
+      .map(appearanceStem)
+  );
+}
+
+/**
+ * Does the page's own instant assert a look the chosen state DENIES?
+ *
+ * The same doctrine as the `held` contradiction, on the appearance axis: a
+ * state is the bible's table talking about a range of pages, and the page's
+ * instant outranks it. What makes this decidable without reading prose
+ * semantically is that the states of one object are MUTUALLY EXCLUSIVE by
+ * construction — the authoring template requires the complete set of looks and
+ * exactly one state per page — so if the instant speaks another state's
+ * vocabulary and none of the chosen state's, the chosen delta is wrong here.
+ *
+ * Deliberately narrow, because a false positive silently strips a legitimate
+ * delta:
+ *   - only the AUTHOR's own words vote (state names and deltas); there is no
+ *     hand-written vocabulary of appearance concepts anywhere in here,
+ *   - only tokens DISTINCTIVE to one state vote; a word two states share says
+ *     nothing,
+ *   - only the sentences of `sceneIntent` that NAME this object are read, so
+ *     the intent's closing "…, warm lamplight, hopeful mood" clause — scene
+ *     lighting, present on nearly every page — cannot vote,
+ *   - the rival must be a single state, and the chosen state must be entirely
+ *     absent from those sentences.
+ *
+ * Known limits: it sees nothing when the object's competing look was filed in
+ * `description` instead of a sibling state, when the instant does not name the
+ * object, or when the prose paraphrases the delta in words the bible never
+ * used. It under-fires by design — the wrong delta shipping is the same
+ * failure we already had, a stripped good delta is a new one.
+ *
+ * @returns {{rival: Object, evidence: string}|null}
+ */
+function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
+  if (!state || !state.delta) return null;
+  const siblings = objectStates(entry).filter(s => s !== state);
+  if (siblings.length === 0) return null;
+  const intent = String(sceneMetadata?.sceneIntent || '').trim();
+  if (!intent) return null;
+
+  const vocab = new Map([[state, appearanceTokens(`${state.name || ''} ${state.delta}`)]]);
+  for (const s of siblings) vocab.set(s, appearanceTokens(`${s.name || ''} ${s.delta || ''}`));
+  const distinctive = (s) => [...vocab.get(s)].filter(t => ![...vocab].some(([o, toks]) => o !== s && toks.has(t)));
+  const mine = distinctive(state);
+  if (mine.length === 0) return null;
+
+  // Tokens that name THIS object and no other element the page cites.
+  const nameTokens = (e) => appearanceTokens(`${e?.name || ''} ${e?.properName || ''} ${e?.type || ''}`);
+  const others = citedEntries(visualBible, sceneMetadata).filter(e => baseVbId(e.id) !== baseVbId(entry?.id));
+  const taken = new Set(others.flatMap(e => [...nameTokens(e)]));
+  const naming = [...nameTokens(entry)].filter(t => !taken.has(t));
+  if (naming.length === 0) return null;
+
+  const sentences = intent.split(/(?<=[.!?])\s+/)
+    .map(text => ({ text, toks: appearanceTokens(text) }))
+    .filter(s => naming.some(t => s.toks.has(t)));
+  if (sentences.length === 0) return null;
+  const said = new Set(sentences.flatMap(s => [...s.toks]));
+
+  if (mine.some(t => said.has(t))) return null; // the instant agrees with the chosen state
+  const rivals = siblings.filter(s => distinctive(s).some(t => said.has(t)));
+  if (rivals.length !== 1) return null;
+  return { rival: rivals[0], evidence: sentences.map(s => s.text).join(' ') };
+}
+
 /**
  * THE ONE PLACE a page's state of an object is decided.
  *
@@ -258,11 +365,15 @@ function pageHoldsObject(entry, sceneMetadata, visualBible = null) {
  *      verdict, the bible's table (the brief has already been shown to cite a
  *      neighbouring page's state), with a WARN naming both.
  *   3. Neither → the default (first) state.
- * `contradicted` is set when the chosen state's `held` still disagrees with
- * the page — the caller drops the state's delta from the prompt (the instant
- * outranks the state) but keeps the cell (identity is right either way).
+ * `contradicted` is set when the page's own instant disagrees with the chosen
+ * state — the caller drops the state's delta from the prompt (the instant
+ * outranks the state) but keeps the cell (identity is right either way). Two
+ * axes reach it by the same road: `held`, when the state's contact flag
+ * disagrees with the brief's `interactions[]`, and `appearance`, when the
+ * instant asserts a sibling state's look (`appearanceContradiction`).
+ * `contradictedBy` says which.
  *
- * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean}}
+ * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean, contradictedBy:('held'|'appearance'|null), rival:Object|null, evidence:string|null}}
  */
 function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false, visualBible = null } = {}) {
   const cited = handle ? objectStateFor(entry, handle) : null;
@@ -284,8 +395,15 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
   } else {
     state = cited || declared || defaultObjectState(entry);
   }
-  const contradicted = !!(state && typeof held === 'boolean' && typeof state.held === 'boolean' && state.held !== held);
-  return { state, cited, declared, held, contradicted };
+  const heldContradicted = !!(state && typeof held === 'boolean' && typeof state.held === 'boolean' && state.held !== held);
+  const appearance = heldContradicted ? null : appearanceContradiction(entry, state, sceneMetadata, visualBible);
+  return {
+    state, cited, declared, held,
+    contradicted: heldContradicted || !!appearance,
+    contradictedBy: heldContradicted ? 'held' : (appearance ? 'appearance' : null),
+    rival: appearance?.rival || null,
+    evidence: appearance?.evidence || null,
+  };
 }
 
 /**
@@ -3069,6 +3187,8 @@ module.exports = {
   entryNamedByRow,
   citedEntries,
   resolveObjectState,
+  appearanceContradiction,
+  appearanceTokens,
   hasElementReference,
   elementRefCell,
   getEmptySceneElementReferences,
