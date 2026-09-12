@@ -970,14 +970,59 @@ export interface TokenUsage {
  * (with its fix ledger), and whether the review rewrote it. The APPROVED arc
  * itself travels on beatsReviewReport.arc and in the outline transcript.
  */
-export interface ArcReviewReport {
+/** One panelist's answer in an arc round — the arc's reviewers. */
+export interface ArcPanelist {
+  letter?: string;
   model?: string | null;
-  planModel?: string | null;
+  text?: string;
+}
+
+/** One panel + re-tell round of the arc machine. */
+export interface ArcRound {
+  round?: number;
+  panel?: ArcPanelist[];
+  failedPanelists?: string[];
+  retellModel?: string | null;
+  finalArc?: string;
+  critique?: string;
+  fixing?: string;
+  keeping?: string;
+  used?: string;
+  maxSeverity?: string | null;
+  /** Dev-mode inspection: what this round actually asked (2026-09-11). */
+  panelPrompt?: string | null;
+  retellPrompt?: string | null;
+}
+
+/**
+ * The arc machine's record: create (two arcs, one committed) → panel → re-tell.
+ *
+ * This replaced a single draft-and-review shape, and the old field names
+ * (`drafted`, `analysis`, `planModel`, `changed`) were left behind here while
+ * the pipeline moved on — so the dev-mode panel rendered nothing from a report
+ * that was full of data. Every field below is one the pipeline writes.
+ */
+export interface ArcReviewReport {
+  machine?: string;
+  creatorModel?: string | null;
+  panelModels?: string[];
+  roundsConfigured?: number;
+  roundsRun?: number;
   durationMs?: number;
-  changed?: boolean;
-  drafted?: string;
-  analysis?: string;
-  prompt?: string | null;
+  /** Raw creation output: both arcs, both critiques, the commitment line. */
+  create?: string;
+  createPrompt?: string | null;
+  /** Which arc won (1 or 2), and the two arcs as separate blocks. */
+  committedArc?: number;
+  committed?: string;
+  discarded?: string;
+  rounds?: ArcRound[];
+  finalArc?: string;
+  critique?: string;
+  fixing?: string;
+  keeping?: string;
+  maxSeverity?: string | null;
+  arcHints?: string;
 }
 
 export interface ReviewDiffReport {

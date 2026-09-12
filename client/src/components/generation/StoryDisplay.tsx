@@ -2815,41 +2815,82 @@ export function StoryDisplay({
               <>
                 {(arcReviewReport || (beatsReviewReport as any)?.arc) && (() => {
                   const c = TONES.emerald;
+                  const ar = arcReviewReport;
+                  const rounds = ar?.rounds || [];
+                  const L = (de: string, fr: string, en: string) => (language === 'de' ? de : language === 'fr' ? fr : en);
+                  const block = (label: string, body?: string | null) => (body ? (
+                    <details className={`mt-3 ${c.card}`}>
+                      <summary className={c.sub}>{label}</summary>
+                      <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{body}</pre>
+                    </details>
+                  ) : null);
                   return (
                     <details key="arc-review" className={c.box}>
                       <summary className={c.head}>
                         <FileText size={20} />
-                        {language === 'de' ? 'Story-Arc' : language === 'fr' ? "Arc de l'histoire" : 'Story arc'}
+                        {L('Story-Arc', "Arc de l'histoire", 'Story arc')}
                         <span className={c.meta}>
-                          [{arcReviewReport?.planModel || '—'} → {arcReviewReport?.model || '—'}
-                          {arcReviewReport ? ` · ${arcReviewReport.changed ? (language === 'de' ? 'umgeschrieben' : 'rewritten') : (language === 'de' ? 'unverändert' : 'unchanged')}` : ''}
-                          {arcReviewReport?.durationMs != null && ` · ${(arcReviewReport.durationMs / 1000).toFixed(0)}s`}]
+                          [{ar?.creatorModel || '—'}
+                          {ar?.panelModels?.length ? ` · ${L('Panel', 'Panel', 'panel')}: ${ar.panelModels.join(' + ')}` : ''}
+                          {ar?.roundsRun != null ? ` · ${ar.roundsRun}/${ar.roundsConfigured ?? '?'} ${L('Runden', 'tours', 'rounds')}` : ''}
+                          {ar?.maxSeverity ? ` · ${ar.maxSeverity}` : ''}
+                          {ar?.durationMs != null && ` · ${(ar.durationMs / 1000).toFixed(0)}s`}]
                         </span>
                       </summary>
-                      {(beatsReviewReport as any)?.arc && (
+
+                      {(ar?.finalArc || (beatsReviewReport as any)?.arc) && (
                         <div className={`mt-3 ${c.card}`}>
-                          <div className={c.label}>{language === 'de' ? 'Geprüfter Arc — die ganze Geschichte, ohne Seiten' : 'Approved arc — the whole story, no pages'}</div>
-                          <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{(beatsReviewReport as any).arc}</pre>
+                          <div className={c.label}>{L('Geprüfter Arc — die ganze Geschichte, ohne Seiten', "Arc approuvé — toute l'histoire, sans pages", 'Approved arc — the whole story, no pages')}</div>
+                          <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{ar?.finalArc || (beatsReviewReport as any).arc}</pre>
                         </div>
                       )}
-                      {(beatsReviewReport as any)?.pagePlan && (
-                        <details className={`mt-3 ${c.card}`}>
-                          <summary className={c.sub}>{language === 'de' ? 'Seitenplan — erst hier bekommt die Geschichte Seiten' : 'Page plan — where the story gets its pages'}</summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{(beatsReviewReport as any).pagePlan}</pre>
-                        </details>
+
+                      {(ar?.fixing || ar?.keeping) && (
+                        <div className={`mt-3 ${c.card}`}>
+                          {ar?.fixing && <div className="text-xs text-gray-700"><span className={c.label}>{L('Behoben', 'Corrigé', 'Fixing')}</span> {ar.fixing}</div>}
+                          {ar?.keeping && <div className="mt-1 text-xs text-gray-700"><span className={c.label}>{L('Behalten', 'Conservé', 'Keeping')}</span> {ar.keeping}</div>}
+                        </div>
                       )}
-                      {arcReviewReport?.drafted && (
-                        <details className={`mt-3 ${c.card}`}>
-                          <summary className={c.sub}>{language === 'de' ? 'Erster Entwurf (vor dem Review)' : 'First draft (before review)'}</summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{arcReviewReport.drafted}</pre>
-                        </details>
+
+                      {block(L('Kritik am finalen Arc', "Critique de l'arc final", 'Critique of the final arc'), ar?.critique)}
+                      {block(L('Hinweise an die Beats', 'Indications aux beats', 'Hints handed to the beats'), ar?.arcHints)}
+
+                      {ar?.committed && block(
+                        L(`Gewählter Arc (Arc ${ar.committedArc ?? '?'}) + Kritik`, `Arc retenu (Arc ${ar.committedArc ?? '?'}) + critique`, `Committed arc (Arc ${ar.committedArc ?? '?'}) + critique`),
+                        ar.committed,
                       )}
-                      {arcReviewReport?.analysis && (
-                        <details className={`mt-3 ${c.card}`}>
-                          <summary className={c.sub}>{language === 'de' ? 'Analyse des Reviewers (mit Fix-Ledger)' : 'Reviewer analysis (with fix ledger)'}</summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{arcReviewReport.analysis}</pre>
+                      {block(L('Verworfener Arc', 'Arc écarté', 'Discarded arc'), ar?.discarded)}
+                      {block(L('Rohe Erstellung (beide Arcs, beide Kritiken)', 'Création brute (les deux arcs)', 'Raw creation (both arcs, both critiques)'), ar?.create)}
+
+                      {rounds.map((r, i) => (
+                        <details key={`arc-round-${r.round ?? i}`} className={`mt-3 ${c.card}`}>
+                          <summary className={c.sub}>
+                            {L('Runde', 'Tour', 'Round')} {r.round ?? i + 1}
+                            <span className="font-normal text-gray-500">
+                              {r.panel?.length ? ` · ${r.panel.length} ${L('Panelisten', 'panélistes', 'panelists')}` : ''}
+                              {r.retellModel ? ` · ${L('neu erzählt von', 'raconté par', 're-told by')} ${r.retellModel}` : ''}
+                              {r.maxSeverity ? ` · ${r.maxSeverity}` : ''}
+                              {r.failedPanelists?.length ? ` · ${r.failedPanelists.length} ${L('ausgefallen', 'en échec', 'failed')}` : ''}
+                            </span>
+                          </summary>
+                          {r.used && <div className="mt-2 text-xs text-gray-700"><span className={c.label}>{L('Verwendet', 'Utilisé', 'Used')}</span> {r.used}</div>}
+                          {(r.panel || []).map((pan, j) => (
+                            <details key={`panelist-${j}`} className={`mt-2 ${c.card}`}>
+                              <summary className={c.sub}>
+                                {L('Panelist', 'Panéliste', 'Panelist')} {pan.letter || String.fromCharCode(65 + j)}
+                                <span className="font-normal text-gray-500">{pan.model ? ` · ${pan.model}` : ''}</span>
+                              </summary>
+                              <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{pan.text}</pre>
+                            </details>
+                          ))}
+                          {block(L('Arc nach dieser Runde', 'Arc après ce tour', 'Arc after this round'), r.finalArc)}
+                          {block(L('Kritik dieser Runde', 'Critique de ce tour', 'Critique from this round'), r.critique)}
+                          {block(L('Prompt — Panel', 'Prompt — panel', 'Prompt — panel'), r.panelPrompt)}
+                          {block(L('Prompt — Neuerzählung', 'Prompt — récit', 'Prompt — re-tell'), r.retellPrompt)}
                         </details>
-                      )}
+                      ))}
+
+                      {block(L('Prompt — Erstellung', 'Prompt — création', 'Prompt — creation'), ar?.createPrompt)}
                     </details>
                   );
                 })()}

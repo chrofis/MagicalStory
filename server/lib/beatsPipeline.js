@@ -709,6 +709,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         round,
         panel,
         failedPanelists,
+        // The prompts each round actually sent (2026-09-11). The report already
+        // keeps every OUTPUT verbatim; without the inputs a dev-mode reader can
+        // see what the panel said but not what it was asked, which is where a
+        // prompt regression hides. Same treatment the beats and text stages
+        // already give their prompts (outlinePrompt, storyTextPrompts).
+        panelPrompt,
+        retellPrompt,
         retellModel: retellRes.modelId || arcCreatorModel,
         finalArc: retold.finalArc,
         used: retold.used,
@@ -777,6 +784,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       roundsRun: roundReports.length,
       durationMs: meta.timings.arcMs,
       create: createRes.text,
+      createPrompt,
       committedArc: commit.n,
       committed: commit.committed,
       discarded: commit.discarded,

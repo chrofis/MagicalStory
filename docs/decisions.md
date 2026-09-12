@@ -33779,3 +33779,48 @@ p5/p6 precede the placement, p18 is past the window, p13 is the whole-square ult
 **Touched:** `prompts/scene-expansion-all.txt` (C7), `prompts/scene-review.txt` (9e),
 `tasks/vb-element-coverage-2026-09-12.md`.
 **Status:** ✅ active
+
+## 2026-09-11 — The arc machine's record is shown in dev mode, and its prompts are stored
+
+**Context:** owner asked why the arc prompt, the raw arc and the arc reviewers
+are "not stored any more". Two different answers:
+
+The raw arc and the reviewers ARE stored, and always were. `arcReviewReport`
+carries `create` (both arcs + both critiques, 15k chars on
+`job_1789163494908_kc2joi4ax`), `committed`, `discarded`, `rounds[].panel[]`
+(each panelist's full text with its model and letter), `critique`, `finalArc`,
+`arcHints`, `creatorModel`, `panelModels`.
+
+What failed is the dev-mode view. `ArcReviewReport` in `client/src/types/story.ts`
+still described the pre-arc-machine shape — `drafted`, `analysis`, `planModel`,
+`changed`, `prompt` — and `StoryDisplay.tsx` rendered from exactly those names.
+None of them exist on the report the pipeline writes, and every field is
+optional, so the panel showed `— → —`, claimed "unchanged", and silently
+rendered no sections at all. A producer moved to a new shape and its consumer
+stayed on the old contract without anything failing loudly.
+
+The prompts were the one real omission: `createPrompt`, `panelPrompt` and
+`retellPrompt` were built and never persisted, unlike the beats prompt
+(`outlinePrompt`) and the text prompts (`storyTextPrompts`). The report's own
+comment says "Everything the machine produced, verbatim — storage is cheap,
+debuggability is the point"; the inputs belong there for the same reason, since
+a prompt regression is invisible from outputs alone.
+
+**Decision:** the arc prompts are stored (create on the report, panel and re-tell
+per round), and the type plus the dev-mode panel are rewritten to the shape the
+pipeline actually writes: header with creator model, panel models, rounds run and
+worst severity; the approved arc; Fixing/Keeping; the critique; the hints; the
+committed and discarded arcs; the raw creation; then each round with its
+panelists by letter and model, the arc after that round, its critique, and the
+two prompts it sent.
+
+**Verified:** against the stored report for `job_1789163494908_kc2joi4ax` — every
+section the panel reads resolves to real content (8 sections, one round, three
+named panelists). The three prompt sections are empty for that story because it
+ran before this change; the render helper returns null for an absent value, so
+they appear only once populated. `tsc --noEmit` clean, client build clean.
+
+**Touched:** `server/lib/beatsPipeline.js` (report + roundReports),
+`client/src/types/story.ts` (`ArcReviewReport`, new `ArcRound`/`ArcPanelist`),
+`client/src/components/generation/StoryDisplay.tsx` (the arc panel).
+**Status:** ✅ active.
