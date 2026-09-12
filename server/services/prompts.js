@@ -240,6 +240,7 @@ async function loadPromptTemplates() {
     // Post-repair figure-integrity check (repair-acceptance): MATCH/EDGES
     // observations -> enum rating; clearly off or worse rejects the repaint.
     ['repairNaturalness', 'repair-naturalness.txt'],
+    ['repairFaceCheck', 'repair-face-check.txt'],
     ['characterRepairBodyBlended', 'character-repair-body-blended.txt'],
     ['characterRepairCutout', 'character-repair-cutout.txt'],
     ['characterRepairInpaint', 'character-repair-inpaint.txt'],

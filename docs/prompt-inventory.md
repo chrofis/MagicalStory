@@ -152,6 +152,7 @@ Sizes measured 2026-08-09.
 | character-repair-cutout.txt | images.js `repairCharacterMismatchWithGrok` | Grok cutout repair |
 | character-repair-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok blended repair |
 | `repair-naturalness.txt` | faceRepair.js checkRepairNaturalness | post-repair figure-integrity check: MATCH/EDGES observations -> enum; clearly off rejects the repaint |
+| `repair-face-check.txt` | repairPipeline.js char-fix gate | post-repair comparative face check: original + repaired in, {intact,confidence,reason} out; not intact refuses the repair |
 | character-repair-body-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok body-blended repair |
 | character-repair-inpaint.txt | faceRepair.js `buildPrompt` (crosshatch + box) | Full-scene (box-mode) char repair |
 | inpainting.txt | images.js `inpaintWithMask` | Mask inpainting (Runware) — **DEAD CHAIN**, no live caller |

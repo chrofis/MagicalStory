@@ -1,0 +1,12 @@
+You are given two versions of the same illustration. IMAGE A is the original. IMAGE B is the same page after a repair that repainted one character.
+
+Judge ONE thing: is {CHARACTER}'s face intact in IMAGE B?
+
+A face is intact when eyes, nose and mouth are each rendered as recognisable features. A face is NOT intact when it is a blank oval, a smear, a melted or scrambled area, a patch of flat colour, or a region blurred so far past the rest of the picture that no feature can be made out. Judge only the character named above.
+
+Compare against IMAGE A. A face that was already turned away, in deep shadow, distant, or cropped out in A and is the same in B is intact — the repair did not take anything away. Judge the same character in both, at the size they occupy in B; a small figure painted loosely is intact when the features are placed, however few strokes drew them. Painterly brushwork, soft edges and visible paint texture are how this medium renders a face and are intact.
+
+Only the face. Ignore clothing, props, background, pose, anatomy elsewhere, style and every other difference between the two images.
+
+Return JSON, nothing else:
+{"intact": true|false, "confidence": 0.0-1.0, "reason": "<one short sentence naming what you see where the face is>"}

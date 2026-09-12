@@ -1446,21 +1446,29 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // char fix on staging is the test; watch for the refusal log line and the
     // `repair_reject_face_integrity` metric.
     try {
-      const { detectIllustrationFaces } = require('./entityConsistency');
-      const [before, after] = await Promise.all([
-        detectIllustrationFaces(currentImageData, 0),
-        detectIllustrationFaces(repairResult.imageData, 0),
-      ]);
-      const nBefore = Array.isArray(before) ? before.length : null;
-      const nAfter = Array.isArray(after) ? after.length : null;
-      if (nBefore !== null && nAfter !== null && nBefore > 0 && nAfter < nBefore) {
-        log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair lost a face (${nBefore} detected before, ${nAfter} after). Keeping the original.`);
-        require('./runMetrics').forJob(storyData?.id || jobId).count('repair_reject_face_integrity');
-        return { pageNumber, imageData: null, error: `char-fix refused: face count fell ${nBefore} → ${nAfter}` };
+      const { PROMPT_TEMPLATES } = require('../services/prompts');
+      const { callTextModel } = require('./textModels');
+      const template = PROMPT_TEMPLATES.repairFaceCheck;
+      if (template) {
+        const res = await callTextModel(
+          template.replace(/\{CHARACTER\}/g, charName || 'the repaired character'),
+          400,
+          MODEL_DEFAULTS.repairFaceCheck || 'gemini-3.7-flash',
+          { images: [currentImageData, repairResult.imageData], usageLabel: 'repair_face_check' }
+        );
+        if (res?.usage && usageTracker) usageTracker('openrouter', res.usage, 'repair_face_check', res.modelId);
+        const raw = String(res?.text || '');
+        const json = raw.match(/\{[\s\S]*\}/);
+        const verdict = json ? JSON.parse(json[0]) : null;
+        if (verdict && verdict.intact === false) {
+          log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${verdict.reason || 'no reason given'}). Keeping the original.`);
+          require('./runMetrics').forJob(storyData?.id || jobId).count('repair_reject_face_integrity');
+          return { pageNumber, imageData: null, error: `char-fix refused: face not intact after repair (${verdict.reason || ''})` };
+        }
+        log.debug(`[CHAR-FIX] Page ${pageNumber} ${charName}: face check ${verdict ? 'intact' : 'unparsed'}`);
       }
-      log.debug(`[CHAR-FIX] Page ${pageNumber} ${charName}: face-integrity ok (${nBefore} → ${nAfter})`);
     } catch (faceErr) {
-      log.warn(`⚠️ [CHAR-FIX] Page ${pageNumber}: face-integrity gate unavailable (${faceErr.message}) — accepting the repair`);
+      log.warn(`⚠️ [CHAR-FIX] Page ${pageNumber}: face check unavailable (${faceErr.message}) — accepting the repair`);
     }
 
     if (repairResult.usage && usageTracker) {

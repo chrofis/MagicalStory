@@ -33971,3 +33971,32 @@ Note the standing risk recorded beside `accessory` in scoring.js: a prompt rule 
 a ceiling without holding it. If clothing CRITICALs persist on period garments in the next costume
 story, the code ceiling is the fallback.
 **Touched files:** `prompts/image-prompt-compliance.txt` (Clothing type bullet).
+
+## A character repair is refused when it leaves the face unreadable (2026-09-12)
+**Context:** `job_1789207854566_l43qgl34w` p9 shipped a character whose face is a featureless smear,
+at quality 70. The chain: a FALSE `accessory_missing` finding ("Lorena is missing her wide-brimmed
+tricorn hat") against a figure already wearing one — reproduced on a re-eval of the original — drove
+`char-fix-round-1`, a maskless whole-frame edit (the class docs/SETTLED.md records for 2026-09-07,
+where the same edit erased a named animal's head). It repainted the head, losing both the face and
+the hat. The damaged output then out-scored the intact original 70 to 10 and pick-best shipped it.
+The entity evaluator DID see it — `{"type":"cutout_artifact","severity":"major","description":"Severe
+blurring and missing regions impair assessment of facial features..."}` — but `cutout_artifact` is in
+`ZERO_POINT_TYPES` (owner, 2026-09-01) because it is meant to describe an artifact of OUR crop
+extraction, not of the page. One type carrying two meanings; the page-level meaning priced at zero.
+A judge bake-off on the two versions (Lab #1209-1216) confirmed the blindness is not model-specific:
+gemini-2.5-flash scored the damaged version 10 points HIGHER than the intact one, qwen3-vl 60 points
+higher, gemini-3.1-pro tied, gemini-2.5-pro errored on both arms.
+**Decision:** After a char fix, a comparative check receives BOTH images — the original as A, the
+repair as B — and answers one question about the named character's face in B
+(`prompts/repair-face-check.txt` → `{intact, confidence, reason}`). Not intact refuses the repair and
+keeps the original, counting `repair_reject_face_integrity`. Comparative rather than absolute, which
+is what makes it reliable where absolute anatomy judgment measured 0-precision: a face already turned
+away, distant or cropped in A is intact in B. Fails open — an unparsed or failed call accepts the
+repair rather than stalling a paid run. ~$0.0025 and ~4s per char fix.
+**Rationale:** Measured 4/4 on real pairs, including two controls: p9 A→B (destroyed) returns
+`intact:false, "facial features replaced with a blurred, featureless smear"`; the SAME pair reversed
+returns `intact:true`, so the check reads the images rather than always doubting a repair; p8's
+repair (face kept) and an identical-image pair both return `intact:true`. The separate type collision
+behind the zero-pointing is being fixed alongside this.
+**Touched files:** `prompts/repair-face-check.txt` (new), `server/services/prompts.js` (registration),
+`server/lib/repairPipeline.js` (the gate), `docs/prompt-inventory.md`.
