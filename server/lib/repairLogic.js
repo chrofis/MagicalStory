@@ -690,6 +690,9 @@ function mapStrategyToMethod(s) {
 const NOT_INPAINTABLE_TYPES = new Set([
   // identity / face
   'character_identity', 'face_mismatch', 'face_drift', 'age_shift', 'skin_tone',
+  // face_destroyed: inpaint repaints the whole figure and the identity drifts;
+  // a featureless face must go to character repair, anchored to the avatar.
+  'face_destroyed',
   // hair
   'hair', 'hair_change', 'hair_nuance',
   // clothing (garment_colour has its own mechanical recolour path)

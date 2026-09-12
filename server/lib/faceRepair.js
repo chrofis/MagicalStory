@@ -1326,7 +1326,11 @@ function applyGeometryGuards(axes, { faceBbox, bodyBbox } = {}) {
 // patch that works even on busy multi-figure pages where every full-figure
 // draw is gate-refused (p16, 12/12). FULL-FIGURE repair is for STRUCTURAL /
 // POSITIONAL defects and clothing (garment = body scale).
-const FACE_DEFECT_TYPES = new Set(['age_shift', 'face_drift', 'face_mismatch', 'facial_hair', 'skin_tone']);
+const FACE_DEFECT_TYPES = new Set(['age_shift', 'face_drift', 'face_mismatch', 'facial_hair', 'skin_tone',
+  // face_destroyed (2026-09-12): a featureless or smeared face in the page. A
+  // face-only patch is exactly the repair — the head size and tilt survive, so
+  // the features come back from the reference avatar without a full redraw.
+  'face_destroyed']);
 const BODY_DEFECT_TYPES = new Set(['clothing_inconsistent', 'color_change', 'shape_change', 'missing', 'unexpected', 'garment']);
 
 function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'grok', forceTarget = null, issueTypes = null } = {}) {

@@ -34000,3 +34000,47 @@ repair (face kept) and an identical-image pair both return `intact:true`. The se
 behind the zero-pointing is being fixed alongside this.
 **Touched files:** `prompts/repair-face-check.txt` (new), `server/services/prompts.js` (registration),
 `server/lib/repairPipeline.js` (the gate), `docs/prompt-inventory.md`.
+
+## 2026-09-12 — `face_destroyed`: a face broken IN THE PAGE is not a crop artifact, and is not free
+
+**Context:** On `job_1789207854566_l43qgl34w` page 9 a character repair destroyed a figure's face —
+it renders as a featureless smear, no eyes, nose or mouth. The entity evaluator saw it and filed
+`{"type":"cutout_artifact","severity":"major","description":"Severe blurring and missing regions
+impair assessment of facial features, hair, and skin tone"}`. `cutout_artifact` is in
+`ZERO_POINT_TYPES` (owner, 2026-09-01) for a correct reason: a grid cell with missing regions or
+hard white gaps is an artifact of OUR crop extraction, not of the page, and charging it would buy
+paid repairs for a defect the image does not have. So the finding cost 0, and the faceless page
+shipped at quality 70 — out-scoring the intact original it replaced.
+
+The fault was a TYPE COLLISION, not a wrong zero-point rule: one type carried two meanings — "our
+crop is broken" (harmless) and "the rendered figure is broken in the picture" (real and expensive) —
+and the page-level meaning was priced at the harmless one's rate.
+
+**Decision:** Split the second meaning into its own type, `face_destroyed`, scored normally.
+`cutout_artifact` keeps its zero-point rule untouched. The entity prompt separates them by WHERE the
+damage ends: at the cell edge (hard white gap, clean straight boundary, a limb stopping where the cut
+ran) → `cutout_artifact`; contained inside the head, away from any cell edge → `face_destroyed`, at
+CRITICAL. `face_destroyed` gets a CRITICAL **floor** in `MIN_SEVERITY_TYPES` (the sanctioned shape:
+the prompt classifies, code only bounds the cost), is deliberately absent from `ZERO_POINT_TYPES` and
+from `MAX_SEVERITY_TYPES`, and buckets to `character_identity` → `grok_face`.
+
+**Rationale:** CRITICAL matches `image-evaluation` D-11, where a headless or bodiless figure is
+CRITICAL — a head with no features is the same class of failure — and CRITICAL is what routes the
+page into character repair under the settled critical-only routing (2026-09-04). The floor lives in
+code rather than the prompt alone because `composite_seam` already measured what happens when a
+severity is escalated in prompt wording: detection *falls*. The repair route is the face patch, not
+a regen: the head size and tilt survive a smear, so the features can come back from the reference
+avatar. `face_destroyed` is added to `NOT_INPAINTABLE_TYPES` — asked to fix a face, inpaint repaints
+the whole figure and identity drifts.
+
+Verified: `deductionPoints` on the evidence finding as filed (`cutout_artifact`/major) = 0; the same
+finding retyped `face_destroyed`/major = 25 (floor applied), bucket `character_identity`.
+`cutout_artifact` still costs 0 at every severity.
+
+**Touched files:** `prompts/entity-consistency-check.txt` (visibility rules, severity guide, type
+tie-break), `prompts/feedback-consolidator.txt` (closed vocabulary + keep-its-own-type note),
+`server/lib/scoring.js` (`MIN_SEVERITY_TYPES`), `server/lib/evalBuckets.js` (`TYPE_TO_BUCKET`),
+`server/lib/faceRepair.js` (`FACE_DEFECT_TYPES`), `server/lib/repairLogic.js`
+(`NOT_INPAINTABLE_TYPES`), `client/src/hooks/useRepairWorkflow.ts` (mirror of the floor, and
+`entityIssuePoints` now reads `subType` first as the server does), `client/src/types/story.ts`
+(`EntityIssueSubType`).

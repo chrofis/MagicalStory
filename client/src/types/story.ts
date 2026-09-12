@@ -468,7 +468,8 @@ export interface FinalChecksTextCheck {
 
 // Entity consistency check issue (from entity grid evaluation)
 export type EntityIssueSubType =
-  | 'face_mismatch' | 'face_drift' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
+  | 'face_mismatch' | 'face_drift' | 'face_destroyed' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
+  | 'cutout_artifact'
   | 'clothing_inconsistent' | 'garment_colour' | 'color_change' | 'shape_change';
 
 export interface EntityConsistencyIssue {

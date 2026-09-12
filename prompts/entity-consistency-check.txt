@@ -62,6 +62,8 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - Only flag an attribute as missing or wrong when the cell's angle would actually show it.
 - Each cell is a cutout of the figure alone, so whatever stood in front of it — furniture, a prop, another figure — was cut away with the background, taking the part it covered. A limb, hand, foot or garment area that is absent or stops at a clean edge is an artefact of that cut and never a defect; report identity, hair, skin, age, build and clothing only.
 - A cell with missing regions, hard white gaps or truncated limbs is a cropping artifact — report `type: "cutout_artifact"`; never describe it as a skin, clothing or anatomy difference.
+- `cutout_artifact` covers damage that ends at the cell edge: a hard white gap, a clean straight boundary, a limb stopping where the cut ran.
+- A face rendered without eyes, nose or mouth, or smeared to an unreadable surface, with the damage contained inside the head and away from any cell edge, is `type: "face_destroyed"` at CRITICAL — never a skin, hair or identity difference, and never a reason to say features could not be assessed.
 
 ## Output Format
 
@@ -130,7 +132,7 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 
 ## Severity Guide
 
-- **CRITICAL**: a viewer would read this as a different person (age, face, build).
+- **CRITICAL**: a viewer would read this as a different person (age, face, build), or the face is not rendered at all (`face_destroyed`).
 - **MAJOR**: a clearly visible difference — a garment, a colour, the hair.
 - **MINOR**: only findable comparing side by side — fastenings, buttons, panels, trim, freckle density, small hue shifts. `face_drift` and `hair_nuance` are always MINOR.
 
@@ -145,6 +147,7 @@ A garment of the wrong kind, cut or category still belongs in `fixable_issues` a
 ## Type Tie-Break
 
 If a defect could match multiple `type` values, pick the most specific:
+- Face rendered without features, smeared or melted inside the picture → `face_destroyed`
 - Wrong species or completely different person → `face_mismatch`
 - Same person, but the face reads rounder, fuller or narrower than the reference → `face_drift`
 - Same person but visibly older/younger → `age_shift`
