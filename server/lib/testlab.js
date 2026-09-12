@@ -3732,6 +3732,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let sceneExpansions = null;
   let sceneReview = null;
   let sceneReviews = null;
+  let authoredBible = null;
   let timeToScenesMs = null;
   if (params.expandScenes !== false) {
     const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
@@ -3783,6 +3784,15 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         });
         const parsedAll = parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES');
         const byPage = new Map((parsedAll.pages || []).map(x => [x.pageNumber, x.text]));
+        // The bible this call AUTHORS, kept on the result. Without it the stage
+        // measures page briefs written against a bible nobody can read back,
+        // and a bible fault in a Lab run is invisible.
+        try {
+          const { extractBibleSections, AD_BIBLE_MARKERS } = require('./beatsPipeline');
+          authoredBible = extractBibleSections(res.text || '', AD_BIBLE_MARKERS) || null;
+        } catch (err) {
+          log.warn(`[TESTLAB] beats_scenes: could not extract the authored bible (${err.message})`);
+        }
         sceneExpansions = toExpand.map(b => ({
           pageNumber: b.pageNumber,
           ok: byPage.has(b.pageNumber),
@@ -3944,6 +3954,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     sceneExpansions,
     sceneReview,
     sceneReviews,
+    authoredBible,
     timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,
