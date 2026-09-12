@@ -10,6 +10,7 @@ const router = express.Router();
 const { dbQuery, getPool, isDatabaseMode, logActivity } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
+const { sentinelExclusion } = require('../../lib/gdprSentinel');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -35,11 +36,13 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 
     const pool = getPool();
 
-    // Build WHERE clause for search
-    let whereClause = '';
+    // Build WHERE clause for search. The GDPR erasure sentinel is not a person
+    // (server/lib/gdprSentinel.js) — it only holds erased users' retained
+    // ledger rows, so it never appears in the listing or the count.
+    let whereClause = `WHERE ${sentinelExclusion('u')}`;
     const queryParams = [];
     if (search) {
-      whereClause = `WHERE u.username ILIKE $1 OR u.email ILIKE $1`;
+      whereClause += ` AND (u.username ILIKE $1 OR u.email ILIKE $1)`;
       queryParams.push(`%${search}%`);
     }
 

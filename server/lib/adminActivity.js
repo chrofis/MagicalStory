@@ -13,6 +13,8 @@
 
 'use strict';
 
+const { sentinelExclusion } = require('./gdprSentinel');
+
 /**
  * @param {Pool} dbPool
  * @param {number} hours - lookback window (1..168)
@@ -29,6 +31,7 @@ async function buildActivityFeed(dbPool, hours = 24) {
            COALESCE(is_trial, false) AS is_trial
     FROM users
     WHERE created_at > NOW() - ($1 * INTERVAL '1 hour')
+      AND ${sentinelExclusion()}
     ORDER BY created_at`, [h]);
   for (const u of newUsers.rows) {
     events.push({
@@ -47,6 +50,7 @@ async function buildActivityFeed(dbPool, hours = 24) {
     FROM users
     WHERE last_login > NOW() - ($1 * INTERVAL '1 hour')
       AND last_login > created_at + INTERVAL '5 minutes'
+      AND ${sentinelExclusion()}
     ORDER BY last_login`, [h]);
   for (const u of logins.rows) {
     events.push({ ts: u.last_login, type: 'login', user: u.email, label: 'Logged in' });

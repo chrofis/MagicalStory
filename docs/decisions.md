@@ -33556,3 +33556,197 @@ The claimed closures and the grown page are both exposed.
 snapshot and the return).
 **Status:** ✅ active — verified against stored text; the corrective pass itself
 has not yet run on a live generation.
+
+
+## 2026-09-12 — GDPR erasure: the eight design questions, ruled (three limits accepted)
+
+**Context:** `scripts/admin/delete-user-data.js` and `docs/gdpr-erasure.md` shipped
+2026-09-11 with eight questions the owner had to answer before a first real
+erasure (`tasks/gdpr-erasure-2026-09-11.md` §8). They cover what survives an
+erasure, whose rows we may rewrite, how long retained rows live, and what can be
+rehearsed. All eight were ruled on 2026-09-12. Three of them changed the script.
+
+**Decision:**
+
+- **Q1 — KEEP `credit_transactions` and `referral_payouts`** (the script deleted
+  them via the `users` cascade). Both are `user_id NOT NULL REFERENCES users(id)
+  ON DELETE CASCADE`, so the rows are reassigned to a sentinel `users` row,
+  `gdpr-erased-sentinel`, created idempotently by the script. The move is an
+  erasure only because the rows are scrubbed crossing over: `description` +
+  `reference_id` on `credit_transactions`, `description` on `referral_payouts`,
+  and `source_user_id` wherever it named the erased person. Amounts, balances,
+  types, dates, `order_stripe_session_id` and `stripe_refund_id` are kept — that
+  is the audit trail being preserved. The sentinel is not a person: no name, an
+  `@invalid` address (RFC 2606, undeliverable), a password that is not a bcrypt
+  hash so nothing can authenticate as it, and it is excluded from the admin user
+  list and count, the admin storage report and the activity feed.
+- **Q2 + Q3 — do not touch third parties' rows** (the script tombstoned
+  `users.referred_by`; that was removed). Other users' `referred_by` and
+  `orders.referral_code_used` keep the erased person's referral code.
+- **Q4 — abort on an unprocessed `stripe_webhook_retry` row** (`processed_at IS
+  NULL`) mentioning the person. Already the behaviour; now a recorded decision.
+  The admin triages the payment at `/api/admin/stripe-webhook-retry`, then re-runs.
+- **Q5 — retention is 10 years** (Swiss OR art. 958f). The privacy policy was
+  edited by the owner to say 10 years; the SOP and the plan now agree.
+- **Q6 — the policy describes the email request path** (`privacy@magicalstory.ch`,
+  one month) instead of a non-existent account setting. Owner-edited. A self-serve
+  delete button is a later follow-up.
+- **Q7 — a READ-ONLY orphan audit**, `scripts/admin/audit-r2-orphans.js`: lists the
+  bucket, compares each key's owning id against the live DB, and reports the count
+  and total bytes of unreferenced objects grouped by key prefix. It deletes nothing
+  and has **no delete mode at all**.
+- **Q8 — production-only R2, accepted.** No staging R2 credentials will be added.
+
+**Accepted limits — declines, recorded deliberately:**
+
+1. **A first name survives an erasure.** The referral code is
+   `Magic<Firstname><NNN>` (`server/lib/referral.js`), so third parties' retained
+   rows keep it. The script counts those rows and prints the count in the dry run
+   and on the receipt, so the limit is visible at every erasure rather than
+   forgotten.
+2. **Retained rows have no expiry.** No retention-date stamp and no purge job were
+   asked for, so nothing records when an anonymised `orders` row or a sentinel-owned
+   ledger row becomes deletable, and nothing will ever remove one. Tracked in
+   `tasks/BACKLOG.md`.
+3. **The R2 half of an erasure cannot be rehearsed.** It runs against production
+   only, so the first real erasure is the first real execution of that code. The
+   compensating control: the dry run prints the exact R2 keys it would delete.
+
+**Rationale:** Q1 — a ledger is evidence; deleting it to satisfy an erasure
+destroys the record of money that moved, and GDPR art. 17(3) does not require
+that. The sentinel exists because the FK does, not because anyone wanted another
+user row — hence the "cannot log in, cannot be emailed, invisible to admin"
+constraints. Q2/Q3 — both alternatives edit a row that belongs to someone else:
+NULLing `referred_by` silently restores that person's one-code-ever entitlement
+(`server/routes/print.js:1493` tests only for `NOT NULL`), and scrubbing
+`orders.referral_code_used` damages a financial record we are retaining. Leaving
+them and reporting the count is the honest trade. Q8 — the bucket-mismatch guard
+is what caught the config problem in the first place; inventing a second set of
+env vars to make a rehearsal possible would have been guesswork, so the exact-key
+print is the review step instead.
+
+**Touched files:**
+- `scripts/admin/delete-user-data.js` — sentinel creation + scrubbed ledger move,
+  the `users.referred_by` tombstone removed, third-party code counts on the dry run
+  and receipt, exact R2 keys printed in the dry run, retention wording, header notes
+- `server/lib/gdprSentinel.js` (new) — the sentinel identity + `sentinelExclusion()`
+- `server/routes/admin/users.js`, `server/routes/admin/analytics.js`,
+  `server/lib/adminActivity.js` — exclude the sentinel from the user list, the user
+  count, the storage report and the activity feed
+- `scripts/admin/audit-r2-orphans.js` (new) — the read-only orphan audit
+- `docs/gdpr-erasure.md`, `tasks/gdpr-erasure-2026-09-11.md`, `tasks/BACKLOG.md`
+- `client/src/pages/PrivacyPolicy.tsx` — 10-year retention + the email request path
+  (edited by the owner, not by this change)
+
+**Status:** ✅ active — dry runs verified on staging (sentinel path printed, bucket
+guard fired as designed) and read-only on production (bucket verified, exact-key
+list printed). No erasure has been executed.
+
+## 2026-09-12 — A figure filed as an object still belongs on EXPECTED CAST; page-text element coverage is not a code check
+
+**Context:** Staging `job_1789163494908_kc2joi4ax` (18 pages, de-CH). Two faults
+were triaged out of it (`tasks/vb-element-coverage-2026-09-12.md`).
+
+Fault 3: `buildExpectedCastBlock` asks for animals through
+`buildSecondaryExpectedCharacters(..., includeAnimals: true)`, which resolves
+names out of `collectSceneCharacterNames` — and that helper reads only
+`characters`, `characterPositions` and `characterClothing`. The Art Director
+files animals and secondary characters in `objects[]` by id (p12:
+`characters: ["Max"], objects: ["LOC002","ANI001"]`), so no animal ever reached
+the roster and pages 12, 15 and 16 each took a false `extra_character` CRITICAL
+(75 / 50 / 54) for drawing the cat their own prompt commissioned. The
+`includeAnimals` switch added 2026-09-10 was dead on arrival.
+
+Fault 1: five pages name an element in their own page TEXT that their `objects[]`
+omits, so it never enters REQUIRED OBJECTS and the evaluator — which judges the
+image against the prompt — cannot see the gap.
+
+**Decision:**
+1. A new helper `collectSceneObjectFigureNames` (sceneMetadata.js) resolves
+   `objects[]` ids against `visualBible.animals` and `.secondaryCharacters` only,
+   stripping a state suffix (`ART002.1` → `ART002`), and `buildExpectedCastBlock`
+   adds what it returns. `collectSceneCharacterNames` is NOT widened: its other
+   caller is the figure detector (images.js), which must keep seeing people only.
+2. `prompts/scene-review.txt` gains check 9d `[element_uncited]`: a page whose
+   plan line or prose stages a named element while `objects[]` omits that
+   element's id is faulted and rewritten by adding the id.
+3. The CODE-side page-text coverage check (item A2) is NOT built. Measured on the
+   stored run, it cannot be written: the page text does not exist when the scene
+   review runs (text is written after it, beatsPipeline step 6), there is no
+   re-plan path for briefs after that point, and the text is in the reader's
+   language while the bible is English. Two candidate matchers over the stored
+   data: whole-word VB name/type/species tokens against the page TEXT flags
+   pages 1, 2, 4, 7, 9, 10, 12, 14, 15, 16, 17, 18 (2 of the 5 wanted, 10 false)
+   and misses pages 3 and 8 entirely; the same matcher against the plan line
+   flags 13 pages. Matching the brief's own prose flags nothing at all — brief
+   prose and `objects[]` agree on every page, which is why the gap only exists
+   against the later text. A real check needs a localized keyword/synonym field
+   authored onto each Visual Bible entry, i.e. a bible-prompt change, plus a
+   post-text stage that can send a page back.
+
+**Rationale:** The roster fix is one line of resolution at the only place that
+asked for animals, and keeping it out of the cast collector protects the
+detector path that must never be handed a dog. For coverage, shipping a matcher
+tuned until it happened to name five German pages would be a matcher that works
+in one language on one story; the honest deliverable is the reviewer-side rule
+plus the measurement above.
+
+**Touched files:** `server/lib/sceneMetadata.js` (`collectSceneObjectFigureNames`),
+`server/lib/evalPipeline.js` (`buildExpectedCastBlock`), `prompts/scene-review.txt`
+(check 9d), `tasks/vb-element-coverage-2026-09-12.md`.
+
+## An object's OWN light is a state; the page's instant can drop a state's delta on the appearance axis too (2026-09-12)
+
+**Context:** Staging `job_1789163494908_kc2joi4ax`. The story's central prop is an object
+whose only change across the book is its own light — it glows, goes dark, glows again, and the
+glow is the plot signal. `prompts/scene-expansion-all.txt` banned light from a state delta
+("never light, that belongs to the scene") while requiring every page of an entry to fall in
+exactly one state. The author therefore filed the emission in `description` (always-true) and
+smuggled the change in as colour: one `dark` state claiming seven pages, three of which the
+text has glowing. `defaultObjectState` documents that the first state IS the unaltered look
+"by construction" — here the first state was the altered one, so even a bare citation resolved
+to `dark`. The p10 prompt read `THIS IMAGE DEPICTS: … the egg glows brightly again` above
+`* egg (object) — its shell is opaque dark brown`, and the renders split: the prose won on two
+pages, the object clause on three. No stage compares an entry's `description` with a state's
+`delta`, so nothing caught it.
+
+**Decision:** Two changes, both owner-approved (tasks/vb-element-coverage-2026-09-12.md, items
+B1 + B2).
+1. **Light is authorable.** The template now separates the two things it was conflating: how
+   the WORLD lights an object (a lamp on it, a shadow, dusk) stays the scene's, page by page;
+   the object's OWN emission — a thing that glows and goes dark, lights up and goes out — is a
+   state like any other change, and then the emission lives in the states, never in
+   `description`.
+2. **`contradicted` grows a second axis.** `resolveObjectState` already dropped a state's delta
+   (keeping its cell) when the state's `held` flag disagreed with the page's declared
+   interactions — the page's instant outranks the bible's table. `appearanceContradiction` puts
+   the appearance case on the same road: when the sentences of `sceneIntent` that name the
+   object speak exactly one SIBLING state's distinctive vocabulary and none of the chosen
+   state's, the delta is dropped and the cell kept. `contradictedBy` ('held' | 'appearance')
+   names the axis in the one warn line.
+
+**Rationale:** The detection is deliberately narrow, because a false positive silently strips a
+legitimate delta. Only the author's own words vote — there is no hand-written vocabulary of
+appearance concepts in the code, and no prose classification; only tokens DISTINCTIVE to one
+state vote; only the intent sentences that NAME the object are read, so the intent's closing
+"…, warm lamplight, hopeful mood" clause (scene lighting, present on nearly every page) cannot
+vote; the rival must be a single state. Sibling states are what makes this decidable without
+semantics: the template requires the complete set of looks with exactly one per page, so they
+are mutually exclusive by construction — the entry's `description`, being always-true, is NOT,
+and is deliberately not a rival source. Measured on the stored story: with the glow authored as
+a state and the page table mis-assigned (the failure shape), the dark delta is dropped on the
+two glowing pages and kept on every page whose text really is dark, including the page that
+mentions the cat lying "on top of" the object. The guard is silent on the story AS STORED,
+because there the rival look was in `description` — B1 is what makes B2 able to see it. It
+under-fires by design: a wrong delta shipping is the failure we already had, a stripped good
+delta would be a new one. First draft of the matcher read tokens of 3+ characters (so "egg" or
+"cat" can name its entry) and let "the" into the vote, which made every sibling a rival on
+every page — hence the explicit three-letter function-word stoplist.
+
+**Touched files:** `prompts/scene-expansion-all.txt` (state rule + the artifact `states[]`
+field), `server/lib/visualBible.js` (`APPEARANCE_STOPWORDS`, `appearanceStem`,
+`appearanceTokens`, `appearanceContradiction`, `resolveObjectState`),
+`server/lib/promptBuilders.js` (the REQUIRED OBJECTS warn line),
+`tasks/vb-element-coverage-2026-09-12.md`.
+
+**Status:** ✅ active

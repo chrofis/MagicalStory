@@ -145,10 +145,10 @@ To exercise these rights, contact us at privacy@magicalstory.ch or use the accou
 • Account data: Until you delete your account
 • Original photos: Maximum 30 days after story completion
 • Generated stories and avatars: Until you delete them or your account
-• Payment records: 7 years (legal requirement)
+• Payment records: 10 years (Swiss Code of Obligations art. 958f)
 • Server logs: 90 days
 
-You can delete your account and all associated data at any time through account settings.`
+To delete your account and all associated data, contact us at privacy@magicalstory.ch. We will confirm your identity and complete the deletion within one month. Payment records are anonymised rather than deleted, and kept for the period stated above as the law requires.`
       },
       {
         title: '12. Cookies and Tracking',
