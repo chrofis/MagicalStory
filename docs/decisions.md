@@ -33949,3 +33949,25 @@ only where the story makes them kin.
 `{CREATURE_TONE}`), `prompts/scene-expansion.txt` (rule 8k), `server/lib/promptBuilders.js`
 (`CREATURE_TONE_LEVELS` cute + not-menacing), `server/lib/testlab.js` (`authoredBible`).
 Commits `fcd3056ca`, `a9fc72600`.
+
+## The costume CRITICAL needs actually-modern dress, not merely a garment the contract did not name (2026-09-12)
+**Context:** `image-prompt-compliance.txt:77` rated "Modern clothes (sweatshirt, jeans, sneakers) when
+the contract names a costume = CRITICAL". On job_1789207854566_l43qgl34w (five characters in
+generated pirate costumes) the compliance evaluator applied it to period garments it had merely
+named differently: a loose blouse with a sash tied at the waist came back as "a purple long-sleeved
+coat with tied front" (CRITICAL on a render that matched its contract word for word), the same
+garment from behind as "a hooded cloak", knee-cropped wide-leg trousers as "a skirt" on three pages,
+and a blouse under a leather vest as "a jacket". Measured across that story and
+job_1789163494908_kc2joi4ax: 9 of 9 `clothing` findings came back CRITICAL, against a quality-side
+rule (D-05) that caps the same type at MAJOR. `clothing` is also the one garment type with no
+`MAX_SEVERITY_TYPES` ceiling, so nothing bounded the over-application, and repair routes on CRITICAL.
+**Decision:** The CRITICAL clause now requires the render to actually be modern everyday dress
+(sweatshirt, hoodie, t-shirt, jeans, tracksuit, trainers) and says outright that a period garment the
+inventory calls by another name is not modern dress. Every other wrong garment type is MAJOR, which
+is what D-05 already said. Prompt-side only — no code ceiling added.
+**Rationale:** Owner ruled prompt-only 2026-09-12, choosing it over a `clothing: 'major'` ceiling so
+the genuine case the rule exists for — a costume story rendered in a hoodie — keeps its CRITICAL.
+Note the standing risk recorded beside `accessory` in scoring.js: a prompt rule has previously lowered
+a ceiling without holding it. If clothing CRITICALs persist on period garments in the next costume
+story, the code ceiling is the fallback.
+**Touched files:** `prompts/image-prompt-compliance.txt` (Clothing type bullet).
