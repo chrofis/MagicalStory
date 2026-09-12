@@ -33701,3 +33701,59 @@ passed into both brief-check rounds), `prompts/scene-review.txt` (check 9d),
 
 **Status:** ✅ active — verified by replaying the stored briefs of
 `job_1789163494908_kc2joi4ax`. No story rerun.
+
+## An object's OWN light is a state; the page's instant can drop a state's delta on the appearance axis too (2026-09-12)
+
+**Context:** Staging `job_1789163494908_kc2joi4ax`. The story's central prop is an object
+whose only change across the book is its own light — it glows, goes dark, glows again, and the
+glow is the plot signal. `prompts/scene-expansion-all.txt` banned light from a state delta
+("never light, that belongs to the scene") while requiring every page of an entry to fall in
+exactly one state. The author therefore filed the emission in `description` (always-true) and
+smuggled the change in as colour: one `dark` state claiming seven pages, three of which the
+text has glowing. `defaultObjectState` documents that the first state IS the unaltered look
+"by construction" — here the first state was the altered one, so even a bare citation resolved
+to `dark`. The p10 prompt read `THIS IMAGE DEPICTS: … the egg glows brightly again` above
+`* egg (object) — its shell is opaque dark brown`, and the renders split: the prose won on two
+pages, the object clause on three. No stage compares an entry's `description` with a state's
+`delta`, so nothing caught it.
+
+**Decision:** Two changes, both owner-approved (tasks/vb-element-coverage-2026-09-12.md, items
+B1 + B2).
+1. **Light is authorable.** The template now separates the two things it was conflating: how
+   the WORLD lights an object (a lamp on it, a shadow, dusk) stays the scene's, page by page;
+   the object's OWN emission — a thing that glows and goes dark, lights up and goes out — is a
+   state like any other change, and then the emission lives in the states, never in
+   `description`.
+2. **`contradicted` grows a second axis.** `resolveObjectState` already dropped a state's delta
+   (keeping its cell) when the state's `held` flag disagreed with the page's declared
+   interactions — the page's instant outranks the bible's table. `appearanceContradiction` puts
+   the appearance case on the same road: when the sentences of `sceneIntent` that name the
+   object speak exactly one SIBLING state's distinctive vocabulary and none of the chosen
+   state's, the delta is dropped and the cell kept. `contradictedBy` ('held' | 'appearance')
+   names the axis in the one warn line.
+
+**Rationale:** The detection is deliberately narrow, because a false positive silently strips a
+legitimate delta. Only the author's own words vote — there is no hand-written vocabulary of
+appearance concepts in the code, and no prose classification; only tokens DISTINCTIVE to one
+state vote; only the intent sentences that NAME the object are read, so the intent's closing
+"…, warm lamplight, hopeful mood" clause (scene lighting, present on nearly every page) cannot
+vote; the rival must be a single state. Sibling states are what makes this decidable without
+semantics: the template requires the complete set of looks with exactly one per page, so they
+are mutually exclusive by construction — the entry's `description`, being always-true, is NOT,
+and is deliberately not a rival source. Measured on the stored story: with the glow authored as
+a state and the page table mis-assigned (the failure shape), the dark delta is dropped on the
+two glowing pages and kept on every page whose text really is dark, including the page that
+mentions the cat lying "on top of" the object. The guard is silent on the story AS STORED,
+because there the rival look was in `description` — B1 is what makes B2 able to see it. It
+under-fires by design: a wrong delta shipping is the failure we already had, a stripped good
+delta would be a new one. First draft of the matcher read tokens of 3+ characters (so "egg" or
+"cat" can name its entry) and let "the" into the vote, which made every sibling a rival on
+every page — hence the explicit three-letter function-word stoplist.
+
+**Touched files:** `prompts/scene-expansion-all.txt` (state rule + the artifact `states[]`
+field), `server/lib/visualBible.js` (`APPEARANCE_STOPWORDS`, `appearanceStem`,
+`appearanceTokens`, `appearanceContradiction`, `resolveObjectState`),
+`server/lib/promptBuilders.js` (the REQUIRED OBJECTS warn line),
+`tasks/vb-element-coverage-2026-09-12.md`.
+
+**Status:** ✅ active
