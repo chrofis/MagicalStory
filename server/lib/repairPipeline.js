@@ -1430,6 +1430,39 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: 'char-fix produced no usable image' };
     }
 
+    // FACE-INTEGRITY GATE (owner, 2026-09-12). A char fix is a MASKLESS whole-frame
+    // edit (docs/SETTLED.md: the same class that erased a named animal's head), so
+    // an additive instruction can repaint a head it was never meant to touch. On
+    // job_1789207854566_l43qgl34w p9 the finding was a false "missing tricorn hat"
+    // against a figure already wearing one; the repair erased the face to a
+    // featureless smear AND removed the hat, then out-scored the original 70 to 10
+    // because no evaluator reads faces. Comparative, not a judgment: the input's
+    // faces are counted, the output's are counted, and a repair that DESTROYS one
+    // is refused. Fails OPEN — a detector outage returns the repair untouched
+    // rather than stalling a paid run: `detectIllustrationFaces` yields [] both
+    // for "no faces" and for "service down", so an outage reads as nBefore = 0
+    // and the gate simply does not act. NOT yet proven against a live detector
+    // — there is no Python analyzer on the dev machine — so the first real
+    // char fix on staging is the test; watch for the refusal log line and the
+    // `repair_reject_face_integrity` metric.
+    try {
+      const { detectIllustrationFaces } = require('./entityConsistency');
+      const [before, after] = await Promise.all([
+        detectIllustrationFaces(currentImageData, 0),
+        detectIllustrationFaces(repairResult.imageData, 0),
+      ]);
+      const nBefore = Array.isArray(before) ? before.length : null;
+      const nAfter = Array.isArray(after) ? after.length : null;
+      if (nBefore !== null && nAfter !== null && nBefore > 0 && nAfter < nBefore) {
+        log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair lost a face (${nBefore} detected before, ${nAfter} after). Keeping the original.`);
+        require('./runMetrics').forJob(storyData?.id || jobId).count('repair_reject_face_integrity');
+        return { pageNumber, imageData: null, error: `char-fix refused: face count fell ${nBefore} → ${nAfter}` };
+      }
+      log.debug(`[CHAR-FIX] Page ${pageNumber} ${charName}: face-integrity ok (${nBefore} → ${nAfter})`);
+    } catch (faceErr) {
+      log.warn(`⚠️ [CHAR-FIX] Page ${pageNumber}: face-integrity gate unavailable (${faceErr.message}) — accepting the repair`);
+    }
+
     if (repairResult.usage && usageTracker) {
       // Provider is Grok for char-repair (repairCharacterMismatchWithGrok);
       // the prior 'gemini_image' label was a copy-paste miscategorisation
