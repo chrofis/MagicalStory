@@ -3876,7 +3876,23 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       let briefFindings = '';
       try {
         const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-        const vb = storyData.visualBible || null;
+        // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
+        // (2026-09-12). The Art Director writes a fresh bible ahead of page 1,
+        // so the stored one is a different id space: on Lab #1195 the findings
+        // named "The Dragon Egg (ART002)" while the new bible's ART002 was a
+        // coin, no element_uncited could ever fire, and the reviewer was told
+        // to drop an element by an id that meant something else in its own
+        // bible. The stored bible stays the fallback for a run that authored none.
+        let vb = storyData.visualBible || null;
+        if (authoredBible?.body) {
+          try {
+            const { UnifiedStoryParser } = require('./outlineParser/unified');
+            const parsed = new UnifiedStoryParser(authoredBible.body).extractVisualBible();
+            if (parsed) vb = parsed;
+          } catch (vbErr) {
+            log.warn(`[TESTLAB] beats_scenes: authored bible did not parse for the pre-check (${vbErr.message}) — falling back to the stored bible`);
+          }
+        }
         const secondaryList = Array.isArray(vb?.secondaryCharacters)
           ? vb.secondaryCharacters : Object.values(vb?.secondaryCharacters || {});
         const seen = new Set();
