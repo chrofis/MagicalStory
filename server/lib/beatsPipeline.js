@@ -1932,43 +1932,6 @@ ${bibleBody}` : bibleBody;
         const survived = left.filter(f => briefBeforeByPage.get(f.pageNumber)?.has(f.type));
         briefUnfixedList = left;
         briefIntroducedList = introduced;
-
-        // CAST BACKSTOP (owner, 2026-09-13). The review may rewrite a page; it
-        // may not leave that page declaring fewer people than its own prose
-        // names. Check 5a `[cast_not_in_plan]` told it to strip cast a plan
-        // line referred to collectively, and on staging
-        // job_1789207854566_l43qgl34w p7 it removed all five from
-        // `characters[]` while the prose still named a sixth — the roster the
-        // presence derivation consumes went to empty and the page shipped
-        // flagged. That is `cast_unlisted`, INTRODUCED, which the lines above
-        // already compute; until now it was only logged.
-        //
-        // The test is name-presence only, never what the prose means: a page
-        // whose rewrite introduces `cast_unlisted` loses the rewrite and keeps
-        // the Art Director's brief. It deliberately does NOT fire on a page
-        // the review made internally consistent — p13/p16 of that same story
-        // moved a secondary out of `characters[]` into `objects[]`, which is
-        // what the field rules ask for, and p15 removed four from
-        // `characters[]` AND de-named them in the prose. Only 5a's own
-        // narrowing reaches those; this catches the self-contradicting half.
-        const revertedPages = revertReviewCastRegressions({ expansions, briefsIn, introduced, sceneDiffs, changed });
-        if (revertedPages.length > 0) {
-          const d = revertedPages.join(', ');
-          log.warn(`↩️ [BEATS] scene-review rewrite REJECTED on page(s) ${d} — it introduced cast_unlisted (the rewrite un-declared cast its own prose still names); the Art Director's brief is kept for those pages`);
-          gl.warn('beats_review_cast_reverted',
-            `Scene-review rewrite rejected on page(s) ${d}: the rewrite introduced cast_unlisted, so the original Art Director brief ships instead`,
-            null, { pages: revertedPages, findings: introduced.filter(f => f.type === 'cast_unlisted') });
-          // The shipped briefs changed, so "what still faults" must be
-          // recomputed over what actually ships — otherwise briefUnfixed
-          // reports faults from a rewrite that was withdrawn.
-          const after2 = checkBriefs(
-            expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
-            briefCastNames,
-            visualBible,
-            { textZoneRules: textZoneRulesActive(inputData) }
-          );
-          briefUnfixedList = after2.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
-        }
         if (introduced.length > 0) {
           const d = introduced.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
           log.warn(`⚠️ [BEATS] brief check after review: ${introduced.length} fault(s) INTRODUCED by the rewrite — ${d}`);
@@ -2369,57 +2332,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-/**
- * Withdraw a scene-review rewrite on any page where the rewrite INTRODUCED a
- * `cast_unlisted` fault — the brief now names someone in its prose that its own
- * `characters[]` omits, which is the page's roster lying about who is in frame.
- *
- * The decision reads one already-computed input: the finding's type and page
- * number. It never reads description prose and never infers what a finding
- * means. A page not in `introduced` keeps its rewrite, including a rewrite that
- * legitimately removed a secondary character from `characters[]` (that leaves
- * no fault behind, so no finding is introduced).
- *
- * Mutates `expansions` (restores `brief`), and prunes `sceneDiffs` / `changed`
- * so the stored report does not claim a rewrite that was withdrawn.
- *
- * @param {Object} args
- * @param {Array<{pageNumber:number, brief:string}>} args.expansions   live briefs, mutated
- * @param {Array<{pageNumber:number, brief:string}>} args.briefsIn     briefs as SENT to the review
- * @param {Array<{pageNumber:number, type:string}>}  args.introduced   faults the rewrite introduced
- * @param {Array<{pageNumber:number}>} [args.sceneDiffs]               pruned in place
- * @param {number[]} [args.changed]                                    pruned in place
- * @returns {number[]} page numbers reverted, ascending
- */
-function revertReviewCastRegressions({ expansions, briefsIn, introduced, sceneDiffs, changed } = {}) {
-  const pages = new Set(
-    (Array.isArray(introduced) ? introduced : [])
-      .filter(f => f && f.type === 'cast_unlisted' && Number.isFinite(f.pageNumber))
-      .map(f => f.pageNumber)
-  );
-  if (pages.size === 0) return [];
-  const originals = new Map((Array.isArray(briefsIn) ? briefsIn : []).map(b => [b.pageNumber, b.brief]));
-  const reverted = [];
-  for (const x of (Array.isArray(expansions) ? expansions : [])) {
-    if (!pages.has(x.pageNumber)) continue;
-    const original = originals.get(x.pageNumber);
-    // No snapshot, or the review left the page alone: nothing to withdraw.
-    if (!original || !String(original).trim() || original === x.brief) continue;
-    x.brief = original;
-    x.reviewRewrote = false;
-    x.reviewRejected = 'cast_unlisted';
-    reverted.push(x.pageNumber);
-  }
-  if (reverted.length > 0) {
-    const done = new Set(reverted);
-    if (Array.isArray(sceneDiffs)) {
-      for (let i = sceneDiffs.length - 1; i >= 0; i--) if (done.has(sceneDiffs[i].pageNumber)) sceneDiffs.splice(i, 1);
-    }
-    if (Array.isArray(changed)) {
-      for (let i = changed.length - 1; i >= 0; i--) if (done.has(changed[i])) changed.splice(i, 1);
-    }
-  }
-  return reverted.sort((a, b) => a - b);
-}
-
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS, revertReviewCastRegressions };
+module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
