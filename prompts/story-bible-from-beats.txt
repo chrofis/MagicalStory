@@ -32,7 +32,7 @@ Primary characters: {PRIMARY_CHARACTER_NAMES}
 
 Determine which clothing variants each character needs, based on the page plan.
 
-- Mark `used: true` only for variants that actually appear.
+- Mark `used: true` only for variants that actually appear.{ERA_CLOTHING_RULE}
 - Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false only for a present-day story in everyday clothes.
 - If any character is costumed, every cover uses the costumed variant for every cover character.
 - `description` is the FULL final outfit for this story — top, bottom, footwear, accessories — as one self-contained sentence. Start from the character's stored clothing above; keep it, add a story-relevant accessory, or change a garment the story requires. The avatar generator uses it verbatim.

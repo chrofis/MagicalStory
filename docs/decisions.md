@@ -36032,3 +36032,86 @@ successful resolution) is backlogged separately, not fixed here.
 **Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
 `prompts/story-trial.txt`
 **Status:** ✅ active
+
+---
+
+## 2026-09-13 — Beats never inherited `CATEGORY_GUIDELINES`: swiss-stories got zero guidance, historical lost its accuracy and costumed rules
+
+**Context:** `storyJobPipeline.js:640` builds the unified writer prompt and the
+beats pipeline discards it. Of that prompt's 19 fill keys, 18 reach the beats
+chain by another route; `CATEGORY_GUIDELINES` — six per-category branches built
+in `buildUnifiedStoryPrompt` — is the only one with no route at all. Measuring
+the per-category `STORY_GUIDE_SECTION` that beats *does* receive showed what
+each branch lost:
+
+| category | STORY_GUIDE_SECTION on beats | lost with CATEGORY_GUIDELINES |
+|---|---|---|
+| life-challenge | 812 ch | 6 framing clauses — still open, see below |
+| educational | 501 ch | weave-naturally / accuracy / reinforcement / discovery |
+| historical | 3319 ch | the accuracy mandate and the `costumed:` clothing rule |
+| adventure | 1192 ch | setting-flavour framing |
+| swiss-stories | **0 ch** | everything — no city research, no story idea |
+
+`swiss-stories` was empty because `getTeachingGuide` had a `swiss-sagen` branch
+but never a `swiss-stories` one: Swiss local stories keep their guide in
+`docs/story-ideas/<city>.md` (parsed into `swissStories.js`), not in a
+`prompts/*-guides.txt` file, so the lookup had nothing to hit. A Swiss local
+story reached the arc author with no landmarks, no traditions, and not even the
+story idea the user picked.
+
+**Decision:** Repair the two branches that lost *content*, each at the beats
+stage that actually consumes it — not by re-porting the whole unified block.
+
+1. `getTeachingGuide('swiss-stories', '<city>-<n>')` now returns a guide built
+   by `buildSwissStoryGuide` from the real source: `getSwissStoryResearch` plus
+   `getSwissCityById`, with the same localized-field handling (`{en,de,fr}` or
+   plain string) the unified branch uses. No research for that city → `null`,
+   never a fabricated stand-in. This flows into `STORY_GUIDE_SECTION`, so it
+   reaches `arc-create.txt` and `story-arc-review.txt` with no new placeholder.
+   Measured: 0 → 4175 chars for `aarau-1`.
+2. The **accuracy mandate** is attached to the topic-guide header in
+   `buildStoryContextFields`, for `historical` and `swiss-stories`: one plain
+   line saying the facts in the guide are binding, placed ahead of the guide
+   body. It belongs where facts are authored and checked — the arc author and
+   the arc reviewer — which is exactly where `STORY_GUIDE_SECTION` already
+   goes. Measured: historical 3319 → 3447 chars.
+3. The **`costumed:`-not-`standard` rule** goes to `story-bible-from-beats.txt`
+   via a new `{ERA_CLOTHING_RULE}` placeholder, filled in
+   `buildStoryBibleFromBeatsPrompt`. That is the one beats stage that decides
+   the clothing variant; putting an outfit rule in the arc chain would only
+   have it restated by a stage that cannot act on it. Empty string for every
+   other category, so their contract is byte-identical to before.
+
+Deliberately NOT re-ported: the PRE-POPULATED LOCATIONS and OBJECTS blocks.
+Those are already handled code-side on beats — `injectHistoricalLocations`
+(`visualBible.js:2321`, called from `storyJobPipeline.js:2009` and `:3011`)
+repairs the dbKey/description linkage, and `beatsPipeline.js:1009` feeds the
+plan counters `getHistoricalLocations` / `getHistoricalObjects`. The reference
+photos and location data were never lost; only the two rules were.
+
+**Rationale:** The alternative was to spread the unified `CATEGORY_GUIDELINES`
+string into the beats templates wholesale. That fails twice: `story-beats.txt`
+declares no `{STORY_GUIDE_SECTION}` at all, so spreading a value into it is a
+silent no-op; and half the block (the locations/objects rules) would duplicate
+machinery that already runs, giving the model two sources for one contract.
+Routing each rule to the stage that can act on it keeps one source per contract.
+
+**Still open (not fixed here):**
+- **life-challenge** — the 6 framing clauses `buildLifeSkillGuidelines` adds on
+  top of the guide body still do not reach beats. This is an owner decision
+  about the framing, not a plumbing defect, and is deliberately left alone.
+- **educational** — its four clauses (weave naturally, age-appropriate
+  accuracy, repetition/reinforcement, discovery moments) still do not reach
+  beats. The guide body does.
+- **adventure** — its setting-flavour framing still does not reach beats.
+- `story-text-from-beats.txt` (prose writing) and `buildClothingReviewPrompt`
+  (wardrobe *review*) declare no guide placeholder, so neither rule reaches
+  them. The text stage writes from the arc and beats, which are authored under
+  the mandate; the clothing reviewer checks a contract written under the rule.
+  Adding placeholders there is a separate call.
+
+**Touched:** `server/lib/promptBuilders.js` (`getTeachingGuide`,
+`buildSwissStoryGuide`, `buildStoryContextFields`,
+`buildStoryBibleFromBeatsPrompt`), `prompts/story-bible-from-beats.txt`,
+`tests/unit/beats-category-guidance.test.ts`
+**Status:** ✅ active

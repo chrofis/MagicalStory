@@ -1009,8 +1009,42 @@ function getTeachingGuide(category, topicId) {
     return HISTORICAL_GUIDES.get(normalizedId) || null;
   } else if (category === 'swiss-sagen') {
     return SWISS_SAGEN_GUIDES.get(normalizedId) || null;
+  } else if (category === 'swiss-stories') {
+    return buildSwissStoryGuide(normalizedId);
   }
   return null;
+}
+
+/**
+ * Swiss local stories keep their guide in docs/story-ideas/<city>.md (parsed by
+ * swissStories.js), not in a prompts/*-guides.txt file — so getTeachingGuide had
+ * no branch for them and every beats stage that reads STORY_GUIDE_SECTION got
+ * nothing at all. Same source and the same localized-field handling the unified
+ * writer path uses for its swiss-stories CATEGORY_GUIDELINES branch.
+ * @param {string} topicId - `<cityId>-<ideaNumber>`, e.g. `aarau-1`
+ * @returns {string|null} guide body, or null when the city has no research
+ */
+function buildSwissStoryGuide(topicId) {
+  const cityId = String(topicId).replace(/-[0-9]+$/, '');
+  const cityData = getSwissStoryResearch(cityId);
+  if (!cityData) return null;
+  const cityMeta = getSwissCityById(cityId);
+  const cityName = cityMeta?.name?.en || cityMeta?.name || cityId;
+  const ideaNum = parseInt(String(topicId).split('-').pop(), 10);
+  const idea = Number.isFinite(ideaNum) ? (cityData.ideas || [])[ideaNum - 1] : null;
+  // Ideas arrive either localized ({en,de,fr}) or as plain strings.
+  const pick = (v) => (v && typeof v === 'object' ? v.en : v) || '';
+  const ideaTitle = pick(idea?.title);
+  const ideaDesc = pick(idea?.description);
+  const lines = [
+    `A Swiss local story set in ${cityName}, a real Swiss city.`,
+    ideaTitle ? `Story idea: "${ideaTitle}"` : '',
+    ideaDesc ? `Concept: ${ideaDesc}` : '',
+    '',
+    'Verified research on the city — the story takes its landmarks, traditions and geography from it:',
+    cityData.research || '',
+  ];
+  return lines.filter(Boolean).join('\n').trim() || null;
 }
 
 // Historical Locations Databank
@@ -5394,8 +5428,14 @@ function buildStoryContextFields(inputData) {
     : (inputData.storyTopic || inputData.storyTheme);
   let guideSection = '';
   try {
+    // The accuracy mandate rode on the unified writer's CATEGORY_GUIDELINES,
+    // which the beats chain never inherited — the guide arrived as unmarked
+    // background reading, with nothing declaring the facts in it binding.
+    const factMandate = (inputData.storyCategory === 'historical' || inputData.storyCategory === 'swiss-stories')
+      ? '\nThis names real events, places and people. Every fact, date, name and sequence in the story comes from this guide. Invent none.'
+      : '';
     const guide = getTeachingGuide(inputData.storyCategory, guideKey);
-    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})\n\n${String(guide).slice(0, 4000)}`;
+    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n\n${String(guide).slice(0, 4000)}`;
   } catch (err) {
     log.warn(`[PROMPT] topic guide unavailable for ${inputData.storyCategory}/${guideKey}: ${err.message}`);
   }
@@ -6843,6 +6883,12 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
     CHARACTER_PHYSICAL_BLOCK: chars
       .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
       .join('\n\n') || '(no character appearance available)',
+    // The `costumed:`-not-`standard` rule also rode on the unified writer's
+    // CATEGORY_GUIDELINES. This is the one beats stage that decides the
+    // clothing variant, so the rule lands here rather than in the arc chain.
+    ERA_CLOTHING_RULE: (inputData.storyCategory === 'historical' || inputData.storyCategory === 'swiss-stories')
+      ? '\n- The story is set in a real period. Every character uses the `costumed` variant, named for that period (`medieval`, `1920s`, …). `standard` is not an option here.'
+      : '',
     PLAN_LINES: planBlocks(beats),
   });
 }
