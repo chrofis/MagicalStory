@@ -2665,9 +2665,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // CRITICAL/CATASTROPHIC IMG faults may buy exactly ONE extra repair round —
     // admission only, the consolidator still decides what to fix.
     //
-    // The text here may be PRE-REFINE. That is fine: refine rewrites wording,
-    // never events — a fault about the picture disagreeing with what happens
-    // on the page reads the same before and after.
+    // THE TEXT IS THE FINAL TEXT (owner, 2026-09-13). It used to be
+    // PRE-REFINE, defended as "refine rewrites wording, never events". Measured
+    // on 12 staging stories that is false twice over: the refiner rewrote 172
+    // of 178 pages (97%), and it merges dialogue, drops beats and changes the
+    // depicted action — exactly what an IMG fault judges. Stored audits show
+    // the cost: nearly every fault is of the form "the picture contradicts the
+    // text", read off prose the book did not ship. The text-refine join now
+    // runs BEFORE this pipeline (storyJobPipeline.js, joinTextRefinement).
     //
     // Non-blocking: auditStoryBook never throws, and a null result
     // contributes nothing.
@@ -2680,13 +2685,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed });
     if (auditPlan.runAudit) {
       try {
-        const { auditStoryBook } = require('./bookAudit');
-        const auditPages = rawImages.map(img => {
-          const best = selectBestVersion(pageVersions.get(img.pageNumber) || []);
-          const imageData = best?.imageData || img.imageData;
-          if (!imageData) return null;
-          return { pageNumber: img.pageNumber, text: img.text, imageData };
-        }).filter(Boolean);
+        const { auditStoryBook, buildAuditPages } = require('./bookAudit');
+        // ONE resolver for "what does the reader actually get on this page" —
+        // the picked version's bytes and the final page text. Never rebuild
+        // this expression inline: the inline version read `img.text` straight
+        // off the page object, which was PRE-REFINE prose.
+        const auditPages = buildAuditPages(rawImages, (pageNumber) => selectBestVersion(pageVersions.get(pageNumber) || []));
         const audit = auditPages.length > 0
           ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
           : null;

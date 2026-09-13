@@ -3692,6 +3692,215 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let textRefineReport = null;
     // Latest snapshot the refiner published (audit, then after each round).
     let textRefinePartial = null;
+
+    // ── TEXT-REFINE JOIN — RUNS ONCE, BEFORE ANYTHING READS THE PAGE TEXT ──
+    // Idempotent: the first call joins the refiner and rewrites the page text
+    // in `expandedScenes`, in `fullStoryText`, and in every page-object list
+    // passed as `targets`; every later call is a no-op.
+    //
+    // ORDERING (owner, 2026-09-13). This used to run AFTER the repair
+    // pipeline, which meant the mid-loop book audit inside that pipeline read
+    // PRE-REFINE prose and routed IMG faults from it — image repairs driven by
+    // a comparison against wording the book would not contain. Measured on 12
+    // staging stories: the refiner rewrote 172 of 178 pages (97%), and 42% of
+    // the shipped words on one book were absent from the text the audit read.
+    // It is not only wording: the refiner merges dialogue, drops beats and
+    // changes the depicted action, which is exactly what an IMG fault judges.
+    let textRefineJoined = false;
+    const joinTextRefinement = async (targets = []) => {
+      if (textRefineJoined) return;
+      textRefineJoined = true;
+      // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
+      // Started back at pagesStart; on a normal run it finished long ago and this
+      // await returns immediately. Resolves to null on any failure — the original
+      // text simply stays.
+      //
+      // BOUNDED (2026-08-10). This await used to be open-ended, resting on
+      // "on a normal run it finished long ago" — an assumption, not a guarantee.
+      // The stage already fails safe (null → original text kept) but had no guard
+      // against being SLOW: a stalled provider or a retrying round would hold the
+      // whole story here, after every image is finished, with a user waiting.
+      // Measured normal cost is ~184s against a ~25-min image phase, so anything
+      // still running at this point is anomalous. Refinement is a polish pass —
+      // shipping the unrefined text is always better than not shipping.
+      if (textRefinePromise) {
+        // 300s, not 90s (owner 2026-08-17). The cap exists so a slow refiner cannot
+        // add its full duration to a story, but 90s was shorter than the refiner's
+        // own runtime: deepseek needs ~2-4 min for two rounds, so a fast image phase
+        // meant the pass was DISCARDED after being paid for (staging
+        // job_1786998860057_o6deqtv5s: $0.16 and 23k output tokens thrown away).
+        // Worst case now adds up to 5 min on a run whose images finished early.
+        // SCALED (2026-08-24). A flat 300s was measured on a stage that had no
+        // blind audit in front of it — that landed 2026-08-23 and roughly doubled
+        // the stage, so the budget no longer matched the work. It is also
+        // reading-level sensitive: a `standard` book's audit emitted 2.3x the
+        // output tokens of a `1st-grade` one (18.4k vs 7.9k on two runs the same
+        // evening), and its single round outweighed a whole 1st-grade round. The
+        // long-text levels get double the base, plus a per-page allowance beyond
+        // ten pages. Salvage below is what makes overrunning cheap; this only
+        // decides how long a user waits for the last round.
+        const LONG_TEXT_LEVELS = new Set(['standard', 'advanced']);
+        const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS)
+          || ((LONG_TEXT_LEVELS.has(inputData?.languageLevel) ? 600000 : 300000)
+            + Math.max(0, (expandedScenes?.length || 0) - 10) * 10000);
+        const TIMED_OUT = Symbol('text-refine-join-timeout');
+        let joinTimer = null;
+        const refined = await Promise.race([
+          textRefinePromise,
+          // NOT unref'd on purpose: an unref'd timer does not keep the loop
+          // alive, so if this ever ran somewhere the loop could drain, the race
+          // would never settle. `clearTimeout` in the finally below is what stops
+          // it leaking, and that runs on both branches.
+          new Promise((resolve) => { joinTimer = setTimeout(() => resolve(TIMED_OUT), JOIN_TIMEOUT_MS); }),
+        ]).finally(() => { if (joinTimer) clearTimeout(joinTimer); });
+        // SALVAGE: on timeout, fall back to the last state the refiner published
+        // rather than throwing the whole stage away. Everything below reads
+        // `usable`, so a partial snapshot ships exactly like a complete run.
+        const usable = (refined === TIMED_OUT) ? textRefinePartial : refined;
+        if (refined === TIMED_OUT) {
+          const secs = (JOIN_TIMEOUT_MS / 1000).toFixed(0);
+          if (usable?.changed?.length) {
+            log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — shipping ${usable.rounds.length} completed round(s), abandoning the one in flight`);
+            genLog.warn('text_refine_join_partial', `Text refinement did not finish within ${secs}s of images completing — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}`);
+          } else {
+            log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed and no round had finished — shipping the ORIGINAL text`);
+            genLog.warn('text_refine_join_timeout', `Text refinement did not finish within ${secs}s of images completing — original text kept`);
+          }
+        }
+        if (usable?.changed?.length) {
+          // Capture the pre-refine prose BEFORE the overwrite below — it is the
+          // only moment both versions exist. Without it the refiner's work is
+          // invisible: the story ships the rewritten text with no record of what
+          // changed, and 10 of 14 pages were rewritten on the first real run.
+          textRefineReport = {
+            rounds: usable.rounds.length,
+            // Per-step trace (owner, 2026-08-27): the count alone made "what did
+            // this step change" unanswerable twice. `kind` says which step —
+            // 'repair' or 'lector'. Analyses capped — text only.
+            roundTrace: usable.rounds.map(r => ({
+              round: r.round,
+              kind: r.kind || null,
+              ok: r.ok,
+              modelKey: r.modelKey || null,
+              modelId: r.modelId || null,
+              elapsedMs: r.elapsedMs || 0,
+              cost: r.cost ?? null,
+              changedPages: r.changedPages || [],
+              // Lector only: how many of its findings the code-side applier
+              // landed, and how many it dropped (see applyLectorFindings).
+              appliedCount: r.appliedCount ?? null,
+              droppedCount: r.droppedCount ?? null,
+              error: r.error || null,
+              analysis: (r.analysis || '').slice(0, 15000),
+            })),
+            changedPages: usable.changed,
+            // Cross-page repetition check after the repair pass (2026-09-10):
+            // { pairs, correctivePassRan, resolved, ... } — see textRefine.js.
+            repetition: usable.repetition || null,
+            // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
+            // output included so a fault can be traced to the auditor that found
+            // it, plus the merged list the single repair pass actually answered.
+            audits: (usable.audits || []).map(a => ({
+              source: a.source,
+              ok: !!a.ok,
+              modelKey: a.modelKey || null,
+              modelId: a.modelId || null,
+              faults: a.faults ?? 0,
+              byCategory: a.byCategory || {},
+              elapsedMs: a.elapsedMs || 0,
+              cost: a.cost ?? null,
+              error: a.error || null,
+              raw: (a.raw || '').slice(0, 40000),
+            })),
+            mergedFindings: (usable.mergedFindings || []).map(f => ({
+              pageNumber: f.pageNumber,
+              category: f.category,
+              text: f.text,
+              sources: f.sources,
+            })),
+            mergeStats: usable.mergeStats || null,
+            // The lector's raw output, its parsed findings, and what the
+            // code-side applier did with each (see applyLectorFindings).
+            proofread: usable.proofread || '',
+            lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+            lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+            // A dropped finding keeps its REASON: quote-absent is the
+            // hallucination guard firing, overlap is two findings on one span.
+            lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
+            durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
+            model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
+            // Same three fields beatsReviewReport and sceneReviewReport carry, so
+            // renderDiffPanel shows all three panels alike (owner 2026-09-06).
+            // They were already IN the round entries — this only projects them.
+            // `prompt` is the repair round's prompt (the lector round has its own
+            // template and no rewrite prompt); `briefsIn` is the page text as
+            // sent in; `analysis` concatenates EVERY round's analysis, labelled,
+            // because a run has a repair round and a lector round and storing
+            // only the last would read as the whole stage's reasoning.
+            prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
+            briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
+            analysis: usable.rounds
+              .filter(r => (r.analysis || '').trim())
+              .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
+              .join('\n\n'),
+            pages: usable.pages
+              .filter(p => usable.changed.includes(p.pageNumber))
+              .map(p => ({
+                pageNumber: p.pageNumber,
+                before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
+                after: p.text,
+              })),
+          };
+          // BOTH arrays: allImages[].text is a COPY taken when the page was
+          // prepared, so updating only the scene would leave the saved story on
+          // the pre-refinement prose.
+          const byPage = new Map(usable.pages.map(p => [p.pageNumber, p.text]));
+          for (const scene of expandedScenes) {
+            const t = byPage.get(scene.pageNumber);
+            if (t) scene.text = t;
+          }
+          // Every page-object list the caller handed us: rawImages before the
+          // repair pipeline, allImages on the late fallback call. Each is a COPY
+          // of the page text taken when the page was prepared.
+          for (const list of targets) {
+            for (const img of list || []) {
+              const t = byPage.get(img.pageNumber);
+              if (t) img.text = t;
+            }
+          }
+          // THIRD store: data.story / data.storyText are assembled from the
+          // pre-refine pages and persisted as-is, and the Lab's edit mode reads
+          // THEM — so without this rebuild the editor showed the original text
+          // while the book showed the refined one (caught by the owner on p18 of
+          // the first arc-pipeline run: "Das reicht." vs the refined ending).
+          fullStoryText = storyPages.map(page =>
+            `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
+          ).join('\n\n');
+          const totalMs = usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
+          // A salvaged snapshot already logged text_refine_join_partial, which
+          // says what was kept AND what was abandoned. Emitting "complete" here
+          // too would read as a clean finish and hide the abandoned round.
+          if (!usable.partial) {
+            genLog.info(
+              'text_refine_complete',
+              `Text refined in ${usable.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${usable.changed.join(', ')}`,
+              null,
+              { rounds: usable.rounds.length, changedPages: usable.changed, durationMs: totalMs }
+            );
+          }
+        } else if (usable && !usable.partial) {
+          // "Nothing to rewrite" and "a round failed" are different outcomes — a
+          // failed round means the ORIGINAL text ships unreviewed, which must be
+          // visible in the log, not filed as a clean convergence.
+          const failedRound = (usable.rounds || []).find(r => !r.ok);
+          if (failedRound) {
+            genLog.warn('text_refine_failed', `Text refinement round ${failedRound.round} failed (${failedRound.error}) — original text kept`);
+          } else {
+            genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
+          }
+        }
+      }
+    };
     // The other two review stages' before/after (beats mode only). Same shape,
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
@@ -5334,6 +5543,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       genLog.info('generation_complete', `Generated ${successCount}/${rawImages.length} page images in ${genDuration}s (pure generation)`);
       genLog.setStage('repair');
 
+      // JOIN THE TEXT REFINER HERE — before covers, before the repair
+      // pipeline, before the book audit inside it. Pure generation is done, so
+      // this is the same "after images completed" moment the join always had;
+      // what changes is that every stage downstream now reads the FINAL text.
+      await joinTextRefinement([rawImages]);
+
       // Await covers before repair pipeline so covers go through the same quality checks
       if (coverAwaitPromise) {
         if (!timing.coversEnd) {
@@ -6057,191 +6272,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, ${repairPhaseLabel} ${repairSecs}s`);
     genLog.info('images_complete', `${imgSuccess}/${allImages.length} pages: generation ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, ${repairPhaseLabel} ${repairSecs}s`);
 
-    // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
-    // Started back at pagesStart; on a normal run it finished long ago and this
-    // await returns immediately. Resolves to null on any failure — the original
-    // text simply stays.
-    //
-    // BOUNDED (2026-08-10). This await used to be open-ended, resting on
-    // "on a normal run it finished long ago" — an assumption, not a guarantee.
-    // The stage already fails safe (null → original text kept) but had no guard
-    // against being SLOW: a stalled provider or a retrying round would hold the
-    // whole story here, after every image is finished, with a user waiting.
-    // Measured normal cost is ~184s against a ~25-min image phase, so anything
-    // still running at this point is anomalous. Refinement is a polish pass —
-    // shipping the unrefined text is always better than not shipping.
-    if (textRefinePromise) {
-      // 300s, not 90s (owner 2026-08-17). The cap exists so a slow refiner cannot
-      // add its full duration to a story, but 90s was shorter than the refiner's
-      // own runtime: deepseek needs ~2-4 min for two rounds, so a fast image phase
-      // meant the pass was DISCARDED after being paid for (staging
-      // job_1786998860057_o6deqtv5s: $0.16 and 23k output tokens thrown away).
-      // Worst case now adds up to 5 min on a run whose images finished early.
-      // SCALED (2026-08-24). A flat 300s was measured on a stage that had no
-      // blind audit in front of it — that landed 2026-08-23 and roughly doubled
-      // the stage, so the budget no longer matched the work. It is also
-      // reading-level sensitive: a `standard` book's audit emitted 2.3x the
-      // output tokens of a `1st-grade` one (18.4k vs 7.9k on two runs the same
-      // evening), and its single round outweighed a whole 1st-grade round. The
-      // long-text levels get double the base, plus a per-page allowance beyond
-      // ten pages. Salvage below is what makes overrunning cheap; this only
-      // decides how long a user waits for the last round.
-      const LONG_TEXT_LEVELS = new Set(['standard', 'advanced']);
-      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS)
-        || ((LONG_TEXT_LEVELS.has(inputData?.languageLevel) ? 600000 : 300000)
-          + Math.max(0, (allImages?.length || 0) - 10) * 10000);
-      const TIMED_OUT = Symbol('text-refine-join-timeout');
-      let joinTimer = null;
-      const refined = await Promise.race([
-        textRefinePromise,
-        // NOT unref'd on purpose: an unref'd timer does not keep the loop
-        // alive, so if this ever ran somewhere the loop could drain, the race
-        // would never settle. `clearTimeout` in the finally below is what stops
-        // it leaking, and that runs on both branches.
-        new Promise((resolve) => { joinTimer = setTimeout(() => resolve(TIMED_OUT), JOIN_TIMEOUT_MS); }),
-      ]).finally(() => { if (joinTimer) clearTimeout(joinTimer); });
-      // SALVAGE: on timeout, fall back to the last state the refiner published
-      // rather than throwing the whole stage away. Everything below reads
-      // `usable`, so a partial snapshot ships exactly like a complete run.
-      const usable = (refined === TIMED_OUT) ? textRefinePartial : refined;
-      if (refined === TIMED_OUT) {
-        const secs = (JOIN_TIMEOUT_MS / 1000).toFixed(0);
-        if (usable?.changed?.length) {
-          log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — shipping ${usable.rounds.length} completed round(s), abandoning the one in flight`);
-          genLog.warn('text_refine_join_partial', `Text refinement did not finish within ${secs}s of images completing — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}`);
-        } else {
-          log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed and no round had finished — shipping the ORIGINAL text`);
-          genLog.warn('text_refine_join_timeout', `Text refinement did not finish within ${secs}s of images completing — original text kept`);
-        }
-      }
-      if (usable?.changed?.length) {
-        // Capture the pre-refine prose BEFORE the overwrite below — it is the
-        // only moment both versions exist. Without it the refiner's work is
-        // invisible: the story ships the rewritten text with no record of what
-        // changed, and 10 of 14 pages were rewritten on the first real run.
-        textRefineReport = {
-          rounds: usable.rounds.length,
-          // Per-step trace (owner, 2026-08-27): the count alone made "what did
-          // this step change" unanswerable twice. `kind` says which step —
-          // 'repair' or 'lector'. Analyses capped — text only.
-          roundTrace: usable.rounds.map(r => ({
-            round: r.round,
-            kind: r.kind || null,
-            ok: r.ok,
-            modelKey: r.modelKey || null,
-            modelId: r.modelId || null,
-            elapsedMs: r.elapsedMs || 0,
-            cost: r.cost ?? null,
-            changedPages: r.changedPages || [],
-            // Lector only: how many of its findings the code-side applier
-            // landed, and how many it dropped (see applyLectorFindings).
-            appliedCount: r.appliedCount ?? null,
-            droppedCount: r.droppedCount ?? null,
-            error: r.error || null,
-            analysis: (r.analysis || '').slice(0, 15000),
-          })),
-          changedPages: usable.changed,
-          // Cross-page repetition check after the repair pass (2026-09-10):
-          // { pairs, correctivePassRan, resolved, ... } — see textRefine.js.
-          repetition: usable.repetition || null,
-          // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
-          // output included so a fault can be traced to the auditor that found
-          // it, plus the merged list the single repair pass actually answered.
-          audits: (usable.audits || []).map(a => ({
-            source: a.source,
-            ok: !!a.ok,
-            modelKey: a.modelKey || null,
-            modelId: a.modelId || null,
-            faults: a.faults ?? 0,
-            byCategory: a.byCategory || {},
-            elapsedMs: a.elapsedMs || 0,
-            cost: a.cost ?? null,
-            error: a.error || null,
-            raw: (a.raw || '').slice(0, 40000),
-          })),
-          mergedFindings: (usable.mergedFindings || []).map(f => ({
-            pageNumber: f.pageNumber,
-            category: f.category,
-            text: f.text,
-            sources: f.sources,
-          })),
-          mergeStats: usable.mergeStats || null,
-          // The lector's raw output, its parsed findings, and what the
-          // code-side applier did with each (see applyLectorFindings).
-          proofread: usable.proofread || '',
-          lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-          lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-          // A dropped finding keeps its REASON: quote-absent is the
-          // hallucination guard firing, overlap is two findings on one span.
-          lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
-          durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
-          model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
-          // Same three fields beatsReviewReport and sceneReviewReport carry, so
-          // renderDiffPanel shows all three panels alike (owner 2026-09-06).
-          // They were already IN the round entries — this only projects them.
-          // `prompt` is the repair round's prompt (the lector round has its own
-          // template and no rewrite prompt); `briefsIn` is the page text as
-          // sent in; `analysis` concatenates EVERY round's analysis, labelled,
-          // because a run has a repair round and a lector round and storing
-          // only the last would read as the whole stage's reasoning.
-          prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
-          briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
-          analysis: usable.rounds
-            .filter(r => (r.analysis || '').trim())
-            .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
-            .join('\n\n'),
-          pages: usable.pages
-            .filter(p => usable.changed.includes(p.pageNumber))
-            .map(p => ({
-              pageNumber: p.pageNumber,
-              before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
-              after: p.text,
-            })),
-        };
-        // BOTH arrays: allImages[].text is a COPY taken when the page was
-        // prepared, so updating only the scene would leave the saved story on
-        // the pre-refinement prose.
-        const byPage = new Map(usable.pages.map(p => [p.pageNumber, p.text]));
-        for (const scene of expandedScenes) {
-          const t = byPage.get(scene.pageNumber);
-          if (t) scene.text = t;
-        }
-        for (const img of allImages) {
-          const t = byPage.get(img.pageNumber);
-          if (t) img.text = t;
-        }
-        // THIRD store: data.story / data.storyText are assembled from the
-        // pre-refine pages and persisted as-is, and the Lab's edit mode reads
-        // THEM — so without this rebuild the editor showed the original text
-        // while the book showed the refined one (caught by the owner on p18 of
-        // the first arc-pipeline run: "Das reicht." vs the refined ending).
-        fullStoryText = storyPages.map(page =>
-          `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
-        ).join('\n\n');
-        const totalMs = usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
-        // A salvaged snapshot already logged text_refine_join_partial, which
-        // says what was kept AND what was abandoned. Emitting "complete" here
-        // too would read as a clean finish and hide the abandoned round.
-        if (!usable.partial) {
-          genLog.info(
-            'text_refine_complete',
-            `Text refined in ${usable.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${usable.changed.join(', ')}`,
-            null,
-            { rounds: usable.rounds.length, changedPages: usable.changed, durationMs: totalMs }
-          );
-        }
-      } else if (usable && !usable.partial) {
-        // "Nothing to rewrite" and "a round failed" are different outcomes — a
-        // failed round means the ORIGINAL text ships unreviewed, which must be
-        // visible in the log, not filed as a clean convergence.
-        const failedRound = (usable.rounds || []).find(r => !r.ok);
-        if (failedRound) {
-          genLog.warn('text_refine_failed', `Text refinement round ${failedRound.round} failed (${failedRound.error}) — original text kept`);
-        } else {
-          genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
-        }
-      }
-    }
+    // The refiner was joined before the repair pipeline (see
+    // joinTextRefinement). This call covers the paths that skipped Phase 5a and
+    // is a no-op on every normal run.
+    await joinTextRefinement([allImages]);
 
     // Wait for cover images if still running (they ran parallel with page images)
     if (coverAwaitPromise) {

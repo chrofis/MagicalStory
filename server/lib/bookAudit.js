@@ -96,6 +96,41 @@ async function loadShippedImage(scene, { pool, imageLoader, storyId, activeVersi
   return `data:${mime};base64,${buf.toString('base64')}`;
 }
 
+/**
+ * THE PAGES THE AUDIT READS — one resolver, used by every caller.
+ *
+ * The audit is the reader's-eye pass, so it must be handed the book that
+ * SHIPS: the FINAL page text and the PICKED image version. Two ways to get
+ * that wrong, both of which have happened:
+ *   - the picked version: `imageVersions[last]` is not the shipped image when
+ *     a page keeps its original after five repair passes (see
+ *     shippedVersionIndex). `pickVersion` answers it for the in-flight
+ *     pipeline, where nothing is pinned yet.
+ *   - the final text: the in-flight pipeline's page objects carried PRE-REFINE
+ *     prose until 2026-09-13, because the text-refine join ran after the
+ *     repair pipeline. Measured: 97% of pages are rewritten by the refiner.
+ *     The join now happens before the pipeline (storyJobPipeline.js,
+ *     joinTextRefinement), so `img.text` here is the shipped wording.
+ *
+ * A page with no resolvable image is dropped — half a page tells the judge
+ * nothing about whether words and picture agree.
+ *
+ * @param {Array} images        page objects carrying pageNumber, text, imageData
+ * @param {Function} [pickVersion] (pageNumber) => version — the picked version
+ * @returns {Array<{pageNumber:number, text:string, imageData:string}>}
+ */
+function buildAuditPages(images, pickVersion) {
+  const out = [];
+  for (const img of images || []) {
+    if (!img || typeof img.pageNumber !== 'number') continue;
+    const picked = typeof pickVersion === 'function' ? pickVersion(img.pageNumber) : null;
+    const imageData = picked?.imageData || img.imageData;
+    if (!imageData) continue;
+    out.push({ pageNumber: img.pageNumber, text: img.text || '', imageData });
+  }
+  return out;
+}
+
 /** Split a data URI (or bare base64) into the shape a Gemini inline_data part wants. */
 function inlinePart(imageData) {
   const mime = String(imageData).match(/^data:(image\/[\w+.-]+);base64,/)?.[1] || 'image/jpeg';
@@ -288,4 +323,4 @@ async function auditStoryBook(storyData, opts = {}) {
   }
 }
 
-module.exports = { auditStoryBook, shippedVersionIndex, parseRoutes, CHUNK_PAGES };
+module.exports = { auditStoryBook, buildAuditPages, shippedVersionIndex, parseRoutes, CHUNK_PAGES };
