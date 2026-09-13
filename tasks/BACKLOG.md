@@ -393,6 +393,13 @@ measurement, is lost).
       and the 2026-09-13 cohort cleanup (22,011 objects / 3,107 MB) will need repeating until the
       commit is promoted. Covered by the P0 promotion line, tracked here because the cost is
       ongoing → `docs/r2-storage.md` §5
+- [ ] **The trial photo upload does not ride out an analyzer restart** — it calls raw `fetch()`
+      instead of `analyzerFetch()`, so a restart surfaces to a real `/try` user as a 500 rather
+      than being retried; `/api/photos/status` and `/api/photos/remove-bg`'s own URL resolution
+      have the same gap. Owner decision 2026-09-13: **log only, do not fix.** Evidence: a staging
+      trial failed 2026-09-13 ~12:34–12:37 CH (`fetch failed`) inside an analyzer restart window
+      and recovered on its own → `server/routes/trial.js:1959`, `server/routes/photos.js:15,55`,
+      `server/lib/analyzerClient.js` (`analyzerFetch`)
 
 - [ ] STR-1 — split `processUnifiedStoryJob` — **now ~6,559 lines (`storyJobPipeline.js:378-6937`,
       file total 7,570); it GREW ~40% since the ~4,600 estimate**; STR-2–STR-5 + VAR-1 each ship as
