@@ -34068,3 +34068,40 @@ prompt already has extra limbs CRITICAL and routes an absence it cannot verify t
 recorded verdict that anatomy checks measure 0-precision. Detection is tracked separately; the one
 framing that has measured well is comparative (the post-repair face check, 4/4), not absolute.
 **Touched files:** `prompts/image-evaluation.txt` (D-09, D-10).
+
+## 2026-09-13 — A pinned Lab version was never loaded: `ctx.versionIndex` was read but never set
+
+**Context.** Two page stages resolve their image with
+`loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null)` —
+`quality_eval` and `inventory_ab`. Nothing anywhere assigned `ctx.versionIndex`.
+`loadSceneContext` does not set it; `runStageOnTarget` attached the target as
+`ctx.target` only. The expression therefore evaluated to `null` on every run,
+which `loadActivePageImage` reads as "load the ACTIVE version".
+
+**Consequence.** A Lab target pinned as `storyId:page:version` silently judged
+whatever version happened to be active. The p9 face bake-off (#1209–#1216) was
+run precisely to compare an original render against the repair that damaged it;
+both arms in fact judged the repaired render, and the "gemini-2.5-flash prefers
+the damaged image by 10 points" verdict measured nothing but run-to-run noise.
+Those experiment IDs are void and must not be cited.
+
+**Decision.** Resolve the pinned version ONCE, in `runStageOnTarget`, next to
+`ctx.target`, so every stage that reads `ctx.versionIndex` gets the target's
+pin. Per-stage re-derivation is what let two stages disagree about which bytes
+they were judging.
+
+**What the corrected runs then showed** (#1218–#1220, p9 truly pinned to v0):
+- The blind inventory reads the hat correctly on the clean render — 4/4 for
+  `gemini-2.5-flash` ("purple pirate hat") and 4/4 for `qwen3-vl` ("purple
+  tricorn hat with small feather"). The `"headwear": "none visible"` that had
+  been treated as an inventory failure was recorded against v1, where the
+  repair had in fact destroyed the hat along with the face. It was correct.
+- The false `accessory_missing` does NOT reproduce on v0: a full `quality_eval`
+  pinned to v0 returned no hat finding at all. Task #17's premise — that it
+  reproduced in #1209 — rested on the version bug.
+- What DOES reproduce on v0 is the three-stage CRITICAL claiming the lantern is
+  held in a hand rather than hung from the chest's lock, on a render where it
+  plainly hangs from the lock. That CRITICAL is what commissions the maskless
+  char-fix, so it, not the hat, is the live fault.
+
+**Touched files.** `server/lib/testlab.js`.

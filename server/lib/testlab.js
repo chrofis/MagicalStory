@@ -6506,7 +6506,9 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const imageDataUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // A pinned target version is the case: comparing describers on a page whose
+  // active version is a repaired render answers a different question.
+  const imageDataUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   if (!imageDataUri) throw new Error(`No image for page ${ctx.pageNumber}`);
   // The image ALONE — every arm here is a blind describer.
   const parts = [{
@@ -7989,6 +7991,11 @@ async function runStageOnTarget(stage, target, opts) {
       // target JSON — that is what lets two versions of ONE page be two
       // separate members of the same set.
       ctx.target = target;
+      // A pinned version, resolved ONCE. Two stages read ctx.versionIndex, and
+      // nothing ever set it — so both silently judged whatever version was
+      // active. That is how the p9 face bake-off (#1209-#1216) compared the
+      // repaired render against itself while reporting one arm as the original.
+      ctx.versionIndex = Number.isFinite(Number(target.versionIndex)) ? Number(target.versionIndex) : null;
       return await runner(ctx, opts);
     });
     result = captureRun.result;
