@@ -235,13 +235,22 @@ A story deleted before an erasure can leave its objects behind: `deleteStoryArte
 silent. Those objects are unreachable per-user, so no erasure can find them.
 
 ```bash
-node scripts/admin/delete-r2-dead-cohorts.js --report-only             # read only, cannot delete
-node scripts/admin/delete-r2-dead-cohorts.js --report-only --list=200  # more example keys
+node scripts/admin/audit-r2-dead-cohorts.js             # the audit — cannot delete, at all
+node scripts/admin/audit-r2-dead-cohorts.js --list=200  # more example keys
 ```
 
 It reports objects, bytes, referenced and unreferenced counts grouped by key prefix and
-sub-kind, and in `--report-only` mode **deletes nothing**. Ruling Q7 (2026-09-12) asked for a
-read-only audit; that is this mode. Note that the audit's old *id-attribution* verdict is
+sub-kind, and writes the same review manifest. Ruling Q7 (2026-09-12) asked for a read-only
+audit that "deletes nothing and has no delete mode": that is this **file**, not a mode —
+it imports no delete command, constructs no S3 client and has no confirm/production flag, so
+deletion is unreachable from it without reading a line of argument parsing. The scan itself is
+shared with the deleting tool (`scripts/lib/r2Cohorts.js`) so the cohort rule cannot drift
+between them; the guarantee is pinned by `tests/unit/r2-cohort-gc.test.ts`.
+
+`node scripts/admin/delete-r2-dead-cohorts.js --report-only` prints the identical report and
+also deletes nothing — a convenience inside the deleting tool, not the Q7 answer.
+
+Note that the audit's old *id-attribution* verdict is
 gone — deletion is decided by the COHORT rule only (`docs/r2-storage.md`), after the three
 false-positive classes of 2026-09-13. The two earlier scripts (`audit-r2-orphans.js`,
 `delete-r2-orphans.js`) were deleted that day.

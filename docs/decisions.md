@@ -34347,6 +34347,52 @@ deleted.
 
 ---
 
+## 2026-09-13 — The read-only R2 audit is a FILE again, not a flag: "cannot delete" must be checkable without reading argument parsing
+
+**Context:** GDPR ruling Q7 (2026-09-12,
+`tasks/gdpr-erasure-2026-09-11.md` §8) required a READ-ONLY orphan audit for R2
+that "deletes nothing and has no delete mode" — a control, because
+`deleteStoryArtefacts` (`server/routes/stories.js:3334`) logs a failed prune
+instead of throwing, leaving objects unreachable by any per-user erasure. Later
+the same week, commit `3b1e18d2b` (entry above) killed the id-attribution verdict
+and consolidated `audit-r2-orphans.js` + `delete-r2-orphans.js` into one tool,
+`scripts/admin/delete-r2-dead-cohorts.js`. The audit survived only as a
+`--report-only` FLAG on a deleting tool.
+
+**Decision:** restore a separate read-only entrypoint,
+`scripts/admin/audit-r2-dead-cohorts.js`, on top of a shared scan module,
+`scripts/lib/r2Cohorts.js`. The module lists, reports and writes the manifest; it
+imports no delete command and exports no delete function. The audit file
+constructs no S3 client and has no confirm/production flag, so deletion is
+unreachable from it by construction. `delete-r2-dead-cohorts.js` keeps its CLI
+exactly — same flags, same output, same two-flag guard — and only re-points its
+internals at the module; `--report-only` stays as a convenience, not as the Q7
+answer. **Q7's original wording stands unamended**; only the script name moved.
+
+**Rationale:** the practical risk of the flag arrangement was low — a mistyped
+flag falls through to the dry run, and deletion needs both `--confirm` and
+`--production`. But a GDPR control's audience is someone auditing it, and they
+should not have to trust argument parsing to believe the audit cannot delete.
+That is an argument about who reads the file, not about probability, so the
+answer is a file with no delete path in it. The scan is NOT duplicated: two
+divergent implementations of the cohort rule is exactly the failure the
+consolidation fixed, so one module serves both tools and the rule cannot drift.
+The cohort rule itself and what counts as dead are unchanged. Verified by running
+the old and new deleting tool side by side against a stubbed S3 client and pg
+Pool (no network): stdout, stderr and manifest identical in both dry-run and
+`--report-only` mode, modulo the wall-clock `time` row.
+
+**Touched files:** `scripts/lib/r2Cohorts.js` (new — the one scan),
+`scripts/admin/audit-r2-dead-cohorts.js` (new — read-only entrypoint),
+`scripts/admin/delete-r2-dead-cohorts.js` (internals only),
+`tests/unit/r2-cohort-gc.test.ts` + `tests/unit/fixtures/r2-gc-stub.cjs` (new —
+pins both guarantees), `docs/gdpr-erasure.md` §12, `docs/r2-storage.md` §4,
+`tasks/gdpr-erasure-2026-09-11.md`.
+
+**Status:** ✅ active.
+
+---
+
 ## 2026-09-13 — Blind inventory describers measured against the pixels: 2.5-flash makes 4× the consequential errors of 3.7-flash, and the reasoning-OFF arm is void
 
 **Context:** The blind visual inventory (`prompts/image-inventory-unified.txt`,

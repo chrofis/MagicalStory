@@ -113,16 +113,24 @@ carve-out for them (owner declined one, 2026-09-13). Their canonical photos live
 
 ## 4. Running it
 
-**One tool, three modes** — `scripts/admin/delete-r2-dead-cohorts.js`. It is both the
-reporter and the deleter; there is no second script, and there must never be one. (Two
-earlier tools, `audit-r2-orphans.js` and `delete-r2-orphans.js`, were deleted on
-2026-09-13: they were built on id attribution, the approach the cohort rule replaced.)
+**Two entrypoints over ONE scan.** The cohort rule, the bucket walk and the whole report
+live in `scripts/lib/r2Cohorts.js`; that module lists and reports and exports no delete
+function, so the rule cannot drift between the tools. (Two earlier tools,
+`audit-r2-orphans.js` and `delete-r2-orphans.js`, were deleted on 2026-09-13: they were built
+on id attribution, the approach the cohort rule replaced, and each had its own scan.)
 
 ```bash
-node scripts/admin/delete-r2-dead-cohorts.js --report-only   # report + manifest, cannot delete
+node scripts/admin/audit-r2-dead-cohorts.js                  # READ ONLY — no delete path exists in this file
+node scripts/admin/delete-r2-dead-cohorts.js --report-only   # report + manifest, cannot delete in this mode
 node scripts/admin/delete-r2-dead-cohorts.js                 # dry run (default), same report
 node scripts/admin/delete-r2-dead-cohorts.js --confirm --production   # actually deletes
 ```
+
+`audit-r2-dead-cohorts.js` is the GDPR control (ruling Q7): it prints the identical report and
+manifest, and cannot delete by construction — no delete command imported, no S3 client built,
+no confirm/production flag. `--report-only` on the deleting tool stays as a convenience for
+someone already in that tool. Both entrypoints and both guarantees are pinned by
+`tests/unit/r2-cohort-gc.test.ts`.
 
 Options: `--age-days=30` (cohort age floor — a cohort whose newest object is younger than
 this is never swept, which protects an in-flight generation), `--list=20` (sample keys per
