@@ -34925,3 +34925,63 @@ POSITIVE case is UNPROVEN: none of the 5 pages carries an actual prop swap, so
 the rule was never given the chance to fire correctly. Needs a page with a known
 wrong prop in hand — the page that motivated the original report was never
 recorded.
+
+## 2026-09-13 — The bible is English end to end; only the story TEXT is German
+**Context:**   `job_1789301291267_ueh8h145m` (de-ch) page 1 asked the image model for
+
+    * **chest** (object)
+    * **tool** (object)     <- ART002 "Brass telescope"
+    * **tool** (object)     <- ART003 "Iron crowbar"
+    The attached reference images include rough images of: chest; tool; tool
+
+two different props under one word, with reference cells the model cannot match
+to either. Page 4 asked for a "tool" and rendered a featureless black pole — the
+render was FAITHFUL, the prompt was wrong — and the quality judge then charged it
+MAJOR `object_presence` for a defect the pipeline had specified.
+
+The labels come from the entry's `type`, which `englishEntityRef` prefers over
+the description for a non-English story. The field the author fills said only
+`"type": "[what kind of object]"`, which is answered with a CATEGORY, and
+`"name": "[Name]"`, with the English requirement a bullet ~100 lines earlier.
+`scene-expansion-all.txt` — the AD-authored bible, today's primary path — had the
+WEAKEST field-level wording of the four bible templates: `story-unified.txt` and
+`story-trial.txt` both inline "plain English description … never a proper noun"
+in the field itself. It also had no `properName`, so a story-given ship name had
+nowhere to go but `name`.
+
+Measured over the 60 most recent stored stories: 47 non-English element names
+(`Küchentopf`, `Emmas gelber Schal — getragen`, `La Nivéole`, `Höhlenritzung`),
+45 one-word `type` values, and 12 stories where two elements share one type
+string — including the story generating while this was written (`tool` for "Fish
+Bone Comb", beside `jewelry` and `box`).
+
+**Decision:** Fix it where it is authored, not where it is read. Owner, 2026-09-13:
+"Keep everything English as long as possible. Text is German, rest English."
+- `name` asks for a plain English noun phrase, English even for a non-English
+  story, never a proper noun and never a bare category.
+- `properName` added to the artifact schema (already carried by the code,
+  `visualBible.js:580`), so a named ship stops colonising `name`.
+- `type` must be specific enough to tell the object apart from every other
+  element in the bible — "iron crowbar", never "tool" — in all FOUR templates
+  (`scene-expansion-all`, `story-unified`, `story-unified-imagefirst`,
+  `story-trial`).
+
+**Rationale:** Classification belongs to the prompt (CLAUDE.md), and every
+code-side remedy broke something real:
+- Using the NAME whatever the language (dropping the `storyIsEnglish` gate in
+  `promptBuilders.js`) would have painted German and French into image prompts —
+  the hazard the settled 2026-07-31 English-only direction exists for. 47 of 60
+  stories would have hit it.
+- Falling back to the description for a one-word `type` reintroduced the label
+  fragments that `tests/unit/secondary-cast-appearance.test.ts:153` pins after a
+  prod incident (`job_1788698812047_q5b1vuds7` p2: "hat" beside "child-sized
+  tunic made of woven straw" — one list, two labelling rules). It failed that
+  test, and word count was the wrong test anyway: "hat" and "costume" are
+  single words and perfectly good labels. The defect is COLLISION, not brevity.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`
+**Status:**    🟡 conditional — new stories only; stored bibles keep their
+colliding labels, and no code-side disambiguation exists if an author still
+returns a duplicate `type`. Verify on the next generated story that two props
+never share a REQUIRED OBJECTS label.

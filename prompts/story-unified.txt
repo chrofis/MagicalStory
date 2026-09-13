@@ -677,7 +677,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "name": "[plain English description of the thing, e.g. 'toy treasure chest' — never a proper noun]",
       "properName": "[OMIT unless the story names this object; then that name]",
       "pages": [X, Y, Z],
-      "type": "[what kind of object]",
+      "type": "[the kind of object, in English — specific enough to tell it apart from every other element in this bible: 'iron crowbar', never 'tool']",
       "size": "[against a person: 'fits in one hand', 'carried in both arms', 'as tall as the child']",
       "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, then the rest in the order the story reaches them, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words — never material, colour or size, those stay in description; never light, that belongs to the scene; never a feature `description` already carries]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
       "wornAs": "[OMIT unless this prop becomes part of a character's costume. Then: \"<CharacterName>.<slot>\", e.g. \"Emma.headwear\" — the slot in that character's clothingRequirements this same item fills once worn.]",

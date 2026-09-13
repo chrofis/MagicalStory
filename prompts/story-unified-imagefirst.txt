@@ -722,7 +722,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "ART001",
       "name": "[Name]",
       "pages": [X, Y, Z],
-      "type": "[what kind of object]",
+      "type": "[the kind of object, in English — specific enough to tell it apart from every other element in this bible: 'iron crowbar', never 'tool']",
       "wornAs": "[OMIT unless this prop becomes part of a character's costume. Then: \"<CharacterName>.<slot>\", e.g. \"Emma.headwear\" — the slot in that character's clothingRequirements this same item fills once worn.]",
       "description": "[size, color, material, distinctive markings. A prop carrying writing has that writing 'illegible' / 'weathered' / 'smudged' / 'blurred' — never quote words to be painted, and never say 'handwritten letters visible' on its own, which makes the image model letter the prop's own name across it. A prop whose interest lies on its face gets two entries, one per side; what is drawn or written on the face stays out of both.]"
     }

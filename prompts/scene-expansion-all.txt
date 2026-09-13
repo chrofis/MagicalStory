@@ -225,9 +225,10 @@ First, exactly:
   "artifacts": [
     {
       "id": "ART001",
-      "name": "[Name]",
+      "name": "[plain English noun phrase for the thing, e.g. 'brass telescope', 'oak sea chest' — English even for a non-English story; never a proper noun, and never a bare category]",
+      "properName": "[OMIT unless the story gives this object a name of its own]",
       "pages": [1],
-      "type": "[what kind of object]",
+      "type": "[the kind of object, in English — specific enough to tell it apart from every other element in this bible: 'iron crowbar', never 'tool']",
       "text": "[OMIT unless words on this object must be readable in the picture (a sign, a plaque, a banner); then the exact words, at most three]",
       "states": "[OMIT unless the story alters this object or turns a face prop's two sides to us. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, then the rest in the order the story reaches them, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[the change to the object itself, one clause, at most 15 words — never material, colour or size, those stay in description; the object's own light belongs here when the story turns it on or off, how the scene lights it never does; never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]",
       "description": "[what it is, named with the word that names it, and the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does; then size, colour, material, geometry, described by shape and parts, never by a style name. No lettering unless this entry names the exact words it carries in `text`; otherwise 'illegible' / 'weathered' / 'smudged'. A prop whose interest lies on its face is one entry, with a state per side.]"
