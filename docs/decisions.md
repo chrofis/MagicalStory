@@ -34516,10 +34516,22 @@ always phrase its way around a prohibition; a two-key schema has nowhere to put
 contact. Classification stays in the prompt per CLAUDE.md — no code reads
 `items_held`.
 **Touched:** `prompts/image-inventory-unified.txt` (field definition + example)
-**Status:**    ✅ active — negative control confirmed on 7 pages; the
-positive control (genuinely gripped props) is UNMEASURED: the three benchmark
-pages carrying them failed upstream in #1243-#1246 (Gemini HTTP error on all
-arms, Grok fallback returned nothing) and must be re-run.
+**Status:**    ✅ active — controlled both ways. #1252/#1253 (10 pages) show
+the schema adopted everywhere and the sandals false positive gone
+("touching purple sandal strap with right hand" -> nothing). #1254/#1255 ran a
+set graded by eye first: one unambiguous positive (both hands wrapped around a
+shell) and five hard negatives (an object lying on the floor, a hat on the
+ground beside a worn lasso, a hand reaching toward but not touching an egg,
+palms flat on a table beside boxes, fingers curled into straw). Positives
+detected 2/2 by both models; no false positives on either. The only miss is
+2.5-flash reporting `nothing` for the curled-in-straw hands — an omission,
+which is the safe direction, since it commissions no repair.
+
+Two ground-truth labels from the earlier grading did NOT survive looking at
+the pixels: the "plank held in both hands" figure really does curl her fingers
+around the edge of an open barn door, and the straw is really grasped. Both
+were called false positives on the strength of `objects[].grounded`, which
+says nothing about grip. Check the image, not the neighbouring field.
 
 ## The Lab records the model that answered, not the one requested (2026-09-13)
 **Context:**   Experiment #1241 requested gemini-3.7-flash with
