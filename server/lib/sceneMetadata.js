@@ -2058,6 +2058,44 @@ function resolveEvalImagePrompt({ promptSent = null, originalPrompt = null } = {
   return pick(promptSent, originalPrompt);
 }
 
+/**
+ * THE PICTURE SPEC for every text-stage consumer = the brief the WRITER was
+ * given, whole.
+ *
+ * The page text is written against the locked scene brief
+ * (buildStoryTextFromBeatsPrompt, promptBuilders.js — METADATA stripped, no
+ * length cut). The refine/repair pass that rewrites that text is shown the same
+ * brief. The arc-informed AUDITOR that decides what the repair pass must change
+ * was shown something else: `extractRefinablePages` (textRefine.js) falls back
+ * to `sceneDescription.slice(0, 600)` when no compact `sceneIntent` exists, and
+ * in the beats pipeline — the pipeline in every environment — nothing ever sets
+ * one: beatsPipeline.js sets no `sceneMetadata`, and `outlineExtract` is the
+ * string "PLAN: …", never JSON. So every beats page reached the auditor as a
+ * blind 600-character head cut.
+ *
+ * The failure that produces: an event stated in the brief's later paragraphs is
+ * absent from the auditor's copy, so it files
+ * `FAULT[MISMATCH]: the text has X, the picture shows no X` — and the repair
+ * pass, reading the WHOLE brief, deletes prose the illustration does contain.
+ * The truncation was never a budget decision; it was a fallback that became the
+ * only path.
+ *
+ * Same class as resolveEvalSceneHint (3b3070dce) and resolveGeneratedOutfit
+ * (e403345b1), and fixed the same way: one resolver, so judge and actor cannot
+ * drift apart again. METADATA is stripped here because it is machine data for
+ * the image call — the writer never saw it, so neither may its judge.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.sceneBrief] - brief as extractRefinablePages carries it
+ * @param {string|null} [sources.sceneDescription] - the stored Art Director brief (Lab replay, stored stories)
+ * @param {string|null} [sources.sceneIntent] - compact one-line intent, last resort
+ * @returns {string|null}
+ */
+function resolveTextStagePictureSpec({ sceneBrief = null, sceneDescription = null, sceneIntent = null } = {}) {
+  const strip = v => (typeof v === 'string' ? v.split(/---\s*METADATA/i)[0].trim() : '');
+  return [sceneBrief, sceneDescription, sceneIntent].map(strip).find(v => v) || null;
+}
+
 module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
@@ -2074,6 +2112,7 @@ module.exports = {
   extractSceneMetadata,
   resolveEvalSceneHint,
   resolveEvalImagePrompt,
+  resolveTextStagePictureSpec,
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,
   findCastMissingFromMetadata,

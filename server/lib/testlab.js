@@ -3215,21 +3215,36 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const outline = String(storyData.outline || '');
   let prompt = null;
   let templateKey = null;
+  // The arc, for both branches. The text branch used to omit it from
+  // buildTextAuditPrompt's third argument, so the replay's STORY_ARC read
+  // "(no story was recorded)" while production (textRefine.js) passes the arc —
+  // the LOADBEARING question could not fire in the Lab and fault counts came
+  // out lower for reasons that had nothing to do with the prompt under test.
+  const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
   if (level === 'arc') {
     templateKey = 'storyArcAudit';
-    const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
     if (!arc.trim()) throw new Error('story has no stored arc to audit');
     prompt = H.buildArcAuditPrompt(storyData, arc);
   } else {
     const blind = level === 'text-blind';
     templateKey = blind ? 'storyTextAuditBlind' : 'storyTextAudit';
+    // Same fields production's extractRefinablePages carries, so the replay's
+    // THE PICTURE SHOWS is resolved from the same sources by the same resolver
+    // (sceneMetadata.resolveTextStagePictureSpec). Handing `sceneIntent` the
+    // full sceneDescription made the replay's spec LONGER than the run's — the
+    // opposite truncation — which broke comparability the other way.
     const pages = (storyData.sceneImages || [])
-      .map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: p.sceneIntent || p.sceneDescription }))
+      .map(p => ({
+        pageNumber: p.pageNumber,
+        text: p.text,
+        sceneBrief: p.sceneDescription || null,
+        sceneIntent: p.sceneIntent || null,
+      }))
       .filter(p => String(p.text || '').trim());
     if (!pages.length) throw new Error('story has no page text to audit');
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
-      : H.buildTextAuditPrompt(storyData, pages);
+      : H.buildTextAuditPrompt(storyData, pages, arc);
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
