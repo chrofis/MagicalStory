@@ -36538,3 +36538,45 @@ template (confirmed by reverting it), so the pin is not vacuous.
 
 **Touched files.** `prompts/arc-retell.txt`,
 `tests/unit/beats-dropped-fill-keys.test.ts` (new), `docs/decisions.md`.
+
+## 2026-09-14 — A re-plan round may not change the page count; repair summaries read the method a result carries; the label round is persisted
+**Context:**   Story A of the 09-14 validation run, `job_1789337998754_apslnsq1z`
+(18-page order, de-ch, watercolor, dragon), completed in 69 min with no crash
+and surfaced three deterministic defects in the stored data:
+1. **19 pages for an 18-page order.** The plan was 18/18; re-plan Round 1 came
+   back with 19 plan lines. The acceptance path guards duplicates
+   (`beats_replan_duplicate`) and omitted pages (`beats_replan_incomplete`) but
+   never compared the round's page count with the division that stands, so a
+   round that ADDS a page passes. Text, briefs and images followed: 19.
+2. **`finalChecksReport.repairRounds[].pages[].method` was `"unknown"` on every
+   entry.** The summary read `r.method`, but iterate / inpaint / char-fix results
+   carry the name in `source` (`iterate-round-1`, …); only the composite path
+   sets `method`. So 278e408ae ("every story records which repair method
+   worked") recorded nothing usable on its first real story.
+3. **`labelRound` reached no stored report.** `runVisualBibleLabelRound` writes
+   `meta.labelRound`, and neither persisted report carried it; the story had
+   valid, unique labels and a null `labelRound` everywhere.
+**Decision:**
+- `beats_replan_page_count`: a re-plan round whose page count differs from the
+  standing division is discarded and the previous division stands — same shape
+  and same fail-soft as the duplicate guard. The beats layer may still move,
+  split or merge instants; it may not change the size of the book.
+- `repairLogic.repairAttemptFromResult(r)` is the one mapping from a repair
+  result to a summary attempt: `method = r.method || r.source || null`. Unit
+  tested (repair-round-effectiveness).
+- The scene-review report carries `labelRound: meta.labelRound`.
+**Rationale:** All three are recording or guarding defects with a single
+correct behaviour; none needed an owner choice. Lab #1263 (quality_eval on p6,
+p14, p8 of the same story) was run BEFORE deciding on the two judge-side
+oddities and changed the diagnosis: the p6 "Levin wears Kiaan's outfit"
+CRITICAL was NOT a wrong contract — the judge received the correct
+per-character block and did not reproduce the finding — so it is judge noise,
+not code; and p14's −10 comes from the semantic judge's "rendered as a
+toddler instead of a school-age boy" findings, the cast-drawn-too-young class
+the owner has ruled out, now emitted judge-side. Both are recorded as open
+items, not changed here (classification belongs to the prompt).
+**Touched:** `server/lib/beatsPipeline.js` (re-plan guard; `labelRound` on the
+report), `server/lib/repairLogic.js` (`repairAttemptFromResult`),
+`server/lib/repairPipeline.js`, `tests/unit/repair-round-effectiveness.test.ts`
+**Status:**    ✅ active — the guard is situational (fires only when a re-plan
+changes the count); the two recording fixes show on the next story with a repair.

@@ -736,6 +736,24 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
  *
  * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>}} args
  */
+/**
+ * One repair result → one attempt row for summarizeRepairRound.
+ *
+ * A repair result names its method in `source` ('iterate-round-1',
+ * 'inpaint-round-2', 'char-fix-round-1'); only the composite path also sets
+ * `method`. Reading `method` alone summarised EVERY page of
+ * job_1789337998754_apslnsq1z as "unknown" — the exact blindness 278e408ae was
+ * written to end.
+ */
+function repairAttemptFromResult(r) {
+  return {
+    pageNumber: r?.pageNumber,
+    method: r?.method || r?.source || null,
+    ok: !!r?.imageData,
+    error: r?.imageData ? null : (r?.error || 'no result'),
+  };
+}
+
 function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {} }) {
   const byMethod = {};
   const pages = [];
@@ -850,4 +868,5 @@ const SAFE_REPAIRABLE_TYPES = new Set([
   'viewer_address',
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
-module.exports = { findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+module.exports = {
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

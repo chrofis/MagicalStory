@@ -2638,7 +2638,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // lines above; a page whose eval failed has no after score and is recorded
     // as `unknown` rather than being counted as unchanged.
     {
-      const { summarizeRepairRound } = require('./repairLogic');
+      const { summarizeRepairRound, repairAttemptFromResult } = require('./repairLogic');
       const roundAfterScores = {};
       for (const r of roundSuccess) {
         const versions = pageVersions.get(r.pageNumber) || [];
@@ -2647,12 +2647,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
       repairRounds.push(summarizeRepairRound({
         round,
-        attempts: roundResults.filter(Boolean).map(r => ({
-          pageNumber: r.pageNumber,
-          method: r.method || null,
-          ok: !!r.imageData,
-          error: r.imageData ? null : (r.error || 'no result'),
-        })),
+        attempts: roundResults.filter(Boolean).map(repairAttemptFromResult),
         beforeScores: roundBeforeScores,
         afterScores: roundAfterScores,
       }));

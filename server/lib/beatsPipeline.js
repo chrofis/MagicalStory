@@ -1159,6 +1159,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
             break;
           }
         }
+        // THE PAGE COUNT IS THE ORDER (2026-09-14). The re-plan may move, split
+        // or merge instants, but a round that returns more or fewer pages than
+        // the division that stands is not a re-division of THIS book: on
+        // job_1789337998754_apslnsq1z an 18-page order came back as 19 plan
+        // lines, passed both guards above (no duplicate, nothing omitted), and
+        // shipped as a 19-page book. Same remedy as the duplicate guard: the
+        // round is discarded and the previous division stands.
+        if (second.parsed.pages.length !== beats.length) {
+          log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
+          gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
+          beats = bestBeats;
+          pagePlan = bestPagePlan;
+          break;
+        }
         if (second.parsed.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
           gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
@@ -2208,6 +2222,10 @@ ${bibleBody}` : bibleBody;
         wornUnresolved,
         wornUnresolvedPages,
         wornRound,
+        // The VB label round writes its outcome to `meta` at adoption time;
+        // without this line it reached no stored report (job_1789337998754_apslnsq1z
+        // had valid labels and a null labelRound everywhere).
+        labelRound: meta.labelRound || null,
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
         rewriteToZeroUnfixed,

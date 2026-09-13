@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — plain CommonJS module
-const { summarizeRepairRound } = require('../../server/lib/repairLogic.js');
+const { summarizeRepairRound, repairAttemptFromResult } = require('../../server/lib/repairLogic.js');
 
 const attempt = (pageNumber: number, method: string, ok = true, error: string | null = null) =>
   ({ pageNumber, method, ok, error });
@@ -110,5 +110,25 @@ describe('summarizeRepairRound', () => {
       { page: 4, method: 'iterate', before: 22, after: 66, delta: 44, outcome: 'improved' },
       { page: 6, method: 'char-fix', before: 35, after: null, delta: null, outcome: 'failed', error: 'no avatar' },
     ]);
+  });
+});
+
+describe('repairAttemptFromResult — the method a repair result actually carries', () => {
+  it('reads the method from `source` when only `source` is set (iterate / inpaint / char-fix results)', () => {
+    expect(repairAttemptFromResult({ pageNumber: 14, imageData: 'x', source: 'iterate-round-1' }).method).toBe('iterate-round-1');
+    expect(repairAttemptFromResult({ pageNumber: 2, imageData: 'x', source: 'char-fix-round-1' }).method).toBe('char-fix-round-1');
+  });
+  it('prefers an explicit `method` (the composite path sets one)', () => {
+    expect(repairAttemptFromResult({ pageNumber: 3, imageData: 'x', source: 'composite-iterate-round-1', method: 'composite' }).method).toBe('composite');
+  });
+  it('a failed result is not ok and keeps its error; a missing error reads "no result"', () => {
+    const a = repairAttemptFromResult({ pageNumber: 5, imageData: null, source: 'inpaint-round-2', error: 'boom' });
+    expect(a).toEqual({ pageNumber: 5, method: 'inpaint-round-2', ok: false, error: 'boom' });
+    expect(repairAttemptFromResult({ pageNumber: 6, imageData: null }).error).toBe('no result');
+  });
+  it('summarises under the source name, never "unknown", for a normal iterate result', () => {
+    const s = summarizeRepairRound({ round: 1, attempts: [repairAttemptFromResult({ pageNumber: 14, imageData: 'x', source: 'iterate-round-1' })], beforeScores: { 14: -30 }, afterScores: { 14: -10 } });
+    expect(Object.keys(s.byMethod)).toEqual(['iterate-round-1']);
+    expect(s.pages[0].method).toBe('iterate-round-1');
   });
 });
