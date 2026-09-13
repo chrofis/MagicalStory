@@ -35546,3 +35546,52 @@ previously rendered a grid with nothing highlighted.
 (local `topicFitsAge` removed, now imports the shared one — behaviour unchanged),
 `tests/unit/trial-age-appropriate-topics.test.ts`
 **Status:** ✅ active
+
+## 2026-09-13 — Anatomy defects ship unguarded: closed by decision, not by fix
+**Context:**   Zero `anatomy` / `proportion` findings across 34 evaluated pages
+(two stories, 2026-09-13). The plumbing is intact — `evalBuckets.js` grades
+`anatomy` with `repair: 'regen'`, `proportion` aliases to it, it sits in the
+consolidator's closed vocabulary and carries no zero-point ceiling, so a
+finding WOULD bill 2/15/25 and repair. It never fires because the DETECTION
+does not work: the per-figure VLM anatomy check is recorded as tested and not
+viable (entry of 2026-08, decisions.md ~24100), and prompt-variant sweeps on
+2.5-flash are exhausted (~30436). The same day's grading saw both blind
+describers pass a smeared face and a crossbow mounted in the plane of the
+shot as `physics_ok: true`.
+**Decision:** (owner, 2026-09-13) Leave it unguarded. The one untried lever —
+cropping each detected figure at native resolution from the existing SAM masks
+and asking the anatomy question on the crop — is NOT pursued now. Anatomy
+defects are repaired on request via the Grok char-fix path, as today.
+**Rationale:** Every measured attempt at VLM anatomy detection returned zero
+precision; spending more Lab money without a new signal is the burn-loop the
+project rules forbid. Recorded so the item is not re-raised as a plumbing bug.
+**Touched:** none
+**Status:**    ✅ decided — reopen only with a new detection signal, not a new prompt variant
+
+## 2026-09-13 — Urgency is drawn, not judged: the plan line's stakes set faces and effort (generation side only)
+**Context:**   A page whose beat is a rising flood and hail on the sail can
+render as two children calmly standing by a box and score clean:
+`image-semantic.txt:46` treats a neutral or calm expression as SATISFYING the
+beat and `:73` lets any frozen pose satisfy a motion verb. The generation
+side already carries the channel — every character has a required
+`expression` (brows/eyes/mouth) and the built prompt re-anchors it in an
+EXPRESSIONS AND EYES block (`promptBuilders.js:4404`); on
+`job_1789301291267_ueh8h145m` p4 it read "focused, mouth slightly open, brows
+lowered". What no rule did was tie those faces and the bodies' effort to the
+plan line's STAKES, and `sceneIntent` sentence 3 invited a bare mood word
+("The mood is urgent" on p1).
+**Decision:** (owner, 2026-09-13: generation side only) Rule 5e in
+`scene-expansion-all.txt`: a plan line carrying threat, hurry or strain is
+drawn under it — expressions name the strain, bodies brace, lean or hurry,
+nothing in the frame rests; a calm plan line is drawn calm; mood is shown
+through faces, bodies, light and weather, never named. `sceneIntent`
+sentence 3 now asks for the mood as it shows, never as a mood word. The
+evaluator is unchanged: no `mood_mismatch` finding, nothing new deducts.
+**Rationale:** Expression judging on children's faces is noisy and
+calm-by-design pages exist, so a judge-side rule would fire on pages the
+owner considers fine and could buy repaints. The cheapest way to stop flat
+books is to stop authoring them. Not pinned by a wording test — prompt
+wording is not pinned by policy; the behaviour shows on the next story.
+**Touched:** `prompts/scene-expansion-all.txt`
+**Status:**    🟡 conditional — verify on the next real story that an urgent
+page's `expression` fields and prose carry strain.
