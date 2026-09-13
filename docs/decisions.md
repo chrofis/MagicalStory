@@ -36115,3 +36115,94 @@ Routing each rule to the stage that can act on it keeps one source per contract.
 `buildStoryBibleFromBeatsPrompt`), `prompts/story-bible-from-beats.txt`,
 `tests/unit/beats-category-guidance.test.ts`
 **Status:** ✅ active
+
+## The trial topic grid ranks by how LIVE a topic is, not by how narrow its window is (supersedes the 896895deb ranking)
+
+**Context:** The per-age grid shipped in `896895deb` ranked narrowest-window-first.
+The owner rejected three things about the result. (1) `potty-training [2,4]`
+ranked FIRST for a four-year-old — most children are trained well before four.
+(2) `first-kindergarten` and `first-school` both appeared at ages 5 and 6, but in
+Switzerland they are two years apart. (3) `visiting-doctor` and `going-vacation`
+filled ages 0-1 while `eating-vegetables` surfaced only at 8 — "feeding is a daily
+battle, a doctor visit is occasional; parental demand does not track window width
+at all."
+
+**Decision:** Three changes plus a catalogue addition.
+
+*Windows mark the live issue, not the plausible one.* Every bound was re-read as
+"is this still what the parent is dealing with", not "is this still conceivable".
+Eleven narrowed (`potty-training` [2,4]->[2,3] first among them), seven widened —
+`screen-time` [5,12]->[3,12] being the largest miss, since the tablet fight starts
+at three and a top-tier daily battle was invisible for two years of it.
+
+*School entry follows the Swiss calendar.* HarmoS sets an inter-cantonal Stichtag
+of 31 July and a minimum entry age of the completed fourth year; Kindergarten runs
+two mandatory years and children pass to the Primarschule after them. A Kindergarten
+entrant is therefore 4;0-5;1 on the first day and a first-Klaessler 6;0-7;1 — which
+is why each carries a TWO-year window rather than one: the Stichtag spread is
+exactly the year between an August-born and a July-born child. `first-kindergarten`
+[4,5], `first-school` [6,7], zero overlap at any age, pinned by a test.
+Sources: https://www.zh.ch/de/bildung/schulen/volksschule/kindergarten.html
+("Alle Kinder, die am 31. Juli vier Jahre alt sind, besuchen ab Schuljahresbeginn
+den Kindergarten" / "dauert zwei Jahre und ist obligatorisch" / "Nach zwei Jahren
+Kindergarten wechseln die Kinder in die Primarschule") and
+https://www.edk.ch/dyn/19795.php. `reading-alone`, `homework`, `money-saving` and
+`test-stress` are re-derived off the same calendar.
+
+*Ranking is `liveness` first, window fit second.* `liveness` (1-5) is how live a
+topic is for a family right now, IN EITHER DIRECTION — a current struggle, or a
+current milestone worth marking. It is not popularity and not how common the event
+is. `pole` ('friction' | 'milestone' | 'both') says which way it pulls; 'both' is a
+wildcard, because a new sibling is exciting AND produces jealousy and a first
+kindergarten day is proud AND frightening. The six tiles are then COMPOSED, not
+taken off the top: one seat reserved for a pure milestone, at most four friction
+tiles, at most one topic per `family` (so `eating-vegetables` never sits beside
+`picky-eating`).
+
+*Five infant topics, because ages 0-1 had none.* `AGE_BANDS` has always routed ages
+0 and 1 to the routine book; the catalogue had nothing to point it at, which is why
+the age-0 grid could not be filled at all. `first-foods`, `bath-time`,
+`first-steps`, `first-words` and `going-outside` are ordinary topics on the
+ordinary toddler shelf — the window does the age work, `ageGroup` stays a shelf
+label. Their guide sections are written in the age-band prompts' register (what the
+pages contain) with NO "Key messages:" line, because the routine band forbids a
+lesson and a coda. Teething and nappy-changes were considered and rejected: teething
+is a state with nothing happening and no resolution within a page, and nobody
+commissions a keepsake about nappies. `saying-goodbye` stays [1,5] rather than
+being narrowed, which is the alternative to a separate infant-separation topic.
+
+**Rationale:** Window width measures how age-SPECIFIC a topic is, which has nothing
+to do with whether a parent is living it — and it systematically buried fieldless
+life events, which are maximally wide by definition. That is a geometry artefact
+masquerading as a preference signal.
+
+**The weights are authored judgement, not measurement, and are documented as such
+in the type.** The repo was searched for real signal before falling back on
+judgement, and here is everything that exists: the only measured per-topic demand
+data is a 2026-08-26 CH Google Keyword Planner probe of four German problem queries
+(`project_ads_funnel_strategy.md`) — Trotzphase 210/mo head and 3,610 cluster,
+Schnuller abgewoehnen 110/1,720, Eingewoehnung Kindergarten 70/1,350,
+geschwisterstreit 40 head only. That probe RAISED `no-pacifier` to 5 and confirmed
+`managing-emotions` and `first-kindergarten`. `sibling-fighting` was kept at 5 on
+judgement despite measuring smallest, because 40 is a head figure and the other
+three are clusters — not comparable. Everything else was checked and rejected as
+signal: `popularLifeChallengeIds` is documented in-code as "the 16 that parents
+actually order" with NO data behind it; production holds 129 stories of which 14
+life-challenge stories come from external accounts across 10 topics (45 of 59
+topics have zero ever) — n too small to distinguish preference from noise; every
+`/themes/*` SEO URL is a hardcoded `priority: 0.6`; there is no Plausible or Umami;
+GA4 has no repo-side API client; the Search Console token is expired. The trial
+fires `topic_selected` but stores `meta = NULL`, so the funnel's highest-intent
+topic signal is discarded — closing that is tracked separately and would replace
+this judgement with measurement.
+
+**Touched:** `client/src/constants/storyTypes.ts` (windows, `liveness`/`pole`/
+`family`, `trialRankScore`, `composeTrialGrid`, pool 29->42, five new topics),
+`client/src/types/story.ts` (`LifeChallenge` fields), `server/lib/promptBuilders.js`
+(`TOPIC_AGE_WINDOWS` regenerated, 56 of 64), `prompts/life-challenge-guides.txt`
+(five sections), `tests/unit/trial-age-appropriate-topics.test.ts`,
+`tests/unit/age-band.test.ts`.
+
+**Status:** ✅ active — supersedes the ranking half of the 2026-09-13
+`896895deb` entry above. The window field, the eight fieldless life events, the
+cap of six and the uncapped wizard all stand unchanged from it.

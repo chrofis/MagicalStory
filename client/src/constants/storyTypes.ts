@@ -478,61 +478,116 @@ export function parseChildAge(age?: string | number | null): number | null {
 }
 
 /**
- * Rank key for the trial grid — LOWER is a better fit, so the visible six are
- * the six most on-target topics for this child rather than the first six in
- * source order. Three signals, in strict priority:
+ * Rank score for the trial grid — HIGHER is a better tile. Two signals, decades
+ * apart so the lower one can never outvote the higher:
  *
- *  1. **Window width** (dominant). A topic whose window is [2,4] is *about*
- *     being two; one whose window is [2,12] merely tolerates it. The narrower
- *     window containing the age is the more deliberate answer to "what is this
- *     child working on right now". A fieldless life event counts as the widest
- *     possible window (0-12): it is real at any age and therefore specific to
- *     none, so it fills the grid only once the targeted topics run out.
- *  2. **Distance from the window's centre.** Inside two equally wide windows,
- *     the one centred on this age beats the one the child is ageing out of —
- *     a 6-year-old gets [4,8] before [6,10].
- *  3. **Commission frequency.** The pool order is the curated popularity
- *     ranking (the 16 that parents actually order, then the 13 age-gated
- *     additions); its index breaks every remaining tie deterministically, so
- *     the grid never reshuffles between renders.
+ *  1. **`liveness` (dominant, x1000).** How live the topic is for this family
+ *     right now, in either direction — a current struggle or a current
+ *     milestone. This replaced window width, which was the wrong axis
+ *     entirely: width measures how age-SPECIFIC a topic is, which has nothing
+ *     to do with whether a parent is living it. Under the old key a fieldless
+ *     life event was maximally wide by definition and therefore always last,
+ *     which is how `visiting-doctor` came to rank first at age 0 while
+ *     `eating-vegetables` — a daily battle for six years — surfaced only at 8.
+ *     Feeding is a nightly fight; a doctor's appointment is an appointment.
+ *  2. **Window fit (0-99).** Only among equally live topics: how centred this
+ *     child's age sits in the window, plus a small term for a narrow window.
+ *     A fieldless event scores 0 here — it is real at any age and centred on
+ *     none — so it loses every tie to a windowed topic of the same liveness.
  *
- * The weights are decades apart, so a lower-priority signal can never outvote a
- * higher one: width dominates (×1000, max span 13), centre offset is bounded by
- * 6 (×100 → max 600), and the pool index is bounded by the pool size (< 100).
+ * The pool index breaks what is left, so the grid never reshuffles between
+ * renders (docs/decisions.md 2026-09-13).
  */
-function trialRankKey(c: LifeChallenge, age: number, pool: LifeChallenge[]): number {
+function trialRankScore(c: LifeChallenge, age: number): number {
+  const live = c.liveness ?? 3;
   const w = c.suitableAges;
-  const width = w ? w[1] - w[0] + 1 : 13;
-  const offset = w ? Math.abs(age - (w[0] + w[1]) / 2) : 0;
-  return width * 1000 + offset * 100 + pool.findIndex(p => p.id === c.id);
+  if (!w) return live * 1000;
+  const centre = (w[0] + w[1]) / 2;
+  const halfWidth = Math.max((w[1] - w[0]) / 2, 0.5);
+  const centrality = 1 - Math.min(Math.abs(age - centre) / halfWidth, 1);
+  const narrowness = 1 - (w[1] - w[0]) / 12;
+  return live * 1000 + Math.round(60 * centrality + 39 * narrowness);
 }
 
 /**
- * The topic list the TRIAL shows: filter, then rank, then cap. Out-of-window
- * topics are ABSENT where the full wizard dims them; what survives is ordered
- * best-fit-first by `trialRankKey`; and only the first TRIAL_GRID_SIZE reach
- * the grid. Two surfaces, two behaviours, deliberately — the wizard is never
- * capped (docs/decisions.md 2026-09-13).
- *
- * `selectedTopicId` is pinned FIRST and survives all three steps — filter, rank
- * and cap — even when it is out of window or outside the trial pool:
- * `/try?category=...&topic=...` deep links from the
- * SEO landing pages fix a topic BEFORE the age is known, and 43 of the 59
- * life challenges are reachable only that way. The user picked it on a landing
- * page; it must not vanish. The server-side age nudge handles the mismatch.
+ * How many of the six tiles may be a pure `friction` topic. Four, so at least
+ * two are always a milestone or a `both` — six tiles of what your child is
+ * doing wrong is a bad second screen on the funnel and not what this product
+ * is for. A parent comes looking for a book either because something is hard
+ * right now or because something is good and worth marking; the grid shows
+ * both (owner, 2026-09-13).
  */
+const TRIAL_MAX_FRICTION = 4;
+
+/**
+ * The topic list the TRIAL shows: filter, rank, then COMPOSE — the six tiles
+ * are a deliberately balanced set, not simply the top six.
+ *
+ * Out-of-window topics are ABSENT where the full wizard dims them. What
+ * survives is ordered by `trialRankScore`, and then three rules shape the six:
+ *
+ *  - **One seat is reserved for a pure `milestone` topic** where the window
+ *    allows one, so no age renders an all-friction grid.
+ *  - **At most `TRIAL_MAX_FRICTION` friction tiles.** A `pole: 'both'` topic
+ *    counts toward neither quota: a new sibling is exciting AND produces
+ *    jealousy, a first kindergarten day is proud AND frightening, and forcing
+ *    such a topic to one pole would misdescribe it. It is a wildcard.
+ *  - **At most one topic per `family`.** Without this, age 3 renders
+ *    `eating-vegetables` beside `picky-eating`, which reads as a bug. Relaxed
+ *    only if the grid would otherwise come up short.
+ *
+ * The composed six are then returned in rank order — the reserved milestone
+ * takes a SEAT, not the first position.
+ *
+ * `selectedTopicId` is pinned FIRST and survives filter, rank, compose and cap
+ * even when it is out of window or outside the trial pool:
+ * `/try?category=...&topic=...` deep links from the SEO landing pages fix a
+ * topic BEFORE the age is known, and most of the catalogue is reachable only
+ * that way. The user picked it on a landing page; it must not vanish. The
+ * server-side age nudge handles the mismatch.
+ */
+function composeTrialGrid(ranked: LifeChallenge[]): LifeChallenge[] {
+  const picked: LifeChallenge[] = [];
+  const families = new Set<string>();
+  let friction = 0;
+
+  const take = (c: LifeChallenge) => {
+    picked.push(c);
+    if (c.pole === 'friction') friction++;
+    if (c.family) families.add(c.family);
+  };
+  const blocked = (c: LifeChallenge, respectFamily: boolean) =>
+    picked.includes(c)
+    || (respectFamily && !!c.family && families.has(c.family))
+    || (c.pole === 'friction' && friction >= TRIAL_MAX_FRICTION);
+
+  const milestone = ranked.find(c => c.pole === 'milestone');
+  if (milestone) take(milestone);
+  for (const pass of [true, false]) {
+    for (const c of ranked) {
+      if (picked.length >= TRIAL_GRID_SIZE) break;
+      if (!blocked(c, pass)) take(c);
+    }
+  }
+  return ranked.filter(c => picked.includes(c));
+}
+
 export function getTrialLifeChallenges(age?: number | null, selectedTopicId?: string): LifeChallenge[] {
   const pool = trialLifeChallengeIds
     .map(id => lifeChallenges.find(c => c.id === id))
     .filter((c): c is LifeChallenge => !!c);
 
   const inWindow = pool.filter(c => topicFitsAge(c, age));
-  const ranked = (age === null || age === undefined || !Number.isFinite(age))
-    ? inWindow
-    : [...inWindow].sort((a, b) => trialRankKey(a, age, pool) - trialRankKey(b, age, pool));
+  const hasAge = age !== null && age !== undefined && Number.isFinite(age);
+  const ranked = hasAge
+    ? [...inWindow].sort((a, b) =>
+        (trialRankScore(b, age as number) - trialRankScore(a, age as number))
+        || (pool.indexOf(a) - pool.indexOf(b)))
+    : inWindow;
+  const composed = hasAge ? composeTrialGrid(ranked) : ranked;
 
   const pinned = selectedTopicId ? lifeChallenges.find(c => c.id === selectedTopicId) : undefined;
-  const list = pinned ? [pinned, ...ranked.filter(c => c.id !== pinned.id)] : ranked;
+  const list = pinned ? [pinned, ...composed.filter(c => c.id !== pinned.id)] : composed;
   return list.slice(0, TRIAL_GRID_SIZE);
 }
 

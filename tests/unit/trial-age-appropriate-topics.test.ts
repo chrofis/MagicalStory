@@ -46,15 +46,15 @@ describe('trial topic list — age filtering', () => {
 
   it('never filters out an any-age topic (no suitableAges field)', () => {
     // An any-age life event is never OUT of window; it can only be pushed off
-    // the grid by the cap, never by the filter. Age 0 is the age at which no
-    // developmental window has opened, so the life events are all that is left.
+    // the grid by the ranking or the cap, never by the filter. (Age 0 used to be
+    // nothing BUT life events; since the five infant topics were authored it is
+    // a real grid, so this no longer asserts what fills it.)
     const anyAge = trialPool.filter(c => !c.suitableAges).map(c => c.id);
     expect(anyAge.length).toBeGreaterThan(0);
     for (const a of anyAge) {
       expect(topicFitsAge(lifeChallenges.find(c => c.id === a)!, 0)).toBe(true);
       expect(topicFitsAge(lifeChallenges.find(c => c.id === a)!, 12)).toBe(true);
     }
-    expect(id(getTrialLifeChallenges(0)).every(x => anyAge.includes(x))).toBe(true);
   });
 
   it('never leaves the trial with an empty topic list at any age 0-12', () => {
@@ -95,8 +95,10 @@ describe('trial topic grid — cap of six', () => {
     }
   });
 
-  it('draws from the widened pool — the 16 curated plus 13 age-gated topics', () => {
-    expect(trialLifeChallengeIds.length).toBe(popularLifeChallengeIds.length + 13);
+  it('draws from the widened pool — the 16 curated plus 26 age-gated topics', () => {
+    // 13 from 896895deb, then 5 infant and 8 pre-teen topics on 2026-09-13: the
+    // grid could not be filled at 0-1 and repeated itself at 9-12 without them.
+    expect(trialLifeChallengeIds.length).toBe(popularLifeChallengeIds.length + 26);
     expect(new Set(trialLifeChallengeIds).size).toBe(trialLifeChallengeIds.length);
     for (const pid of popularLifeChallengeIds) expect(trialLifeChallengeIds).toContain(pid);
     for (const tid of trialLifeChallengeIds) {
@@ -120,40 +122,40 @@ describe('trial topic grid — cap of six', () => {
   });
 });
 
-describe('trial topic grid — ranking, best fit first', () => {
-  it('puts the tighter-fitting window first', () => {
-    // At 3, potty-training [2,4] (width 3) must beat making-friends [3,12] (10).
-    const at3 = id(getTrialLifeChallenges(3));
-    expect(at3[0]).toBe('potty-training');
-    expect(at3).not.toContain('making-friends');
-  });
+describe('trial topic grid — ranking by liveness, then fit', () => {
+  const liveness = (tid: string) => lifeChallenges.find(c => c.id === tid)!.liveness ?? 3;
 
-  it('ranks by window width monotonically, over the whole visible grid', () => {
+  it('ranks by liveness monotonically over the whole visible grid', () => {
+    // The grid is composed, not a raw top-six, so a reserved milestone seat may
+    // sit below a livelier tile — but liveness must never INCREASE down the list
+    // among tiles of the same pole.
     for (let age = 0; age <= 12; age++) {
-      const widths = id(getTrialLifeChallenges(age)).map(width);
-      for (let i = 1; i < widths.length; i++) {
-        expect(widths[i]).toBeGreaterThanOrEqual(widths[i - 1]);
+      const grid = getTrialLifeChallenges(age);
+      for (const pole of ['friction', 'milestone', 'both'] as const) {
+        const vals = grid.filter(c => c.pole === pole).map(c => c.liveness ?? 3);
+        for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeLessThanOrEqual(vals[i - 1]);
       }
     }
   });
 
-  it('breaks a width tie by distance from the window centre', () => {
-    // At 6, first-school [5,8] and first-kindergarten [3,6] are both width 4;
-    // 6 sits 0.5 from first-school's centre and 1.5 from kindergarten's.
-    const at6 = id(getTrialLifeChallenges(6));
-    expect(at6.indexOf('first-school')).toBeLessThan(at6.indexOf('first-kindergarten'));
-    // …and at 4 the kindergarten window is the centred one, school not yet open.
-    const at4 = id(getTrialLifeChallenges(4));
-    expect(at4).toContain('first-kindergarten');
-    expect(at4).not.toContain('first-school');
+  it('puts a daily battle above an occasional event, whatever the window says', () => {
+    // The fault this replaced: window width ranked a fieldless life event last
+    // ALWAYS, so visiting-doctor filled age 0-1 while eating-vegetables — a
+    // battle for six years — surfaced only at 8.
+    for (const age of [2, 3, 4, 5, 6, 7]) {
+      const ids = id(getTrialLifeChallenges(age));
+      expect(ids).not.toContain('visiting-doctor');
+    }
+    expect(id(getTrialLifeChallenges(4))).toContain('eating-vegetables');
+    expect(liveness('eating-vegetables')).toBeGreaterThan(liveness('visiting-doctor'));
   });
 
-  it('sinks the any-age life events below every windowed topic', () => {
-    // They are in window at every age, so only the ranking keeps them off the
-    // grid once developmental topics exist (age 2 and up).
-    for (const age of [2, 5, 9, 12]) {
-      for (const c of getTrialLifeChallenges(age)) expect(c.suitableAges).toBeTruthy();
-    }
+  it('breaks a liveness tie by window fit', () => {
+    // At 4 both first-kindergarten [4,5] and going-to-bed [1,8] are liveness 5;
+    // 4 sits inside the tight kindergarten window and off-centre in the other.
+    const at4 = getTrialLifeChallenges(4);
+    expect(id(at4)).toContain('first-kindergarten');
+    expect(id(at4)).not.toContain('first-school');
   });
 
   it('is deterministic — the same age gives the same order every call', () => {
@@ -164,6 +166,89 @@ describe('trial topic grid — ranking, best fit first', () => {
 
   it('does not reorder when the age is unknown — no signal, no ranking', () => {
     expect(id(getTrialLifeChallenges(null))).toEqual(id(trialPool).slice(0, TRIAL_GRID_SIZE));
+  });
+});
+
+describe('trial topic grid — the six tiles are a composed set', () => {
+  it('never shows more than four pure-friction tiles', () => {
+    // Six tiles of what your child is doing wrong is a bad second screen: a
+    // parent comes looking either because something is hard or because
+    // something is worth marking (owner, 2026-09-13).
+    for (let age = 0; age <= 12; age++) {
+      const friction = getTrialLifeChallenges(age).filter(c => c.pole === 'friction');
+      expect(friction.length).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('seats at least one pure milestone at every age that has one in window', () => {
+    for (let age = 0; age <= 12; age++) {
+      const grid = getTrialLifeChallenges(age);
+      const available = lifeChallenges.filter(c => c.pole === 'milestone' && topicFitsAge(c, age)
+        && trialLifeChallengeIds.includes(c.id));
+      if (available.length) expect(grid.some(c => c.pole === 'milestone')).toBe(true);
+    }
+  });
+
+  it('never shows two tiles from the same family', () => {
+    // eating-vegetables beside picky-eating reads as a bug, not a choice.
+    for (let age = 0; age <= 12; age++) {
+      const fams = getTrialLifeChallenges(age).map(c => c.family).filter(Boolean);
+      expect(new Set(fams).size).toBe(fams.length);
+    }
+  });
+
+  it('treats a `both` topic as a wildcard, counting toward neither quota', () => {
+    // A new sibling is exciting AND produces jealousy; forcing it to one pole
+    // would misdescribe it.
+    const both = lifeChallenges.filter(c => c.pole === 'both').map(c => c.id);
+    expect(both).toContain('new-sibling');
+    expect(both).toContain('first-kindergarten');
+    const at0 = getTrialLifeChallenges(0);
+    expect(at0.filter(c => c.pole === 'friction').length).toBeLessThanOrEqual(4);
+  });
+
+  it('fills all six tiles at every age from 0 to 12', () => {
+    // Age 0 could not be filled before the five infant topics existed — that is
+    // how the catalogue gap was found.
+    for (let age = 0; age <= 12; age++) {
+      expect(getTrialLifeChallenges(age).length).toBe(TRIAL_GRID_SIZE);
+    }
+  });
+});
+
+describe('Swiss school entry — kindergarten and school are two years apart', () => {
+  // HarmoS: Stichtag 31 July, minimum entry age the completed 4th year, two
+  // mandatory Kindergarten years, then the Primarschule (zh.ch Volksschule /
+  // Kindergarten; edk.ch/dyn/19795.php). A Kindergarten entrant is 4;0-5;1 on
+  // the first day and a first-Klaessler 6;0-7;1 — hence a two-year window each,
+  // and a two-year gap between them.
+  const kg = () => lifeChallenges.find(c => c.id === 'first-kindergarten')!.suitableAges!;
+  const school = () => lifeChallenges.find(c => c.id === 'first-school')!.suitableAges!;
+
+  it('gives each a two-year window', () => {
+    expect(kg()).toEqual([4, 5]);
+    expect(school()).toEqual([6, 7]);
+  });
+
+  it('never lets the two overlap at any age', () => {
+    for (let age = 0; age <= 12; age++) {
+      const both = topicFitsAge(lifeChallenges.find(c => c.id === 'first-kindergarten')!, age)
+        && topicFitsAge(lifeChallenges.find(c => c.id === 'first-school')!, age);
+      expect(both).toBe(false);
+    }
+  });
+
+  it('never shows both on the same grid', () => {
+    for (let age = 0; age <= 12; age++) {
+      const ids = id(getTrialLifeChallenges(age));
+      expect(ids.includes('first-kindergarten') && ids.includes('first-school')).toBe(false);
+    }
+  });
+
+  it('keeps school-entry topics keyed to the same calendar', () => {
+    // Reading is taught from the 1. Klasse; Hausaufgaben bite from the Mittelstufe.
+    expect(lifeChallenges.find(c => c.id === 'reading-alone')!.suitableAges![0]).toBe(6);
+    expect(lifeChallenges.find(c => c.id === 'homework')!.suitableAges![0]).toBe(7);
   });
 });
 
@@ -249,25 +334,55 @@ describe('the FULL WIZARD is never capped or ranked', () => {
 });
 
 describe('every life challenge carries a window, or is a declared life event', () => {
-  // Owner ruling (2026-09-13): all 59 get labelled; exactly eight stay fieldless
+  // Owner ruling (2026-09-13): all 64 get labelled; exactly eight stay fieldless
   // because they happen TO a child at whatever age they happen.
   const ANY_AGE_LIFE_EVENTS = [
     'moving-house', 'going-vacation', 'parents-splitting', 'visiting-doctor',
     'staying-hospital', 'death-pet', 'grandparent-sick', 'new-sibling',
   ];
 
-  it('labels all 59 — a window, or one of the eight any-age life events', () => {
-    expect(lifeChallenges.length).toBe(59);
+  it('labels all 64 — a window, or one of the eight any-age life events', () => {
+    expect(lifeChallenges.length).toBe(64);
     const fieldless = lifeChallenges.filter(c => !c.suitableAges).map(c => c.id).sort();
     expect(fieldless).toEqual([...ANY_AGE_LIFE_EVENTS].sort());
   });
 
-  it('gives no developmental topic a window starting at 0', () => {
-    // Owner ruling: "no developmental topic carries a 0" — going-to-bed is [1,8].
+  // The five 0-2 topics the owner commissioned on 2026-09-13. They are the only
+  // windows allowed to start at 0: the earlier "no developmental topic carries a
+  // 0" ruling was made when the catalogue had nothing for an infant at all, and
+  // authoring these is what superseded it.
+  const INFANT_TOPICS = ['first-foods', 'bath-time', 'first-steps', 'first-words', 'going-outside'];
+
+  it('starts a window at 0 only for the five infant topics', () => {
     for (const c of lifeChallenges) {
-      if (c.suitableAges) expect(c.suitableAges[0]).toBeGreaterThanOrEqual(1);
+      if (!c.suitableAges) continue;
+      if (c.suitableAges[0] === 0) expect(INFANT_TOPICS).toContain(c.id);
     }
     expect(lifeChallenges.find(c => c.id === 'going-to-bed')!.suitableAges).toEqual([1, 8]);
+  });
+
+  it('keeps every infant topic inside the routine and quest bands (0-2)', () => {
+    for (const tid of INFANT_TOPICS) {
+      const c = lifeChallenges.find(x => x.id === tid)!;
+      expect(c.suitableAges![1]).toBeLessThanOrEqual(2);
+      expect(c.ageGroup).toBe('toddler');   // an ordinary shelf, not a special case
+    }
+  });
+
+  it('gives every topic a liveness and a pole', () => {
+    for (const c of lifeChallenges) {
+      expect(c.liveness).toBeGreaterThanOrEqual(1);
+      expect(c.liveness).toBeLessThanOrEqual(5);
+      expect(['friction', 'milestone', 'both']).toContain(c.pole);
+    }
+  });
+
+  it('keeps the owner-locked windows exactly as ruled', () => {
+    const w = (tid: string) => lifeChallenges.find(c => c.id === tid)!.suitableAges;
+    expect(w('telling-truth')).toEqual([4, 12]);
+    expect(w('dealing-bully')).toEqual([5, 12]);
+    expect(w('going-to-bed')).toEqual([1, 8]);
+    expect(w('losing-game')).toEqual([4, 12]);
   });
 
   it('keeps every window well-formed and inside 0-12', () => {
@@ -288,9 +403,9 @@ describe('every life challenge carries a window, or is a declared life event', (
 describe('topicFitsAge — the shared window rule (trial filters, wizard dims)', () => {
   it('is inclusive at both ends', () => {
     const c = lifeChallenges.find(x => x.id === 'first-school')!;
-    expect(c.suitableAges).toEqual([5, 8]);
-    expect(topicFitsAge(c, 5)).toBe(true);
-    expect(topicFitsAge(c, 8)).toBe(true);
+    const [lo, hi] = c.suitableAges!;
+    expect(topicFitsAge(c, lo)).toBe(true);
+    expect(topicFitsAge(c, hi)).toBe(true);
     expect(topicFitsAge(c, 4)).toBe(false);
     expect(topicFitsAge(c, 9)).toBe(false);
   });

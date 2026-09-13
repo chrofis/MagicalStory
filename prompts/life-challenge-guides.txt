@@ -7,6 +7,108 @@
 # Edit freely - changes take effect on next story generation.
 
 # =============================================================================
+# BABY (Ages 0-2)
+# =============================================================================
+#
+# These five are written in the register of prompts/age-band-*.txt — what the
+# pages CONTAIN, not what the child should learn — and deliberately carry no
+# "Key messages:" line. The routine band (ages 0-1) forbids a lesson and forbids
+# a coda, so a line of morals here would hand the writer the one thing the band
+# tells it not to write. The other sections in this file are still in the older
+# advice voice; converting them is tracked separately in tasks/BACKLOG.md.
+
+[bath-time]
+**What the book is.** An ordinary bath, from the water running to the towel. The
+pleasure is the things in it — the water, the foam, the flannel, the cup that
+pours, the boat, the plug — each one named as it comes.
+
+**What happens.** Warm water, being lowered in, splashing, pouring, being washed,
+hair rinsed, lifted out, wrapped up. One page per step, and something new to look
+at on each.
+
+**The small thing that goes wrong.** Soap near the eyes, a toy floating out of
+reach, water that startles when it first touches. Put right within a page — a
+cloth, a hand, a reach.
+
+**What it is not.** Not a child who refuses and is talked round. Not being clean,
+and not why we wash.
+
+**Ending.** Wrapped in a towel, warm, carried off. Nothing said about what it meant.
+
+[first-foods]
+**What the book is.** Learning to eat. The high chair, the bib, the spoon, the
+bowl, and a first taste of a few ordinary things.
+
+**What happens.** Being sat up, tied into the bib, the spoon coming close, the
+first taste and the face it makes, the hand that wants the spoon, the mess. A
+different food on each page, named plainly.
+
+**Food.** Only what a child this age actually eats — puree, porridge, soft fruit,
+bread, a cooked vegetable. Never sweets, never anything a baby cannot swallow
+safely.
+
+**The small thing that goes wrong.** The spoon goes on the floor, or a taste is
+not liked and the face says so. Picked up, wiped, offered again. Never a refusal
+that lasts pages.
+
+**What it is not.** Not a fussy eater being won round, and not a case for
+vegetables — those are different topics and a much older child.
+
+**Ending.** Full, wiped, lifted down.
+
+[first-steps]
+**What the book is.** The days of learning to walk — holding on, letting go, and
+falling over and getting up again.
+
+**What happens.** Pulling up on a table leg, edging sideways along the sofa, one
+hand held, the hand let go, two steps, down. Each page a new thing held on to or
+let go of.
+
+**Falling.** Falls happen, they do not hurt, and getting up is part of it. Never
+frightening, and nobody laughing at it.
+
+**What it is not.** Not one goal wanted across the whole book, and not a first
+step saved up as a prize on the last page. Steps happen all the way through.
+
+**Ending.** Carried, or the last bit walked to someone waiting. Shown, not
+remarked on.
+
+[first-words]
+**What the book is.** Pointing at a thing and saying what it is. The naming is the
+book; there is no plot underneath it.
+
+**What happens.** Each page is one thing seen and one word for it — an animal, a
+ball, a boot, the moon — said by the child, or said to them and said back. The
+same shape of sentence comes round on every page.
+
+**The small thing that goes wrong.** A word comes out sideways, or the wrong thing
+gets named. Met with delight, never with correction.
+
+**What it is not.** Not teaching, not a list of words to learn, and not a child who
+could not speak and then can.
+
+**Ending.** One last word, and then home, a meal or sleep.
+
+[going-outside]
+**What the book is.** Being taken out and brought back. The coat, the boots, the
+pram, and a world of things to look at on the way.
+
+**What happens.** Being dressed for outside, the door, the path, what is there —
+a dog, a bird, a puddle, a bus, leaves, snow — and the way home. One new thing per
+page, named.
+
+**Outside is Swiss.** Rain, snow, wind, autumn leaves, a lake, a hill, a tram.
+Ordinary here, never exotic.
+
+**The small thing that goes wrong.** A mitten comes off and is gone for a page.
+Found, or replaced by a warm hand.
+
+**What it is not.** Not an errand the child gets through. No shops, tickets,
+traffic or crowds they manage themselves.
+
+**Ending.** Back through the same door, coat off, warm.
+
+# =============================================================================
 # TODDLER (Ages 2-4)
 # =============================================================================
 
