@@ -325,7 +325,7 @@ describe('the FULL WIZARD is never capped or ranked', () => {
     }
   });
 
-  it('still reaches all 59 life challenges through the shelves', () => {
+  it('still reaches all 64 life challenges through the shelves', () => {
     const reachable = new Set(
       lifeChallengeGroups.flatMap(g => id(getLifeChallengesByGroup(g.id)))
     );

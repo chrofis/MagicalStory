@@ -86,12 +86,12 @@ describe('parseTeachingGuideFile', () => {
         expect(banner, `${f} [${id}] has banner pollution`).toBeUndefined();
       }
     }
-    expect(total).toBe(184);
+    expect(total).toBe(189);
   });
 
-  it('life-challenge guides parse all 59 topics clean', () => {
+  it('life-challenge guides parse all 64 topics clean', () => {
     const guides = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
-    expect(guides.size).toBe(59);
+    expect(guides.size).toBe(64);
     for (const id of ['no-pacifier', 'understanding-rules', 'trying-new-things', 'grandparent-sick']) {
       const g = guides.get(id);
       expect(g, `${id} missing`).toBeTruthy();
