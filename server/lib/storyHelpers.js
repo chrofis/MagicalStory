@@ -346,6 +346,57 @@ async function ensureLandmarkPhotoBytes(photos, opts = {}) {
 }
 
 /**
+ * page → landmark-photo promise for the TRIAL early background plates.
+ *
+ * Registered synchronously (the outline-stream callback that calls this cannot
+ * be async — an un-awaited promise on the stream handler), but every actual
+ * resolution is deferred behind `descriptionsPromise`.
+ *
+ * THAT AWAIT IS THE WHOLE POINT. `decideLandmarkPhotoSource` — the policy half
+ * of resolveLandmarkPhotoForLocation — runs on the resolver's first line,
+ * BEFORE any await. `loadLandmarkPhotoDescriptions` is what writes
+ * `loc.photoVariants`, and it is merely STARTED in the same tick as the plate
+ * block. Calling the resolver straight away therefore always decided on a
+ * variant-less location: the variant arm is skipped and the legacy arm needs
+ * `photoFetchStatus === 'success'`, which a variant-backed Swiss landmark never
+ * reaches. Result: null, i.e. a plate rendered with NO landmark photo and no
+ * fidelity / REFERENCE line, while the page itself (which awaits the same
+ * promise) got the photo. Measured on staging job_1789337873076_qf2at21ui p6.
+ *
+ * @param {Object} visualBible
+ * @param {Object} [opts]
+ * @param {Promise} [opts.descriptionsPromise] - loadLandmarkPhotoDescriptions()
+ * @returns {Object<number, Promise<Object|null>>} page number → photo promise
+ *   (never rejects; a failed resolve yields null)
+ */
+function trialPlateLandmarkPromisesByPage(visualBible, opts = {}) {
+  const byPage = {};
+  for (const loc of (visualBible?.locations || [])) {
+    if (!loc.isRealLandmark || !loc.pages?.length) continue;
+    const p = (async () => {
+      if (opts.descriptionsPromise) await opts.descriptionsPromise;
+      // No scene view exists here (the plate is built from the VB background,
+      // before any brief), so the resolver picks an exterior — which is what a
+      // background plate wants.
+      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, { sceneView: null });
+      if (!photo) return null;
+      // block ⇔ bytes: a legacy entry can resolve to a URL with no inline data,
+      // and the fidelity block must never ship without the photo it describes.
+      // Same guard the page path applies.
+      const [withBytes] = await ensureLandmarkPhotoBytes([photo]);
+      return withBytes || null;
+    })().catch(err => {
+      log.warn(`⚠️ [TRIAL] Landmark photo resolve failed for "${loc.name}": ${err.message}`);
+      return null;
+    });
+    for (const pn of loc.pages) {
+      if (!byPage[pn]) byPage[pn] = p;
+    }
+  }
+  return byPage;
+}
+
+/**
  * Age → head-to-body ratio lookup, used both at avatar-generation time
  * (prescribes the expected proportion) and at image-evaluation time (verifies
  * the generated figure matches). Returns a string like "1:6" or null if age
@@ -518,6 +569,7 @@ module.exports = {
   resolveLandmarkPhotoForLocation,
   decideLandmarkPhotoSource,
   ensureLandmarkPhotoBytes,
+  trialPlateLandmarkPromisesByPage,
   buildAvailableLandmarksSection,
 
   // Location vantages (canvas-per-vantage pipeline)

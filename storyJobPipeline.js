@@ -2107,26 +2107,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // shipping a photographic page in a watercolour book. Measured on
           // prod job_1787647410717_5dvfqu8jg p1 and staging
           // job_1787696601288_bfgznq960: both 'pending_lazy', both zero plates.
-          // No scene view exists here (the plate is built from the VB
-          // background, before any brief), so the resolver picks an exterior —
-          // which is what a background plate wants.
           // Photo resolution is async, and this callback is deliberately sync
           // (making it async would leave an un-awaited promise on the stream
           // handler). So resolve ONCE PER LOCATION into a promise here and await
-          // it inside the plate task that already runs async below.
-          const { resolveLandmarkPhotoForLocation, buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-          const landmarkPromiseByPage = {};
-          for (const loc of (vb.locations || [])) {
-            if (!loc.isRealLandmark || !loc.pages?.length) continue;
-            const p = resolveLandmarkPhotoForLocation(vb, loc, { sceneView: null })
-              .catch(err => {
-                log.warn(`⚠️ [TRIAL] Landmark photo resolve failed for "${loc.name}": ${err.message}`);
-                return null;
-              });
-            for (const pn of loc.pages) {
-              if (!landmarkPromiseByPage[pn]) landmarkPromiseByPage[pn] = p;
-            }
-          }
+          // it inside the plate task that already runs async below — the scene
+          // view and the rest of that reasoning now live in the helper's doc.
+          // The per-location resolution lives in trialPlateLandmarkPromisesByPage
+          // — and it AWAITS landmarkDescriptionsPromise first. Without that the
+          // resolver's sync policy half decided on a location whose
+          // photoVariants had not been loaded yet (the descriptions query was
+          // only started one line above, at 2047), so every variant-backed Swiss
+          // landmark resolved to null: the plate rendered with no photo and,
+          // since 286086573 derives both from the same variable, with neither
+          // the REFERENCE line nor the fidelity block. Measured on staging
+          // job_1789337873076_qf2at21ui p6 (Kirche Rohrdorf, 3 variants): the
+          // page row carried the photo, the plate prompt carried neither block.
+          // The page path (line ~887) and the cover path (line ~1706) have
+          // always awaited it before resolving landmark photos; this was the
+          // one sibling that did not.
+          const { buildLandmarkFidelityBlock, trialPlateLandmarkPromisesByPage } = require('./server/lib/storyHelpers');
+          const landmarkPromiseByPage = trialPlateLandmarkPromisesByPage(vb, {
+            descriptionsPromise: landmarkDescriptionsPromise,
+          });
 
           // ONE plate per distinct vantage, fanned out to that vantage's pages —
           // the same economy full mode has had since Phase 5a-pre-vantage. Trial
