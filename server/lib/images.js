@@ -3621,25 +3621,38 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
   }
 
-  // ENFORCE the sceneIntent contract. The template requires it (it becomes
-  // the image prompt's THIS IMAGE DEPICTS overview) but the model
-  // occasionally omits it and the prompt then shipped WITHOUT its overview
-  // (observed: an iterate-round version rendered from a header-less prompt).
-  // One retry; still missing → loud error, never a silent header-less send.
-  if (!extractSceneMetadata(newSceneDescription)?.sceneIntent) {
-    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration omitted sceneIntent — retrying once`);
+  // ENFORCE THE BRIEF CONTRACT: prose plus scene metadata that PARSES and
+  // carries sceneIntent (the marker, a ```json fence and bare JSON are all
+  // accepted — see iterateBriefGuard.js, all three shapes are real in stored
+  // rows). A reply that fails it is a CUT reply, not a shorter one — and a
+  // cut brief used to be persisted silently: job_1789207854566_l43qgl34w p7
+  // stored 1884 characters ending mid-word inside a character description with
+  // no metadata block at all, so the page's cast, objects, positions and text
+  // placement were all empty downstream and the roster shipped wrong. The
+  // generic truncation guard cannot see it (~500 output tokens against
+  // qwen-plus's 32,768 ceiling), so the detection is structural
+  // (iterateBriefGuard.js) and the guard's verdict is consulted alongside it.
+  // One retry; still unusable → THROW, so the round is recorded as failed and
+  // the previous good brief and image stand. Never overwrite good with cut.
+  const { assessIterateBrief, describeIterateBrief } = require('./iterateBriefGuard');
+  let briefCheck = assessIterateBrief(newSceneDescription, { truncation: sceneResult.truncation });
+  if (!briefCheck.usable) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration returned an unusable brief (${describeIterateBrief(briefCheck)}) — retrying once`);
     const retry = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer omitted the required "sceneIntent" field in the metadata JSON. It is mandatory — include it.`,
+      `${scenePrompt}\n\nYour previous answer was incomplete: it must be the full prose brief followed by a ---METADATA--- block whose JSON includes the mandatory "sceneIntent" field. Return the whole thing.`,
       null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' }
     );
     if (usageTracker && retry.usage) {
       usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);
     }
-    if (extractSceneMetadata(retry.text)?.sceneIntent) {
+    const retryCheck = assessIterateBrief(retry.text, { truncation: retry.truncation });
+    if (retryCheck.usable) {
       sceneResult = retry;
       newSceneDescription = retry.text;
+      briefCheck = retryCheck;
     } else {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: sceneIntent still missing after retry — the image prompt will lack its overview line`);
+      log.error(`❌ [ITERATE] Page ${pageNumber}: unusable brief after retry (first: ${describeIterateBrief(briefCheck)}; retry: ${describeIterateBrief(retryCheck)}) — REFUSING to overwrite the existing brief; this iterate round fails for this page`);
+      throw new Error(`iterate brief unusable for page ${pageNumber}: ${describeIterateBrief(retryCheck)}`);
     }
   }
 
