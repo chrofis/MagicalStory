@@ -6329,8 +6329,9 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     ];
   } else {
     ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
+      // No costumeDescription: pass 2 is a style transfer and its judge does
+      // not score the outfit (that axis lives on pass 1).
       pass: 2, facePhoto, realisticSheet: realistic, artStyle,
-      costumeDescription: costume.description || 'standard outfit',
       declaredAge: params.declaredAge ?? null, model, promptOverride,
     }));
   }

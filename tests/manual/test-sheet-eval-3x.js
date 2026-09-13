@@ -31,7 +31,7 @@ async function toDataUri(url) {
       const v = await _internal.evaluateStyledSheetWithGemini(
         facePhoto, pass1, styled, 'comic', process.env.GEMINI_API_KEY, null
       );
-      console.log(`EVAL ${i}: layout=${v.layoutScore} identity=${v.identityScore} style=${v.styleScore} outfit=${v.outfitScore} clean=${v.cleanScore} final=${v.finalScore} valid=${v.valid}`);
+      console.log(`EVAL ${i}: layout=${v.layoutScore} identity=${v.identityScore} style=${v.styleScore} clean=${v.cleanScore} final=${v.finalScore} valid=${v.valid}`);
       if (v.failureReasons?.length) console.log(`   reasons: ${v.failureReasons.join('; ').slice(0, 220)}`);
       if (v.clean?.reason) console.log(`   clean reason: ${String(v.clean.reason).slice(0, 220)}`);
     } catch (e) {

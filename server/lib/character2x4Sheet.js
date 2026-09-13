@@ -926,7 +926,7 @@ function loadStyleAnchor(artStyle) {
 
 /**
  * Pass 2 evaluator — verifies the style-transferred sheet preserves identity
- * + costume + layout, AND that the requested style was actually applied
+ * + layout, AND that the requested style was actually applied
  * (rather than the model returning the source unchanged, as Gemini tends to).
  *
  * Receives THREE images in order: source face photo, Pass 1 realistic sheet,
@@ -935,23 +935,19 @@ function loadStyleAnchor(artStyle) {
  */
 async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null, declaredAge = null, opts = {}) {
   // model / promptOverride: Test Lab A/B only; production passes neither.
-  const { model = 'gemini-2.5-flash', promptOverride = null, costumeDescription = null } = opts;
+  // Pass 2 is a STYLE TRANSFER: the restyler is never told which garments to
+  // produce (buildStyleTransferPrompt takes no costume), so the judge must not
+  // ask. The outfit is decided and scored on pass 1 — no costume input here.
+  const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
-  // TASK 7 age gate — style transfer is where kids drift younger (the art
+  // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
   const ageNum = parseInt(declaredAge, 10);
   prompt = prompt.replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
-  // TASK 4 spec conformance (owner, 2026-09-01): the outfit is judged against
-  // the character's clothing description, not only against Image 2. Source is
-  // the canonical clothingRequirements prose the sheet was generated from;
-  // "none" disables the check (prompt-side skip).
-  const clothingDesc = (typeof costumeDescription === 'string' && costumeDescription.trim()) ? costumeDescription.trim() : 'none';
-  prompt = prompt.replace(/CLOTHING_DESCRIPTION/g, clothingDesc);
-
   const toInlinePart = (dataUri) => {
     const b64 = r2.stripDataUriPrefix(dataUri);
     const mime = dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
@@ -992,12 +988,11 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 // never judged. Two signatures: an unfilled "<placeholder>" (current template)
 // or the pre-2026-08-12 worked example's distinctive reason strings.
 const LEGACY_EXAMPLE_REASONS = [
-  'Navy shirt + tan pants + brown loafers preserved across cells 5-8',
   'Same 4×2 grid as Image 2, no figure crosses gutters',
   'Only the target character appears; no other or extra people in any cell',
 ];
 function isEchoedStyleVerdict(verdict) {
-  const reasons = ['layout', 'identity', 'style', 'outfit', 'clean', 'bodyFace', 'age', 'solo']
+  const reasons = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo']
     .map(k => verdict?.[k]?.reason)
     .filter(r => typeof r === 'string');
   if (reasons.length === 0) return false;
@@ -1207,7 +1202,10 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
  *                             judged SEPARATELY (this is the only place the
  *                             "does each body have a head" check runs).
  *   pass 2 (styled)         → evaluateStyledSheetWithGemini: holistic identity /
- *                             style / outfit. Style transfer re-renders an
+ *                             style. The outfit is pass 1's axis and is not
+ *                             re-judged here — pass 2 is a style transfer and
+ *                             is never told which garments to draw. Style
+ *                             transfer re-renders an
  *                             existing good sheet and cannot lose heads, so no
  *                             per-cell head/body check is run here.
  *
@@ -1230,7 +1228,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride, costumeDescription }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride }
   );
   return { verdict: styled, split: null };
 }
@@ -1343,10 +1341,6 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
         artStyle,
         characterName: character?.name,
         characterAge: character?.age,
-        // Spec-conformance check in the Pass-2 eval judges the outfit against
-        // this prose (same canonical clothingRequirements text the sheet was
-        // generated from).
-        costumeDescription,
         usageTracker,
         skipQualityEval,
       });
@@ -1412,10 +1406,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * Pass 2 — take the realistic Pass 1 sheet and re-render it in the story's
  * art style via Grok edit. Best-of-N retry. Eval via
  * evaluateStyledSheetWithGemini: layout + identity (vs source photo) +
- * style match + costume preserved. Returns the same shape as Pass 1's
+ * style match. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, costumeDescription = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
   // Optional per-style anchor image (Image 2). The prompt references it only
   // when present; styleTransferGenerate passes it as the 2nd reference.
   const styleAnchor = loadStyleAnchor(artStyle);
@@ -1549,9 +1543,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     let verdict = null;
     try {
       ({ verdict } = await evaluateAvatarSheet(result.imageData, {
-        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, costumeDescription, usageTracker,
+        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
       }));
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Mirror Pass-1 behaviour: a Gemini eval failure must NOT lock in this
       // attempt at the maximum score and break the retry loop. Score it
@@ -1572,7 +1566,6 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       layoutScore: verdict.layoutScore,
       identityScore: verdict.identityScore,
       styleScore: verdict.styleScore,
-      outfitScore: verdict.outfitScore,
       cleanScore: verdict.cleanScore,
       bodyFaceScore: verdict.bodyFaceScore,
       reasons: verdict.failureReasons || [],
