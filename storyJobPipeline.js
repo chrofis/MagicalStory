@@ -2124,6 +2124,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     style: artStyleDesc,
                     description: bg.description,
                     landmarkFidelity: landmarkFidelityBlock,
+                    // Tells the model what the attached reference IS
+                    // (prompts.js REFERENCE line). Same expression the full /
+                    // vantage path uses — 'landmark' when a photo is attached,
+                    // otherwise null. No VB element grid is built on the trial
+                    // plate call, so the 'element' arm of that expression has
+                    // no counterpart here. Without this the trial plate got the
+                    // landmark photo as pixels but no line saying the place in
+                    // the scene IS that photo.
+                    referenceKind: emptySceneLandmarkPhotos.length > 0 ? 'landmark' : null,
                     visualBible: streamingVisualBible,
                     pageNumber: pageNum,
                   });
