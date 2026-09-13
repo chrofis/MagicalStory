@@ -388,6 +388,35 @@ describe('extra_character — prompt vocabulary', () => {
     expect(t).toMatch(/`extra_character`[^\n]*keeps its own type when merging/);
   });
 
+  // THE DELETIONS (owner, 2026-09-13). Four layers argued about the same
+  // question; three of them are gone and code answers it. These pin the
+  // removals so a later prompt edit cannot quietly re-open the argument.
+  it('image-evaluation no longer asks the model to reconcile the counts (D-04c is gone)', () => {
+    const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
+    expect(t).not.toContain('D-04c');
+    // Wording-independent: no rule tells the model what to do when the counts
+    // are equal and it holds both an absence and a surplus.
+    expect(t).not.toMatch(/counts are EQUAL/i);
+  });
+
+  it('image-evaluation D-04 observes an absence and emits no code for it', () => {
+    const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
+    const line = t.split('\n').find(l => l.startsWith('**D-04 ')) || '';
+    expect(line).toBeTruthy();
+    // It no longer declares a type or a severity — the two things that make a
+    // rule an emission rather than an observation.
+    expect(line).not.toContain('`missing_character`');
+    expect(line).not.toMatch(/CRITICAL|CATASTROPHIC|MAJOR/);
+  });
+
+  it('feedback-consolidator no longer carries the merge exception the derivation replaced', () => {
+    const t = String(PROMPT_TEMPLATES.feedbackConsolidator || '');
+    // The consolidator must not be told to fold a missing/extra pair into one
+    // character_identity — the pair is now unrepresentable upstream.
+    expect(t).not.toMatch(/figure count EQUALS the expected cast/i);
+    expect(t).not.toMatch(/merge the two into ONE `character_identity`/i);
+  });
+
   it('image-prompt-compliance never pairs an `unmatched` figure with a named character', () => {
     const t = String(PROMPT_TEMPLATES.imagePromptCompliance || PROMPT_TEMPLATES.threeStageCompliance || '');
     expect(t).toMatch(/`reference` is `unmatched`[^\n]*never pair it with a prompt-named character/);

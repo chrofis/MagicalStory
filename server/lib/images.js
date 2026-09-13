@@ -2541,52 +2541,14 @@ async function evaluateImageBatch(images, options = {}) {
         }
       }
 
-      // TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27). missing_character is
-      // the only finding built on NOT seeing something, so one blind spot can
-      // fabricate it. Here — and only here — both enumerations of this image
-      // exist: the detector's named figures and the evaluator's matches[]. If
-      // EITHER placed the character in the picture, the absence claim is
-      // contradicted and is dropped before it can be billed.
-      //
-      // The eval already deducts for a genuine absence; this does not add a
-      // second charge, it removes a wrong one. Both witnesses silent ->
-      // untouched, and the existing deduction stands.
-      let presenceDrops = [];
-      if (qualityResult) {
-        const { charactersSeenByAnyWitness, dropContradictedAbsences } = require('./identityAgreement');
-        const seen = charactersSeenByAnyWitness(qualityResult, bboxDetection?.figures);
-        if (seen.size > 0) {
-          presenceDrops = dropContradictedAbsences(
-            [qualityResult.fixableIssues, qualityResult.threeStageResult?.fixableIssues,
-             qualityResult.threeStageResult?.issues, qualityResult.semanticResult?.semanticIssues],
-            seen,
-            { pageLabel: `PAGE ${img.pageNumber}: ` }
-          );
-          // RESCORE after a drop (review 2026-09-01). score/qualityScore were
-          // derived from the issue lists INSIDE evaluateImageQuality — before
-          // this filter can run, because the filter needs the detector, which
-          // needs the eval. Dropping the claim without recomputing left its
-          // −20/−30 baked into the number while the finding vanished from the
-          // list: the page was silently under-scored and the repair-method
-          // gates acted on a charge with no finding behind it. Same rubric,
-          // same clamp as evalPipeline (visual = (10 − Σ SEVERITY_PENALTY) ×
-          // 10; final = visual − semanticPenaltyPoints), recomputed from the
-          // now-filtered lists so the invariant "score derives from the
-          // current issues" holds again.
-          if (presenceDrops.length) {
-            const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
-            const visual = Math.max(0, Math.min(10, 10 - (qualityResult.fixableIssues || []).reduce(
-              (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1), 0))) * 10;
-            // Shared table (scoring.js semanticPenaltyPoints) — the hand-copied
-            // chain here billed a CATASTROPHIC semantic issue 10, half of MAJOR.
-            const semanticPenalty = require('./scoring').semanticPenaltyPoints(qualityResult.semanticResult?.semanticIssues);
-            const before = qualityResult.score;
-            qualityResult.qualityScore = visual;
-            qualityResult.score = visual - semanticPenalty;
-            log.info(`👥 [PRESENCE] PAGE ${img.pageNumber}: rescored after ${presenceDrops.length} dropped absence claim(s): ${before} → ${qualityResult.score}`);
-          }
-        }
-      }
+      // TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27) — FOLDED INTO THE
+      // DERIVATION (owner, 2026-09-13). The principle stands: an absence claim
+      // is the one finding built on NOT seeing something, so a single blind
+      // spot can fabricate it. It no longer runs here as an after-the-fact
+      // filter deleting claims one at a time (and rescoring behind them).
+      // evalPipeline.derivePresenceFinding now compares the detector count
+      // against the evaluator own enumeration BEFORE any claim is made, and
+      // declines to derive at all when they disagree.
 
       // Create bbox overlay image for dev mode display
       let bboxOverlayImage = null;
@@ -2619,10 +2581,6 @@ async function evaluateImageBatch(images, options = {}) {
         verdict: qualityResult?.verdict || null,
         issuesSummary: qualityResult?.issuesSummary || null,
         fixableIssues: qualityResult?.fixableIssues || [],
-        // Absence claims removed because a witness saw the character (see the
-        // two-witness block above). Recorded, not silent: a drop is evidence
-        // about the evaluator, not just a quieter score.
-        ...(presenceDrops.length ? { presenceDrops } : {}),
         fixTargets: qualityResult?.fixTargets || [],
         enrichedFixTargets,
         figures: qualityResult?.figures || [],

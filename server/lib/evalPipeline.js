@@ -2198,33 +2198,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           if (sid) require('./runMetrics').forJob(sid).count(`presence_${spoke ? presence.outcome : `declined_${presence.reason}`}`);
         } catch { /* metrics are best-effort */ }
       }
-      // COUNT DIAGNOSTIC (2026-09-10) — log only, never a finding: the prompt
-      // owns `extra_character` (D-04b). This surfaces the case the prompt
-      // missed — more figures than roster entries and no extra_character
-      // emitted — so a repeat of the five-for-four cover is countable.
-      // PAIR DIAGNOSTIC (2026-09-11) — log only, the prompt owns the call
-      // (D-04c). A missing/extra pair on a page whose counts reconcile is one
-      // recognition failure reported twice, and the removal instruction it used
-      // to produce deleted a commissioned character from a cover.
-      if (expectedCast.count > 0 && figures.length === expectedCast.count) {
-        const types = fixableIssues.map(i => String(i.type || '').toLowerCase());
-        if (types.includes('extra_character') && types.includes('missing_character')) {
-          log.warn(`👥 [EVAL] ${pageContext}: missing_character AND extra_character on ${figures.length} figure(s) for a roster of ${expectedCast.count} — recognition failure reported as a surplus (D-04c)`);
-          try {
-            const sid = evalOptions?.storyMeta?.storyId;
-            if (sid) require('./runMetrics').forJob(sid).count('eval_missing_extra_pair');
-          } catch { /* metrics are best-effort */ }
-        }
-      }
-      if (expectedCast.declared && figures.length > expectedCast.count) {
-        const flagged = fixableIssues.some(i => String(i.type || '').toLowerCase() === 'extra_character');
-        const unmatched = matches.filter(m => !m.reference || String(m.reference).toLowerCase() === 'unmatched').length;
-        log.warn(`👥 [EVAL] ${pageContext}: ${figures.length} figure(s) for a roster of ${expectedCast.count} (${unmatched} unmatched) — ${flagged ? 'extra_character reported' : 'NO extra_character finding emitted'}`);
-        try {
-          const sid = evalOptions?.storyMeta?.storyId;
-          if (sid && !flagged) require('./runMetrics').forJob(sid).count('eval_figure_surplus_unflagged');
-        } catch { /* metrics are best-effort */ }
-      }
 
       // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
       let p1Usage = null;
