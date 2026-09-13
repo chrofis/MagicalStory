@@ -34044,3 +34044,27 @@ tie-break), `prompts/feedback-consolidator.txt` (closed vocabulary + keep-its-ow
 (`NOT_INPAINTABLE_TYPES`), `client/src/hooks/useRepairWorkflow.ts` (mirror of the floor, and
 `entityIssuePoints` now reads `subType` first as the server does), `client/src/types/story.ts`
 (`EntityIssueSubType`).
+
+## Anatomy severity follows how badly the body is broken, not whether the defect adds or subtracts (2026-09-13)
+**Context:** D-09 rated extra limbs CRITICAL while D-10 rated a MISSING hand, limbs detached or joined
+wrongly, merged or duplicated faces and grossly misplaced features at MAJOR — so a spare arm cost 25
+points and a missing one 15, and "merged or duplicated faces" cost less than the `face_destroyed`
+floor set the day before for the same defect. The split ran along additive-vs-subtractive rather than
+along how badly the page is broken. Owner, seeing the face-destroyed work: "Is a 3rd arm or missing
+leg not also an anatomical issue that is critical?"
+**Decision:** D-09 now covers a limb or a face the body does not have or has lost — extra limbs, a
+missing hand/arm/leg, limbs detached or joined wrongly, merged or duplicated faces, features grossly
+misplaced. D-10 keeps only detail within a limb or face that is otherwise whole: six or more fingers,
+fused or melted fingers, cross-eyes. Those three stay MAJOR deliberately — they are the
+false-positive-prone ones, and a cheap wrong call there is the price of the rule.
+**Rationale:** `anatomy` is a graded type (no ceiling, no floor), so the prompt's own severity is what
+gets charged: minor 2 / major 15 / critical 25. Only the image-SEEING judge changed; the compliance
+prompt already has extra limbs CRITICAL and routes an absence it cannot verify to
+`unverified_absence`, which is correct for a judge that never sees the picture.
+**Known limit, measured:** re-grading changes nothing until the rules fire. Across all 34 pages of
+`job_1789207854566_l43qgl34w` and `job_1789163494908_kc2joi4ax` there were ZERO `anatomy` or
+`proportion` findings — including the page whose face was destroyed, which D-10's own wording
+("merged or duplicated faces, features grossly misplaced") described exactly. Consistent with the
+recorded verdict that anatomy checks measure 0-precision. Detection is tracked separately; the one
+framing that has measured well is comparative (the post-repair face check, 4/4), not absolute.
+**Touched files:** `prompts/image-evaluation.txt` (D-09, D-10).
