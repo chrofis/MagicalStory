@@ -59,7 +59,8 @@ describe('buildExpectedCastBlock — the secondary that declares this page', () 
     const r = buildExpectedCastBlock({ sceneCharacters: null, visualBible: VB, pageNumber: 3 });
     // `crowdExpected` (2026-09-13) rides on every roster; an undeclared one
     // carries the safe default, because absent must always mean "no crowd".
-    expect(r).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false });
+    // `nonHumanNames` likewise — an undeclared roster names nobody, human or not.
+    expect(r).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] });
   });
 });
 

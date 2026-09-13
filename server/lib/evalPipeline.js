@@ -940,7 +940,7 @@ function buildExpectedCastBlock({
   // roster was supplied — and keeps the blank block.
   const castDeclared = Array.isArray(sceneCharacters);
   for (const c of (castDeclared ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
-  if (!castDeclared) return { block: '', names: [], count: 0, declared: false, crowdExpected: false };
+  if (!castDeclared) return { block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] };
 
   const sh = getStoryHelpers();
   // CROWD FLAG (2026-09-13). Carried on the roster so the presence derivation
@@ -999,7 +999,14 @@ function buildExpectedCastBlock({
   if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
     lines.push(`Detector figure count (GroundingDINO): ${det}`);
   }
-  return { block: lines.join('\n'), names, count: names.length, declared: true, crowdExpected };
+  // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18). The roster the EVALUATOR
+  // reads keeps everyone — the fairies are on the page and it must account for
+  // them. The roster ARITHMETIC reads is people-only, and this is which entries
+  // are not. One source with the detector call (`vbNonHumanNames`), never a
+  // second guess about what is non-human.
+  const nonHumanSet = new Set(require('./bboxDetection').vbNonHumanNames(visualBible));
+  const nonHumanNames = names.filter(n => nonHumanSet.has(String(n).toLowerCase()));
+  return { block: lines.join('\n'), names, count: names.length, declared: true, crowdExpected, nonHumanNames };
 }
 
 /**
@@ -1130,9 +1137,14 @@ const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
  * @param {object} args
  * @param {Array} args.figures - the evaluator's `figures[]`
  * @param {Array} args.matches - the evaluator's `matches[]`, one per figure
- * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean}} args.cast
- *        the roster from buildExpectedCastBlock
- * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures)
+ * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean,
+ *          nonHumanNames: string[]}} args.cast
+ *        the roster from buildExpectedCastBlock. `nonHumanNames` are the entries
+ *        a "person" detector can never satisfy (the VB's animals and creatures);
+ *        every count below is taken with those removed from BOTH sides.
+ * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures),
+ *        with the figures the detector itself named as non-human removed — a
+ *        PEOPLE count, because that is what the derivation compares against
  * @param {string[]|null} args.referenceNames - the names the evaluator was actually
  *        HANDED a labelled `Reference: <name>` image for on this call. An array
  *        (empty included) gates the identity branch; `undefined` means the caller
@@ -1168,21 +1180,43 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
   // (image-evaluation D — OUTPUT). A reply that broke that contract has no
   // second witness, so there is nothing to reconcile against.
   if (!figs || !mts || figs.length !== mts.length) return decline('matches_contract_broken');
-  if (det !== figs.length) return decline('witnesses_disagree');
+  // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18; applied at this layer
+  // 2026-09-13). The detector's prompt is "person", so its count is a count of
+  // PEOPLE. Comparing it to a roster that holds the story's dog, dragon or
+  // fairies makes every such page report a shortfall; `figureDetection` learned
+  // that in August and this derivation, one layer up, repeated it in both
+  // directions at once. Measured on job_1789304198359_y3n0euk3z (four fairies
+  // in `visualBible.animals`): 4 of 23 page-versions declined
+  // `witnesses_disagree`, every one a fairy page, the evaluator counting the
+  // fairies and the detector not.
+  //
+  // So both sides are reduced to people before anything is compared. The
+  // evaluator's side needs it too: it DOES see the fairies, so `figures.length`
+  // is an everything-count. Only a figure it NAMED as a non-human roster entry
+  // can be subtracted — a figure it left `unmatched` is of unknown kind and
+  // stays counted, which keeps the disagreement honest rather than explaining
+  // it away.
+  //
+  // There is deliberately no non-human presence check to replace this: a
+  // missing fairy simply stops being arithmetic evidence (owner).
+  const nonHuman = new Set((Array.isArray(cast.nonHumanNames) ? cast.nonHumanNames : [])
+    .map(n => String(n).trim().toLowerCase()).filter(Boolean));
+  const refOf = (m) => String(m?.reference || '').trim().toLowerCase();
+  const isUnnamed = (r) => !r || r === 'unmatched' || r === 'unknown';
+  const evaluatorPeople = figs.length - mts.filter(m => nonHuman.has(refOf(m))).length;
+  if (det !== evaluatorPeople) return decline('witnesses_disagree');
 
-  const castCount = Number(cast.count) || 0;
-  const castNames = Array.isArray(cast.names) ? cast.names : [];
+  const castNames = (Array.isArray(cast.names) ? cast.names : [])
+    .filter(n => !nonHuman.has(String(n).trim().toLowerCase()));
+  const castCount = castNames.length;
   // Who did the evaluator place in the picture? Names only, lowercased.
   const claimed = new Set();
   for (const m of mts) {
-    const r = String(m?.reference || '').trim().toLowerCase();
-    if (r && r !== 'unmatched' && r !== 'unknown') claimed.add(r);
+    const r = refOf(m);
+    if (!isUnnamed(r)) claimed.add(r);
   }
   const unclaimedCast = castNames.filter(n => !claimed.has(String(n).toLowerCase()));
-  const unmatchedFigures = mts.filter(m => {
-    const r = String(m?.reference || '').trim().toLowerCase();
-    return !r || r === 'unmatched' || r === 'unknown';
-  });
+  const unmatchedFigures = mts.filter(m => isUnnamed(refOf(m)));
 
   const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER });
 
@@ -1197,7 +1231,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
         // reference attach reads `missing.item` to find the VB cell to show.
         character: who,
         item: who,
-        description: `${det} figure(s) are in the frame for an EXPECTED CAST of ${castCount}`
+        description: `${det} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
           + (who ? `; ${who} is absent.` : '.'),
         fix: who
           ? `Add ${who} to the scene, matching that entry's reference and CLOTHING CONTRACT.`
@@ -1218,7 +1252,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
       finding: mark({
         type: 'extra_character',
         character: figId !== undefined && figId !== null ? `figure ${figId}` : null,
-        description: `${det} figure(s) are in the frame for an EXPECTED CAST of ${castCount}`
+        description: `${det} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
           + ` — ${det - castCount} more figure(s) than the page was written to hold.`,
         fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
       }),
@@ -1434,6 +1468,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const realFigureCount = Array.isArray(evalOptions.detectedFigures)
       ? require('./bboxDetection').countRealFigures(evalOptions.detectedFigures)
       : (evalOptions.detectedFigureCount ?? null);
+    // ...AND THE SAME COUNT WITH THE NON-HUMANS TAKEN OUT. The detector's
+    // prompt is "person", but a humanoid non-human (a hand-sized fairy) does
+    // get boxed sometimes, and the identity pass then NAMES it from the same
+    // roster — job_1789304198359_y3n0euk3z p12/p15 carry a detector figure
+    // called "Yellow Fairy". So the people count is the real-figure list minus
+    // the figures the detector itself named as a VB animal or creature. This,
+    // not `realFigureCount`, is what the presence arithmetic compares against
+    // (COUNT PEOPLE AGAINST PEOPLE, owner 2026-08-18). The EXPECTED CAST block
+    // keeps printing `realFigureCount`: the roster it prints holds the fairies
+    // too, so that pair still matches.
+    const detectedPeopleCount = (() => {
+      if (!Array.isArray(evalOptions.detectedFigures)) return realFigureCount;
+      const { countRealFigures, vbNonHumanNames } = require('./bboxDetection');
+      const nh = new Set(vbNonHumanNames(evalOptions.visualBible || null));
+      if (nh.size === 0) return realFigureCount;
+      return countRealFigures(evalOptions.detectedFigures
+        .filter(f => !nh.has(String(f?.name || '').trim().toLowerCase())));
+    })();
     // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
     // attach loop below with the names that reached the critique as a labelled
     // `Reference: <name>` image — not what was requested, what was attached.
@@ -2241,7 +2293,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       let presenceDerived = false;
       {
         const presence = derivePresenceFinding({
-          figures, matches, cast: expectedCast, detectedFigureCount: realFigureCount,
+          figures, matches, cast: expectedCast, detectedFigureCount: detectedPeopleCount,
           referenceNames: attachedReferenceNames,
         });
         const spoke = presence.outcome !== 'declined';
@@ -2251,12 +2303,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           fixableIssues = fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()));
           const dropped = before - fixableIssues.length;
           if (presence.finding) fixableIssues.push(presence.finding);
-          log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${realFigureCount} real figure(s) vs EXPECTED CAST ${expectedCast.count}`
+          log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${detectedPeopleCount} person-figure(s) vs EXPECTED CAST ${expectedCast.count}`
+            + `${expectedCast.nonHumanNames?.length ? ` (minus non-human ${expectedCast.nonHumanNames.join(', ')})` : ''}`
             + ` → ${presence.outcome}${presence.reason ? ` [${presence.reason}]` : ''}${presence.finding?.character ? ` (${presence.finding.character})` : ''}`
             + `${dropped ? `; dropped ${dropped} evaluator presence finding(s)` : ''}`);
         } else {
           log.info(`👥 [PRESENCE] ${pageContext || 'page'}: declined (${presence.reason})`
-            + ` — detector ${realFigureCount ?? 'n/a'}, evaluator ${Array.isArray(figures) ? figures.length : 'n/a'}, roster ${expectedCast.count}`);
+            + ` — detector people ${detectedPeopleCount ?? 'n/a'} (all figures ${realFigureCount ?? 'n/a'}),`
+            + ` evaluator ${Array.isArray(figures) ? figures.length : 'n/a'}, roster ${expectedCast.count}`
+            + `${expectedCast.nonHumanNames?.length ? ` incl. non-human ${expectedCast.nonHumanNames.join(', ')}` : ''}`);
         }
         try {
           // The id may be absent at an unthreaded call site; forJob() now rescues

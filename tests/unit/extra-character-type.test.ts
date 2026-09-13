@@ -26,7 +26,7 @@ const visualBible = {
 
 describe('buildExpectedCastBlock — page roster', () => {
   it('is blank when the caller knows NO cast (null), so the evaluator does not judge the count', () => {
-    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false });
+    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] });
     expect(buildExpectedCastBlock({}).block).toBe('');
   });
 
@@ -85,6 +85,32 @@ describe('buildExpectedCastBlock — page roster', () => {
     expect(withDet.block).toBe('EXPECTED CAST (4): Aaron, Ben, Carl, Dan\nDetector figure count (GroundingDINO): 5');
     expect(buildExpectedCastBlock({ sceneCharacters: boys, detectedFigureCount: null }).block)
       .toBe('EXPECTED CAST (4): Aaron, Ben, Carl, Dan');
+  });
+
+  // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18). The roster the EVALUATOR
+  // reads keeps the animals — they are on the page. The roster the presence
+  // ARITHMETIC reads must not, because the detector's prompt is "person".
+  it('flags the VB animals/creatures on the roster, by name AND by id', () => {
+    const sceneHint = 'Four boys fly a kite while a dog barks.\n\n---METADATA---\n'
+      + JSON.stringify({ characters: [{ name: 'Aaron' }, { name: 'Ben' }, { name: 'Carl' }, { name: 'Dan' }, { name: 'CHR001' }, { name: 'ANI001' }] });
+    const r = buildExpectedCastBlock({ sceneCharacters: boys, sceneHint, visualBible, evaluationType: 'scene' });
+    // The dog is filed by id here; the block still lists everyone.
+    expect(r.nonHumanNames).toEqual(['ANI001']);
+    expect(r.count).toBe(6);
+    // The human secondary is NOT non-human.
+    expect(r.nonHumanNames).not.toContain('CHR001');
+  });
+
+  it('flags an animal the cover description names by its NAME', () => {
+    const r = buildExpectedCastBlock({
+      sceneCharacters: boys, visualBible, evaluationType: 'cover',
+      sceneHint: 'Aaron, Ben, Carl and Dan run down the hill with Nia the dog and a red kite.',
+    });
+    expect(r.nonHumanNames).toEqual(['Nia']);
+  });
+
+  it('a cast with no animals flags nothing', () => {
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, visualBible }).nonHumanNames).toEqual([]);
   });
 
   it('accepts bare name strings and dedupes case-insensitively', () => {
@@ -550,5 +576,126 @@ describe('extra_character — prompt vocabulary', () => {
   it('image-prompt-compliance never pairs an `unmatched` figure with a named character', () => {
     const t = String(PROMPT_TEMPLATES.imagePromptCompliance || PROMPT_TEMPLATES.threeStageCompliance || '');
     expect(t).toMatch(/`reference` is `unmatched`[^\n]*never pair it with a prompt-named character/);
+  });
+});
+
+describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
+  // Owner, 2026-08-18, settled in figureDetection.js and re-broken one layer up
+  // on 2026-09-13. GroundingDINO's prompt is "person": its count is a count of
+  // PEOPLE. Comparing it to a roster holding the story's dog, dragon or fairies
+  // reports a shortfall on every page with one. Measured on
+  // job_1789304198359_y3n0euk3z (four fairies in `visualBible.animals`): p7
+  // billed a CRITICAL `missing_character` against "Yellow Fairy", and p5/p6/p10/
+  // p15 declined `witnesses_disagree` — the evaluator counting the fairies it
+  // can see against a detector that mostly cannot.
+  //
+  // There is deliberately no separate non-human presence check: a missing fairy
+  // stops being arithmetic evidence, it does not become a new finding type.
+
+  const roster = (names: string[], nonHumanNames: string[] = [], extra: object = {}) =>
+    ({ names, count: names.length, declared: true, crowdExpected: false, block: '', nonHumanNames, ...extra });
+  const figs = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
+  const matched = (refs: (string | null)[]) =>
+    refs.map((r, i) => ({ figure: i + 1, reference: r ?? 'unmatched', confidence: r ? 0.9 : 0 }));
+
+  it('an animal on the roster is not a person the detector failed to find (p7 v7)', () => {
+    // Stored inputs: detector 2 people, evaluator 3 figures of which it named
+    // one "Green Fairy", roster [Liz, Ayan, Green Fairy, Yellow Fairy].
+    const r = derivePresenceFinding({
+      figures: figs(3), matches: matched(['Liz', 'Ayan', 'Green Fairy']),
+      cast: roster(['Liz', 'Ayan', 'Green Fairy', 'Yellow Fairy'], ['Green Fairy', 'Yellow Fairy']),
+      detectedFigureCount: 2,
+    });
+    expect(r).toEqual({ outcome: 'reconciled', reason: null, finding: null });
+  });
+
+  it('never bills a CRITICAL absence against a non-human roster entry', () => {
+    // The same page as above run the old way would name the fairy. Whatever the
+    // outcome, the fairy is never the accused.
+    const cast = roster(['Liz', 'Ayan', 'Green Fairy', 'Yellow Fairy'], ['Green Fairy', 'Yellow Fairy']);
+    for (const det of [0, 1, 2, 3, 4]) {
+      const r = derivePresenceFinding({
+        figures: figs(3), matches: matched(['Liz', 'Ayan', 'Green Fairy']), cast, detectedFigureCount: det,
+      });
+      expect(String(r.finding?.character || '')).not.toMatch(/fairy/i);
+      expect(String(r.finding?.item || '')).not.toMatch(/fairy/i);
+    }
+  });
+
+  it('the evaluator side is a people count too — its named non-humans come off (p5 v5)', () => {
+    // Two children and four fairies: detector 2, evaluator 6. Raw lengths
+    // disagree; people counts do not.
+    const r = derivePresenceFinding({
+      figures: figs(6),
+      matches: matched(['Liz', 'Ayan', 'Pink Fairy', 'Green Fairy', 'Yellow Fairy', 'Blue Fairy']),
+      cast: roster(['Liz', 'Ayan', 'Pink Fairy', 'Green Fairy', 'Yellow Fairy', 'Blue Fairy'],
+        ['Pink Fairy', 'Green Fairy', 'Yellow Fairy', 'Blue Fairy']),
+      detectedFigureCount: 2,
+    });
+    expect(r.outcome).toBe('reconciled');
+    expect(r.finding).toBeNull();
+  });
+
+  it('the witnesses-disagree gate compares two PEOPLE counts, both ways', () => {
+    const cast = roster(['Liz', 'Blue Fairy'], ['Blue Fairy']);
+    // 2 evaluator figures, one of them the fairy -> 1 person; detector 1 person.
+    expect(derivePresenceFinding({
+      figures: figs(2), matches: matched(['Liz', 'Blue Fairy']), cast, detectedFigureCount: 1,
+    }).outcome).toBe('reconciled');
+    // The detector ALSO boxed the fairy and it was counted as a person: the two
+    // readings really do differ, and the derivation still refuses to rule.
+    expect(derivePresenceFinding({
+      figures: figs(2), matches: matched(['Liz', 'Blue Fairy']), cast, detectedFigureCount: 2,
+    })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', finding: null });
+    // A figure the evaluator left UNMATCHED is of unknown kind and stays in the
+    // people count — an unexplained figure is never explained away as an animal.
+    expect(derivePresenceFinding({
+      figures: figs(2), matches: matched(['Liz', null]), cast, detectedFigureCount: 1,
+    })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree' });
+  });
+
+  it('a surplus is still a surplus — the fairy just is not part of the sum (p15 v23)', () => {
+    const r = derivePresenceFinding({
+      figures: figs(3), matches: matched(['Liz', 'Yellow Fairy', null]),
+      cast: roster(['Liz', 'Yellow Fairy'], ['Yellow Fairy']), detectedFigureCount: 2,
+    });
+    expect(r.outcome).toBe('extra_character');
+    expect(r.finding.character).toBe('figure 3');
+    // The numbers it states are the people numbers it actually compared.
+    expect(r.finding.description).toMatch(/2 person-figure\(s\).*EXPECTED CAST of 1 person\(s\)/);
+  });
+
+  it('a human-only page is unchanged, with or without the field', () => {
+    const args = { figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']), detectedFigureCount: 3 };
+    const withField = derivePresenceFinding({ ...args, cast: roster(['Aaron', 'Ben', 'Carl', 'Dan'], []) });
+    // A roster from before the field existed must behave identically.
+    const legacy = derivePresenceFinding({
+      ...args, cast: { names: ['Aaron', 'Ben', 'Carl', 'Dan'], count: 4, declared: true, crowdExpected: false, block: '' },
+    });
+    expect(withField.outcome).toBe('missing_character');
+    expect(withField.finding.character).toBe('Dan');
+    expect(legacy).toEqual(withField);
+  });
+
+  it('still emits at most ONE presence outcome — no input yields both types', () => {
+    // The mutual-exclusion invariant, re-checked against rosters that mix
+    // people and animals in every proportion.
+    const names = ['Liz', 'Ayan', 'Pink Fairy', 'Blue Fairy'];
+    for (let nFig = 0; nFig <= 5; nFig++) {
+      for (let det = 0; det <= 5; det++) {
+        for (const refs of [
+          [], ['Liz'], ['Liz', 'Pink Fairy'], ['Liz', 'Ayan', 'Pink Fairy', 'Blue Fairy'], [null, 'Blue Fairy'],
+        ]) {
+          const matches = matched([...refs, ...Array(Math.max(0, nFig - refs.length)).fill(null)].slice(0, nFig));
+          const r = derivePresenceFinding({
+            figures: figs(nFig), matches, detectedFigureCount: det,
+            cast: roster(names, ['Pink Fairy', 'Blue Fairy']),
+          });
+          expect(['declined', 'reconciled', 'missing_character', 'extra_character', 'character_identity'])
+            .toContain(r.outcome);
+          if (r.finding) expect(r.finding.type).toBe(r.outcome);
+        }
+      }
+    }
   });
 });
