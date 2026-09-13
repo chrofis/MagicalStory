@@ -20,6 +20,10 @@
 const { log } = require('../utils/logger');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
 const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
+// Production's arguments for the beats writer/Art-Director calls, resolved from
+// a stored story. Every replay stage builds its inputs through these so a
+// divergent, thinner expression cannot be written a fourth time.
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints } = require('./beatsReplayInputs');
 
 // ─────────────────────────────────────────────────────────────────────
 // Context loading
@@ -3752,9 +3756,11 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   if (!plainStoredBeats) {
     // The planner divides a finished story (2026-08-31): feed it the stored
     // story's arc so the Lab measures the production shape.
+    // Production also passes `arcHints` alongside the arc (beatsPipeline.js:935)
+    // — the "FIX WHILE DIVIDING" block. It was missing here.
     plannerPrompt = buildBeatsPrompt(storyData, pageCount, {
-      finalArc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc
-        || parseBeats(String(storyData.outline || '')).arc || '',
+      finalArc: resolveReplayArc(storyData, { parseBeats }),
+      arcHints: resolveReplayArcHints(storyData),
     });
     if (!plannerPrompt) throw new Error('story-beats template unavailable');
     if (promptOverride) plannerPrompt = promptOverride;
@@ -3836,14 +3842,21 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       const allPrompt = buildSceneExpansionAllPrompt(
         { ...storyData, characters: storyData.characters || [], pageClothing: null },
         toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
-        {
-          // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
-          // of page 1. The stage still measures the page briefs — parseAll
-          // reads the `## Page N` blocks and ignores the leading sections.
+        // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
+        // of page 1. The stage still measures the page briefs — parseAll
+        // reads the `## Page N` blocks and ignores the leading sections.
+        //
+        // finalArc comes through the shared resolver: production passes
+        // `finalArc: approvedArc` (beatsPipeline.js:1511) and this stage passed
+        // nothing, so FINAL_ARC rendered as "(no arc was recorded for this
+        // story)" on every run while production's Art Director staged each page
+        // with the whole arc in view. It is the SAME arc the stage already hands
+        // its own planner above — one expression for both, now.
+        buildReplaySceneOptions(storyData, {
           availableAvatars,
           maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
-          clothingRequirements: storyData.clothingRequirements || null,
-        }
+          parseBeats,
+        })
       );
       if (allPrompt) {
         const tAll = Date.now();
@@ -7366,11 +7379,25 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   const { beats, source: beatsSource } = resolveStoryBeats(storyData, { getPageText, extractSceneMetadata });
   if (beats.length === 0) throw new Error('story has no beats and no pages to rebuild them from');
 
+  // PRODUCTION ARGUMENTS (beatsPipeline.js:2327). The stage used to pass
+  // `expansions = []` and no arcHints, which is the state production warns
+  // about by name — "text is being written blind to the illustrations … the OLD
+  // sibling behaviour" (beatsPipeline.js:2321-2326). Every writer A/B run this
+  // way measured a task production never sets. `params.blindToBriefs` keeps
+  // that arm reachable, but as an explicit override, never as the baseline.
+  const textArgs = buildReplayTextArgs(storyData, beats, {
+    parseBeats,
+    overrides: {
+      expansions: (params.blindToBriefs === true || params.blindToBriefs === 'true') ? [] : undefined,
+    },
+  });
   const orig = PROMPT_TEMPLATES.storyTextFromBeats;
   if (promptOverride) PROMPT_TEMPLATES.storyTextFromBeats = promptOverride;
   let prompt;
-  try { prompt = buildStoryTextFromBeatsPrompt(storyData, beats, [], parseBeats(String(storyData.outline || '')).arc || ''); }
-  finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
+  try {
+    prompt = buildStoryTextFromBeatsPrompt(
+      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints });
+  } finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
   if (!prompt) throw new Error('story-text-from-beats template unavailable');
 
   const model = params.textModel || MODEL_DEFAULTS.outline;
@@ -7393,6 +7420,12 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   return {
     storyId: target.storyId,
     beatsSource,
+    // Visible in the result so a reader can tell a production-faithful run from
+    // an override arm without re-reading the prompt.
+    briefsSeen: textArgs.expansions.length,
+    arcChars: textArgs.arc.length,
+    arcHintsChars: textArgs.arcHints.length,
+    overridden: textArgs.overridden,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
@@ -7423,7 +7456,7 @@ async function runWriterCompareStage(target, { params = {} }) {
   await loadPromptTemplates();
   const SH = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost, IMAGE_MODELS } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser/unified');
   const WC = require('./testlabWriterCompare');
 
@@ -7444,6 +7477,19 @@ async function runWriterCompareStage(target, { params = {} }) {
   // replays, so every arm is fed the same input.
   const { beats, source: beatsSource } = resolveStoryBeats(storyData, {
     getPageText: SH.getPageText, extractSceneMetadata: SH.extractSceneMetadata,
+  });
+
+  // The arguments production hands each of these calls, resolved once from the
+  // stored story (server/lib/beatsReplayInputs.js). Every arm below is a MODEL
+  // comparison — the inputs must be production's, or the ranking is a ranking
+  // of models at a task nobody ships.
+  const textArgs = buildReplayTextArgs(storyData, beats, { parseBeats: SH.parseBeats });
+  const sceneOptions = buildReplaySceneOptions(storyData, {
+    availableAvatars: SH.buildAvailableAvatarsForPrompt
+      ? SH.buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+      : '',
+    maxCharactersPerScene: IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage]?.maxCharactersPerScene || 3,
+    parseBeats: SH.parseBeats,
   });
 
   const call = async (prompt, model, label) => {
@@ -7482,7 +7528,9 @@ async function runWriterCompareStage(target, { params = {} }) {
     for (const stage of stages) {
       try {
         if (stage === 'plan') {
-          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: SH.parseBeats(String(storyData.outline || '')).arc || '' }), model, 'plan');
+          // Production: buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints })
+          // — beatsPipeline.js:935. arcHints was missing here.
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints }), model, 'plan');
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
@@ -7490,11 +7538,18 @@ async function runWriterCompareStage(target, { params = {} }) {
           const p = new UnifiedStoryParser(r.text);
           arm.stages.bible = { ...WC.scoreBible(p.extractClothingRequirements(), p.extractVisualBible(), expectedChars), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'scenes') {
-          const r = await call(SH.buildSceneExpansionAllPrompt(storyData, beats, {}), model, 'scenes');
+          // Production: buildSceneExpansionAllPrompt(inputData, beats, { availableAvatars,
+          // maxCharactersPerScene, finalArc, clothingRequirements }) — beatsPipeline.js:1511.
+          // `{}` gave the Art Director no avatars, no cast cap, no wardrobe and
+          // FINAL_ARC = "(no arc was recorded for this story)".
+          const r = await call(SH.buildSceneExpansionAllPrompt(storyData, beats, sceneOptions), model, 'scenes');
           const briefs = String(r.text).split(/^##\s*(?:Page|Seite)\s*\d+/im).slice(1);
           arm.stages.scenes = { ...WC.scoreScenes(briefs), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'text') {
-          const r = await call(SH.buildStoryTextFromBeatsPrompt(storyData, beats, [], SH.parseBeats(String(storyData.outline || '')).arc || ''), model, 'text');
+          // Production: buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions,
+          // approvedArc, { arcHints }) — beatsPipeline.js:2327.
+          const r = await call(SH.buildStoryTextFromBeatsPrompt(
+            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints }), model, 'text');
           const parsed = SH.parseRefinedText(r.text);
           arm.stages.text = { ...WC.scoreText(parsed.pages || [], expectedPages, storyData.language), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         }
