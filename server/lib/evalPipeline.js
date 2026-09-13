@@ -899,6 +899,8 @@ function buildExpectedCastBlock({
   detectedFigureCount = null,
   pageLabel = '',
   sceneMetadata = null,
+  pageNumber = null,
+  extraNames = [],
 } = {}) {
   const names = [];
   const labels = [];
@@ -944,7 +946,17 @@ function buildExpectedCastBlock({
     // cites as CHR001). The parsed metadata is passed in where the caller
     // holds it; parsing a hint stays the fallback.
     const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
-    for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, includeAnimals: true })) add(e.name, vbKind(e.name));
+    for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
+    // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The
+    // detector-side roster in storyJobPipeline has always read the VB
+    // secondary's own `pages[]` and this one never did — the single input the
+    // two rosters could not agree on. Evidence for the rule itself:
+    // job_1786743927715_kcx0p939w p3, where the scene metadata named [Emma,
+    // Noah] and Lira (pages [3,5,9]) was in the prose and the image prompt.
+    // Requires the caller to say which page this is; without it, nothing.
+    if (pageNumber !== null && pageNumber !== undefined && Number.isFinite(Number(pageNumber))) {
+      for (const e of sh.buildSecondaryExpectedForPage(visualBible, pageNumber, [...names])) add(e.name, vbKind(e.name));
+    }
     // A FIGURE FILED AS AN OBJECT IS STILL A FIGURE (2026-09-12). The Art
     // Director puts animals and secondary characters in `objects[]` by id, and
     // the cast collector above reads only `characters` / `characterPositions` /
@@ -975,6 +987,73 @@ function buildExpectedCastBlock({
     lines.push(`Detector figure count (GroundingDINO): ${det}`);
   }
   return { block: lines.join('\n'), names, count: names.length, declared: true };
+}
+
+/**
+ * ONE ROSTER (2026-09-13). `buildExpectedCastBlock` is authoritative for
+ * MEMBERSHIP — who is on this page — and every other cast builder in the
+ * pipeline resolves its NAME SET through here.
+ *
+ * There used to be four builders and they disagreed. On
+ * job_1789207854566_l43qgl34w p7 the detector was told to look for
+ * Sarah/Saira/Facundo/Fiona while the evaluator judged the same image against
+ * Sarah/Facundo/Frau Amrein — three names, four names, zero overlap on two of
+ * them, and a CRITICAL `extra_character` out of the gap. The detector-side
+ * builders keep producing their own description-bearing entries (the detector
+ * needs identity prose this roster does not carry); only the membership
+ * question is answered in one place.
+ *
+ * Returns a lowercase-keyed Map name → canonical spelling, plus the ordered
+ * `names` array, so a caller can both test membership and append what it lacks.
+ */
+function resolveExpectedCastNames(opts = {}) {
+  const cast = buildExpectedCastBlock(opts);
+  const byLower = new Map();
+  for (const n of cast.names) byLower.set(String(n).toLowerCase(), n);
+  return { names: cast.names, byLower, declared: cast.declared };
+}
+
+/**
+ * Bring a detector-side cast list onto the authoritative roster.
+ *
+ * The detector's entries carry identity PROSE the eval roster does not have
+ * ("silver hair in a tight bun, rectangular reading glasses") and that prose is
+ * what lets Set-of-Mark tell two figures apart — so those entries are never
+ * rewritten or dropped here. What is reconciled is MEMBERSHIP: any name the
+ * authoritative roster holds and this list lacks is appended, described from
+ * the Visual Bible when the Bible knows it and name-only when it does not.
+ *
+ * Appending only. A detector list is allowed to be richer than the roster in
+ * one direction (a VB secondary resolved by a path the roster has not been
+ * given yet); deleting from it on that basis would blind the identity call —
+ * measured on job_1789207854566_l43qgl34w p15, where the detector's six names
+ * were correct and the page roster's `[Fiona]` was the stale one.
+ *
+ * @returns {{entries: Array, names: Array<string>, added: Array<string>}}
+ */
+function reconcileDetectorCast(entries, authoritative, { visualBible = null, pageLabel = '' } = {}) {
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  const auth = authoritative && authoritative.byLower instanceof Map ? authoritative : null;
+  if (!auth || auth.names.length === 0) {
+    return { entries: list, names: list.map(e => e?.name).filter(Boolean), added: [] };
+  }
+  const have = new Set(list.map(e => String(e?.name || '').toLowerCase()).filter(Boolean));
+  const missing = auth.names.filter(n => !have.has(String(n).toLowerCase()));
+  const added = [];
+  if (missing.length > 0) {
+    let described = {};
+    try {
+      described = getStoryHelpers().buildSecondaryCharacterDescriptions(
+        visualBible, missing, [...have], pageLabel, { includeAnimals: true }) || {};
+    } catch { /* a roster name the Bible cannot describe still joins, name-only */ }
+    for (const n of missing) {
+      const hit = Object.keys(described).find(k => k.toLowerCase() === String(n).toLowerCase());
+      list.push({ name: hit || n, description: hit ? (described[hit].richDescription || '') : '' });
+      added.push(hit || n);
+    }
+    log.debug(`👥 [ONE ROSTER] ${pageLabel}detector cast gained ${added.length} roster name(s): ${added.join(', ')}`);
+  }
+  return { entries: list, names: list.map(e => e?.name).filter(Boolean), added };
 }
 
 /**
@@ -1152,6 +1231,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       detectedFigureCount: evalOptions.detectedFigureCount ?? null,
       pageLabel: pageContext ? `${pageContext} ` : '',
       sceneMetadata: evalOptions.sceneMetadata || null,
+      // ONE ROSTER: the two inputs only the detector-side builder used to have.
+      pageNumber: evalOptions.pageNumber ?? null,
+      extraNames: evalOptions.outlineCharacters || [],
     });
     if (expectedCast.count > 0) {
       log.debug(`👥 [EVAL] ${pageContext}: expected cast (${expectedCast.count}) ${expectedCast.names.join(', ')}`);
@@ -2278,6 +2360,8 @@ module.exports = {
   sanitizeForGemini,
   evaluateImageQuality,
   buildExpectedCastBlock,
+  resolveExpectedCastNames,
+  reconcileDetectorCast,
   parseFixableIssues,
   IMAGE_QUALITY_THRESHOLD,
 };

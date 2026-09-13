@@ -5612,16 +5612,41 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             expectedCharacters.push(...buildSecondaryExpectedForPage(
               visualBible, img.pageNumber, expectedCharacters.map(c => c.name)
             ));
+            // ONE ROSTER (2026-09-13). The entries above keep their identity
+            // prose — the detector needs it and the eval roster does not carry
+            // it — but MEMBERSHIP is decided in one place, by
+            // buildExpectedCastBlock, for every builder in the pipeline. Before
+            // this the detector and the evaluator answered "who is on this page"
+            // separately and disagreed (job_1789207854566_l43qgl34w p7: detector
+            // Sarah/Saira/Facundo/Fiona, evaluator Sarah/Facundo/Frau Amrein).
+            const { resolveExpectedCastNames, reconcileDetectorCast } = require('./server/lib/evalPipeline');
+            const authoritativeCast = resolveExpectedCastNames({
+              sceneCharacters: img.sceneCharacters || null,
+              sceneHint: img.sceneHint || null,
+              originalPrompt: img.sceneDescription || '',
+              visualBible,
+              evaluationType: img.evaluationType || 'scene',
+              pageLabel: `PAGE ${img.pageNumber} `,
+              sceneMetadata,
+              pageNumber: img.pageNumber,
+              extraNames: img.scene?.outlineCharacters || [],
+            });
+            const reconciled = reconcileDetectorCast(expectedCharacters, authoritativeCast,
+              { visualBible, pageLabel: `PAGE ${img.pageNumber} ` });
             const expectedObjects = Array.isArray(sceneMetadata.objects)
               ? sceneMetadata.objects.filter(o => typeof o === 'string')
               : [];
             img.sharedBboxDetection = await detectAllBoundingBoxes(img.imageData, {
-              expectedCharacters,
+              expectedCharacters: reconciled.entries,
               expectedObjects,
               sceneContext: img.sceneDescription || null,
               pageContext: `PAGE ${img.pageNumber}`,
               artStyle,
             });
+            // The authoritative names ride ALONGSIDE expectedCharacters, never
+            // instead of it: the arithmetic reads this, the SoM prompt reads
+            // the described entries.
+            if (img.sharedBboxDetection) img.sharedBboxDetection.expectedCastNames = reconciled.names;
             const figCount = img.sharedBboxDetection?.figures?.length || 0;
             const idCount = img.sharedBboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
             log.debug(`🔍 [BBOX-SHARED] P${img.pageNumber}: ${figCount} figures, ${idCount} identified`);

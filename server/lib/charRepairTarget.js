@@ -75,7 +75,28 @@ function buildPageCast({
       : '';
     expected.push({ name: requiredName, description: ch ? sh.buildIdentityLine(ch, clothingText) : '' });
   }
-  return expected;
+
+  // ONE ROSTER (2026-09-13). Membership is buildExpectedCastBlock's answer for
+  // every cast builder in the pipeline; the identity lines above are this
+  // builder's own and are never rewritten. Repainting a face is the most
+  // destructive thing here — a lineup shorter than the roster is exactly how a
+  // user's name lands on a Visual Bible secondary.
+  try {
+    const { resolveExpectedCastNames, reconcileDetectorCast } = require('./evalPipeline');
+    const vb = visualBible || storyData?.visualBible || null;
+    const authoritative = resolveExpectedCastNames({
+      sceneCharacters: sceneCharacters || null,
+      visualBible: vb,
+      evaluationType: 'scene',
+      pageLabel: label,
+      sceneMetadata,
+      extraNames: outlineCharacters || [],
+    });
+    return reconcileDetectorCast(expected, authoritative, { visualBible: vb, pageLabel: label }).entries;
+  } catch (err) {
+    log.debug(`[CHAR-REPAIR TARGET] ${label}roster reconciliation skipped: ${err.message}`);
+    return expected;
+  }
 }
 
 /**

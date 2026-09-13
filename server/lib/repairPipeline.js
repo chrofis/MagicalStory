@@ -2503,6 +2503,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // actually sent to Grok, not the stale original page prompt.
             prompt: repairResult.prompt || null,
             description: repairResult.description || null,
+            // THE REWRITTEN CONTRACT TRAVELS WITH THE VERSION (2026-09-13).
+            // executeIterateAction already returns the cast it re-derived from
+            // the rewritten brief (images.js iteratePageCore → newSceneCharacters,
+            // newSceneMetadata) and buildVersionEntry / final assembly already
+            // read `v.sceneCharacters` / `v.sceneMetadata` — but this object,
+            // the one that becomes the version, never copied them across. So
+            // the rewrite's description was promoted to the page and its CAST
+            // was not: on job_1789207854566_l43qgl34w p15 the iterate rewrite
+            // named six people and the page record kept `[Fiona]`, leaving the
+            // final image judged against a roster of 2 against 6 drawn figures
+            // and taking an `extra_character` CRITICAL for its own cast.
+            // Declared-or-unknown: `|| null` would swallow a rewrite that
+            // legitimately empties the cast, so the array passes through as-is.
+            sceneCharacters: Array.isArray(repairResult.sceneCharacters) ? repairResult.sceneCharacters : null,
+            sceneMetadata: repairResult.sceneMetadata || null,
             // Detection is part of every image version (owner decision
             // 2026-07-31): the ONE detection made on this result's bytes
             // (iterate's internal or the round pre-detect), stamped directly

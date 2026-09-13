@@ -2447,6 +2447,35 @@ async function evaluateImageBatch(images, options = {}) {
         log.debug(`📦 [BATCH EVAL] PAGE ${img.pageNumber}: ${Object.keys(sceneOnly).length} secondary character(s) from the Visual Bible: ${Object.keys(sceneOnly).join(', ')}`);
       }
 
+      // ONE ROSTER (2026-09-13): membership comes from buildExpectedCastBlock,
+      // the same answer the evaluator above was given. The rich descriptions
+      // assembled here are untouched — only names the roster holds and this map
+      // lacks are appended, so the detector can never be asked about a smaller
+      // cast than the judge is scoring against.
+      const { resolveExpectedCastNames, reconcileDetectorCast } = require('./evalPipeline');
+      const authoritativeCast = resolveExpectedCastNames({
+        sceneCharacters: img.sceneCharacters || null,
+        sceneHint: img.sceneHint || null,
+        originalPrompt: img.sceneDescription || '',
+        visualBible,
+        evaluationType: img.evaluationType || 'scene',
+        pageLabel: `PAGE ${img.pageNumber} `,
+        sceneMetadata,
+        pageNumber: img.pageNumber,
+        extraNames: img.outlineCharacters || img.scene?.outlineCharacters || [],
+      });
+      const castReconciled = reconcileDetectorCast(
+        Object.entries(characterDescriptions).map(([name, d]) => ({ name, description: d?.richDescription || '' })),
+        authoritativeCast,
+        { visualBible, pageLabel: `PAGE ${img.pageNumber} ` }
+      );
+      for (const name of castReconciled.added) {
+        if (!characterDescriptions[name]) {
+          const e = castReconciled.entries.find(x => x.name === name);
+          characterDescriptions[name] = { richDescription: e?.description || '', clothingDescriptions: {} };
+        }
+      }
+
       // Parse Visual Bible objects from prompt
       const vbObjects = parseVisualBibleObjects(img.prompt || '');
       // Scene metadata emits VB IDs ("ART003", "LOC001.2"); translate them to
@@ -2484,6 +2513,8 @@ async function evaluateImageBatch(images, options = {}) {
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];
+        // Alongside expectedCharacters, never instead of it (see site A).
+        if (bboxDetection) bboxDetection.expectedCastNames = castReconciled.names;
       }
 
       // WHO IS WHO — reconcile the evaluator against the detector before any
@@ -4166,8 +4197,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           visualBible, iterateSceneMetadata, iterExpectedCharacters.map(c => c.name),
           { pageLabel: `${iterLabel} ` }
         ));
+        // ONE ROSTER (2026-09-13) — same membership answer the iterate eval got.
+        const { resolveExpectedCastNames: _resolveCast, reconcileDetectorCast: _reconcileCast } = require('./evalPipeline');
+        const iterAuthoritative = _resolveCast({
+          sceneCharacters: sceneCharacters || null,
+          originalPrompt: newSceneDescription || '',
+          visualBible,
+          evaluationType: 'scene',
+          pageLabel: `${iterLabel} `,
+          sceneMetadata: iterateSceneMetadata,
+          pageNumber,
+        });
+        const iterReconciled = _reconcileCast(iterExpectedCharacters, iterAuthoritative,
+          { visualBible, pageLabel: `${iterLabel} ` });
         iterDetection = await detectAllBoundingBoxes(genResult.imageData, {
-          expectedCharacters: iterExpectedCharacters,
+          expectedCharacters: iterReconciled.entries,
           expectedObjects: Array.isArray(iterateSceneMetadata?.objects)
             ? iterateSceneMetadata.objects.filter(o => typeof o === 'string')
             : [],
@@ -4175,6 +4219,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           pageContext: iterLabel,
           artStyle,
         });
+        if (iterDetection) iterDetection.expectedCastNames = iterReconciled.names;
       } catch (bboxErr) {
         log.warn(`⚠️ [ITERATE] Page ${pageNumber}: detection failed (${bboxErr.message})`);
       }
