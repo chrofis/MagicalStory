@@ -12,6 +12,10 @@ The `finalScore` field at the end MUST equal the LOWEST of these three checks:
 
 Anything below 5/10 in any of those three forces the entire avatar to fail. Children rendered as adults, adults rendered as children, or completely wrong clothing must score ≤3 on the failing dimension.
 
+DECLARED OVERRIDES (corrections the user requested; the generator was instructed to apply them):
+{DECLARED_OVERRIDES}
+Each listed item deliberately differs from IMAGE 1. Judge a listed item against the declaration, not against the photo: rendered as declared = full match, no cap and no deduction, even when IMAGE 1 shows otherwise; rendered differently from the declaration = a defect, score it down. Anything not listed is still judged against IMAGE 1 as normal.
+
 TASK 1: FACE MATCH
 Compare facial features. Score each 1-10 (10 = perfect match).
 IGNORE when scoring face: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts, art-style differences (photo vs illustration).
@@ -22,7 +26,7 @@ DO NOT ignore: face geometry. A different forehead height, cheekbone prominence,
   - nose: bridge profile + tip + nostril shape.
   - mouth: lip thickness + width + cupid's bow.
   - overallStructure: holistic "is this the same person" gestalt.
-  - glasses: if reference person wears glasses, avatar MUST have matching style (capped at 3 if missing or wrong frame). If no glasses in reference, avatar MUST NOT have glasses (capped at 3 if added).
+  - glasses: if reference person wears glasses, avatar MUST have matching style (capped at 3 if missing or wrong frame). If no glasses in reference, avatar MUST NOT have glasses (capped at 3 if added). Skip both caps when DECLARED OVERRIDES lists glasses: score against that declaration instead.
 Cross-style benefit-of-doubt is limited: when IMAGE 2 is illustration and IMAGE 1 is photo, a score of 8-10 requires faceShape AND foreheadCheekJawline AND eyes AND nose AND mouth to ALL agree. If any one is visibly different, cap at 6. If two are off, cap at 4.
 `faceMatch.score` = LOWEST of the seven feature scores. NOT average. One drift drags everything down.
 
