@@ -359,10 +359,22 @@ function normalizeWithMap(s) {
  * replacement lands on the real characters — a plain `includes` check could
  * verify a quote but not replace it.
  *
- * The FIRST occurrence wins when a page repeats the quoted span: the lector
- * quotes "the shortest span that contains the fault", so a repeat is the same
- * fault twice and a second finding for it will be dropped as overlapping or
- * applied on the next pass over the text.
+ * The FIRST occurrence wins when a page repeats the quoted span. The lector
+ * quotes the WHOLE SENTENCE the fault stands in (2026-09-13), so a repeat means
+ * the page carries that sentence twice and a second finding for it will be
+ * dropped as overlapping or applied on the next pass over the text.
+ *
+ * WHY THE SENTENCE AND NOT THE FAULT (prod job_1789227389389_z18dmvnt6 p15):
+ * the contract used to ask for "the shortest span that contains the fault",
+ * with agreement corrected only INSIDE that span. The lector quoted
+ * `la doudou toute degoulinante` -> `le doudou tout degoulinant`, a correct
+ * gender fix, and the preposition one word to its LEFT was outside the span:
+ * `de la doudou` became `de le doudou`, which French contracts to `du`. The
+ * substitution was applied exactly as asked and shipped a NEW error. A span
+ * that stops short of the words agreement reaches cannot be applied safely,
+ * so the span is now the sentence. One line per sentence, all its faults in
+ * one correction -- several findings inside one sentence would collide on the
+ * overlap guard below and all but the first would be dropped.
  */
 function locateQuote(pageText, quote) {
   const { norm, map } = normalizeWithMap(pageText);

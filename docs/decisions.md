@@ -35747,3 +35747,43 @@ show a topic in the trial that the writer is then told is off-age),
 `tests/unit/trial-age-appropriate-topics.test.ts`, `tests/unit/age-band.test.ts`
 (new mirror test).
 **Status:** ✅ active
+
+### The lector quotes the whole SENTENCE, not the shortest faulty span (2026-09-13)
+**Context:** Prod `job_1789227389389_z18dmvnt6` p15 shipped «autour des deux
+enfants et **de le doudou** tout dégoulinant» — `de + le`, which French
+contracts to `du`. The proofreader was not absent and did not miss it: the
+stored `textRefineReport` shows the lector ran (`lectorApplied: 10`,
+`lectorDropped: 0`) and was fixing this very word on pages 1, 5, 6, 10 and 14.
+
+**The lector's own correction created the error.** Its p15 finding was
+`'la doudou toute dégoulinante'` → `'le doudou tout dégoulinant'` — a correct
+gender fix. The preposition sat one word to the LEFT of the quoted span, and
+the old contract asked for "the shortest span that contains the fault", with
+agreement corrected only "inside the span you quote". Substituting exactly as
+instructed turned `de la doudou` into `de le doudou`. The applier was faithful;
+the span was wrong.
+
+**Decision:** `story-text-proofread.txt` now asks for the WHOLE SENTENCE the
+fault stands in, quoted and returned corrected, with the neighbouring sentences
+read for judgement but never quoted. One line per SENTENCE, not per fault: a
+sentence with several faults comes back once with all of them fixed.
+
+**Rationale:** A gender, number or case fix forces agreement outward — article,
+preposition and its contraction, adjective, participle — and there is no way to
+know at authoring time how far that reach goes. A span that stops short of it
+cannot be applied safely by substitution, and `applyLectorFindings` is pure
+substitution by design (no model call, the quote doubling as the hallucination
+guard). The sentence is the smallest unit that always contains the agreement
+chain. The one-line-per-sentence rule is load-bearing rather than cosmetic:
+two findings inside one sentence overlap, and the applier's overlap guard drops
+all but the first — pinned by a test.
+
+Considered and held in reserve: a deterministic post-apply lint for `de le` /
+`de les` / `à le` / `à les`. It is safe (those are always wrong in French, no
+context needed) but it patches the symptom of a span contract that is wrong for
+every language, not just French.
+
+**Touched:** `prompts/story-text-proofread.txt`, `server/lib/textRefine.js`
+(contract comment on `locateQuote`), `tests/unit/lector-sentence-span.test.ts`
+(6 tests, including a regression test that reproduces the shipped `de le doudou`)
+**Status:** ✅ active
