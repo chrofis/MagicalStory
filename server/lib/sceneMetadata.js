@@ -2096,6 +2096,74 @@ function resolveTextStagePictureSpec({ sceneBrief = null, sceneDescription = nul
   return [sceneBrief, sceneDescription, sceneIntent].map(strip).find(v => v) || null;
 }
 
+/**
+ * THE SCENE CAST as OBJECTS — the only shape that carries position/action/depth.
+ *
+ * `extractSceneMetadata()` returns TWO cast lists and they are not the same
+ * shape: `metadata.characters` is `string[]` (names only, flattened here in
+ * both the prose branch and the JSON branch), while `metadata.fullData.
+ * characters` keeps the brief's objects (`{ name, position, action, depth,
+ * clothing, … }`). Reading `.position` / `.action` / `.depth` off an entry of
+ * the flat list yields `undefined` with no throw and no warning.
+ *
+ * That is exactly what entityConsistency's bbox disambiguation context did from
+ * the day it was written (24c8981aa, 2026-03-22 — the flat shape predates it,
+ * so the contract was never true): it emitted one `- undefined:` line per cast
+ * member into a prompt block headed "use to identify characters by position and
+ * action". The disambiguation payload was 100% lost while the prompt claimed to
+ * carry it. generateWithIterativePlacement (images.js) is the sibling that got
+ * it right and even documents the two shapes.
+ *
+ * One resolver so a third site cannot pick the wrong list, and a LOUD failure —
+ * never a silent `undefined` — when a string turns up where an object belongs.
+ * A bare name is still returned as `{ name }` with blank position/action so a
+ * degraded brief costs detail, not the cast: a paid run is never killed for it
+ * (gates are guidelines).
+ *
+ * @param {Object|null} metadata - an extractSceneMetadata() result
+ * @param {string} [where] - call-site label, for the log line
+ * @returns {Array<{name: string, position: string, action: string}>}
+ */
+function resolveSceneCastEntries(metadata, where = 'scene-cast') {
+  if (!metadata) return [];
+  const structured = Array.isArray(metadata.fullData?.characters) ? metadata.fullData.characters : null;
+  const flat = Array.isArray(metadata.characters) ? metadata.characters : [];
+  const usingFlat = !(structured && structured.length);
+  const raw = usingFlat ? flat : structured;
+  if (usingFlat && flat.length) {
+    log.warn(`⚠️  [SCENE-CAST] ${where}: no structured cast (fullData.characters) — falling back to the ${flat.length} bare name(s) in metadata.characters; position/action are unavailable for this scene`);
+  }
+  const out = [];
+  for (const entry of raw) {
+    if (entry && typeof entry === 'object') {
+      const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+      if (!name) {
+        log.error(`❌ [SCENE-CAST] ${where}: cast entry has no name (${JSON.stringify(entry).slice(0, 120)}) — dropped`);
+        continue;
+      }
+      out.push({
+        ...entry,
+        name,
+        position: typeof entry.position === 'string' ? entry.position.trim() : '',
+        action: typeof entry.action === 'string' ? entry.action.trim() : ''
+      });
+      continue;
+    }
+    if (typeof entry === 'string' && entry.trim()) {
+      // Loud only when the STRUCTURED list held a string — that is the contract
+      // violation. The flat-list fallback is strings by definition and has
+      // already warned once for the whole scene.
+      if (!usingFlat) {
+        log.error(`❌ [SCENE-CAST] ${where}: cast entry is a bare name string ("${entry.trim()}") where a cast OBJECT was expected — position/action are missing for this figure. Read fullData.characters, never metadata.characters.`);
+      }
+      out.push({ name: entry.trim(), position: '', action: '' });
+      continue;
+    }
+    log.error(`❌ [SCENE-CAST] ${where}: unusable cast entry ${JSON.stringify(entry)} — dropped`);
+  }
+  return out;
+}
+
 module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
@@ -2113,6 +2181,7 @@ module.exports = {
   resolveEvalSceneHint,
   resolveEvalImagePrompt,
   resolveTextStagePictureSpec,
+  resolveSceneCastEntries,
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,
   findCastMissingFromMetadata,

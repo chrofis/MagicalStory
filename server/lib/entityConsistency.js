@@ -1679,7 +1679,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
       if (pageCharNames.length > 0) {
         // Build expected characters with physical descriptions + clothing for Gemini
-        const { extractSceneMetadata } = require('./storyHelpers');
+        const { extractSceneMetadata, resolveSceneCastEntries } = require('./storyHelpers');
         const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription) : null;
         const charClothing = sceneMetadata?.characterClothing || {};
 
@@ -1739,7 +1739,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         let sceneContext = null;
         if (sceneMetadata?.imageSummary) {
           const contextParts = [`**SCENE:** ${sanitizeForGemini(sceneMetadata.imageSummary, 'full')}`];
-          const sceneChars = sceneMetadata.characters || [];
+          // The cast OBJECTS (fullData.characters), never the flat name list:
+          // `metadata.characters` is string[], so `c.position` / `c.action` off
+          // it were `undefined` and this block emitted "- undefined:" per figure
+          // into a prompt headed "use to identify characters by position and
+          // action". One resolver, and a string entry now fails loudly.
+          const sceneChars = resolveSceneCastEntries(sceneMetadata, `bbox scene context p${pageNumber}`);
           if (sceneChars.length > 0) {
             contextParts.push(sceneChars.map(c => {
               const parts = [`- ${c.name}:`];
