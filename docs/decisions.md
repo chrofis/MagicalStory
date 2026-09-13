@@ -34105,3 +34105,101 @@ they were judging.
   char-fix, so it, not the hat, is the live fault.
 
 **Touched files.** `server/lib/testlab.js`.
+
+---
+
+## 2026-09-13 — Character presence is ONE code-derived signal, mutually exclusive by construction
+
+**Context:** Four layers argued about the same question — "is this figure
+really extra?" — and they disagreed with each other.
+
+1. `prompts/image-evaluation.txt` D-04 (`missing_character`), D-04b
+   (`extra_character`) and D-04c (a rule telling the model to reconcile the
+   two when the counts are equal).
+2. `prompts/feedback-consolidator.txt` — an EXCEPTION clause re-doing D-04c at
+   merge time.
+3. `server/lib/evalPipeline.js` — two log-only diagnostics plus the
+   `eval_missing_extra_pair` / `eval_figure_surplus_unflagged` metrics,
+   counting how often the prompt got it wrong.
+4. `server/lib/identityAgreement.js` — a two-witness filter deleting absence
+   claims after the fact, and a rescore behind it.
+
+The disagreement was destructive, not merely noisy. A critical
+`extra_character` routed through `decideRepairMethod` step 3 to inpaint — a
+Grok whole-frame edit — executing a "Remove this figure" instruction, and a
+commissioned child (Julian) was erased from a cover. On
+`job_1789207854566_l43qgl34w` p7 the same page carried BOTH a
+`missing_character` and an `extra_character`: each individually true, the
+counts never reconciled, one of them proposing to delete a figure the other
+said was absent. On p12 a `missing_character` was billed for a character
+(Fiona) the page's roster never commissioned at all.
+
+The inputs were also lying. Two rosters existed and disagreed — the detector
+matched against `bboxDetection.expectedCharacters`, the evaluator built its
+own via `buildExpectedCastBlock` — and the figure count was inflated by
+sub-1%-of-frame faceless boxes. Count-vs-roster reconciliation on that story
+measured 11/16 before the roster work.
+
+**Decision:** The evaluator OBSERVES; code DECIDES. Delivered as Phases 0-4.
+
+- **Phase 0** — `extra_character` keeps its score but loses its removal route:
+  the fix text is an identity reconciliation, and the type joined
+  `NOT_INPAINTABLE_TYPES` because the route, not the sentence, was the danger.
+- **Phase 1** — one roster (`buildExpectedCastBlock` is authoritative for
+  membership, every other builder resolves its name set through it); the count
+  filters micro-figures (`countRealFigures`); the page roster is the union of
+  hint and prose; per-page clothing keys are not a cast signal.
+- **Phase 2** — `derivePresenceFinding` (pure, exported, wired once in the
+  quality path) emits AT MOST ONE outcome per page:
+  `figures < cast` → `missing_character`; `figures > cast` →
+  `extra_character` unless the brief declared a crowd; `figures == cast` with
+  an unmatched figure → `character_identity` naming who it should be;
+  otherwise nothing. It declines entirely when the roster was never declared,
+  when no detector count reached the call, when `matches[]` breaks its
+  per-figure contract, or when the two witnesses disagree.
+  A new `crowdExpected` boolean on the scene brief carries the one thing
+  arithmetic cannot see — that a page was written to hold unnamed background
+  people. Derived findings are stamped `derivedBy: 'presence-arithmetic'`.
+  When the derivation speaks it owns the pair and the evaluator's own
+  missing/extra findings are dropped first; when it declines they stand.
+- **Phase 3** — D-04c deleted, D-04 demoted to observation, the consolidator
+  exception deleted, both diagnostics and the pair metric deleted, the surplus
+  metric replaced by per-outcome counters, and the two-witness filter plus its
+  rescore removed from `identityAgreement.js` / `images.js`.
+
+Classification normally belongs to the prompt and code may only change a
+severity. This is the agreed exception (owner, 2026-09-13): the decision moved
+into code because the arithmetic is mechanical — a count and a list the model
+itself declared. No finding's description text is read anywhere in the path.
+
+**Rationale:** The pair was never a real observation, it was two layers
+disagreeing about one recognition failure — and the layer that "won" was
+whichever ran last. Making the outcomes mutually exclusive BY CONSTRUCTION
+(one function, one return value) is the only shape where the pair cannot
+recur; every alternative is another reconciliation rule that can itself be
+wrong. The two-witness principle was not weakened, it moved earlier: instead
+of withdrawing a claim after billing it, a disagreement between the detector
+and the evaluator now means no claim is made.
+
+Measured on the 16 pages of `job_1789207854566_l43qgl34w`, replayed from
+stored data: every page yields exactly one outcome; three pages strictly
+improve (p4 and p13 emit `character_identity` where an arithmetically
+impossible `extra_character` stood; p12 loses a `missing_character` billed for
+a character the page never commissioned); p7 loses its destructive pair. Two
+pages (p7, p15) still emit a wrong `extra_character` — the cause is upstream,
+an Art Director brief whose `characters[]` is under-declared against its own
+`sceneIntent`, and the derivation reports it as one finding instead of two.
+
+**Touched:** `server/lib/evalPipeline.js` (`derivePresenceFinding`,
+`PRESENCE_DERIVED_MARKER`, `buildExpectedCastBlock` crowd carry, the single
+unconditional score recompute), `server/lib/sceneMetadata.js` (three parser
+return sites), `server/lib/images.js` (iterate passthrough, deleted
+two-witness call site + rescore), `server/lib/identityAgreement.js`,
+`server/lib/repairLogic.js` (Phase 0), `prompts/scene-expansion.txt`,
+`prompts/image-evaluation.txt`, `prompts/feedback-consolidator.txt`,
+`tests/unit/extra-character-type.test.ts`,
+`tests/unit/inpaint-routing.test.ts`,
+`tests/manual/test-compliance-severity-cap.js`,
+`tasks/presence-signal-rewrite-2026-09-13.md`.
+
+**Status:** ✅ active (staging only at the time of writing — not on master).
