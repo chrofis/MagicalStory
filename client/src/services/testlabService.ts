@@ -513,7 +513,9 @@ export const TESTLAB_STAGES = [
   // The measurement for the hazard-reduction loop: how many render hazards do
   // this book's briefs (or beat SCENE lines) demand, by class.
   { id: 'scene_hazard_count', label: 'Scene hazard count — render hazards per page in the briefs, by class', producesImage: false, overridable: true, storyLevel: true },
-  { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
+  // outline_review retired 2026-09-13 — it measured the split-outline-review
+  // branch, which beats mode (the only pipeline) never reaches. Stored rows
+  // still render; the stage can no longer be started.
   { id: 'text_refine', label: 'Text refine — 2 audits, merge, 1 repair, 1 lector', producesImage: false, overridable: true, storyLevel: true },
   // Step 2 (fast structural review) retired 2026-09-01 — this stage now only
   // plans + expands scenes; historical rows with a review still display.

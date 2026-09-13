@@ -118,16 +118,9 @@ export default function TestLab() {
   // silently opened the story list instead.
   const [tab, setTab] = useState<Tab>(() =>
     new URLSearchParams(window.location.search).has('exp') ? 'experiments' : 'stories');
-  // One-tap "Review" from the Stories tab hands a story to the Experiments tab
-  // (prefills the outline_review stage + story ID) — no window.prompt / no
-  // benchmark detour / no typing IDs on mobile. {} bumps to force a re-apply
-  // even when the same story is tapped twice.
-  const [preset, setPreset] = useState<{ storyId: string; stage: string } | null>(null);
-
-  const useStoryForReview = (storyId: string) => {
-    setPreset({ storyId, stage: 'outline_review' });
-    setTab('experiments');
-  };
+  // The one-tap "Review" hand-off from the Stories tab (and the `preset`
+  // plumbing into the Experiments tab) retired 2026-09-13 with the
+  // outline_review stage — prefilling that stage was its only purpose.
 
   return (
     <div className="min-h-screen bg-gray-100 p-3 sm:p-6">
@@ -150,10 +143,10 @@ export default function TestLab() {
           <button className={tabBtn(tab === 'scores')} onClick={() => setTab('scores')}>Scores</button>
         </div>
 
-        {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
+        {tab === 'stories' && <StoriesTab />}
         {tab === 'benchmark' && <BenchmarkTab />}
         {tab === 'sheetsets' && <SetsTab />}
-        {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
+        {tab === 'experiments' && <ExperimentsTab />}
         {tab === 'findings' && <FindingsTab />}
         {tab === 'scores' && <ScorecardsPanel />}
       </div>
@@ -165,7 +158,7 @@ export default function TestLab() {
 // Stories tab
 // ─────────────────────────────────────────────────────────────────────
 
-function StoriesTab({ onReviewStory }: { onReviewStory: (storyId: string) => void }) {
+function StoriesTab() {
   const [stories, setStories] = useState<TestLabStory[]>([]);
   const [pagination, setPagination] = useState<TestLabPagination | null>(null);
   const [page, setPage] = useState(1);
@@ -274,9 +267,6 @@ function StoriesTab({ onReviewStory }: { onReviewStory: (storyId: string) => voi
                 <td className="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">{new Date(s.createdAt).toLocaleDateString()}</td>
                 <td className="px-3 sm:px-4 py-3 text-sm">
                   <div className="flex flex-wrap gap-1.5">
-                    <Button size="sm" onClick={() => onReviewStory(s.id)}>
-                      <FlaskConical size={14} /> Review
-                    </Button>
                     <Button variant="secondary" size="sm" onClick={() => window.open(`/create?storyId=${s.id}`, '_blank')}>
                       <ExternalLink size={14} /> Open
                     </Button>
@@ -677,7 +667,7 @@ function SetsTab() {
 // Experiments tab
 // ─────────────────────────────────────────────────────────────────────
 
-function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string; stage: string } | null; onPresetApplied: () => void }) {
+function ExperimentsTab() {
   const [experiments, setExperiments] = useState<ExperimentSummary[]>([]);
   const [benchmarks, setBenchmarks] = useState<BenchmarkScene[]>([]);
   const [selected, setSelected] = useState<ExperimentDetail | null>(null);
@@ -723,19 +713,13 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     return () => { cancelled = true; clearTimeout(t); };
   }, [storySearch]);
   const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [writerModel, setWriterModel] = useState('');
   const [refineModel, setRefineModel] = useState('');
-  const [reviewMode, setReviewMode] = useState<'compare' | 'iterate'>('compare');
-  const [reviewAspect, setReviewAspect] = useState<'both' | 'text' | 'scene'>('both');
-  const [iterRounds, setIterRounds] = useState<{ model: string; split: boolean; textModel: string; sceneModel: string }[]>([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const stageInfo = TESTLAB_STAGES.find(s => s.id === stage);
   const isStoryLevel = !!(stageInfo as { storyLevel?: boolean } | undefined)?.storyLevel;
   const isCharacterLevel = !!(stageInfo as { characterLevel?: boolean } | undefined)?.characterLevel;
-  const isOutlineReview = stage === 'outline_review';
   const isTextRefine = stage === 'text_refine';
   const needsCharacter = stage === 'char_repair' || stage === 'qwen_insert' || isCharacterLevel;
   // Characters on the selected benchmark pages (from their snapshots).
@@ -752,8 +736,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     ...(storyIdInput.trim() ? [storyIdInput.trim()] : []),
   ])];
   const targetCount = isStoryLevel || isCharacterLevel ? storyTargetIds.length : selectedBench.length;
-  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim())
-    && (!isOutlineReview || (reviewMode === 'compare' ? selectedModels.length > 0 : iterRounds.length > 0));
+  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim());
 
   const [expLimit, setExpLimit] = useState(20);
 
@@ -779,30 +762,14 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
 
   useEffect(() => { load(); }, [load]);
 
-  // Text-model catalogue for the outline_review reviewer picker (single source
-  // of truth = server TEXT_MODELS). Default-selects the configured reviewer.
+  // Text-model catalogue for the text_refine repair-model picker (single source
+  // of truth = server TEXT_MODELS).
   useEffect(() => {
     testlabService.getTextModels()
-      .then(res => {
-        setTextModels(res.models);
-        const dflt = res.defaultReviewModel || res.models[0]?.id || '';
-        setSelectedModels(prev => prev.length ? prev : (dflt ? [dflt] : []));
-        setWriterModel(prev => prev || res.defaultWriterModel || '');
-        setIterRounds(prev => prev.length ? prev : [{ model: dflt, split: false, textModel: dflt, sceneModel: dflt }]);
-      })
+      .then(res => { setTextModels(res.models); })
       .catch(() => { /* picker stays empty; non-fatal */ });
   }, []);
 
-  // One-tap "Review" from the Stories tab: land here with the outline_review
-  // stage selected and that story ticked as the target, so nothing needs typing.
-  useEffect(() => {
-    if (!preset) return;
-    setStage(preset.stage);
-    setSelectedStoryIds([preset.storyId]);
-    setStoryIdInput('');
-    setError(null);
-    onPresetApplied();
-  }, [preset, onPresetApplied]);
 
   // Deep link: /admin/test-lab?exp=717 opens that experiment directly.
   //
@@ -947,21 +914,6 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       if (isTextRefine) {
         if (refineModel) params.model = refineModel;
       }
-      if (isOutlineReview) {
-        if (writerModel) params.writerModel = writerModel;
-        params.aspect = reviewAspect;
-        if (reviewMode === 'iterate') {
-          // Repeated rounds — each round's critique feeds the next; per-round models.
-          params.mode = 'iterate';
-          params.rounds = iterRounds.map(r => r.split
-            ? { split: true, textModel: r.textModel, sceneModel: r.sceneModel }
-            : { model: r.model });
-        } else {
-          if (selectedModels.length === 0) { alert('Pick at least one reviewer model to compare.'); setStarting(false); return; }
-          params.mode = 'compare';
-          params.models = selectedModels; // one shared draft, reviewed by each model
-        }
-      }
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
         catch { alert('Params JSON is not valid JSON.'); setStarting(false); return; }
@@ -1007,8 +959,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   // re-run can never silently drop part of the original configuration.
   const WIDGET_PARAM_KEYS = new Set([
     'autoEval', 'characterName', 'coverType', 'backend', 'whiteoutTarget', 'freshDetection',
-    'rerunDetection', 'variants', 'pass', 'model', 'splitRows', 'writerModel', 'aspect', 'mode', 'rounds',
-    'models', 'genericityWarnings', 'repairMode', 'cropPad', 'crop', 'blurFace', 'referenceCharacter',
+    'rerunDetection', 'variants', 'pass', 'model', 'splitRows',
+    'genericityWarnings', 'repairMode', 'cropPad', 'crop', 'blurFace', 'referenceCharacter',
   ]);
 
   const reuseExperiment = (d: ExperimentDetail) => {
@@ -1060,24 +1012,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     if (p.model) setAvatarEvalModel(String(p.model));
     setAvatarSplitRows(p.splitRows !== false);
 
-    // outline_review: the whole point of re-running — same draft setup, swapped models.
-    if (p.writerModel) setWriterModel(String(p.writerModel));
-    setReviewAspect((p.aspect === 'text' || p.aspect === 'scene') ? p.aspect : 'both');
-    if (p.mode === 'iterate') {
-      setReviewMode('iterate');
-      const rounds = (Array.isArray(p.rounds) ? p.rounds : []) as { model?: string; split?: boolean; textModel?: string; sceneModel?: string }[];
-      if (rounds.length) {
-        setIterRounds(rounds.map(r => ({
-          model: r.model || r.textModel || '',
-          split: !!r.split,
-          textModel: r.textModel || r.model || '',
-          sceneModel: r.sceneModel || r.model || '',
-        })));
-      }
-    } else if (p.mode === 'compare' || Array.isArray(p.models)) {
-      setReviewMode('compare');
-      if (Array.isArray(p.models)) setSelectedModels(p.models as string[]);
-    }
+    // A stored outline_review row (stage retired 2026-09-13) has no widgets left
+    // to restore into; its writerModel/aspect/mode/rounds/models surface in the
+    // Params JSON box instead, so nothing is silently dropped.
 
     // Anything no widget owns (replayOf, extraRule, one-off knobs) survives verbatim.
     const leftover = Object.fromEntries(Object.entries(p).filter(([k]) => !WIDGET_PARAM_KEYS.has(k)));
@@ -1270,82 +1207,6 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
             </div>
           </div>
         )}
-        {isOutlineReview && (
-          <div className="mb-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border overflow-hidden text-xs">
-                <button className={`px-3 py-1.5 ${reviewMode === 'compare' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'}`} onClick={() => setReviewMode('compare')}>Compare models</button>
-                <button className={`px-3 py-1.5 ${reviewMode === 'iterate' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'}`} onClick={() => setReviewMode('iterate')}>Repeated rounds</button>
-              </div>
-              <label className="text-xs text-gray-600 flex items-center gap-1.5">
-                Aspect:
-                <select className="border rounded-lg px-2 py-1 text-xs" value={reviewAspect} onChange={e => setReviewAspect(e.target.value as 'both' | 'text' | 'scene')}>
-                  <option value="both">Text + Scene</option>
-                  <option value="text">Text only</option>
-                  <option value="scene">Scene only</option>
-                </select>
-              </label>
-              <label className="text-xs text-gray-600 flex items-center gap-1.5">
-                Writer draft:
-                <select className="border rounded-lg px-2 py-1 text-xs" value={writerModel} onChange={e => setWriterModel(e.target.value)}>
-                  {textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
-                </select>
-              </label>
-            </div>
-
-            {reviewMode === 'compare' ? (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-gray-700">Reviewer models to compare ({selectedModels.length})</div>
-                  {textModels.length > 0 && <button className="text-xs text-indigo-600 hover:underline" onClick={() => setSelectedModels(selectedModels.length === textModels.length ? [] : textModels.map(m => m.id))}>{selectedModels.length === textModels.length ? 'Deselect all' : 'Select all'}</button>}
-                </div>
-                <div className="text-xs text-gray-500 mb-2">One writer draft, then the review runs through each selected model independently — which model reviews best. {reviewAspect !== 'both' && <b>{reviewAspect} pass only.</b>}</div>
-                {textModels.length === 0 && <div className="text-sm text-gray-400">Loading models…</div>}
-                <div className="flex flex-wrap gap-2">
-                  {textModels.map(m => {
-                    const on = selectedModels.includes(m.id);
-                    const price = m.pricing ? `$${m.pricing.input}/$${m.pricing.output} per 1M` : 'price n/a';
-                    return (
-                      <label key={m.id} title={`${m.description}\n${m.modelId} · ${price}`} className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${on ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
-                        <input type="checkbox" className="hidden" checked={on} onChange={e => setSelectedModels(prev => e.target.checked ? [...prev, m.id] : prev.filter(id => id !== m.id))} />
-                        {m.id} <span className={on ? 'text-indigo-100' : 'text-gray-400'}>· {price}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-sm font-medium text-gray-700 mb-1">Review rounds (each round's critique feeds the next)</div>
-                <div className="text-xs text-gray-500 mb-2">Round N reviews the same draft with the prior rounds' critique as context, told to only add what's new — watch the fixes-per-round trend to see if it converges. Pick different models per round to test whether mixing helps. {reviewAspect !== 'both' && <b>{reviewAspect} pass only for non-split rounds.</b>}</div>
-                <div className="space-y-2">
-                  {iterRounds.map((r, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-2 text-xs border rounded-lg p-2">
-                      <span className="font-semibold text-gray-600">Round {i + 1}</span>
-                      <label className="flex items-center gap-1"><input type="checkbox" checked={r.split} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, split: e.target.checked } : x))} /> split text/scene</label>
-                      {r.split ? (
-                        <>
-                          <label className="flex items-center gap-1">text:
-                            <select className="border rounded px-1 py-0.5" value={r.textModel} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, textModel: e.target.value } : x))}>{textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}</select>
-                          </label>
-                          <label className="flex items-center gap-1">scene:
-                            <select className="border rounded px-1 py-0.5" value={r.sceneModel} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, sceneModel: e.target.value } : x))}>{textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}</select>
-                          </label>
-                        </>
-                      ) : (
-                        <label className="flex items-center gap-1">model:
-                          <select className="border rounded px-1 py-0.5" value={r.model} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, model: e.target.value } : x))}>{textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}</select>
-                        </label>
-                      )}
-                      {iterRounds.length > 1 && <button className="text-red-500 hover:underline ml-auto" onClick={() => setIterRounds(prev => prev.filter((_, j) => j !== i))}>remove</button>}
-                    </div>
-                  ))}
-                </div>
-                <button className="text-xs text-indigo-600 hover:underline mt-2" onClick={() => setIterRounds(prev => { const last = prev[prev.length - 1] || { model: writerModel, split: false, textModel: writerModel, sceneModel: writerModel }; return [...prev, { ...last }]; })}>+ Add round</button>
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="mb-4">
           <input
@@ -1455,11 +1316,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
             {starting ? 'Starting…' : `Run on ${targetCount} target(s)`}
           </Button>
           <span className="text-xs text-gray-500">
-            {isOutlineReview
-              ? (reviewMode === 'iterate'
-                  ? `Per story: 1 writer draft + ${iterRounds.reduce((n, r) => n + (r.split ? 2 : 1), 0)} review call(s) across ${iterRounds.length} round(s). Cost varies by model. No images saved.`
-                  : `Per story: 1 writer draft + ${selectedModels.length} reviewer call(s). Cost varies by model (Opus ≈ 30–80¢/review, DeepSeek V4 Flash ≈ 1–2¢). No images saved.`)
-              : stageInfo?.producesImage
+            {stageInfo?.producesImage
                 ? `~$${(targetCount * 0.05).toFixed(2)} est. (${targetCount} × image gen + eval) — stored as test versions, invisible to users.`
                 : `~$${(targetCount * 0.01).toFixed(2)} est. (LLM/eval only, no images saved to the story).`}
           </span>

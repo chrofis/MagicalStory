@@ -36237,3 +36237,50 @@ an eight-year-old's book `formidable`, pinned by a test.
 **Touched:** `server/lib/promptBuilders.js` (`creatureToneLevel`),
 `tests/unit/creature-tone-youngest-main.test.ts` (7 tests)
 **Status:** ✅ active
+
+---
+
+## 2026-09-13 — The Test Lab's `outline_review` stage is retired: it measured a configuration that cannot ship
+
+**Context:** `runOutlineReviewStage` forced `splitOutlineReview: true` on the
+reconstructed creation input and benchmarked reviewer models against a
+`buildUnifiedStoryPrompt` writer draft via `buildOutlineReviewPrompt`. In
+production that pair of calls sits behind
+`if (!beatsMode && !inputData.trialMode && splitOutlineReviewEnabled)` in
+`storyJobPipeline.js`, and `server/config/runtime.js` sets
+`pipelineMode: 'beats'` in every environment. Beats is the pipeline everywhere
+(trials excepted, and trials are excluded by the same gate) — so no story has
+gone through that branch since beats became the default.
+
+**Decision:** Retire the Lab stage. Removed from `STAGE_RUNNERS` and from the
+client mirror `TESTLAB_STAGES`; the runner function, the stage's form controls
+(reviewer-model multi-select, writer-draft picker, aspect selector, repeated-
+rounds builder), its `start()` params branch and its cost estimate are deleted,
+along with the Stories-tab one-tap "Review" button and the `preset` plumbing
+that existed only to prefill this stage. The legacy production branch and
+`buildUnifiedStoryPrompt` / `buildOutlineReviewPrompt` themselves are NOT
+touched — only the Lab stage retires.
+
+**Rationale:** A Lab stage is a measuring instrument for something that can
+ship. This one measured a pipeline configuration production cannot reach, so
+every verdict it produced was about a dead path — worse than no measurement,
+because the numbers look authoritative. Its beats analogues already exist as
+their own stages (arc review, `text_refine`, scene review). Labelling it
+"legacy" was rejected (the Lab would still spend money on it); repointing it at
+the beats chain was rejected (those stages exist).
+
+Stored experiments keep working: 7 `outline_review` rows exist on staging, and
+the Lab's list and detail views render from the stored `stage` string and
+`result.stageKind`, never from the registry. The one degradation is deliberate:
+"Re-use params" on such a row can no longer restore its widgets (there are
+none), so `writerModel` / `aspect` / `mode` / `rounds` / `models` were dropped
+from `WIDGET_PARAM_KEYS` and now surface in the Params JSON box instead of
+being silently discarded. Starting the stage fails at
+`STAGE_RUNNERS[stage]` with "Unknown stage", which is correct.
+
+**Touched:** `server/lib/testlab.js` (runner + registry entry),
+`client/src/services/testlabService.ts` (`TESTLAB_STAGES`),
+`client/src/pages/TestLab.tsx` (form block, params branch, preset plumbing,
+Stories-tab Review button), `server/routes/admin/testlab.js` (comment),
+`tests/unit/testlab-outline-review-retired.test.ts` (4 tests)
+**Status:** ✅ active

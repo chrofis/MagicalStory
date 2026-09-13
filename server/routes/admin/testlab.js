@@ -152,8 +152,9 @@ router.get('/templates', async (req, res) => {
 });
 
 // GET /api/admin/testlab/text-models — full text-model catalogue (single source
-// of truth = server/config/models.js TEXT_MODELS) so the outline_review
-// comparison UI can offer every model with pricing instead of a hardcoded list.
+// of truth = server/config/models.js TEXT_MODELS) so the Lab's model pickers
+// can offer every model with pricing instead of a hardcoded list. Built for the
+// outline_review comparison UI (retired 2026-09-13); text_refine uses it now.
 router.get('/text-models', async (req, res) => {
   try {
     const { TEXT_MODELS, MODEL_PRICING, MODEL_DEFAULTS } = require('../../config/models');

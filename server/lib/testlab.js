@@ -3449,190 +3449,25 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
 }
 
 /**
- * Outline-review model comparison (split outline review, Call 2). Target:
- * {storyId}. Compares how DIFFERENT models perform AS THE REVIEWER.
+ * RETIRED 2026-09-13 — the outline_review stage is gone.
  *
- * One critique-free writer draft (Call 1, split mode) is generated ONCE from
- * the story's reconstructed creation input, then every model in params.models
- * runs buildOutlineReviewPrompt on that SAME draft (Call 2) — so the only
- * variable is the reviewer. Faithful to production: same split writer, same
- * deterministic REVIEW HINTS pre-check, same buildOutlineReviewPrompt. Report
- * only — nothing is written back to the story.
+ * It forced splitOutlineReview:true and measured buildUnifiedStoryPrompt +
+ * buildOutlineReviewPrompt. storyJobPipeline gates that branch behind
+ * "not beatsMode, not trialMode, splitOutlineReviewEnabled", and runtime.js sets
+ * pipelineMode:'beats' in every environment — so production never makes either
+ * call. The stage measured a configuration that cannot ship, and its beats
+ * analogues are their own stages (arc_review, text_refine, scene_review).
  *
- * params.models    : string[] of TEXT_MODELS keys to compare (default: the
- *                    configured outlineReviewModel).
- * params.writerModel : model for the shared Call-1 draft (default: MODEL_DEFAULTS.outline).
+ * Stored experiments keep rendering: the result renderer keys off
+ * result.stageKind === 'outline_review', which is untouched.
  */
-async function runOutlineReviewStage(target, { params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { buildUnifiedStoryPrompt, buildOutlineReviewPrompt } = require('./storyHelpers');
-  const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
-  const { UnifiedStoryParser } = require('./outlineParser');
-  const { checkSceneConsistency } = require('./sceneConsistencyCheck');
 
-  const models = Array.isArray(params.models) && params.models.length
-    ? params.models
-    : [MODEL_DEFAULTS.outlineReviewModel];
-  const bad = models.filter(m => !TEXT_MODELS[m]);
-  if (bad.length) throw new Error(`Unknown reviewer model(s): ${bad.join(', ')}. Valid: ${Object.keys(TEXT_MODELS).join(', ')}`);
-
-  // Reconstruct the creation input from the PERMANENT story record (story_jobs
-  // is pruned ~1h after completion — routes/jobs.js). stories.data carries every
-  // field the prompt builders read, copied verbatim at save time (server.js).
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  const inputData = {
-    pages: storyData.pages,
-    languageLevel: storyData.languageLevel,
-    language: storyData.language,
-    mainCharacters: storyData.mainCharacters || [],
-    characters: storyData.characters || [],
-    relationships: storyData.relationships || {},
-    relationshipTexts: storyData.relationshipTexts || {},
-    storyCategory: storyData.storyCategory,
-    storyTopic: storyData.storyTopic,
-    storyTheme: storyData.storyTheme,
-    storyType: storyData.storyType,
-    storyTypeName: storyData.storyTypeName,
-    storyDetails: storyData.storyDetails,
-    artStyle: storyData.artStyle,
-    season: storyData.season,
-    userLocation: storyData.userLocation,
-    dedication: storyData.dedication,
-    layout: storyData.layout,
-    storyPromptVariant: storyData.storyPromptVariant,
-    availableLandmarks: storyData.availableLandmarks,
-    customThemeText: storyData.customThemeText,
-    modelOverrides: storyData.modelOverrides,
-    splitOutlineReview: true, // force the critique-free Call-1 writer draft
-  };
-  if (!(inputData.characters || []).length) {
-    throw new Error(`Story ${target.storyId} has no persisted characters/input to rebuild the review.`);
-  }
-
-  // Call 1 — one shared critique-free writer draft.
-  const writerModel = params.writerModel || MODEL_DEFAULTS.outline;
-  if (!TEXT_MODELS[writerModel]) throw new Error(`Unknown writer model "${writerModel}"`);
-  const writerPrompt = buildUnifiedStoryPrompt(inputData, inputData.pages || null);
-  const wt0 = Date.now();
-  // STREAMING, like production (server.js buildUnified call) — not optional. A
-  // non-streaming request gets no response headers until the whole completion is
-  // finished, so any draft that takes over 5 minutes trips undici's default
-  // 300s headersTimeout and surfaces as "fetch failed". withRetry sees that as
-  // retryable, so it burns 3 x 5 min and ends with zero results (exp #270).
-  // Streaming delivers headers immediately, so the ceiling never applies.
-  const writer = await callTextModelStreaming(writerPrompt, null, null, writerModel, { usageLabel: 'testlab_review_writer' });
-  const writerElapsedMs = Date.now() - wt0;
-  const writerOutput = writer.text || '';
-  if (!writerOutput) throw new Error('Writer draft (Call 1) came back empty');
-
-  // Deterministic scene-consistency pre-check → REVIEW HINTS (same as prod).
-  let hints = [];
-  try {
-    const draftPages = new UnifiedStoryParser(writerOutput).extractPages();
-    hints = checkSceneConsistency(draftPages, writerOutput, {
-      knownCharacterNames: (inputData.characters || []).map(c => c.name),
-    });
-  } catch (e) {
-    log.warn(`[TESTLAB] outline_review hint pre-check failed (non-fatal): ${e.message}`);
-  }
-  const hintCount = hints.reduce((n, e) => n + (e.issues?.length || 0), 0);
-
-  // ── Call 2 ──────────────────────────────────────────────────────────
-  const CAP = 120000; // per-text storage cap; full reviews are large
-  const validAspect = a => (a === 'text' || a === 'scene') ? a : 'both';
-  const fixCountOf = t => (String(t).match(/^[\s\-*•]*Pages?\s+[\d,\s\-–]+?\s*:/gim) || []).length;
-
-  // Run one review call: build the aspect-scoped prompt (optionally with prior
-  // passes fed in for the repeated-review convergence test), score its fixes.
-  const runOneReview = async (modelKey, aspect, priorReviews) => {
-    if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown reviewer model "${modelKey}"`);
-    const prompt = buildOutlineReviewPrompt(inputData, writerOutput, hints, { aspect, priorReviews });
-    if (!prompt) throw new Error('outline-review template unavailable');
-    const t0 = Date.now();
-    // Streaming for the same headersTimeout reason as the writer above. Anthropic
-    // / xAI / Gemini reviewers stream; OpenRouter has no streaming path and falls
-    // back to the plain call, so those stay exposed to the 5-minute ceiling.
-    const r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: 'testlab_outline_review' });
-    const elapsedMs = Date.now() - t0;
-    const usage = r.usage || {};
-    const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
-    let reviewText = r.text || '';
-    const reviewTruncated = reviewText.length > CAP;
-    if (reviewTruncated) reviewText = reviewText.slice(0, CAP) + '\n…[output truncated for storage]';
-    return {
-      modelKey, modelId, aspect, ok: true, elapsedMs,
-      usage: { input_tokens: usage.input_tokens || 0, output_tokens: usage.output_tokens || 0 },
-      cost: calculateTextCost(modelId, usage), fixCount: fixCountOf(reviewText), reviewText, reviewTruncated,
-    };
-  };
-
-  let writerDraft = writerOutput;
-  const writerTruncated = writerDraft.length > CAP;
-  if (writerTruncated) writerDraft = writerDraft.slice(0, CAP) + '\n…[draft truncated for storage]';
-
-  const mode = params.mode === 'iterate' ? 'iterate' : 'compare';
-  const base = {
-    stageKind: 'outline_review',
-    mode,
-    writerModel,
-    writerModelId: writer.modelId || TEXT_MODELS[writerModel].modelId,
-    writerElapsedMs,
-    writerChars: writerOutput.length,
-    writerTruncated,
-    writerDraft,
-    hintCount,
-  };
-
-  if (mode === 'iterate') {
-    // Repeated reviews: each round's critique feeds the next ("go deeper, only
-    // add what's new"). Per-round model(s) — same or different — test whether
-    // mixing models helps; per-round fix counts show whether it converges.
-    const roundsCfg = Array.isArray(params.rounds) && params.rounds.length ? params.rounds : [{}];
-    const priorCombined = [], priorText = [], priorScene = [];
-    const rounds = [];
-    for (let i = 0; i < roundsCfg.length; i++) {
-      const rc = roundsCfg[i] || {};
-      const startedAt = Date.now();
-      try {
-        if (rc.split) {
-          const textModel = rc.textModel || MODEL_DEFAULTS.outlineReviewModel;
-          const sceneModel = rc.sceneModel || MODEL_DEFAULTS.outlineReviewModel;
-          const [tr, sr] = await Promise.all([
-            runOneReview(textModel, 'text', priorText),
-            runOneReview(sceneModel, 'scene', priorScene),
-          ]);
-          priorText.push(tr.reviewText); priorScene.push(sr.reviewText);
-          const totalFixCount = tr.fixCount + sr.fixCount;
-          rounds.push({ round: i + 1, split: true, text: tr, scene: sr, totalFixCount, converged: totalFixCount === 0, elapsedMs: Date.now() - startedAt });
-        } else {
-          const modelKey = rc.model || MODEL_DEFAULTS.outlineReviewModel;
-          const rev = await runOneReview(modelKey, validAspect(params.aspect), priorCombined);
-          priorCombined.push(rev.reviewText);
-          rounds.push({ round: i + 1, split: false, review: rev, totalFixCount: rev.fixCount, converged: rev.fixCount === 0, elapsedMs: Date.now() - startedAt });
-        }
-      } catch (err) {
-        rounds.push({ round: i + 1, ok: false, error: err.message, elapsedMs: Date.now() - startedAt });
-        break; // later rounds depend on this one's output
-      }
-    }
-    return { ...base, rounds };
-  }
-
-  // Compare mode (default): N models each do ONE review of the same draft, same
-  // aspect, independently — which model reviews best.
-  const aspect = validAspect(params.aspect);
-  const reviewRuns = await Promise.all(models.map(m =>
-    runOneReview(m, aspect, []).catch(err => ({ modelKey: m, ok: false, elapsedMs: 0, error: err.message }))
-  ));
-  return { ...base, aspect, reviewRuns };
-}
 
 /**
  * TEXT REFINEMENT — iterative, full text in / full text out.
  *
- * Distinct from outline_review's `iterate` mode on purpose. There, every round
+ * Distinct from the retired outline_review stage's `iterate` mode on purpose.
+ * There, every round
  * re-reads the SAME writer draft with a growing stack of prior critiques
  * attached, and answers in patches — so the rounds argue with each other's
  * comments instead of building on each other's prose. Here each round receives
@@ -4126,8 +3961,9 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     refineAudits: res.audits,
     refineMerged: res.mergedFindings,
     refineMergeStats: res.mergeStats,
-    // NOT `rounds` — outline_review's iterate mode already returns that key with
-    // a different shape, and both land in the same ExperimentResult.
+    // NOT `rounds` — the retired outline_review stage's iterate mode returns
+    // that key with a different shape in STORED rows, and both land in the same
+    // ExperimentResult.
     refineRounds: res.rounds,
     finalPages: res.pages.map((p, idx) => ({
       pageNumber: p.pageNumber,
@@ -8065,7 +7901,7 @@ const STORY_STAGES = {
   audit_replay: runAuditReplayStage,
   scene_hazard_count: runSceneHazardCountStage,
   style_repair: runStyleRepairStage,
-  outline_review: runOutlineReviewStage,
+  // outline_review retired 2026-09-13 — see the note above runTextRefineStage.
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
   scene_review_replay: runSceneReviewReplayStage,
