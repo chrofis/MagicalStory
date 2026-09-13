@@ -35233,9 +35233,17 @@ bible-emitting templates (`label` field; `vehicles`/`clothing` gain a real
 authored schema in `scene-expansion-all.txt` — they were shown only as `[]`);
 tests: `vb-label.test.ts`, `vb-label-round.test.ts` (new) + five updated.
 **Status:**    🟡 conditional — unit-proven (1431 pass, the 7 pre-existing
-failures unchanged). Lab `beats_scenes` and one real story still owed: every
-artifact carries `label`, zero `beats_vb_label_unresolved`, no two props share a
-REQUIRED OBJECTS lead. Stored bibles are unaffected until re-authored.
+failures unchanged) and Lab-proven on the motivating story: `beats_scenes`
+#1262 re-authored `job_1789301291267_ueh8h145m` (de-ch) on `d09c3f2da` and the
+Art Director returned 9 elements with 8 authored labels (CHR001 exempt, label =
+name), 0 duplicates, 0 validator findings. The former "tool"/"tool" pair is now
+`brass spyglass` / `iron bar`; the broken handle Emma holds became its own
+element (`iron handle`) instead of a prop the model had to invent; the ship and
+the beach came back with English names. Note the Lab stage extracts the
+authored bible but does not run `runVisualBibleLabelRound` — the round is
+covered by its unit tests with a mocked model. Still owed: one real story
+showing zero `beats_vb_label_unresolved` and no shared REQUIRED OBJECTS lead
+end to end. Stored bibles are unaffected until re-authored.
 
 ## 2026-09-13 — The same split-identity shape exists for CHARACTERS (measured, not yet fixed)
 **Context:**   A read-only hunt for the element-label shape elsewhere found four
