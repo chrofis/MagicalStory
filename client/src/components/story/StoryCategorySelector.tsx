@@ -18,7 +18,7 @@ import {
   getHistoricalEventsByGroup,
 } from '@/constants/storyTypes';
 import { storyService } from '@/services/storyService';
-import type { Language, SwissCity, SwissStoriesData, SwissLocalizedString } from '@/types/story';
+import type { Language, SwissCity, SwissStoriesData, SwissLocalizedString, LifeChallenge } from '@/types/story';
 
 type StoryCategoryId = 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
 
@@ -48,6 +48,12 @@ interface StoryCategorySelectorProps {
   storyTheme: string;  // Adventure theme (or 'realistic')
   customThemeText?: string;  // Custom theme description when theme is 'custom'
   userLocation?: { city: string | null; region: string | null; country: string | null } | null;
+  /**
+   * Age of the oldest main character — the same child the server's age band is
+   * resolved from. Life-skill topics that only land inside a developmental
+   * window are sorted first and the rest flagged; nothing is ever hidden.
+   */
+  focusAge?: number | null;
   // Callbacks
   onCategoryChange: (category: StoryCategoryId) => void;
   onTopicChange: (topic: string) => void;
@@ -55,6 +61,17 @@ interface StoryCategorySelectorProps {
   onCustomThemeTextChange?: (text: string) => void;
   // For backwards compatibility - sets the legacy storyType
   onLegacyStoryTypeChange: (storyType: string) => void;
+}
+
+/**
+ * Is this life-skill topic inside the child's developmental window? A topic
+ * with no `suitableAges` is any-age — a life event reaches a child whenever it
+ * happens — and so is always in window.
+ */
+function topicFitsAge(challenge: LifeChallenge, age?: number | null): boolean {
+  const w = challenge.suitableAges;
+  if (!w || age === null || age === undefined || !Number.isFinite(age)) return true;
+  return age >= w[0] && age <= w[1];
 }
 
 // Haversine distance in km
@@ -114,6 +131,7 @@ export function StoryCategorySelector({
   onThemeChange,
   onCustomThemeTextChange,
   onLegacyStoryTypeChange,
+  focusAge,
 }: StoryCategorySelectorProps) {
   const { language } = useLanguage();
   const lang = language as Language;
@@ -138,6 +156,7 @@ export function StoryCategorySelector({
   const translations = {
     en: {
       storyType: 'Story Type',
+      outsideAgeWindow: 'Usually chosen for ages',
       theme: 'Theme',
       topic: 'Topic',
       setting: 'Setting',
@@ -166,6 +185,7 @@ export function StoryCategorySelector({
     },
     de: {
       storyType: 'Geschichte',
+      outsideAgeWindow: 'Meist gewählt für Alter',
       theme: 'Thema',
       topic: 'Thema',
       setting: 'Setting',
@@ -194,6 +214,7 @@ export function StoryCategorySelector({
     },
     fr: {
       storyType: 'Histoire',
+      outsideAgeWindow: 'Habituellement choisi pour les âges',
       theme: 'Thème',
       topic: 'Sujet',
       setting: 'Cadre',
@@ -222,6 +243,7 @@ export function StoryCategorySelector({
     },
     it: {
       storyType: 'Storia',
+      outsideAgeWindow: 'Di solito scelto per le età',
       theme: 'Tema',
       topic: 'Argomento',
       setting: 'Ambientazione',
@@ -531,7 +553,8 @@ export function StoryCategorySelector({
 
         <div className="space-y-3">
           {lifeChallengeGroups.map((group) => {
-            const challenges = getLifeChallengesByGroup(group.id);
+            const challenges = [...getLifeChallengesByGroup(group.id)]
+              .sort((a, b) => Number(topicFitsAge(b, focusAge)) - Number(topicFitsAge(a, focusAge)));
             const isExpanded = expandedLifeGroups.includes(group.id);
 
             return (
@@ -549,18 +572,27 @@ export function StoryCategorySelector({
 
                 {isExpanded && (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
-                    {challenges.map((challenge) => (
-                      <button
-                        key={challenge.id}
-                        onClick={() => handleTopicSelect(challenge.id)}
-                        className="p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
-                      >
-                        <span className="text-xl mr-2">{challenge.emoji}</span>
-                        <span className="text-sm font-medium">
-                          {challenge.name[lang] || challenge.name.en}
-                        </span>
-                      </button>
-                    ))}
+                    {challenges.map((challenge) => {
+                      const fits = topicFitsAge(challenge, focusAge);
+                      return (
+                        <button
+                          key={challenge.id}
+                          onClick={() => handleTopicSelect(challenge.id)}
+                          className={`p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left${fits ? '' : ' opacity-60'}`}
+                          title={fits ? undefined : `${t.outsideAgeWindow} (${challenge.suitableAges?.[0]}-${challenge.suitableAges?.[1]})`}
+                        >
+                          <span className="text-xl mr-2">{challenge.emoji}</span>
+                          <span className="text-sm font-medium">
+                            {challenge.name[lang] || challenge.name.en}
+                          </span>
+                          {!fits && (
+                            <span className="ml-1 text-xs text-gray-400">
+                              {challenge.suitableAges?.[0]}-{challenge.suitableAges?.[1]}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

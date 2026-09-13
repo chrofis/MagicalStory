@@ -35372,3 +35372,51 @@ Aligning the authoring prompts is a separate decision.
 `storyJobPipeline.js`, `server/routes/regeneration.js`,
 `tests/unit/composite-secondary-cast.test.ts`
 **Status:** ✅ active
+
+### Two kinds of life-skill topic: a developmental skill has an age window, a life event does not
+**Context:** A 1-year-old with topic `moving-house` reached the writer with a
+contradiction inside one assembled prompt: `buildLifeSkillGuidelines` demanded
+"practical tips or coping strategies" and "End with a hopeful, empowering
+message" while the `routine` band (`prompts/age-band-routine.txt`) forbade a
+lesson. Measured offline on the trial prompt (both blocks present, ~70 lines
+apart) and on the legacy unified prompt (the demand present, no band block at
+all). Separately, the 59 topics were all treated as any-age, so `potty-training`
+at 1 and `body-changes` at 4 were written as if the child were in the middle of
+that phase.
+**Decision:** Three things.
+1. `buildLifeSkillGuidelines` emits a short variant for `SIMPLE_BANDS`
+   (`routine`/`quest`/`tries`, ages 0-3) that drops the coping-strategy and
+   empowering-ending clauses and reframes the teaching guide as background for
+   the writer rather than things to tell the child. Age four and up is
+   unchanged. The builder learns the band from a new optional `inputData` 4th
+   argument; both call sites already had it in scope.
+2. The three simple band files carry a pre-reflective life-event clause ("a life
+   event is weather, not a task") and a rewritten ending. **The ban is on the
+   coda, not on success** — the thing may go well, and the routine band now says
+   so explicitly ("a first taste, a first step up, a thing carried all the way —
+   shown happening and not remarked on"); what is banned is the prize, the
+   ceremony and the closing line about what it means.
+3. A topic either has a developmental window or it does not. Windowed topics
+   carry `suitableAges: [min, max]` (client) / `TOPIC_AGE_WINDOWS`
+   (`promptBuilders.js`); **absence means any-age**, which is the correct
+   semantic for every life event (a move, a new sibling, a hospital stay). A
+   child outside the window gets one terse line in the AGE_MODE block telling
+   the writer to write the topic as it reaches a child of that age (watching a
+   sibling, remembering it, being about to reach it). It never refuses and never
+   blocks — a gate is a guideline. `ageGroup` is untouched: it is the picker
+   shelf, a different thing.
+**Rationale:** Per-band treatment lives in the 5 band files, NOT in the 59 topic
+guides. Writing "how this topic works for a 1-year-old" into each guide is ~59 ×
+5 bands of prose; the band files cover the same ground in ~300 words apiece
+against the ~5000 words that per-topic-per-band text would cost, and they stay
+correct when a topic is added. The window map is deliberately the windowed
+topics only (~32 rows), never a mirror of the full 59-row table — a second copy
+of the topic list is a drift source.
+**Touched:** `server/lib/promptBuilders.js` (`buildLifeSkillGuidelines`,
+`TOPIC_AGE_WINDOWS`, `buildTopicWindowSection`, `buildAgeModeSection`),
+`prompts/age-band-routine.txt`, `prompts/age-band-quest.txt`,
+`prompts/age-band-tries.txt`, `client/src/types/story.ts`,
+`client/src/constants/storyTypes.ts`,
+`client/src/components/story/StoryCategorySelector.tsx`,
+`client/src/components/story/StorySettings.tsx`, `tests/unit/age-band.test.ts`
+**Status:** ✅ active

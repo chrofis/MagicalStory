@@ -126,6 +126,18 @@ export function StorySettings({
   languageLevel = '',
   pages = 0,
 }: StorySettingsProps) {
+  /**
+   * The child the age band is resolved from: the OLDEST main character, the
+   * same rule the server uses (resolveAgeBand → pickMainCharacters). Feeds the
+   * topic picker's in-window sort; never gates anything.
+   */
+  const focusAge = (() => {
+    const mains = characters.filter(c => mainCharacters.includes(c.id));
+    const ages = (mains.length ? mains : characters)
+      .map(c => parseInt(String(c.age ?? ''), 10))
+      .filter(n => Number.isFinite(n) && n >= 0);
+    return ages.length ? Math.max(...ages) : null;
+  })();
   const { t, language } = useLanguage();
   const lang = language as UILanguage;
   const thinkingMessage = useRotatingMessage(lang);
@@ -229,6 +241,7 @@ export function StorySettings({
           onTopicChange={onTopicChange}
           onThemeChange={onThemeChange}
           onCustomThemeTextChange={onCustomThemeTextChange}
+          focusAge={focusAge}
           onLegacyStoryTypeChange={onLegacyStoryTypeChange}
         />
       )}
@@ -658,6 +671,7 @@ export function StorySettings({
               onCategoryChange={onCategoryChange}
               onTopicChange={onTopicChange}
               onThemeChange={onThemeChange}
+              focusAge={focusAge}
               onLegacyStoryTypeChange={onLegacyStoryTypeChange}
             />
 

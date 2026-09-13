@@ -981,7 +981,19 @@ const SWISS_SAGEN_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'swiss-
  * chosen idea sentence, so the topic and the theme reached the writer with
  * whatever weight that one sentence gave them.
  */
-function buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide) {
+function buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide, inputData = null) {
+  if (inputData && SIMPLE_BANDS.has(resolveAgeBand(inputData))) {
+    return `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
+
+**GUIDELINES for Life Skills Stories at this age:**
+- The topic is what happens around the main character — what they see, hold, hear and do while it happens
+- No tips, no strategies, no moral, no closing line about what it means
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} setting — the topic happens inside it` : '- This is a realistic story set in everyday life situations'}
+
+${teachingGuide ? `**WHAT THE SITUATION IS for "<user_input>${storyTopic}</user_input>"** — background for you, never things to tell the child:
+${teachingGuide}` : ''}`;
+  }
+
   return `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Life Skills Stories:**
@@ -4938,7 +4950,45 @@ const AGE_BAND_TEMPLATE_KEYS = {
  */
 function buildAgeModeSection(inputData = {}) {
   const key = AGE_BAND_TEMPLATE_KEYS[resolveAgeBand(inputData)];
-  return key ? (PROMPT_TEMPLATES[key] || '') : '';
+  const band = key ? (PROMPT_TEMPLATES[key] || '') : '';
+  const window = buildTopicWindowSection(inputData);
+  return [band, window].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Life-skill topics that only land inside a developmental window, inclusive.
+ * ABSENCE MEANS ANY AGE — a life event (a move, a new sibling, a hospital stay)
+ * reaches a child whenever it happens and is never listed here. Mirrors the
+ * `suitableAges` field in client/src/constants/storyTypes.ts; only the windowed
+ * topics live here, never the full topic table.
+ */
+const TOPIC_AGE_WINDOWS = {
+  'potty-training': [2, 4], 'washing-hands': [2, 5], 'brushing-teeth': [2, 6],
+  'saying-goodbye': [1, 5], 'no-pacifier': [2, 4], 'getting-dressed': [2, 5],
+  'cleaning-up': [2, 6], 'sitting-still': [3, 7], 'sharing': [2, 6],
+  'waiting-turn': [3, 6], 'first-kindergarten': [3, 6], 'whining': [2, 6],
+  'saying-sorry': [3, 8], 'picky-eating': [2, 7], 'table-manners': [3, 8],
+  'being-patient': [3, 7], 'tattling-vs-telling': [4, 8], 'understanding-rules': [3, 7],
+  'first-school': [5, 8], 'homework': [6, 11], 'reading-alone': [5, 9],
+  'losing-game': [4, 9], 'money-saving': [6, 12], 'spending-wisely': [7, 12],
+  'screen-time': [5, 12], 'peer-pressure': [8, 12], 'body-changes': [9, 12],
+  'responsibility': [6, 12], 'managing-time': [8, 12], 'online-safety': [7, 12],
+  'comparing-others': [7, 12], 'test-stress': [7, 12],
+};
+
+/**
+ * One line when the chosen topic sits outside its window for this child. It
+ * never refuses and never blocks — the book is written, from the angle the
+ * topic actually reaches a child of this age.
+ */
+function buildTopicWindowSection(inputData = {}) {
+  const topic = String(inputData.storyTopic || '').trim().toLowerCase();
+  const w = TOPIC_AGE_WINDOWS[topic];
+  if (!w) return '';
+  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  if (!Number.isFinite(age) || age < 0) return '';
+  if (age >= w[0] && age <= w[1]) return '';
+  return `**Topic timing.** This topic usually belongs to ages ${w[0]}-${w[1]} and the main character is ${age}. Write it the way it reaches a child of ${age} — watching someone else do it, remembering it, or being close to it — not as something they are being taught.`;
 }
 
 /**
@@ -6813,7 +6863,7 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
 
   let categoryGuidelines = '';
   if (storyCategory === 'life-challenge') {
-    categoryGuidelines = buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide);
+    categoryGuidelines = buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide, inputData);
   } else if (storyCategory === 'educational') {
     categoryGuidelines = `This is an EDUCATIONAL story teaching about "<user_input>${storyTopic}</user_input>".
 
@@ -7219,7 +7269,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
 
     // Same life-skill block the full story prompt carries; empty for adventure.
     const categoryGuidelines = category === 'life-challenge' && inputData.storyTopic
-      ? buildLifeSkillGuidelines(inputData.storyTopic, inputData.storyTheme, getTeachingGuide('life-challenge', inputData.storyTopic))
+      ? buildLifeSkillGuidelines(inputData.storyTopic, inputData.storyTheme, getTeachingGuide('life-challenge', inputData.storyTopic), inputData)
       : '';
 
     return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
@@ -7527,6 +7577,9 @@ module.exports = {
   pickMainCharacters,
   resolveAgeBand,
   buildAgeModeSection,
+  buildLifeSkillGuidelines,
+  buildTopicWindowSection,
+  TOPIC_AGE_WINDOWS,
   buildCreatureToneSection,
   challengeCatalogueBands,
   parseArcReview,

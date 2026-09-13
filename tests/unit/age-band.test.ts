@@ -14,6 +14,9 @@ const {
   buildAgeModeSection,
   buildStoryShapeSection,
   challengeCatalogueBands,
+  buildLifeSkillGuidelines,
+  buildTopicWindowSection,
+  TOPIC_AGE_WINDOWS,
 } = require_('../../server/lib/promptBuilders');
 
 const char = (id: number, name: string, age: number, isMain: boolean) =>
@@ -232,5 +235,87 @@ describe('challengeCatalogueBands', () => {
 
   it('treats an unknown age as standard with the default youngest of eight', () => {
     expect(challengeCatalogueBands({ characters: [{ id: 1, name: 'A', isMain: true }] })).toEqual(['3', '6']);
+  });
+});
+
+/**
+ * Topic-age suitability (owner, Option A). Two kinds of topic: a developmental
+ * skill has a window, a life event has none and reaches a child at any age.
+ */
+describe('life-skill guidelines below age four', () => {
+  const lifeSkill = (age: number) => ({ ...solo(age), storyTopic: 'moving-house', storyTheme: 'realistic' });
+
+  it('drops the coping-strategy and empowering-ending demands in the simple bands', () => {
+    for (const age of [0, 1, 2, 3]) {
+      const block = buildLifeSkillGuidelines('moving-house', 'realistic', null, lifeSkill(age));
+      expect(block).not.toMatch(/coping strateg/i);
+      expect(block).not.toMatch(/empowering/i);
+    }
+  });
+
+  it('keeps them from age four up and when no story input is supplied', () => {
+    for (const age of [4, 5, 6, 9]) {
+      const block = buildLifeSkillGuidelines('moving-house', 'realistic', null, lifeSkill(age));
+      expect(block).toMatch(/coping strateg/i);
+      expect(block).toMatch(/empowering/i);
+    }
+    expect(buildLifeSkillGuidelines('moving-house', 'realistic', null)).toMatch(/empowering/i);
+  });
+
+  it('still names the topic and still carries the teaching guide', () => {
+    const block = buildLifeSkillGuidelines('moving-house', 'realistic', 'GUIDE BODY', lifeSkill(1));
+    expect(block).toContain('moving-house');
+    expect(block).toContain('GUIDE BODY');
+  });
+});
+
+describe('buildTopicWindowSection', () => {
+  const withTopic = (age: number, storyTopic: string) => ({ ...solo(age), storyTopic });
+
+  it('says nothing while the child is inside the window', () => {
+    for (const age of [2, 3, 4]) expect(buildTopicWindowSection(withTopic(age, 'potty-training'))).toBe('');
+  });
+
+  it('nudges without refusing when the child is outside it', () => {
+    const under = buildTopicWindowSection(withTopic(1, 'potty-training'));
+    const over = buildTopicWindowSection(withTopic(9, 'potty-training'));
+    for (const line of [under, over]) {
+      expect(line).toMatch(/2-4/);
+      expect(line).not.toMatch(/refus|cannot|not allowed|choose another/i);
+    }
+    expect(under).toContain('main character is 1');
+    expect(over).toContain('main character is 9');
+  });
+
+  it('treats a topic with no window as any-age', () => {
+    expect(TOPIC_AGE_WINDOWS['moving-house']).toBeUndefined();
+    for (const age of [0, 1, 5, 11]) {
+      expect(buildTopicWindowSection(withTopic(age, 'moving-house'))).toBe('');
+    }
+  });
+
+  it('says nothing when the topic or the age is unreadable', () => {
+    expect(buildTopicWindowSection(solo(1))).toBe('');
+    expect(buildTopicWindowSection({ characters: [{ id: 1, name: 'A', isMain: true }], mainCharacters: [1], storyTopic: 'potty-training' })).toBe('');
+  });
+
+  it('reaches the writer through the age-mode block, at every band', () => {
+    expect(buildAgeModeSection({ ...solo(1), storyTopic: 'potty-training' })).toMatch(/Topic timing/);
+    expect(buildAgeModeSection({ ...solo(9), storyTopic: 'potty-training' })).toMatch(/Topic timing/);
+    expect(buildAgeModeSection({ ...solo(3), storyTopic: 'potty-training' })).not.toMatch(/Topic timing/);
+  });
+});
+
+describe('the simple bands ban the coda, not success', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  it('forbids the closing moral and allows the thing to go well', () => {
+    for (const age of [1, 2, 3]) {
+      const section = buildAgeModeSection(solo(age));
+      expect(section).toMatch(/no prize, no ceremony/i);
+      expect(section).toMatch(/life event/i);
+    }
+    expect(buildAgeModeSection(solo(1))).toMatch(/A small thing may go well/);
+    expect(buildAgeModeSection(solo(3))).toMatch(/The problem is solved/);
   });
 });

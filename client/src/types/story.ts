@@ -112,6 +112,13 @@ export interface LifeChallenge {
   name: LocalizedString;
   emoji: string;
   ageGroup: 'toddler' | 'preschool' | 'early-school' | 'family' | 'preteen';
+  /**
+   * The child ages this topic actually lands for, inclusive. Absent means
+   * any-age — a life event (a move, a new sibling, a hospital stay) reaches a
+   * child at whatever age it happens. `ageGroup` is the picker shelf and is a
+   * different thing.
+   */
+  suitableAges?: [number, number];
 }
 
 export interface LifeChallengeGroup {
