@@ -792,3 +792,17 @@ gates the next step: run it bare or capture to a file, then filter the file.
 ## 2026-09-11 — a stage that fails open is invisible until you count it
 The production composite aborted on every trigger for 17 days ("cleanBackgroundPrompt or scene.description required") and nobody saw it: the pipeline caught the throw, kept the direct render, and every "composite verdict" in that period was a Lab verdict. A rerun meant to validate a composite change validated nothing.
 Rules: (1) before claiming a stage ran, read the stored outcome field for the pages it should have touched (here `compositeOutcome`), not the log of the change; (2) when wiring a call from a closure, confirm each field exists ON THAT OBJECT at that point (`pageData.scene.sceneDescription`, not `pageData.sceneDescription`); (3) a fail-open stage needs an abort count in the run summary.
+
+## 2026-09-13 — "no reference in the database" is not proof an object is dead
+Three R2 orphan classifiers in one session, three different false-positive classes, all from the same
+inference: absence of a reference means deletable. (1) An `orders` row owns a PDF but never stores its
+URL — structurally invisible to a URL scan; 22 paid-order PDFs were queued for deletion. (2)
+`dbHousekeeping.js:148` writes `{table}/{userId}/{rowId}/migrated/…`, so segment 2 is a USER id — a live
+user with 27 stories and 77 orders landed on the delete list. (3) Numeric ids are simultaneously user ids,
+character ids and JSONB values, so the substring VERIFIER was wrong too.
+Rules: (1) when a destructive action rests on "X is absent", find a positive test instead — here, group by
+owner prefix and delete only if ZERO members are in the referenced set, which never interprets an id;
+(2) an unrecognised shape is protected, never defaulted to deletable; (3) verify a classifier by sampling
+and proving the negative through a DIFFERENT code path — that is what caught it; (4) price the thing before
+proposing deletion: the whole 20 GB bucket cost $0.16/month, so storage was never a reason to delete
+anything, and the owner's actual concern was deletion COMPLETENESS.
