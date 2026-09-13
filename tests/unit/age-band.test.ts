@@ -272,18 +272,22 @@ describe('life-skill guidelines below age four', () => {
 describe('buildTopicWindowSection', () => {
   const withTopic = (age: number, storyTopic: string) => ({ ...solo(age), storyTopic });
 
+  // The window VALUE is catalogue data and moves when a topic is recalibrated;
+  // what is pinned here is the behaviour around it, read from the table itself.
+  const [lo, hi] = TOPIC_AGE_WINDOWS['potty-training'] as [number, number];
+
   it('says nothing while the child is inside the window', () => {
-    for (const age of [2, 3, 4]) expect(buildTopicWindowSection(withTopic(age, 'potty-training'))).toBe('');
+    for (let age = lo; age <= hi; age++) expect(buildTopicWindowSection(withTopic(age, 'potty-training'))).toBe('');
   });
 
   it('nudges without refusing when the child is outside it', () => {
-    const under = buildTopicWindowSection(withTopic(1, 'potty-training'));
+    const under = buildTopicWindowSection(withTopic(lo - 1, 'potty-training'));
     const over = buildTopicWindowSection(withTopic(9, 'potty-training'));
     for (const line of [under, over]) {
-      expect(line).toMatch(/2-4/);
+      expect(line).toMatch(new RegExp(`${lo}-${hi}`));
       expect(line).not.toMatch(/refus|cannot|not allowed|choose another/i);
     }
-    expect(under).toContain('main character is 1');
+    expect(under).toContain(`main character is ${lo - 1}`);
     expect(over).toContain('main character is 9');
   });
 
@@ -328,9 +332,9 @@ describe('the simple bands ban the coda, not success', () => {
  * is pinned here rather than left to whoever edits one side next.
  */
 describe('TOPIC_AGE_WINDOWS mirrors the client windows exactly', () => {
-  it('has the same window for every one of the 59 life challenges', async () => {
+  it('has the same window for every one of the 64 life challenges', async () => {
     const { lifeChallenges } = await import('../../client/src/constants/storyTypes');
-    expect(lifeChallenges.length).toBe(59);
+    expect(lifeChallenges.length).toBe(64);
     for (const c of lifeChallenges) {
       if (c.suitableAges) expect(TOPIC_AGE_WINDOWS[c.id]).toEqual(c.suitableAges);
       else expect(TOPIC_AGE_WINDOWS[c.id]).toBeUndefined();
@@ -339,6 +343,6 @@ describe('TOPIC_AGE_WINDOWS mirrors the client windows exactly', () => {
     for (const key of Object.keys(TOPIC_AGE_WINDOWS)) {
       expect(lifeChallenges.some(c => c.id === key)).toBe(true);
     }
-    expect(Object.keys(TOPIC_AGE_WINDOWS).length).toBe(51);
+    expect(Object.keys(TOPIC_AGE_WINDOWS).length).toBe(56);
   });
 });

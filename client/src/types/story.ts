@@ -119,6 +119,36 @@ export interface LifeChallenge {
    * different thing.
    */
   suitableAges?: [number, number];
+  /**
+   * How LIVE this topic is for a family right now, in either direction, 1-5.
+   * High means the parent is either currently struggling with it (the
+   * refusing, the fighting, the not-sleeping, the not-listening) or currently
+   * marking it (a first day, a new baby, a thing just mastered). Low means the
+   * topic is real but not live: it happens TO the family rather than being what
+   * the family is in the middle of.
+   *
+   * This is NOT topic popularity and NOT how common the event is. A doctor's
+   * appointment is common and near-zero liveness — nobody goes looking for a
+   * book because an appointment exists.
+   *
+   * The values are AUTHORED JUDGEMENT, not measurement. The only measured
+   * signal that touches them is a 2026-08-26 CH Keyword Planner probe of four
+   * German problem queries (docs/decisions.md 2026-09-13).
+   */
+  liveness?: number;
+  /**
+   * Which way the topic pulls. `friction` is a current struggle, `milestone` a
+   * current joy or thing worth marking, `both` a topic that is genuinely each
+   * at once — a new sibling is exciting AND produces jealousy; a first
+   * kindergarten day is proud AND frightening. `both` acts as a wildcard in the
+   * trial grid's pole quota, counting toward whichever side is short.
+   */
+  pole?: 'friction' | 'milestone' | 'both';
+  /**
+   * Near-duplicate grouping. At most one topic per family reaches the trial
+   * grid, so a parent never sees two tiles that read as the same book.
+   */
+  family?: string;
 }
 
 export interface LifeChallengeGroup {

@@ -4955,30 +4955,42 @@ function buildAgeModeSection(inputData = {}) {
  * topics live here, never the full topic table.
  */
 const TOPIC_AGE_WINDOWS = {
-  // Mirrors `suitableAges` in client/src/constants/storyTypes.ts. Every life
-  // challenge carries a window EXCEPT the eight any-age life events
+  // GENERATED MIRROR of `suitableAges` in client/src/constants/storyTypes.ts,
+  // pinned in sync by tests/unit/age-band.test.ts. The client filters the trial
+  // picker with the window and the server nudges the writer with it, so a drift
+  // shows a topic in the trial that the writer is then told is off-age.
+  //
+  // Every life challenge carries a window EXCEPT the eight any-age life events
   // (moving-house, going-vacation, parents-splitting, visiting-doctor,
   // staying-hospital, death-pet, grandparent-sick, new-sibling) — those happen
   // TO a child at whatever age they happen, so there is nothing to nudge.
-  'potty-training': [2, 4], 'washing-hands': [2, 5], 'brushing-teeth': [2, 6],
-  'saying-goodbye': [1, 5], 'no-pacifier': [2, 4], 'getting-dressed': [2, 5],
+  // Windows revised 2026-09-13: bounds mark where a topic is a REAL PARENTAL
+  // CONCERN, not where it is merely plausible; kindergarten and school entry
+  // follow the Swiss HarmoS calendar (docs/decisions.md 2026-09-13).
+  'first-foods': [0, 2], 'bath-time': [0, 2], 'first-steps': [0, 1],
+  'first-words': [1, 2], 'going-outside': [0, 2], 'potty-training': [2, 3],
+  'washing-hands': [2, 4], 'brushing-teeth': [2, 6],
   'eating-vegetables': [2, 8], 'going-to-bed': [1, 8],
-  'cleaning-up': [2, 6], 'sitting-still': [3, 7], 'sharing': [2, 6],
-  'waiting-turn': [3, 6], 'first-kindergarten': [3, 6], 'whining': [2, 6],
-  'saying-sorry': [3, 8], 'picky-eating': [2, 7], 'table-manners': [3, 8],
-  'being-patient': [3, 7], 'tattling-vs-telling': [4, 8], 'understanding-rules': [3, 7],
-  'making-friends': [3, 12], 'being-brave': [3, 12], 'managing-emotions': [2, 12],
-  'first-school': [5, 8], 'homework': [6, 11], 'reading-alone': [5, 9],
-  'losing-game': [4, 12], 'being-different': [5, 12], 'dealing-bully': [5, 12],
-  'telling-truth': [4, 12], 'trying-new-things': [3, 12], 'sibling-fighting': [3, 12],
-  'jealousy': [3, 12], 'not-giving-up': [4, 12], 'being-left-out': [4, 12],
-  'taking-care-belongings': [4, 12], 'helping-at-home': [3, 12],
+  'saying-goodbye': [1, 5], 'no-pacifier': [2, 4], 'getting-dressed': [3, 6],
+  'cleaning-up': [3, 8], 'sitting-still': [3, 7], 'sharing': [2, 6],
+  'waiting-turn': [2, 6], 'first-kindergarten': [4, 5],
+  'making-friends': [4, 12], 'being-brave': [3, 12],
+  'managing-emotions': [2, 10], 'whining': [2, 7], 'saying-sorry': [3, 8],
+  'picky-eating': [2, 8], 'table-manners': [3, 9], 'being-patient': [3, 7],
+  'first-school': [6, 7], 'homework': [7, 12], 'reading-alone': [6, 9],
+  'losing-game': [4, 12], 'being-different': [5, 12],
+  'dealing-bully': [5, 12], 'telling-truth': [4, 12],
+  'trying-new-things': [3, 12], 'sibling-fighting': [3, 12],
+  'jealousy': [3, 10], 'not-giving-up': [4, 12], 'being-left-out': [5, 12],
+  'taking-care-belongings': [5, 12], 'helping-at-home': [4, 12],
   'dealing-disappointment': [3, 12], 'anxiety-worrying': [4, 12],
-  'caring-for-pet': [4, 12], 'being-active': [4, 12],
-  'money-saving': [6, 12], 'spending-wisely': [7, 12],
-  'screen-time': [5, 12], 'peer-pressure': [8, 12], 'body-changes': [9, 12],
-  'responsibility': [6, 12], 'managing-time': [8, 12], 'online-safety': [7, 12],
-  'comparing-others': [7, 12], 'test-stress': [7, 12],
+  'caring-for-pet': [4, 12], 'tattling-vs-telling': [4, 8],
+  'understanding-rules': [2, 7], 'money-saving': [7, 12],
+  'spending-wisely': [8, 12], 'screen-time': [3, 12],
+  'peer-pressure': [8, 12], 'body-changes': [9, 12],
+  'responsibility': [6, 12], 'managing-time': [8, 12],
+  'online-safety': [7, 12], 'being-active': [4, 12],
+  'comparing-others': [7, 12], 'test-stress': [8, 12]
 };
 
 /**
