@@ -839,3 +839,8 @@ wiring. Plumbing that duplicates existing plumbing is worse than no fix: it ship
 progress, and the real defect stays.
 **Cost:** two wrong option-sets put to the owner, one near-miss on building a redundant prompt block,
 and three findings filed with the wrong owner. Caught only because the owner pushed back twice.
+
+## 2026-09-14 — Before a paid run: the LIVE commit must equal origin/staging HEAD, not just be "ok" and idle
+**What happened:** I launched an 18-page dragon rerun (job_1789337754344_c6h7vz7mu, ~CHF 2) after checking `/api/health` (commit c83e8344, status ok) and `/api/health/busy` (idle). Four commits had been pushed by another session at 00:10-00:13; Railway's build landed at 00:16 and restarted the container 27 seconds into my job — "Server restarted during generation". The push gate was not violated (the push preceded my launch); the deploy was simply in flight and I did not look.
+**Rule:** Before launching anything paid on an environment, `git fetch` and require `live commit == origin/<branch> HEAD`. If they differ, a deploy is pending — wait for it to land (poll `/api/health` until the SHA matches), then launch. `busy:false` and `status:ok` say nothing about a build that has not finished yet.
+**Cost:** one full story's arc stage, one of the three runs the goal allowed.
