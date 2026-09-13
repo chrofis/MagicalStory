@@ -34782,3 +34782,71 @@ both DST switch nights wrong (2026-03-29 is a 23-hour Swiss day, 2026-10-25 a
 **Status:** ✅ active — no schema change needed (`trial_events.step` is a
 VARCHAR(40) whitelisted in code, not an enum). The production backfill has NOT
 been run yet; it awaits owner approval.
+
+---
+
+### The book that ships gets audited, and a CRITICAL finding buys ONE more repair round
+**Context:** The mid-loop book audit was gated on `round < maxRegenAttempts`
+(`repairPipeline.js`), so the FINAL round's output — the book that actually
+reaches the customer — was never read by anything. The separate post-repair
+final audit had been removed on 2026-09-01 because it wrote to
+`sceneImages[].bookAuditFaults`, a field with zero consumers; that removal left
+the shipping state unmeasured. Measured on production story
+`job_1789227389389_z18dmvnt6`: three repair rounds ran; its round-2 audit
+recorded 37 faults `{CATASTROPHIC:1, CRITICAL:5, MAJOR:25, MINOR:6}`; the final
+round's output was never audited. A later Lab audit of the SHIPPED book
+(experiment #1229, `gemini-2.5-flash`) found 21 faults including 3 CRITICAL —
+p3 "a model of a boat, not a photograph as the text states", p6 "Maman and Ayan
+are entirely absent", p10 "wooden planks with autumn leaves, contradicting the
+established underwater setting". All three shipped to a paying customer.
+
+**Decision:**
+- The book audit now runs on **every** round the spend guard allows, including
+  the last one. `bookUnchanged` (a round where every repair failed leaves the
+  book byte-identical) still suppresses a pointless re-audit.
+- The FINAL round's audit may grant **exactly one** extra repair round. Pages
+  carrying a `CRITICAL` or `CATASTROPHIC` IMG fault are re-admitted to repair
+  even when their score says they are fine; the round budget (`roundLimit`) is
+  raised by one, once, guarded by `extraRoundUsed`. No loop, no recursion.
+- **Severity decides admission and nothing else.** Code never reads fault text,
+  never classifies it, never derives a fix. The fault lines reach the
+  consolidator unchanged via `readerFindingsByPage`, exactly as the mid-loop
+  findings already did, and the consolidator decides from its prompt what (if
+  anything) to fix. This is the narrow reading of the owner's
+  classification-belongs-to-the-prompt ruling.
+- Audit-admitted pages are appended AFTER the score-ranked bad pages (worst-first
+  order preserved) and pass through `applyRoundCap` like any other round's work,
+  so the 50%/30% per-round caps still hold.
+- Outcome is recorded on the existing `bookAuditRounds[]` entry —
+  `finalRound`, `extraRoundGranted`, `extraRoundAdmittedPages`. **Verified
+  consumer:** `storyJobPipeline.js` reads `bookAuditRounds` off the pipeline
+  result (~L5783) and writes `finalChecksReport.bookAuditRounds` (~L6350),
+  which is stored and displayed. That is the explicit fix for the 2026-09-01
+  removal reason: nothing is written to a field with no reader.
+
+**Rationale:** The audit is the only judge that reads a page's words and its
+picture together, so "the text says a photograph, the picture shows a model" has
+no other detector. Measuring it and then discarding the measurement was the worst
+of both: we paid for the judge and shipped the defects anyway. Admission-only
+keeps code out of the classification business while still giving a CRITICAL
+finding a route to a repair. Bounded at one extra round so spend cannot run away,
+and every failure path (audit error, audit returns nothing, the extra round's
+repairs all fail) leaves the story completing normally — `auditStoryBook` never
+throws, and the audit block swallows what it can't do. A quality gate never kills
+a paid run.
+
+**Known scope limits (deliberate, not defects):**
+- **Covers are not audited.** `auditStoryBook` iterates `storyData.sceneImages`;
+  covers live in `coverImages`. Out of scope for this change.
+- **Recall is imperfect.** In that story, the p14 defect was missed by 5 of the 7
+  judge configurations tested. The audit raises the floor; it is not a guarantee.
+
+**Touched:**
+- `server/lib/repairLogic.js` (`planBookAuditRound`, `admitPagesFromAudit`,
+  `AUDIT_ADMIT_SEVERITIES`)
+- `server/lib/repairPipeline.js` (mutable `roundLimit`, audit gate, audit-admitted
+  pages in the bad-page list)
+- `tests/unit/final-book-audit-round.test.ts`
+**Status:** ✅ active — supersedes the 2026-09-01 "final post-repair audit
+removed" entry (that audit's storage problem is fixed here, not reinstated).
+`docs/SETTLED.md` carries NO book-audit line, so no reversal protocol applied.

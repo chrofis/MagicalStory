@@ -1859,7 +1859,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   const { decideRepairMethod } = require('./repairLogic');
 
-  for (let round = 1; round <= maxRegenAttempts; round++) {
+  // The round budget is MUTABLE by exactly one step: the final round's book
+  // audit may grant ONE extra round (owner, 2026-09-13). See planBookAuditRound.
+  let roundLimit = maxRegenAttempts;
+  let extraAuditRoundUsed = false;
+  // Pages the final audit re-admitted to repair. Consumed by the next round's
+  // bad-page list, then cleared — it can only ever be filled once.
+  let auditAdmittedNums = [];
+
+  for (let round = 1; round <= roundLimit; round++) {
     // Build eval map for this round using best versions so far. Each entry now
     // carries explicit visualScore / semanticPenalty / imageScore / entityPenalty /
     // finalScore so bad-page detection and the per-page method decision can
@@ -1937,6 +1945,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     let badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
+    // AUDIT-ADMITTED PAGES (owner, 2026-09-13). A page the final book audit hit
+    // with a CRITICAL/CATASTROPHIC IMG fault re-enters repair even when its
+    // score says it is fine — the audit is the only judge that reads the words
+    // and the picture together. Appended AFTER the score-ranked pages so
+    // worst-first is preserved, and subject to the same per-round cap below.
+    if (auditAdmittedNums.length > 0) {
+      const added = auditAdmittedNums.filter(pn => !badPageNums.includes(pn) && roundEvalPages[pn]);
+      if (added.length > 0) {
+        log.info(`📖 [BOOK-AUDIT] Round ${round}: ${added.length} page(s) admitted to repair by the final audit: ${added.join(', ')}`);
+        badPageNums = [...badPageNums, ...added];
+      }
+      auditAdmittedNums = [];
+    }
     // PER-ROUND CAP (owner, 2026-09-09): a round may work on at most 50% (round 1)
     // / 30% (later rounds) of the story's pages, worst first. Capped-out pages are
     // DEFERRED — they are still bad next round and come back. Never fails a job.
@@ -1974,8 +1995,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     require('./runMetrics').forJob(storyData?.id || jobId).add('redo_trigger', badPages.length);
 
     // Progress: spread rounds across 35-60% range
-    const progressBase = 68 + Math.floor((round - 1) / maxRegenAttempts * 20);
-    await updateProgress(progressBase, `Round ${round}/${maxRegenAttempts}: Repairing ${badPages.length} pages...`);
+    const progressBase = 68 + Math.floor((round - 1) / roundLimit * 20);
+    await updateProgress(progressBase, `Round ${round}/${roundLimit}: Repairing ${badPages.length} pages...`);
 
     // Per-page decision: ONE method per page per round.
     //   1. catastrophic visual/semantic → iterate
@@ -2565,11 +2586,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // text, in order) and hands its IMG faults to the next round's
     // consolidator via readerFindingsByPage.
     //
-    // Skipped on the LAST round: nothing would consume the findings. (The
-    // post-repair final audit that used to cover the shipped state was
-    // removed — owner ruling, 2026-09-01, docs/decisions.md — it wrote
-    // findings to a field with zero consumers. Run it on demand instead via
-    // the Test Lab "book_audit" stage.)
+    // It runs on the LAST round too (owner, 2026-09-13, superseding the
+    // 2026-09-01 removal): the book that actually ships must be read. Its
+    // CRITICAL/CATASTROPHIC IMG faults may buy exactly ONE extra repair round —
+    // admission only, the consolidator still decides what to fix.
     //
     // The text here may be PRE-REFINE. That is fine: refine rewrites wording,
     // never events — a fault about the picture disagreeing with what happens
@@ -2582,7 +2602,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // byte-identical, so re-auditing it buys the same findings twice. It still
     // runs when no audit has happened yet — those findings are new.
     const bookUnchanged = roundSuccess.length === 0 && bookAuditRounds.length > 0;
-    if (round < maxRegenAttempts && !bookUnchanged) {
+    const { planBookAuditRound, admitPagesFromAudit } = require('./repairLogic');
+    const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed });
+    if (auditPlan.runAudit) {
       try {
         const { auditStoryBook } = require('./bookAudit');
         const auditPages = rawImages.map(img => {
@@ -2617,7 +2639,26 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             pagesRead: audit.pagesRead,
             pagesSkipped: audit.pagesSkipped,
           });
+          const record = bookAuditRounds[bookAuditRounds.length - 1];
           log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
+
+          // FINAL AUDIT → ONE EXTRA ROUND. Severity decides admission and
+          // nothing else; the fault lines reach the consolidator unread by code.
+          record.finalRound = round >= roundLimit;
+          if (auditPlan.mayGrantExtraRound) {
+            const admitted = admitPagesFromAudit(audit.byRoute.IMG);
+            if (admitted.length > 0) {
+              auditAdmittedNums = admitted;
+              extraAuditRoundUsed = true;
+              roundLimit = round + 1;
+              record.extraRoundGranted = true;
+              record.extraRoundAdmittedPages = admitted;
+              log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found CRITICAL/CATASTROPHIC IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
+            } else {
+              record.extraRoundGranted = false;
+              log.info(`📖 [BOOK-AUDIT] Final audit: no CRITICAL/CATASTROPHIC IMG fault — book ships as audited`);
+            }
+          }
         }
       } catch (auditErr) {
         // A missing measurement never costs a paid-for repair round.

@@ -119,6 +119,58 @@ function findSafeRepairableFinding(result) {
 }
 
 /**
+ * FINAL-BOOK AUDIT → ONE EXTRA REPAIR ROUND (owner, 2026-09-13).
+ *
+ * Two decisions the round loop needs, kept pure so they can be pinned by tests.
+ *
+ * 1) `runAudit` — the book audit used to be skipped on the LAST round, so the
+ *    book that actually SHIPS was never read by anything. It now runs on every
+ *    round the spend guard allows (`bookUnchanged` still suppresses a re-audit
+ *    of a byte-identical book).
+ * 2) `mayGrantExtraRound` — the final round's audit may buy exactly ONE more
+ *    repair round, and only if it has not already done so. Bounded by
+ *    construction: no loop, no recursion, one grant per story.
+ *
+ * @param {Object} o
+ * @param {number} o.round             1-based round just finished
+ * @param {number} o.roundLimit        current last round
+ * @param {boolean} o.bookUnchanged    every repair in this round failed → same book
+ * @param {boolean} o.extraRoundUsed   an extra round has already been granted
+ * @returns {{ runAudit: boolean, mayGrantExtraRound: boolean }}
+ */
+function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed }) {
+  const runAudit = !bookUnchanged;
+  return {
+    runAudit,
+    mayGrantExtraRound: runAudit && !extraRoundUsed && round >= roundLimit,
+  };
+}
+
+/** Severities that may re-admit a page to repair. Admission ONLY — never a fix. */
+const AUDIT_ADMIT_SEVERITIES = new Set(['CRITICAL', 'CATASTROPHIC']);
+
+/**
+ * Which pages a final book audit re-admits to repair.
+ *
+ * Severity is the ONLY thing code reads here, and it decides ONE thing: whether
+ * the page re-enters repair. WHAT to fix on that page stays entirely the
+ * consolidator's decision from the prompt (the fault lines are handed to it via
+ * `readerFindingsByPage`, unread by code). Never pattern-match the fault text.
+ *
+ * @param {Array<{page:number, severity:string}>} imgFaults
+ * @returns {number[]} page numbers, first-seen order
+ */
+function admitPagesFromAudit(imgFaults) {
+  const pages = [];
+  for (const f of imgFaults || []) {
+    if (!f || f.page == null) continue;
+    if (!AUDIT_ADMIT_SEVERITIES.has(String(f.severity || '').trim().toUpperCase())) continue;
+    if (!pages.includes(f.page)) pages.push(f.page);
+  }
+  return pages;
+}
+
+/**
  * PER-ROUND REPAIR CAP (owner, 2026-09-09).
  *
  * Limits how many of a story's pages a single repair round may work on: round 1
@@ -722,4 +774,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
   'viewer_address',
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
-module.exports = { findBadPages, applyRoundCap, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+module.exports = { findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
