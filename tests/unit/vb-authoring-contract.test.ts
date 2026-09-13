@@ -318,3 +318,41 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     expect(src).not.toMatch(/<age category/);
   });
 });
+
+describe('the authored `label` — one English name per element', () => {
+  const cjs = createRequire(import.meta.url);
+  const { parseVisualBible } = cjs('../../server/lib/visualBible.js');
+
+  it('survives the parse whitelist on every pool', () => {
+    const json = {
+      secondaryCharacters: [{ id: 'CHR001', label: 'village baker', name: 'Aline', pages: [1] }],
+      animals: [{ id: 'ANI001', label: 'grey farm cat', name: 'Mitzi', pages: [1] }],
+      artifacts: [{ id: 'ART001', label: 'brass hand lantern', name: 'lantern', type: 'hand tool', pages: [1], description: 'small brass lantern' }],
+      locations: [{ id: 'LOC001', label: 'hilltop meadow', name: 'Wiese', pages: [1] }],
+      vehicles: [{ id: 'VEH001', label: 'red mail cart', name: 'cart', pages: [1], colorAndDetails: 'red', signatureElement: 'brass bell' }],
+      clothing: [{ id: 'CLO001', label: 'blue wool cloak', name: 'cloak', pages: [1], wornBy: 'Aline', description: 'blue wool', howWorn: 'over the shoulders' }],
+    };
+    const outline = [
+      'Visual Bible',
+      '',
+      '```json',
+      JSON.stringify(json),
+      '```',
+      '',
+    ].join('\n');
+    const vb = parseVisualBible(outline);
+    for (const pool of ['secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing']) {
+      expect(vb[pool], pool).toHaveLength(1);
+      expect(vb[pool][0].label, pool).toBe(json[pool][0].label);
+    }
+  });
+
+  it('is authored by all four bible-emitting templates', async () => {
+    await cjs('../../server/services/prompts.js').loadPromptTemplates();
+    const templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
+    for (const key of ['storyUnified', 'storyUnifiedImageFirst', 'storyTrial', 'sceneExpansionAll']) {
+      expect(templates[key], key).toBeTruthy();
+      expect(templates[key], key).toMatch(/"label":\s*"\[the one English name every prompt uses/);
+    }
+  });
+});

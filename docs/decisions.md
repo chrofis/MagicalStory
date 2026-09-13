@@ -35179,3 +35179,86 @@ behaviour is not a defect, so none of them has a defect to fix.
 **Touched:** `prompts/image-semantic.txt` (unchanged — this entry documents why),
 `docs/SETTLED.md` (Prompts & evaluation)
 **Status:** ✅ active
+
+## 2026-09-13 — One authored `label` per Visual Bible element; ids stay internal
+**Context:**   Elements carried five identity fields (`name`, `properName`, `type`,
+`kind`, `description`) and NINE competing rules decided which string named an
+element at each consumer — the REQUIRED OBJECTS lead, the "rough images of:"
+sentence, `sanitizeVbIdsInPrompt`, the ref-sheet kind sentence, both cell gates,
+`resolveExpectedObjectLabels`, `formatElementsBlock`, `elementLabel`,
+`sceneBriefCheck`. A reference cell was keyed by id but NAMED by a different
+string than the checklist line pointing at it. On `job_1789301291267_ueh8h145m`
+(de-ch) that produced `**tool** (object)` twice on one page (see the entry above)
+and a MAJOR `object_presence` charged for a defect the prompt specified. The
+prompt-wording fix earlier today (`082afaf95`) asked for better types; it could
+not enforce anything.
+**Decision:** (owner, 2026-09-13: "we have the ID so that we have ID and one
+label together — fix it properly; keep everything English, text is German, rest
+English")
+- Every element carries `id` + ONE authored English `label` (1-4 words ending in
+  the noun, unique across the bible, never a bare category, never the proper
+  name, never a story-language word). Secondary characters, animals and real
+  landmarks keep `label = name`. A state `ART001.2` derives
+  `stateLabelOf = "<label>, <state name>"` — never authored.
+- `server/lib/vbLabel.js` is the single source of truth: `labelOf`,
+  `stateLabelOf`, `validateLabels` (7 codes), `repairLabels` (deterministic
+  ladder, never kills).
+- Enforced right after the AD bible is adopted (`beatsPipeline.js`
+  `runVisualBibleLabelRound`): validate → ONE fed-back model round
+  (`prompts/vb-label-repair.txt`, `usageLabel beats_vb_label_repair`) → re-validate
+  → deterministic repair → `gl.warn('beats_vb_label_unresolved')` → SHIP. The
+  round projects labels back into the transcript itself (`syncVisualBibleSection`).
+- Every consumer reads the label through two thin helpers: image-facing
+  `elementLeadLabel` (`promptBuilders.js`) and judge/sheet-facing
+  `elementDisplayLabel` (`vbIdGuard.js`). The detector's expected labels use the
+  same helper as the checklist lead, so detector == lead by construction.
+- **Ids never reach an image model** (settled: Grok painted `ART001` as
+  lettering, decisions.md:3298). The label is the only element string the image
+  model sees; ids remain the key for cells, briefs, detection and judges.
+**Rationale:** Two code-side patches were tried first and both broke something
+real (entry above). The invariant has to live where the data is born and be
+read through one function, or the tenth rule appears next month. The no-label
+FALLBACK is byte-identical to the pre-label derivation on purpose: the bold
+lead is the GroundingDINO key and the entity-consistency key, so stored bibles
+without a label must render exactly as before (pinned in
+`required-objects-label.test.ts`). Two fallbacks are deliberate — image-facing
+must be English, judge-facing may be the story-language `name`.
+**Touched:** `server/lib/vbLabel.js` (new), `visualBible.js` (parse whitelist
+keeps `label` on all six pools + new-entry parse; `englishEntityRef` returns the
+label first; `entryNamedByRow` matches label tokens; exports),
+`promptBuilders.js`, `bboxDetection.js`, `referenceSheets.js`, `vbIdGuard.js`,
+`vbElementBudget.js`, `sceneBriefCheck.js`, `beatsPipeline.js`,
+`services/prompts.js`; `prompts/vb-label-repair.txt` (new), the four
+bible-emitting templates (`label` field; `vehicles`/`clothing` gain a real
+authored schema in `scene-expansion-all.txt` — they were shown only as `[]`);
+tests: `vb-label.test.ts`, `vb-label-round.test.ts` (new) + five updated.
+**Status:**    🟡 conditional — unit-proven (1431 pass, the 7 pre-existing
+failures unchanged). Lab `beats_scenes` and one real story still owed: every
+artifact carries `label`, zero `beats_vb_label_unresolved`, no two props share a
+REQUIRED OBJECTS lead. Stored bibles are unaffected until re-authored.
+
+## 2026-09-13 — The same split-identity shape exists for CHARACTERS (measured, not yet fixed)
+**Context:**   A read-only hunt for the element-label shape elsewhere found four
+incompatible "does this string name that entry?" matchers for characters and
+secondaries: exact-or-containment (`promptBuilders.js:429-457`), token overlap
+(`visualBible.js:191`), whole-word subset first-match-wins with no uniqueness
+test (`phantomCharacters.js:48`), and plain `toLowerCase()` equality
+(`charRepairTarget.js:71,239`, `entityConsistency.js:1494`,
+`evalPipeline.js:928,1053`, `bboxDetection.js:190` — the last with no id
+fallback). `promptBuilders.js:485` keys the roster by the METADATA name while
+the prose uses the VB name. Confirmed on `job_1789163494908_kc2joi4ax`: p2
+`expectedCharacters` holds `"Mother"` for `ANI002 "Mother Dragon"`, p9 resolves
+`"Marroni Vendor"` in full — one story, one builder, two spellings. The judge
+writes "Mother Dragon", the repair target exact-matches a figure named
+"Mother", and `vbKind()` fails to resolve it, silently dropping the `(animal)`
+tag from EXPECTED CAST. Also found: costume label built in two casings and
+looked up case-sensitively (`clothingCategories.js:101` vs
+`clothingResolve.js:869` vs `entityConsistency.js:2939`); judge and generator
+build the clothing contract independently and only WARN on divergence
+(`clothingResolve.js:559`); covers resolve entities by name in prose while pages
+resolve by id only; three location canonicalisers.
+**Decision:** Recorded, NOT fixed. Backlog. The remedy shape is the same as for
+elements: one `resolveEntityByName`, every roster/detector/repair keyed by
+`entry.id`.
+**Touched:** none (finding only)
+**Status:**    🟡 open

@@ -13,6 +13,7 @@ const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
 const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState } = require('./visualBible');
+const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -3748,7 +3749,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // wastes ~200 chars per page with no model benefit.
       const promptObjects = requiredObjects.filter(o => o.type !== 'location');
       requiredObjectsSection = `\n${header}\n`;
-      const GENERIC_NOUN_BY_TYPE = { object: 'object', vehicle: 'vehicle', clothing: 'outfit' };
       // VB ids whose reference render travels with this generation call
       // (grid cell or, for a plate-covered vehicle, the background plate).
       // Callers that know the attachment set pass it; without it no image
@@ -3783,26 +3783,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         if (placedElsewhere) {
           log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: required ${obj.type} ${obj.id || ''} emitted state-aware (scene places it off-body)`);
         }
-        // English-only entity refs: the VB NAME follows the story language, so
-        // artifacts/vehicles/clothing lead with an English description-derived
-        // ref. Animals keep their proper name (identity anchor). The ref is
-        // built from the STATE-AWARE description so a stripped attachment
-        // clause can't sneak back in via the lead.
-        // Spread, not a bare {description}: the ref is chosen from the entry's
-        // English `type` for a non-English story, and a state-aware rebuild
-        // that dropped `type` silently fell back to a description chop — so
-        // two artifacts in the SAME list were labelled by two different rules
-        // ("hat" beside "child-sized tunic made of woven straw", prod
-        // job_1788698812047_q5b1vuds7 p2). Only the description is restated.
+        // ONE authored English label per element, minted with the bible and
+        // read here through `labelOf` — the same string the detector, the cell
+        // gates and the judges use. Nine competing naming rules once produced
+        // `**tool** (object)` twice in one page's checklist
+        // (job_1789301291267_ueh8h145m); the label is now authored once instead.
+        // Animals keep their proper name (identity anchor). The entry is passed
+        // state-aware so a stripped attachment clause cannot return via a
+        // description-derived backfill.
         const refEntry = placedElsewhere ? { ...obj.entry, description } : obj.entry;
-        // The lead is a checklist NAME — one clean short noun phrase, trimmed
-        // clause-aware so it never stops on a modifier or a half-stated
-        // measurement. Both rules now live in ONE place: visualBible's
-        // `clauseRef`, which englishEntityRef itself also runs (the label's
-        // copy was the only trimmer until then, so every other consumer of
-        // the ref got the untrimmed chop).
-        const shortRef = (r) => clauseRef(r, { maxWords: 6, hardCap: 10 });
-
 
         // A two-sided prop is TWO bible entries whose orientation lives in the
         // NAME's parenthetical ("… (turned away)", "… (face to camera)").
@@ -3810,28 +3799,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // the copied description; with the description gone it rides the lead
         // instead, so the pair mechanism keeps its text channel.
         const qualifier = (obj.name && obj.name.match(/\(([^)]+)\)\s*$/)) ? ` (${obj.name.match(/\(([^)]+)\)\s*$/)[1]})` : '';
-        // An ENGLISH story's VB names are English BY CONSTRUCTION —
-        // story-unified.txt mandates English `name` + `description` for
-        // artifacts/vehicles/clothing — so for those stories the NAME is the
-        // better label: it is the term the Art Director's own prose uses, and
-        // it is whole, where any description chop is a guess at where the noun
-        // phrase ends. Non-English stories keep the description-derived ref:
-        // the settled English-only direction (decisions.md 2026-07-31) exists
-        // because a story-language token degrades compliance and gets painted
-        // onto the prop as lettering, and the code-side ref is the backstop
-        // for exactly those stories. Same story-language gate the cover hint's
-        // free-text `Mood:` field uses.
-        const storyIsEnglish = /^en(?:[-_]|$)/.test(language);
-        // The orientation parenthetical rides `qualifier` below — strip it
-        // here so it is not emitted twice.
-        const nameLabel = String(obj.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-        const nameIsUsable = storyIsEnglish && nameLabel
-          && !/^(?:ART|VEH|CLO|LOC|CHR|ANI)\d+$/i.test(nameLabel);
         const refName = (obj.type === 'animal' && obj.name)
           ? obj.name
-          : (nameIsUsable
-            ? nameLabel
-            : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object', { language })));
+          : elementLeadLabel(refEntry, { language, type: obj.type });
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
           : `**${refName}${qualifier}** (${obj.type})`;
@@ -4084,6 +4054,43 @@ function vbDeclaredLetteringNames(visualBible) {
  * @returns {string} Sanitised prompt with VB IDs resolved or orphan lines
  *                   dropped.
  */
+/**
+ * The ONE image-facing name for a Visual Bible element.
+ *
+ * An AUTHORED `label` wins — one English label per element, minted with the
+ * bible and read by the REQUIRED OBJECTS lead, the detector's grounding label,
+ * the reference-sheet cell gates and the judges, so all of them say the same
+ * word. Nine competing naming rules once printed `**tool** (object)` twice in
+ * one page's checklist (job_1789301291267_ueh8h145m).
+ *
+ * With NO label — every bible stored before labels existed — the derivation
+ * below is the pre-label one, byte-for-byte: the bold lead is the
+ * GroundingDINO grounding key AND the entity-consistency key, so a shorter (or
+ * merely different) string on a stored story silently re-keys its objects.
+ *
+ * @param {Object} entry - the VB entry
+ * @param {Object} [opts]
+ * @param {string} [opts.language] - story language ('de', 'en-gb', …)
+ * @param {string} [opts.type] - pool type: 'object' | 'vehicle' | 'clothing'
+ * @returns {string}
+ */
+const LEAD_GENERIC_NOUN_BY_TYPE = { object: 'object', vehicle: 'vehicle', clothing: 'outfit' };
+function elementLeadLabel(entry, opts = {}) {
+  if (!entry || typeof entry !== 'object') return 'object';
+  if (String(entry.label || '').trim()) return labelOf(entry);
+  const language = opts.language || 'en';
+  // An ENGLISH story's VB names are English by construction (story-unified.txt),
+  // so the NAME is the label; a non-English story routes through the
+  // English-only description ref (decisions.md 2026-07-31).
+  const storyIsEnglish = /^en(?:[-_]|$)/.test(language);
+  const nameLabel = String(entry.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const nameIsUsable = storyIsEnglish && nameLabel
+    && !/^(?:ART|VEH|CLO|LOC|CHR|ANI)\d+$/i.test(nameLabel);
+  if (nameIsUsable) return nameLabel;
+  const generic = LEAD_GENERIC_NOUN_BY_TYPE[opts.type] || 'object';
+  return clauseRef(englishEntityRef(entry, generic, { language }), { maxWords: 6, hardCap: 10 });
+}
+
 function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   if (!prompt || typeof prompt !== 'string') return prompt;
   if (!visualBible || typeof visualBible !== 'object') return prompt;
@@ -4092,11 +4099,13 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   // are English-only: characters and animals resolve to their given names
   // (identity anchors), but artifact/location/vehicle/clothing NAMES follow
   // the story language ("Roter Umhang" must not reach the English prompt), so
-  // those resolve to an English description-derived ref instead. Locations
-  // keep their name WITH the English visual fields inlined (real-landmark
-  // names are real-world identifiers the model knows).
-  const NAME_POOLS = ['mainCharacters', 'secondaryCharacters', 'animals'];
+  // those resolve to the element's authored English `label` (vbLabel.labelOf)
+  // — the same string the REQUIRED OBJECTS lead and the detector use. Real
+  // landmarks keep their name (a real-world identifier the model knows); an
+  // invented place keeps its English visual fields inlined behind the label.
+  // properName never reaches an image model (SETTLED).
   const REF_POOLS = { artifacts: 'object', vehicles: 'vehicle', clothing: 'outfit' };
+  const NAME_POOLS = ['mainCharacters', 'secondaryCharacters', 'animals'];
   const idToName = new Map();
   for (const pool of NAME_POOLS) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
@@ -4107,14 +4116,25 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   for (const [pool, genericNoun] of Object.entries(REF_POOLS)) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       if (!entry?.id) continue;
-      idToName.set(String(entry.id).toUpperCase(), englishEntityRef(entry, genericNoun));
+      // Authored label wins; with none, the pre-label ref, unchanged — this
+      // string is substituted INTO the Art Director's prose, so a shorter
+      // derivation deletes detail a stored story was written around.
+      const ref = String(entry.label || '').trim() ? labelOf(entry) : englishEntityRef(entry, genericNoun);
+      idToName.set(String(entry.id).toUpperCase(), ref);
     }
   }
   for (const entry of (Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
     if (!entry?.id) continue;
+    // An invented place: the label leads, the English visual fields stay
+    // inlined behind it exactly as englishLocationRef built them.
+    const visuals = [entry.features, entry.colors, entry.signatureElement]
+      .map(v => String(v || '').trim()).filter(Boolean).join('; ');
+    const labelled = String(entry.label || '').trim();
     const ref = entry.isRealLandmark
       ? (entry.name || englishLocationRef(entry))
-      : (englishLocationRef(entry) || englishEntityRef(entry, 'place'));
+      : (labelled
+        ? (visuals ? `${labelOf(entry)} (${visuals})` : labelOf(entry))
+        : (englishLocationRef(entry) || englishEntityRef(entry, 'place')));
     if (!ref) continue;
     idToName.set(String(entry.id).toUpperCase(), ref);
     // VANTAGE HANDLES. A location shown from more than one viewpoint carries
@@ -7439,6 +7459,7 @@ module.exports = {
   buildImagePrompt,
   looksAtPhrase,
   sanitizeVbIdsInPrompt,
+  elementLeadLabel,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
   buildReceiverPlacement,

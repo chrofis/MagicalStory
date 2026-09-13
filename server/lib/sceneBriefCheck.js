@@ -224,7 +224,8 @@ function coverageIndex(visualBible) {
     const list = Array.isArray(vb[key]) ? vb[key] : Object.values(vb[key] || {});
     for (const e of list) {
       if (!e || !e.id || !e.name) continue;
-      out.push({ id: String(e.id).toUpperCase(), name: e.name, words: [...new Set([e.name, e.type, e.species].filter(Boolean).map(head).filter(Boolean))] });
+      const label = require('./vbIdGuard').elementDisplayLabel(e);
+      out.push({ id: String(e.id).toUpperCase(), name: e.name, label, words: [...new Set([label, e.name, e.type, e.species].filter(Boolean).map(head).filter(Boolean))] });
     }
   }
   const owners = new Map();
@@ -257,7 +258,7 @@ function checkElementCoverage(page, metadata, visualBible) {
     pageNumber: page.pageNumber,
     type: 'element_uncited',
     ids: missing.map(e => e.id),
-    detail: `The plan line stages ${missing.map(e => `${e.name} (${e.id})`).join(' and ')}, and objects[] does not cite `
+    detail: `The plan line stages ${missing.map(e => `${e.label || e.name} (${e.id})`).join(' and ')}, and objects[] does not cite `
       + `${missing.length > 1 ? 'those ids' : 'that id'}. An element reaches the illustrator only through its id. `
       + `Cite it and describe it in the prose, or restage the page without it — and if the page is then over its element budget, `
       + `withdraw the least important citation instead of going over.`,

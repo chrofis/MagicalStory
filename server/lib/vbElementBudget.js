@@ -175,9 +175,11 @@ function rankPageElements(pageNumber, metadata, visualBible) {
   ));
 }
 
-/** `Name (ID, type)` — how an element is named to the reviewer. */
+/** `Label (ID, type)` — how an element is named to the reviewer. The label is
+ * the element's ONE authored English label (vbLabel.labelOf); the id rides
+ * along because the reviewer is a text judge, not an image model. */
 function label(e) {
-  return `${e.name || e.id} (${e.id}, ${e.type})`;
+  return `${require('./vbIdGuard').elementDisplayLabel(e)} (${e.id}, ${e.type})`;
 }
 
 /**

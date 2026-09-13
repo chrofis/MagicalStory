@@ -151,6 +151,21 @@ describe('an invented cast member carries its appearance into the image prompt',
 });
 
 describe('REQUIRED OBJECTS labels the whole list by one rule', () => {
+  // ONE authored English label per element (vbLabel.labelOf); an unlabelled
+  // entry backfills from its English `type`. Both paths are pinned here.
+  it('leads with the authored label when the bible has one', () => {
+    const vb = {
+      ...visualBible,
+      artifacts: [
+        { ...visualBible.artifacts[0], label: 'straw sun hat' },
+        { ...visualBible.artifacts[1], label: 'woven straw tunic' },
+      ],
+    };
+    const block = build(scene(), vb).slice(build(scene(), vb).indexOf('**REQUIRED OBJECTS'));
+    expect(block).toContain('**straw sun hat** (object)');
+    expect(block).toContain('**woven straw tunic** (object)');
+  });
+
   it('labels both artifacts from their English type for a German story', () => {
     const prompt = build(scene());
     const block = prompt.slice(prompt.indexOf('**REQUIRED OBJECTS'));

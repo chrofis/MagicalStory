@@ -296,6 +296,12 @@ function syncVisualBibleSection(bibleSections, visualBible) {
           ...(typeof st.held === 'boolean' ? { held: st.held } : {}),
         }));
       }
+      // The authored English label (and the code repair that replaced it) is
+      // a mutation like any other: unprojected, every later re-parse reads the
+      // bible WITHOUT it and the page prompt falls back to `type` — the
+      // duplicate-`tool` defect this label exists to end.
+      if (mem.label) entry.label = mem.label;
+      if (mem.labelRepaired) entry.labelRepaired = mem.labelRepaired;
       if (key === 'secondaryCharacters' && mem.secondaryAgeClamped) {
         entry.age = mem.age;
         entry.secondaryAgeClamped = mem.secondaryAgeClamped;
@@ -305,6 +311,112 @@ function syncVisualBibleSection(bibleSections, visualBible) {
 
   const body = '```json\n' + JSON.stringify(json, null, 2) + '\n```\n\n';
   return text.replace(sectionRe, (_m, marker) => `${marker}${body}`);
+}
+
+/**
+ * ONE fed-back round over the Visual Bible's element labels.
+ *
+ * Every element needs one authored English `label`: it is the only handle the
+ * page prompt has on it (ids never reach an image model). On
+ * job_1789301291267_ueh8h145m two artifacts both typed "tool", so REQUIRED
+ * OBJECTS read `**tool** (object)` twice and the model could not tell the two
+ * props apart.
+ *
+ * The shape is the canonical fed-back retry (worn-state round, landmark
+ * minimum-2): a deterministic check names the faults, the AUTHOR gets exactly
+ * one extra round to fix the ids it faulted on, and whatever survives is
+ * repaired in code. Never a kill and never a second model round — a naming
+ * guideline must not end a paid run.
+ *
+ * @param {object} visualBible mutated in place
+ * @param {{model: string, language?: string, gl: object, log: object, stageReport?: object}} opts
+ * @returns {Promise<{round: number, findings: number, repairedByModel: number, repairedByCode: number, unresolved: string[]}>}
+ */
+async function runVisualBibleLabelRound(visualBible, { model, language, gl, log: logger = log, stageReport } = {}) {
+  const { validateLabels, repairLabels } = require('./vbLabel');
+  const report = { round: 0, findings: 0, repairedByModel: 0, repairedByCode: 0, unresolved: [] };
+
+  let findings = [];
+  try { findings = validateLabels(visualBible) || []; } catch { findings = []; }
+  if (!findings.length) {
+    if (stageReport) stageReport.labelRound = report;
+    return report;
+  }
+  report.findings = findings.length;
+
+  const faulted = new Set(findings.map(f => String(f.id).trim().toUpperCase()));
+  const byId = new Map();
+  for (const key of SYNCED_COLLECTIONS) {
+    for (const entry of (Array.isArray(visualBible?.[key]) ? visualBible[key] : [])) {
+      const id = String(entry?.id ?? '').trim().toUpperCase();
+      if (id && faulted.has(id)) byId.set(id, entry);
+    }
+  }
+
+  const before = new Map([...byId].map(([id, e]) => [id, String(e.label ?? '')]));
+
+  try {
+    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+    const template = PROMPT_TEMPLATES.vbLabelRepair;
+    if (!template) throw new Error('vb-label-repair template unavailable');
+
+    const block = findings.map(f => `- ${f.id}: ${f.detail}`).join('\n');
+    const entries = [...byId.entries()].map(([id, e]) => ({
+      id,
+      label: String(e.label ?? ''),
+      name: e.name ?? null,
+      type: e.type ?? null,
+      description: e.extractedDescription || e.description || null,
+    }));
+    const prompt = fillTemplate(template, {
+      LABEL_FINDINGS: block,
+      LABEL_ENTRIES: JSON.stringify(entries, null, 2),
+      STORY_LANGUAGE: language || '',
+    });
+
+    // maxTokens null = the model's own maximum (owner rule: no output caps).
+    const res = await textModels.callTextModelStreaming(prompt, null, null, model, { usageLabel: 'beats_vb_label_repair' });
+    if (res?.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
+
+    const parsed = require('./storyHelpers').extractJsonFromText(res?.text || '');
+    const rows = Array.isArray(parsed?.labels) ? parsed.labels : [];
+    for (const row of rows) {
+      const id = String(row?.id ?? '').trim().toUpperCase();
+      const label = String(row?.label ?? '').trim();
+      // ONLY the ids that faulted, and ONLY the label field.
+      if (!label || !byId.has(id)) continue;
+      byId.get(id).label = label;
+    }
+    report.round = 1;
+  } catch (err) {
+    logger.warn(`⚠️ [BEATS] Visual Bible label round failed (${err.message}) — repairing ${findings.length} label fault(s) in code`);
+  }
+
+  let after = [];
+  try { after = validateLabels(visualBible) || []; } catch { after = []; }
+  report.repairedByModel = [...byId.keys()].filter(id => !after.some(f => String(f.id).trim().toUpperCase() === id)
+    && String(byId.get(id).label ?? '') !== before.get(id)).length;
+
+  let repair = { repaired: [], unresolved: [] };
+  if (after.length) repair = repairLabels(visualBible, after);
+  report.repairedByCode = repair.repaired.length;
+  report.unresolved = repair.unresolved;
+
+  if (repair.unresolved.length) {
+    visualBible.labelUnresolved = repair.unresolved;
+    logger.warn(`⚠️ [BEATS] Visual Bible label(s) still faulty after the fed-back round and the code repair: ${repair.unresolved.join(', ')} — shipping flagged`);
+    gl?.warn?.('beats_vb_label_unresolved',
+      `Element label(s) unresolved after one author round and the code repair: ${repair.unresolved.join(', ')}`,
+      null, { unresolved: repair.unresolved, findings: report.findings });
+  } else {
+    logger.info(`🏷️ [BEATS] Visual Bible labels: ${report.findings} fault(s) — ${report.repairedByModel} fixed by the author, ${report.repairedByCode} by code`);
+    gl?.info?.('beats_vb_label_round',
+      `Element labels: ${report.findings} fault(s) resolved (${report.repairedByModel} by the author, ${report.repairedByCode} by code)`,
+      null, { findings: report.findings });
+  }
+
+  if (stageReport) stageReport.labelRound = report;
+  return report;
 }
 
 // ── Cross-story challenge memory ────────────────────────────────────────────
@@ -1494,6 +1606,23 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // to end a paid run. Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy
     // in the striped scarf" stated ten next to a commissioned 6-year-old,
     // rendered 11-12 on p5.
+    // ONE authored English label per element, enforced the moment the bible is
+    // adopted — BEFORE the clamp, so the clamp's own sync carries the labels
+    // too. Its own sync below runs regardless, so the projection never depends
+    // on whether the clamp fired.
+    const labelRound = await runVisualBibleLabelRound(visualBible, {
+      model: sceneModel, language: inputData.language, gl, log, stageReport: meta,
+    });
+    if (labelRound.findings > 0) {
+      const synced = syncVisualBibleSection(bibleBody, visualBible);
+      if (synced === bibleBody) {
+        log.warn('⚠️ [BEATS] Element labels could not be written back into the transcript — downstream re-parses will read the UNLABELLED bible');
+        gl.warn('beats_vb_sync_failed', 'Element labels could not be written back into the transcript — stored bible will not reflect them');
+      } else {
+        bibleBody = synced;
+      }
+    }
+
     const childBand = visualBible?.secondaryCharacters?.length
       ? commissionedChildBand(inputData.characters || [])
       : null;
@@ -2394,4 +2523,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

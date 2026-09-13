@@ -121,20 +121,33 @@ function parseVisualBibleObjects(prompt) {
  *
  * @param {string[]} entries - Mix of VB IDs and plain names (order preserved)
  * @param {Object|null} visualBible - Story visual bible
+ * @param {string} [language] - story language, so the label matches the lead
+ *                              the page prompt actually emitted
  * @returns {string[]} Array of names, deduplicated case-insensitively
  */
-function resolveExpectedObjectLabels(entries, visualBible) {
+function resolveExpectedObjectLabels(entries, visualBible, language = 'en') {
   if (!Array.isArray(entries) || entries.length === 0) return [];
+  // Byte-identical to what promptBuilders' REQUIRED OBJECTS lead emits: the
+  // same `elementLeadLabel` (authored label, else the pre-label derivation).
+  // The bold lead is the GroundingDINO grounding key and the
+  // entity-consistency key, so the two must never diverge. Lazy require —
+  // promptBuilders is the heavier module. A dotted id resolves to the BASE
+  // entry: the lead is state-free.
+  const { elementLeadLabel } = require('./promptBuilders');
   const vb = visualBible || {};
   const byId = new Map();
-  const addPool = (list) => {
+  const addPool = (list, type) => {
     for (const e of (list || [])) {
-      if (e && e.id && e.name) byId.set(String(e.id).toUpperCase(), e.name);
+      if (!e || !e.id) continue;
+      const label = elementLeadLabel(e, { language, type });
+      if (label) byId.set(String(e.id).toUpperCase(), label);
     }
   };
-  addPool(vb.artifacts);
+  addPool(vb.artifacts, 'object');
+  // Animals and secondary characters lead with their NAME in the prompt, which
+  // is what their entry already resolves to.
   addPool(vb.animals);
-  addPool(vb.vehicles);
+  addPool(vb.vehicles, 'vehicle');
   addPool(vb.secondaryCharacters);
   // Locations are skipped downstream in parseVisualBibleObjects, but LOC IDs
   // still appear in scene metadata objects[] — translate them too so the
@@ -1780,6 +1793,35 @@ function escapeXml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * THE NON-HUMAN ROSTER — one source (2026-09-13).
+ *
+ * COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18) needs to know which cast
+ * names a "person" prompt can never be expected to satisfy. The Visual Bible's
+ * `animals` and `creatures` are that list and the only non-fuzzy one; a story's
+ * fairies live in `animals`, the same place its dog does. Extracted from
+ * `enrichWithBoundingBoxes`, which had it inline, so the detector call and
+ * every consumer of the detector's count read the SAME set rather than each
+ * deciding for itself what is non-human.
+ *
+ * @param {object|null} visualBible
+ * @returns {string[]} lowercased names, possibly empty — never null
+ */
+function vbNonHumanNames(visualBible) {
+  const out = [];
+  for (const e of [...((visualBible?.animals) || []), ...((visualBible?.creatures) || [])]) {
+    // BOTH SPELLINGS. A roster entry is sometimes the VB id, not the name — the
+    // Art Director files a page's animals in `objects[]` as `ANI001` and the
+    // cast collector carries that id through verbatim. Matching on the name
+    // alone let `ANI001` count as a person. An id can never collide with a
+    // human character's name.
+    for (const k of [e?.name, e?.id]) {
+      const v = String(k || '').trim().toLowerCase();
+      if (v) out.push(v);
+    }
+  }
+  return out;
+}
 
 /**
  * Detect all bounding boxes in image and match to fixable issues
@@ -1797,10 +1839,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   // cannot match them — so the undercount check must not count them. The Visual
   // Bible is the only non-fuzzy source for which is which; callers that pass no
   // VB behave exactly as before.
-  const nonHumanNames = [
-    ...((visualBible?.animals) || []),
-    ...((visualBible?.creatures) || []),
-  ].map(a => String(a?.name || '').toLowerCase()).filter(Boolean);
+  const nonHumanNames = vbNonHumanNames(visualBible);
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
@@ -2176,6 +2215,7 @@ module.exports = {
   detectAllBoundingBoxes,
   isMicroFigure,
   countRealFigures,
+  vbNonHumanNames,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
   // wrapper above is the only entry (sourceImageFp invariant, 2026-07-19).
   detectSubRegion,

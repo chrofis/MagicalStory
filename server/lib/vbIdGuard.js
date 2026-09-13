@@ -233,6 +233,25 @@ function formatInteractionsBlock(interactions, visualBible = null, characters = 
  * @param {Object|null} visualBible
  * @returns {string} the legend, or '(none)'
  */
+/**
+ * The name a JUDGE, a reviewer or a reference-sheet cell calls an element by.
+ *
+ * The element's ONE authored English label (vbLabel.labelOf) when the bible
+ * carries one, so every consumer says the same word. With no label — a bible
+ * stored before labels existed — the entry's `name`, unchanged: labelOf's
+ * backfill is deliberately terse and would re-word a stored story's elements.
+ *
+ * @param {Object} entry
+ * @returns {string}
+ */
+function elementDisplayLabel(entry) {
+  const { labelOf } = require('./vbLabel');
+  if (!entry || typeof entry !== 'object') return labelOf(entry);
+  if (String(entry.label || '').trim()) return labelOf(entry);
+  const name = String(entry.name || '').trim();
+  return name || labelOf(entry);
+}
+
 function formatElementsBlock(objectIds, visualBible = null) {
   const ids = Array.isArray(objectIds) ? objectIds : [];
   if (ids.length === 0 || !visualBible) return '(none)';
@@ -247,14 +266,20 @@ function formatElementsBlock(objectIds, visualBible = null) {
       entry = (visualBible[pool] || []).find(e => String(e?.id || '').toUpperCase() === base.toUpperCase());
       if (entry) break;
     }
-    if (!entry || !entry.name) continue;
+    if (!entry) continue;
+    // The element's ONE authored English label — the same string the page
+    // prompt and the detector use. The id stays: a text/vision JUDGE may see
+    // ids, and the repair resolves the reference by id.
+    const label = elementDisplayLabel(entry);
+    if (!label) continue;
     seen.add(base);
-    lines.push(`${base} — ${String(entry.name).trim()}`);
+    lines.push(`${base} — ${label}`);
   }
   return lines.length ? lines.join('\n') : '(none)';
 }
 
 module.exports = {
+  elementDisplayLabel,
   VB_ID_POOLS,
   VB_ID_PATTERN,
   baseVbId,

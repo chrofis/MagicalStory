@@ -13,6 +13,7 @@ const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
 const { stripDataUriPrefix } = require('./r2');
 const { baseVbId, vbIdFacet } = require('./vbIdGuard');
+const vbLabel = require('./vbLabel');
 
 /**
  * OBJECT STATES. One physical thing is ONE artifact entry however the story
@@ -180,6 +181,8 @@ function citedEntries(visualBible, sceneMetadata) {
  *      tokens only → ambiguous → null, never a guess. With a single candidate
  *      every one of its tokens is unique, so any overlap names it.
  *
+ * Matching runs over the entry's `label`, `name` and `properName` tokens.
+ *
  * @param {string} rowField   the row's `object` (or `character`) string
  * @param {Array} candidates  every entry the row could mean — the entry under
  *   test plus the brief's cited entries (`citedEntries`)
@@ -202,7 +205,7 @@ function entryNamedByRow(rowField, candidates) {
   }
   const rowTokens = rowMatchTokens(raw);
   if (rowTokens.size === 0) return null;
-  const tokensOf = new Map(cands.map(c => [c, rowMatchTokens(`${c.name || ''} ${c.properName || ''}`)]));
+  const tokensOf = new Map(cands.map(c => [c, rowMatchTokens(`${c.name || ''} ${c.properName || ''} ${c.label || ''}`)]));
   const named = cands.filter(c => {
     const mine = tokensOf.get(c);
     for (const t of rowTokens) {
@@ -540,6 +543,7 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.secondaryCharacters && Array.isArray(jsonData.secondaryCharacters)) {
       visualBible.secondaryCharacters = jsonData.secondaryCharacters.map(char => ({
         id: char.id || generateId('CHR', visualBible.secondaryCharacters.length),
+        label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
         appearsInPages: char.pages || [],
         description: buildCharacterDescription(char),
@@ -556,6 +560,7 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.animals && Array.isArray(jsonData.animals)) {
       visualBible.animals = jsonData.animals.map(animal => ({
         id: animal.id || generateId('ANI', visualBible.animals.length),
+        label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         appearsInPages: animal.pages || [],
         description: buildAnimalDescription(animal),
@@ -575,6 +580,9 @@ function tryParseVisualBibleJSON(outline) {
         return {
         id,
         name: artifact.name,
+        // The one authored English name every prompt uses for this element.
+        // This parse is a WHITELIST — without this line the label is dropped.
+        label: typeof artifact.label === 'string' && artifact.label.trim() ? artifact.label.trim() : null,
         // A name the STORY gives the object. Kept for the text side only;
         // image prompts carry the descriptive `name`, never this.
         properName: artifact.properName || null,
@@ -615,6 +623,7 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.locations && Array.isArray(jsonData.locations)) {
       visualBible.locations = jsonData.locations.map(loc => ({
         id: loc.id || generateId('LOC', visualBible.locations.length),
+        label: typeof loc.label === 'string' && loc.label.trim() ? loc.label.trim() : null,
         name: loc.name,
         appearsInPages: loc.pages || [],
         description: buildLocationDescription(loc),
@@ -639,6 +648,7 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
       visualBible.vehicles = jsonData.vehicles.map(veh => ({
         id: veh.id || generateId('VEH', visualBible.vehicles.length),
+        label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
         appearsInPages: veh.pages || [],
         description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
@@ -656,6 +666,7 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.clothing && Array.isArray(jsonData.clothing)) {
       visualBible.clothing = jsonData.clothing.map(item => ({
         id: item.id || generateId('CLO', visualBible.clothing.length),
+        label: typeof item.label === 'string' && item.label.trim() ? item.label.trim() : null,
         name: item.name,
         appearsInPages: item.pages || [],
         description: `${item.description}. ${item.howWorn}`,
@@ -1189,7 +1200,10 @@ function clauseRef(text, opts = {}) {
 }
 
 /**
- * Short ENGLISH image-facing reference for a VB entity. The entity NAME
+ * Short ENGLISH image-facing reference for a VB entity. The entry's authored
+ * English `label` is the answer whenever it exists — one name per element,
+ * used by every prompt. Everything below is the fallback for entries that
+ * predate the label. The entity NAME
  * follows the story language (a German "Roter Umhang" must never reach the
  * English image prompt as the thing to draw), so build the reference from the
  * entry's English `type` or description instead. Falls back to the
@@ -1198,6 +1212,8 @@ function clauseRef(text, opts = {}) {
  * it, storyHelpers' page-prompt emission sites use it directly.
  */
 function englishEntityRef(entry, genericNoun = 'object', opts = {}) {
+  // The authored English label is the one name every prompt uses — it wins.
+  if (entry && typeof entry.label === 'string' && entry.label.trim()) return entry.label.trim();
   // The entry's own `type` is English by construction and is already a clean
   // noun phrase ("children's knitted hat"), where any description cut is a
   // guess at where the noun phrase ends. For a NON-English story — the only
@@ -1744,6 +1760,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.secondaryCharacters && Array.isArray(jsonData.secondaryCharacters)) {
       newEntries.secondaryCharacters = jsonData.secondaryCharacters.map(char => ({
         id: char.id || generateId('CHR', idCounter.CHR++),
+        label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
         description: buildCharacterDescription(char),
         pages: char.pages || [],
@@ -1754,6 +1771,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.animals && Array.isArray(jsonData.animals)) {
       newEntries.animals = jsonData.animals.map(animal => ({
         id: animal.id || generateId('ANI', idCounter.ANI++),
+        label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         description: buildAnimalDescription(animal),
         pages: animal.pages || [],
@@ -1764,6 +1782,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
       newEntries.artifacts = jsonData.artifacts.map(artifact => ({
         id: artifact.id || generateId('ART', idCounter.ART++),
+        label: typeof artifact.label === 'string' && artifact.label.trim() ? artifact.label.trim() : null,
         name: artifact.name,
         description: artifact.description || `${artifact.type}: ${artifact.description}`,
         type: artifact.type,
@@ -1775,6 +1794,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.locations && Array.isArray(jsonData.locations)) {
       newEntries.locations = jsonData.locations.map(loc => ({
         id: loc.id || generateId('LOC', idCounter.LOC++),
+        label: typeof loc.label === 'string' && loc.label.trim() ? loc.label.trim() : null,
         name: loc.name,
         description: buildLocationDescription(loc),
         setting: loc.setting,
@@ -1787,6 +1807,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
       newEntries.vehicles = jsonData.vehicles.map(veh => ({
         id: veh.id || generateId('VEH', idCounter.VEH++),
+        label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
         description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
         signatureElement: veh.signatureElement,
@@ -1798,6 +1819,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.clothing && Array.isArray(jsonData.clothing)) {
       newEntries.clothing = jsonData.clothing.map(item => ({
         id: item.id || generateId('CLO', idCounter.CLO++),
+        label: typeof item.label === 'string' && item.label.trim() ? item.label.trim() : null,
         name: item.name,
         description: `${item.description}. ${item.howWorn || ''}`.trim(),
         wornBy: item.wornBy,
@@ -3151,7 +3173,10 @@ module.exports = {
   buildVisualBiblePrompt,
   buildFullVisualBiblePrompt,
   englishEntityRef,
+  labelOf: vbLabel.labelOf,
+  stateLabelOf: vbLabel.stateLabelOf,
   clauseRef,
+  REF_GENERIC_TYPE,
   englishLocationRef,
   resolveSceneCreatures,
   significantEntityTokens,

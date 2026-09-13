@@ -345,6 +345,11 @@ async function loadPromptTemplates() {
     // step 3b). It runs BEFORE the styled-avatar kickoff — an outfit reviewed
     // after the avatars exist is a rejected avatar, not a corrected outfit.
     ['clothingReview', 'clothing-review.txt'],
+    // ONE fed-back round over the Visual Bible's authored element labels
+    // (beats-first pipeline, right after the Art Director's bible is adopted).
+    // Deterministic validation finds the faults, this prompt asks the author
+    // to fix exactly those ids, and code repairs whatever survives.
+    ['vbLabelRepair', 'vb-label-repair.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     // Plot-shape rules per age band of the OLDEST MAIN character. One of these

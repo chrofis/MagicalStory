@@ -308,8 +308,11 @@ function characterAgeCue(el) {
  */
 function elementKindSentence(el) {
   if (!el || el.type === 'character') return '';
+  const { elementDisplayLabel } = require('./vbIdGuard');
   const clean = (v) => String(v || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.\s]+$/, '').trim();
-  const name = clean(el.displayName || el.name);
+  // ONE authored English label per element (vbLabel.labelOf) — the same string
+  // the page prompt's REQUIRED OBJECTS lead and the detector use.
+  const name = clean(el.displayName || elementDisplayLabel(el));
   // The bible's free-text type ("single reptile scale") arrives as `kind`
   // (getElementsNeedingReferenceImages stamps the pool onto `type`); a bare
   // entry may still carry it on `type`, and a pool label is never a kind.
@@ -616,8 +619,9 @@ async function askCellGate(cellsBase64, prompt) {
  * @returns {string}
  */
 function elementCellGatePrompt(el, styleDescription = '') {
+  const { elementDisplayLabel } = require('./vbIdGuard');
   const rawType = String(el?.kind || el?.type || '').trim();
-  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : String(el?.displayName || el?.name || 'object').trim();
+  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : (String(el?.displayName || '').trim() || elementDisplayLabel(el));
   const desc = String(el?.description || '').trim();
   const text = String(el?.text || '').trim();
   const textClause = text ? ` (4) Lettering: the words "${text}" are readable and spelled exactly so; any other lettering fails.` : '';
@@ -632,10 +636,12 @@ function elementCellGatePrompt(el, styleDescription = '') {
  * @returns {string}
  */
 function stateCellsGatePrompt(parent, cells) {
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const { stateLabelOf } = require('./vbLabel');
   const rawType = String(parent?.kind || parent?.type || '').trim();
-  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : String(parent?.build || parent?.name || 'object').trim();
+  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : (String(parent?.build || '').trim() || elementDisplayLabel(parent));
   const desc = String(parent?.description || '').trim();
-  const list = cells.map((c, i) => `${i + 1}. ${c.stateName || c.name}: ${c.delta || ''}`.trim()).join(' ');
+  const list = cells.map((c, i) => `${i + 1}. ${c.stateName || stateLabelOf(parent, c)}: ${c.delta || ''}`.trim()).join(' ');
   return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Judge strictly: is it the same object in every cell — same shape, build, material and colour — differing only in the named state? Two different objects, or a change that is not the one named, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
@@ -743,7 +749,8 @@ async function checkStateBatch(cellsBase64, parent, cells, styleDescription = ''
  */
 function expandElementStateCells(el) {
   const { objectStates } = require('./visualBible');
-  const { baseVbId } = require('./vbIdGuard');
+  const { stateLabelOf } = require('./vbLabel');
+  const { baseVbId, elementDisplayLabel } = require('./vbIdGuard');
   const states = objectStates(el);
   if (states.length === 0) return [el];
   // A state row with no dotted id mints a cell with `id: undefined`: the grid
@@ -772,7 +779,10 @@ function expandElementStateCells(el) {
       // by name when the model draws a different grid than asked for, and
       // every cell of one object would otherwise carry the same name.
       name: `${el.name} — ${s.name}`,
-      displayName: el.name,
+      // The image-facing strings: ONE authored English label per element
+      // (vbLabel), the state cell carrying "label, state".
+      label: stateLabelOf(el, s),
+      displayName: elementDisplayLabel(el),
       baseDescription: baseDesc,
       stateName: s.name,
       delta: s.delta,

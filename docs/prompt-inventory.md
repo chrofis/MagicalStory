@@ -45,7 +45,9 @@ Three loading mechanisms feed these templates:
 | story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the FINAL ARC + the locked plan lines. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |
 | text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines) |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
+| vb-label-repair.txt | (new) Visual Bible label repair | One fed-back round to fix Visual Bible label faults |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
+| — | — | **Bible `label` field (2026-09-13):** story-unified.txt, story-unified-imagefirst.txt, story-trial.txt and scene-expansion-all.txt all author a `label` beside each element's `id` — the one English name every prompt uses for that element |
 | age-band-routine.txt | promptBuilders.js `buildAgeModeSection` → `{AGE_MODE}` in arc-create, arc-retell, story-arc-review, story-beats, story-trial, trial-idea, generate-story-idea(s) | Plot shape when the oldest MAIN character is 0–1: a day's rhythm, no plot, naming and repetition |
 | age-band-quest.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 2: one tiny goal, one search place per page, a repeated phrase, cosy close |
 | age-band-tries.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 3: one problem, try-fail / try-fail / try-succeed by the child's own doing |

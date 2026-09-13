@@ -8,8 +8,12 @@ import { describe, it, expect } from 'vitest';
 //     "small hat knitted from chunky red" — the head noun "wool" cut off,
 //     leaving a colour qualifying nothing. ART008
 //     ("Copper-coloured fallen leaves") became "Fallen horse chestnut and
-//     plane tree", which names two TREES and no leaves. The entry's own
-//     `name` is the checklist term and was never consulted.
+//     plane tree", which names two TREES and no leaves.
+//
+//     The lead is now the element's ONE authored English `label`, read through
+//     vbLabel.labelOf — the same string the detector, the cell gates and the
+//     judges use. On de-ch job_1789301291267_ueh8h145m two artifacts both
+//     declared type "tool" and the block read "**tool** (object)" twice.
 //
 // (2) p8 — `sanitizeVbIdsInPrompt` registers a possessive-stripped alias so
 //     "Fiona's Schatzkarte" is also caught as bare "Schatzkarte". For ART001
@@ -27,6 +31,7 @@ import { buildImagePrompt, sanitizeVbIdsInPrompt } from '../../server/lib/prompt
 const ART001 = {
   id: 'ART001',
   name: "Lily's red woollen hat",
+  label: 'red woollen hat',
   type: "children's knitted hat",
   description:
     'A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths, roughly ten centimetres tall when the brim is turned up, the knit stitches visible as raised ridges across the surface, slightly misshapen from wear',
@@ -35,6 +40,7 @@ const ART001 = {
 const ART008 = {
   id: 'ART008',
   name: 'Copper-coloured fallen leaves',
+  label: 'copper fallen leaves',
   type: 'autumn leaves',
   description:
     'Fallen horse chestnut and plane tree leaves in deep copper, burnt orange, and dull gold tones, roughly palm-sized, lying flat or curled at the edges on the ground, scattered unevenly across stone paving and earth',
@@ -78,7 +84,7 @@ const build = (prose: string, objects: string[], language = 'en-gb', pageNumber 
     {}
   ) as string;
 
-describe('REQUIRED OBJECTS label is built from the entry name, not a description chop', () => {
+describe('REQUIRED OBJECTS leads with the element ONE authored label', () => {
   const p3Prose =
     'Lily, wearing her red chunky-knit woollen hat, springs forward across the stone-paved square. Copper-coloured fallen chestnut leaves scatter across the grey cobbles. Ultra-wide shot.';
 
@@ -87,28 +93,14 @@ describe('REQUIRED OBJECTS label is built from the entry name, not a description
     expect(block).not.toContain('small hat knitted from chunky red');
   });
 
-  it("keeps ART001's colour and a head noun on the label", () => {
+  it('emits the authored label as the bold lead', () => {
     const block = requiredObjectsBlock(build(p3Prose, ['ART001', 'ART008']));
-    const line = block.split('\n').find((l) => /hat/.test(l))!;
-    expect(line).toBeDefined();
-    expect(line).toMatch(/\bred\b/);
-    expect(line).toMatch(/\bhat\b/);
-    // The label must not END on a bare colour — that is the exact defect.
-    expect(line).not.toMatch(/\bred\*\*/);
-  });
-
-  it("labels ART008 from its name, not two tree species", () => {
-    const block = requiredObjectsBlock(build(p3Prose, ['ART001', 'ART008']));
+    expect(block).toContain('* **red woollen hat** (object)');
+    expect(block).toContain('* **copper fallen leaves** (object)');
     expect(block).not.toContain('Fallen horse chestnut and plane tree');
-    const line = block.split('\n').find((l) => /leaves/.test(l))!;
-    expect(line).toBeDefined();
-    expect(line).toMatch(/copper/i);
   });
 
-  it('a NON-English story keeps the description-derived ref (settled English-only direction)', () => {
-    // decisions.md 2026-07-31: a story-language name must not reach the
-    // image prompt. The name path is gated on the story language, so a German
-    // story still routes through englishEntityRef.
+  it('emits the authored labels for a NON-English story too — the label is English by construction', () => {
     const deVb = {
       ...visualBible,
       artifacts: [{ ...ART001, name: 'Lilys rote Wollmütze' }],
@@ -122,7 +114,46 @@ describe('REQUIRED OBJECTS label is built from the entry name, not a description
       null,
       {}
     ) as string;
+    expect(requiredObjectsBlock(prompt)).toContain('* **red woollen hat** (object)');
     expect(prompt).not.toContain('Wollmütze');
+  });
+
+  it('BACKFILL PARITY — a bible stored before labels emits exactly the pre-label string', () => {
+    // No `label` authored: the lead is byte-for-byte what it was before labels
+    // existed — an English story's own `name`. The bold lead is the
+    // GroundingDINO grounding key and the entity-consistency key, so a stored
+    // story must not be re-keyed by this change.
+    const legacy = {
+      ...visualBible,
+      artifacts: [{ id: 'ART001', name: "Lily's red woollen hat", type: "children's knitted hat", description: ART001.description }],
+    };
+    const prompt = buildImagePrompt(
+      scene('Lily springs forward across the square.', ['ART001']),
+      { language: 'en-gb', artStyle: 'pixar', layout: { textInImage: true } },
+      null, legacy, 3, null, {}
+    ) as string;
+    expect(requiredObjectsBlock(prompt)).toContain("* **Lily's red woollen hat** (object)");
+    expect(prompt).not.toContain('small hat knitted from chunky red');
+  });
+
+  it('THE INCIDENT — two artifacts of the same `type` never share a lead (job_1789301291267_ueh8h145m)', () => {
+    // Both declared type "tool", so the pre-label rules printed `**tool**
+    // (object)` twice and the model could not tell the props apart.
+    const twins = {
+      ...visualBible,
+      artifacts: [
+        { id: 'ART001', name: 'Kelle', label: 'wooden trowel', type: 'tool', description: 'a short wooden trowel' },
+        { id: 'ART002', name: 'Hammer', label: 'iron hammer', type: 'tool', description: 'a small iron hammer' },
+      ],
+    };
+    const block = requiredObjectsBlock(buildImagePrompt(
+      scene('Lily lifts both.', ['ART001', 'ART002']),
+      { language: 'de', artStyle: 'pixar', layout: { textInImage: true } },
+      null, twins, 3, null, {}
+    ) as string);
+    expect(block).toContain('* **wooden trowel** (object)');
+    expect(block).toContain('* **iron hammer** (object)');
+    expect(block).not.toContain('**tool**');
   });
 });
 

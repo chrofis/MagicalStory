@@ -24,9 +24,12 @@ const {
   stateCellsGatePrompt,
 } = cjs('../../server/lib/referenceSheets.js');
 
+// Every element carries its ONE authored English label (vbLabel) — the string
+// every consumer now names it by.
 const scale = {
   id: 'ART001',
   name: 'small dragon scale',
+  label: 'small dragon scale',
   type: 'single reptile scale',
   description: 'an oval, slightly convex scale about as wide as a child\'s palm; deep teal with a faint warm bronze sheen',
   pageCount: 5,
@@ -34,6 +37,7 @@ const scale = {
 const ball = {
   id: 'ART003',
   name: "Julian's ball",
+  label: "Julian's ball",
   type: 'rubber play ball',
   description: 'a round rubber ball about 20 cm in diameter; bright yellow with a single wide white band',
   states: [
@@ -45,12 +49,13 @@ const ball = {
 const sign = {
   id: 'ART005',
   name: 'trail sign (face to camera)',
+  label: 'trail sign (face to camera)',
   type: 'wooden trail fork sign, front face',
   description: 'a weathered pale brown plank 40 cm wide on a rough post; three small arrow shapes painted in faded dark brown',
   text: 'Windchopf',
   pageCount: 2,
 };
-const location = { id: 'LOC003', name: 'hillside cave entrance', type: 'location', description: 'outdoor, a dark cave mouth under a mossy rock lip', pageCount: 2 };
+const location = { id: 'LOC003', name: 'hillside cave entrance', label: 'hillside cave entrance', type: 'location', description: 'outdoor, a dark cave mouth under a mossy rock lip', pageCount: 2 };
 const character = { id: 'CHR001', name: 'Fenn', type: 'character', build: 'a dragon, broad-chested', description: 'a dragon, broad-chested and sturdy', pageCount: 4 };
 
 describe('elementKindSentence — the noun as prose', () => {
@@ -59,9 +64,9 @@ describe('elementKindSentence — the noun as prose', () => {
   });
   it('keeps a possessive or capitalised name definite on its own', () => {
     expect(elementKindSentence(ball)).toBe("This is Julian's ball, a rubber play ball: ");
-    expect(elementKindSentence({ ...scale, name: 'Nordwind', type: 'two-masted ship' })).toBe('This is Nordwind, a two-masted ship: ');
+    expect(elementKindSentence({ ...scale, name: 'Nordwind', label: 'Nordwind', type: 'two-masted ship' })).toBe('This is Nordwind, a two-masted ship: ');
     // A multi-word name that merely starts with a proper noun keeps its article.
-    expect(elementKindSentence({ ...scale, name: 'Windchopf sign', type: 'wooden trail sign' })).toBe('This is the Windchopf sign, a wooden trail sign: ');
+    expect(elementKindSentence({ ...scale, name: 'Windchopf sign', label: 'Windchopf sign', type: 'wooden trail sign' })).toBe('This is the Windchopf sign, a wooden trail sign: ');
   });
   it('drops a trailing parenthetical from the name and uses "an" before a vowel', () => {
     expect(elementKindSentence({ ...sign, text: null, type: 'oak plank sign' })).toBe('This is the trail sign, an oak plank sign: ');
@@ -85,6 +90,12 @@ describe('elementKindSentence — the noun as prose', () => {
     expect(cells).toHaveLength(2);
     expect(cells[0].name).toContain(' — in play');
     expect(elementKindSentence(cells[0])).toBe("This is Julian's ball, a rubber play ball: ");
+    // The cell's image-facing strings: "label, state" on the cell, the plain
+    // label as the parent's display name.
+    expect(cells[0].label).toBe("Julian's ball, in play");
+    expect(cells[1].label).toBe("Julian's ball, lost below");
+    expect(cells[0].displayName).toBe("Julian's ball");
+    expect(stateCellsGatePrompt(ball, cells)).toContain('1. in play');
     expect(cells[0].baseDescription).toBe(ball.description);
   });
 });
@@ -109,7 +120,7 @@ describe('buildReferenceSheetPrompt / batches with the new cells', () => {
     await cjs('../../server/services/prompts.js').loadPromptTemplates();
   });
   it('a multi-cell sheet carries the kind sentences and the blanket no-text rule', () => {
-    const p = buildReferenceSheetPrompt([scale, { ...scale, id: 'ART002', name: 'large dragon scale' }], 'soft watercolor');
+    const p = buildReferenceSheetPrompt([scale, { ...scale, id: 'ART002', name: 'large dragon scale', label: 'large dragon scale' }], 'soft watercolor');
     expect(p).toContain('Row 1: This is the small dragon scale, a single reptile scale: ');
     expect(p).toContain('Row 2: This is the large dragon scale, a single reptile scale: ');
     expect(p).toContain('Zero text, zero labels');
