@@ -380,6 +380,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
+  // Hoisted to function scope (2026-09-13): the eval/repair short-circuit reads
+  // it in the images block, and the analytics block — far below, outside that
+  // scope — must report "not measured" rather than a measured zero when it is
+  // on. One declaration, both readers. See docs/decisions.md
+  // "Unevaluated runs report not-measured, never a clean score".
+  const skipQualityEval = inputData.skipQualityEval === true;
+
   // The stories row exists from the FIRST moment (owner, 2026-08-15).
   // story_images.story_id references stories.id, so anything written during
   // generation — cover repairs, debug artifacts, per-page versions — needs the
@@ -5341,7 +5348,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Phases 5b-5g: Unified repair pipeline
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
-      const skipQualityEval = inputData.skipQualityEval === true;
 
       // ── Text-space gate + repair: count calm pixels INSIDE the polygon the
       // renderer will draw text into. If calmFound < calmNeeded for the page's
@@ -5941,8 +5947,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const imgSuccess = allImages.filter(p => p.imageData).length;
     const repairSecs = ((timing.repairEnd - timing.pagesEnd) / 1000).toFixed(1);
     log.debug(`📖 [UNIFIED] Generated ${imgSuccess}/${allImages.length} page images`);
-    log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, repair phase: ${repairSecs}s`);
-    genLog.info('images_complete', `${imgSuccess}/${allImages.length} pages: generation ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, repair phase (detection/evals/entity/rounds/covers) ${repairSecs}s`);
+    // The phase label must say what the phase ACTUALLY did. With
+    // skipQualityEval on there is no detection, no eval, no entity check and no
+    // repair round — only the text-space pass and persistence run — so naming
+    // those stages made a trial look like it had been graded.
+    const repairPhaseLabel = skipQualityEval
+      ? 'post-generation phase (text-space + persistence only, NO evals/repair)'
+      : 'repair phase (detection/evals/entity/rounds/covers)';
+    log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, ${repairPhaseLabel} ${repairSecs}s`);
+    genLog.info('images_complete', `${imgSuccess}/${allImages.length} pages: generation ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, ${repairPhaseLabel} ${repairSecs}s`);
 
     // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
     // Started back at pagesStart; on a normal run it finished long ago and this
@@ -6445,22 +6458,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     clearCurrentLogger();
     log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries (including API usage)`);
 
-    // Compute quality aggregates for analytics
-    const qualityScores = allImages
-      .map(img => img.qualityScore)
-      .filter(s => s != null && !isNaN(s));
-    const avgQualityScore = qualityScores.length > 0
-      ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length)
-      : null;
-    const minQualityScore = qualityScores.length > 0 ? Math.min(...qualityScores) : null;
-    const maxQualityScore = qualityScores.length > 0 ? Math.max(...qualityScores) : null;
-    const firstAttemptPassRate = allImages.length > 0
-      ? Math.round(allImages.filter(img => !img.totalAttempts || img.totalAttempts <= 1).length / allImages.length * 100)
-      : null;
-    const totalRetries = allImages.reduce((sum, img) => sum + Math.max(0, (img.totalAttempts || 1) - 1), 0);
-    const pagesWithIssues = qualityScores.filter(s => s < 70).length;
-    const contentBlocked = allImages.reduce((sum, img) =>
-      sum + (img.retryHistory?.filter(r => r.blocked)?.length || 0), 0);
+    // Quality aggregates — one implementation, in server/lib/storyMetrics.js,
+    // so the "not measured vs measured zero" rule is pinned by unit tests and
+    // cannot drift between this writer and the metrics collector that reads it.
+    const { computeQualityAnalytics } = require('./server/lib/storyMetrics');
+    const {
+      qualityEvaluated, qualityEvalSkipReason,
+      avgQualityScore, minQualityScore, maxQualityScore,
+      firstAttemptPassRate, totalRetries, pagesWithIssues, contentBlocked,
+    } = computeQualityAnalytics(allImages, { skipQualityEval });
 
     // A page or cover that reaches persistence with no image bytes is a
     // SHIPPED DEFECT — the story must say so instead of looking complete
@@ -6594,7 +6600,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // done): detection, evals, entity checks, repair rounds, cover checks.
         repairDurationMs: timing.repairEnd ? timing.repairEnd - timing.pagesEnd : null,
         coversDurationMs: timing.coversEnd ? timing.coversEnd - (timing.coversStart || timing.storyGenEnd) : null,
-        // Quality
+        // Quality.
+        // `qualityEvaluated: false` marks every score/count below as NOT
+        // MEASURED (all null) — the run skipped the eval + repair pipeline.
+        // `true` means the numbers are real, including a truthful 0 / 100.
+        qualityEvaluated,
+        qualityEvalSkipReason: qualityEvaluated ? null : 'skipQualityEval',
         avgQualityScore,
         minQualityScore,
         maxQualityScore,
@@ -6609,6 +6620,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Pipeline config
         pipelineConfig: {
           enableFullRepair,
+          // Recorded alongside it because repair is unreachable when eval is
+          // skipped: without this the row could not be read back correctly.
+          skipQualityEval,
         },
         // Models used
         models: (() => {
@@ -7548,7 +7562,13 @@ async function _processStoryJobImpl(jobId) {
     // non-admins here — before any reader (this function OR the pipeline's
     // resolveLayout) can pick them up — so a normal user can't pick expensive
     // models or silently degrade their own paid story.
-    if (!isAdmin) {
+    // `serverAuthoredInput` (set only by a server route that builds the whole
+    // commission itself, and forced to false on the user-facing create-story
+    // path after the req.body spread) means there is no client-supplied field
+    // here to strip. Without this exemption the trial route's deliberate
+    // `enableFullRepair: false` was deleted — trial users are not admins — and
+    // every trial ran and recorded the default ON (2026-09-13).
+    if (!isAdmin && inputData.serverAuthoredInput !== true) {
       delete inputData.modelOverrides;
       delete inputData.skipImages;
       delete inputData.skipCovers;

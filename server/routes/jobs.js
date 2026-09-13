@@ -161,6 +161,12 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
     const isAdminDraft = req.user.impersonating === true;
     inputData.adminDraft = isAdminDraft;
 
+    // This payload DID come from a request body, so it is never server-authored.
+    // Forced here (after the spread, same reason as adminDraft above) so a
+    // client cannot set the marker that exempts a job from the pipeline's
+    // non-admin developer-field strip.
+    inputData.serverAuthoredInput = false;
+
     // Characters must belong to the caller. The wizard sends whole character
     // objects from client state, and that state survives an account switch, so
     // `job_1786309527338_4zwhrn08y` was submitted under the smoke account

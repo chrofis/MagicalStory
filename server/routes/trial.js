@@ -2718,6 +2718,14 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     titlePageOnly: true, // legacy flag — coverTypes above is what decides
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
+    // This commission is built here, from scratch — no part of it comes from
+    // the request body. The pipeline strips developer-mode fields
+    // (enableFullRepair, skipImages, modelOverrides, …) from any NON-admin
+    // job, and trial users are not admins: without this marker the
+    // deliberate `enableFullRepair: false` above was deleted and the run fell
+    // back to the default ON, which is what every trial story then recorded
+    // in analytics.pipelineConfig (prod job_1789292742265_mgxmrkfpd).
+    serverAuthoredInput: true,
     trialMode: true, // Trial prompt with visual bible backgrounds for early empty scene streaming
     ...(userLocation?.city ? { userLocation } : {}), // IP-based location for landmark personalization
   };

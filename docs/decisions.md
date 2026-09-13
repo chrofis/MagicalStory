@@ -35072,3 +35072,69 @@ contradicting the cap the rest of the pipeline was just given is noise the re-pl
 **Touched:** `server/lib/beatsPipeline.js`, `server/lib/planCounters.js`, `server/lib/promptBuilders.js`,
 `tests/unit/plan-counters.test.ts`, `tests/unit/plan-replan-ranking.test.ts`
 **Status:** ✅ active
+
+### Unevaluated runs report not-measured, never a clean score (finding B4)
+**Context:** Trial stories skip quality eval by design (`skipQualityEval: true`
+in `server/routes/trial.js`; `storyJobPipeline.js` short-circuits the eval +
+repair pipeline). The analytics block nonetheless computed its quality
+aggregates over the resulting empty set. Prod trial
+`job_1789292742265_mgxmrkfpd` (6 pages, zero eval records — no `qualityScore`,
+`evaluation`, `semanticResult`, `entityReport` or `retryHistory` on any page,
+`finalChecksReport.sceneConsistency.pages` empty) therefore shipped
+`"firstAttemptPassRate": 100, "pagesWithIssues": 0, "totalRetries": 0,
+"pipelineConfig": {"enableFullRepair": true}` — which reads as "6 pages
+evaluated, all passed first try" while four of its six pages had real defects.
+Two separate faults: absent counters reported as a measured clean result, and
+a `enableFullRepair` value that contradicted how the run actually executed.
+**Decision:**
+1. Quality aggregates move into one exported helper,
+   `computeQualityAnalytics(images, { skipQualityEval })`
+   (`server/lib/storyMetrics.js`). When the run skipped evaluation it returns
+   `qualityEvaluated: false`, `qualityEvalSkipReason: 'skipQualityEval'` and
+   **null** for `avg/min/maxQualityScore`, `firstAttemptPassRate`,
+   `totalRetries` and `pagesWithIssues`. When the run WAS evaluated the real
+   numbers are reported, including a truthful `0` / `100`.
+   `contentBlocked` keys off the presence of a `retryHistory` array rather than
+   the flag, because the skip path never attaches one.
+2. `analytics.pipelineConfig` additionally records `skipQualityEval`, so the
+   row explains itself without a reader having to know that repair is
+   unreachable when eval is off.
+3. Root cause of the wrong `enableFullRepair`: the pipeline strips
+   developer-mode fields from every **non-admin** job, and trial users are not
+   admins — so the trial's deliberate `enableFullRepair: false` was deleted and
+   the run fell back to the default ON. Fixed at the source: a commission built
+   entirely server-side carries `serverAuthoredInput: true` and is exempt from
+   that strip. `POST /api/jobs/create-story` forces the marker to `false` after
+   its `req.body` spread (same pattern as `adminDraft`) so a client cannot set
+   it. The admin rerun endpoints set it too — they force `skipImages` /
+   `enableFullRepair` on jobs that run on the *source* story's (possibly
+   non-admin) account, where the strip was silently discarding them.
+4. The generation-log phase label no longer claims work that did not happen:
+   with `skipQualityEval` it reads "post-generation phase (text-space +
+   persistence only, NO evals/repair)" instead of "repair phase
+   (detection/evals/entity/rounds/covers)".
+**Rationale:** A dashboard, a query and a future agent must be able to tell
+"nothing was graded" from "graded, and clean" — the previous row was
+indistinguishable from a perfect full run, which is exactly the failure mode
+`feedback_measure_current_not_average.md` describes. Null alone would be
+ambiguous (a pre-flag story is also null), so the explicit
+`qualityEvaluated` boolean rides alongside; the pattern already exists in
+`server/lib/character2x4Sheet.js` (`evaluated` / `evalSkipped`). Nulling
+everything unconditionally was rejected: an evaluated story with genuinely zero
+issues must keep reporting `0` / `100`. Patching the stored `enableFullRepair`
+at the output would have left the pipeline still *running* with the wrong
+value; the strip is the single source of truth and was fixed there.
+Consumer audit: `server/lib/storyMetrics.js:364` and
+`server/services/database.js:898` already read these with `?? null`; no client
+code, admin dashboard or SQL column consumes them — nothing renders a null as
+`0` or crashes.
+**Touched:**
+- `server/lib/storyMetrics.js` (`computeQualityAnalytics`; `qualityEvaluated`
+  added to the metrics `detail.analytics` block)
+- `storyJobPipeline.js` (`skipQualityEval` hoisted to function scope; analytics
+  block calls the helper; phase label; non-admin strip exemption)
+- `server/routes/trial.js` (`serverAuthoredInput: true`)
+- `server/routes/jobs.js` (forces `serverAuthoredInput = false`)
+- `server/routes/admin/jobs.js` (rerun-text / rerun-full mark their commissions)
+- `tests/unit/quality-analytics-not-measured.test.ts`
+**Status:** ✅ active

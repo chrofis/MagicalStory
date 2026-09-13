@@ -361,6 +361,10 @@ function computeMetrics(data, jobRow) {
         findings: Array.isArray(p.fixTargets) ? p.fixTargets.length : null,
       })),
       analytics: {
+        // Carried so a reader can tell a null score apart from a missing one:
+        // false = the run skipped evaluation entirely (trials), null = the
+        // story predates the flag (2026-09-13).
+        qualityEvaluated: analytics.qualityEvaluated ?? null,
         avgQualityScore: analytics.avgQualityScore ?? null,
         firstAttemptPassRate: analytics.firstAttemptPassRate ?? null,
         totalRetries: analytics.totalRetries ?? null,
@@ -484,4 +488,60 @@ async function collectStoryMetrics(storyId, { pool, environment } = {}) {
   }
 }
 
-module.exports = { collectStoryMetrics, computeMetrics, extractOutlineSections, compareStoryDraftVsFinal };
+/**
+ * Quality aggregates for stories.data.analytics.
+ *
+ * NOT MEASURED is not MEASURED ZERO (2026-09-13). A run with
+ * `skipQualityEval` (trials) never evaluates a page, never records an attempt
+ * count and never keeps a retry history — so every aggregate is null and
+ * `qualityEvaluated: false` says why. A run that WAS evaluated reports its real
+ * numbers, including a truthful `pagesWithIssues: 0` /
+ * `firstAttemptPassRate: 100`.
+ *
+ * Evidence: prod trial job_1789292742265_mgxmrkfpd shipped
+ * `firstAttemptPassRate: 100, pagesWithIssues: 0, totalRetries: 0` over zero
+ * eval records while four of its six pages had real defects.
+ *
+ * @param {Array<object>} images - the final sceneImages (+ covers) of the run
+ * @param {{ skipQualityEval?: boolean }} opts
+ * @returns {{qualityEvaluated: boolean, qualityEvalSkipReason: string|null,
+ *   avgQualityScore: number|null, minQualityScore: number|null,
+ *   maxQualityScore: number|null, firstAttemptPassRate: number|null,
+ *   totalRetries: number|null, pagesWithIssues: number|null,
+ *   contentBlocked: number|null}}
+ */
+function computeQualityAnalytics(images, { skipQualityEval = false } = {}) {
+  const all = Array.isArray(images) ? images : [];
+  const qualityEvaluated = !skipQualityEval;
+
+  const scores = qualityEvaluated
+    ? all.map(img => img && img.qualityScore).filter(s => s != null && !isNaN(s))
+    : [];
+
+  // contentBlocked is counted off retryHistory, which the skip-eval path never
+  // attaches — "0 blocked" there would mean "no history was kept". Report it
+  // only when at least one image actually carries a history to count.
+  const sawRetryHistory = all.some(img => img && Array.isArray(img.retryHistory));
+
+  return {
+    qualityEvaluated,
+    qualityEvalSkipReason: qualityEvaluated ? null : 'skipQualityEval',
+    avgQualityScore: scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+    minQualityScore: scores.length > 0 ? Math.min(...scores) : null,
+    maxQualityScore: scores.length > 0 ? Math.max(...scores) : null,
+    firstAttemptPassRate: (qualityEvaluated && all.length > 0)
+      ? Math.round(all.filter(img => !img.totalAttempts || img.totalAttempts <= 1).length / all.length * 100)
+      : null,
+    totalRetries: qualityEvaluated
+      ? all.reduce((sum, img) => sum + Math.max(0, ((img && img.totalAttempts) || 1) - 1), 0)
+      : null,
+    pagesWithIssues: qualityEvaluated ? scores.filter(s => s < 70).length : null,
+    contentBlocked: sawRetryHistory
+      ? all.reduce((sum, img) => sum + ((img.retryHistory || []).filter(r => r && r.blocked).length), 0)
+      : null,
+  };
+}
+
+module.exports = { collectStoryMetrics, computeMetrics, extractOutlineSections, compareStoryDraftVsFinal, computeQualityAnalytics };
+
