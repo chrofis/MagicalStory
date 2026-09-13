@@ -35262,3 +35262,35 @@ elements: one `resolveEntityByName`, every roster/detector/repair keyed by
 `entry.id`.
 **Touched:** none (finding only)
 **Status:**    🟡 open
+
+## A divided object's markings do not multiply — a prompt rule, not an authored field (2026-09-13)
+**Context:** Prod trial `job_1789292742265_mgxmrkfpd` declared ONE artifact carrying ONE
+surface device, with a `broken` state splitting it into two halves. Pages 3 and 4 rendered
+the device complete and mirrored on EACH half; pages 5-6 (no split) rendered one. The page
+text itself described the single device as now facing two ways. Mechanism: the device is an
+attribute of the noun, so when the instruction multiplies the noun ("two halves") the
+attribute replicates per instance. Nothing in the prompt said the marking is one painting
+that the split runs through.
+**Decision:** One line appended to the REQUIRED OBJECTS block, after the element bullets:
+"A state that divides, opens or breaks an object does not multiply its markings: a device,
+emblem or pattern on the surface is one marking, and the split runs through it — each part
+shows only its share." Plain line, no `* **` prefix, so `parseVisualBibleObjects` cannot
+read it as an element.
+**Rationale:** The block starts the protected tail that `shrinkPromptForModel` reattaches
+verbatim, so the rule survives head compression — a placement in `image-generation.txt`'s
+head (where "Draw exactly one of each named object" lives) does not. It is emitted only
+when a page actually states an object, so it costs no budget on object-free pages, and it
+reaches the trial and full pipelines alike because both go through `buildImagePrompt`.
+The wording is state-agnostic on purpose: prod's parse path drops state ids (the state
+system is half-installed, `b8559256c` staging-only), so a rule gated on an emitted state
+clause would never fire on master.
+The structural alternative — an authored `markings` field on the artifact entry, letting
+the renderer be told explicitly how many markings exist — was considered and **declined by
+the owner** in favour of the cheap prompt rule. This rule is a nudge, not a guarantee: no
+evaluator checks marking multiplicity, and nothing fails a page that ignores it.
+**Touched:** `server/lib/promptBuilders.js` (REQUIRED OBJECTS block builder),
+`tests/manual/test-page-prompt-builder.js` (4 pins: rule reaches the BUILT prompt, sits
+past the `**REQUIRED OBJECTS` protected-tail marker, is a plain line, and is invisible to
+the object parser — pinned structurally, never on wording).
+**Status:** ✅ active
+

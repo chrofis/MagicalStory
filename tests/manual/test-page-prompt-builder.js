@@ -168,6 +168,23 @@ check(/Flocke/.test(vbSection), 'animal keeps its given name in fallback section
   check(/red superhero cape/i.test(reqSection), 'cape still listed (as English ref) in REQUIRED OBJECTS');
   check(/silver scissors/i.test(reqSection), 'artifact listed via English ref');
 
+  // (5) markings do not multiply with a divided object. Pinned structurally,
+  // not by wording: the rule must reach the BUILT prompt and sit at or after
+  // the '**REQUIRED OBJECTS' marker, which is where shrinkPromptForModel's
+  // protected tail begins — a head placement would be compressed away.
+  // Evidence: prod trial job_1789292742265_mgxmrkfpd.
+  const markingIdx = prompt.search(/multiply its markings/i);
+  check(markingIdx >= 0, 'markings rule reaches the built page prompt');
+  const tailIdx = prompt.indexOf('**REQUIRED OBJECTS');
+  check(tailIdx >= 0 && markingIdx > tailIdx, 'markings rule sits inside the protected tail');
+  check(!/^\s*\*\s+\*\*.*multiply its markings/mi.test(prompt),
+    'markings rule is a plain line, not a checklist entry the object parser would read');
+
+  // The object parser must not read the plain rule line as an element.
+  const { parseVisualBibleObjects } = require('../../server/lib/bboxDetection');
+  const parsedNames = parseVisualBibleObjects(prompt).map(o => o.name || '').join(' | ');
+  check(!/multiply|marking/i.test(parsedNames), 'object parser does not treat the markings rule as an element');
+
   // Scene's declared facing survives in the prose
   check(/facing the camera/.test(prompt), 'scene-declared facing retained in prose');
 

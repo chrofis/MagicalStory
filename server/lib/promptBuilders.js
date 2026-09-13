@@ -3861,6 +3861,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           ? `The attached reference images include a rough image of ${gridRefNames[0]} — match its look at the size and placement the scene description gives it.\n`
           : `The attached reference images include rough images of: ${gridRefNames.join('; ')} — match each one's look at the size and placement the scene description gives it.\n`;
       }
+      // MARKINGS DO NOT MULTIPLY WITH THE OBJECT. Plain line (no "* **"
+      // prefix) so parseVisualBibleObjects never reads it as an object.
+      // A state that divides an object multiplies the noun ("two halves"), and
+      // an attribute of that noun replicates per instance: prod trial
+      // job_1789292742265_mgxmrkfpd declared ONE artifact bearing ONE device
+      // and a split state, and two pages rendered the device complete on each
+      // half. It sits here rather than in the template head so it rides the
+      // protected tail through shrinkPromptForModel, and costs prompt budget
+      // only on pages that actually state an object.
+      requiredObjectsSection += `A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
+`;
       if (promptObjects.length === 0) {
         // All entries were locations — nothing left to list.
         requiredObjectsSection = '';
