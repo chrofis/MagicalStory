@@ -52,10 +52,22 @@ class S3Client {
   }
 }
 
+// The staging database references a cohort production has never heard of —
+// s2, which every production-only scan classifies as long-dead. That is the
+// real shape of the 2026-09-13 loss: staging stories, production bucket.
+const STAGING_URL = 'postgres://stub/staging';
+
 class Pool {
+  constructor(opts = {}) {
+    this.staging = String(opts.connectionString || '') === STAGING_URL;
+  }
   async query(sql) {
     if (/information_schema/.test(sql)) {
       return { rows: [{ table_name: 'characters' }, { table_name: 'story_images' }] };
+    }
+    if (this.staging) {
+      if (/"story_images"/.test(sql)) return { rows: [{ s: HOST + 'stories/s2/page1.png' }] };
+      return { rows: [{ s: null }] };
     }
     if (/FROM story_images WHERE image_url/.test(sql)) {
       return { rows: [{ image_url: HOST + 'stories/s1/page1.png' }] };
@@ -75,6 +87,10 @@ Module._load = function (request) {
 };
 
 process.env.DATABASE_URL = 'postgres://stub/stub';
+// Opt-in: only the two-database test sets it, so every other test keeps
+// measuring the production-only scan.
+if (process.env.STUB_WITH_STAGING === '1') process.env.STAGING_DATABASE_URL = STAGING_URL;
+else delete process.env.STAGING_DATABASE_URL;
 process.env.R2_BUCKET = 'stub-bucket';
 process.env.R2_PUBLIC_URL = HOST;
 process.env.R2_ACCOUNT_ID = 'stub-account';

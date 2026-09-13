@@ -29,14 +29,14 @@ const MODULE = path.join(ROOT, 'scripts', 'lib', 'r2Cohorts.js');
 
 let deleteLog: string;
 
-function run(script: string, args: string[]) {
+function run(script: string, args: string[], env: Record<string, string> = {}) {
   // A real delete run appends its receipt to ./tasks/…jsonl, so give each run a
   // throwaway cwd rather than writing into the repo.
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'r2gc-cwd-'));
   fs.mkdirSync(path.join(cwd, 'tasks'));
   const res = spawnSync(process.execPath, ['-r', STUB, script, ...args, '--no-manifest'], {
     cwd,
-    env: { ...process.env, STUB_DELETE_LOG: deleteLog },
+    env: { ...process.env, STUB_DELETE_LOG: deleteLog, ...env },
     encoding: 'utf8',
   });
   const deleted = fs.existsSync(deleteLog)
@@ -97,6 +97,21 @@ describe('delete-r2-dead-cohorts.js — deletion needs both flags', () => {
       'stories/s2/page1.png',
       'stories/s2/retry/a.png',
     ]);
+  });
+
+  it('spares a cohort only the STAGING database references', () => {
+    // The 2026-09-13 loss: staging stories live in the staging database while
+    // their images are written to the PRODUCTION bucket, so a production-only
+    // reference scan called those cohorts dead. stories/s2 is exactly that
+    // shape — unreferenced in production, referenced in staging — and the test
+    // above proves a production-only scan destroys it.
+    const res = run(DELETER, ['--confirm', '--production'], { STUB_WITH_STAGING: '1' });
+    expect(res.status).toBe(0);
+    expect(res.deleted).not.toContain('stories/s2/page1.png');
+    expect(res.deleted).not.toContain('stories/s2/retry/a.png');
+    // The genuinely dead cohort is still swept — this must not become a
+    // blanket amnesty.
+    expect(res.deleted).toContain('characters/u2/c9/photos/p.png');
   });
 
   it('never puts a referenced or protected object in the victim set', () => {

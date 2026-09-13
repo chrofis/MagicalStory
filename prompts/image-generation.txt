@@ -28,3 +28,5 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 {COVER_COMPOSITION}
 
 **ART STYLE:** {STYLE_DESCRIPTION}
+
+**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.

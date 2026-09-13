@@ -146,29 +146,72 @@ async function scanAndReport({ options, modeLabel, toolName }) {
 
   // 1. Every URL stored anywhere. A table that fails to scan is a HARD STOP —
   //    a silent zero there would mark that table's objects deletable.
-  section('1. REFERENCE SCAN — every base table, cast to text');
-  const tables = await pool.query(
-    "select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by table_name"
-  );
+  //
+  //    EVERY DATABASE THAT WRITES TO THIS BUCKET, not just the one that owns it
+  //    (2026-09-13). Staging stories live in the STAGING database while their
+  //    images are written to the PRODUCTION bucket, so a production-only
+  //    reference scan sees zero references to them, calls the whole cohort dead
+  //    and deletes it. Measured after the first sweep: benchmark story
+  //    job_1777923092665_wkhxd3mg9 lost 54 of its 189 scene images, and a
+  //    27-story sample found 5 more with objects gone — every one present in
+  //    the staging database and absent from production. The cohort rule was
+  //    never wrong; its reference set was one database short.
+  //
+  //    A configured STAGING_DATABASE_URL that cannot be scanned is a HARD STOP
+  //    for the same reason a table failure is: skipping it silently marks every
+  //    staging-only cohort deletable.
+  section('1. REFERENCE SCAN — every base table, cast to text, in every writing database');
   const referenced = new Set();
   const perTable = new Map();
-  for (const { table_name: tn } of tables.rows) {
+  let tablesScanned = 0;
+
+  const sources = [{ label: 'production (DATABASE_URL)', pool }];
+  if (process.env.STAGING_DATABASE_URL && process.env.STAGING_DATABASE_URL !== process.env.DATABASE_URL) {
+    sources.push({
+      label: 'staging (STAGING_DATABASE_URL)',
+      pool: new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } }),
+      extra: true,
+    });
+  } else {
+    row('staging reference scan', 'SKIPPED — STAGING_DATABASE_URL not set');
+  }
+
+  for (const src of sources) {
+    let tables;
     try {
-      const r = await pool.query(`select string_agg(src::text,' ') s from "${tn}" src`);
-      const blob = r.rows[0] && r.rows[0].s;
-      if (!blob) continue;
-      const hits = blob.match(new RegExp(HOST.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + `[^"'\\s,}\\]\\)]+`, 'g')) || [];
-      const before = referenced.size;
-      hits.forEach((u) => referenced.add(u.slice(HOST.length)));
-      if (hits.length) perTable.set(tn, { hits: hits.length, newKeys: referenced.size - before });
+      tables = await src.pool.query(
+        "select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by table_name"
+      );
     } catch (err) {
-      die(`could not scan table ${tn}: ${err.message}\n  The reference set is incomplete, so no verdict from this run is trustworthy.`);
+      die(`could not list tables in ${src.label}: ${err.message}
+  The reference set is incomplete, so no verdict from this run is trustworthy.`);
     }
+    row(`  scanning ${src.label}`, `${tables.rows.length} table(s)`);
+    for (const { table_name: tn } of tables.rows) {
+      try {
+        const r = await src.pool.query(`select string_agg(src::text,' ') s from "${tn}" src`);
+        const blob = r.rows[0] && r.rows[0].s;
+        if (!blob) continue;
+        const hits = blob.match(new RegExp(HOST.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + `[^"'\\s,}\\]\\)]+`, 'g')) || [];
+        const before = referenced.size;
+        hits.forEach((u) => referenced.add(u.slice(HOST.length)));
+        if (hits.length) {
+          const key = src.extra ? `${tn} (staging)` : tn;
+          perTable.set(key, { hits: hits.length, newKeys: referenced.size - before });
+        }
+      } catch (err) {
+        die(`could not scan table ${tn} in ${src.label}: ${err.message}
+  The reference set is incomplete, so no verdict from this run is trustworthy.`);
+      }
+    }
+    tablesScanned += tables.rows.length;
+    if (src.extra) await src.pool.end();
   }
   for (const [t, e] of [...perTable.entries()].sort((a, b) => b[1].hits - a[1].hits)) {
     row(`  ${t}`, `${e.hits} url(s), +${e.newKeys} new key(s)`);
   }
-  row('TABLES SCANNED', tables.rows.length);
+  row('DATABASES SCANNED', sources.length);
+  row('TABLES SCANNED', tablesScanned);
   row('DISTINCT KEYS REFERENCED', referenced.size);
 
   // 2. Bucket walk, grouped by cohort.

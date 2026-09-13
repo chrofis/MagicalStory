@@ -34850,3 +34850,78 @@ a paid run.
 **Status:** ✅ active — supersedes the 2026-09-01 "final post-repair audit
 removed" entry (that audit's storage problem is fixed here, not reinstated).
 `docs/SETTLED.md` carries NO book-audit line, so no reversal protocol applied.
+
+## 2026-09-13 — R2 cohort GC scans EVERY database that writes to the bucket
+**Context:**   The cohort GC (entry above) built its referenced-set from
+`DATABASE_URL` alone. Staging stories live in the STAGING database while their
+images are written to the PRODUCTION bucket, so a production-only scan sees
+zero references to them, classifies the whole cohort dead, and deletes it. This
+already happened: benchmark story `job_1777923092665_wkhxd3mg9` lost 54 of its
+189 scene images (pages 1-10 entirely), and a 27-story sample found 5 more with
+objects gone, all created 2026-07-15 to 2026-08-25.
+**Decision:** The reference scan runs over every database that writes to the
+bucket — `DATABASE_URL` plus `STAGING_DATABASE_URL` when set and different. A
+configured staging URL that cannot be scanned is a FATAL stop, exactly as a
+table that fails to scan is: skipping it silently marks every staging-only
+cohort deletable.
+**Rationale:** The cohort rule was never wrong; its reference set was one
+database short. Measured on the real bucket the same day:
+- production reference set: `_wkhxd3mg9` 0 keys, `_q1fjbdzbx` 0, `_s980g4s9a` 0
+  — all three DEAD and sweepable.
+- staging reference set: the same three at 612, 8 and 4 keys — all LIVE.
+- staging contributes 31,276 distinct keys the production-only scan never saw.
+- the fixed audit over the whole production bucket: 0 dead cohorts, 366 live —
+  but so does the audit with staging hidden, and that is NOT evidence for the
+  fix. Every staging-only cohort had ALREADY been deleted in full (all three
+  ids list 0 objects under `stories/<id>/` in `magicalstory-images`), so they
+  no longer exist as cohorts to classify. The URLs that still answer 200 are
+  served from the SEPARATE staging bucket, which the production GC never
+  touches. The evidence for the fix is the reference-set comparison above plus
+  the unit test — not the audit.
+**Touched:** `scripts/lib/r2Cohorts.js`; `tests/unit/r2-cohort-gc.test.ts` +
+`tests/unit/fixtures/r2-gc-stub.cjs` (a cohort referenced only by the staging
+database is spared, while the genuinely dead cohort is still swept — 11/11)
+**Status:**    ✅ active
+
+## 2026-09-13 — The render-side cast rule lives in the PROTECTED TAIL
+**Context:**   The brief side of "pages drop a character the beat is about" was
+fixed (reviewer checks 5/5b, declared `REMOVED CAST:`), but
+`prompts/image-generation.txt` never told the model to draw every character in
+the reference list. Written first as a **Composition** bullet.
+**Decision:** It ships as a `**REQUIRED CAST:**` block at the very END of the
+template, after `**ART STYLE**`.
+**Rationale:** Position is the protection. `shrinkPromptForModel` holds back
+everything from `**REQUIRED OBJECTS` / `**ART STYLE` onward and LLM-compresses
+the head, where only REFERENCE CARD COLOURS and the opening rules block have
+verbatim carve-outs. Measured on a crowded-page prompt: 15,529 chars shrink to
+832 — so a Composition bullet is deleted precisely on the crowded pages that
+drop characters in the first place. With tail placement the rule survives that
+same shrink verbatim. Same reasoning, and the same remedy, as the baked-title
+block.
+**Touched:** `prompts/image-generation.txt`
+**Status:**    ✅ active
+
+## 2026-09-13 — D-16b: a held prop the prompt never names, while a required one lies unhandled
+**Context:**   `items_held` is now trustworthy (two-key schema, same day) but
+nothing compared it against the page's REQUIRED OBJECTS. D-16 fires only on
+DECLARED INTERACTIONS, so a closing page whose object is merely a required
+object, with no declared interaction, had no check at all.
+**Decision:** New rule D-16b in `prompts/image-evaluation.txt`, MAJOR, reusing
+the existing `action_interaction` type (no new scored type, so no vocabulary or
+scoring-table changes). It fires when a hand closes around an object the
+USER_PROMPT never names while a required object lies absent or unhandled, and
+carries the same grip test as the inventory: resting on, leaning against or
+overlapping is not holding, and anything hanging or strapped on belongs to what
+carries it. Skipped when no REQUIRED OBJECTS block exists, and skipped for an
+object D-16 already reports.
+**Rationale:** Classification belongs to the prompt (CLAUDE.md), and the
+severity is MAJOR rather than CRITICAL deliberately — a prop swap should not buy
+a repaint on its own, which is the failure this whole day started with.
+**Touched:** `prompts/image-evaluation.txt`
+**Status:**    🟡 conditional — NO FALSE POSITIVES measured (Lab #1260 baseline
+vs #1261, 5 pages; the pirate p9 control, where a lantern hangs in front of a
+hand that genuinely holds a chest, returns 0 findings on both arms). The
+POSITIVE case is UNPROVEN: none of the 5 pages carries an actual prop swap, so
+the rule was never given the chance to fire correctly. Needs a page with a known
+wrong prop in hand — the page that motivated the original report was never
+recorded.
