@@ -62,6 +62,11 @@ const THEMES = {
     halloween: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: "Histoire d'Halloween", it: 'Storia di Halloween' },
   },
   'life-challenges': {
+    'bath-time': { en: 'Bath Time', de: 'Baden', fr: 'Le bain', it: 'Il bagnetto' },
+    'first-foods': { en: 'Learning to Eat', de: 'Essen lernen', fr: 'Apprendre à manger', it: 'Imparare a mangiare' },
+    'first-steps': { en: 'Learning to Walk', de: 'Laufen lernen', fr: 'Apprendre à marcher', it: 'Imparare a camminare' },
+    'first-words': { en: 'First Words', de: 'Erste Wörter', fr: 'Premiers mots', it: 'Prime parole' },
+    'going-outside': { en: 'Going Outside', de: 'Nach draussen gehen', fr: 'Sortir dehors', it: 'Uscire fuori' },
     'potty-training': { en: 'Potty Training', de: 'Töpfchen-Training', fr: "Apprentissage du pot", it: 'Uso del Vasino' },
     'washing-hands': { en: 'Washing Hands', de: 'Hände waschen', fr: 'Se laver les mains', it: 'Lavarsi le Mani' },
     'brushing-teeth': { en: 'Brushing Teeth', de: 'Zähne putzen', fr: 'Se brosser les dents', it: 'Lavarsi i Denti' },
