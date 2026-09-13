@@ -915,7 +915,13 @@ function parseTeachingGuideFile(filePath) {
     }
 
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n');
+    // Split on either line ending. The `$` anchor in the topic-header regex
+    // below does not match before a trailing \r, so a CRLF copy of a guide
+    // file parses to ZERO topics — silently, with every guide coming back
+    // null. (Git stores these files LF, so Linux deploys are unaffected; a
+    // Windows working tree checks adventure-guides.txt out as CRLF and loses
+    // all 15 adventure guides locally.)
+    const lines = content.split(/\r?\n/);
 
     let currentId = null;
     let currentContent = [];
@@ -931,8 +937,13 @@ function parseTeachingGuideFile(filePath) {
         currentId = match[1];
         currentContent = [];
       } else if (currentId) {
-        // Skip comment lines at start of file
-        if (!line.startsWith('#') || currentContent.length > 0) {
+        // '#' opens a comment line in this format — the file header, and the
+        // section banners that separate topic groups. They are never guide
+        // content, wherever they appear. Skipping them only while the current
+        // topic was still empty let a banner that FOLLOWS a topic's content
+        // land at the end of that topic's guidance, and it shipped into the
+        // story prompt (20 of 169 topics across four guide files).
+        if (!line.startsWith('#')) {
           currentContent.push(line);
         }
       }
