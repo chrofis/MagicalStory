@@ -806,3 +806,8 @@ owner prefix and delete only if ZERO members are in the referenced set, which ne
 and proving the negative through a DIFFERENT code path — that is what caught it; (4) price the thing before
 proposing deletion: the whole 20 GB bucket cost $0.16/month, so storage was never a reason to delete
 anything, and the owner's actual concern was deletion COMPLETENESS.
+
+## 2026-09-14 — Compare a brief to the plan that SHIPPED, never to `briefsIn`
+**What happened:** I diagnosed "the Art Director drifts one page behind its plan lines" on job_1789304198359_y3n0euk3z, wrote it up, scanned 20 stories and reported 6 more. The owner said "the beats is allowed to shift a page or delete one and create a new one." Against the FINAL plan (`data.outline`, post `beats_replan`) every brief matched its own page. I had compared against `beatsReviewReport.briefsIn`, which `beatsPipeline.js:1254` stores as `plan.pages` — the division BEFORE the re-plan round.
+**Rule:** The beats layer may re-divide the book after the plan check. Any page-to-plan comparison — cast, moment, elements, a Lab replay, a scan — must read the division that actually shipped (the page plan inside `data.outline`, or whatever `resolveStoryBeats` is fixed to return), never `briefsIn`. Before claiming a pipeline stage disobeyed its input, prove the input you hold is the one it was given. This is the same lesson as "verify what RAN, not what was asked", one hop earlier.
+**Cost:** a false finding in decisions/backlog (withdrawn), a void 6-of-20 scan, ~half a day. The pre-existing backlog item "four Lab stages measure a story division that never shipped" now has its first measured victim.
