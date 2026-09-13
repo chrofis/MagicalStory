@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { renderVerdict, resolveTargets, parseRefs, ENVIRONMENTS } =
+const { renderVerdict, resolveTargets, parseRefs, ENVIRONMENTS, isHookInvocation } =
   require('../../scripts/admin/check-push-idle.js');
 
 const staging = ENVIRONMENTS['refs/heads/staging'];
@@ -98,5 +98,30 @@ describe('manual mode reports status instead of saying nothing', () => {
     const hook = renderVerdict(staging, { verdict: 'idle', reasons: [], detail: 'commit abc' });
     const manual = renderVerdict(staging, { verdict: 'idle', reasons: [], detail: 'commit abc' }, { manual: true });
     expect(text(manual)).toBe(text(hook));
+  });
+});
+
+describe('hook vs manual is decided by argv, not stdin', () => {
+  it('git passes the remote name and URL, so a hook run has extra argv', () => {
+    expect(isHookInvocation(['node', 'check-push-idle.js', 'origin', 'https://github.com/x/y.git'])).toBe(true);
+  });
+
+  it('a by-hand run passes no arguments', () => {
+    expect(isHookInvocation(['node', 'check-push-idle.js'])).toBe(false);
+  });
+
+  it('REGRESSION: a non-interactive by-hand run is MANUAL, not a zero-ref hook run', () => {
+    // An agent shell, a CI step and `node check-push-idle.js < /dev/null` all
+    // have a non-TTY stdin. Keyed on isTTY they resolved zero targets and
+    // exited 0 printing nothing; keyed on argv they report.
+    expect(isHookInvocation(['node', 'check-push-idle.js'])).toBe(false);
+    expect(resolveTargets([], { manual: true }).length).toBeGreaterThan(0);
+  });
+
+  it('a manual run never gates: zero refs still resolve every environment', () => {
+    const manualTargets = resolveTargets([], { manual: true });
+    const hookTargets = resolveTargets([], { manual: false });
+    expect(hookTargets).toHaveLength(0);
+    expect(manualTargets.length).toBeGreaterThan(0);
   });
 });

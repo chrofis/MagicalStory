@@ -162,12 +162,42 @@ function resolveTargets(refs, { manual = false } = {}) {
     .filter(Boolean);
 }
 
-async function main() {
-  const manual = Boolean(process.stdin.isTTY);
-  const refs = await readRefs();
-  const targets = resolveTargets(refs, { manual });
+/**
+ * HOOK or MANUAL is decided by ARGV, not by stdin.
+ *
+ * git calls a pre-push hook with two arguments — the remote name and its URL —
+ * and `.githooks/pre-push` forwards them verbatim (`exec node … "$@"`). A
+ * by-hand run passes none. That is the only signal available BEFORE reading
+ * stdin, and reading stdin is exactly what must be avoided on a manual run:
+ * with no refs coming, the stream's `end` never fires and the process hangs.
+ *
+ * Two weaker signals were tried and rejected (2026-09-13):
+ *   `process.stdin.isTTY` — false for an agent shell, a CI step, a wrapper
+ *     script and `node check-push-idle.js < /dev/null`. All four then took the
+ *     hook path, resolved zero targets and exited 0 printing nothing, which is
+ *     the silence being reported on. Most by-hand runs in this project are not
+ *     interactive.
+ *   "no refs arrived on stdin" — correct in principle, but it cannot be known
+ *     without waiting for stdin to close, and racing a timer against git's refs
+ *     risks treating a REAL push as manual and letting it through ungated. The
+ *     gate exists to protect a running generation; it may never fail open.
+ *
+ * `readRefs()` keeps its own isTTY shortcut as a second belt for an interactive
+ * invocation that somehow reaches it.
+ */
+function isHookInvocation(argv = process.argv) {
+  return Array.isArray(argv) && argv.length > 2;
+}
 
-  if (targets.length === 0) return; // feature branch / tag — no deploy, no gate
+async function main() {
+  const hook = isHookInvocation();
+  // A manual run never reads stdin: nothing will close it, and there is
+  // nothing to gate.
+  const refs = hook ? await readRefs() : [];
+  const targets = resolveTargets(refs, { manual: !hook });
+  const manual = !hook;
+
+  if (targets.length === 0) return; // hook on a feature branch / tag — no deploy, no gate
 
   if (manual) console.log('Checking whether each environment is idle (a deploy restarts the container)…');
 
@@ -195,4 +225,4 @@ if (require.main === module) {
 
 // Exported for tests/manual/test-push-idle-gate.js — the verdict logic decides
 // whether every push in this repo is allowed, so it gets exercised directly.
-module.exports = { probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets };
+module.exports = { probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets, isHookInvocation};
