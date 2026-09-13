@@ -36458,3 +36458,83 @@ There is no third unified variant (`server/services/prompts.js` registers two).
 - `tests/unit/coping-strategy-and-page-openings.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-14 — Spread-but-never-declared in the beats chain: one defect, three deliberate scopings
+
+**Context.** An instrumented `fillTemplate` sweep found four values that a
+builder computes and spreads, but whose template declares no placeholder — so
+they are dropped with no error, no warning and no log. Measured on one
+commission (historical / moon-landing / `de`, all four values non-empty):
+
+| stage | dropped value | verdict |
+|---|---|---|
+| `arc-retell.txt` | `LANGUAGE` | **defect** |
+| `arc-retell.txt` | `CHARACTER_NAMES` | by design |
+| `story-text-from-beats.txt` | `STORY_BRIEF` | by design |
+| `story-text-from-beats.txt` | `STORY_GUIDE_SECTION` | by design |
+| `story-bible-from-beats.txt` | `STORY_GUIDE_SECTION` | by design |
+
+**Decision.** Fix `LANGUAGE` on `arc-retell` only. The other four stay absent,
+and are now pinned absent.
+
+1. **`arc-retell` / `LANGUAGE` — defect.** `arc-create.txt:1` reads "Work in
+   ENGLISH. The finished book will be written in `{LANGUAGE}` — keep names,
+   places and cultural details as they will appear there." `arc-retell.txt:1`
+   read only "Work in ENGLISH." The re-telling is not a lesser stage: it
+   re-tells the arc **whole** every round ("Never edit or patch the old arc"),
+   so the FINAL arc that reaches the beats and the text writer is a *retell*
+   output, not the create output — and `TELLING_RULES` sends it off to invent
+   fresh vessel and place names. It was inventing them with no idea the book is
+   German. Fixed by appending arc-create's own sentence verbatim, in the same
+   position (line 1, after "Work in ENGLISH").
+
+2. **`arc-retell` / `CHARACTER_NAMES` — by design.** It is a bare roster line
+   ("Mira, Tobias"). `arc-retell` already carries `{CHARACTER_DETAILS}`, headed
+   *"source of truth"*, which names every character with age, gender and traits,
+   and `{STORY_BRIEF}` names the cast again. A third copy of the same names adds
+   nothing the invented-figure counting rule cannot already do.
+
+3. **`story-text-from-beats` / `STORY_BRIEF` — by design, already documented in
+   code.** `buildStoryTextFromBeatsPrompt` carries an explicit "NO COMMISSION
+   HERE" comment: by that stage the arc IS the story and has already ruled on
+   the idea's mechanics — which obstacles survive, which are dropped as unsuited
+   to the cast's age. Re-showing the raw idea re-opens those rulings, and it
+   took them: `job_1789147573901_m3uam0nxi`'s arc collapsed a three-way group
+   split and dropped a coded gate; the text stage, handed the idea a second
+   time, restored both. Subject, world and cast reach the writer through
+   `{STORY_ARC}`, `{PLAN_LINES}` and `{CHARACTER_DETAILS}` — verified present in
+   the built prompt, so this is scoping, not blindness.
+
+4. **`story-text-from-beats` / `STORY_GUIDE_SECTION` — by design**, already
+   stated in the 2026-09-13 entry: "The text stage writes from the arc and
+   beats, which are authored under the mandate." Independently: the guide is up
+   to 4000 chars of dates, figures and political context, carrying the header
+   *"Every fact … comes from this guide. Invent none."* The prose writer's own
+   contract is the opposite — "invent no character, creature, object, place or
+   turn of the plot the story does not carry". Handing it an encyclopedia is an
+   invitation to import facts the arc never settled.
+
+5. **`story-bible-from-beats` / `STORY_GUIDE_SECTION` — by design.** That stage
+   writes the WARDROBE contract and nothing else. The 2026-09-13 entry routed
+   the one wardrobe-relevant rule to it as `{ERA_CLOTHING_RULE}` precisely so
+   each rule lands at the stage that can act on it. The period it needs is
+   already in `{STORY_BRIEF}` (`Category: historical` / `Topic: moon-landing`,
+   verified in the built prompt); the rest of the guide is 3.4k chars of
+   non-wardrobe fact on a call whose whole output is a JSON clothing block.
+
+**Rationale.** Four drops, one defect. The instinct this entry exists to block
+is "declare all four placeholders and the sweep goes green" — three of these
+absences are load-bearing scoping decisions with job-ID evidence behind them,
+and re-adding them would undo two prior entries. A drop is only a defect when
+the value is not reaching that stage by another route.
+
+**Evidence.** Built offline, all four values non-empty (`STORY_BRIEF` 841 ch,
+`STORY_GUIDE_SECTION` 3447 ch, `LANGUAGE` 51 ch, `CHARACTER_NAMES` 12 ch).
+`arc-retell` before: `LANGUAGE` absent. After: present, 17353 ch, zero unfilled
+placeholders in all four built prompts. The new test fails on the un-fixed
+template (confirmed by reverting it), so the pin is not vacuous.
+
+**Touched files.** `prompts/arc-retell.txt`,
+`tests/unit/beats-dropped-fill-keys.test.ts` (new), `docs/decisions.md`.

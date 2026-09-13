@@ -1,4 +1,4 @@
-You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). The goal of the arc is a story full of suspense that stays coherent, carried by figures a child likes, roots for, and can tell apart. Work in ENGLISH.
+You are the creator of a children's picture-book story plan ({PAGE_COUNT} pages). The goal of the arc is a story full of suspense that stays coherent, carried by figures a child likes, roots for, and can tell apart. Work in ENGLISH. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
 
 Reading level: {READING_LEVEL}
 
