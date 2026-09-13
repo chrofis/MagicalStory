@@ -73,4 +73,15 @@ describe('unionPageCast', () => {
     expect(unionPageCast('Sarah runs.', ['Sarah'], [])).toEqual([]);
     expect(unionPageCast('Sarah runs.', ['Sarah'], null as any)).toEqual([]);
   });
+
+  it('per-page clothing keys are NOT a cast signal at the call sites', () => {
+    // Measured: on job_1789207854566_l43qgl34w p3 and p11 the outline
+    // commissioned nobody and still emitted a clothing entry for all five
+    // characters. Reading those keys as cast put five people on two empty
+    // pages. The hint side of the union is `characters[]` only.
+    const fs = require('fs');
+    const src = fs.readFileSync(require('path').join(process.cwd(), 'storyJobPipeline.js'), 'utf8');
+    expect(src).not.toMatch(/unionPageCast\([^)]*Object\.keys\([^)]*[Cc]lothing/s);
+    expect(src).toMatch(/unionPageCast\(\s+scene\.sceneDescription,\s+scene\.characters \|\| \[\],/);
+  });
 });

@@ -1166,11 +1166,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // Determine which characters appear in this scene. Same union rule as
           // the full-mode page cast (see unionPageCast): the hint's own
-          // `characters[]` / per-page clothing keys are commissioned cast even
-          // when the prose never names them.
+          // `characters[]` is commissioned cast even when the prose never names
+          // them. Per-page clothing keys are deliberately NOT read — they are
+          // populated for the whole cast on pages that commission nobody.
           const sceneCharacters = unionPageCast(
             (page.sceneHint || '') + '\n' + (page.text || ''),
-            [...(page.characters || []), ...Object.keys(perCharClothing || {})],
+            page.characters || [],
             inputData.characters
           );
 
@@ -3766,9 +3767,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // (garment owners), and prose that describes a figure without naming it
         // scans down to the named subset. This is the roster every presence
         // check downstream is measured against.
+        //
+        // The hint side is `characters[]` ONLY. Per-page `characterClothing` is
+        // NOT a cast signal, and reading its keys was measured to be wrong: on
+        // job_1789207854566_l43qgl34w p3 and p11 the outline commissioned no
+        // people at all and still emitted a clothing entry for all five, which
+        // put a cast of five onto two empty pages.
         const sceneCharacters = unionPageCast(
           scene.sceneDescription,
-          [...(scene.characters || []), ...Object.keys(scene.characterClothing || {})],
+          scene.characters || [],
           inputData.characters
         );
         // Characters section takes priority over scene metadata JSON (may have stale costume data)
