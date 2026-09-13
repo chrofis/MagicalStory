@@ -399,7 +399,16 @@ const TRIAL_FUNNEL_STEPS = [
   'create_clicked',       // pressed create — navigates to /trial-generation
   'generation_started',   // the job was accepted
   'generation_completed', // the story finished
+  // A LEAD, not a conversion, and optional: the Google path never passes through
+  // it. Reported like any other step but it can't be the baseline for the one
+  // after it — see OPTIONAL_TRIAL_STEPS.
   'email_submitted',      // gave an email (the lead)
+  // The terminal step, and the only honest conversion number: a real account
+  // exists, reached by EITHER auth method (meta.method is email or google).
+  // Until 2026-09-13 the funnel ended at email_submitted, so the 4 conversions
+  // that came in through Google were invisible and the panel read 12.5% where
+  // the truth was 50%.
+  'account_created',
 ];
 const TRIAL_FUNNEL_STEP_SET = new Set(TRIAL_FUNNEL_STEPS);
 
@@ -408,7 +417,7 @@ const TRIAL_FUNNEL_STEP_SET = new Set(TRIAL_FUNNEL_STEPS);
 // face-selection modal appears only when a photo has 2+ faces, so a run of
 // single-face photos would otherwise read as "everyone was lost at face_picked"
 // and drive the next step's rate to 0%.
-const OPTIONAL_TRIAL_STEPS = new Set(['face_picked']);
+const OPTIONAL_TRIAL_STEPS = new Set(['face_picked', 'email_submitted']);
 
 // Crawlers hit /try and would otherwise inflate `landing`. Not a security
 // control — a bot that wants in can lie — just noise reduction so the top of
@@ -496,13 +505,19 @@ router.post('/event', trialEventLimiter, async (req, res) => {
     if (BOT_UA_RE.test(ua)) return;
 
     // user_id from the session token only — never from the body.
+    // Accept the trial session token AND a full account token: after the Google
+    // link the trial session token is gone and only `auth_token` remains, so an
+    // anonymous-only check left every post-signup event with user_id = NULL
+    // (measured on prod 2026-09-13: the converted visit's generation_completed
+    // row had no user). Either token proves the user server-side; a client-
+    // supplied id is still never trusted.
     let userId = null;
     const token = (req.headers['authorization'] || '').split(' ')[1];
     if (token) {
       try {
         const decoded = verifyToken(token);
-        if (decoded?.anonymous && decoded.userId) userId = decoded.userId;
-      } catch { /* expired or not a session token — stays anonymous */ }
+        if (decoded?.userId) userId = decoded.userId;
+      } catch { /* expired or not one of ours — stays anonymous */ }
     }
 
     await recordTrialEvent({
@@ -525,6 +540,83 @@ router.post('/event', trialEventLimiter, async (req, res) => {
 });
 
 /**
+ * The per-step rows, given a step → distinct-visit count map. Pure, so the
+ * optional-step rule is pinned by a unit test rather than by a live funnel.
+ *
+ * An OPTIONAL step (the multi-face modal; the email lead, which the Google
+ * signup path skips entirely) is reported but never becomes the baseline for
+ * the step after it — otherwise a run of single-face photos, or a week of
+ * Google-only conversions, reads as "everyone was lost here" and drives the
+ * next step's rate to 0%.
+ *
+ * @param {Map<string, number>} byStep
+ */
+function buildTrialFunnelRows(byStep) {
+  const first = byStep.get(TRIAL_FUNNEL_STEPS[0]) || 0;
+  let prev = null;
+  return TRIAL_FUNNEL_STEPS.map((step) => {
+    const visits = byStep.get(step) || 0;
+    const optional = OPTIONAL_TRIAL_STEPS.has(step);
+    // A step can legitimately exceed its predecessor (an event lost to a
+    // closed tab, a resumed visit), so clamp the rate rather than report >100%.
+    const fromPrev = prev === null ? 100 : prev === 0 ? 0 : Math.min(100, Math.round((visits / prev) * 1000) / 10);
+    const entry = {
+      step,
+      optional,
+      visits,
+      pctOfFirst: first === 0 ? 0 : Math.min(100, Math.round((visits / first) * 1000) / 10),
+      pctOfPrev: fromPrev,
+      // Skipping an optional step is not a loss — only mandatory steps can lose people.
+      droppedFromPrev: prev === null || optional ? 0 : Math.max(0, prev - visits),
+    };
+    if (!optional) prev = visits;
+    return entry;
+  });
+}
+
+/**
+ * Turn a panel range token into a SQL window over trial_events.created_at.
+ *
+ * Two shapes, deliberately:
+ *  - '<N>d'  — the original rolling interval ("the last 30 days"), which is what
+ *              a trend wants and what every earlier caller asked for.
+ *  - 'today' / 'yesterday' — EUROPE/ZURICH CALENDAR days, which is what the owner
+ *              means by "today" and which a rolling interval can never express.
+ *              The bounds come from scripts/lib/chTime.js (Intl-derived, DST-safe);
+ *              never compute them with setHours() — the container's local time is
+ *              UTC, so that would silently start the day an hour or two early.
+ *
+ * Labels are Swiss local, marked CH, per docs/SETTLED.md.
+ *
+ * @param {string} range
+ * @param {Date} [now] - injectable for tests
+ */
+function resolveTrialWindow(range = '30d', now = new Date()) {
+  const { chDayRange, ch } = require('../../scripts/lib/chTime');
+  const token = String(range || '30d').trim().toLowerCase();
+
+  if (token === 'today' || token === 'yesterday') {
+    const { start, end } = chDayRange(token === 'today' ? 0 : -1, now);
+    return {
+      range: token,
+      days: 1,
+      clause: 'created_at >= $1 AND created_at < $2',
+      params: [start, end],
+      label: `${ch(start)} – ${ch(end)}`,
+    };
+  }
+
+  const days = Math.max(1, Math.min(365, parseInt(token, 10) || 30));
+  return {
+    range: `${days}d`,
+    days,
+    clause: "created_at >= NOW() - ($1 || ' days')::INTERVAL",
+    params: [String(days)],
+    label: `${ch(new Date(now.getTime() - days * 86400000))} – ${ch(now)}`,
+  };
+}
+
+/**
  * Per-step trial funnel: how many distinct visits reached each step.
  *
  * `source` buckets on the landing UTMs:
@@ -535,17 +627,19 @@ router.post('/event', trialEventLimiter, async (req, res) => {
  * Drop-off is expressed against the PREVIOUS step, not against landing, because
  * the question is "which click loses them", not "what fraction of the top".
  *
- * @param {number} days - lookback window
+ * @param {string} range - '<N>d' rolling window, or 'today' | 'yesterday' (CH calendar days)
  * @param {string} source - all | paid | organic | direct
  */
-async function getTrialStepFunnel(days = 30, source = 'all') {
-  const empty = { days, source, steps: [], totalVisits: 0, allSourcesVisits: 0 };
+async function getTrialStepFunnel(range = '30d', source = 'all') {
+  const window = resolveTrialWindow(range);
+  const empty = { range: window.range, rangeLabel: window.label, days: window.days, source, steps: [], totalVisits: 0, allSourcesVisits: 0 };
   try {
     const { getPool } = require('../services/database');
     const pool = getPool();
     if (!pool) return empty;
 
-    const windowClause = "created_at >= NOW() - ($1 || ' days')::INTERVAL";
+    const windowClause = window.clause;
+    const windowParams = window.params;
     const sourceClause = trialSourceWhereClause(source);
     const clauses = sourceClause ? [windowClause, sourceClause] : [windowClause];
 
@@ -554,7 +648,7 @@ async function getTrialStepFunnel(days = 30, source = 'all') {
          FROM trial_events
         WHERE ${clauses.join(' AND ')}
         GROUP BY step`,
-      [String(days)]
+      windowParams
     );
 
     const byStep = new Map(rows.map((r) => [r.step, r.visits]));
@@ -568,33 +662,15 @@ async function getTrialStepFunnel(days = 30, source = 'all') {
       const all = await pool.query(
         `SELECT COUNT(DISTINCT visit_id)::int AS visits
            FROM trial_events
-          WHERE ${windowClause} AND step = $2`,
-        [String(days), TRIAL_FUNNEL_STEPS[0]]
+          WHERE ${windowClause} AND step = $${windowParams.length + 1}`,
+        [...windowParams, TRIAL_FUNNEL_STEPS[0]]
       );
       allSourcesVisits = all.rows[0]?.visits || 0;
     }
 
-    let prev = null;
-    const steps = TRIAL_FUNNEL_STEPS.map((step) => {
-      const visits = byStep.get(step) || 0;
-      const optional = OPTIONAL_TRIAL_STEPS.has(step);
-      // A step can legitimately exceed its predecessor (an event lost to a
-      // closed tab, a resumed visit), so clamp the rate rather than report >100%.
-      const fromPrev = prev === null ? 100 : prev === 0 ? 0 : Math.min(100, Math.round((visits / prev) * 1000) / 10);
-      const entry = {
-        step,
-        optional,
-        visits,
-        pctOfFirst: first === 0 ? 0 : Math.min(100, Math.round((visits / first) * 1000) / 10),
-        pctOfPrev: fromPrev,
-        // Skipping an optional step is not a loss — only mandatory steps can lose people.
-        droppedFromPrev: prev === null || optional ? 0 : Math.max(0, prev - visits),
-      };
-      if (!optional) prev = visits;
-      return entry;
-    });
+    const steps = buildTrialFunnelRows(byStep);
 
-    return { days, source, steps, totalVisits: first, allSourcesVisits };
+    return { range: window.range, rangeLabel: window.label, days: window.days, source, steps, totalVisits: first, allSourcesVisits };
   } catch (err) {
     log.warn(`[TRIAL FUNNEL] Failed to compute step funnel: ${err.message}`);
     return empty;
@@ -3058,6 +3134,9 @@ module.exports.getTrialStatsHistory = getTrialStatsHistory;
 module.exports.getTrialFunnel = getTrialFunnel;
 module.exports.getTrialStepFunnel = getTrialStepFunnel;
 module.exports.TRIAL_FUNNEL_STEPS = TRIAL_FUNNEL_STEPS;
+module.exports.OPTIONAL_TRIAL_STEPS = OPTIONAL_TRIAL_STEPS;
+module.exports.buildTrialFunnelRows = buildTrialFunnelRows;
+module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;

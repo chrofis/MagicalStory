@@ -67,4 +67,46 @@ function fromPgNaive(d) {
   ));
 }
 
-module.exports = { ch, chTime, fromPgNaive };
+/**
+ * Offset of Europe/Zurich at a given instant, in ms (+3600000 CET, +7200000 CEST).
+ * Derived from Intl, never from a hand-written DST rule.
+ */
+function chOffsetMs(date) {
+  const p = parts(date);
+  const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return asUTC - date.getTime();
+}
+
+/**
+ * The UTC instant of Swiss-local midnight, `offsetDays` from the CH calendar day
+ * containing `now` (0 = today, -1 = yesterday, +1 = tomorrow — the exclusive end
+ * of today).
+ *
+ * Why not `date.setHours(0,0,0,0)`: that is the SERVER's local midnight, which is
+ * UTC in Railway containers — an hour or two off the day the owner means, so a
+ * "today" panel silently mixes in part of yesterday evening. DST is handled by
+ * re-reading the zone offset at the candidate instant, which is what makes the
+ * 02:00→03:00 and 03:00→02:00 nights come out right.
+ *
+ * @param {number} offsetDays
+ * @param {Date|string|number} [now] - injectable for tests
+ * @returns {Date}
+ */
+function chDayStart(offsetDays = 0, now = new Date()) {
+  const base = toDate(now);
+  const p = parts(base);
+  // Midnight of the target CH calendar day, read as if it were UTC…
+  const naive = Date.UTC(+p.year, +p.month - 1, +p.day + offsetDays, 0, 0, 0);
+  // …then shifted back by the zone offset actually in force at that instant.
+  // Two passes: the first guess can land on the wrong side of a DST switch.
+  let ms = naive - chOffsetMs(new Date(naive));
+  ms = naive - chOffsetMs(new Date(ms));
+  return new Date(ms);
+}
+
+/** [start, end) of a Swiss calendar day. offsetDays 0 = today, -1 = yesterday. */
+function chDayRange(offsetDays = 0, now = new Date()) {
+  return { start: chDayStart(offsetDays, now), end: chDayStart(offsetDays + 1, now) };
+}
+
+module.exports = { ch, chTime, fromPgNaive, chOffsetMs, chDayStart, chDayRange };

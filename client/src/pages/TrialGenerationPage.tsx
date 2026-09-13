@@ -560,6 +560,7 @@ export default function TrialGenerationPage() {
       trackEmailLead();
       trackEvent('trial_email_lead');
       trackTrialStep('email_submitted');
+      trackTrialStep('account_created', { method: 'email' });
     } catch {
       setAuthError(t.error);
     } finally {
@@ -606,6 +607,11 @@ export default function TrialGenerationPage() {
 
     setGoogleLinked(true);
     setIsVerified(true);
+
+    // The terminal funnel step. Fired after the token swap above on purpose:
+    // trackTrialStep falls back to `auth_token`, so the event is authenticated
+    // either way and the server can attach the user id.
+    trackTrialStep('account_created', { method: 'google' });
   };
 
   // (Google Identity Services uses an in-page popup — no redirect flow to handle.)

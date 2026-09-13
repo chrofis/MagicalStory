@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type TrialStepFunnel, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob, type ActivityFeed } from '@/services';
+import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type TrialStepFunnel, type TrialFunnelRange, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob, type ActivityFeed } from '@/services';
 import {
   Users,
   BookOpen,
@@ -62,6 +62,7 @@ export default function AdminDashboard() {
   const [trialFunnel, setTrialFunnel] = useState<TrialFunnel | null>(null);
   const [trialStepFunnel, setTrialStepFunnel] = useState<TrialStepFunnel | null>(null);
   const [stepFunnelSource, setStepFunnelSource] = useState<'all' | 'paid' | 'organic' | 'direct'>('all');
+  const [stepFunnelRange, setStepFunnelRange] = useState<TrialFunnelRange>('30d');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [userSearch, setUserSearch] = useState('');
@@ -128,7 +129,7 @@ export default function AdminDashboard() {
         adminService.getTrialStats().catch(() => null),
         adminService.getTrialStatsHistory(14).catch(() => []),
         adminService.getTrialFunnel(30).catch(() => null),
-        adminService.getTrialStepFunnel(30, 'all').catch(() => null),
+        adminService.getTrialStepFunnel('30d', 'all').catch(() => null),
       ]);
       setStats(statsData);
       if (trialData) setTrialStats(trialData);
@@ -147,7 +148,15 @@ export default function AdminDashboard() {
   // re-run on every source switch.
   const selectStepFunnelSource = async (source: 'all' | 'paid' | 'organic' | 'direct') => {
     setStepFunnelSource(source);
-    const data = await adminService.getTrialStepFunnel(30, source).catch(() => null);
+    const data = await adminService.getTrialStepFunnel(stepFunnelRange, source).catch(() => null);
+    if (data) setTrialStepFunnel(data);
+  };
+
+  // Same re-fetch for the time window. 'today'/'yesterday' are Europe/Zurich
+  // calendar days server-side, not a rolling 24h.
+  const selectStepFunnelRange = async (range: TrialFunnelRange) => {
+    setStepFunnelRange(range);
+    const data = await adminService.getTrialStepFunnel(range, stepFunnelSource).catch(() => null);
     if (data) setTrialStepFunnel(data);
   };
 
@@ -982,6 +991,27 @@ export default function AdminDashboard() {
                     </h2>
                     <p className="text-sm text-gray-500 mt-1">{texts.trialStepFunnelSubtitle}</p>
                   </div>
+                  <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    {([
+                      ['today', texts.trialStepFunnelRangeToday],
+                      ['yesterday', texts.trialStepFunnelRangeYesterday],
+                      ['7d', texts.trialStepFunnelRange7d],
+                      ['30d', texts.trialStepFunnelRange30d],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => selectStepFunnelRange(key)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+                          stepFunnelRange === key
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex items-center gap-1">
                     {([
                       ['all', texts.trialStepFunnelSourceAll],
@@ -1002,7 +1032,11 @@ export default function AdminDashboard() {
                       </button>
                     ))}
                   </div>
+                  </div>
                 </div>
+
+                {/* The exact window, Swiss local, marked CH. */}
+                <p className="text-xs text-gray-400 -mt-2 mb-3 font-mono">{trialStepFunnel.rangeLabel}</p>
 
                 {trialStepFunnel.totalVisits === 0 ? (
                   <p className="text-sm text-gray-500 italic">
@@ -1026,7 +1060,7 @@ export default function AdminDashboard() {
                               <td className="py-1.5 pr-4">
                                 <div className="flex items-center gap-2">
                                   <span className={row.optional ? 'text-gray-400 italic' : 'text-gray-700'}>
-                                    {row.step.replace(/_/g, ' ')}
+                                    {texts.trialStepLabels[row.step] || row.step.replace(/_/g, ' ')}
                                   </span>
                                   {/* Bar width is share of the top of the funnel,
                                       so the shape of the drop-off is visible at a glance. */}

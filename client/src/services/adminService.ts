@@ -55,7 +55,13 @@ export interface TrialStepFunnelEntry {
   droppedFromPrev: number;
 }
 
+/** '<N>d' rolling, or a Europe/Zurich calendar day. */
+export type TrialFunnelRange = 'today' | 'yesterday' | `${number}d`;
+
 export interface TrialStepFunnel {
+  range: string;
+  /** Human window, Swiss local, marked CH — e.g. "2026-09-13 00:00:00 CH – …". */
+  rangeLabel: string;
   days: number;
   source: string;
   steps: TrialStepFunnelEntry[];
@@ -510,8 +516,8 @@ export const adminService = {
     return api.get<TrialFunnel>(`/api/admin/trial-funnel?days=${days}`);
   },
 
-  async getTrialStepFunnel(days = 30, source = 'all'): Promise<TrialStepFunnel> {
-    return api.get<TrialStepFunnel>(`/api/admin/trial-step-funnel?days=${days}&source=${source}`);
+  async getTrialStepFunnel(range: TrialFunnelRange = '30d', source = 'all'): Promise<TrialStepFunnel> {
+    return api.get<TrialStepFunnel>(`/api/admin/trial-step-funnel?range=${range}&source=${source}`);
   },
 
   // Token Usage Analytics

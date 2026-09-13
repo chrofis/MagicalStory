@@ -800,9 +800,11 @@ router.get('/trial-step-funnel', authenticateToken, requireAdmin, async (req, re
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Trial step funnel requires database mode' });
     }
-    const days = parseInt(req.query.days) || 30;
+    // `range` is the current knob: '<N>d' rolling, or 'today'/'yesterday' on CH
+    // calendar boundaries. `days` stays accepted so an old bookmark still works.
+    const range = req.query.range || `${parseInt(req.query.days) || 30}d`;
     const source = TRIAL_SOURCES.includes(req.query.source) ? req.query.source : 'all';
-    const funnel = await getTrialStepFunnel(days, source);
+    const funnel = await getTrialStepFunnel(range, source);
     res.json(funnel);
   } catch (err) {
     console.error('❌ [ADMIN] Error fetching trial step funnel:', err);

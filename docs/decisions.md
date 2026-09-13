@@ -34727,3 +34727,58 @@ left alone — it is not the trial path and not the measured 23% path.
 **Touched:** `prompts/story-trial.txt`, `server/lib/promptBuilders.js`
 (`buildTrialStoryPrompt` → `CREATURE_TONE`), `tests/unit/trial-prompt-parity.test.ts`
 **Status:** ✅ active
+
+---
+
+## The trial funnel's terminal step is `account_created`, covering both auth methods; `email_submitted` is a lead, not a conversion (2026-09-13)
+**Context:** The per-step /try funnel ended at `email_submitted`, which is emitted
+in exactly one place — `handleEmailSubmit`. The Google path (`completeGoogleLink`
+→ `POST /api/trial/link-google`) emitted no tracking at all. Measured on prod
+2026-09-13: all 4 conversions of the preceding 30 days came in through Google, so
+the panel reported 1 conversion against 8 finished stories (12.5%) where the truth
+was 5 of 8 (50%) — the funnel's headline number was wrong by 4×. Two further
+faults sat behind it: `completeGoogleLink` deletes `trial_session_token` before
+any tracking could fire, so post-signup events went out as unauthenticated beacons
+and the server resolved no user id (today's `generation_completed` row has
+`user_id = NULL`); and the panel's only window was
+`created_at >= NOW() - N days`, a rolling interval that can never express "today".
+**Decision:**
+1. One terminal step `account_created`, fired by BOTH auth paths with
+   `meta.method = email | google`. `email_submitted` stays as an OPTIONAL step
+   (`OPTIONAL_TRIAL_STEPS`, the same treatment `face_picked` has): it is reported,
+   but it never becomes the baseline for the step after it. It is a lead, not a
+   conversion.
+2. `trackTrialStep` falls back to `auth_token` when `trial_session_token` is gone,
+   and `POST /api/trial/event` accepts any valid token (not only an anonymous
+   one) when resolving the user id.
+3. The panel window is a `range` token: `<N>d` rolling as before, plus `today` and
+   `yesterday` evaluated on **Europe/Zurich calendar boundaries** via
+   `chDayRange()` in `scripts/lib/chTime.js`. The active window is shown as a
+   Swiss local label marked CH.
+4. Conversions that happened before the step existed are backfilled by
+   `scripts/admin/backfill-trial-account-created.js`, dated from the
+   `credit_transactions` "Welcome credits (Google sign-up)" row.
+**Rationale:** A funnel whose last step only one of two auth paths can reach does
+not measure conversion, it measures which button was clicked — and it was
+silently reporting a quarter of the real rate to the person deciding ad spend.
+The token fallback was chosen over re-ordering the statements in
+`completeGoogleLink` because it fixes EVERY post-signup event rather than one
+call site, and cannot be undone by a future edit that moves a line. Calendar-day
+windows are computed from Intl, never by hand: the container's local midnight is
+UTC, an hour or two off the day the owner means, and a fixed 24h subtraction gets
+both DST switch nights wrong (2026-03-29 is a 23-hour Swiss day, 2026-10-25 a
+25-hour one) — both pinned by tests.
+**Touched:**
+- `server/routes/trial.js` (`TRIAL_FUNNEL_STEPS`, `OPTIONAL_TRIAL_STEPS`,
+  `buildTrialFunnelRows`, `resolveTrialWindow`, `getTrialStepFunnel`, `POST /event`)
+- `scripts/lib/chTime.js` (`chOffsetMs`, `chDayStart`, `chDayRange`)
+- `server/routes/admin/analytics.js` (`range` query param, `days` still accepted)
+- `client/src/utils/trialFunnel.ts` (`TrialStep` union, auth_token fallback)
+- `client/src/pages/TrialGenerationPage.tsx` (both emit sites)
+- `client/src/services/adminService.ts`, `client/src/pages/AdminDashboard.tsx`,
+  `client/src/pages/admin/translations.ts` (range buttons, CH label, step labels)
+- `scripts/admin/backfill-trial-account-created.js`
+- `tests/unit/trial-funnel-window.test.ts`
+**Status:** ✅ active — no schema change needed (`trial_events.step` is a
+VARCHAR(40) whitelisted in code, not an enum). The production backfill has NOT
+been run yet; it awaits owner approval.
