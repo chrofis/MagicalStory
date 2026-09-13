@@ -1146,6 +1146,21 @@ async function extractInlineImagesToR2(storyId, data) {
           upload(s.grokRefImages[idx], r2.keyForGrokRef(storyId, pageNum, 0, idx), (url) => { s.grokRefImages[idx] = url; });
         }
       }
+      // Refs packed into the empty-scene PLATE call (the landmark photo, the
+      // VB element grid). One plate per page, so no version index — same key
+      // shape as the page's grok refs, under an empty-scene- prefix. The
+      // generic Phase 1.5 sweep would catch these too, but only under an
+      // opaque /aux/ key; an explicit walker keeps them grouped with the page.
+      if (Array.isArray(s.emptySceneGrokRefImages)) {
+        for (let k = 0; k < s.emptySceneGrokRefImages.length; k++) {
+          const idx = k;
+          upload(
+            s.emptySceneGrokRefImages[idx],
+            `stories/${storyId}/debug/p${pageNum}/empty-scene-ref-${idx}.jpg`,
+            (url) => { s.emptySceneGrokRefImages[idx] = url; }
+          );
+        }
+      }
       if (Array.isArray(s.imageVersions)) {
         for (let i = 0; i < s.imageVersions.length; i++) {
           const v = s.imageVersions[i];
@@ -1577,6 +1592,7 @@ async function extractInlineImagesToR2(storyId, data) {
  *   - sceneImages[*].imageVersions[*].grokRefImages[*]            (Grok inputs)
  *   - sceneImages[*].imageVersions[*].inpaintReferenceImages[*]   (inpaint refs)
  *   - sceneImages[*].grokRefImages[*]
+ *   - sceneImages[*].emptySceneGrokRefImages[*]                   (plate inputs)
  *   - sceneImages[*].bboxOverlayImage                             (debug overlay)
  *   - sceneImages[*].visualBibleGrid                              (debug grid)
  *   - sceneImages[*].landmarkPhotos[*].photoData                  (Wikimedia bytes)
@@ -1663,6 +1679,10 @@ function stripInlineImagesFromStoryData(data, { keepDisplayBytes = false } = {})
       if (!s || typeof s !== 'object') continue;
       s.bboxOverlayImage = keepUrl(s.bboxOverlayImage);
       s.grokRefImages = filterUrlArray(s.grokRefImages);
+      // Same treatment for the empty-scene plate's packed refs — R2 URLs are
+      // kept, anything still inline after extract (R2 unreachable) is dropped
+      // rather than persisted as base64 in the JSONB blob.
+      s.emptySceneGrokRefImages = filterUrlArray(s.emptySceneGrokRefImages);
       s.originalImage = undefined;
       s.preEntityRepairImage = undefined;
       s.visualBibleGrid = keepUrl(s.visualBibleGrid);

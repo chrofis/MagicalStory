@@ -2150,7 +2150,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                   });
                   if (result?.imageData) {
-                    sceneBackgrounds[pageNum] = { imageData: result.imageData, prompt: emptyPrompt };
+                    // grokRefImages = what packReferences actually packed into
+                    // the plate call (the landmark photo, here). Same field
+                    // name every other image call in the pipeline stores its
+                    // packed refs under; carried onto the page row below as
+                    // emptySceneGrokRefImages so the plate call leaves a trace.
+                    sceneBackgrounds[pageNum] = {
+                      imageData: result.imageData,
+                      prompt: emptyPrompt,
+                      grokRefImages: result.grokRefImages || null,
+                    };
                     log.info(`🎬 [TRIAL] Empty scene for page ${pageNum} generated (${Math.round(result.imageData.length / 1024)}KB)`);
                     if (result.usage) {
                       const isGrok = result.modelId?.startsWith('grok-imagine');
@@ -4243,6 +4252,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // plate's page group.
               let plateImage = result.imageData;
               let platePrompt = emptyPrompt;
+              let plateRefs = result.grokRefImages || null;
               let plateQcRecord = null;
               try {
                 const { validateEmptyScene } = require('./server/lib/images');
@@ -4315,6 +4325,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       plateQcRecord = { v1ImageData: plateImage, v1Issues: qc.issues, visionFeedback: qc.visionFeedback || null, retryPrompt };
                       plateImage = retryResult.imageData;
                       platePrompt = retryPrompt;
+                      plateRefs = retryResult.grokRefImages || null;
                       genLog.info('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry ${retryQc.pass ? 'passed QC' : `still has ${retryQc.issues.length} issue(s) — fewer than v1's ${qc.issues.length}, keeping retry`}`);
                     } else {
                       genLog.warn('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry did not improve (${retryQc.issues.join(', ')}) — keeping the first plate`);
@@ -4336,6 +4347,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 sceneBackgrounds[pn] = {
                   imageData: plateImage,
                   prompt: platePrompt,
+                  // Refs packed into the plate call that produced plateImage
+                  // (the retry's, when the retry won). Same field name every
+                  // other image call stores its packed refs under.
+                  grokRefImages: plateRefs,
                   textAreaMask: null,
                   emptySceneVbGrid: emptySceneVbGridDataUrl,
                   vantageId,
@@ -4630,17 +4645,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
                       // Return both versions so they can be compared in dev mode
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, grokRefImages: retryResult.grokRefImages || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                     }
                     log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
                     // Pick whichever version has fewer issues
                     const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
-                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, grokRefImages: (retryQc.issues.length < qc.issues.length ? retryResult.grokRefImages : result.grokRefImages) || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                   }
                 }
               }
 
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, grokRefImages: result?.grokRefImages || null, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
             } catch (err) {
               // Loud, and in the STORED log (2026-08-29). A page whose plate
               // failed still renders — the page path handles a null
@@ -4674,6 +4689,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sceneBackgrounds[bg.pageNumber] = {
               imageData: bg.imageData,
               prompt: bg.prompt,
+              // Refs packed into the plate call — same field name every other
+              // image call stores its packed refs under.
+              grokRefImages: bg.grokRefImages || null,
               textAreaMask: bg.textAreaMask || null,
               emptySceneVbGrid: bg.emptySceneVbGrid || null,
               // Store QC data for dev mode comparison (v1 failed, v2 retry)
@@ -4828,7 +4846,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 visualBibleGrid: pageData.visualBibleGrid,
                 grokRefImages: streamResult.grokRefImages,
                 emptySceneImage: null,
-                emptyScenePrompt: null,
+                // The trial plate was the ONLY image call in the pipeline that
+                // left no trace: this branch hardcoded null, so every trial
+                // page shipped with emptyScenePrompt null even though the
+                // plate had been rendered from a real prompt during outline
+                // streaming. Read it back off the slot the trial loop filled.
+                emptyScenePrompt: sceneBackgrounds[pageData.pageNumber]?.prompt || null,
+                emptySceneGrokRefImages: sceneBackgrounds[pageData.pageNumber]?.grokRefImages || null,
+                vantageId: sceneBackgrounds[pageData.pageNumber]?.vantageId || null,
                 sceneDescription: pageData.scene.sceneDescription,
                 text: pageData.scene.text,
                 sceneCharacters: pageData.sceneCharacters,
@@ -5173,6 +5198,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               grokRefImages: genResult.grokRefImages || null,
               emptySceneImage: emptySceneData?.imageData || null,
               emptyScenePrompt: emptySceneData?.prompt || null,
+              emptySceneGrokRefImages: emptySceneData?.grokRefImages || null,
+              // Which vantage group this page's plate came from. Persisted so
+              // plate-group membership is directly auditable instead of being
+              // reconstructable only by comparing image hashes across pages.
+              vantageId: emptySceneData?.vantageId || null,
               textAreaMask: emptySceneData?.textAreaMask || null,
               emptySceneVbGrid: emptySceneData?.emptySceneVbGrid || null,
               emptySceneQc: emptySceneData?.v1Issues ? {
@@ -5538,7 +5568,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBibleGrid: img.visualBibleGrid || null,
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
-          emptyScenePrompt: img.emptyScenePrompt || null,
+          emptyScenePrompt: img.emptyScenePrompt || sceneBackgrounds[img.pageNumber]?.prompt || null,
+          // Refs packed into the empty-scene plate call, and the vantage
+          // group the plate belongs to. Both are whitelisted here or they
+          // never reach stories.data. Base64 in emptySceneGrokRefImages is
+          // offloaded to R2 by extractInlineImagesToR2 (explicit walker).
+          emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
+          vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
           emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
             v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
             v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
@@ -5869,7 +5905,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
-          emptyScenePrompt: img.emptyScenePrompt || null,
+          emptyScenePrompt: img.emptyScenePrompt || sceneBackgrounds[img.pageNumber]?.prompt || null,
+          // Refs packed into the empty-scene plate call, and the vantage
+          // group the plate belongs to. Both are whitelisted here or they
+          // never reach stories.data. Base64 in emptySceneGrokRefImages is
+          // offloaded to R2 by extractInlineImagesToR2 (explicit walker).
+          emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
+          vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
           emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
             v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
             v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
