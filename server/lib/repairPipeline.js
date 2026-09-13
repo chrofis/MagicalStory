@@ -417,6 +417,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: orig.characterPhotos,
       allCharacterPhotos,
       sceneDescription: entry.description || orig.sceneDescription,
+      // The post-shrink scene block from the ORIGINAL render — the description
+      // the image model actually received when the built prompt was over its
+      // character cap. An entry with its OWN description (an iterate rewrite)
+      // was rendered from a different contract, so it must not inherit it.
+      compressedScene: entry.description ? null : (orig.compressedScene || null),
       // An ARRAY on the entry is that version's own declaration (an iterate
       // rewrite can legitimately empty the cast); anything else inherits the
       // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
@@ -625,6 +630,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: img.characterPhotos,
       allCharacterPhotos,
       sceneDescription: img.sceneDescription,
+      // Same as buildEvalInputs: this IS the original render, so it evaluates
+      // against the sent (post-shrink) description when there was one.
+      compressedScene: img.compressedScene || null,
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       pageText: img.text,

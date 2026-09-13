@@ -4731,26 +4731,13 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     ].filter(Boolean).join('\n');
   }).join('\n\n') || '(no character details available)';
 
-  // Story brief = what the book was ASKED to be. This mirrors the field set the
-  // writer prompt receives, because a refiner working from less context than the
-  // writer had will drift away from the commission — storyDetails in particular
-  // is the user's own idea in their own words and is the strongest anchor here.
-  // Absent fields are omitted rather than sent as "undefined".
-  const relLines = buildRelationshipLines(inputData);
-  const rel = relLines.length ? relLines.map(r => `  - ${r}`).join('\n') : null;
-  const brief = [
-    inputData.title ? `Title: ${inputData.title}` : null,
-    inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
-    inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
-    inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
-    inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
-    `Season: ${seasonLabel(inputData)}`,
-    buildSettingLine(inputData),
-    rel ? `Relationships:\n${rel}` : null,
-    // The commission itself, last so it reads as the payload — wrapped the same
-    // way the writer wraps it, since it is untrusted user text.
-    inputData.storyDetails ? `\nStory idea (the user's own words):\n${wrapUserInput(inputData.storyDetails)}` : null,
-  ].filter(Boolean).join('\n') || '(no additional brief recorded)';
+  // NO COMMISSION HERE. text-refine.txt carries no {STORY_BRIEF} placeholder,
+  // and must not gain one: the refiner judges the finished text against the ARC,
+  // which is the master. The pre-arc commission was deliberately withheld from
+  // the generator at this stage, so putting it in front of this judge would be
+  // spec drift — it would "fix" the text toward a brief the writer never saw.
+  // A brief was computed and passed here until 2026-09-13; the template silently
+  // dropped it, and the argument is deleted rather than wired up.
 
   // Reuse the canonical DO-NOT-WRITE list from the writer template so the ban
   // categories can never drift between writing and refining.
@@ -4774,7 +4761,6 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PAGE_COUNT: pages.length,
     CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
-    STORY_BRIEF: brief,
     CHARACTER_DETAILS: characterDetails,
     // The whole story — every fact it states belongs on some page. Read-only:
     // never a licence to add events the story does not carry.
@@ -5056,8 +5042,28 @@ const CREATURE_TONE_LEVELS = {
   formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
 
+/**
+ * The band comes from the YOUNGEST main character, not the focus one
+ * (owner, 2026-09-13).
+ *
+ * `pickMainCharacters().focus` is `mains[0]` after a DESCENDING age sort — the
+ * OLDEST main. On prod job_1789227389389_z18dmvnt6 the mains were Liz 5 and
+ * Ayan 8, so focus was Ayan and the whole book was briefed `formidable`
+ * ("claws and teeth visible rather than hidden … it may loom") — in a book
+ * whose other lead is five. Its p10 crayfish was drawn gripping a wet,
+ * dead-looking mouse, which is that instruction working as written. Liz alone
+ * would have got `not-menacing` ("no teeth shown, claws not raised").
+ *
+ * The gentler band is the safe direction for a mixed-age cast: an eight-year-old
+ * is not harmed by a non-menacing creature, a five-year-old is harmed by a
+ * formidable one. Same reasoning as the reading level, which already clamps to
+ * `youngestMainAge` at buildChildCriticPrompt's age helper.
+ *
+ * Fallback is NaN, not youngestMainAge's default 5: a cast with no readable age
+ * must still yield no tone section at all, exactly as before.
+ */
 function creatureToneLevel(inputData = {}) {
-  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  const age = youngestMainAge(inputData, NaN);
   if (!Number.isFinite(age) || age < 0) return null;
   if (age <= 4) return 'cute';
   if (age <= 6) return 'not-menacing';
@@ -6484,8 +6490,13 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '') {
     .filter(p => String(p.planLine || '').trim())
     .map(p => `## Page ${p.pageNumber}\n${String(p.planLine).trim()}`)
     .join('\n\n');
+  // NO COMMISSION HERE. story-text-audit.txt carries no {STORY_BRIEF}
+  // placeholder, and must not gain one: the auditor judges the finished text
+  // against the ARC and the plan, which are the master. The pre-arc commission
+  // was deliberately withheld from the generator at this stage, so showing it to
+  // this judge would be spec drift. It was computed and passed here until
+  // 2026-09-13; the template silently dropped it, so the argument is deleted.
   return fillTemplate(template, {
-    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
     PLAN_LINES: planLines || '(no page plan was recorded)',
     PAGES: body,

@@ -5452,6 +5452,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               thinkingText: genResult.thinkingText || null,
               usage: genResult.usage,
               prompt: pageData.prompt,
+              // Set ONLY when the built prompt went over the image model's
+              // character cap and shrinkPromptForModel LLM-compressed the scene
+              // prose: the description the model actually received. The batch
+              // eval judges the render against it instead of the pre-shrink
+              // `scene.sceneDescription`, which can name clauses the compressor
+              // removed (sceneMetadata.resolveEvalSceneDescription). Undefined
+              // on every under-cap page, so nothing extra is stored there.
+              compressedScene: genResult.compressedScene || null,
               characterPhotos: pageData.characterPhotos,
               landmarkPhotos: pageData.landmarkPhotos,
               visualBibleGrid: pageData.visualBibleGrid,
@@ -5823,6 +5831,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
+          // Post-shrink scene block, when the prompt was over the model cap
+          // (see the page-record comment above). Persisted so a repair rerun
+          // from the stored story evaluates against the sent description too.
+          compressedScene: img.compressedScene || null,
           sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           thinkingText: img.thinkingText || null,
@@ -6146,6 +6158,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
+          // Post-shrink scene block, when the prompt was over the model cap
+          // (see the page-record comment above). Persisted so a repair rerun
+          // from the stored story evaluates against the sent description too.
+          compressedScene: img.compressedScene || null,
           sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           qualityScore: img.qualityScore,

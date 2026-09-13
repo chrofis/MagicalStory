@@ -2059,6 +2059,49 @@ function resolveEvalImagePrompt({ promptSent = null, originalPrompt = null } = {
 }
 
 /**
+ * ORIGINAL_PROMPT for the BATCH image eval = the scene DESCRIPTION the image
+ * model actually received.
+ *
+ * Sibling of resolveEvalImagePrompt, and the last open site of the same bug.
+ * The batch eval deliberately feeds the judge a scene DESCRIPTION rather than
+ * the full prompt, because `resolveEvalArtStyle` (services/prompts) depends on
+ * ORIGINAL_PROMPT carrying NO `**ART STYLE` block — a prompt would make every
+ * style-dependent evaluator rule read the style out of the wrong string.
+ *
+ * When the page's built prompt went over the image model's character cap,
+ * `shrinkPromptForModel` (images.js) LLM-compresses the prompt's HEAD — the
+ * scene prose — and sends that instead. It now hands the compressed head back
+ * as `compressedScene`, which the generation paths stamp onto the page record.
+ * That string is the description the generator was really given, so it is what
+ * the judge must score against; without it the judge files "the boat is
+ * missing" against a clause the compressor removed before the model ever saw
+ * it.
+ *
+ * Shrinking is the uncommon case: with no `compressedScene` the chain is
+ * exactly what this site did before (sceneDescription, then prompt), so an
+ * unshrunk page's eval input is byte-identical.
+ *
+ * THE ART STYLE INVARIANT IS ENFORCED HERE, not assumed. The compressed head is
+ * taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE` tail
+ * split, so it cannot contain a style block by construction — but the head is
+ * rewritten by an LLM, and a compressor that echoes a style heading back would
+ * silently poison resolveEvalArtStyle. A candidate carrying an ART STYLE block
+ * is therefore rejected and the page falls back to its stored description.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.compressedScene] - post-shrink scene block, when the shrinker compressed
+ * @param {string|null} [sources.sceneDescription] - the page's stored scene description
+ * @param {string|null} [sources.prompt] - last-resort fallback (today's behaviour)
+ * @returns {string} - never null; '' when nothing is available (the batch eval passes a string)
+ */
+function resolveEvalSceneDescription({ compressedScene = null, sceneDescription = null, prompt = null } = {}) {
+  const usable = v => typeof v === 'string' && v.trim();
+  const carriesArtStyle = v => /\*\*ART STYLE/i.test(v);
+  if (usable(compressedScene) && !carriesArtStyle(compressedScene)) return compressedScene;
+  return [sceneDescription, prompt].find(usable) || '';
+}
+
+/**
  * THE PICTURE SPEC for every text-stage consumer = the brief the WRITER was
  * given, whole.
  *
@@ -2180,6 +2223,7 @@ module.exports = {
   extractSceneMetadata,
   resolveEvalSceneHint,
   resolveEvalImagePrompt,
+  resolveEvalSceneDescription,
   resolveTextStagePictureSpec,
   resolveSceneCastEntries,
   collectSceneCharacterNames,

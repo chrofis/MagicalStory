@@ -122,7 +122,7 @@ const {
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // IMAGE_PROMPT for the judges = the string the model actually received.
 // Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
-const { resolveEvalImagePrompt } = require('./sceneMetadata');
+const { resolveEvalImagePrompt, resolveEvalSceneDescription } = require('./sceneMetadata');
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
 let storyHelpersModule = null;
 function getStoryHelpers() {
@@ -815,7 +815,17 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   return head.trimEnd() + '\n' + tail;
 }
 
-async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
+/**
+ * @param {Object|null} meta - optional out-param. When the LLM head-compression
+ *   branch fires, `meta.compressedScene` receives the COMPRESSED SCENE BLOCK —
+ *   the rewritten head, i.e. the scene prose the image model actually got. The
+ *   batch image eval judges the render against that description rather than the
+ *   pre-shrink one (sceneMetadata.resolveEvalSceneDescription). It is the head
+ *   ALONE: taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE`
+ *   tail split, so it carries no ART STYLE block, and it is not a second copy
+ *   of the whole prompt.
+ */
+async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null, meta = null) {
   if (!prompt || prompt.length <= maxPromptLength) return prompt;
 
   // 1. Deterministic: merge duplicated bullet bodies, collapse blank runs.
@@ -907,6 +917,9 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         }
         if (newHead.length > 500 && newHead.length <= headBudget) {
           const assembled = newHead + (rulesBlock ? '\n\n' + rulesBlock : '') + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
+          // The description the model really received — the one string the
+          // batch eval needs and nothing stored today holds.
+          if (meta) meta.compressedScene = newHead;
           // The head/allowance ratio is the number that matters: a model that
           // writes far under its allowance silently deletes scene facts, and
           // nothing downstream can tell that from a legitimately terse rewrite.
@@ -992,6 +1005,11 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     maxRefSlots = null,                  // Test Lab only: raise packReferences/editWithGrok's
                                           // slot budget above the production default of 3
                                           // (xAI's edit cap is 5). null = production default.
+    // Out-param: receives `compressedScene` when the prompt went over the
+    // model's cap and shrinkPromptForModel LLM-compressed the scene prose.
+    // Callers stamp it onto the page record so the batch eval judges the render
+    // against the description that was actually sent.
+    promptMeta = null,
   } = opts;
 
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
@@ -1051,7 +1069,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
     const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength || 7500;
-    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel);
+    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel, promptMeta);
 
     try {
       const refImages = await packReferences(
@@ -1243,7 +1261,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   const modelConfig = IMAGE_MODELS[modelId];
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null);
+  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null, promptMeta);
   if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };
   }
@@ -1820,9 +1838,19 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   log.debug(`🆕 [IMAGE GEN-ONLY] Cache MISS - key: ${genOnlyCacheKey.substring(0, 24)}...`);
 
+  // Over-cap prompts are LLM-compressed before they are sent. `shrinkMeta`
+  // collects the COMPRESSED SCENE BLOCK so it can be stamped onto the result
+  // (and from there onto the page record) — the batch image eval scores the
+  // render against that description, not the pre-shrink one. Empty on the
+  // overwhelmingly common under-cap path, and the field is then omitted
+  // entirely, so unshrunk pages carry exactly what they carried before.
+  const shrinkMeta = {};
+  const sceneStamp = () => (shrinkMeta.compressedScene ? { compressedScene: shrinkMeta.compressedScene } : {});
+
   // Shared provider-dispatch ladder (Runware/Grok/Gemini selection + reference
   // packing + truncation + aspect + onImageReady). See _dispatchImageGeneration.
   const raw = await _dispatchImageGeneration(prompt, characterPhotos, {
+    promptMeta: shrinkMeta,
     logLabel: 'IMAGE GEN-ONLY',
     verbose: false,
     previousImage,
@@ -1866,7 +1894,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     const finalResult = {
       imageData: raw.imageData,
       modelId: raw.modelId,
-      usage: raw.usage
+      usage: raw.usage,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1887,6 +1916,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       modelId: raw.modelId,
       usage: raw.usage,
       grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1899,7 +1929,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       modelId: raw.modelId,
       usage: raw.usage,
       // Reconstruction record — refs were built above but never stamped.
-      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1912,6 +1943,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       modelId: raw.modelId,
       usage: raw.usage,
       grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -2070,7 +2102,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
               // grok-imagine-image page has ≤3.
               grokRefImages: parts
                 .filter(p => p.inline_data)
-                .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
+                .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`),
+              ...sceneStamp()
             };
 
             if (!skipCache) imageCache.set(genOnlyCacheKey, result);
@@ -2335,18 +2368,25 @@ async function evaluateImageBatch(images, options = {}) {
       // inside evaluateImageQuality from these same photos — prepending them to
       // the prompt as well would state the outfit twice.
       //
-      // NOT the sent prompt, deliberately — and a KNOWN GAP. This site feeds the
-      // judge the scene DESCRIPTION (the resolveEvalArtStyle call below depends
-      // on that: ORIGINAL_PROMPT here carries no ART STYLE block). When the
-      // page's built prompt went over the model cap, shrinkPromptForModel
-      // compressed the scene prose before sending it, so the description held
-      // here can name a clause the model never received. There is no stored
-      // post-shrink DESCRIPTION to substitute: the generation paths persist the
-      // post-shrink PROMPT (`img.prompt`) and nothing else. Swapping this to
-      // `img.prompt` would change what class of string every batch eval judges
-      // against — an owner decision, not a wiring fix. See
-      // sceneMetadata.resolveEvalImagePrompt.
-      const sceneDescWithClothing = `${img.sceneDescription || img.prompt || ''}`;
+      // NOT the sent prompt, deliberately: this site feeds the judge the scene
+      // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
+      // ORIGINAL_PROMPT here must carry no ART STYLE block.
+      //
+      // But when the page's built prompt went over the model cap,
+      // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
+      // the description stored on the page still names clauses the model never
+      // received. The shrink path now hands its compressed scene block back
+      // (`compressedScene`), so that is what the judge scores against when it
+      // exists. No shrink → the exact chain this site always used. The resolver
+      // also re-checks the ART STYLE invariant on the compressed string, since
+      // that head is LLM-rewritten. See
+      // sceneMetadata.resolveEvalSceneDescription (sibling of
+      // resolveEvalImagePrompt, which closed the six prompt-side sites).
+      const sceneDescWithClothing = resolveEvalSceneDescription({
+        compressedScene: img.compressedScene,
+        sceneDescription: img.sceneDescription,
+        prompt: img.prompt,
+      });
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       // Use img.evaluationType if set (covers use 'cover' for text-focused eval)

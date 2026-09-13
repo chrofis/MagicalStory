@@ -36206,3 +36206,34 @@ this judgement with measurement.
 **Status:** ✅ active — supersedes the ranking half of the 2026-09-13
 `896895deb` entry above. The window field, the eight fieldless life events, the
 cap of six and the uncapped wizard all stand unchanged from it.
+
+### The creature-tone band comes from the YOUNGEST main character (2026-09-13)
+**Context:** Prod `job_1789227389389_z18dmvnt6` p10 drew a crayfish gripping a
+wet, dead-looking mouse in a picture book whose younger lead is five. That is
+not a render defect — it is the brief working as written. `creatureToneLevel`
+read `pickMainCharacters(inputData).focus?.age`, and `focus` is `mains[0]` after
+a DESCENDING age sort, i.e. the OLDEST main. The story's mains were Liz 5 and
+Ayan 8, so focus was Ayan and every scene brief in the book carried the
+`formidable` band: "claws and teeth visible rather than hidden, real physical
+weight and presence … It may loom, and its size may be stated against a child."
+Liz alone would have produced `not-menacing` ("a neutral or gentle mouth that
+shows no teeth … claws are not raised or displayed").
+
+**Decision:** The band is picked from `youngestMainAge(inputData)`. Bands are
+unchanged (0-4 `cute`, 5-6 `not-menacing`, 7+ `formidable`), and so is the rule
+that a cast with no readable age emits no tone section at all — the fallback
+passed is `NaN`, not `youngestMainAge`'s own default of 5.
+
+**Rationale:** For a mixed-age cast the gentler band is the safe direction: an
+eight-year-old is not harmed by a non-menacing crayfish, a five-year-old is
+harmed by a formidable one. The picker was not deliberately choosing the oldest
+child — `focus` exists to decide whose name goes in the title and who the story
+follows, and reusing it for a safety band silently inherited a descending sort.
+`youngestMainAge` already existed for exactly this shape and is what the reading
+level clamps to; only the creature tone was not using it. Non-main characters do
+not lower the band — a toddler in the cast who is not who the book is for leaves
+an eight-year-old's book `formidable`, pinned by a test.
+
+**Touched:** `server/lib/promptBuilders.js` (`creatureToneLevel`),
+`tests/unit/creature-tone-youngest-main.test.ts` (7 tests)
+**Status:** ✅ active
