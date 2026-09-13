@@ -879,6 +879,18 @@ function extractSceneMetadata(sceneDescription) {
         // time/weather passthroughs removed 2026-08-11: written for months,
         // read by nothing (metadata-migration audit).
         background: metadata.background || null,
+        // The Art Director writes `sceneIntent` on every page, and this
+        // allowlist dropped it — so the two branches of this function
+        // disagreed: a JSON-format brief (fullData = the parsed object)
+        // carried it and a prose-format brief (the production AD format) did
+        // not. Consumers written as `meta.sceneIntent || meta.fullData
+        // .sceneIntent` (evalPipeline, routes/regeneration) therefore reached
+        // it through one shape only, and any caller handed a bare `fullData`
+        // lost it outright. Measured 2026-09-13 over five staging stories:
+        // present in 83/83 briefs, 0/83 stored. Null when a brief (or a row
+        // written before this date) carries none — readers must treat absent
+        // as "not declared".
+        sceneIntent: metadata.sceneIntent || null,
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
