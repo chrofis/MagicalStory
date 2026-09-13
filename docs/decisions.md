@@ -35595,6 +35595,18 @@ wording is not pinned by policy; the behaviour shows on the next story.
 **Touched:** `prompts/scene-expansion-all.txt`
 **Status:**    🟡 conditional — verify on the next real story that an urgent
 page's `expression` fields and prose carry strain.
+**Follow-up (2026-09-13):** the sibling template `prompts/scene-expansion.txt`
+carried the old `Sentence 3: setting, lighting, mood.` and no stakes rule. It
+is not dead: it is the live per-page shortfall fallback in production
+(`beatsPipeline.js:1468`, usage `beats_scene_expansion_fallback`) and the Test
+Lab `scene_expansion` stage template, so a shortfall retry could still emit a
+bare mood label and Lab experiments tested the old wording. Both changes are
+now ported in that file's own voice — it names the beat "the hint", not "the
+plan line", so the rule reads `5e. **The hint's stakes set the faces and the
+effort.**` beside its existing `5d` hint-verb rule. `story-unified.txt` and
+`story-unified-imagefirst.txt` are deliberately left on the old wording
+(owner-scoped as legacy). Still generation-side only; evaluator untouched.
+**Touched (follow-up):** `prompts/scene-expansion.txt`
 
 ## 2026-09-13 — The reference sheet must state that the figure is shod (barefoot books)
 **Context:**   Staging trial `job_1789296188291_thezv15y1` ("…Kastanie…", 6
