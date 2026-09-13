@@ -34190,6 +34190,26 @@ pages (p7, p15) still emit a wrong `extra_character` — the cause is upstream,
 an Art Director brief whose `characters[]` is under-declared against its own
 `sceneIntent`, and the derivation reports it as one finding instead of two.
 
+**Addendum, same day — the identity branch needs a reference to accuse.**
+The replay's one regression was p3: a single figure, a roster of one (Frau
+Amrein, a Visual Bible secondary), and ZERO reference photos attached to the
+critique. `matches[]` is produced by comparing each figure to the labelled
+`Reference: <name>` images in the prompt, so for a cast member the evaluator
+has no image of, `unmatched` is the only answer available — whether she was
+drawn right or wrong — and the derivation billed a CRITICAL on it. So the
+identity branch is now gated on what the evaluator was ACTUALLY HANDED:
+`evaluateImageQuality` collects the names it attached a labelled reference
+for (attached, not requested — a photo that fails to resolve is skipped) and
+passes them to the pure function as `referenceNames`. With no reference-backed
+cast entry left unclaimed, the branch emits nothing. Deliberately
+`reconciled`, NOT `declined`: the counts did reconcile, so the derivation
+still owns the pair and still drops the evaluator's arithmetically impossible
+surplus. Replayed over the same 16 pages: p3, p4 and p13 (all three the same
+photo-less secondary) go from a derived `character_identity` to no finding
+while still dropping the stored `extra_character` on p4/p13; p7, p12, p15 and
+every reconciled page are bit-identical. An omitted `referenceNames` means
+"the caller cannot say" and leaves the branch as it was.
+
 **Touched:** `server/lib/evalPipeline.js` (`derivePresenceFinding`,
 `PRESENCE_DERIVED_MARKER`, `buildExpectedCastBlock` crowd carry, the single
 unconditional score recompute), `server/lib/sceneMetadata.js` (three parser

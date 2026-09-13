@@ -1126,9 +1126,13 @@ const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
  * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean}} args.cast
  *        the roster from buildExpectedCastBlock
  * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures)
+ * @param {string[]|null} args.referenceNames - the names the evaluator was actually
+ *        HANDED a labelled `Reference: <name>` image for on this call. An array
+ *        (empty included) gates the identity branch; `undefined` means the caller
+ *        could not say, and the branch behaves as before.
  * @returns {{outcome: string, reason: string|null, finding: object|null}}
  */
-function derivePresenceFinding({ figures, matches, cast, detectedFigureCount } = {}) {
+function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, referenceNames } = {}) {
   const decline = (reason) => ({ outcome: 'declined', reason, finding: null });
 
   if (!cast || cast.declared !== true) return decline('roster_not_declared');
@@ -1203,9 +1207,37 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount } =
   // ONE recognition failure, not an absence plus a surplus — the old D-04c,
   // now arithmetic.
   if (unmatchedFigures.length === 0) return { outcome: 'reconciled', reason: null, finding: null };
+
+  // UNMATCHED IS ONLY EVIDENCE WHEN THERE WAS SOMETHING TO MATCH AGAINST
+  // (2026-09-13). `matches[]` is produced by comparing each figure to the
+  // labelled `Reference: <name>` images attached to the critique — the page's
+  // photo-backed cast. A Visual Bible secondary joins this roster from the
+  // brief and carries NO such image, so the only answer the evaluator can give
+  // for the figure that is her is `unmatched`, whether she was drawn right or
+  // wrong. Billing a CRITICAL on that is a false positive by construction:
+  // job_1789207854566_l43qgl34w p3 (one figure, roster [Frau Amrein], zero
+  // references attached) and p4/p13 (roster [Fiona, Frau Amrein], Fiona
+  // matched, the second figure unmatched because she is the secondary).
+  //
+  // So the branch needs a reference-backed cast entry to name. Not a decline:
+  // the counts DID reconcile, which is a real outcome — the derivation still
+  // owns the pair and still drops the evaluator's arithmetically impossible
+  // surplus on those pages. It just has no identity claim to make.
+  const refs = Array.isArray(referenceNames)
+    ? new Set(referenceNames.map(n => String(n || '').trim().toLowerCase()).filter(Boolean))
+    : null;
+  const referenced = refs ? unclaimedCast.filter(n => refs.has(String(n).toLowerCase())) : unclaimedCast;
+  // At equal counts an unmatched figure always leaves a cast name unclaimed
+  // (distinct claims <= figures - unmatched < castCount), so this is exactly
+  // the question "is the entry it should be one the evaluator had an image of".
+  // A page that got no reference at all (`refs.size === 0`) is the same answer.
+  if (refs && referenced.length === 0) {
+    return { outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', finding: null };
+  }
+
   const fig = unmatchedFigures[0];
   const figId = fig && (fig.figure ?? fig.id);
-  const who = unclaimedCast[0] || null;
+  const who = referenced[0] || null;
   const figLabel = figId !== undefined && figId !== null ? `figure ${figId}` : 'the unmatched figure';
   return {
     outcome: 'character_identity',
@@ -1380,6 +1412,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const realFigureCount = Array.isArray(evalOptions.detectedFigures)
       ? require('./bboxDetection').countRealFigures(evalOptions.detectedFigures)
       : (evalOptions.detectedFigureCount ?? null);
+    // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
+    // attach loop below with the names that reached the critique as a labelled
+    // `Reference: <name>` image — not what was requested, what was attached.
+    // The presence derivation gates its identity branch on this.
+    const attachedReferenceNames = [];
     const expectedCast = buildExpectedCastBlock({
       sceneCharacters,
       sceneHint,
@@ -1615,6 +1652,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             }
           });
           addedCount++;
+          if (charName) attachedReferenceNames.push(String(charName));
         } catch (refErr) {
           skippedCount++;
           log.warn(`⚠️ [EVAL] Reference photo${charName ? ` "${charName}"` : ''} failed to load (${refErr.message}) — skipping`);
@@ -2183,6 +2221,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       {
         const presence = derivePresenceFinding({
           figures, matches, cast: expectedCast, detectedFigureCount: realFigureCount,
+          referenceNames: attachedReferenceNames,
         });
         const spoke = presence.outcome !== 'declined';
         presenceDerived = spoke;
@@ -2192,7 +2231,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           const dropped = before - fixableIssues.length;
           if (presence.finding) fixableIssues.push(presence.finding);
           log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${realFigureCount} real figure(s) vs EXPECTED CAST ${expectedCast.count}`
-            + ` → ${presence.outcome}${presence.finding?.character ? ` (${presence.finding.character})` : ''}`
+            + ` → ${presence.outcome}${presence.reason ? ` [${presence.reason}]` : ''}${presence.finding?.character ? ` (${presence.finding.character})` : ''}`
             + `${dropped ? `; dropped ${dropped} evaluator presence finding(s)` : ''}`);
         } else {
           log.info(`👥 [PRESENCE] ${pageContext || 'page'}: declined (${presence.reason})`
@@ -2200,7 +2239,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
         try {
           const sid = evalOptions?.storyMeta?.storyId;
-          if (sid) require('./runMetrics').forJob(sid).count(`presence_${spoke ? presence.outcome : `declined_${presence.reason}`}`);
+          if (sid) require('./runMetrics').forJob(sid).count(`presence_${spoke ? `${presence.outcome}${presence.reason ? `_${presence.reason}` : ''}` : `declined_${presence.reason}`}`);
         } catch { /* metrics are best-effort */ }
       }
 

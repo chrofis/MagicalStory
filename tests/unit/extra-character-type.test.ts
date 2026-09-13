@@ -212,6 +212,136 @@ describe('derivePresenceFinding — the one presence signal', () => {
     expect(run({ figures: [], matches: [], cast: roster([]), detectedFigureCount: 0 }).outcome).toBe('reconciled');
   });
 
+  describe('the identity branch needs a reference to accuse', () => {
+    // UNMATCHED IS ONLY EVIDENCE WHEN THERE WAS SOMETHING TO MATCH AGAINST
+    // (2026-09-13). `matches[]` comes from comparing each figure to the
+    // labelled `Reference: <name>` images attached to the critique. A Visual
+    // Bible secondary joins the roster from the brief and has no such image,
+    // so `unmatched` is the only answer available for her — right or wrong.
+    // Measured on job_1789207854566_l43qgl34w p3 / p4 / p13.
+
+    it('a photo-less secondary alone on the page emits NOTHING (p3)', () => {
+      const r = run({
+        figures: figs(1), matches: matched([null]),
+        cast: roster(['Frau Amrein']), detectedFigureCount: 1,
+        referenceNames: [],
+      });
+      expect(r).toEqual({ outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', finding: null });
+    });
+
+    it('a photo-less secondary beside a matched lead emits NOTHING (p4/p13)', () => {
+      const r = run({
+        figures: figs(2), matches: matched(['Fiona', null]),
+        cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2,
+        referenceNames: ['Fiona'],
+      });
+      expect(r.finding).toBeNull();
+      expect(r.reason).toBe('unclaimed_cast_has_no_reference');
+    });
+
+    it('but it is RECONCILED, not declined — the derivation still owns the pair', () => {
+      // The wiring drops the evaluator's own missing/extra findings whenever
+      // the outcome is not `declined`. p4/p13 carried an arithmetically
+      // impossible `extra_character` on a 2-vs-2 page; that must still go.
+      const r = run({
+        figures: figs(2), matches: matched(['Fiona', null]),
+        cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2,
+        referenceNames: ['Fiona'],
+      });
+      expect(r.outcome).toBe('reconciled');
+      expect(r.outcome).not.toBe('declined');
+    });
+
+    it('a REFERENCE-BACKED cast member unmatched on a reconciled page still emits character_identity', () => {
+      const r = run({
+        figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', null]),
+        cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4,
+        referenceNames: ['Aaron', 'Ben', 'Carl', 'Dan'],
+      });
+      expect(r.outcome).toBe('character_identity');
+      expect(r.finding.character).toBe('Dan');
+    });
+
+    it('names the reference-backed unclaimed entry, not merely the first one', () => {
+      const r = run({
+        figures: figs(3), matches: matched(['Aaron', null, null]),
+        cast: roster(['Aaron', 'Frau Amrein', 'Dan']), detectedFigureCount: 3,
+        referenceNames: ['Aaron', 'Dan'],
+      });
+      expect(r.outcome).toBe('character_identity');
+      expect(r.finding.character).toBe('Dan');
+    });
+
+    it('matching is case-insensitive on both sides', () => {
+      const r = run({
+        figures: figs(2), matches: matched(['aaron', null]),
+        cast: roster(['Aaron', 'Dan']), detectedFigureCount: 2,
+        referenceNames: ['AARON', ' dan '],
+      });
+      expect(r.outcome).toBe('character_identity');
+      expect(r.finding.character).toBe('Dan');
+    });
+
+    it('at equal counts an unmatched figure always leaves a cast name unclaimed', () => {
+      // Why the gate can ask about the CAST ENTRY and nothing else: distinct
+      // claims <= figures - unmatched < castCount, so `unclaimedCast` is never
+      // empty on this branch. Swept rather than asserted in prose.
+      const names = ['Aaron', 'Ben', 'Carl', 'Dan'];
+      for (let n = 1; n <= 4; n++) {
+        for (let claims = 0; claims < n; claims++) {
+          const refs = Array.from({ length: n }, (_, i) => (i < claims ? names[i] : null));
+          const r = run({
+            figures: figs(n), matches: matched(refs), cast: roster(names.slice(0, n)),
+            detectedFigureCount: n, referenceNames: names,
+          });
+          expect(r.outcome).toBe('character_identity');
+          expect(names).toContain(r.finding.character);
+        }
+      }
+    });
+
+    it('no referenceNames supplied at all -> the branch behaves exactly as before', () => {
+      const r = run({
+        figures: figs(2), matches: matched(['Fiona', null]),
+        cast: roster(['Fiona', 'Frau Amrein']), detectedFigureCount: 2,
+      });
+      expect(r.outcome).toBe('character_identity');
+      expect(r.finding.character).toBe('Frau Amrein');
+    });
+
+    it('the OTHER branches are untouched by the gate', () => {
+      const refless = { referenceNames: [] };
+      expect(run({ figures: figs(1), matches: matched(['Aaron']), cast: roster(['Aaron', 'Ben']), detectedFigureCount: 1, ...refless }).outcome)
+        .toBe('missing_character');
+      expect(run({ figures: figs(3), matches: matched([null, null, null]), cast: roster(['Aaron']), detectedFigureCount: 3, ...refless }).outcome)
+        .toBe('extra_character');
+      expect(run({ figures: figs(1), matches: matched(['Aaron']), cast: roster(['Aaron']), detectedFigureCount: 1, ...refless }))
+        .toEqual({ outcome: 'reconciled', reason: null, finding: null });
+    });
+
+    it('MUTUAL EXCLUSION still holds with the gate on', () => {
+      const names = ['Aaron', 'Ben', 'Carl', 'Dan'];
+      for (let castSize = 0; castSize <= 4; castSize++) {
+        for (let figCount = 0; figCount <= 5; figCount++) {
+          for (let namedRefs = 0; namedRefs <= figCount; namedRefs++) {
+            for (const refList of [[], ['Aaron'], names]) {
+              const refs = Array.from({ length: figCount }, (_, i) => (i < namedRefs ? names[i % 4] : null));
+              const r = run({
+                figures: figs(figCount), matches: matched(refs),
+                cast: roster(names.slice(0, castSize)), detectedFigureCount: figCount,
+                referenceNames: refList,
+              });
+              const emitted = r.finding ? [r.finding.type] : [];
+              expect(emitted.includes('missing_character') && emitted.includes('extra_character')).toBe(false);
+              if (r.outcome === 'declined') expect(r.finding).toBeNull();
+              else expect(r.outcome).toBe(r.finding ? r.finding.type : 'reconciled');
+            }
+          }
+        }
+      }
+    });
+  });
+
   describe('declines — four reasons to say nothing rather than guess', () => {
     const base = {
       figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]),
