@@ -2363,7 +2363,9 @@ async function evaluateImageBatch(images, options = {}) {
           // Detector figure count for the EXPECTED CAST block — present on
           // repair-round re-evaluations that carry the previous detection;
           // null on a first-round eval, which runs before detection.
-          detectedFigureCount: require('./bboxDetection').countRealFigures(img.bboxDetection?.figures),
+          // Phase 5b-pre already detected on these exact bytes; the repair
+          // rounds carry their own. Shared first, page second — never a new call.
+          detectedFigures: img.sharedBboxDetection?.figures || img.bboxDetection?.figures || null,
           storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
@@ -4157,22 +4159,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     let iterDetection = null;
     if (!skipEval && genResult?.imageData) {
       try {
-        iterQuality = await evaluateImageQuality(
-          genResult.imageData, imagePrompt, refApplied.characterPhotos, 'scene', null,
-          iterLabel, null, null, sceneCharacters, {
-            // Era-aware landmark protection — iterate uses the same refs it
-            // just rendered from and the era it resolved above.
-            landmarkPhotos: refApplied.landmarkPhotos || null,
-            era: iterateSceneMetadata?.era || null,
-          }
-        );
-        if (usageTracker && iterQuality?.usage) {
-          usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);
-        }
-      } catch (evalErr) {
-        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
-      }
-      try {
         // sceneCharacters is the photo-backed cast; story-invented characters
         // live only in the Visual Bible and must be appended, or the identity
         // call assigns a cast name to the invented figure
@@ -4222,6 +4208,32 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         if (iterDetection) iterDetection.expectedCastNames = iterReconciled.names;
       } catch (bboxErr) {
         log.warn(`⚠️ [ITERATE] Page ${pageNumber}: detection failed (${bboxErr.message})`);
+      }
+      try {
+        iterQuality = await evaluateImageQuality(
+          genResult.imageData, imagePrompt, refApplied.characterPhotos, 'scene', null,
+          iterLabel, null, null, sceneCharacters, {
+            // Era-aware landmark protection — iterate uses the same refs it
+            // just rendered from and the era it resolved above.
+            landmarkPhotos: refApplied.landmarkPhotos || null,
+            era: iterateSceneMetadata?.era || null,
+            // The rewrite's PARSED metadata. Without it the iterate eval's
+            // EXPECTED CAST roster silently loses every figure the brief filed
+            // in objects[] — a VB secondary, an animal — and the page takes an
+            // extra_character CRITICAL for drawing its own commissioned cast.
+            sceneMetadata: iterateSceneMetadata || null,
+            pageNumber,
+            // DETECT-THEN-EVAL (2026-09-13). The detection above already runs
+            // on these exact bytes; ordering it first costs no extra call and
+            // gives the roster arithmetic its figure count.
+            detectedFigures: iterDetection?.figures || null,
+          }
+        );
+        if (usageTracker && iterQuality?.usage) {
+          usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
       }
     }
     imageResult = {

@@ -1295,24 +1295,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
     let coverBboxOverlay = null;
 
     if (!skipEval && genResult?.imageData) {
-      try {
-        // evalOptions empty on purpose: the cover prompt carries the full ART
-        // STYLE block, which the evaluator extracts itself (same as the old
-        // gen-time eval did).
-        const qualityResult = await evaluateImageQuality(
-          genResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
-          iterateLabel, null, sceneDescription, selectedCoverCharacters, {}
-        );
-        if (qualityResult) {
-          evalScore = qualityResult.score ?? null;
-          evalReasoning = qualityResult.reasoning || null;
-          if (usageTracker && qualityResult.usage) {
-            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
-          }
-        }
-      } catch (evalErr) {
-        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: eval failed (${evalErr.message}) — serving unscored render`);
-      }
       // A COVER GETS THE SAME CLOTHING INFO AS A PAGE (owner, 2026-08-15).
       //
       // This built `description: c.description || ''` - and a character object
@@ -1345,6 +1327,32 @@ async function iterateCover(coverKey, storyData, options = {}) {
       } catch (bboxErr) {
         log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: detection failed (${bboxErr.message})`);
       }
+      try {
+        // evalOptions empty on purpose: the cover prompt carries the full ART
+        // STYLE block, which the evaluator extracts itself (same as the old
+        // gen-time eval did).
+        const qualityResult = await evaluateImageQuality(
+          genResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
+          iterateLabel, null, sceneDescription, selectedCoverCharacters, {
+            // DETECT-THEN-EVAL (2026-09-13). The detection below this block used
+            // to run after the eval, so the EXPECTED CAST roster on a cover was
+            // never given a figure count — and the originating evidence for the
+            // whole presence rewrite (a cover with a character erased) was a
+            // cover. Reordered; no extra detector call.
+            detectedFigures: coverBboxDetection?.figures || null,
+            sceneMetadata: coverSceneMetadata || null,
+          }
+        );
+        if (qualityResult) {
+          evalScore = qualityResult.score ?? null;
+          evalReasoning = qualityResult.reasoning || null;
+          if (usageTracker && qualityResult.usage) {
+            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
+          }
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: eval failed (${evalErr.message}) — serving unscored render`);
+      }
     }
 
     imageResult = {
@@ -1374,21 +1382,6 @@ async function iterateCover(coverKey, storyData, options = {}) {
     let compOverlay = null;
     if (!skipEval && imageResult.imageData) {
       try {
-        const qualityResult = await evaluateImageQuality(
-          imageResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
-          iterateLabel, null, sceneDescription, selectedCoverCharacters, {}
-        );
-        if (qualityResult) {
-          compScore = qualityResult.score ?? null;
-          compReasoning = qualityResult.reasoning || null;
-          if (usageTracker && qualityResult.usage) {
-            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
-          }
-        }
-      } catch (evalErr) {
-        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: composite eval failed (${evalErr.message}) — serving unscored render`);
-      }
-      try {
         compBbox = await detectAllBoundingBoxes(imageResult.imageData, {
           // Same identity lines as the first detection above - a second call
           // that sends bare names would overwrite a good detection with a blind
@@ -1406,6 +1399,25 @@ async function iterateCover(coverKey, storyData, options = {}) {
         }
       } catch (bboxErr) {
         log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: composite detection failed (${bboxErr.message})`);
+      }
+      try {
+        const qualityResult = await evaluateImageQuality(
+          imageResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
+          iterateLabel, null, sceneDescription, selectedCoverCharacters, {
+            // Same reorder as the direct path above.
+            detectedFigures: compBbox?.figures || null,
+            sceneMetadata: coverSceneMetadata || null,
+          }
+        );
+        if (qualityResult) {
+          compScore = qualityResult.score ?? null;
+          compReasoning = qualityResult.reasoning || null;
+          if (usageTracker && qualityResult.usage) {
+            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
+          }
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: composite eval failed (${evalErr.message}) — serving unscored render`);
       }
     }
     return {

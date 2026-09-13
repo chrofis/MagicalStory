@@ -580,6 +580,13 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
         {
           landmarkPhotos: ctx.scene.landmarkPhotos || null,
           era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+          sceneMetadata: ctx.scene.sceneMetadata || null,
+          pageNumber: ctx.pageNumber,
+          // No figure count: these are FRESH bytes and no detector runs in this
+          // stage, so the stored detection belongs to a different image. Null
+          // makes the roster decline to judge the count rather than judge it
+          // against the wrong picture.
+          detectedFigures: null,
         }
       );
       if (evalRes) {
@@ -721,6 +728,13 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
       // Era-aware landmark protection (2026-09-05) — Lab parity with production.
       landmarkPhotos: ctx.scene.landmarkPhotos || null,
       era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+      sceneMetadata: ctx.scene.sceneMetadata || null,
+      pageNumber: ctx.pageNumber,
+      // The stored detection was made on the ACTIVE version's bytes. When a
+      // different version is pinned it describes a different picture, so the
+      // count is withheld rather than guessed.
+      detectedFigures: (ctx.versionIndex ?? null) === null
+        ? (ctx.scene.bboxDetection?.figures || null) : null,
     }
   );
   const elapsedMs = Date.now() - t0;
@@ -844,6 +858,13 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
           artStyle,
           landmarkPhotos: ctx.scene.landmarkPhotos || null,
           era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+          sceneMetadata: ctx.scene.sceneMetadata || null,
+          pageNumber: ctx.pageNumber,
+          // Frozen with the other inputs: a count that changed between repeats
+          // would be read as judge variance. Withheld when a version is pinned
+          // (the stored detection is the active version's).
+          detectedFigures: versionIndex === null
+            ? (ctx.scene.bboxDetection?.figures || null) : null,
         }
       );
     } catch (err) { error = err.message; }
@@ -4544,6 +4565,10 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
           artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
           landmarkPhotos: ctx.scene.landmarkPhotos || null,
           era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+          sceneMetadata: ctx.scene.sceneMetadata || null,
+          pageNumber: ctx.pageNumber,
+          // A replayed paste canvas — no detection exists for these bytes.
+          detectedFigures: null,
         },
       );
       if (!ev) throw new Error('evalRepair: the evaluator returned nothing');
@@ -4839,7 +4864,13 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     const fresh = await evaluateImageQuality(
       imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
       null, `testlab-exp${experimentId}-P${ctx.pageNumber}-decide`,
-      ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
+      ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+      {
+        sceneMetadata: ctx.scene.sceneMetadata || null,
+        pageNumber: ctx.pageNumber,
+        // The ACTIVE image, which is what the stored detection was made on.
+        detectedFigures: ctx.scene.bboxDetection?.figures || null,
+      }
     );
     if (!fresh) throw new Error('Fresh evaluation returned null');
     // Production stamps the consolidated plan onto the eval at scoring time;

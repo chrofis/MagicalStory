@@ -782,17 +782,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Shared eval + detection — the same primitives the unified pipeline uses
     // (Step 1 batch eval / Phase 5b-pre detection), run once for this version.
-    let regenQuality = null;
-    try {
-      regenQuality = await evaluateImageQuality(
-        genResult.imageData, imagePrompt, referencePhotos, 'scene', null,
-        `PAGE ${pageNumber}`, null, null, sceneCharacters,
-        // Era-aware landmark protection — the refs this regen rendered from.
-        { landmarkPhotos: pageLandmarkPhotos || null, era: sceneMetadata?.era || null }
-      );
-    } catch (evalErr) {
-      log.warn(`⚠️ [REGEN] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored version`);
-    }
     let regenDetection = null;
     try {
       regenDetection = await detectAllBoundingBoxes(genResult.imageData, {
@@ -809,6 +798,22 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       });
     } catch (bboxErr) {
       log.warn(`⚠️ [REGEN] Page ${pageNumber}: detection failed (${bboxErr.message})`);
+    }
+    let regenQuality = null;
+    try {
+      regenQuality = await evaluateImageQuality(
+        genResult.imageData, imagePrompt, referencePhotos, 'scene', null,
+        `PAGE ${pageNumber}`, null, null, sceneCharacters,
+        // Era-aware landmark protection — the refs this regen rendered from.
+        // DETECT-THEN-EVAL (2026-09-13): the detection above already ran on
+        // these exact bytes, so the roster arithmetic gets its figure count
+        // without a second detector call.
+        { landmarkPhotos: pageLandmarkPhotos || null, era: sceneMetadata?.era || null,
+          sceneMetadata: sceneMetadata || null, pageNumber,
+          detectedFigures: regenDetection?.figures || null }
+      );
+    } catch (evalErr) {
+      log.warn(`⚠️ [REGEN] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored version`);
     }
     // Same contract shape the old gen+eval bundle returned: eval fields
     // (score, reasoning, fixTargets, fixableIssues, semanticResult,
@@ -4018,7 +4023,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           // The page's own cast as stored on the sceneImage record — the
           // EXPECTED CAST roster. The reference list above is the WHOLE
           // story cast, which is why it cannot serve as the roster here.
-          scene.sceneCharacters || null
+          scene.sceneCharacters || null,
+          {
+            // No new detector call: this endpoint scores the page's ACTIVE
+            // image and the stored detection was made on those same bytes.
+            detectedFigures: scene.bboxDetection?.figures || null,
+            sceneMetadata: scene.sceneMetadata || null,
+            pageNumber: isCoverPage(pageNumber) ? null : pageNumber,
+          }
         );
 
         if (!evaluation) {
@@ -4332,7 +4344,13 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         qualityModelOverride,
         pageLabel,
         null,                    // storyText — run quality only, semantic is separate
-        null                     // sceneHint — not used for quality-only
+        null,                    // sceneHint — not used for quality-only
+        scene.sceneCharacters || null,
+        {
+          // Same stored-bytes argument as the re-evaluate endpoint above.
+          detectedFigures: scene.bboxDetection?.figures || null,
+          sceneMetadata: scene.sceneMetadata || null,
+        }
       );
 
       if (!evaluation) {
