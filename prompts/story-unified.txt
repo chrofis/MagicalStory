@@ -724,10 +724,9 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 ```
 
 **REAL-WORLD LANDMARKS:**
-For famous buildings, monuments, or locations that exist in reality:
-- Set `"isRealLandmark": true`
-- Set `"landmarkQuery"` to the EXACT landmark name for photo lookup
-- This helps us show accurate landmark photos in illustrations
+Only an entry listed in an AVAILABLE LANDMARKS section below may be tagged: set `"isRealLandmark": true` and `"landmarkQuery"` to the EXACT name as listed.
+Every other location — a town, a street, a square, a building, any place that exists in reality but is not on that list — stays `"isRealLandmark": false` with `"landmarkQuery": null`.
+No AVAILABLE LANDMARKS section below means no landmarks are available: every location is `"isRealLandmark": false`, `"landmarkQuery": null`.
 
 **LOCATION VANTAGES:**
 A vantage is one camera viewpoint of a location; a single canvas is rendered per vantage and reused across the pages that use it. Pages reference a vantage with the dotted form `LOC001.2` (vantage 2 of LOC001).

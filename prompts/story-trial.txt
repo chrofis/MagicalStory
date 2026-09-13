@@ -137,7 +137,7 @@ Use empty arrays `[]` for categories with no elements.
 - `"isRealLandmark": true` (not false — if you wrote the landmark's name, you picked it from the list, so it is real)
 - `"landmarkQuery"`: the exact landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
 
-This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). When in doubt, mark it as real — false negatives waste the photo pipeline and produce off-brand renders.
+This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). A place that exists in reality but is not listed in the LANDMARKS section stays `"isRealLandmark": false` — when in doubt, leave it false. With no LANDMARKS section, every location is false.
 
 Example — picking "Kapellbrücke (Luzern) [Bridge]" from the LANDMARKS section:
 ```json

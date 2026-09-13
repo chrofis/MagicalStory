@@ -35998,3 +35998,37 @@ model than no line at all.
 `buildStoryBriefBody`, `buildTextRefinePrompt`, `buildUnifiedStoryPrompt`,
 `buildBasePrompt`), `tests/unit/beats-brief-relationships.test.ts`
 **Status:** ✅ active
+
+## 2026-09-13 — One landmark spec: the closed-world list is the only licence to tag `isRealLandmark`
+
+**Context:** Two contradictory landmark specs reached the writer. The injected
+`buildAvailableLandmarksSection` (`server/lib/promptBuilders.js`) is closed-world — only a
+listed entry may be tagged, a story set elsewhere uses none. The static block in
+`prompts/story-unified.txt` and `prompts/story-unified-imagefirst.txt` was open-world: "for
+famous buildings, monuments, or locations that exist in reality: set `isRealLandmark` … set
+`landmarkQuery` to the EXACT landmark name for photo lookup". "Locations that exist in
+reality" licenses a town name, a foreign square or a historical site — all real, none in the
+index, none resolvable. The builder returns the EMPTY STRING when no landmarks are available,
+so with an empty list the open-world block was the ONLY landmark instruction the model saw.
+Measured unresolvable tags: prod 9/240 entries (3.8%), staging 4/222 (1.8%); 8 of the 13 came
+from the unified path, and one prod case is later than the 2026-09-05 index-only routing.
+`prompts/story-trial.txt` pushed the same way from the other side — "when in doubt, mark it as
+real — false negatives waste the photo pipeline" — while the measured failure mode is false
+POSITIVES.
+
+**Decision:** The static block in both unified templates now states the closed-world rule
+only: a location may be tagged only if it is listed in an AVAILABLE LANDMARKS section;
+anything real but unlisted stays `isRealLandmark: false` / `landmarkQuery: null`; and **no
+AVAILABLE LANDMARKS section at all means every location is false**. The trial prompt's
+"when in doubt, mark it as real" is inverted to "when in doubt, leave it false", with the
+same empty-section clause.
+
+**Rationale:** The empty-list clause has to live in the STATIC template, because the injected
+section is exactly what disappears in that case — putting it in the builder would only repeat
+the rule in the case that already works. Prompt-side only: the classification logic in code is
+unchanged. The related flag-count issue (`storyJobPipeline.js:2628` counts the flag, not a
+successful resolution) is backlogged separately, not fixed here.
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/story-trial.txt`
+**Status:** ✅ active
