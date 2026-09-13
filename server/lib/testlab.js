@@ -633,6 +633,18 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // aboardOverride: test the aboard fix on a story whose stored AD metadata
   // predates the `aboard` field.
   const aboardId = params.aboardOverride ?? meta.aboard ?? null;
+  // Production attaches the VB element grid to every plate call
+  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
+  // saw only the text channel and a prompt change that fixes the image channel
+  // was invisible to the Lab. Same helper, same aboard filter.
+  // Built BEFORE the prompt: which reference family is attached decides the
+  // REFERENCE line (referenceKind below), exactly as at the production call
+  // sites (storyJobPipeline.js Phase 5a-pre-vantage and the trial plate).
+  const { buildEmptySceneVbGrid } = require('./referenceSheets');
+  const emptySceneVbGrid = await buildEmptySceneVbGrid(
+    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
+  );
+
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
     style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
@@ -643,6 +655,11 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       : '',
     eraGuard: buildEraGuard(meta.era),
     landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null),
+    // Tells the model what the attached reference IS. Without it the Lab tested
+    // a DIFFERENT prompt than production, which passes it at every plate call
+    // site (storyJobPipeline.js vantage plate + retry, the per-page 5a-pre path,
+    // and the trial plate — every one of them passes it).
+    referenceKind: (ctx.landmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
     visualBible: ctx.visualBible,
     pageNumber: ctx.pageNumber ?? null,
     aboardId,
@@ -650,15 +667,6 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     // gate production runs (AD is the authority on vehicle presence).
     sceneObjects: meta.objects || null,
   });
-
-  // Production attaches the VB element grid to every plate call
-  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
-  // saw only the text channel and a prompt change that fixes the image channel
-  // was invisible to the Lab. Same helper, same aboard filter.
-  const { buildEmptySceneVbGrid } = require('./referenceSheets');
-  const emptySceneVbGrid = await buildEmptySceneVbGrid(
-    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
-  );
 
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, [], {
