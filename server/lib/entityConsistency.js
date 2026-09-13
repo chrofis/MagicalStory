@@ -785,6 +785,21 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // artStyle = ...` line above it.
     const artStyle = storyData.artStyle || 'pixar';
 
+    // PER-PAGE WORN STATE. A page's brief can declare one of a character's
+    // garments OFF (`wornItems[]`); the generator strips it out of the outfit
+    // the image model was given, so the grid judge must not go on demanding
+    // it. Parsed once here, consumed by `expectedClothing` below through the
+    // generator's own stripper (wornItems.resolveGeneratedOutfit).
+    const wornMetaByPage = new Map();
+    for (const sd of sceneDescriptions) {
+      const desc = sd && (sd.description || sd.sceneDescription);
+      if (!desc || sd.pageNumber == null) continue;
+      try {
+        const meta = extractSceneMetadata(desc);
+        if (meta) wornMetaByPage.set(sd.pageNumber, meta);
+      } catch { /* unparsable brief → no worn state, unchanged behaviour */ }
+    }
+
     // Story-invented characters are checked too, when they appear more than
     // once. They are not in `characters` (the photo-backed roster) but they do
     // drift, and until now nothing watched them: on job_1786780194082_s980g4s9a
@@ -907,10 +922,20 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // The grid prompt judges clothing against this description, not against
           // the reference avatar's pixels — style transfer can mutate the avatar's
           // outfit, and avatars.clothing can be stale across stories.
+          // The grid spans every page of this character×clothing group, so the
+          // worn state is the UNION over those pages: a garment declared off on
+          // any of them is dropped from the expected text rather than demanded
+          // on all of them. One resolver, shared with the generator's strip.
+          const groupWornMetas = [...new Set(groupAppearances.map(a => a.pageNumber))]
+            .map(pn => wornMetaByPage.get(pn) || null).filter(Boolean);
           const expectedClothing = character.__vbSecondary
             ? character.__vbDescription
-            : buildClothingDescription(
-              character, clothingCategory, artStyle, storyData.clothingRequirements || null
+            : require('./wornItems').resolveGeneratedOutfit(
+              buildClothingDescription(
+                character, clothingCategory, artStyle, storyData.clothingRequirements || null
+              ),
+              charName,
+              { visualBible: storyData.visualBible || storyData.wornItemsVisualBible || null, sceneMetadatas: groupWornMetas }
             );
           const gridLabel = `${charName} (${clothingCategory})`;
 

@@ -532,6 +532,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // rendered story outfits as mismatches and emits fixInstructions to repaint
     // them into the default.
     clothingRequirements: storyData?.clothingRequirements || null,
+    // The bible, for ONE purpose: resolving which outfit clause a page's
+    // `wornItems[]` OFF entry belongs to, so the grid judge is handed the same
+    // stripped outfit the generator used (wornItems.resolveGeneratedOutfit).
+    // Deliberately NOT the plain `visualBible` key: that one ALSO switches on
+    // visual-bible secondary-character checks, which this path has never run —
+    // a separate behaviour change with its own paid grid evals.
+    wornItemsVisualBible: visualBible || null,
     artStyle: artStyle || 'pixar'
   });
 

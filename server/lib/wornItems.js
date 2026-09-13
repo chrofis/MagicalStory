@@ -260,6 +260,60 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
   return { text, removals };
 }
 
+/**
+ * THE OUTFIT THIS PAGE WAS ACTUALLY GENERATED AGAINST — one resolver for every
+ * eval-side clothing contract.
+ *
+ * The generator already strips a page's OFF items out of the outfit text it
+ * sends to the image model (promptBuilders.buildImagePrompt → a LOCAL
+ * `effectiveReferencePhotos` copy). Nothing persisted that stripped copy, so
+ * every judge kept receiving the story-level outfit and scored the render
+ * against a garment the brief had deliberately removed. Measured on staging
+ * job_1789207854566_l43qgl34w p12 (ART008 Sarah `off` "lost in the dark
+ * shaft", ART009 Facundo `off`): two MAJOR findings — "missing red sash / add
+ * red sash at waist" and the orange-sash equivalent — survived the
+ * consolidator and rode into `imageVersions[1]` = `iterate-round-1`, a PAID
+ * repair round ordering the pipeline to repaint both sashes. p10 same shape.
+ *
+ * So the eval side RECOMPUTES the same strip from the page's declared
+ * `wornItems[]` + the story outfit, through the same `stripOffItemsFromOutfit`
+ * the generator uses — no new prompt channel, no new field plumbed through the
+ * pipeline, no second implementation that can drift. Same shape as
+ * sceneMetadata.resolveEvalSceneHint (3b3070dce) for the identical class of
+ * bug on scene hints.
+ *
+ * Only the named character's own items are considered, so the cast never has
+ * to be plumbed to the call site. `sceneMetadatas` (plural) is for a contract
+ * that spans several pages — the entity-consistency grid judges one
+ * character×clothing group across every page it appears on, and a single
+ * expected-clothing string cannot say "off on p12 only". There the union is
+ * taken: an item off on ANY page of the group is not demanded on the grid,
+ * because a demanded-but-absent garment costs a paid repair round while a
+ * silent one costs nothing.
+ *
+ * Returns the text unchanged whenever anything is missing or the strip is not
+ * structurally unambiguous — see removeWornItemFromOutfit.
+ */
+function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sceneMetadata = null, sceneMetadatas = null } = {}) {
+  const text = String(outfitText || '');
+  if (!text.trim() || !ownerName || !visualBible) return text;
+  const metas = Array.isArray(sceneMetadatas) ? sceneMetadatas : (sceneMetadata ? [sceneMetadata] : []);
+  if (metas.length === 0) return text;
+  const seen = new Set();
+  const off = [];
+  for (const meta of metas) {
+    if (!meta) continue;
+    for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta)) {
+      if (r.state !== 'off' || seen.has(r.id)) continue;
+      seen.add(r.id);
+      off.push(r);
+    }
+  }
+  if (off.length === 0) return text;
+  const { text: stripped } = stripOffItemsFromOutfit(text, off, ownerName);
+  return stripped;
+}
+
 module.exports = {
   WORN_SLOTS,
   SLOT_NOUNS,
@@ -273,5 +327,6 @@ module.exports = {
   buildWornStateBlock,
   removeWornItemFromOutfit,
   stripOffItemsFromOutfit,
+  resolveGeneratedOutfit,
   sameName,
 };

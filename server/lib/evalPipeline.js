@@ -1393,6 +1393,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let clothingContractBlock = '';
     try {
       const lines = [];
+      // WORN ITEMS. A page can declare a garment OFF (`wornItems[]`), and the
+      // generator honours it — the judge must be handed the SAME stripped
+      // outfit or it scores the render against a garment the brief removed and
+      // orders a paid repair round to repaint it. One resolver, shared with the
+      // generator's own strip. See wornItems.resolveGeneratedOutfit.
+      const { resolveGeneratedOutfit } = require('./wornItems');
+      const wornMeta = evalOptions.sceneMetadata
+        || (() => { try { return getStoryHelpers().extractSceneMetadata(sceneHint || originalPrompt); } catch { return null; } })();
+      const wornCtx = { visualBible: evalOptions.visualBible || null, sceneMetadata: wornMeta };
+      const asWorn = (name, outfit) => resolveGeneratedOutfit(outfit, name, wornCtx);
       const reqs = evalOptions.clothingRequirements || null;
       if (reqs) {
         const { buildClothingDescription } = require('./entityConsistency');
@@ -1400,13 +1410,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           if (!c?.name) continue;
           const category = reqs[c.name]?._currentClothing;
           if (!category) continue;
-          const outfit = buildClothingDescription(c, category, artStyleForEval, reqs);
+          const outfit = asWorn(c.name, buildClothingDescription(c, category, artStyleForEval, reqs));
           if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
         }
       }
       if (lines.length === 0) {
         for (const p of (referenceImages || [])) {
-          if (p?.name && p?.clothingDescription) lines.push(`- ${p.name}: ${String(p.clothingDescription).trim()}`);
+          if (!p?.name || !p?.clothingDescription) continue;
+          const outfit = asWorn(p.name, p.clothingDescription);
+          if (outfit && String(outfit).trim()) lines.push(`- ${p.name}: ${String(outfit).trim()}`);
         }
       }
       clothingContractBlock = lines.join('\n');
