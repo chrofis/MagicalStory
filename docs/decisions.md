@@ -34985,3 +34985,48 @@ code-side remedy broke something real:
 colliding labels, and no code-side disambiguation exists if an author still
 returns a duplicate `type`. Verify on the next generated story that two props
 never share a REQUIRED OBJECTS label.
+
+### Every story records which repair method worked and which did not (2026-09-13)
+**Context:** Repair runs up to N rounds and each bad page picks exactly ONE
+method (`iterate` / `inpaint` / `char-fix`, `decideRepairMethod`). Whether a
+round was worth running, and which method earned its money, was unanswerable
+without hand-querying JSONB: the raw data existed (every version carries
+`method` + `finalScore`; every failed attempt is written to `retryHistory` as
+`round_repair_failed`) but nothing aggregated it. On prod story
+`job_1789227389389_z18dmvnt6` three rounds ran for 21.5 minutes and five pages
+still shipped at ≤35 with open CRITICALs — with no record of which method had
+been tried on them or whether it helped.
+
+The motivating measurement, worth keeping: a repair that scores WORSE than the
+image it replaced is completely invisible today, because `selectBestVersion`
+keeps the best version per page. The money is spent, the page is unchanged, and
+no report mentions it. `regressed` is the count this record exists to surface.
+
+**Decision:** `summarizeRepairRound()` (`repairLogic.js`, pure, no I/O)
+aggregates each round into `{round, attempted, repaired, failed, improved,
+regressed, byMethod, pages}` and the pipeline stamps the array on
+`finalChecksReport.repairRounds` — same shape, same place and same lifecycle as
+`bookAuditRounds`. `before` is the `finalScore` `findBadPages` ranked the page
+on entering the round; `after` is the `finalScore` `applyScore` stamped on the
+new version. A page with either score missing is `unknown`, never counted as
+`unchanged`. A round also logs one `📈 [REPAIR-EFFECT]` line.
+
+**Rationale:** Pure aggregation over data the round already produced — no extra
+model calls, no added cost, no change to any repair decision. Considered and
+rejected: computing it after the fact in a `scripts/analysis/` tool. That would
+work retroactively on existing stories, but the verdict then lives outside the
+story and only exists when somebody remembers to run it; the owner chose the
+per-story record (2026-09-13).
+
+Note for anyone re-opening the cost question: the round loop does NOT re-evaluate
+untouched pages — `buildEvalInputs(roundSuccess)` and the entity check both run
+on the repaired set only (`repairPipeline.js`, and the merge comment saying so).
+The evaluation spend inside repair is the cost of measuring pages we DID repair.
+There is no "skip re-eval of untouched pages" saving available; it is already the
+behaviour.
+
+**Touched:** `server/lib/repairLogic.js` (`summarizeRepairRound`),
+`server/lib/repairPipeline.js` (before-snapshot, per-round emit, return value),
+`storyJobPipeline.js` (`finalChecksReport.repairRounds`),
+`tests/unit/repair-round-effectiveness.test.ts` (9 tests)
+**Status:** ✅ active

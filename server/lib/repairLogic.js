@@ -716,6 +716,82 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   return { method: 'skip', reason: 'no repair needed' };
 }
 
+/**
+ * PER-ROUND, PER-METHOD REPAIR EFFECTIVENESS (owner, 2026-09-13).
+ *
+ * The pipeline runs up to N rounds and each page picks ONE method (iterate /
+ * inpaint / char-fix). Which method actually earned its money was invisible:
+ * the data existed on every version (`method`, `score`) and on retryHistory
+ * (`round_repair_failed`), but nothing aggregated it, so "round 2 was worth
+ * running" could never be answered without hand-querying JSONB.
+ *
+ * A REGRESSION is the finding this exists to surface: the pipeline keeps the
+ * best version per page, so a repair that scored WORSE costs money and changes
+ * nothing — invisible in every other report.
+ *
+ * Pure function, no I/O: `attempts` are what the round tried, `beforeScores`
+ * the finalScore findBadPages ranked on, `afterScores` the finalScore stamped
+ * on the new version. A page with either score missing is `unknown`, never
+ * silently counted as unchanged.
+ *
+ * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>}} args
+ */
+function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {} }) {
+  const byMethod = {};
+  const pages = [];
+
+  for (const a of attempts) {
+    if (!a || a.pageNumber == null) continue;
+    const method = a.method || 'unknown';
+    const m = byMethod[method] || (byMethod[method] = {
+      attempted: 0, repaired: 0, failed: 0,
+      improved: 0, unchanged: 0, regressed: 0, unknown: 0,
+      totalDelta: 0, scoredPages: 0, avgDelta: null,
+    });
+    m.attempted++;
+
+    if (!a.ok) {
+      m.failed++;
+      pages.push({ page: a.pageNumber, method, before: beforeScores[a.pageNumber] ?? null, after: null, delta: null, outcome: 'failed', error: a.error || null });
+      continue;
+    }
+
+    m.repaired++;
+    const before = beforeScores[a.pageNumber];
+    const after = afterScores[a.pageNumber];
+    let outcome, delta = null;
+    if (typeof before !== 'number' || typeof after !== 'number') {
+      outcome = 'unknown';
+      m.unknown++;
+    } else {
+      delta = Math.round((after - before) * 10) / 10;
+      outcome = delta > 0 ? 'improved' : (delta < 0 ? 'regressed' : 'unchanged');
+      m[outcome]++;
+      m.totalDelta += delta;
+      m.scoredPages++;
+    }
+    pages.push({ page: a.pageNumber, method, before: before ?? null, after: after ?? null, delta, outcome });
+  }
+
+  for (const m of Object.values(byMethod)) {
+    m.avgDelta = m.scoredPages > 0 ? Math.round((m.totalDelta / m.scoredPages) * 10) / 10 : null;
+    delete m.totalDelta;
+    delete m.scoredPages;
+  }
+
+  const repaired = pages.filter(p => p.outcome !== 'failed').length;
+  return {
+    round,
+    attempted: pages.length,
+    repaired,
+    failed: pages.length - repaired,
+    improved: pages.filter(p => p.outcome === 'improved').length,
+    regressed: pages.filter(p => p.outcome === 'regressed').length,
+    byMethod,
+    pages,
+  };
+}
+
 function mapStrategyToMethod(s) {
   if (!s) return { method: 'skip', reason: 'no strategy' };
   return { method: s.strategy || 'skip', reason: s.reason || '' };
@@ -774,4 +850,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
   'viewer_address',
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
-module.exports = { findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+module.exports = { findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

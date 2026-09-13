@@ -3702,6 +3702,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Compact record of each mid-loop book audit (one per repair round that had
     // a further round to feed). See the repair loop's MID-LOOP BOOK AUDIT block.
     let pipelineBookAuditRounds = null;
+    let pipelineRepairRounds = null;
     // Pages that ship below the repair threshold or still carrying a CRITICAL
     // (D7): the run must say so somewhere a reader will find it.
     let pipelineShippedDefective = null;
@@ -5732,7 +5733,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dedication: inputData.dedication || '',
         };
 
-        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, shippedDefective } = await runUnifiedRepairPipeline(rawImages, {
+        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, repairRounds, shippedDefective } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
           usageTracker: (provider, usage, funcName, modelId) => {
@@ -5781,6 +5782,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineCharFixDetails = charFixDetails;
         pipelineStyleConsistency = styleConsistency || null;
         pipelineBookAuditRounds = (bookAuditRounds && bookAuditRounds.length) ? bookAuditRounds : null;
+        pipelineRepairRounds = (repairRounds && repairRounds.length) ? repairRounds : null;
         pipelineShippedDefective = (shippedDefective && shippedDefective.length) ? shippedDefective : null;
 
         // Map pipeline results to allImages format. Index rawImages by
@@ -6348,6 +6350,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (pipelineBookAuditRounds) {
       finalChecksReport = finalChecksReport || {};
       finalChecksReport.bookAuditRounds = pipelineBookAuditRounds;
+    }
+
+    // Per-round, per-method repair effectiveness (owner, 2026-09-13): which
+    // method improved pages, which regressed them, which failed outright.
+    if (pipelineRepairRounds) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.repairRounds = pipelineRepairRounds;
     }
 
     // KNOWN-BROKEN PAGES (D7). Attached whenever the repair budget ran out with

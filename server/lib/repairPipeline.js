@@ -730,6 +730,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // ---------------------------------------------------------------------
   const readerFindingsByPage = new Map();   // pageNumber -> [{ severity, line }]
   const bookAuditRounds = [];
+  // Per-round, per-method repair effectiveness — see summarizeRepairRound.
+  const repairRounds = [];
 
   const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null) => {
     try {
@@ -1984,6 +1986,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const badPages = [...badPageNums, ...colourOnlyNums]
       .map(pn => byPageNumber.get(pn))
       .filter(Boolean);
+    // Score each page carried INTO this round, before any repair touches it —
+    // the same finalScore findBadPages ranked on. This is the "before" half of
+    // the per-method effectiveness record; taken here because roundEvalPages is
+    // rebuilt at the top of every round.
+    const roundBeforeScores = {};
+    for (const img of badPages) {
+      const fs = roundEvalPages[img.pageNumber]?.finalScore;
+      roundBeforeScores[img.pageNumber] = typeof fs === 'number' ? fs : null;
+    }
     if (colourOnlyNums.length) {
       log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${colourOnlyNums.length} colour-only page(s) pulled in: ${colourOnlyNums.join(', ')}`);
     }
@@ -2579,6 +2590,38 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           versions.push(newVersion);
         }
       }
+    }
+
+    // ── PER-ROUND, PER-METHOD EFFECTIVENESS ───────────────────────────────
+    // Which repair method earned its money this round. Pure aggregation over
+    // data the round already produced — no extra calls, no cost. The "after"
+    // score is the finalScore applyScore stamped on the new version a few
+    // lines above; a page whose eval failed has no after score and is recorded
+    // as `unknown` rather than being counted as unchanged.
+    {
+      const { summarizeRepairRound } = require('./repairLogic');
+      const roundAfterScores = {};
+      for (const r of roundSuccess) {
+        const versions = pageVersions.get(r.pageNumber) || [];
+        const latest = versions[versions.length - 1];
+        roundAfterScores[r.pageNumber] = typeof latest?.finalScore === 'number' ? latest.finalScore : null;
+      }
+      repairRounds.push(summarizeRepairRound({
+        round,
+        attempts: roundResults.filter(Boolean).map(r => ({
+          pageNumber: r.pageNumber,
+          method: r.method || null,
+          ok: !!r.imageData,
+          error: r.imageData ? null : (r.error || 'no result'),
+        })),
+        beforeScores: roundBeforeScores,
+        afterScores: roundAfterScores,
+      }));
+      const summary = repairRounds[repairRounds.length - 1];
+      const methodLine = Object.entries(summary.byMethod)
+        .map(([m, s]) => `${m} ${s.improved}↑/${s.regressed}↓/${s.unchanged}=/${s.failed}✗ (avg ${s.avgDelta ?? 'n/a'})`)
+        .join(' | ') || 'no attempts';
+      log.info(`📈 [REPAIR-EFFECT] Round ${round}: ${methodLine}`);
     }
 
     // ── MID-LOOP BOOK AUDIT — the reader's-eye pass, fed forward ──────────
@@ -3664,7 +3707,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // `shippedDefective` travels with the result so the job status and the stored
   // story can say which pages are known-broken — a log line alone is what let
   // two pages ship at 0 and 5 unremarked (D7).
-  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, shippedDefective };
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, repairRounds, shippedDefective };
 }
 
 module.exports = {
