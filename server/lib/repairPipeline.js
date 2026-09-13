@@ -1475,7 +1475,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (template) {
         const res = await callTextModel(
           template.replace(/\{CHARACTER\}/g, charName || 'the repaired character'),
-          400,
+          // null = model max (owner rule: no output caps anywhere). A numeric
+          // 400 here was the one offender tests/unit/no-output-caps.test.ts
+          // found; a truncated JSON verdict is worse than a long one.
+          null,
           MODEL_DEFAULTS.repairFaceCheck || 'gemini-3.7-flash',
           { images: [currentImageData, repairResult.imageData], usageLabel: 'repair_face_check' }
         );

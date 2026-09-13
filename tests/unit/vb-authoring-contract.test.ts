@@ -247,7 +247,11 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // Owner ruling 2026-09-11: two cells for the same object under different
   // light are indistinguishable pictures. Light is the scene's, per page.
   it.each([
-    ['sceneExpansionAll', /Light is not a state either/],
+    // B1+B2 (39fc0d0ff): how the WORLD lights an object is not a state; the
+    // object's OWN light (glows / goes dark) is. The all-pages template carries
+    // that split; the two legacy templates still say a change of light is
+    // never a state.
+    ['sceneExpansionAll', /How the WORLD lights it is not a state/],
     ['storyUnified', /A change of light is not a state/],
     ['storyTrial', /A change of light is not a state/],
   ])('%s excludes light from the state test', (key, re) => {
@@ -265,8 +269,11 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     expect(t).toMatch(/a flower wilts, a bottle breaks, a canvas gets painted/);
   });
 
-  it.each(['sceneExpansionAll', 'storyUnified'])('%s states schema keeps light out of a delta', (key) => {
-    expect(templates[key]).toMatch(/never light, that belongs to the scene/);
+  it("sceneExpansionAll states schema: the object's own light may be a delta, the scene's light never", () => {
+    expect(templates['sceneExpansionAll']).toMatch(/the object's own light belongs here when the story turns it on or off, how the scene lights it never does/);
+  });
+  it('storyUnified states schema keeps light out of a delta', () => {
+    expect(templates['storyUnified']).toMatch(/never light, that belongs to the scene/);
   });
 
   it('carries the recognisability requirement into the artifact schema field', () => {
