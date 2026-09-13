@@ -740,8 +740,34 @@ function isDatabaseMode() {
 // Record merged eval bucket-hits for stats. Best-effort: never throws, never
 // blocks generation. `findings` = [{ story_id, page_number, bucket, severity,
 // owner, agreement, eval_type, art_style, genre, language, char_count, judges }].
+// TABLE-NAME COLLISION (found 2026-09-13, NOT fixed here — needs an owner call).
+// Two different `eval_findings` tables are defined in this repo: the per-finding
+// stats sink below (story_id/page_number/bucket/…, created by the dead
+// database.js init block) and migrations/013_eval_findings.sql — the Lab's
+// eval-findings REGISTRY (slug/title/category/rationale/evidence). The migration
+// wins, so on staging every INSERT here fails with `column "story_id" does not
+// exist`. It had never been noticed because no caller passed storyId, so this
+// function was never reached at all. Now that the repair pipeline threads the id,
+// it would fail once per bucket per page — so probe once, say so LOUDLY, and stop
+// rather than logging the same failure hundreds of times per story.
+let evalFindingsSinkUsable = null; // null = unprobed, false = wrong table / absent
+
 async function recordEvalFindings(findings) {
   if (!Array.isArray(findings) || !findings.length) return;
+  if (evalFindingsSinkUsable === false) return;
+  if (evalFindingsSinkUsable === null) {
+    try {
+      const probe = await dbQuery(
+        `SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'eval_findings' AND column_name = 'story_id' LIMIT 1`
+      );
+      evalFindingsSinkUsable = probe.rows.length > 0;
+    } catch { evalFindingsSinkUsable = false; }
+    if (!evalFindingsSinkUsable) {
+      console.warn('⚠️ [eval_findings] per-finding stats DISABLED: the `eval_findings` table in this database is the Lab findings REGISTRY (migrations/013), which has no story_id column. The stats sink needs its own table name. See tasks/BACKLOG.md.');
+      return;
+    }
+  }
   try {
     for (const f of findings) {
       if (!f || !f.bucket || !f.severity) continue;

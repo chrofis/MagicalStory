@@ -1139,6 +1139,21 @@ const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
  *        could not say, and the branch behaves as before.
  * @returns {{outcome: string, reason: string|null, finding: object|null}}
  */
+/**
+ * The runMetrics counter name for one presence derivation.
+ *
+ * `spoke` is true when the arithmetic actually decided (outcome + optional
+ * reason); false when it DECLINED, which is the interesting case — it is how
+ * often the detector and the evaluator disagree badly enough that presence
+ * refuses to rule. Kept here, next to the derivation, so the counter vocabulary
+ * and the derivation cannot drift apart, and so it is testable without an
+ * evaluator call.
+ */
+function presenceCounterName(presence, spoke) {
+  const reason = presence?.reason ? `_${presence.reason}` : '';
+  return spoke ? `presence_${presence?.outcome}${reason}` : `presence_declined${reason}`;
+}
+
 function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, referenceNames } = {}) {
   const decline = (reason) => ({ outcome: 'declined', reason, finding: null });
 
@@ -1679,8 +1694,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         log.error(`❌ [EVAL] ${pageContext}: ${referenceImages.length} reference photo(s) supplied, 0 attached — refusing to grade identity-blind; eval fails instead of returning an unanchored score`);
         // Countable, not just scrollback: shows up in story_metrics counters.
         try {
-          const sid = evalOptions?.storyMeta?.storyId;
-          if (sid) require('./runMetrics').forJob(sid).count('eval_refs_attach_failed');
+          require('./runMetrics').forJob(evalOptions?.storyMeta?.storyId).count('eval_refs_attach_failed');
         } catch { /* metrics are best-effort */ }
         return null;
       }
@@ -2245,8 +2259,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             + ` — detector ${realFigureCount ?? 'n/a'}, evaluator ${Array.isArray(figures) ? figures.length : 'n/a'}, roster ${expectedCast.count}`);
         }
         try {
-          const sid = evalOptions?.storyMeta?.storyId;
-          if (sid) require('./runMetrics').forJob(sid).count(`presence_${spoke ? `${presence.outcome}${presence.reason ? `_${presence.reason}` : ''}` : `declined_${presence.reason}`}`);
+          // The id may be absent at an unthreaded call site; forJob() now rescues
+          // it from the ambient run scope and warns rather than dropping it.
+          require('./runMetrics').forJob(evalOptions?.storyMeta?.storyId)
+            .count(presenceCounterName(presence, spoke));
         } catch { /* metrics are best-effort */ }
       }
 
@@ -2295,8 +2311,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (figures.length > 0 && matches.length === 0) {
         log.warn(`⚠️ [EVAL] ${pageContext}: ${figures.length} figure(s) and ZERO matches — no per-character finding can name anyone on this page`);
         try {
-          const sid = evalOptions?.storyMeta?.storyId;
-          if (sid) require('./runMetrics').forJob(sid).count('eval_matches_missing');
+          require('./runMetrics').forJob(evalOptions?.storyMeta?.storyId).count('eval_matches_missing');
         } catch { /* metrics are best-effort */ }
       }
 
@@ -2591,6 +2606,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 }
 
 module.exports = {
+  presenceCounterName,
   runVisualInventory,
   validateEmptyScene,
   capComplianceIdentitySeverity,

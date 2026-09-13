@@ -1341,6 +1341,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
             // cover. Reordered; no extra detector call.
             detectedFigures: coverBboxDetection?.figures || null,
             sceneMetadata: coverSceneMetadata || null,
+            // The eval's runMetrics counters (presence_*, eval_matches_missing)
+            // key off this; without it they went to the NOOP recorder.
+            storyMeta: { storyId: storyData?.id || null },
           }
         );
         if (qualityResult) {
@@ -1407,6 +1410,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
             // Same reorder as the direct path above.
             detectedFigures: compBbox?.figures || null,
             sceneMetadata: coverSceneMetadata || null,
+            storyMeta: { storyId: storyData?.id || null },
           }
         );
         if (qualityResult) {
