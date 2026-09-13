@@ -235,10 +235,13 @@ A story deleted before an erasure can leave its objects behind: `deleteStoryArte
 silent. Those objects are unreachable per-user, so no erasure can find them.
 
 ```bash
-node scripts/admin/audit-r2-orphans.js            # production bucket, read only
-node scripts/admin/audit-r2-orphans.js --list=200 # more example keys per prefix
+node scripts/admin/delete-r2-dead-cohorts.js --report-only             # read only, cannot delete
+node scripts/admin/delete-r2-dead-cohorts.js --report-only --list=200  # more example keys
 ```
 
-It reports the count and total bytes of unreferenced objects grouped by key prefix and
-**deletes nothing** — it has no delete mode at all (ruling Q7). Anything it finds is decided
-per prefix, by hand.
+It reports objects, bytes, referenced and unreferenced counts grouped by key prefix and
+sub-kind, and in `--report-only` mode **deletes nothing**. Ruling Q7 (2026-09-12) asked for a
+read-only audit; that is this mode. Note that the audit's old *id-attribution* verdict is
+gone — deletion is decided by the COHORT rule only (`docs/r2-storage.md`), after the three
+false-positive classes of 2026-09-13. The two earlier scripts (`audit-r2-orphans.js`,
+`delete-r2-orphans.js`) were deleted that day.

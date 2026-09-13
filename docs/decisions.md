@@ -34318,11 +34318,29 @@ broke the earlier attempts — all correctly excluded.
   a `user_id` with no `users` row** — stories outliving their owner. A real
   integrity problem, independent of R2. On the backlog.
 
-**Touched files:** `scripts/admin/delete-r2-dead-cohorts.js` (new),
-`docs/r2-storage.md` (new — prefix map, reference tables, cohort rule, how to
-run the audit and the deleter), `tasks/BACKLOG.md`. Read-only audit remains
-`scripts/admin/audit-r2-orphans.js`; the manifest-consuming
-`scripts/admin/delete-r2-orphans.js` is unchanged.
+**Consolidated to ONE tool, same day (owner ruling 2026-09-13).** The two
+id-attribution tools — `scripts/admin/audit-r2-orphans.js` and
+`scripts/admin/delete-r2-orphans.js` — were **deleted**. Keeping them was a
+standing hazard, not dead weight: the audit's manifest is a real file on disk in
+a real format, and `delete-r2-orphans.js` is a real deleter that consumes it. A
+future session reaching for the obvious-looking "audit then delete" pair would
+have re-run exactly the three false-positive classes above, with a deleter
+attached. Their genuinely useful, rule-independent parts were ported onto the
+cohort tool: per-prefix and per-sub-kind reporting (`debug`, `aux`, `retry`,
+`vb`, `empty_scene`, `tl_*`, …), an `--age-days` floor (default 30, applied per
+COHORT since deletion is all-or-nothing per cohort), loud reporting of
+unrecognised prefixes with samples, the bucket↔database host guard, and a
+manifest written to disk. The manifest is now a **review artefact only, never an
+input** — the reverse of the old design, so no file can drive a delete. Dropped
+with the scripts: gate 3 (owning-row lookup), the `orders/pdf-{jobId}-…` regex,
+landmark id parsing, and the batch re-verification built on the same id
+attribution.
+
+**Touched files:** `scripts/admin/delete-r2-dead-cohorts.js` (the single tool —
+report / dry-run / delete modes), `docs/r2-storage.md` (new — prefix map,
+reference tables, cohort rule, how to run it), `tasks/BACKLOG.md`.
+`scripts/admin/audit-r2-orphans.js` and `scripts/admin/delete-r2-orphans.js`
+deleted.
 
 **Status:** ✅ active. Note the bucket will re-accumulate orphans until
 `0e07da278` is promoted to master.

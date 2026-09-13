@@ -113,21 +113,34 @@ carve-out for them (owner declined one, 2026-09-13). Their canonical photos live
 
 ## 4. Running it
 
-**Audit (read-only, has no delete mode and never will)** —
-`scripts/admin/audit-r2-orphans.js`. Reports and writes a manifest; a human decides.
-`scripts/admin/delete-r2-orphans.js` consumes **only** that reviewed manifest, never a
-re-derived list.
-
-**Cohort deleter** — `scripts/admin/delete-r2-dead-cohorts.js`:
+**One tool, three modes** — `scripts/admin/delete-r2-dead-cohorts.js`. It is both the
+reporter and the deleter; there is no second script, and there must never be one. (Two
+earlier tools, `audit-r2-orphans.js` and `delete-r2-orphans.js`, were deleted on
+2026-09-13: they were built on id attribution, the approach the cohort rule replaced.)
 
 ```bash
-node scripts/admin/delete-r2-dead-cohorts.js                          # dry run (default)
+node scripts/admin/delete-r2-dead-cohorts.js --report-only   # report + manifest, cannot delete
+node scripts/admin/delete-r2-dead-cohorts.js                 # dry run (default), same report
 node scripts/admin/delete-r2-dead-cohorts.js --confirm --production   # actually deletes
 ```
 
-Safety layers, in order: dry-run default → both `--confirm` and `--production` required →
-FATAL on any table that fails to scan → final assertion that no victim key is in the
-referenced set → batches of 1000 (S3 API max) → every deleted key appended to
+Options: `--age-days=30` (cohort age floor — a cohort whose newest object is younger than
+this is never swept, which protects an in-flight generation), `--list=20` (sample keys per
+prefix), `--out=path.json` / `--no-manifest` (the review manifest).
+
+The report breaks the bucket down by prefix and by sub-kind (`debug`, `aux`, `retry`, `vb`,
+`empty_scene`, `migrated`, `tl_*`, …) with objects / bytes / referenced / unreferenced for
+each, and prints any **unrecognised** top-level prefix with sample keys — those are
+protected unconditionally, but a new one means this page is out of date. Sub-kinds are
+reporting only; they never enter a deletion decision.
+
+The manifest is a **review artefact, never an input**. Nothing can be deleted by feeding a
+file back in, so a stale or hand-edited manifest cannot drive a delete.
+
+Safety layers, in order: `--report-only` cannot delete at all → dry-run default → both
+`--confirm` and `--production` required → bucket/database host guard →
+FATAL on any table that fails to scan → the age floor → final assertion that no victim key
+is in the referenced set → batches of 1000 (S3 API max) → every deleted key appended to
 `tasks/r2-deletion-log-<date>.jsonl` (gitignored).
 
 Reads `DATABASE_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,

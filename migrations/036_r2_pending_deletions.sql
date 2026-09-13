@@ -6,7 +6,7 @@
 -- `r2.deleteObject` log a failure and return a count rather than throwing, so
 -- until now a failed prune was SILENT: the row was gone, nothing in the system
 -- knew which keys it had owned, and the objects were unreachable forever
--- (that is what scripts/admin/audit-r2-orphans.js counts).
+-- (that is what scripts/admin/delete-r2-dead-cohorts.js --report-only counts).
 --
 -- This table is the missing anchor. A prune that fails records the prefix (or
 -- key) it was going to remove, and the daily housekeeping routine retries it.
