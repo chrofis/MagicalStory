@@ -2113,6 +2113,54 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   return { targets: enrichedTargets, detectionHistory };
 }
 
+/**
+ * A MICRO-FIGURE IS NOT A CAST MEMBER (2026-09-13).
+ *
+ * The expected-cast roster decides one CRITICAL presence finding per page by
+ * arithmetic — figures vs cast — so the count has to mean "people the picture
+ * is actually about". GroundingDINO also returns sub-1%-of-frame smudges:
+ * background silhouettes, a statue, a wet blur on paving stones.
+ *
+ * figureDetection.js has its own prune, but it requires no-face AND area < 0.8%
+ * AND score < 0.45, and both offending boxes on job_1789207854566_l43qgl34w
+ * scored ~0.52 and survived it. That module is not to be modified, so the
+ * filter lives here, at the consumption site, and filters FOR COUNTING only —
+ * the stored figures array is never mutated.
+ *
+ * The predicate is deliberately NOT "has no face". p5 of that job is a
+ * five-figure back-view page where four GENUINE cast members have faceBox null,
+ * facePoint null and samPoints empty; they survive on AREA, at 8-11% of frame.
+ * The margin is 6.5x — the largest micro-figure measured 0.64% of frame, the
+ * smallest genuine cast figure 4.14%.
+ *
+ * All four conjuncts must hold. `confidence === 'low'` is redundant against the
+ * other three on every figure measured, and costs nothing to require.
+ */
+function isMicroFigure(figure) {
+  if (!figure || typeof figure !== 'object') return false;
+  if (figure.faceBox) return false;
+  if (figure.facePoint) return false;
+  if (Array.isArray(figure.samPoints) && figure.samPoints.length > 0) return false;
+  if (figure.confidence !== 'low') return false;
+  const box = figure.gdinoBox || figure.box;
+  if (!Array.isArray(box) || box.length < 4) return false;
+  const [x1, y1, x2, y2] = box.map(Number);
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return false;
+  // Normalised coordinates only. A pixel-space box would read as an enormous
+  // area and never match, which is the safe direction to fail.
+  if (Math.max(x1, y1, x2, y2) > 1.0001) return false;
+  const area = Math.abs(x2 - x1) * Math.abs(y2 - y1);
+  return area < 0.01;
+}
+
+/**
+ * The figure list as the presence arithmetic should read it. Never mutates.
+ */
+function countRealFigures(figures) {
+  if (!Array.isArray(figures)) return null;
+  return figures.filter(f => !isMicroFigure(f)).length;
+}
+
 module.exports = {
   parseVisualBibleObjects,
   resolveExpectedObjectLabels,
@@ -2126,6 +2174,8 @@ module.exports = {
   restampDetectionForCoverText,
   detectionForVersion,
   detectAllBoundingBoxes,
+  isMicroFigure,
+  countRealFigures,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
   // wrapper above is the only entry (sourceImageFp invariant, 2026-07-19).
   detectSubRegion,

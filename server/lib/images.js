@@ -2363,7 +2363,7 @@ async function evaluateImageBatch(images, options = {}) {
           // Detector figure count for the EXPECTED CAST block — present on
           // repair-round re-evaluations that carry the previous detection;
           // null on a first-round eval, which runs before detection.
-          detectedFigureCount: Array.isArray(img.bboxDetection?.figures) ? img.bboxDetection.figures.length : null,
+          detectedFigureCount: require('./bboxDetection').countRealFigures(img.bboxDetection?.figures),
           storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,

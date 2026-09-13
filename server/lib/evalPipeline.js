@@ -1228,7 +1228,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       originalPrompt,
       visualBible: evalOptions.visualBible || null,
       evaluationType,
-      detectedFigureCount: evalOptions.detectedFigureCount ?? null,
+      // COUNT ONLY REAL FIGURES. A caller that hands over the figures array
+      // gets them filtered here (see isMicroFigure); a caller that only has a
+      // number is trusted to have filtered already — images.js does.
+      detectedFigureCount: Array.isArray(evalOptions.detectedFigures)
+        ? require('./bboxDetection').countRealFigures(evalOptions.detectedFigures)
+        : (evalOptions.detectedFigureCount ?? null),
       pageLabel: pageContext ? `${pageContext} ` : '',
       sceneMetadata: evalOptions.sceneMetadata || null,
       // ONE ROSTER: the two inputs only the detector-side builder used to have.
