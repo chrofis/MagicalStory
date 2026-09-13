@@ -811,3 +811,31 @@ anything, and the owner's actual concern was deletion COMPLETENESS.
 **What happened:** I diagnosed "the Art Director drifts one page behind its plan lines" on job_1789304198359_y3n0euk3z, wrote it up, scanned 20 stories and reported 6 more. The owner said "the beats is allowed to shift a page or delete one and create a new one." Against the FINAL plan (`data.outline`, post `beats_replan`) every brief matched its own page. I had compared against `beatsReviewReport.briefsIn`, which `beatsPipeline.js:1254` stores as `plan.pages` — the division BEFORE the re-plan round.
 **Rule:** The beats layer may re-divide the book after the plan check. Any page-to-plan comparison — cast, moment, elements, a Lab replay, a scan — must read the division that actually shipped (the page plan inside `data.outline`, or whatever `resolveStoryBeats` is fixed to return), never `briefsIn`. Before claiming a pipeline stage disobeyed its input, prove the input you hold is the one it was given. This is the same lesson as "verify what RAN, not what was asked", one hop earlier.
 **Cost:** a false finding in decisions/backlog (withdrawn), a void 6-of-20 scan, ~half a day. The pre-existing backlog item "four Lab stages measure a story division that never shipped" now has its first measured victim.
+
+## 2026-09-14 — A defect in the output is not evidence of a missing input
+**What happened:** prod `job_1789227389389_z18dmvnt6` p8 narrates «queues d'argent» while the
+contract gives a deep yellow and a red tail, and all 7 surfaces drew the contract. I diagnosed a
+plumbing gap and offered options built on it; when the owner asked "is this only for the clothing,
+what about all the visual bible elements", I went further and proposed injecting a whole
+`{VISUAL_CONTRACT}` block into the writer. The owner's reply — "this is not hard to do or catch,
+something must be wrong somewhere" — is what sent me to the stored prompt. `stories.data.storyTextPrompts`
+(59,347 chars) already carried the per-page `ILLUSTRATION (already locked)` block with **both tail
+colours verbatim**, and `buildTextRefinePrompt` already passes the full `sceneBrief` as
+`{SCENE_OUTLINES}`. The real gap was a RULE gap: the prompts said "don't narrate wardrobe" and
+"never contradict" (read as being about events) and said nothing about the case that occurred — a
+transformation is an event, so naming the tails was legitimate and no rule anchored the colour.
+**Three more of the same shape in the same session:** the narrative audits "never fire" (the arc
+review had already filed `[MAJOR] Maman lets two small children go under the lake`, and
+`roundsConfigured: 1` meant nothing could act on it); "p3 text says photograph, image shows a model
+ship" (filed backwards — the brief says "a photographic display of a sailing barque", the text was
+faithful and the IMAGE deviated); "p2 should have routed to char-fix and didn't" (it routed in all
+three rounds and the method failed: `original 16 → 10 → -35 → -30`).
+**Rule:** before proposing that a stage lacks an input, open the artefact the run stored and grep it.
+`stories.data` holds `storyTextPrompts`, `sceneDescriptions`, every `*ReviewReport`, `textRefineReport`
+(with `roundTrace` / `lectorApplied` / `proofread`), `finalChecksReport`, and per page `imageVersions`
+with `source`/`finalScore`, `retryHistory`, `unrepairedCritical`, `bestSource`. If the input is there
+and the rule is there, the bug is in the rule's SCOPE, a severity ceiling, or the method — never the
+wiring. Plumbing that duplicates existing plumbing is worse than no fix: it ships, it looks like
+progress, and the real defect stays.
+**Cost:** two wrong option-sets put to the owner, one near-miss on building a redundant prompt block,
+and three findings filed with the wrong owner. Caught only because the owner pushed back twice.
