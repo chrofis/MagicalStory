@@ -34503,3 +34503,49 @@ accepted and changed nothing: the 7 pages that completed averaged 2,817 in /
 deepseek-v4-pro — verify by token count, never by the parameter being accepted.
 **Touched:** measurement only (Lab #1238, #1241, #1242)
 **Status:**    ✅ active
+
+## Per-object billing is declined: `object_presence` and `setting` stay page-scoped (2026-09-13)
+**Context:**   B2 in `tasks/eval-variance-backlog.md` proposed billing object
+findings per object instead of once per page, and was framed as blocked on the
+evaluators not emitting a subject for them. It followed B1, which shipped the
+mandatory `character` field (2026-09-11, `3146b3c8d`, staging only).
+**Decision:** Declined. `object_presence` and `setting` remain in
+`PAGE_SCOPED_BUCKETS`, so `deductionClassKey` keeps returning `page:<bucket>`
+before the subject is read. The 2026-08-19 ruling is reaffirmed, not reversed.
+No `subject`/`element` field is added to object findings in the evaluator
+prompts, and no code changes.
+**Rationale — the real reason is cost, not missing data:** A MAJOR is 15
+points. A page missing three declared props bills 15 today and would bill 45
+per-object. That crosses `REPAIR_DEFAULTS.scoreThreshold` (redo below 50) and
+the issue threshold of 5, forcing redos on prop-heavy pages — and
+`REPAIR_DEFAULTS` already records that regenerated pages often come back worse.
+That is the same evidence behind C1, which the owner declined on 2026-08-19.
+Multiplicity is in any case already visible without costing points: the jury
+merges per `(bucket, subject)` since `2bee3632c`, repair targets resolve, and
+`duplicate_object` holds its own bucket specifically so a duplicated prop is not
+zero-rated on a page that already carries a missing element (see the existing
+`duplicate_object` entry).
+**Rationale — the correction:** B2 is NOT closed for want of a subject. Measured
+2026-09-13 (read-only, `stories.data → sceneImages[] → imageVersions[]`, 82
+stories / 20,030 findings, 2026-08-14 → 2026-09-12, buckets via
+`evalBuckets.bucketForType()`): on the consolidated list — the one the stale
+2026-08-20 "11% / 3%" figures actually matched — `object_presence` subject
+coverage went 22.9% → 96.7% (29/30) across B1, and on the raw evaluator lists
+27.3% (300/1099) → 45.5% (20/44). The subject IS available; `scoring.js:552`
+discards it by deliberate choice. `setting` is the one genuinely uncoverable
+case (0.7% → 15.8%, 3/19 consolidated), because a setting defect usually has no
+figure to attribute to, so a mandatory `character` field cannot reach it. For
+contrast, the buckets that ARE billed per subject: clothing 54.3% → 100%
+(47/47), character_identity 76.0% → 96.0%, action_interaction 65.1% → 94.0%;
+consolidated, clothing / character_identity / accessory all reach 100%.
+**Caveat:** n=2 post-B1 stories (`job_1789207854566_l43qgl34w`,
+`job_1789227389389_z18dmvnt6`), both staging. B1 is staging-branch only and was
+never merged to master, so production has no independent post-B1 story (its one
+"post" row is a copy of staging's). Directional, not established.
+**Touched:** none — no code changed. The unchanged mechanism is
+`server/lib/scoring.js:478-489` (`PAGE_SCOPED_BUCKETS`) and `:552`
+(`deductionClassKey` returning `page:<bucket>` before reading the subject).
+Backlog entries closed: `tasks/eval-variance-backlog.md` (B2 + the open
+decision), `tasks/BACKLOG.md` (the B1 note).
+**Status:**    ✅ active — closed by owner ruling; re-opening needs new evidence,
+not the "objects have no subject" premise, which is false.

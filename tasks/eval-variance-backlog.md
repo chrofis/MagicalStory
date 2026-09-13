@@ -9,7 +9,8 @@ finding was that the score carries roughly 26 points of run-to-run noise.
 ## B. Finding taxonomy (one prompt change across three templates + one validation run)
 
 **Verified against the tree 2026-08-20: B3, B4 and B5 shipped after this list was written.**
-Only B1/B2 remain.
+**Section B is now CLOSED:** B1 shipped 2026-09-11 (`3146b3c8d`, staging) and B2 was declined
+and closed by the owner on 2026-09-13.
 
 **Re-scoped 2026-09-06: the CONSUMER plumbing already landed** — 2bee3632c (the jury merges per
 `(bucket, subject)`) and `evalBuckets.js:265-353` carries `subject` through and warns that scoring
@@ -17,12 +18,22 @@ bills per `(class, subject)`. What remains for both B1 and B2 is the PROMPT-side
 `prompts/image-evaluation.txt` nor `prompts/image-semantic.txt` instructs the evaluator to emit a
 subject. Do not read these as unbuilt.
 
-- [ ] **B1. Clothing findings carry no `subject`.** Clothing is the largest producer of
-      deductions, so per-character billing degrades to per-page: two characters' clothing
-      problems collapse into one charge. Remaining work: the evaluator prompt must emit it.
-- [ ] **B2. Objects have no subject either.** Only 11% of `object_presence` and 3% of
-      `setting` findings carry one, so distinct objects merge. Owner accepted this merge for
-      now (2026-08-19); a `subject` field closes it properly. Remaining work: prompt-side emission.
+- [x] **B1. Clothing findings carry no `subject`.** (2026-09-11, `3146b3c8d`, staging branch
+      only — never merged to master.) Clothing is the largest producer of deductions, so
+      per-character billing degraded to per-page: two characters' clothing problems collapsed
+      into one charge. Both evaluator templates now require `character` on every finding that
+      belongs to a figure.
+- [x] **B2. Per-object billing for `object_presence` / `setting` — DECLINED AND CLOSED
+      (owner, 2026-09-13).** `object_presence` and `setting` stay in `PAGE_SCOPED_BUCKETS`
+      (`server/lib/scoring.js:478-489`); the 2026-08-19 ruling is reaffirmed, not reversed, and
+      no `subject`/`element` field is added to object findings in the evaluator prompts. No
+      code change. **The reason is cost, not missing data:** per-object billing would charge a
+      page missing three declared props 45 points instead of 15, crossing
+      `REPAIR_DEFAULTS.scoreThreshold`, and regenerated pages often come back worse. **And the
+      old premise was wrong:** post-B1, 96.7% of consolidated `object_presence` findings DO
+      carry a subject — `scoring.js:552` discards it deliberately. Do not re-open this on the
+      belief that objects have no subject.
+      → `docs/decisions.md` 2026-09-13 "Per-object billing is declined"
 - [x] **B3. `viewer_address` has its own type** — `evalBuckets.js:101` + `:188`.
       Done 2026-08-20, `docs/decisions.md` "emotion and viewer_address become their own types".
 - [x] **B4. `emotion` has its own type** — `evalBuckets.js:91` + `:179`. Same entry. The
@@ -59,8 +70,11 @@ subject. Do not read these as unbuilt.
 
 ## Open decisions for the owner
 
-- [ ] Approve the B1–B2 prompt change (a `subject` field on clothing and object findings).
-      B3/B4 already shipped.
+- [x] Approve the B1–B2 prompt change (a `subject` field on clothing and object findings).
+      B3/B4 already shipped. **RULED: B1 approved and shipped** (2026-09-11, `3146b3c8d`);
+      **B2 declined and closed** (2026-09-13) — objects and settings stay page-scoped, no
+      prompt change, no code change. → `docs/decisions.md` 2026-09-13 "Per-object billing is
+      declined"
 - [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
       `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every
       100 with a second eval was offered and declined" (restated `:14904`).

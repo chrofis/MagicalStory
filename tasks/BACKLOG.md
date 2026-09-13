@@ -516,8 +516,11 @@ Nothing below should be coded until it is answered.
 - [x] (2026-09-11, 3146b3c8d) B1 APPROVED AND SHIPPED — both evaluator templates now require `character` on every
       finding belonging to a figure. **B2 is emission-only:** `object_presence` and `setting` sit in
       `PAGE_SCOPED_BUCKETS` (`scoring.js:464-475`), which discards the subject at billing by an earlier deliberate
-      decision, so objects gained a jury-merge and repair target but NOT a page penalty. Raising object deductions
-      needs its own decision on that list → `tasks/eval-variance-backlog.md`
+      decision, so objects gained a jury-merge and repair target but NOT a page penalty. **B2 is now DECLINED AND
+      CLOSED (owner, 2026-09-13): objects and settings stay page-scoped, no prompt change, no code change.** The reason
+      is cost (three missing props would bill 45 instead of 15 and force redos), not missing data — post-B1, 96.7% of
+      consolidated `object_presence` findings carry a subject and `scoring.js:552` discards it on purpose.
+      → `docs/decisions.md` 2026-09-13 "Per-object billing is declined", `tasks/eval-variance-backlog.md`
 - [x] (2026-09-11, owner ruling) **ANSWERED: NO drawn mounting context** — "no handle bar. Only the thing itself." **The prompt ban does NOT hold, measured (Lab 1193, deployed `e62bec84`): with `reference-sheet.txt` forbidding anything named as what the object attaches to, the cell still drew the handlebar, larger than before.** Naming the attachment is what fixes object identity AND what drags it into the cell — one sentence doing both jobs, and a ban on drawing a thing the description just named fights rule 12b ("never name what must be absent"). Owner closed it anyway: "It is good enough for now." Not fixed, not to be re-raised without new evidence. If it ever needs fixing, the non-prompt lever is a post-render isolate (DINO/SAM already exist for figures) rather than more wording. Also measured: identical descriptions give materially different cells run to run (1192 clean scale → 1194 artichoke), so single renders are not verdicts.
       The words-only fix (Lab 1191/1192) is the whole lever; the cell prompt now bans drawing whatever the
       description names as what the object attaches to, is part of, or is used with. No `mount` field is built.
