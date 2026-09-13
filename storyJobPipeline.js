@@ -2101,15 +2101,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           }
 
-          for (const bg of vb.backgrounds) {
-            if (!bg.description || !bg.pages?.length) continue;
-            // Pick the first landmark whose `pages` array overlaps this bg's
+          // ONE plate per distinct vantage, fanned out to that vantage's pages —
+          // the same economy full mode has had since Phase 5a-pre-vantage. Trial
+          // used to render one plate PER PAGE (6 calls / $0.12 on a 6-page trial,
+          // 17-23% of the whole trial cost) while measuring only 1-3 distinct
+          // vantages across 12 measured trials. The grouping is the real grouper
+          // (groupPagesByVantage) fed a synthesized page shape — see
+          // groupTrialPlatePagesByVantage. Pages with no LOC come back as their
+          // own single-page group, so nobody loses a plate.
+          const { groupTrialPlatePagesByVantage } = require('./server/lib/sceneMetadata');
+          const plateGroups = groupTrialPlatePagesByVantage(vb);
+          log.info(`🎬 [TRIAL] ${plateGroups.length} plate(s) for ${plateGroups.reduce((n, g) => n + g.pages.length, 0)} page(s): ${plateGroups.map(g => `${g.vantageId || 'unassigned'}→p${g.pages.join(',')}`).join('; ')}`);
+          for (const plateGroup of plateGroups) {
+            const bg = { description: plateGroup.description, pages: plateGroup.pages };
+            // Representative page — the one whose landmark, log line and prompt
+            // page-number the shared plate inherits. Same choice the full-mode
+            // vantage path makes (`group.pageNumbers[0]`).
+            const pageNum = plateGroup.pages[0];
+            // Pick the first landmark whose `pages` array overlaps this group's
             // pages — typically there's only one. Plumbing the photo into the
             // empty-scene render is the only way to anchor the building's
             // shape; the scene description alone doesn't carry visual identity.
             const bgLandmarkPromise = bg.pages.map(pn => landmarkPromiseByPage[pn]).find(Boolean)
               || Promise.resolve(null);
-            for (const pageNum of bg.pages) {
+            {
               const platePromise = bgLimit(async () => {
                 try {
                   const bgLandmark = await bgLandmarkPromise;
@@ -2119,7 +2134,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // photo by NAME so Grok knows which building it's looking at
                   // and preserves its silhouette; '' when no landmark.
                   const landmarkFidelityBlock = buildLandmarkFidelityBlock(bgLandmark);
-                  log.info(`🎬 [TRIAL] Empty scene page ${pageNum}: ${bgLandmark ? `landmark "${bgLandmark.name}" variant ${bgLandmark.variantNumber ?? '?'} attached` : 'no landmark photo'}`);
+                  log.info(`🎬 [TRIAL] Empty scene ${plateGroup.vantageId || 'unassigned'} (pages ${bg.pages.join(',')}, rep p${pageNum}): ${bgLandmark ? `landmark "${bgLandmark.name}" variant ${bgLandmark.variantNumber ?? '?'} attached` : 'no landmark photo'}`);
                   const emptyPrompt = buildEmptyScenePrompt({
                     style: artStyleDesc,
                     description: bg.description,
@@ -2155,25 +2170,34 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     // name every other image call in the pipeline stores its
                     // packed refs under; carried onto the page row below as
                     // emptySceneGrokRefImages so the plate call leaves a trace.
-                    sceneBackgrounds[pageNum] = {
-                      imageData: result.imageData,
-                      prompt: emptyPrompt,
-                      grokRefImages: result.grokRefImages || null,
-                    };
-                    log.info(`🎬 [TRIAL] Empty scene for page ${pageNum} generated (${Math.round(result.imageData.length / 1024)}KB)`);
+                    // Fan out the same canvas to every page in the group — same
+                    // shape (and same per-page trace fields) the full-mode
+                    // vantage fan-out writes. vantageId is null for a page that
+                    // resolved to no LOC, exactly as the vantage path leaves it.
+                    for (const pn of bg.pages) {
+                      sceneBackgrounds[pn] = {
+                        imageData: result.imageData,
+                        prompt: emptyPrompt,
+                        grokRefImages: result.grokRefImages || null,
+                        vantageId: plateGroup.vantageId || null,
+                      };
+                    }
+                    log.info(`🎬 [TRIAL] Empty scene for pages ${bg.pages.join(',')} generated from 1 plate (${Math.round(result.imageData.length / 1024)}KB)`);
                     if (result.usage) {
                       const isGrok = result.modelId?.startsWith('grok-imagine');
                       addUsage(isGrok ? 'grok' : 'gemini_image', result.usage, 'trial_empty_scene', result.modelId);
                     }
                   }
                 } catch (err) {
-                  log.warn(`⚠️ [TRIAL] Empty scene for page ${pageNum} failed: ${err.message}`);
+                  log.warn(`⚠️ [TRIAL] Empty scene for pages ${bg.pages.join(',')} failed: ${err.message}`);
                 }
               });
               // Registered BEFORE any page streams, so the page render can await
               // its own plate instead of racing it. Never rejects (the task
               // swallows its own errors), so an await here cannot break a page.
-              trialEmptyScenePromises.set(pageNum, platePromise);
+              // Every page in the group awaits the SAME promise — the one render
+              // that fills all their slots.
+              for (const pn of bg.pages) trialEmptyScenePromises.set(pn, platePromise);
               bgPromises.push(platePromise);
             }
           }

@@ -1819,6 +1819,79 @@ function groupPagesByVantage(pageDataArray, visualBible) {
   return groups;
 }
 
+/**
+ * Group the TRIAL empty-scene plate pages by vantage.
+ *
+ * Trial renders its backdrop plates during outline streaming, from
+ * `visualBible.backgrounds[]` prose — long before any page has scene metadata,
+ * so `groupPagesByVantage` cannot be called on a `pageDataArray` that does not
+ * exist yet. The grouping fact it needs, though, IS already in the bible:
+ * `locations[].pages[]` says which pages stand in which LOC, and that is the
+ * same LOC the page's own `setting.location` will name later (the trial prompt
+ * tells the model to reference the bible LOC id). So we synthesize the minimal
+ * page shape `groupPagesByVantage` reads — `objects: ["Name [LOC001]"]`, the
+ * exact string form `extractSceneMetadata` emits — and reuse the real grouper.
+ * No parallel grouping logic.
+ *
+ * Trial bibles carry no `vantages[]` (deliberately — `LOC001.N` means
+ * photo-variant in trial, vantage in full mode), so every group here is a
+ * synthesized `LOC###.1`: one plate per distinct location.
+ *
+ * A page with no LOC lands in `__unassigned__` and is returned as its OWN
+ * single-page group — it still gets a plate, it just cannot share one.
+ *
+ * DESCRIPTION when a group spans two different `backgrounds[]` entries: the
+ * FIRST page's prose wins. Same rule the full-mode vantage path uses for its
+ * representative page (`group.pageNumbers[0]` supplies framing, aspect, model
+ * and landmark refs) — one plate, one description, chosen deterministically.
+ *
+ * @param {Object} visualBible - needs `backgrounds[]`; uses `locations[]` when present
+ * @returns {Array<{vantageId: string|null, pages: number[], description: string}>}
+ *   ordered by first page; covers exactly the pages `backgrounds[]` names.
+ */
+function groupTrialPlatePagesByVantage(visualBible) {
+  const backgrounds = Array.isArray(visualBible?.backgrounds) ? visualBible.backgrounds : [];
+  // page → plate prose. First backgrounds[] entry naming a page wins, so a page
+  // listed twice is still rendered once (today's loop would render it twice).
+  const descByPage = new Map();
+  for (const bg of backgrounds) {
+    if (!bg?.description || !Array.isArray(bg.pages) || bg.pages.length === 0) continue;
+    for (const pn of bg.pages) {
+      if (typeof pn !== 'number' || descByPage.has(pn)) continue;
+      descByPage.set(pn, bg.description);
+    }
+  }
+  const pages = Array.from(descByPage.keys()).sort((a, b) => a - b);
+  if (pages.length === 0) return [];
+
+  const locations = Array.isArray(visualBible?.locations) ? visualBible.locations : [];
+  const synthetic = pages.map(pageNumber => {
+    const loc = locations.find(l => l?.id && Array.isArray(l.pages) && l.pages.includes(pageNumber)) || null;
+    return {
+      pageNumber,
+      sceneMetadata: { objects: loc ? [`${loc.name || ''} [${loc.id}]`.trim()] : [] },
+      emptyScenePrompt: '',
+    };
+  });
+
+  const grouped = groupPagesByVantage(synthetic, visualBible);
+  const out = [];
+  for (const [key, group] of grouped.entries()) {
+    if (key === '__unassigned__') {
+      // No LOC → no shared backdrop is knowable. One plate per page, exactly
+      // as trial does today.
+      for (const pn of group.pageNumbers) {
+        out.push({ vantageId: null, pages: [pn], description: descByPage.get(pn) });
+      }
+      continue;
+    }
+    const groupPages = group.pageNumbers.slice().sort((a, b) => a - b);
+    out.push({ vantageId: key, pages: groupPages, description: descByPage.get(groupPages[0]) });
+  }
+  out.sort((a, b) => a.pages[0] - b.pages[0]);
+  return out;
+}
+
 // ============================================================================
 // POSITION NORMALIZATION
 // ============================================================================
@@ -1937,6 +2010,7 @@ module.exports = {
   extractPageClothing,
   getPrimaryVantageForPage,
   groupPagesByVantage,
+  groupTrialPlatePagesByVantage,
   normalizePositionToLCR,
   getPageText,
   updatePageText
