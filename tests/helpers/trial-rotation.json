@@ -78,6 +78,19 @@
       "storyTopic": "",
       "storyDetails": "",
       "description": "Dubois/FR — Jules (6), thème de vie"
+    },
+    {
+      "index": 6,
+      "family": "agebands",
+      "face": "Omar.jpg",
+      "name": "Omar",
+      "age": "3",
+      "gender": "male",
+      "language": "de",
+      "storyCategory": "adventure",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Agebands/DE — Omar (3), Abenteuer, freies Thema — Altersband 'tries'"
     }
   ]
 }
