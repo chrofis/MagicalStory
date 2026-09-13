@@ -1982,6 +1982,46 @@ function updatePageText(storyText, pageNumber, newText) {
 }
 
 
+/**
+ * SCENE_HINT for the image evaluators = the spec the IMAGE GENERATOR consumed.
+ *
+ * The semantic judge calls SCENE_HINT "the authoritative source" and scores the
+ * render against it. Page images are built by buildImagePrompt() from
+ * `scene.sceneDescription` — the Art Director brief, after the scene reviewer
+ * edited it. The Art Director deliberately trims cast and simplifies action to
+ * keep an image readable (owner-confirmed, by design); feeding the judge the
+ * upstream plan line instead turns every deliberate trim into a full-severity
+ * semantic defect on a page that is correct.
+ *
+ * Fixed once on 2026-08-31 (c0928a079) on the reasoning "pages never set
+ * outlineExtract, so they fall through to the AD brief". 824fb02d9 (2026-09-02)
+ * then gave every beats page `outlineExtract: "PLAN: <planLine>"`, which won the
+ * `||` chain and silently reopened the bug for the whole beats pipeline — the
+ * pipeline in every environment. Measured on staging 2026-09-13: every page of
+ * every beats story stored a `PLAN: …` outlineExtract while its sceneDescription
+ * held the full brief.
+ *
+ * Covers are the genuine exception: their `outlineExtract` IS the cover brief
+ * the image was generated from.
+ *
+ * @param {Object} sources
+ * @param {string} sources.evaluationType - 'cover' takes the cover brief; anything else is a page
+ * @param {string|null} [sources.entryDescription] - this version's own rewritten brief (iterate)
+ * @param {string|null} [sources.sceneDescription] - the reviewed Art Director brief (page default)
+ * @param {string|null} [sources.outlineExtract] - cover brief; on beats pages a "PLAN: …" plan line
+ * @param {string|null} [sources.sceneHint] - legacy/plan hint, last resort
+ * @returns {string|null}
+ */
+function resolveEvalSceneHint({ evaluationType, entryDescription = null, sceneDescription = null, outlineExtract = null, sceneHint = null } = {}) {
+  const pick = (...vals) => vals.find(v => typeof v === 'string' && v.trim()) || null;
+  if (evaluationType === 'cover') return pick(outlineExtract, entryDescription, sceneDescription, sceneHint);
+  // A "PLAN: …" outlineExtract is the beats plan line. It is never what a page
+  // render was made from, so it is not a fallback either — drop it outright
+  // rather than let it resurface when a brief is missing.
+  const planLess = (typeof outlineExtract === 'string' && /^\s*PLAN:/i.test(outlineExtract)) ? null : outlineExtract;
+  return pick(entryDescription, sceneDescription, planLess, sceneHint);
+}
+
 module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
@@ -1996,6 +2036,7 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  resolveEvalSceneHint,
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,
   findCastMissingFromMetadata,

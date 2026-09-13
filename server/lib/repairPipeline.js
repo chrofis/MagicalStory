@@ -34,6 +34,8 @@ const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
 
 const getStoryHelpers = () => require('./storyHelpers');
+// Leaf module (parsers only) — safe to require eagerly, no cycle back here.
+const { resolveEvalSceneHint } = require('./sceneMetadata');
 const images = () => require('./images');
 
 function selectBestVersion(versions) {
@@ -426,15 +428,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // to keep a present-day landmark's own structures out of `object_presence`.
       landmarkPhotos: orig.landmarkPhotos || null,
       era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
-      // SCENE_HINT = what the image was MADE from (2026-08-31). Pages were
-      // judged against the beats SCENE (scene.sceneHint) while the render
-      // obeyed the Art Director brief — job_1788123310558 p6 got a CRITICAL
-      // "missing character" and p9 a MAJOR "object not in hand" for content
-      // the AD brief never asked for. Covers are unchanged: their
-      // scene.outlineExtract IS the cover brief the image was generated
-      // from (pages never set outlineExtract, so they fall through to the
-      // AD brief; entry.description wins on an iterate rewrite).
-      sceneHint: orig.scene?.outlineExtract || entry.description || orig.sceneDescription || orig.scene?.sceneHint || null,
+      // SCENE_HINT = what the image was MADE from. One resolver for every eval
+      // call site (sceneMetadata.resolveEvalSceneHint) — the inline `||` chain
+      // this replaced assumed pages never set `outlineExtract`, an assumption
+      // 824fb02d9 broke two days later by storing "PLAN: <planLine>" on every
+      // beats page. See the helper's own comment for the full history.
+      sceneHint: resolveEvalSceneHint({
+        evaluationType: orig.evaluationType,
+        entryDescription: entry.description,
+        sceneDescription: orig.sceneDescription,
+        outlineExtract: orig.scene?.outlineExtract,
+        sceneHint: orig.scene?.sceneHint,
+      }),
       evaluationType: orig.evaluationType,
       // Structured cover text contract (replaces the old prompt-string surgery):
       // 'appOverlay' → evaluator must never flag missing/present title text;
@@ -618,9 +623,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageText: img.text,
       landmarkPhotos: img.landmarkPhotos || null,
       era: resolveSceneEra(img.sceneMetadata),
-      // Same SCENE_HINT rule as buildEvalInputs above: the AD brief for
-      // pages, the cover brief (scene.outlineExtract) for covers.
-      sceneHint: img.scene?.outlineExtract || img.sceneDescription || img.scene?.sceneHint || null,
+      // Same resolver as buildEvalInputs above: the AD brief for pages, the
+      // cover brief (scene.outlineExtract) for covers.
+      sceneHint: resolveEvalSceneHint({
+        evaluationType: img.evaluationType,
+        sceneDescription: img.sceneDescription,
+        outlineExtract: img.scene?.outlineExtract,
+        sceneHint: img.scene?.sceneHint,
+      }),
       evaluationType: img.evaluationType,
     });
   }
