@@ -7196,6 +7196,12 @@ ${adventureGuide}` : ''}`;
       MAIN_CHARACTER_NAMES: mainCharacterNames,
       PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
       CATEGORY_GUIDELINES: categoryGuidelines,
+      // The age band + topic-age-window nudge, the same block the trial and
+      // every beats stage carry. It sits AFTER the category guidelines in the
+      // template on purpose: the band text says its rules "override any
+      // instruction elsewhere", so it must be the last word on how hard the
+      // coping/empowering demand above may push (2026-09-13).
+      AGE_MODE: buildAgeModeSection(inputData),
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
       MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
       // Reader age for the title pick the writer makes in its ---TITLE---

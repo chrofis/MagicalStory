@@ -36328,3 +36328,73 @@ insufficient.
 
 **Touched:** `prompts/scene-expansion-all.txt`
 **Status:** ✅ active
+
+### A value spread into a template that never declares its placeholder is silently dropped (2026-09-14)
+
+**Context:** `fillTemplate` substitutes the placeholders a template declares
+and ignores every other key it is handed. Nothing warns. So a builder can
+compute an expensive block, spread it into a `fillTemplate` call, and have it
+discarded — the prompt builds, the stage runs, and the only symptom is output
+written without context nobody can see was missing. Three instances surfaced
+inside a week; the `swiss-stories` / `historical` `CATEGORY_GUIDELINES` loss
+(2026-09-13, above) was the same shape one layer up.
+
+Two more were confirmed by building the real prompts offline:
+
+- `prompts/arc-retell.txt` — the stage that RE-TELLS the whole story — received
+  `STORY_GUIDE_SECTION` (the topic guide: the facts and context for the
+  commissioned life skill) from `buildStoryContextFields`, which every arc
+  builder spreads, but declared no placeholder. Only `arc-create.txt` and
+  `story-arc-review.txt` did. The re-telling rewrote the arc with the guide out
+  of view, 610 characters of commissioned material dropped on the floor.
+- The legacy unified writer's templates carried `{CATEGORY_GUIDELINES}` and no
+  `{AGE_MODE}` — and `buildUnifiedStoryPrompt` passed no such key either, so
+  the age band AND the topic-age-window nudge reached that writer never. The
+  coping/empowering demand arrived with zero band restraint. Production runs
+  beats, so this was cosmetic on the day, but the path is still reachable
+  (`storyPromptVariant` / `STORY_PROMPT_VARIANT=textFirst`).
+
+**Decision:** Declare both placeholders, positioned rather than appended.
+`{STORY_GUIDE_SECTION}` goes into `arc-retell.txt` after `{CHARACTER_DETAILS}`
+and before `{STORY_SHAPE}`, the same slot `arc-create.txt` gives it: the guide
+is facts that constrain the telling, so it sits with the other facts, ahead of
+the shape, the budgets and the task. `{AGE_MODE}` goes into BOTH unified
+variants (`story-unified.txt` and the default `story-unified-imagefirst.txt`)
+directly AFTER `{CATEGORY_GUIDELINES}`, matching `story-trial.txt`, and
+`buildUnifiedStoryPrompt` now passes the key.
+
+**Rationale:** Order decides who wins. The age-band text states that its rules
+"override any instruction elsewhere", so it has to be the last word on how hard
+the category guidelines above it may push — the same reason the trial prompt
+puts it there. The guide is the opposite kind of block: context the stage reads
+before it works, so it belongs where `arc-create.txt` already proved it reads
+well, not appended at the end where the task instructions already live.
+
+Sweeping `prompts/arc-*.txt` and `prompts/story-*.txt` against what their
+builders actually spread turned up the rest of the class, left unfixed pending
+the owner's call on whether each stage wants the value:
+
+- `story-text-from-beats.txt` — drops `STORY_BRIEF` and `STORY_GUIDE_SECTION`.
+  This is the stage that writes the shipped page text in the production beats
+  pipeline; it sees neither the commission nor the topic guide.
+- `story-bible-from-beats.txt` — drops `STORY_GUIDE_SECTION`.
+- `arc-retell.txt` — also drops `LANGUAGE` and `CHARACTER_NAMES`, both of which
+  `arc-create.txt` declares.
+- `arc-create.txt`, `story-arc-review.txt`, `story-bible-from-beats.txt`,
+  `arc-retell.txt` — drop `MAX_CHARACTERS_PER_SCENE`, `LANGUAGE_INSTRUCTION`
+  and `LANGUAGE_NOTE`; `story-trial.txt` drops `LANGUAGE_NOTE`. These are
+  context-field noise spread everywhere by `buildStoryContextFields` and are
+  plausibly unwanted at an arc stage — listed for completeness, not as faults.
+
+`shrinkPromptForModel` is not a factor: its only call sites are image prompts
+(`grok.js:252`, `images.js:1072`, `images.js:1264`, `sceneComposite.js:3416`),
+re-verified on the day. Nothing truncates a story-text prompt.
+
+**Touched:**
+- `prompts/arc-retell.txt` (declares `{STORY_GUIDE_SECTION}`)
+- `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt` (declare `{AGE_MODE}`)
+- `server/lib/promptBuilders.js` (`buildUnifiedStoryPrompt` passes `AGE_MODE`)
+- `tests/unit/spread-values-reach-their-template.test.ts` (pins both, and that
+  neither prompt ships an unfilled `{PLACEHOLDER}`)
+
+**Status:** ✅ active
