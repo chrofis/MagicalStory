@@ -76,3 +76,45 @@ describe('unreferencedSecondaryCreatures', () => {
     expect(unreferencedSecondaryCreatures({ objects: ['CHR001.2'] }, null)).toEqual([]);
   });
 });
+
+/**
+ * From 2026-09-13 the scene reviewer promotes a Visual Bible secondary INTO
+ * `characters[]` (scene-review rules 5/5a reconcile the cast against the page
+ * plan line, which names the secondary — job_1789304198359 pages 9/10/14/15).
+ * A `characters[]` row is therefore no longer proof the composite has a figure
+ * to cast, so the trigger intersects against the story's photo-backed cast.
+ */
+describe('the trigger counts only photo-backed characters', () => {
+  const outdoor = (characters: any[]) => ({ fullData: { setting: 'outdoor', objects: [], interactions: [], characters } });
+  const fg = { name: 'Fiona', depth: 'foreground', position: 'right foreground' };
+  const promotedSecondary = { name: 'Ondine', depth: 'background', position: 'far out on the water' };
+  const realSecond = { name: 'Rico', depth: 'background', position: 'far up the path' };
+  const photoBacked = [{ name: 'Fiona' }, { name: 'Rico' }];
+
+  it('does NOT trip when the second characters[] row is not photo-backed', () => {
+    expect(needsScaleRepair(outdoor([fg, promotedSecondary]), photoBacked)).toBe(false);
+  });
+
+  it('still trips for two genuinely photo-backed characters at foreground + background', () => {
+    expect(needsScaleRepair(outdoor([fg, realSecond]), photoBacked)).toBe(true);
+  });
+
+  it('a promoted secondary does not top up a page that is otherwise one castable figure', () => {
+    expect(needsScaleRepair(outdoor([fg, promotedSecondary, realSecond]), [{ name: 'Fiona' }])).toBe(false);
+    expect(needsScaleRepair(outdoor([fg, promotedSecondary, realSecond]), photoBacked)).toBe(true);
+  });
+
+  it('matches names case- and whitespace-insensitively, and accepts plain names or a Set', () => {
+    expect(needsScaleRepair(outdoor([fg, realSecond]), ['  fiona ', 'RICO'])).toBe(true);
+    expect(needsScaleRepair(outdoor([fg, realSecond]), new Set(['fiona', 'rico']))).toBe(true);
+  });
+
+  it('an omitted cast list keeps the old behaviour — callers that cannot supply one are unchanged', () => {
+    expect(needsScaleRepair(outdoor([fg, promotedSecondary]))).toBe(true);
+    expect(needsScaleRepair(outdoor([fg, promotedSecondary]), null)).toBe(true);
+  });
+
+  it('an empty cast list casts nobody', () => {
+    expect(needsScaleRepair(outdoor([fg, realSecond]), [])).toBe(false);
+  });
+});

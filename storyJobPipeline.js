@@ -4893,7 +4893,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const { needsScaleRepair } = require('./server/lib/scaleRepair');
                 if (!require('./server/config/runtime').runtime('sceneCompositeEnabled')) {
                   compositeOutcome = { status: 'disabled', reason: 'runtime.sceneCompositeEnabled is false' };
-                } else if (needsScaleRepair(pageData.sceneMetadata)) {
+                  // Count only figures the composite can cast: the scene
+                  // reviewer now promotes Visual Bible secondaries into
+                  // characters[] (scene-review rules 5/5a), and the composite
+                  // renders photo-backed characters only.
+                } else if (needsScaleRepair(pageData.sceneMetadata, inputData.characters || [])) {
                   compositeOutcome = { status: 'triggered' };
                   // Resolve avatar refs only for the background characters.
                   const helpers = require('./server/lib/storyHelpers');

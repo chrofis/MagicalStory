@@ -35294,3 +35294,71 @@ past the `**REQUIRED OBJECTS` protected-tail marker, is a plain line, and is inv
 the object parser — pinned structurally, never on wording).
 **Status:** ✅ active
 
+## 2026-09-13 — The page plan owns the cast: a Visual Bible secondary may carry a `characters[]` row, and the composite trigger stops trusting that row
+
+**Context:** `prompts/scene-review.txt` contradicted itself. Rule 8bc ended with
+"A secondary character (a CHR id in `objects[]`) has no `characters[]` row";
+rules 5 (`cast_over_cap`) and 5a (`cast_not_in_plan`, both shipped 2026-09-10 in
+`75e8169a1`) tell the reviewer to reconcile `characters[]` against the PAGE PLAN
+line — and the plan line names the secondary. On `job_1789304198359_y3n0euk3z`
+the reviewer obeyed 5/5a and broke 8bc: it promoted the Visual Bible secondary
+Ondine into `characters[]` on pages 9, 10 and 14, and the iterate round did the
+same for `Yellow Fairy [ANI003]` on page 15.
+
+Downstream, `needsScaleRepair` — the composite's trigger — carried the
+2026-09-10 fix for the mirror-image failure: CHR-id secondaries read out of
+`objects[]` were counted as figures, the composite could not cast them, and the
+dragon vanished from four plates (`job_1789083667794`). That fix was "count
+`characters[]` only", which a promoted secondary now walks straight through.
+
+**Decision:** Two halves, one commit.
+1. Rules 5/5a win. The sentence asserting a secondary has no `characters[]` row
+   is deleted from `prompts/scene-review.txt`. Secondaries will carry
+   `characters[]` rows from now on. The useful half of 8bc survives, scoped to
+   how the figure is actually staged: a secondary staged **only** as a CHR id in
+   `objects[]` still needs a `watching` interaction naming its gaze.
+2. `needsScaleRepair(sceneMetadata, castableCharacters)` takes the story's
+   photo-backed cast and intersects `characters[]` against it **before** the
+   `< 2` gate. Only figures the composite can actually cast are counted. The
+   two production call sites pass it (`storyJobPipeline.js` → `inputData.characters`,
+   `server/routes/regeneration.js` → `storyData.characters`); an omitted list
+   keeps the previous behaviour for callers that have none.
+
+**Rationale:** The page plan line is already the authority for a page's cast
+everywhere else in the review prompt; leaving 8bc in place meant the reviewer
+was told to obey two rules that cannot both hold, and it picked one at random
+per page. Fixing it the other way (weakening 5/5a) would give the brief back the
+ability to drop a character the plan line stages.
+
+The trigger fix is not optional follow-up: half (1) reopens exactly the
+`job_1789083667794` hole through the other door. The trigger site already
+intersected against the real cast when it built its background refs, so before
+this a promoted secondary passed the count gate and then resolved to nothing —
+the composite would run on a page whose second figure it could not draw.
+Currently masked by `runtime.sceneCompositeEnabled === false`
+(`server/config/runtime.js`), so it was armed rather than firing; the fix holds
+whichever way the composite is configured.
+
+Replaying the trigger over the stored pages of `job_1789304198359_y3n0euk3z`
+showed no page changing verdict: pages 9 and 10 stage Ondine alone (one figure),
+page 14 has both figures at midground (no foreground, so the depth gate catches
+it) and page 15 has no depths at all. One depth label is all that separates it —
+the same page 14 with Ondine at `background` returns `true` before the fix and
+`false` after.
+
+The owner accepted as a consequence that plate generation for secondary-only
+pages changes; tracked separately.
+
+**Supersedes:** the "a secondary character has no `characters[]` row" clause of
+rule 8bc in `prompts/scene-review.txt`. The identical sentence in the Art
+Director authoring prompts (`prompts/scene-expansion.txt` rule 8j,
+`prompts/scene-expansion-all.txt` rule 8j, and the `characters[]`/clothing
+contracts in `prompts/story-unified-imagefirst.txt`) is deliberately left
+standing: it is the coherent authoring-side contract, and the clothing rule
+("a secondary character never carries a clothing category") depends on it.
+Aligning the authoring prompts is a separate decision.
+
+**Touched:** `prompts/scene-review.txt`, `server/lib/scaleRepair.js`,
+`storyJobPipeline.js`, `server/routes/regeneration.js`,
+`tests/unit/composite-secondary-cast.test.ts`
+**Status:** ✅ active

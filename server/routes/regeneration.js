@@ -1667,9 +1667,12 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
     }
     const sceneMetadata = extractSceneMetadata(scene.sceneDescription || scene.description || '');
     const { needsScaleRepair, runScaleRepair } = require('../lib/scaleRepair');
-    if (!needsScaleRepair(sceneMetadata)) {
+    // Only photo-backed characters count — a Visual Bible secondary promoted
+    // into characters[] by the scene reviewer (rules 5/5a) is not a figure the
+    // composite can cast.
+    if (!needsScaleRepair(sceneMetadata, storyData.characters || [])) {
       return res.status(400).json({
-        error: 'Scene does not need scale repair (no depth=background characters declared in metadata).',
+        error: 'Scene does not need scale repair (fewer than two photo-backed characters at foreground + background depth).',
       });
     }
     // Background character refs INTENTIONALLY OMITTED. Sending an avatar
