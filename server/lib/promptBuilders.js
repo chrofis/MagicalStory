@@ -2175,24 +2175,8 @@ function buildBasePrompt(inputData, textPageCount = null) {
 
   // Build relationship descriptions
   let relationshipDescriptions = '';
-  if (inputData.relationships) {
-    const relationships = inputData.relationships;
-    const relationshipTexts = inputData.relationshipTexts || {};
-    const characters = inputData.characters || [];
-
-    const relationshipLines = Object.entries(relationships)
-      .filter(([key, type]) => type && type !== 'Not Known to')
-      .map(([key, type]) => {
-        const [char1Id, char2Id] = key.split('-').map(Number);
-        const char1 = characters.find(c => c.id === char1Id);
-        const char2 = characters.find(c => c.id === char2Id);
-        if (!char1 || !char2) return null;
-        const customText = relationshipTexts[key] || '';
-        const baseRelationship = `${char1.name} is ${type} ${char2.name}`;
-        return customText ? `${baseRelationship}. ${customText}` : baseRelationship;
-      })
-      .filter(Boolean);
-
+  {
+    const relationshipLines = buildRelationshipLines(inputData);
     if (relationshipLines.length > 0) {
       relationshipDescriptions = `\n- **Relationships**:\n${relationshipLines.map(r => `  - ${r}`).join('\n')}`;
     }
@@ -4718,9 +4702,8 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // writer had will drift away from the commission — storyDetails in particular
   // is the user's own idea in their own words and is the strongest anchor here.
   // Absent fields are omitted rather than sent as "undefined".
-  const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
-    ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
-    : null;
+  const relLines = buildRelationshipLines(inputData);
+  const rel = relLines.length ? relLines.map(r => `  - ${r}`).join('\n') : null;
   const brief = [
     inputData.title ? `Title: ${inputData.title}` : null,
     inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
@@ -5302,11 +5285,67 @@ function buildSettingLine(inputData) {
     : `Setting/location: ${place}`;
 }
 
+// ONE renderer for relationships, shared by every prompt path (beats brief,
+// unified writer, legacy base prompt). It was not always one: the beats brief
+// rendered `relationshipTexts` alone, keyed by the raw id pair, so production's
+// arc author saw "1-2: They share a room." — no names, no relationship type,
+// and stale pairs whose ids no longer resolve leaked through as raw keys
+// (docs/decisions.md, 2026-09-13).
+//
+// `relationships` carries the TYPE per ordered id pair; `relationshipTexts`
+// carries the user's free note for that pair. Entries are ordered and may be
+// reciprocal ('1-2' and '2-1' both present) — both directions are rendered,
+// because "Leo is Brother of Mia" and "Mia is Sister of Leo" are different
+// facts. A pair whose ids do not resolve to a character is dropped entirely:
+// never emit a raw id key. A note with no type ("orphan") is still the user's
+// own words about a real pair, so it is rendered with names and no type rather
+// than discarded — deduped by unordered pair so a reciprocal note appears once.
+function buildRelationshipLines(inputData) {
+  const relationships = inputData.relationships || {};
+  const relationshipTexts = inputData.relationshipTexts || {};
+  const characters = inputData.characters || [];
+  const byId = new Map(characters.map(c => [Number(c.id), c]));
+  const resolve = (key) => {
+    const parts = String(key).split('-');
+    if (parts.length !== 2) return null;
+    const a = byId.get(Number(parts[0]));
+    const b = byId.get(Number(parts[1]));
+    return (a && b && a !== b) ? [a, b] : null;
+  };
+
+  const lines = [];
+  for (const [key, type] of Object.entries(relationships)) {
+    if (!type || type === 'Not Known to') continue;
+    const pair = resolve(key);
+    if (!pair) continue;
+    const text = String(relationshipTexts[key] || '').trim();
+    const base = `${pair[0].name} is ${type} ${pair[1].name}`;
+    lines.push(text ? `${base}. ${text}` : base);
+  }
+
+  const seenOrphan = new Set();
+  for (const [key, rawText] of Object.entries(relationshipTexts)) {
+    const type = relationships[key];
+    if (type && type !== 'Not Known to') continue;   // already rendered above
+    const text = String(rawText || '').trim();
+    if (!text) continue;
+    const pair = resolve(key);
+    if (!pair) continue;
+    const reverseKey = `${pair[1].id}-${pair[0].id}`;
+    const reverseType = relationships[reverseKey];
+    if (reverseType && reverseType !== 'Not Known to') continue; // the note belongs to that line
+    const unordered = [Number(pair[0].id), Number(pair[1].id)].sort((x, y) => x - y).join('-');
+    if (seenOrphan.has(unordered)) continue;
+    seenOrphan.add(unordered);
+    lines.push(`${pair[0].name} and ${pair[1].name}: ${text}`);
+  }
+  return lines;
+}
+
 /** The commission's factual body (title, type, setting, the user's own idea) — no framing. */
 function buildStoryBriefBody(inputData) {
-  const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
-    ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
-    : null;
+  const relLines = buildRelationshipLines(inputData);
+  const rel = relLines.length ? relLines.map(r => `  - ${r}`).join('\n') : null;
   return [
     inputData.title ? `Title: ${inputData.title}` : null,
     inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
@@ -6852,24 +6891,8 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
 
   // Build relationship descriptions
   let relationshipDescriptions = '';
-  if (inputData.relationships) {
-    const relationships = inputData.relationships;
-    const relationshipTexts = inputData.relationshipTexts || {};
-    const characters = inputData.characters || [];
-
-    const relationshipLines = Object.entries(relationships)
-      .filter(([key, type]) => type && type !== 'Not Known to')
-      .map(([key, type]) => {
-        const [char1Id, char2Id] = key.split('-').map(Number);
-        const char1 = characters.find(c => c.id === char1Id);
-        const char2 = characters.find(c => c.id === char2Id);
-        if (!char1 || !char2) return null;
-        const customText = relationshipTexts[key] || '';
-        const baseRelationship = `${char1.name} is ${type} ${char2.name}`;
-        return customText ? `${baseRelationship}. ${customText}` : baseRelationship;
-      })
-      .filter(Boolean);
-
+  {
+    const relationshipLines = buildRelationshipLines(inputData);
     if (relationshipLines.length > 0) {
       relationshipDescriptions = `\n**Relationships:**\n${relationshipLines.map(r => `- ${r}`).join('\n')}`;
     }
@@ -7564,6 +7587,7 @@ module.exports = {
   buildTextRefinePrompt,
   parseRefinedText,
   buildStoryContextFields,
+  buildRelationshipLines,
   buildBeatsPrompt,
   buildChallengeIdeasSection,
   buildArcCreatePrompt,

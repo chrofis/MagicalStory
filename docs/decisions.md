@@ -35956,3 +35956,45 @@ test `tests/unit/season-outfit-sheet.test.ts`.
 **Status:**    🟡 conditional — unit-proven and code-traced; no sheet has been
 generated with it (no paid calls were permitted), so warm/cold behaviour on real
 pixels is unverified. One `/try` run with the date in a cold season is the check.
+
+### Relationships reach every prompt through one renderer — the beats brief had lost names and type (2026-09-13)
+**Context:** Production runs the beats chain. `buildStoryBriefBody`
+(`server/lib/promptBuilders.js`) rendered `{STORY_BRIEF}` relationships from
+`inputData.relationshipTexts` alone, keyed by the raw id pair. The built brief
+for a three-character story read:
+
+```
+Relationships:
+  1-2: They share a room.
+  1-3: He visits every summer.
+  9-4: stale entry
+```
+
+The whole `inputData.relationships` map — which carries the relationship TYPE —
+was dropped, the character NAMES never appeared, and a stale pair whose ids no
+longer resolve to a character leaked through as an unreadable key. So the arc
+author, the retell, the panel, the hints, the beats planner and every review
+stage were told two anonymous numbers share a room. The named form existed in
+`buildUnifiedStoryPrompt` and in the legacy `buildBasePrompt` all along; the
+same id-pair rendering also sat in `buildTextRefinePrompt`.
+**Decision:** One renderer, `buildRelationshipLines(inputData)`, is the single
+source of truth for turning `relationships` + `relationshipTexts` into prose.
+All four sites read through it: the beats brief, the text-refine brief, the
+unified writer prompt and the legacy base prompt. It joins the type with the
+names ("Leo is Brother of Mia. They share a room."), renders both directions of
+a reciprocal pair, drops a `Not Known to` pair, and drops any pair whose ids do
+not resolve — a raw id key is never emitted again, and the `Relationships:`
+block is omitted entirely when nothing resolves. A note in `relationshipTexts`
+whose pair has no entry in `relationships` is still the user's own words about a
+real pair, so it renders with names and no invented type ("Leo and Mia: …"),
+deduped by unordered pair; previously the unified path silently discarded it.
+**Rationale:** The relationship type and the character names are the point of
+the field — a note like "They share a room" is meaningless without "brother".
+Four copies of one rendering is how the beats copy drifted in the first place,
+so the fix is extraction, not a fifth copy. Unresolvable ids fail by omission
+rather than by emitting a key, because a half-rendered `1-2:` is worse for the
+model than no line at all.
+**Touched:** `server/lib/promptBuilders.js` (`buildRelationshipLines`,
+`buildStoryBriefBody`, `buildTextRefinePrompt`, `buildUnifiedStoryPrompt`,
+`buildBasePrompt`), `tests/unit/beats-brief-relationships.test.ts`
+**Status:** ✅ active
