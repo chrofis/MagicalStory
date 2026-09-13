@@ -34442,3 +34442,64 @@ per 15-call story, +$0.12**. From 2027, at $1.50/$7.50, 3.7-flash is **$0.368,
 (`server/lib/testlab.js` `runInventoryAbStage`).
 
 **Status:** ✅ active as a measurement. The model choice is NOT decided here.
+
+## `items_held` is a two-key schema, not free text (2026-09-13)
+**Context:**   A figure carrying a chest, with a lantern hanging off the chest's
+lock in front of her hand, was inventoried as holding the lantern. The same
+inventory's `action` field said she carried the chest — it contradicted itself.
+The three-stage compliance judge has NOT seen the image and is told the
+inventory is authoritative, so it cannot overrule it; it emitted a CRITICAL
+`action_interaction`, and a CRITICAL buys a repaint of a correct render. Three
+of four vision models reproduce it and they disagree about WHICH hand
+(2.5-flash right, qwen3-vl left twice, 3.1-pro right) — the signature of a
+guess. The 10-page grading (#1237/#1238) found both of gemini-3.7-flash's only
+consequential errors were this same field, so the model is not the variable.
+**Decision:** `items_held` is `{"left": ..., "right": ...}`; each value is the
+name of the object that hand's fingers wrap around, or `nothing`. Verbs and
+contact phrases are excluded. `action` continues to name what each hand touches
+and `worn_carried` takes anything strapped or slung, so contact information is
+not lost — it just stops arriving in the field that means grip.
+**Rationale:** The first attempt kept the field free-text and added a rule
+naming the distinction ("what each hand closes around… an object that hangs,
+rests or leans is named with what carries it"). The model complied by
+rewording rather than by answering differently: measured in #1244 against
+#1238, "held in both hands" became "gripping the edge of a vertical wooden
+board with both hands" and "touching a pair of yellow sandals on the ground"
+became "touching purple sandal strap with right hand". A free-text field can
+always phrase its way around a prohibition; a two-key schema has nowhere to put
+contact. Classification stays in the prompt per CLAUDE.md — no code reads
+`items_held`.
+**Touched:** `prompts/image-inventory-unified.txt` (field definition + example)
+**Status:**    ✅ active — negative control confirmed on 7 pages; the
+positive control (genuinely gripped props) is UNMEASURED: the three benchmark
+pages carrying them failed upstream in #1243-#1246 (Gemini HTTP error on all
+arms, Grok fallback returned nothing) and must be re-run.
+
+## The Lab records the model that answered, not the one requested (2026-09-13)
+**Context:**   Experiment #1241 requested gemini-3.7-flash with
+`reasoning:{enabled:false}`. Every call returned 400 — "Reasoning is mandatory
+for this endpoint and cannot be disabled" — the documented gemini-2.5-flash
+inventory fallback served all 10 pages, and the experiment row still read
+gemini-3.7-flash. The run reported "10/10 ok". It was caught only because the
+token counts came back byte-identical to the 2.5-flash arm.
+**Decision:** `runVisualInventory` returns `servedByModel` (its `modelId`, which
+the fallbacks already reassign), and the `inventory_ab` arm records it per run.
+**Rationale:** Without it any inventory A/B can silently compare a model with
+itself and be reported as a comparison. The fallback itself stays — it is on
+every page's critical path (owner, 2026-09-07) — but it must be visible.
+**Touched:** `server/lib/evalPipeline.js`, `server/lib/testlab.js`
+**Status:**    ✅ active — confirmed in #1243/#1244
+
+## gemini-3.7-flash has no usable thinking lever (2026-09-13)
+**Context:**   3.7-flash emits 1.74x the output tokens of 2.5-flash on the same
+pages, making it 2.7x the cost per story today and 5.4x from 2027. The question
+was whether a lower thinking level recovers that.
+**Decision:** There is none. `{enabled:false}` is rejected outright (400,
+"reasoning is mandatory for this endpoint"). `{effort:"low"}` (#1242) was
+accepted and changed nothing: the 7 pages that completed averaged 2,817 in /
+2,781 out against the default arm's 2,821 / 2,710, and 3 of 10 pages failed.
+**Rationale:** Recorded so the lever is not re-proposed. Note the standing
+`textModels.js` warning that `{effort:'low'}` measured 9x MORE expensive on
+deepseek-v4-pro — verify by token count, never by the parameter being accepted.
+**Touched:** measurement only (Lab #1238, #1241, #1242)
+**Status:**    ✅ active
