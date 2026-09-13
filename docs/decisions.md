@@ -35138,3 +35138,44 @@ code, admin dashboard or SQL column consumes them — nothing renders a null as
 - `server/routes/admin/jobs.js` (rerun-text / rerun-full mark their commissions)
 - `tests/unit/quality-analytics-not-measured.test.ts`
 **Status:** ✅ active
+
+### The page text is not a checklist for the image — semantic eval judges image-vs-BRIEF (2026-09-13)
+**Context:** Sessions keep "discovering" that `prompts/image-semantic.txt`
+scores the image against SCENE_HINT + IMAGE_PROMPT and treats STORY_TEXT as
+narrative context only (lines 3, 5, 13, 94, and the `"source"` field at 126).
+It gets filed as a bug every time: on prod story
+`job_1789227389389_z18dmvnt6` page 6 scored **100/100 semantic** while two of
+the three things its text narrates are absent from the picture.
+
+**Decision:** This is intentional and stays. **A page's text may narrate two
+actions while the illustration depicts one** — the brief chooses the moment to
+draw, and that is the Art Director doing its job. A page scoring 100/100 while
+its text mentions something not in the picture is NOT a defect. Do not propose
+adding a text-vs-image comparison to the per-page evaluator, and do not re-open
+cast findings sourced from the text (see the standing "AD trims cast by design"
+ruling — fewer figures than the text names is correct behaviour).
+
+**Rationale:** The pipeline order is `beat → brief → image` and `beat → text`,
+with the text written AFTER the briefs. The two are siblings, not a spec and an
+implementation, and the brief is deliberately narrower than the prose: one page
+of text carries a sequence, one illustration carries a moment. An evaluator
+holding the image to the full text would fire on every page that compresses —
+which is every page. The character half of the rule additionally guards against
+"missing character" CRITICALs for people the text mentions but who are
+elsewhere, remembered, or only spoken about.
+
+The reader's-eye question — *do the words on this page describe this picture* —
+is real, and it IS asked, exactly once: by the **book audit**, which reads page
+text interleaved with the shipped image at the end of the run (and, since the
+2026-09-13 final-audit entry, on the book that actually ships). That is the
+right place for it: one judge, reading the finished book like a reader, rather
+than a per-page gate that would penalise normal compression on every page.
+
+Options weighed and rejected (owner, 2026-09-13): an action-only scored type in
+`image-semantic.txt`; an upstream brief↔text agreement check at page-text write
+time; promoting book-audit IMG faults to scored deductions. All rejected — the
+behaviour is not a defect, so none of them has a defect to fix.
+
+**Touched:** `prompts/image-semantic.txt` (unchanged — this entry documents why),
+`docs/SETTLED.md` (Prompts & evaluation)
+**Status:** ✅ active

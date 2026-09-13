@@ -31,6 +31,7 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
   the next book. The sanctioned shape: the evaluator emits a **type** from the closed list, and code adjusts
   what that type may **cost** (`ZERO_POINT_TYPES`, `MAX_SEVERITY_TYPES` in `scoring.js`). A left/right regex
   guard was built and removed the same day, 2026-08-09; the prompt-side fix alone produced zero mirror findings.
+- **The page TEXT is not a checklist for the image — semantic eval judges image-vs-BRIEF, by design** (owner, 2026-09-13). A page's prose may narrate two actions while the scene depicts one; the brief picks the moment. `image-semantic.txt` states this at lines 3/5/13/94 and it is correct — a page scoring 100/100 while the text mentions something absent is NOT a bug. Do not propose "compare the image against the page text" in the per-page evaluator, and do not re-open cast findings from text ("AD trims cast by design"). The reader's-eye text-vs-image comparison exists ONCE, at the end, in the book audit. See decisions.md 2026-09-13.
 - **Ask before coding an eval rule.** Prompt-vs-code is the owner's call, not an implementation detail —
   propose the shape first, then build.
 
