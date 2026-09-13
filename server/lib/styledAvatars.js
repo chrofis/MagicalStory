@@ -21,7 +21,7 @@ const { getFacePhoto, getPrimaryPhoto, getStandardAvatar } = require('./characte
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
 const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
-const { slugifyCostume } = require('../utils/costumeKey');
+const { slugifyCostume, costumeSubKey, pickCostumed } = require('../utils/costumeKey');
 
 /**
  * Resolve an avatar's bytes for one of the standard categories. After the R2
@@ -551,9 +551,10 @@ function rememberStyledAvatarOnCharacter(character, artStyle, clothingCategory, 
   if (!character.avatars.styledAvatars) character.avatars.styledAvatars = {};
   if (!character.avatars.styledAvatars[artStyle]) character.avatars.styledAvatars[artStyle] = {};
   if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
-    const costumeType = clothingCategory.startsWith('costumed:')
-      ? (clothingCategory.split(':')[1] || 'default')
-      : 'default';
+    // ONE key per costume (utils/costumeKey.js): the label arrives in either
+    // casing, and a raw colon part written here was missed by the slugified
+    // reads elsewhere.
+    const costumeType = costumeSubKey(clothingCategory);
     if (!character.avatars.styledAvatars[artStyle].costumed) character.avatars.styledAvatars[artStyle].costumed = {};
     character.avatars.styledAvatars[artStyle].costumed[costumeType] = styledAvatar;
   } else {
@@ -641,9 +642,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           if (matchingKey) charReqs = clothingRequirements[matchingKey];
         }
         const costumeConfig = charReqs?.costumed;
-        const colonKey = clothingCategory.startsWith('costumed:') ? clothingCategory.split(':')[1] : null;
-        const costumeType = colonKey || slugifyCostume(costumeConfig?.costume) || 'default';
-        originalAvatar = avatars?.costumed?.[costumeType];
+        // Canonical slug for every WRITE below; the READ tolerates a slot stored
+        // under the raw colon part by an older run (utils/costumeKey.js).
+        const costumeType = costumeSubKey(clothingCategory, costumeConfig?.costume);
+        originalAvatar = pickCostumed(avatars?.costumed, clothingCategory, costumeConfig?.costume);
         if (!originalAvatar) {
           if (costumeConfig?.used && costumeConfig?.description) {
             pendingCostumedGenerations.push({ charName, char, clothingCategory, cacheKey, costumeType, costumeConfig });
@@ -897,8 +899,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
             // clothingRequirements (passed earlier into pendingCostumedGenerations)
             // when bare 'costumed' arrived. Default key is 'default' so the
             // slot is never lost.
-            const costumeType = (clothingCategory.startsWith('costumed:'))
-              ? clothingCategory.split(':')[1]
+            const costumeType = clothingCategory.startsWith('costumed:')
+              ? costumeSubKey(clothingCategory)
               : (result.costumeType || 'default');
             if (!character.avatars.styledAvatars[artStyle].costumed) character.avatars.styledAvatars[artStyle].costumed = {};
             character.avatars.styledAvatars[artStyle].costumed[costumeType] = result.styledAvatar;

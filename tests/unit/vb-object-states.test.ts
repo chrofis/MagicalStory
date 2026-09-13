@@ -671,7 +671,7 @@ describe('resolveObjectState — the page instant outranks a contradicting state
       expect(block).not.toMatch(/no hands touching it/);
       // ART001.2 (the chip) has no row of its own and no `held` flag on the stored bible: its clause stays.
       expect(block).toMatch(/open upturned palm/);
-      expect(warnings.join('\n')).toMatch(/Page 13: ART010\.1 \("in trough"\) says the object is untouched but the brief's interactions put hands on it/);
+      expect(warnings.join('\n')).toMatch(/Page 13: ART010\.1 \("in trough"\) — the brief's interactions put hands on it but the state says the object is untouched/);
     });
     it('a fresh bible stamping held:true on the chip state drops "open upturned palm" on p13 too - no row puts hands on the chip', () => {
       // The existing reverse rule, reported as measured: the p13 row names the
@@ -703,14 +703,14 @@ describe('resolveObjectState — the page instant outranks a contradicting state
     const line = lineFor(HELD_BIBLE(), 5, ['ART001.1'], handsOn('ART001.1'), warnings);
     expect(line).toContain('hollowed carved vessel');       // the object stays listed
     expect(line).not.toMatch(/nothing touching it/);         // the contradicting delta is gone
-    expect(warnings.join('\n')).toMatch(/Page 5: ART001\.1 \("resting"\) says the object is untouched but the brief's interactions put hands on it/);
+    expect(warnings.join('\n')).toMatch(/Page 5: ART001\.1 \("resting"\) — the brief's interactions put hands on it but the state says the object is untouched/);
   });
 
   it('the reverse: an in-hand state on a page that declares its contacts and has no hands on it is dropped too', () => {
     const warnings: string[] = [];
     const line = lineFor(HELD_BIBLE(), 7, ['ART001'], noHands(), warnings);
     expect(line).not.toMatch(/gripped in one hand/);
-    expect(warnings.join('\n')).toMatch(/ART001\.2 \("in hand"\) says the object is in hand but the brief's interactions declare no hands on it/);
+    expect(warnings.join('\n')).toMatch(/ART001\.2 \("in hand"\) — the brief's interactions declare no hands on it but the state says the object is in hand/);
   });
 
   it('a consistent state rides the line untouched, with no warning', () => {

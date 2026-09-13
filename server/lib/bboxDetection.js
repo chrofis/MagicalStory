@@ -1267,11 +1267,11 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       const costumed = clothingDescriptions.costumed;
       if (typeof costumed === 'string') return costumed;
       if (costumed && typeof costumed === 'object') {
-        // If legacy subtype-keyed, prefer the matching key; else first entry.
-        if (category.startsWith('costumed:')) {
-          const type = category.split(':')[1];
-          if (costumed[type]) return costumed[type];
-        }
+        // One resolver for the key (utils/costumeKey.js): slug, then the raw
+        // colon part an older run may have written, then the first entry.
+        const { pickCostumed } = require('../utils/costumeKey');
+        const hit = pickCostumed(costumed, category);
+        if (typeof hit === 'string' && hit) return hit;
         const firstCostume = Object.values(costumed).find(v => typeof v === 'string');
         if (firstCostume) return firstCostume;
       }

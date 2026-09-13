@@ -35462,3 +35462,37 @@ which scored the page and passed it; it is not a text fault.
 
 **Touched:** `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`
 **Status:** ✅ active
+
+## 2026-09-13 — One key per costume: `costumed:<x>` resolves through `utils/costumeKey.js` everywhere
+**Context:**   The `costumed:<x>` label was produced in two casings
+(`clothingCategories.js:101` lower-cases the costume, `clothingResolve.js:869`
+preserves it) and the `costumed: { <key>: … }` maps were written with the raw
+colon part (`styledAvatars.js` remember/write sites) but read with a
+case-sensitive lookup (`entityConsistency.js:2939`, `bboxDetection.js:1273`,
+`styledAvatars.js:646`). A costume written as "Zauberlehrling" was missed by a
+lookup for "zauberlehrling"; the prompt then fell back to "costume as shown in
+reference" while a different styled sheet was the reference attached. Found by
+the 2026-09-13 split-identity hunt; code-proven, not story-confirmed.
+**Decision:** `costumeSubKey(category, fallbackCostume)` is the one key
+(slugified colon part → story costume name → 'default'), and `pickCostumed(map,
+category, fallback)` is the one read (slug, then the raw colon part an older
+run may have written, then — one costume per character — the first entry).
+Every write and read of a costumed map goes through them.
+**Rationale:** Same shape as the element label fix: one canonical key, read
+through one function. The read tolerates raw keys so stored characters keep
+resolving without regeneration; writes converge on the slug from now on.
+**Touched:** `server/utils/costumeKey.js`, `server/lib/styledAvatars.js`,
+`server/lib/entityConsistency.js`, `server/lib/bboxDetection.js`,
+`tests/unit/costume-key.test.ts` (new)
+**Status:**    ✅ active
+
+## 2026-09-13 — The three "failing" `vb-object-states` tests were stale regexes
+**Context:**   Three assertions matched the `[VB-STATE]` clause-dropped
+warning in its pre-`39fc0d0ff` word order ("says the object is untouched but
+the brief's interactions put hands on it"). That commit reworded it to lead
+with the brief ("the brief's interactions put hands on it but the state says
+the object is untouched"); the logic — drop the contradicting delta, loudly —
+never changed. The suite carried them as "known failures" for the day.
+**Decision:** Regexes updated to the current wording; 69/69.
+**Touched:** `tests/unit/vb-object-states.test.ts`
+**Status:**    ✅ active

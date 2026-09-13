@@ -2934,11 +2934,15 @@ function buildClothingDescription(character, clothingCategory, artStyle, clothin
     const colonSub = clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : null;
     if (charReqs?.costumed?.signature && charReqs.costumed.signature !== 'none') return charReqs.costumed.signature;
     if (charReqs?.costumed?.description) return charReqs.costumed.description;
-    // Nested-by-subtype legacy shape: prefer the matching key, else first entry.
+    // Nested-by-subtype shape. One resolver for the key (utils/costumeKey.js):
+    // the colon part arrives in either casing and this lookup was
+    // case-sensitive, so a costume written as "Zauberlehrling" was missed by
+    // "zauberlehrling" and the prompt fell back to the generic line below while
+    // a different styled sheet was attached.
     if (avatars?.costumed && typeof avatars.costumed === 'object') {
-      if (colonSub && avatars.costumed[colonSub]?.clothing) return avatars.costumed[colonSub].clothing;
-      const firstEntry = Object.values(avatars.costumed)[0];
-      if (firstEntry?.clothing) return firstEntry.clothing;
+      const { pickCostumed } = require('../utils/costumeKey');
+      const hit = pickCostumed(avatars.costumed, clothingCategory, charReqs?.costumed?.costume);
+      if (hit?.clothing) return hit.clothing;
     }
     return `${colonSub || 'costume'} as shown in reference`;
   }
