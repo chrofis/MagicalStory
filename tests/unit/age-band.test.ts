@@ -319,3 +319,26 @@ describe('the simple bands ban the coda, not success', () => {
     expect(buildAgeModeSection(solo(3))).toMatch(/The problem is solved/);
   });
 });
+
+/**
+ * `TOPIC_AGE_WINDOWS` is a hand-kept mirror of `suitableAges` in
+ * client/src/constants/storyTypes.ts — the client filters the picker with it,
+ * the server nudges the writer with it. A drift between the two shows a topic
+ * in the trial that the writer is then told is off-age (or the reverse), so it
+ * is pinned here rather than left to whoever edits one side next.
+ */
+describe('TOPIC_AGE_WINDOWS mirrors the client windows exactly', () => {
+  it('has the same window for every one of the 59 life challenges', async () => {
+    const { lifeChallenges } = await import('../../client/src/constants/storyTypes');
+    expect(lifeChallenges.length).toBe(59);
+    for (const c of lifeChallenges) {
+      if (c.suitableAges) expect(TOPIC_AGE_WINDOWS[c.id]).toEqual(c.suitableAges);
+      else expect(TOPIC_AGE_WINDOWS[c.id]).toBeUndefined();
+    }
+    // …and nothing on the server that the client does not know about.
+    for (const key of Object.keys(TOPIC_AGE_WINDOWS)) {
+      expect(lifeChallenges.some(c => c.id === key)).toBe(true);
+    }
+    expect(Object.keys(TOPIC_AGE_WINDOWS).length).toBe(51);
+  });
+});

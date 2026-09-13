@@ -21,7 +21,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { highActionPagesPhrase } = require('./planCounters');
@@ -4681,7 +4681,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // avoid changing what it cannot see. Falls back to the intent for stored
   // stories that predate the brief being carried.
   const sceneOutlines = pages
-    .map(p => `## Page ${p.pageNumber}\n${p.sceneBrief || p.sceneIntent || '(no scene outline recorded)'}`)
+    .map(p => `## Page ${p.pageNumber}\n${resolveTextStagePictureSpec(p) || '(no scene outline recorded)'}`)
     .join('\n\n');
   // The locked plan lines, page by page — which picture each page carries
   // (beats pipeline only; extractRefinablePages leaves `planLine` empty on a
@@ -4963,14 +4963,27 @@ function buildAgeModeSection(inputData = {}) {
  * topics live here, never the full topic table.
  */
 const TOPIC_AGE_WINDOWS = {
+  // Mirrors `suitableAges` in client/src/constants/storyTypes.ts. Every life
+  // challenge carries a window EXCEPT the eight any-age life events
+  // (moving-house, going-vacation, parents-splitting, visiting-doctor,
+  // staying-hospital, death-pet, grandparent-sick, new-sibling) — those happen
+  // TO a child at whatever age they happen, so there is nothing to nudge.
   'potty-training': [2, 4], 'washing-hands': [2, 5], 'brushing-teeth': [2, 6],
   'saying-goodbye': [1, 5], 'no-pacifier': [2, 4], 'getting-dressed': [2, 5],
+  'eating-vegetables': [2, 8], 'going-to-bed': [1, 8],
   'cleaning-up': [2, 6], 'sitting-still': [3, 7], 'sharing': [2, 6],
   'waiting-turn': [3, 6], 'first-kindergarten': [3, 6], 'whining': [2, 6],
   'saying-sorry': [3, 8], 'picky-eating': [2, 7], 'table-manners': [3, 8],
   'being-patient': [3, 7], 'tattling-vs-telling': [4, 8], 'understanding-rules': [3, 7],
+  'making-friends': [3, 12], 'being-brave': [3, 12], 'managing-emotions': [2, 12],
   'first-school': [5, 8], 'homework': [6, 11], 'reading-alone': [5, 9],
-  'losing-game': [4, 9], 'money-saving': [6, 12], 'spending-wisely': [7, 12],
+  'losing-game': [4, 12], 'being-different': [5, 12], 'dealing-bully': [5, 12],
+  'telling-truth': [4, 12], 'trying-new-things': [3, 12], 'sibling-fighting': [3, 12],
+  'jealousy': [3, 12], 'not-giving-up': [4, 12], 'being-left-out': [4, 12],
+  'taking-care-belongings': [4, 12], 'helping-at-home': [3, 12],
+  'dealing-disappointment': [3, 12], 'anxiety-worrying': [4, 12],
+  'caring-for-pet': [4, 12], 'being-active': [4, 12],
+  'money-saving': [6, 12], 'spending-wisely': [7, 12],
   'screen-time': [5, 12], 'peer-pressure': [8, 12], 'body-changes': [9, 12],
   'responsibility': [6, 12], 'managing-time': [8, 12], 'online-safety': [7, 12],
   'comparing-others': [7, 12], 'test-stress': [7, 12],
@@ -6368,11 +6381,16 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '') {
     const m = String(brief || '').match(/THIS IMAGE DEPICTS:\*{0,2}\s*([\s\S]*?)(?=\n\s*\n\s*(?:\*\*|#|[A-Z][A-Z ]{3,}:)|$)/);
     return (m ? m[1] : '').trim();
   };
-  // sceneIntent first: the DEPICTS header only ever exists in image prompts,
-  // never in briefs, so depictsOf alone left every page "(no picture
-  // description)" and the MISMATCH question could not fire.
+  // THE WHOLE BRIEF, via the shared resolver (sceneMetadata.js) — the same spec
+  // the writer wrote this text from and the same one the repair pass acts on.
+  // It used to be `p.sceneIntent`, which in beats mode is a blind 600-char head
+  // cut of the brief (extractRefinablePages' fallback, the only path a beats
+  // page ever takes), so the auditor filed MISMATCH faults against events it
+  // could not see and the repairer deleted prose the picture does contain.
+  // depictsOf stays the last resort: the DEPICTS header exists only in image
+  // prompts, never in briefs.
   const body = pages.map(p =>
-    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${String(p.sceneIntent || '').trim() || depictsOf(p.sceneBrief) || '(no picture description)'}`
+    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${resolveTextStagePictureSpec(p) || depictsOf(p.sceneBrief) || '(no picture description)'}`
   ).join('\n\n');
   // The story and its division (2026-09-02). The LOADBEARING question asked
   // what "the story and the beat" treat as load-bearing while the audit was

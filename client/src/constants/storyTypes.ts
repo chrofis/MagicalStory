@@ -155,8 +155,8 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'potty-training', name: { en: 'Potty Training', de: 'Töpfchen-Training', fr: 'Apprentissage du pot', it: 'Uso del vasino' }, emoji: '🚽', ageGroup: 'toddler', suitableAges: [2, 4] },
   { id: 'washing-hands', name: { en: 'Washing Hands', de: 'Hände waschen', fr: 'Se laver les mains', it: 'Lavarsi le mani' }, emoji: '🧼', ageGroup: 'toddler', suitableAges: [2, 5] },
   { id: 'brushing-teeth', name: { en: 'Brushing Teeth', de: 'Zähne putzen', fr: 'Se brosser les dents', it: 'Lavarsi i denti' }, emoji: '🪥', ageGroup: 'toddler', suitableAges: [2, 6] },
-  { id: 'eating-vegetables', name: { en: 'Eating Vegetables', de: 'Gemüse essen', fr: 'Manger des légumes', it: 'Mangiare verdure' }, emoji: '🥦', ageGroup: 'toddler' },
-  { id: 'going-to-bed', name: { en: 'Going to Bed', de: 'Ins Bett gehen', fr: 'Aller au lit', it: 'Andare a letto' }, emoji: '🛏️', ageGroup: 'toddler' },
+  { id: 'eating-vegetables', name: { en: 'Eating Vegetables', de: 'Gemüse essen', fr: 'Manger des légumes', it: 'Mangiare verdure' }, emoji: '🥦', ageGroup: 'toddler', suitableAges: [2, 8] },
+  { id: 'going-to-bed', name: { en: 'Going to Bed', de: 'Ins Bett gehen', fr: 'Aller au lit', it: 'Andare a letto' }, emoji: '🛏️', ageGroup: 'toddler', suitableAges: [1, 8] },
   { id: 'saying-goodbye', name: { en: 'Saying Goodbye', de: 'Abschied nehmen', fr: 'Dire au revoir', it: 'Dire addio' }, emoji: '👋', ageGroup: 'toddler', suitableAges: [1, 5] },
   { id: 'no-pacifier', name: { en: 'No More Pacifier', de: 'Ohne Schnuller', fr: 'Plus de tétine', it: 'Senza ciuccio' }, emoji: '🍼', ageGroup: 'toddler', suitableAges: [2, 4] },
   { id: 'getting-dressed', name: { en: 'Getting Dressed by Myself', de: 'Sich alleine anziehen', fr: 'S\'habiller tout seul', it: 'Vestirsi da solo' }, emoji: '👕', ageGroup: 'toddler', suitableAges: [2, 5] },
@@ -167,10 +167,10 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'sharing', name: { en: 'Learning to Share', de: 'Teilen lernen', fr: 'Apprendre à partager', it: 'Imparare a condividere' }, emoji: '🤝', ageGroup: 'preschool', suitableAges: [2, 6] },
   { id: 'waiting-turn', name: { en: 'Waiting Your Turn', de: 'Warten können', fr: 'Attendre son tour', it: 'Aspettare il proprio turno' }, emoji: '⏳', ageGroup: 'preschool', suitableAges: [3, 6] },
   { id: 'first-kindergarten', name: { en: 'First Day of Kindergarten', de: 'Erster Kindergartentag', fr: 'Premier jour de maternelle', it: 'Primo giorno all\'asilo' }, emoji: '🎒', ageGroup: 'preschool', suitableAges: [3, 6] },
-  { id: 'making-friends', name: { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis', it: 'Fare veri amici' }, emoji: '👫', ageGroup: 'preschool' },
-  { id: 'being-brave', name: { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux', it: 'Essere coraggiosi' }, emoji: '💪', ageGroup: 'preschool' },
+  { id: 'making-friends', name: { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis', it: 'Fare veri amici' }, emoji: '👫', ageGroup: 'preschool', suitableAges: [3, 12] },
+  { id: 'being-brave', name: { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux', it: 'Essere coraggiosi' }, emoji: '💪', ageGroup: 'preschool', suitableAges: [3, 12] },
   { id: 'new-sibling', name: { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille', it: 'Nuovo fratellino o sorellina' }, emoji: '👶', ageGroup: 'preschool' },
-  { id: 'managing-emotions', name: { en: 'Managing Big Emotions', de: 'Grosse Gefühle bewältigen', fr: 'Gérer les grandes émotions', it: 'Gestire le grandi emozioni' }, emoji: '😤', ageGroup: 'preschool' },
+  { id: 'managing-emotions', name: { en: 'Managing Big Emotions', de: 'Grosse Gefühle bewältigen', fr: 'Gérer les grandes émotions', it: 'Gestire le grandi emozioni' }, emoji: '😤', ageGroup: 'preschool', suitableAges: [2, 12] },
   { id: 'whining', name: { en: 'Using a Nice Voice', de: 'Nicht jammern', fr: 'Parler sans pleurnicher', it: 'Usare una voce gentile' }, emoji: '🗣️', ageGroup: 'preschool', suitableAges: [2, 6] },
   { id: 'saying-sorry', name: { en: 'Saying Sorry & Meaning It', de: 'Sich aufrichtig entschuldigen', fr: 'S\'excuser sincèrement', it: 'Chiedere scusa sinceramente' }, emoji: '🙏', ageGroup: 'preschool', suitableAges: [3, 8] },
   { id: 'picky-eating', name: { en: 'Trying New Foods', de: 'Neues Essen probieren', fr: 'Goûter de nouveaux aliments', it: 'Provare cibi nuovi' }, emoji: '🍽️', ageGroup: 'preschool', suitableAges: [2, 7] },
@@ -181,20 +181,20 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'first-school', name: { en: 'First Day of School', de: 'Erster Schultag', fr: 'Premier jour d\'école', it: 'Primo giorno di scuola' }, emoji: '🏫', ageGroup: 'early-school', suitableAges: [5, 8] },
   { id: 'homework', name: { en: 'Doing Homework', de: 'Hausaufgaben machen', fr: 'Faire ses devoirs', it: 'Fare i compiti' }, emoji: '📝', ageGroup: 'early-school', suitableAges: [6, 11] },
   { id: 'reading-alone', name: { en: 'Learning to Read', de: 'Lesen lernen', fr: 'Apprendre à lire', it: 'Imparare a leggere' }, emoji: '📖', ageGroup: 'early-school', suitableAges: [5, 9] },
-  { id: 'losing-game', name: { en: 'Losing a Game', de: 'Verlieren können', fr: 'Savoir perdre', it: 'Saper perdere' }, emoji: '🎯', ageGroup: 'early-school', suitableAges: [4, 9] },
-  { id: 'being-different', name: { en: 'Being Yourself', de: 'Du selbst sein', fr: 'Être soi-même', it: 'Essere se stessi' }, emoji: '🌈', ageGroup: 'early-school' },
-  { id: 'dealing-bully', name: { en: 'Standing Up for Yourself', de: 'Für sich einstehen', fr: 'S\'affirmer face aux autres', it: 'Difendersi da soli' }, emoji: '🛡️', ageGroup: 'early-school' },
-  { id: 'telling-truth', name: { en: 'Telling the Truth', de: 'Die Wahrheit sagen', fr: 'Dire la vérité', it: 'Dire la verità' }, emoji: '✅', ageGroup: 'early-school' },
-  { id: 'trying-new-things', name: { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & Apprendre', it: 'Crescere e imparare' }, emoji: '🌟', ageGroup: 'early-school' },
-  { id: 'sibling-fighting', name: { en: 'Getting Along with Siblings', de: 'Geschwisterstreit', fr: 'S\'entendre avec ses frères et sœurs', it: 'Andare d\'accordo con i fratelli' }, emoji: '👧👦', ageGroup: 'early-school' },
-  { id: 'jealousy', name: { en: 'Dealing with Jealousy', de: 'Mit Eifersucht umgehen', fr: 'Gérer la jalousie', it: 'Gestire la gelosia' }, emoji: '💚', ageGroup: 'early-school' },
-  { id: 'not-giving-up', name: { en: 'Not Giving Up', de: 'Nicht aufgeben', fr: 'Ne pas abandonner', it: 'Non arrendersi' }, emoji: '🧗', ageGroup: 'early-school' },
-  { id: 'being-left-out', name: { en: 'Being Left Out', de: 'Ausgeschlossen werden', fr: 'Être mis à l\'écart', it: 'Essere esclusi' }, emoji: '😔', ageGroup: 'early-school' },
-  { id: 'taking-care-belongings', name: { en: 'Taking Care of Things', de: 'Auf Sachen aufpassen', fr: 'Prendre soin de ses affaires', it: 'Avere cura delle proprie cose' }, emoji: '🎒', ageGroup: 'early-school' },
-  { id: 'helping-at-home', name: { en: 'Helping at Home', de: 'Im Haushalt helfen', fr: 'Aider à la maison', it: 'Aiutare in casa' }, emoji: '🏡', ageGroup: 'early-school' },
-  { id: 'dealing-disappointment', name: { en: 'Dealing with Disappointment', de: 'Mit Enttäuschung umgehen', fr: 'Gérer la déception', it: 'Gestire la delusione' }, emoji: '😞', ageGroup: 'early-school' },
-  { id: 'anxiety-worrying', name: { en: 'Worry & Anxiety', de: 'Sorgen & Ängste', fr: 'Soucis & Anxiété', it: 'Preoccupazioni e ansia' }, emoji: '😰', ageGroup: 'early-school' },
-  { id: 'caring-for-pet', name: { en: 'Caring for a Pet', de: 'Sich um ein Haustier kümmern', fr: 'Prendre soin d\'un animal', it: 'Prendersi cura di un animale' }, emoji: '🐕', ageGroup: 'early-school' },
+  { id: 'losing-game', name: { en: 'Losing a Game', de: 'Verlieren können', fr: 'Savoir perdre', it: 'Saper perdere' }, emoji: '🎯', ageGroup: 'early-school', suitableAges: [4, 12] },
+  { id: 'being-different', name: { en: 'Being Yourself', de: 'Du selbst sein', fr: 'Être soi-même', it: 'Essere se stessi' }, emoji: '🌈', ageGroup: 'early-school', suitableAges: [5, 12] },
+  { id: 'dealing-bully', name: { en: 'Standing Up for Yourself', de: 'Für sich einstehen', fr: 'S\'affirmer face aux autres', it: 'Difendersi da soli' }, emoji: '🛡️', ageGroup: 'early-school', suitableAges: [5, 12] },
+  { id: 'telling-truth', name: { en: 'Telling the Truth', de: 'Die Wahrheit sagen', fr: 'Dire la vérité', it: 'Dire la verità' }, emoji: '✅', ageGroup: 'early-school', suitableAges: [4, 12] },
+  { id: 'trying-new-things', name: { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & Apprendre', it: 'Crescere e imparare' }, emoji: '🌟', ageGroup: 'early-school', suitableAges: [3, 12] },
+  { id: 'sibling-fighting', name: { en: 'Getting Along with Siblings', de: 'Geschwisterstreit', fr: 'S\'entendre avec ses frères et sœurs', it: 'Andare d\'accordo con i fratelli' }, emoji: '👧👦', ageGroup: 'early-school', suitableAges: [3, 12] },
+  { id: 'jealousy', name: { en: 'Dealing with Jealousy', de: 'Mit Eifersucht umgehen', fr: 'Gérer la jalousie', it: 'Gestire la gelosia' }, emoji: '💚', ageGroup: 'early-school', suitableAges: [3, 12] },
+  { id: 'not-giving-up', name: { en: 'Not Giving Up', de: 'Nicht aufgeben', fr: 'Ne pas abandonner', it: 'Non arrendersi' }, emoji: '🧗', ageGroup: 'early-school', suitableAges: [4, 12] },
+  { id: 'being-left-out', name: { en: 'Being Left Out', de: 'Ausgeschlossen werden', fr: 'Être mis à l\'écart', it: 'Essere esclusi' }, emoji: '😔', ageGroup: 'early-school', suitableAges: [4, 12] },
+  { id: 'taking-care-belongings', name: { en: 'Taking Care of Things', de: 'Auf Sachen aufpassen', fr: 'Prendre soin de ses affaires', it: 'Avere cura delle proprie cose' }, emoji: '🎒', ageGroup: 'early-school', suitableAges: [4, 12] },
+  { id: 'helping-at-home', name: { en: 'Helping at Home', de: 'Im Haushalt helfen', fr: 'Aider à la maison', it: 'Aiutare in casa' }, emoji: '🏡', ageGroup: 'early-school', suitableAges: [3, 12] },
+  { id: 'dealing-disappointment', name: { en: 'Dealing with Disappointment', de: 'Mit Enttäuschung umgehen', fr: 'Gérer la déception', it: 'Gestire la delusione' }, emoji: '😞', ageGroup: 'early-school', suitableAges: [3, 12] },
+  { id: 'anxiety-worrying', name: { en: 'Worry & Anxiety', de: 'Sorgen & Ängste', fr: 'Soucis & Anxiété', it: 'Preoccupazioni e ansia' }, emoji: '😰', ageGroup: 'early-school', suitableAges: [4, 12] },
+  { id: 'caring-for-pet', name: { en: 'Caring for a Pet', de: 'Sich um ein Haustier kümmern', fr: 'Prendre soin d\'un animal', it: 'Prendersi cura di un animale' }, emoji: '🐕', ageGroup: 'early-school', suitableAges: [4, 12] },
   { id: 'tattling-vs-telling', name: { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: 'Rapporter vs Demander de l\'aide', it: 'Fare la spia o chiedere aiuto' }, emoji: '🗣️', ageGroup: 'preschool', suitableAges: [4, 8] },
   { id: 'understanding-rules', name: { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non', it: 'Perché i genitori dicono no' }, emoji: '🚦', ageGroup: 'preschool', suitableAges: [3, 7] },
 
@@ -216,7 +216,7 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'responsibility', name: { en: 'Taking Responsibility', de: 'Verantwortung übernehmen', fr: 'Prendre ses responsabilités', it: 'Assumersi responsabilità' }, emoji: '🎯', ageGroup: 'preteen', suitableAges: [6, 12] },
   { id: 'managing-time', name: { en: 'Managing Time', de: 'Zeitmanagement', fr: 'Gestion du temps', it: 'Gestione del tempo' }, emoji: '⏰', ageGroup: 'preteen', suitableAges: [8, 12] },
   { id: 'online-safety', name: { en: 'Online Safety', de: 'Sicherheit im Internet', fr: 'Sécurité en ligne', it: 'Sicurezza online' }, emoji: '🔒', ageGroup: 'preteen', suitableAges: [7, 12] },
-  { id: 'being-active', name: { en: 'Being Active & Going Outdoors', de: 'Aktiv sein & Rausgehen', fr: 'Être actif & Sortir dehors', it: 'Essere attivi e uscire all\'aperto' }, emoji: '🏃', ageGroup: 'preteen' },
+  { id: 'being-active', name: { en: 'Being Active & Going Outdoors', de: 'Aktiv sein & Rausgehen', fr: 'Être actif & Sortir dehors', it: 'Essere attivi e uscire all\'aperto' }, emoji: '🏃', ageGroup: 'preteen', suitableAges: [4, 12] },
   { id: 'comparing-others', name: { en: 'Comparing Yourself to Others', de: 'Sich mit anderen vergleichen', fr: 'Se comparer aux autres', it: 'Confrontarsi con gli altri' }, emoji: '📊', ageGroup: 'preteen', suitableAges: [7, 12] },
   { id: 'test-stress', name: { en: 'Test & Exam Stress', de: 'Prüfungsangst', fr: 'Stress des examens', it: 'Stress da esami' }, emoji: '📋', ageGroup: 'preteen', suitableAges: [7, 12] },
 ];
@@ -228,6 +228,30 @@ export const popularLifeChallengeIds = [
   'losing-game', 'dealing-bully', 'telling-truth', 'screen-time',
   'moving-house', 'sharing', 'brushing-teeth', 'eating-vegetables'
 ];
+
+/**
+ * The pool the TRIAL grid draws from — the curated 16 above plus 13 topics that
+ * only become reachable once a child age narrows the list. It is deliberately
+ * NOT `popularLifeChallengeIds`: the wizard's Popular shelf is an uncapped,
+ * always-visible curated shortlist, and a 29-tile shelf sitting above the age
+ * shelves that already list the same topics makes "Popular" meaningless. The
+ * trial can afford the wider pool because it filters by age and caps at
+ * TRIAL_GRID_SIZE (docs/decisions.md 2026-09-13).
+ */
+export const trialLifeChallengeIds = [
+  ...popularLifeChallengeIds,
+  'saying-goodbye', 'potty-training', 'no-pacifier', 'getting-dressed',
+  'washing-hands', 'whining', 'picky-eating', 'waiting-turn',
+  'being-patient', 'saying-sorry', 'new-sibling', 'visiting-doctor',
+  'going-vacation',
+];
+
+/**
+ * The trial topic grid is `grid-cols-2 sm:grid-cols-3` (TrialTopicStep.tsx):
+ * six tiles fill both geometries square — 3 rows of 2 on mobile, 2 rows of 3 on
+ * desktop — where any other count leaves a ragged final row.
+ */
+export const TRIAL_GRID_SIZE = 6;
 
 export const lifeChallengeGroups: LifeChallengeGroup[] = [
   { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires', it: 'Popolari' }, ageRange: 'all' },
@@ -440,23 +464,62 @@ export function parseChildAge(age?: string | number | null): number | null {
 }
 
 /**
- * The topic list the TRIAL shows: age-appropriate topics only. The trial
- * FILTERS (out-of-window topics are absent) where the full wizard DIMS them —
- * two surfaces, two behaviours, deliberately (docs/decisions.md 2026-09-13).
+ * Rank key for the trial grid — LOWER is a better fit, so the visible six are
+ * the six most on-target topics for this child rather than the first six in
+ * source order. Three signals, in strict priority:
  *
- * `selectedTopicId` is pinned into the list even when it is out of window or
- * not one of the popular 16: `/try?category=...&topic=...` deep links from the
+ *  1. **Window width** (dominant). A topic whose window is [2,4] is *about*
+ *     being two; one whose window is [2,12] merely tolerates it. The narrower
+ *     window containing the age is the more deliberate answer to "what is this
+ *     child working on right now". A fieldless life event counts as the widest
+ *     possible window (0-12): it is real at any age and therefore specific to
+ *     none, so it fills the grid only once the targeted topics run out.
+ *  2. **Distance from the window's centre.** Inside two equally wide windows,
+ *     the one centred on this age beats the one the child is ageing out of —
+ *     a 6-year-old gets [4,8] before [6,10].
+ *  3. **Commission frequency.** The pool order is the curated popularity
+ *     ranking (the 16 that parents actually order, then the 13 age-gated
+ *     additions); its index breaks every remaining tie deterministically, so
+ *     the grid never reshuffles between renders.
+ *
+ * The weights are decades apart, so a lower-priority signal can never outvote a
+ * higher one: width dominates (×1000, max span 13), centre offset is bounded by
+ * 6 (×100 → max 600), and the pool index is bounded by the pool size (< 100).
+ */
+function trialRankKey(c: LifeChallenge, age: number, pool: LifeChallenge[]): number {
+  const w = c.suitableAges;
+  const width = w ? w[1] - w[0] + 1 : 13;
+  const offset = w ? Math.abs(age - (w[0] + w[1]) / 2) : 0;
+  return width * 1000 + offset * 100 + pool.findIndex(p => p.id === c.id);
+}
+
+/**
+ * The topic list the TRIAL shows: filter, then rank, then cap. Out-of-window
+ * topics are ABSENT where the full wizard dims them; what survives is ordered
+ * best-fit-first by `trialRankKey`; and only the first TRIAL_GRID_SIZE reach
+ * the grid. Two surfaces, two behaviours, deliberately — the wizard is never
+ * capped (docs/decisions.md 2026-09-13).
+ *
+ * `selectedTopicId` is pinned FIRST and survives all three steps — filter, rank
+ * and cap — even when it is out of window or outside the trial pool:
+ * `/try?category=...&topic=...` deep links from the
  * SEO landing pages fix a topic BEFORE the age is known, and 43 of the 59
  * life challenges are reachable only that way. The user picked it on a landing
  * page; it must not vanish. The server-side age nudge handles the mismatch.
  */
 export function getTrialLifeChallenges(age?: number | null, selectedTopicId?: string): LifeChallenge[] {
-  const visible = getLifeChallengesByGroup('popular').filter(c => topicFitsAge(c, age));
-  if (selectedTopicId && !visible.some(c => c.id === selectedTopicId)) {
-    const pinned = lifeChallenges.find(c => c.id === selectedTopicId);
-    if (pinned) return [pinned, ...visible];
-  }
-  return visible;
+  const pool = trialLifeChallengeIds
+    .map(id => lifeChallenges.find(c => c.id === id))
+    .filter((c): c is LifeChallenge => !!c);
+
+  const inWindow = pool.filter(c => topicFitsAge(c, age));
+  const ranked = (age === null || age === undefined || !Number.isFinite(age))
+    ? inWindow
+    : [...inWindow].sort((a, b) => trialRankKey(a, age, pool) - trialRankKey(b, age, pool));
+
+  const pinned = selectedTopicId ? lifeChallenges.find(c => c.id === selectedTopicId) : undefined;
+  const list = pinned ? [pinned, ...ranked.filter(c => c.id !== pinned.id)] : ranked;
+  return list.slice(0, TRIAL_GRID_SIZE);
 }
 
 export function getLifeChallengesByGroup(groupId: string): LifeChallenge[] {

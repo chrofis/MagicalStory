@@ -35646,3 +35646,104 @@ and needs its own ask.
 `tests/unit/sheet-footwear-rule.test.ts`
 **Status:**    🟡 conditional — needs one live sheet generation to confirm the
 sheet comes back shod; the fix is unverifiable from stored evidence alone.
+
+## 2026-09-13 — All 59 life challenges carry an age window; the trial grid ranks by fit and caps at six
+**Context:** The entry above ("The trial FILTERS age-inappropriate life
+challenges") shipped `suitableAges` on 32 of the 59 life challenges and made the
+trial filter on it. Two gaps were left open. (1) 27 topics had no window at all,
+so they were any-age by accident rather than by decision — a 10-year-old was
+still offered `going-to-bed` and a 2-year-old `telling-truth`, because neither
+had been rated. (2) What survived the filter came out in source-file order and
+uncapped, so the grid was both arbitrarily ordered and a different height at
+every age (7 tiles at 0-1, 16 at 5-6). The owner ruled, verbatim: *"First just
+label all with appropriate ages. Than rank them by age group and keep the top 5
+or so, what fits todays layout 4 or 6?"*
+
+**Decision — three parts, in that order.**
+
+**(a) Every one of the 59 is labelled.** 51 carry a `suitableAges` window;
+exactly **8 stay fieldless on purpose** — `moving-house`, `going-vacation`,
+`parents-splitting`, `visiting-doctor`, `staying-hospital`, `death-pet`,
+`grandparent-sick`, `new-sibling`. These are life EVENTS: they happen *to* a
+child at whatever age they happen, so there is no developmental window to state
+and no age at which the topic is wrong. Fieldless therefore now means "declared
+any-age", not "not yet rated" — the distinction the previous state could not
+make. Owner rulings inside this pass: `telling-truth` [4,12],
+`dealing-bully` [5,12], `going-to-bed` **[1,8] not [0,8]** (no developmental
+topic carries a 0 — age 0 is a baby and nothing is being *learned*), and
+`losing-game` widened [4,9] → **[4,12]** (losing badly does not stop mattering
+at 9). `ageGroup` was NOT touched: it is the wizard's picker shelf, a different
+axis from the window, and conflating them is what made the old shelf label
+unusable as a filter.
+
+**(b) The visible topics are ranked best-fit-first** (`trialRankKey`), three
+signals, decades apart so a lower-priority one can never outvote a higher one:
+1. **Window width** (×1000, max span 13) — dominant. A topic whose window is
+   [2,4] is *about* being two; one whose window is [2,12] merely tolerates it.
+   The narrower window containing the age is the more deliberate answer to
+   "what is this child working on right now". A fieldless life event counts as
+   the widest possible window (13): real at any age, therefore specific to none,
+   so it fills the grid only once the targeted topics run out.
+2. **Distance from the window's centre** (×100, bounded by 6). Between two
+   equally wide windows, the one centred on this age beats the one the child is
+   ageing out of — at 6, `first-school` [5,8] outranks `first-kindergarten`
+   [3,6] though both are width 4.
+3. **Commission frequency** — the pool's own index, which is the curated
+   popularity order. It breaks every remaining tie deterministically, so the
+   grid never reshuffles between renders.
+With no declared age there is no ranking signal, so the pool keeps source order
+and only the cap applies.
+
+**(c) The grid caps at 6** (`TRIAL_GRID_SIZE`), applied AFTER filtering and
+ranking. The number is geometry, not taste: `TrialTopicStep.tsx` renders
+`grid grid-cols-2 sm:grid-cols-3`, so six is 3 full rows of 2 on mobile and 2
+full rows of 3 on desktop. Four would leave a ragged 3+1 desktop row. The
+deep-link pin is inserted before the slice and so survives filter, rank and cap:
+it is always first and always visible, displacing the last-ranked topic rather
+than the best-fitting one.
+
+**The cap is what makes the wider pool safe.** 13 topics that the 16-topic
+popular list could never surface are added to a new `trialLifeChallengeIds`
+pool: `saying-goodbye`, `potty-training`, `no-pacifier`, `getting-dressed`,
+`washing-hands`, `whining`, `picky-eating`, `waiting-turn`, `being-patient`,
+`saying-sorry`, `new-sibling`, `visiting-doctor`, `going-vacation`. Before the
+cap this would have made the grid taller; with it, they compete for six slots
+and win only where they genuinely fit — a 2-year-old now sees `potty-training`
+first instead of `sibling-fighting`.
+
+**The pool is NOT `popularLifeChallengeIds`, deliberately.** The full wizard's
+Popular shelf shares that constant via `getLifeChallengesByGroup('popular')`,
+is always visible, dims rather than filters, and is never capped. Widening it to
+29 would put half the catalogue into a shelf whose entire job is to be a curated
+shortlist, sitting directly above the age shelves that already list the same
+topics — "Popular" would stop meaning anything, and it would get worse for the
+wizard to make the trial better. So the wizard keeps the curated 16 and the
+trial draws from its own 29. Nothing is lost in the wizard: all 59 remain
+reachable there through the age shelves, which is pinned by a test.
+
+**The four heavy life events stay deep-link-only.** `parents-splitting`,
+`death-pet`, `grandparent-sick` and `staying-hospital` are in no pool and reach
+no grid at any age. They are fieldless (any-age) and would therefore be
+*eligible* everywhere — which is exactly why they need the explicit exclusion:
+a parent who came to the trial to make a dinosaur book should not be offered
+"Parents Living Apart" as a suggestion. They remain fully reachable by deep link
+from their SEO landing pages, where the parent arrived looking for that topic.
+
+**Consequences visible in the table.** Age 0 yields 4 tiles, not 6, and that is
+correct: no developmental window opens at 0 (owner ruling (a)), so only the
+any-age life events remain. Ages 9-12 currently return an identical six, because
+the pool holds only one preteen-windowed topic (`screen-time`) — the preteen
+shelf (`peer-pressure`, `body-changes`, `managing-time`, `homework`,
+`money-saving`) was not among the 13 promoted. That is a pool-composition fact,
+not a ranking fault; widening the pool at the preteen end is a separate call for
+the owner.
+
+**Touched:** `client/src/constants/storyTypes.ts` (19 new `suitableAges`,
+`losing-game` widened, `trialLifeChallengeIds`, `TRIAL_GRID_SIZE`,
+`trialRankKey`, `getTrialLifeChallenges`), `server/lib/promptBuilders.js`
+(`TOPIC_AGE_WINDOWS` mirrored to all 51 — the client filters the picker with the
+window, the server nudges the writer with it, and a drift between the two would
+show a topic in the trial that the writer is then told is off-age),
+`tests/unit/trial-age-appropriate-topics.test.ts`, `tests/unit/age-band.test.ts`
+(new mirror test).
+**Status:** ✅ active
