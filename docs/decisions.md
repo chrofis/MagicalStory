@@ -35420,3 +35420,45 @@ of the topic list is a drift source.
 `client/src/components/story/StoryCategorySelector.tsx`,
 `client/src/components/story/StorySettings.tsx`, `tests/unit/age-band.test.ts`
 **Status:** ✅ active
+
+### The prose may name what the picture shows — it may not recolour it (2026-09-13)
+**Context:** Prod `job_1789227389389_z18dmvnt6` p8 text reads «il change les
+jambes des enfants en **queues d'argent**» (silver tails) while the locked
+contract gives Liz a deep yellow tail and Ayan a red one, and all 7 rendered
+surfaces drew yellow and red. The images are correct; the text is not.
+
+Verified before fixing, because the obvious diagnosis was wrong: the writer was
+NOT missing the information. The stored `storyTextPrompts` (59,347 chars) for
+this run contains the per-page `ILLUSTRATION (already locked — what the reader
+will SEE on this page)` block carrying both "a fitted red mermaid tail with
+red-to-burgundy scales" and "a fitted deep yellow mermaid tail with
+yellow-to-gold scales". `buildTextRefinePrompt` likewise passes the full
+`sceneBrief` as `{SCENE_OUTLINES}`. Writer, reviewer and refiner each held both
+halves. No plumbing was missing, so no plumbing was added.
+
+**Decision:** The gap was in the RULES, which covered only two cases and not the
+one that occurred. Both prompts said appearance is "the picture's business, not
+the prose's" (don't mention it) and "never contradict" (read as being about
+events). Neither said what to do when the story legitimately must name the thing
+— a transformation, a gift, a thing found or lost is an EVENT, and the writer had
+every reason to name the tails. Added to `story-text-from-beats.txt` and
+`text-refine.txt`: naming such a thing is allowed, copying the brief's wording is
+not, and where the brief colours a thing the prose uses that colour or names none
+at all — never a different one. The refiner's rule is written as a flaggable
+condition so the page enters its ledger.
+
+**Rationale:** Prompt-side, per the standing "classification belongs to the
+PROMPT" rule — the alternative considered was a deterministic colour-word check
+against the brief fed through the mechanical REVIEW HINTS channel, which is code
+reading prose. Held in reserve; the rule gap is the cheaper and more honest fix
+first. No story-specific example is used in either prompt (the tail/silver case
+that motivated this is deliberately generalised).
+
+**Also corrected here:** the related finding "p3 text says photograph, image
+shows a model ship" was filed backwards. The p3 brief specifies "a photographic
+display of a flat-bottomed wooden sailing barque" — the TEXT is faithful and the
+IMAGE deviated. That is an image-vs-brief defect owned by the semantic evaluator,
+which scored the page and passed it; it is not a text fault.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`
+**Status:** ✅ active
