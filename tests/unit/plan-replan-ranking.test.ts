@@ -37,7 +37,6 @@ describe('counters stay consistent with the allowance', () => {
     const res = runPlanCounters({ pages, roster, commissionedNames: ['Mara'], highActionPages: 2 });
     expect(res.stats.highActionAllowance).toBe(2);
     // Nothing here counts interlocking, elevation or creatures; only NAMES.
-    expect(res.findings.some((f: any) => f.code === 'CAST_OVER_3')).toBe(false);
     expect(res.findings.some((f: any) => f.code === 'CAST_OVER_CEILING')).toBe(false);
   });
   it('defaults the allowance from the page count when the caller omits it', () => {

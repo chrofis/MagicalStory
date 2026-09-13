@@ -35030,3 +35030,45 @@ behaviour.
 `storyJobPipeline.js` (`finalChecksReport.repairRounds`),
 `tests/unit/repair-round-effectiveness.test.ts` (9 tests)
 **Status:** ✅ active
+
+## 2026-09-13 — The storyHelpers facade re-exports its domain modules by construction, never by a hand-written list
+**Context:** `parsePlanCheckRoster` was added to `promptBuilders.js` on 2026-09-11 (`df1eb1ff3`)
+and exported there correctly. `beatsPipeline.js:95` destructures it from `./storyHelpers` — the
+re-export facade — which listed every forwarded name by hand, twice (an import destructure and a
+`module.exports` list). The new name was in neither. Node reports nothing for a missing property,
+so the binding was `undefined`, `parsePlanCheckRoster is not a function` was thrown inside the plan
+check's `try`, and the roster it produces is what the ENTIRE plan-counter layer counts over. Every
+beats story on staging therefore shipped with no cast, invented-cast, shot-variety or focal-page
+counting for two days, behind a WARN (`job_1789304198359_y3n0euk3z`: "Plan counters did not run:
+the check's roster covers 0 of 15 page(s)", twice per run). It was not a require cycle:
+`promptBuilders`' 103-module dependency closure never reaches `beatsPipeline`. 42 promptBuilders
+exports were missing from the facade in total.
+**Decision:** the facade spreads the module objects of `promptBuilders`, `sceneMetadata` and
+`clothingResolve` into `module.exports`; the explicit list is kept after them as the documented
+surface and as the place local residue and the `buildSceneIterationPrompt` alias win.
+`tests/unit/story-helpers-facade.test.ts` pins two properties: every domain export is forwarded, and
+every name any module destructures from the facade resolves to something defined.
+**Rationale:** the class of bug, not the one name — a lazy require of the one function would leave
+the other 41 and every future export exposed. The destructure scan is the general guard: an import
+that silently binds `undefined` now fails a test instead of a story.
+**Touched:** `server/lib/storyHelpers.js`, `tests/unit/story-helpers-facade.test.ts`
+**Status:** ✅ active
+
+## 2026-09-13 — A skipped plan-counter layer is an ERROR, and the one per-page cast counter reads the configured cap
+**Context:** two faults the run above exposed. (1) Losing the roster degraded silently behind a
+WARN, which is why a dead counter layer survived two days of runs. (2) `CAST_OVER_3` asked for a
+justification above a hardcoded 3 while `CAST_OVER_CEILING` counted the configured
+`maxCharactersPerScene` — which went to 6 the same day (`678129944`), the day the scene reviewer's
+twin check was reframed from a hardcoded "three" to the cap read as a recommendation. (3) The
+roster parser kept a possessive as its own figure: replaying the stored plan of
+`job_1789304198359_y3n0euk3z`, "Ondine" and "Ondine's" entered the cast as two people and inflated
+pages 10 and 14.
+**Decision:** both the lost-roster and the skipped-counters paths log at ERROR level, in the run log
+and in the generation log, and neither aborts the run (`feedback_gates_are_guidelines`). `CAST_OVER_3`
+is retired; one counter, `CAST_OVER_CEILING`, fires past the configured cap and carries the
+justification clause. `parsePlanCheckRoster` strips a trailing possessive.
+**Rationale:** a counter layer that cannot run must be impossible to miss, and a plan counter
+contradicting the cap the rest of the pipeline was just given is noise the re-plan spends rounds on.
+**Touched:** `server/lib/beatsPipeline.js`, `server/lib/planCounters.js`, `server/lib/promptBuilders.js`,
+`tests/unit/plan-counters.test.ts`, `tests/unit/plan-replan-ranking.test.ts`
+**Status:** ✅ active

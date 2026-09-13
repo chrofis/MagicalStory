@@ -416,7 +416,7 @@ function namesIn(text, cast, aliases = {}) {
  *
  * NOTE FOR THE COUNTERS: no counter in this module penalises the allowance.
  * Nothing here counts elevated figures, interlocked pairs or creatures; the
- * only per-page cast counters (CAST_OVER_3, CAST_OVER_CEILING) count NAMES in
+ * only per-page cast counter (CAST_OVER_CEILING) counts NAMES in
  * the who-column, and a high-action instant adds no name to a page. The budget
  * is therefore carried through to `stats.highActionAllowance` for the report
  * and never used to suppress a finding — there is none to suppress.
@@ -525,18 +525,20 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       `${shotCounts['ultra-wide'] || 0} ultra-wide page(s); the plan asks for about two`);
   }
 
-  // 3. Cast per page. Over three is reported for the model to test the plan
-  //    line's justification against; over the image model's ceiling is a
-  //    finding on its own, justification or not.
-  const overThree = rows.filter(r => r.present.length > 3);
-  if (overThree.length) {
-    add('CAST_OVER_3', overThree.map(r => r.pageNumber),
-      `${overThree.length} page(s) put more than three named characters in frame — each needs a justification in its plan line`);
-  }
+  // 3. Cast per page, against the CONFIGURED ceiling — never a literal.
+  //    There were two counters here: CAST_OVER_3 (hardcoded 3, "needs a
+  //    justification") and CAST_OVER_CEILING (the image model's
+  //    maxCharactersPerScene). The 3 was written when the ceiling was 5; the
+  //    ceiling is 6 since 2026-09-13 (678129944), and the scene reviewer's
+  //    twin check was reframed the same day from a hardcoded "three" to the
+  //    cap read as a composition recommendation. A plan counter that still
+  //    asked for a justification at four people was contradicting the cap the
+  //    rest of the pipeline had just been given. One counter, one number, read
+  //    from config.
   const overCeiling = rows.filter(r => r.present.length > maxCharactersPerScene);
   if (overCeiling.length) {
     add('CAST_OVER_CEILING', overCeiling.map(r => r.pageNumber),
-      `more than ${maxCharactersPerScene} named characters in frame — past what the image model can hold`);
+      `${overCeiling.length} page(s) put more than ${maxCharactersPerScene} named characters in frame — past what the image model can hold, and each needs a justification in its plan line`);
   }
 
   // 4. Solo pages and no-people pages both have to exist.

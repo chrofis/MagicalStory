@@ -21,6 +21,24 @@ const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, b
 const { wrapUserInput, stripAgeWords, buildHairDescription, buildCharacterDescriptionsForBbox, buildSecondaryCharacterDescriptions, buildSecondaryExpectedCharacters, buildCastIdentityDescription, buildIdentityClothingText, buildIdentityLine, buildSecondaryExpectedForPage, buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, getAgeCategory, getAgeCategoryLabel, AGE_CATEGORY_ORDER, getAgeCategoryIndex, clampApparentAge, getTeachingGuide, preloadHistoricalLocations, getHistoricalLocations, preloadHistoricalObjects, getHistoricalObjects, getAdventureGuide, getSceneComplexityGuide, ART_STYLES, WORLD_ART_STYLES, buildStyleWardrobeBlock, resolveArtStyle, resolveArtStyleForEmptyScene, resolveArtStyleForSheet, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage, extractCharacterVisualProfile, buildCharacterPhysicalDescription, buildGroundingPrompt, buildCharacterPromptBlock, buildRelativeHeightDescription, buildCharacterRestriction, buildCharacterReferenceList, buildReferenceCardColours, buildCoverPrompt, buildBasePrompt, buildSceneExpansionAllPrompt, buildSceneExpansionPrompt, buildSceneDescriptionPrompt, textDeclaresNonWornPlacement, sceneDeclaresNonWornState, stripWornStateFromDescription, buildImagePrompt, sanitizeVbIdsInPrompt, buildOutlineReviewPrompt, buildTextRefinePrompt, parseRefinedText, buildBeatsPrompt, buildChallengeIdeasSection, buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, buildArcHintsPrompt, parseArcHints, parseArcCreate, parseArcRetell, parseInventedFigures, arcInventedAllowance, critiqueMaxSeverity, buildPlanCheckPrompt, parsePlanCheck, buildReplanSection, replanRank, findingPages, buildArcReviewPrompt, buildArcAuditPrompt, buildTextAuditPrompt, buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt, countFaults, faultsByCategory, parseArcReview, buildStoryShapeSection, buildClothingReviewPrompt, parseClothingReview, parseBeats, parsePagePlan, parsePlanResponse, planBlocks, planInstant, buildSceneReviewPrompt, buildDoNotWriteSection, buildStoryTextFromBeatsPrompt, buildStoryBibleFromBeatsPrompt, buildUnifiedStoryPrompt, buildTrialStoryPrompt, buildAvailableLandmarksSection, buildPreviousScenesContext, buildChildCriticPrompt, youngestMainAge } = require('./promptBuilders');
 const { extractJsonFromText, parseProseMetadataFormat, POSITION_ABBREVIATIONS, expandPositionAbbreviations, stripEntityIds, stripSceneMetadata, parseCharacterDescriptions, enforceSpreadTextPosition, mirrorLeftRight, extractSceneMetadata, collectSceneCharacterNames, findCastMissingFromMetadata, getCharactersInScene, unionPageCast, parseSceneHintMetadata, parseStoryPages, parseSceneDescriptions, extractShortSceneDescriptions, extractCoverScenes, extractPageClothing, getPrimaryVantageForPage, groupPagesByVantage, normalizePositionToLCR, getPageText, updatePageText } = require('./sceneMetadata');
 
+/*
+ * EXHAUSTIVE RE-EXPORT (2026-09-13). The facade used to list every forwarded
+ * name by hand, twice — once in the destructures above, once in
+ * `module.exports`. A function added to a domain module and NOT added to both
+ * lists is simply absent here, and every importer that destructures it from
+ * this facade binds `undefined` with no error at require time. That is exactly
+ * how `parsePlanCheckRoster` (promptBuilders.js, added 2026-09-11 in df1eb1ff3)
+ * reached `beatsPipeline.js:95` as undefined and killed the whole plan-counter
+ * layer on every beats run for two days — behind a WARN, so nothing failed.
+ * The module objects below are spread into `module.exports`, so a new domain
+ * export is forwarded automatically. The explicit list after them is kept as
+ * the documented surface and as the place local residue and the alias win.
+ * `tests/unit/story-helpers-facade.test.ts` pins both properties.
+ */
+const promptBuildersModule = require('./promptBuilders');
+const sceneMetadataModule = require('./sceneMetadata');
+const clothingResolveModule = require('./clothingResolve');
+
 /**
  * Calculate the actual page count for a story
  * Picture-book layout is the default for all reading levels: 1 scene = 1 page
@@ -348,6 +366,11 @@ function getHeadBodyRatio(age) {
 }
 
 module.exports = {
+  // Everything the three domain modules export, forwarded by construction.
+  ...clothingResolveModule,
+  ...sceneMetadataModule,
+  ...promptBuildersModule,
+
   // Config
   ART_STYLES,
   resolveArtStyle,

@@ -6079,7 +6079,10 @@ function parsePlanCheckRoster(raw) {
   const out = new Map();
   const names = (s) => String(s || '')
     .split(',')
-    .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').trim())
+    // A possessive is the same figure: a roster that answers "Ondine's" for a
+    // page that also says "Ondine" used to enter the cast twice and inflate
+    // every per-page count (measured replaying job_1789304198359_y3n0euk3z).
+    .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/(?:'s|’s|s'|s’)$/i, '').trim())
     .filter(n => n && !/^none$/i.test(n));
   for (const line of String(raw || '').split('\n')) {
     const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*))?$/i);

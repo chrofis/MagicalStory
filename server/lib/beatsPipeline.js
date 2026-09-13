@@ -928,14 +928,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       modelFindings = parsePlanCheck(res.text || '');
       roster = parsePlanCheckRoster(res.text || '');
     } catch (err) {
-      log.warn(`⚠️ [BEATS] Plan check (${label}) failed (${err.message}) — no roster, so the counters do not run this round`);
-      gl.warn(`${label}_failed`, `Plan check failed: ${err.message} — no roster, the counters do not run`);
+      // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
+      // with it (the counters do arithmetic on its roster), so this is an
+      // ERROR in the run log and in the generation log — not a WARN that two
+      // days of beats runs scrolled past (2026-09-13, the undefined
+      // `parsePlanCheckRoster` binding). It still never aborts a paid run:
+      // quality gates ship with a warning (feedback_gates_are_guidelines).
+      log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
+      gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
     const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount), declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster });
     if (counters.skipped) {
       const got = roster ? roster.size : 0;
-      log.warn(`⚠️ [BEATS] Plan counters (${label}) skipped — roster covers ${got} of ${pages.length} page(s)`);
-      gl.warn(`${label}_counters_skipped`, `Plan counters did not run: the check's roster covers ${got} of ${pages.length} page(s)`, null, { rosterPages: got, pages: pages.length });
+      log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
+      gl.error(`${label}_counters_skipped`, `Plan counters did not run (${counters.skipped}): the check's roster covers ${got} of ${pages.length} page(s)`, null, { reason: counters.skipped, rosterPages: got, pages: pages.length });
     }
     // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
     // model finding the check number it answered, so buildReplanSection can rank

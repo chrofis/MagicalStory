@@ -146,12 +146,16 @@ describe('runPlanCounters', () => {
     expect(r.findings.map((f: any) => f.code)).toContain('SHOT_VARIETY');
   });
 
-  it('flags a page with more than three named characters', () => {
+  // ONE cast counter, and its threshold is the CONFIGURED ceiling — the
+  // hardcoded 3 was removed 2026-09-13 when the cap went to 6 (678129944).
+  it('flags a page past the configured ceiling, and not one at the ceiling', () => {
     const pages = [page(1, line('wide', 'Ana, Ben, Cara and Rook arrive'))];
-    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: [...CAST, 'Rook'] });
-    const codes = r.findings.map((f: any) => f.code);
-    expect(codes).toContain('CAST_OVER_3');
-    expect(codes).toContain('CAST_OVER_CEILING');
+    const over = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: [...CAST, 'Rook'], maxCharactersPerScene: 3 });
+    expect(over.findings.map((f: any) => f.code)).toContain('CAST_OVER_CEILING');
+    const under = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: [...CAST, 'Rook'], maxCharactersPerScene: 6 });
+    expect(under.findings.map((f: any) => f.code)).not.toContain('CAST_OVER_CEILING');
+    // The retired code must not come back under a literal threshold.
+    expect(under.findings.map((f: any) => f.code)).not.toContain('CAST_OVER_3');
   });
 
   it('flags consecutive pages carried by invented characters, and pages with no commissioned cast', () => {
