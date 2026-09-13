@@ -35496,3 +35496,53 @@ never changed. The suite carried them as "known failures" for the day.
 **Decision:** Regexes updated to the current wording; 69/69.
 **Touched:** `tests/unit/vb-object-states.test.ts`
 **Status:**    ✅ active
+
+### The trial FILTERS age-inappropriate life challenges; the full wizard DIMS them
+**Context:** `ded6831d5` gave 32 of the 59 life challenges a `suitableAges`
+window (absence of the field means any-age — a life event reaches a child at
+whatever age it happens). The full wizard uses that window to dim-and-sort:
+out-of-window topics stay clickable, greyed, with a "best for N-M" label. The
+owner then directed, verbatim: "for the trial mode we should show only age
+appropriate challenges. No dimming."
+**Decision:** Two surfaces, two behaviours, deliberately. `TrialTopicStep`
+renders `getTrialLifeChallenges(age, selectedTopic)` — out-of-window topics are
+absent, with no tooltip and no label. `StoryCategorySelector` (full wizard) is
+unchanged and keeps dimming. Both call the one shared `topicFitsAge()` in
+`client/src/constants/storyTypes.ts`, so the window rule has a single source of
+truth even though the two surfaces act on it differently.
+**Rationale:**
+- The trial is a 3-step funnel for a first-time visitor with no account. A
+  greyed-out tile with an explanatory tooltip is a decision to make; an absent
+  tile is not. The full wizard is used by an owner who already has characters
+  and may deliberately want an out-of-window topic — there, removing choice
+  would be a regression.
+- Filtering is only safe because absence means any-age. Measured over the 16
+  popular trial topics: the worst ages are 0-1 with 7/16 visible, 2 → 10/16,
+  3 → 13/16, 4 → 14/16, 5-6 → 16/16, 7 → 12/16, 8 → 11/16, 9 → 9/16,
+  10-12 → 8/16. Never empty, never below 7. (The old `ageGroup` shelf label
+  would have left age 1 with a single topic — that is why it is not the filter.)
+- The 33 adventure themes carry no age data at all, so every one of them is
+  any-age by the absence rule and the trial filter removes none of them. The
+  filter is life-challenge-only by construction, not by a special case.
+**No declared age → show everything.** Age is optional in the trial
+(`TrialCharacterStep` `canProceed` checks name, gender, photo; `trial.js`
+validates age only if present) and on prod 1 of 18 trial stories has a blank
+age. We did NOT make age required: the character step is the funnel's
+highest-friction step (photo upload + consent) and adding a mandatory field
+there to improve topic curation for ~6% of runs is a bad trade. A blank age
+filters nothing, which is the same "no data → no filtering" rule as a missing
+`suitableAges`.
+**Deep links stay intact.** `/try?category=…&topic=…` fixes the topic before
+the age is known, and 43 of the 59 life challenges are reachable ONLY that way
+(they are an SEO surface — see `project_ads_funnel_strategy`). A deep-linked
+topic is PINNED to the front of the trial list even when it is out of window or
+not one of the popular 16, so the selection is never invisible or inconsistent;
+the server-side age nudge from `ded6831d5` handles the mismatch in the story
+itself. This also fixes a pre-existing hole: a deep-linked non-popular topic
+previously rendered a grid with nothing highlighted.
+**Touched:** `client/src/constants/storyTypes.ts` (`topicFitsAge`,
+`parseChildAge`, `getTrialLifeChallenges`), `client/src/pages/trial/TrialTopicStep.tsx`,
+`client/src/pages/TrialWizard.tsx`, `client/src/components/story/StoryCategorySelector.tsx`
+(local `topicFitsAge` removed, now imports the shared one — behaviour unchanged),
+`tests/unit/trial-age-appropriate-topics.test.ts`
+**Status:** ✅ active

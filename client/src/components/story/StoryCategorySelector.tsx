@@ -16,9 +16,10 @@ import {
   getLifeChallengesByGroup,
   getEducationalTopicsByGroup,
   getHistoricalEventsByGroup,
+  topicFitsAge,
 } from '@/constants/storyTypes';
 import { storyService } from '@/services/storyService';
-import type { Language, SwissCity, SwissStoriesData, SwissLocalizedString, LifeChallenge } from '@/types/story';
+import type { Language, SwissCity, SwissStoriesData, SwissLocalizedString } from '@/types/story';
 
 type StoryCategoryId = 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
 
@@ -61,17 +62,6 @@ interface StoryCategorySelectorProps {
   onCustomThemeTextChange?: (text: string) => void;
   // For backwards compatibility - sets the legacy storyType
   onLegacyStoryTypeChange: (storyType: string) => void;
-}
-
-/**
- * Is this life-skill topic inside the child's developmental window? A topic
- * with no `suitableAges` is any-age — a life event reaches a child whenever it
- * happens — and so is always in window.
- */
-function topicFitsAge(challenge: LifeChallenge, age?: number | null): boolean {
-  const w = challenge.suitableAges;
-  if (!w || age === null || age === undefined || !Number.isFinite(age)) return true;
-  return age >= w[0] && age <= w[1];
 }
 
 // Haversine distance in km

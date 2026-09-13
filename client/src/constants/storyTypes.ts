@@ -417,6 +417,48 @@ export function getStoryTypesByGroup(groupId: AdventureThemeGroupId): StoryType[
   return storyTypes.filter(t => t.group === groupId);
 }
 
+/**
+ * Is this life-skill topic inside the child's developmental window? A topic
+ * with no `suitableAges` is any-age — a life event reaches a child whenever it
+ * happens — and so is always in window. An unknown age is also always in
+ * window: no age data means no filtering, never an empty list.
+ */
+export function topicFitsAge(challenge: LifeChallenge, age?: number | null): boolean {
+  const w = challenge.suitableAges;
+  if (!w || age === null || age === undefined || !Number.isFinite(age)) return true;
+  return age >= w[0] && age <= w[1];
+}
+
+/**
+ * The wizard age field is a free-text string ('' when the user skipped it).
+ * Returns null for anything that is not a usable age.
+ */
+export function parseChildAge(age?: string | number | null): number | null {
+  if (age === null || age === undefined || age === '') return null;
+  const n = typeof age === 'number' ? age : parseInt(String(age), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * The topic list the TRIAL shows: age-appropriate topics only. The trial
+ * FILTERS (out-of-window topics are absent) where the full wizard DIMS them —
+ * two surfaces, two behaviours, deliberately (docs/decisions.md 2026-09-13).
+ *
+ * `selectedTopicId` is pinned into the list even when it is out of window or
+ * not one of the popular 16: `/try?category=...&topic=...` deep links from the
+ * SEO landing pages fix a topic BEFORE the age is known, and 43 of the 59
+ * life challenges are reachable only that way. The user picked it on a landing
+ * page; it must not vanish. The server-side age nudge handles the mismatch.
+ */
+export function getTrialLifeChallenges(age?: number | null, selectedTopicId?: string): LifeChallenge[] {
+  const visible = getLifeChallengesByGroup('popular').filter(c => topicFitsAge(c, age));
+  if (selectedTopicId && !visible.some(c => c.id === selectedTopicId)) {
+    const pinned = lifeChallenges.find(c => c.id === selectedTopicId);
+    if (pinned) return [pinned, ...visible];
+  }
+  return visible;
+}
+
 export function getLifeChallengesByGroup(groupId: string): LifeChallenge[] {
   if (groupId === 'popular') {
     return popularLifeChallengeIds.map(id => lifeChallenges.find(c => c.id === id)).filter((c): c is LifeChallenge => !!c);

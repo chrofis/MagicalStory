@@ -610,6 +610,7 @@ export default function TrialWizard() {
                 previewAvatar={previewAvatar}
                 characterName={characterData.name}
                 characterGender={characterData.gender}
+                characterAge={characterData.age}
               />
             )}
             {currentStep === 'ideas' && (

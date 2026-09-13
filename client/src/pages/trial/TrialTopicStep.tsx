@@ -6,7 +6,8 @@ import {
   storyTypes,
   lifeChallenges,
   getStoryTypesByGroup,
-  getLifeChallengesByGroup,
+  getTrialLifeChallenges,
+  parseChildAge,
 } from '@/constants/storyTypes';
 import type { Language } from '@/types/story';
 
@@ -20,6 +21,8 @@ interface Props {
   previewAvatar?: string | null;
   characterName?: string;
   characterGender?: string;
+  /** Declared child age, free text from the character step ('' when skipped). */
+  characterAge?: string;
 }
 
 type TrialCategory = 'adventure' | 'life-challenge';
@@ -100,11 +103,20 @@ const strings: Record<string, {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender }: Props) {
+export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender, characterAge }: Props) {
   // Match on the BASE language so regional codes ('de-ch', 'fr-ch', 'it-ch') resolve too.
   const langBase = (storyInput.language || '').toLowerCase().split('-')[0];
   const lang = (langBase === 'de' ? 'de' : langBase === 'fr' ? 'fr' : langBase === 'it' ? 'it' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
+
+  // Owner directive: the trial shows only age-appropriate challenges — hidden
+  // means absent, no dimming, no "best for" label. A blank age filters nothing.
+  // A deep-linked topic stays pinned (see getTrialLifeChallenges).
+  const childAge = parseChildAge(characterAge);
+  const trialChallenges = useMemo(
+    () => getTrialLifeChallenges(childAge, storyInput.storyTopic),
+    [childAge, storyInput.storyTopic]
+  );
 
   const avatarBanner = characterName ? (
     <div className="flex flex-col items-center text-center mb-8">
@@ -324,7 +336,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-          {getLifeChallengesByGroup('popular').map((challenge) => (
+          {trialChallenges.map((challenge) => (
             <button
               key={challenge.id}
               onClick={() => handleTopicSelect(challenge.id)}
