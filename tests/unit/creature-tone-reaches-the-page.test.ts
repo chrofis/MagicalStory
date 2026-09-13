@@ -66,7 +66,22 @@ describe('both Art Director templates receive it', () => {
     // from different places (the all-pages one has `inputData`, the single-page
     // one has `options.story`), and pinning the argument text made this test
     // fail on a correct fix.
+    //
+    // Pinned per Art Director fill rather than as a global count: writers
+    // outside the AD (the trial's one-call writer) legitimately fill
+    // CREATURE_TONE too, and a total made this test fail on a correct addition.
     const src = read('server/lib/promptBuilders.js');
-    expect((src.match(/CREATURE_TONE: buildCreatureToneSection\(/g) || []).length).toBe(2);
+    const fillBlock = (anchor: RegExp) => {
+      const start = src.search(anchor);
+      expect(start).toBeGreaterThan(-1);
+      const next = src.indexOf('fillTemplate(', start + 20);
+      return src.slice(start, next > -1 ? next : src.length);
+    };
+    for (const anchor of [
+      /const filledAll = fillTemplate\(/,
+      /const filledPage = fillTemplate\(PROMPT_TEMPLATES\.sceneExpansion,/,
+    ]) {
+      expect(fillBlock(anchor)).toContain('CREATURE_TONE: buildCreatureToneSection(');
+    }
   });
 });
