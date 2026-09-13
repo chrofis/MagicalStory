@@ -114,4 +114,36 @@ function check(desc, cond) {
   check('lowercase critical + spaced matches [] still capped', issues[0].severity === 'MAJOR');
 }
 
+// 8. SCOPE: the cap never reaches the code-derived presence finding
+//    (owner, 2026-09-13). capComplianceIdentitySeverity exists to stop the
+//    BLIND compliance judge billing a CRITICAL for an absence it inferred from
+//    an empty matches[]. The derived missing_character rests on the detector's
+//    real-figure count against the roster — an observation, not an inference —
+//    so it must keep its CRITICAL. That holds because of WHERE the cap is
+//    called, not because of what it does: it would cap a derived finding
+//    happily if one were ever routed through it. So pin the call site.
+{
+  const callSites = SRC.split('\n')
+    .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+    .filter(l => /(^|[^.\w])capComplianceIdentitySeverity\(/.test(l.line)
+      && !/^\s*\*/.test(l.line) && !/^function /.test(l.line));
+  check('capComplianceIdentitySeverity has exactly ONE call site', callSites.length === 1);
+
+  const fnStart = SRC.indexOf('function derivePresenceFinding(');
+  const wireStart = SRC.indexOf('const presence = derivePresenceFinding({');
+  check('derivePresenceFinding exists and is wired', fnStart !== -1 && wireStart !== -1);
+  // The single call site is in the compliance parser, far above the quality
+  // path's presence wiring — and the derivation body itself never calls it.
+  check('the cap is not called from the derivation or its wiring',
+    callSites[0].n < SRC.slice(0, fnStart).split('\n').length);
+
+  // And the cap WOULD strip a derived CRITICAL — which is exactly why the
+  // call-site assertion above is the test that matters.
+  const derived = [{ description: 'x', severity: 'CRITICAL', type: 'missing_character', derivedBy: 'presence-arithmetic' }];
+  cap(derived);
+  check('(documented) the cap is type-driven and would demote a derived finding if it ever saw one',
+    derived[0].severity === 'MAJOR');
+}
+
+
 console.log(`✅ test-compliance-severity-cap: all ${passed} checks passed`);

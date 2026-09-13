@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 // CJS registry, not vitest's ESM graph — the prompt store and scoring both
 // reach each other with plain require() (see duplicate-object-type.test.ts).
 const require_ = createRequire(import.meta.url);
-const { buildExpectedCastBlock, parseFixableIssues } = require_('../../server/lib/evalPipeline');
+const { buildExpectedCastBlock, parseFixableIssues, derivePresenceFinding, PRESENCE_DERIVED_MARKER } = require_('../../server/lib/evalPipeline');
 const { deductionPoints, composeDeductions, SEVERITY_POINTS } = require_('../../server/lib/scoring');
 const { bucketForType } = require_('../../server/lib/evalBuckets');
 const { hasCriticalSeverityFinding, NOT_INPAINTABLE_TYPES } = require_('../../server/lib/repairLogic');
@@ -135,41 +135,180 @@ describe('extra_character — scoring and taxonomy', () => {
   });
 });
 
-describe('extra_character — parse + score path', () => {
-  // A synthetic evaluator response: five figures for a four-name roster, one
-  // `unmatched`, and the D-04b finding the prompt asks for.
-  const parsedJson = {
-    figures: [1, 2, 3, 4, 5].map(id => ({ id, zone: 'center-midground' })),
-    matches: [
-      { figure: 1, reference: 'Aaron', confidence: 0.9 },
-      { figure: 2, reference: 'Ben', confidence: 0.9 },
-      { figure: 3, reference: 'Carl', confidence: 0.85 },
-      { figure: 4, reference: 'Dan', confidence: 0.85 },
-      { figure: 5, reference: 'unmatched', confidence: 0 },
-    ],
-    verdict: 'FAIL',
-    fixable_issues: [
-      { type: 'extra_character', severity: 'CRITICAL', character: 'figure 5',
-        description: 'A fifth child stands at the right; the EXPECTED CAST lists four.',
-        fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT." },
-    ],
-  };
+describe('derivePresenceFinding — the one presence signal', () => {
+  // ONE PAGE, ONE OUTCOME (owner, 2026-09-13). The evaluator observes
+  // (`figures[]` + `matches[]`, one match per figure, same ids and order); code
+  // does the arithmetic. Four layers used to argue about "is this figure really
+  // extra?" and their disagreement was destructive — an `extra_character` sent
+  // to inpaint erased a commissioned child from a cover while the same page
+  // also carried a `missing_character` for the child it had just erased.
 
-  it('parses to one CRITICAL extra_character finding billed at 25', () => {
-    const fixableIssues = parseFixableIssues(parsedJson);
-    expect(fixableIssues).toHaveLength(1);
-    expect(fixableIssues[0]).toMatchObject({ type: 'extra_character', severity: 'CRITICAL', character: 'figure 5' });
-    const [d] = composeDeductions({ evalResult: { fixableIssues } }).quality;
-    expect(d.severity).toBe('critical');
-    expect(d.type).toBe('extra_character');
+  const roster = (names: string[], extra: object = {}) =>
+    ({ names, count: names.length, declared: true, crowdExpected: false, block: '', ...extra });
+  const figs = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
+  const matched = (refs: (string | null)[]) =>
+    refs.map((r, i) => ({ figure: i + 1, reference: r ?? 'unmatched', confidence: r ? 0.9 : 0 }));
+  const run = (o: object) => derivePresenceFinding(o);
+
+  it('figures < cast -> missing_character, naming who, with `item` for the inpaint reference attach', () => {
+    const r = run({
+      figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']),
+      cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 3,
+    });
+    expect(r.outcome).toBe('missing_character');
+    expect(r.finding.type).toBe('missing_character');
+    expect(r.finding.severity).toBe('CRITICAL');
+    expect(r.finding.character).toBe('Dan');
+    // images.js reads `missing.item` to attach the VB reference cell for inpaint.
+    expect(r.finding.item).toBe('Dan');
+    // Never a removal instruction — that is the whole reason this rewrite exists.
+    expect(r.finding.fix).not.toMatch(/remove|delete|erase|paint out|take out/i);
+  });
+
+  it('figures > cast -> extra_character against the unmatched figure', () => {
+    const r = run({
+      figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]),
+      cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5,
+    });
+    expect(r.outcome).toBe('extra_character');
+    expect(r.finding.type).toBe('extra_character');
+    expect(r.finding.character).toBe('figure 5');
+    expect(r.finding.fix).not.toMatch(/remove|delete|erase|paint out|take out/i);
+  });
+
+  it('the crowd flag suppresses the surplus branch, and only that branch', () => {
+    const crowd = roster(['Aaron', 'Ben', 'Carl', 'Dan'], { crowdExpected: true });
+    expect(run({ figures: figs(9), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null, null, null, null, null]), cast: crowd, detectedFigureCount: 9 }))
+      .toMatchObject({ outcome: 'declined', reason: 'crowd_expected', finding: null });
+    // A shortfall on a crowd page is still a shortfall.
+    expect(run({ figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']), cast: crowd, detectedFigureCount: 3 }).outcome)
+      .toBe('missing_character');
+  });
+
+  it('figures == cast with an unmatched figure -> character_identity naming the cast member it should be', () => {
+    // The old D-04c, now arithmetic: an absence plus a surplus on a page whose
+    // counts reconcile is ONE recognition failure, not two findings.
+    const r = run({
+      figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', null]),
+      cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4,
+    });
+    expect(r.outcome).toBe('character_identity');
+    expect(r.finding.type).toBe('character_identity');
+    expect(r.finding.character).toBe('Dan');
+    expect(r.finding.description).toMatch(/figure 4/);
+    expect(r.finding.description).toMatch(/Dan/);
+  });
+
+  it('figures == cast, all matched -> nothing', () => {
+    expect(run({
+      figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan']),
+      cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4,
+    })).toEqual({ outcome: 'reconciled', reason: null, finding: null });
+  });
+
+  it('a declared-empty roster still counts: any figure at all is a surplus', () => {
+    expect(run({ figures: figs(3), matches: matched([null, null, null]), cast: roster([]), detectedFigureCount: 3 }).outcome)
+      .toBe('extra_character');
+    expect(run({ figures: [], matches: [], cast: roster([]), detectedFigureCount: 0 }).outcome).toBe('reconciled');
+  });
+
+  describe('declines — four reasons to say nothing rather than guess', () => {
+    const base = {
+      figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]),
+      cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5,
+    };
+
+    it('roster not declared', () => {
+      for (const cast of [{ names: [], count: 0, declared: false, crowdExpected: false }, null, undefined]) {
+        expect(run({ ...base, cast })).toMatchObject({ outcome: 'declined', reason: 'roster_not_declared' });
+      }
+    });
+
+    it('no detector count — permanent for the call sites that genuinely have none', () => {
+      for (const n of [null, undefined, NaN, 'four']) {
+        expect(run({ ...base, detectedFigureCount: n })).toMatchObject({ outcome: 'declined', reason: 'no_detector_count' });
+      }
+    });
+
+    it('matches[] is not the per-figure list its contract promises', () => {
+      expect(run({ ...base, matches: undefined })).toMatchObject({ reason: 'matches_contract_broken' });
+      expect(run({ ...base, matches: matched(['Aaron']) })).toMatchObject({ reason: 'matches_contract_broken' });
+      expect(run({ ...base, figures: null })).toMatchObject({ reason: 'matches_contract_broken' });
+    });
+
+    it('THE WITNESSES DISAGREE — the folded two-witness rule', () => {
+      // The detector saw 4 real figures, the evaluator enumerated 5. Two
+      // readings of one picture; when they differ the count is not trustworthy
+      // for this page, so no claim is made at all. This replaces the absence
+      // filter that used to delete claims one at a time after the fact.
+      expect(run({ ...base, detectedFigureCount: 4 })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', finding: null });
+      expect(run({ ...base, detectedFigureCount: 6 })).toMatchObject({ outcome: 'declined', reason: 'witnesses_disagree', finding: null });
+    });
+  });
+
+  it('every derived finding is MARKED, so it can be told apart from the evaluator D-02/D-04', () => {
+    const cases = [
+      { figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 3 },
+      { figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5 },
+      { figures: figs(4), matches: matched(['Aaron', 'Ben', 'Carl', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 4 },
+    ];
+    for (const c of cases) expect(run(c).finding.derivedBy).toBe(PRESENCE_DERIVED_MARKER);
+  });
+
+  it('a derived finding is a real, routable, scored finding', () => {
+    const f = run({ figures: figs(5), matches: matched(['Aaron', 'Ben', 'Carl', 'Dan', null]), cast: roster(['Aaron', 'Ben', 'Carl', 'Dan']), detectedFigureCount: 5 }).finding;
+    expect(bucketForType(f.type)).toBe('character_presence');
+    const [d] = composeDeductions({ evalResult: { fixableIssues: [f] } }).quality;
     expect(deductionPoints(d)).toBe(25);
+    expect(hasCriticalSeverityFinding({ fixableIssues: [f] })).toBe(true);
+    // `subType` is deliberately absent — every reader does `subType || type`.
+    expect(f.subType).toBeUndefined();
   });
 
-  it('puts the page in the repair queue through the critical arm', () => {
-    expect(hasCriticalSeverityFinding({ fixableIssues: parseFixableIssues(parsedJson) })).toBe(true);
+  it('never mutates its inputs', () => {
+    const figures = figs(5);
+    const matches = matched(['Aaron', 'Ben', 'Carl', 'Dan', null]);
+    const cast = roster(['Aaron', 'Ben', 'Carl', 'Dan']);
+    const snapshot = JSON.stringify({ figures, matches, cast });
+    run({ figures, matches, cast, detectedFigureCount: 5 });
+    expect(JSON.stringify({ figures, matches, cast })).toBe(snapshot);
   });
 
-  it('parseFixableIssues drops entries without a description and defaults the rest', () => {
+  // THE INVARIANT. This is the whole design: the two presence types are
+  // mutually exclusive BY CONSTRUCTION, so no input can ever produce both.
+  // Exhaustive over the shape space rather than over a few hand-picked cases.
+  it('MUTUAL EXCLUSION: no input yields both presence types, ever', () => {
+    const names = ['Aaron', 'Ben', 'Carl', 'Dan'];
+    const outcomes = new Set<string>();
+    for (let castSize = 0; castSize <= 4; castSize++) {
+      for (let figCount = 0; figCount <= 6; figCount++) {
+        for (let namedRefs = 0; namedRefs <= figCount; namedRefs++) {
+          for (const crowd of [false, true]) {
+            for (const det of [figCount, figCount + 1, null]) {
+              const refs = Array.from({ length: figCount }, (_, i) => (i < namedRefs ? names[i % 4] : null));
+              const r = run({
+                figures: figs(figCount), matches: matched(refs),
+                cast: roster(names.slice(0, castSize), { crowdExpected: crowd }),
+                detectedFigureCount: det,
+              });
+              outcomes.add(r.outcome);
+              const emitted = r.finding ? [r.finding.type] : [];
+              expect(emitted.filter(t => t === 'missing_character' || t === 'extra_character').length).toBeLessThanOrEqual(1);
+              expect(emitted.includes('missing_character') && emitted.includes('extra_character')).toBe(false);
+              if (r.outcome === 'declined') expect(r.finding).toBeNull();
+              else expect(r.outcome).toBe(r.finding ? r.finding.type : 'reconciled');
+            }
+          }
+        }
+      }
+    }
+    // The sweep actually reached every branch, so the invariant is not vacuous.
+    expect(outcomes).toEqual(new Set(['missing_character', 'extra_character', 'character_identity', 'reconciled', 'declined']));
+  });
+});
+
+describe('parseFixableIssues — the evaluator side, unchanged', () => {
+  it('drops entries without a description and defaults the rest', () => {
     const out = parseFixableIssues({ fixable_issues: [{ type: 'x' }, { description: 'd' }] });
     expect(out).toEqual([{ description: 'd', severity: 'MODERATE', type: 'default', character: null, fix: 'Fix: d' }]);
     expect(parseFixableIssues(null)).toEqual([]);

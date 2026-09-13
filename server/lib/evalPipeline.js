@@ -1079,6 +1079,151 @@ function parseFixableIssues(parsedJson) {
     }));
 }
 
+/** Stamped on every finding this file's arithmetic authored (see derivePresenceFinding). */
+const PRESENCE_DERIVED_MARKER = 'presence-arithmetic';
+
+/** The presence types the derivation owns outright once it has spoken. */
+const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
+
+/**
+ * THE PRESENCE SIGNAL (owner, 2026-09-13). One page, one outcome, mutually
+ * exclusive by construction.
+ *
+ * Four layers used to argue about "is this figure really extra?" — D-04, D-04b
+ * and D-04c in the evaluator prompt, an exception clause in the consolidator,
+ * two log-only diagnostics here, and a two-witness absence filter in
+ * identityAgreement. They disagreed, and their disagreement was destructive:
+ * an `extra_character` routed to inpaint erased a commissioned child from a
+ * cover, while the same page also carried a `missing_character` for the child
+ * it had just erased.
+ *
+ * The evaluator keeps the job it can do — OBSERVATION. It reports `figures[]`
+ * and `matches[]`, one match per figure, same ids and order. This function does
+ * the arithmetic, which is mechanical: a count and a list the model declared.
+ * No prose is read; no finding's description is interpreted.
+ *
+ *   figures <  cast                      -> missing_character
+ *   figures >  cast                      -> extra_character  (unless the brief declared a crowd)
+ *   figures == cast, an unmatched figure -> character_identity, naming who it should be
+ *   figures == cast, all matched         -> nothing
+ *
+ * And four reasons to say nothing at all rather than guess:
+ *   - the roster was never declared (`declared: false`) — no cast, no arithmetic;
+ *   - no detector count reached this call (~4 sites genuinely cannot supply one);
+ *   - `matches[]` is not the per-figure list its contract promises;
+ *   - THE WITNESSES DISAGREE. The detector's real-figure count and the
+ *     evaluator's own enumeration are two independent readings of the same
+ *     picture; when they differ, the count is not trustworthy for this page and
+ *     nothing is derived. This is the two-witness rule (owner, 2026-08-27),
+ *     folded in from identityAgreement — it used to run afterwards, deleting
+ *     absence claims one at a time; here it gates the claim being made at all.
+ *
+ * Pure. Never mutates its inputs.
+ *
+ * @param {object} args
+ * @param {Array} args.figures - the evaluator's `figures[]`
+ * @param {Array} args.matches - the evaluator's `matches[]`, one per figure
+ * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean}} args.cast
+ *        the roster from buildExpectedCastBlock
+ * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures)
+ * @returns {{outcome: string, reason: string|null, finding: object|null}}
+ */
+function derivePresenceFinding({ figures, matches, cast, detectedFigureCount } = {}) {
+  const decline = (reason) => ({ outcome: 'declined', reason, finding: null });
+
+  if (!cast || cast.declared !== true) return decline('roster_not_declared');
+  const det = Number(detectedFigureCount);
+  if (detectedFigureCount === null || detectedFigureCount === undefined || !Number.isFinite(det)) {
+    return decline('no_detector_count');
+  }
+  const figs = Array.isArray(figures) ? figures : null;
+  const mts = Array.isArray(matches) ? matches : null;
+  // `matches` carries exactly one entry per figure, same ids and order
+  // (image-evaluation D — OUTPUT). A reply that broke that contract has no
+  // second witness, so there is nothing to reconcile against.
+  if (!figs || !mts || figs.length !== mts.length) return decline('matches_contract_broken');
+  if (det !== figs.length) return decline('witnesses_disagree');
+
+  const castCount = Number(cast.count) || 0;
+  const castNames = Array.isArray(cast.names) ? cast.names : [];
+  // Who did the evaluator place in the picture? Names only, lowercased.
+  const claimed = new Set();
+  for (const m of mts) {
+    const r = String(m?.reference || '').trim().toLowerCase();
+    if (r && r !== 'unmatched' && r !== 'unknown') claimed.add(r);
+  }
+  const unclaimedCast = castNames.filter(n => !claimed.has(String(n).toLowerCase()));
+  const unmatchedFigures = mts.filter(m => {
+    const r = String(m?.reference || '').trim().toLowerCase();
+    return !r || r === 'unmatched' || r === 'unknown';
+  });
+
+  const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER });
+
+  if (det < castCount) {
+    const who = unclaimedCast[0] || null;
+    return {
+      outcome: 'missing_character',
+      reason: null,
+      finding: mark({
+        type: 'missing_character',
+        // `character` for every per-figure reader; `item` because the inpaint
+        // reference attach reads `missing.item` to find the VB cell to show.
+        character: who,
+        item: who,
+        description: `${det} figure(s) are in the frame for an EXPECTED CAST of ${castCount}`
+          + (who ? `; ${who} is absent.` : '.'),
+        fix: who
+          ? `Add ${who} to the scene, matching that entry's reference and CLOTHING CONTRACT.`
+          : `Add the missing EXPECTED CAST member, matching that entry's reference and CLOTHING CONTRACT.`,
+      }),
+    };
+  }
+
+  if (det > castCount) {
+    // N-09 in arithmetic form. A page the brief wrote as populated has unnamed
+    // background people on purpose; the surplus is the crowd, not a defect.
+    if (cast.crowdExpected === true) return decline('crowd_expected');
+    const fig = unmatchedFigures[0];
+    const figId = fig && (fig.figure ?? fig.id);
+    return {
+      outcome: 'extra_character',
+      reason: null,
+      finding: mark({
+        type: 'extra_character',
+        character: figId !== undefined && figId !== null ? `figure ${figId}` : null,
+        description: `${det} figure(s) are in the frame for an EXPECTED CAST of ${castCount}`
+          + ` — ${det - castCount} more figure(s) than the page was written to hold.`,
+        fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
+      }),
+    };
+  }
+
+  // Counts reconcile. An unmatched figure alongside an unclaimed cast name is
+  // ONE recognition failure, not an absence plus a surplus — the old D-04c,
+  // now arithmetic.
+  if (unmatchedFigures.length === 0) return { outcome: 'reconciled', reason: null, finding: null };
+  const fig = unmatchedFigures[0];
+  const figId = fig && (fig.figure ?? fig.id);
+  const who = unclaimedCast[0] || null;
+  const figLabel = figId !== undefined && figId !== null ? `figure ${figId}` : 'the unmatched figure';
+  return {
+    outcome: 'character_identity',
+    reason: null,
+    finding: mark({
+      type: 'character_identity',
+      // The cast member is what a repair has to paint; the figure is named in
+      // the description so the target is unambiguous either way.
+      character: who || (figId !== undefined && figId !== null ? `figure ${figId}` : null),
+      description: `${figLabel} matches no EXPECTED CAST entry while the frame holds exactly the cast (${castCount})`
+        + (who ? `; it should be ${who}.` : '.'),
+      fix: who
+        ? `Redraw ${figLabel} as ${who}, matching that entry's reference and CLOTHING CONTRACT.`
+        : `Redraw ${figLabel} as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.`,
+    }),
+  };
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -1228,18 +1373,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // EXPECTED CAST roster + count (see buildExpectedCastBlock). Built once,
     // read by the quality prompt and by the post-parse count diagnostic.
+    // COUNT ONLY REAL FIGURES. A caller that hands over the figures array
+    // gets them filtered here (see isMicroFigure); a caller that only has a
+    // number is trusted to have filtered already — images.js does. Hoisted:
+    // the prompt hint and the presence derivation read the SAME number.
+    const realFigureCount = Array.isArray(evalOptions.detectedFigures)
+      ? require('./bboxDetection').countRealFigures(evalOptions.detectedFigures)
+      : (evalOptions.detectedFigureCount ?? null);
     const expectedCast = buildExpectedCastBlock({
       sceneCharacters,
       sceneHint,
       originalPrompt,
       visualBible: evalOptions.visualBible || null,
       evaluationType,
-      // COUNT ONLY REAL FIGURES. A caller that hands over the figures array
-      // gets them filtered here (see isMicroFigure); a caller that only has a
-      // number is trusted to have filtered already — images.js does.
-      detectedFigureCount: Array.isArray(evalOptions.detectedFigures)
-        ? require('./bboxDetection').countRealFigures(evalOptions.detectedFigures)
-        : (evalOptions.detectedFigureCount ?? null),
+      detectedFigureCount: realFigureCount,
       pageLabel: pageContext ? `${pageContext} ` : '',
       sceneMetadata: evalOptions.sceneMetadata || null,
       // ONE ROSTER: the two inputs only the detector-side builder used to have.
@@ -2022,6 +2169,35 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (matches.length > 0) {
         log.info(`📊 [EVAL] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
       }
+      // THE PRESENCE SIGNAL (owner, 2026-09-13). Code does the arithmetic and
+      // emits at most one outcome — see derivePresenceFinding. When it speaks,
+      // it OWNS the pair: the evaluator's own missing/extra findings are
+      // dropped first, so a page can never carry both at once. When it declines
+      // (no detector count — covers today; witnesses disagreeing) the
+      // evaluator's findings stand untouched, which is what keeps the surplus
+      // detectable on the ~4 call sites that have no detector.
+      {
+        const presence = derivePresenceFinding({
+          figures, matches, cast: expectedCast, detectedFigureCount: realFigureCount,
+        });
+        const spoke = presence.outcome !== 'declined';
+        if (spoke) {
+          const before = fixableIssues.length;
+          fixableIssues = fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()));
+          const dropped = before - fixableIssues.length;
+          if (presence.finding) fixableIssues.push(presence.finding);
+          log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${realFigureCount} real figure(s) vs EXPECTED CAST ${expectedCast.count}`
+            + ` → ${presence.outcome}${presence.finding?.character ? ` (${presence.finding.character})` : ''}`
+            + `${dropped ? `; dropped ${dropped} evaluator presence finding(s)` : ''}`);
+        } else {
+          log.info(`👥 [PRESENCE] ${pageContext || 'page'}: declined (${presence.reason})`
+            + ` — detector ${realFigureCount ?? 'n/a'}, evaluator ${Array.isArray(figures) ? figures.length : 'n/a'}, roster ${expectedCast.count}`);
+        }
+        try {
+          const sid = evalOptions?.storyMeta?.storyId;
+          if (sid) require('./runMetrics').forJob(sid).count(`presence_${spoke ? presence.outcome : `declined_${presence.reason}`}`);
+        } catch { /* metrics are best-effort */ }
+      }
       // COUNT DIAGNOSTIC (2026-09-10) — log only, never a finding: the prompt
       // owns `extra_character` (D-04b). This surfaces the case the prompt
       // missed — more figures than roster entries and no extra_character
@@ -2153,21 +2329,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             log.warn(`⚠️ [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}${threeStageResult.evalError}`);
           } else if (threeStageResult?.fixableIssues?.length) {
             fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
-            // Recompute visual score from merged fixable_issues (same rubric
-            // as main eval). Then re-apply semantic penalty on top.
-            const mergedPenalty = fixableIssues.reduce(
-              (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
-              0
-            );
-            const mergedRawScore = Math.max(0, Math.min(10, 10 - mergedPenalty));
-            visualScore = mergedRawScore * 10;
-            // Re-derive semantic penalty so finalScore = visualScore − semantic.
-            // (Was applied to `score` above; recomputed here against visualScore.)
-            // Shared table (scoring.js semanticPenaltyPoints) — same reason as
-            // the first chain: the hand-copy billed CATASTROPHIC 10.
-            const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult?.semanticIssues);
-            finalScore = visualScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
-            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Merged ${threeStageResult.fixableIssues.length} issue(s); recomputed visual ${score}→${visualScore}, final ${finalScore} (semantic −${semanticPenalty})`);
           }
           if (threeStageResult?.issuesSummary) {
             combinedIssuesSummary = combinedIssuesSummary
@@ -2177,6 +2338,28 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         } catch (tsErr) {
           log.warn(`[THREE-STAGE] Parallel evaluation failed: ${tsErr.message}`);
         }
+      }
+
+      // THE SCORE DERIVES FROM THE CURRENT ISSUE LIST — recomputed here, once,
+      // over whatever `fixableIssues` finally holds. It used to be recomputed
+      // only inside the three-stage merge branch, which was fine while that
+      // branch was the only thing that could change the list after the first
+      // computation at `score`. The presence derivation now also adds and
+      // removes entries, so a page with no three-stage findings would have
+      // carried a derived CRITICAL that cost nothing. Same rubric, same shared
+      // semantic table; with nothing added this reproduces `score` exactly.
+      {
+        const mergedPenalty = fixableIssues.reduce(
+          (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
+          0
+        );
+        const recomputed = Math.max(0, Math.min(10, 10 - mergedPenalty)) * 10;
+        const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult?.semanticIssues);
+        if (recomputed !== visualScore) {
+          log.info(`📊 [EVAL] ${pageContext ? `[${pageContext}] ` : ''}Recomputed visual ${visualScore}→${recomputed} from ${fixableIssues.length} finding(s), final ${recomputed - semanticPenalty} (semantic −${semanticPenalty})`);
+        }
+        visualScore = recomputed;
+        finalScore = visualScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
       }
 
       // Aggregate usage from quality + P1 + semantic + three-stage evaluations
@@ -2374,5 +2557,8 @@ module.exports = {
   resolveExpectedCastNames,
   reconcileDetectorCast,
   parseFixableIssues,
+  derivePresenceFinding,
+  PRESENCE_DERIVED_MARKER,
+  PRESENCE_COUNT_TYPES,
   IMAGE_QUALITY_THRESHOLD,
 };
