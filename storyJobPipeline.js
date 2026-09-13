@@ -5371,17 +5371,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // one cover even while the flag says app-side: the model painted the
             // title, so the evaluator must VERIFY it — spelling is the whole risk
             // baked mode takes on. The other covers keep app-side typography.
-            const textMode = (coverData.titleBaked === true || !MODEL_DEFAULTS.appSideCoverType) ? 'painted' : 'appOverlay';
-            let expectedText = null;
-            if (textMode === 'painted') {
-              if (coverKey === 'frontCover') {
-                expectedText = title || inputData.title || inputData.storyTitle || null;
-              } else if (coverKey === 'initialPage') {
-                expectedText = coverData.dedication || inputData.dedication || null;
-              } else if (coverKey === 'backCover') {
-                expectedText = 'magicalstory.ch';
-              }
-            }
+            // ONE resolver, shared with the cover ITERATE path (2026-09-13) so
+            // a regenerated / Lab cover is judged under the same text contract
+            // as a freshly generated one.
+            const { textMode, expectedText } = require('./server/lib/coverTypography').resolveCoverTextContract(coverKey, {
+              titleBaked: coverData.titleBaked === true,
+              title: title || inputData.title || inputData.storyTitle || null,
+              dedication: coverData.dedication || inputData.dedication || null,
+            });
             // Synthetic sceneMetadata from the outline's structured cover hint,
             // so the shared Phase 5b-pre detection and eval enrich see expected
             // character positions + objects exactly like pages do.

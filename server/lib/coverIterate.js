@@ -1012,7 +1012,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // two never disagree about which mode an environment is in. A Lab run may
   // force either side via opts, so an experiment does not depend on which
   // environment it happens to run in.
-  const { resolveCoverTitleMode } = require('./coverTypography');
+  const { resolveCoverTitleMode, resolveCoverTextContract } = require('./coverTypography');
   const titleModeInfo = resolveCoverTitleMode(normalizedCoverType, storyData.title, { modeOverride: coverTitleMode });
   const bakeTitle = titleModeInfo.bakeTitle;
   if (bakeTitle) {
@@ -1329,9 +1329,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
         log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: detection failed (${bboxErr.message})`);
       }
       try {
-        // evalOptions empty on purpose: the cover prompt carries the full ART
-        // STYLE block, which the evaluator extracts itself (same as the old
-        // gen-time eval did).
+        // THE JUDGE GETS THE SPEC THE GENERATOR GOT (owner, 2026-09-13).
+        // Three inputs were missing here while the page path passed them
+        // (images.js buildEvalInputs): the DEDUPED reference list, the visual
+        // bible, and the cover text contract. See the composite call below —
+        // same three, same reasons.
         const qualityResult = await evaluateImageQuality(
           // IMAGE_PROMPT = what the model got. Covers carry the longest
           // prompts in the system, so the shrinker fires here most of all;
@@ -1340,7 +1342,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
           // stays the cover brief — unchanged.
           genResult.imageData,
           resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: coverPrompt }),
-          coverCharacterPhotos, 'cover', null,
+          // DEDUPED, like the prompt. applyCoverWornHeldDedupe resolves the
+          // "same item is both worn clothing and a held artifact" contradiction
+          // by deleting the WORN phrasing; the generator's prompt was built
+          // from the deduped list, so a judge handed the raw list builds a
+          // CLOTHING CONTRACT saying she WEARS the lantern she is HOLDING and
+          // orders a repair that paints it onto her coat. Same image bytes —
+          // the dedupe only rewrites clothingDescription.
+          clothingDedupedPhotos, 'cover', null,
           iterateLabel, null, sceneDescription, selectedCoverCharacters, {
             // DETECT-THEN-EVAL (2026-09-13). The detection below this block used
             // to run after the eval, so the EXPECTED CAST roster on a cover was
@@ -1349,6 +1358,18 @@ async function iterateCover(coverKey, storyData, options = {}) {
             // cover. Reordered; no extra detector call.
             detectedFigures: coverBboxDetection?.figures || null,
             sceneMetadata: coverSceneMetadata || null,
+            // The bible every cover consumer in evalPipeline needs: the
+            // cover-specific EXPECTED CAST branch, scrubVbIds on the fidelity
+            // reference (without it every VB id degrades to "the object"),
+            // resolveGeneratedOutfit's worn-item mapping, and vbNonHumanNames.
+            visualBible,
+            // Direct render: the title is painted only in baked mode; otherwise
+            // the art is textless and typography is stamped after this eval.
+            ...resolveCoverTextContract(coverKey, {
+              titleBaked: !!bakeTitle,
+              title: storyTitle,
+              dedication: coverDedication,
+            }),
             // The eval's runMetrics counters (presence_*, eval_matches_missing)
             // key off this; without it they went to the NOOP recorder.
             storyMeta: { storyId: storyData?.id || null },
@@ -1420,11 +1441,25 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // instruction would be strictly worse than judging it against the
         // cover brief it was assembled to depict.
         const qualityResult = await evaluateImageQuality(
-          imageResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
+          // Deduped for the same reason as the direct path: the composite's
+          // cast builder reads the cover hint's holds[] too, so a worn-AND-held
+          // contradiction is resolved there as well — the judge must not be the
+          // only consumer still holding the pre-dedupe phrasing.
+          imageResult.imageData, coverPrompt, clothingDedupedPhotos, 'cover', null,
           iterateLabel, null, sceneDescription, selectedCoverCharacters, {
             // Same reorder as the direct path above.
             detectedFigures: compBbox?.figures || null,
             sceneMetadata: coverSceneMetadata || null,
+            visualBible,
+            // Composite never takes the baked-title route (coverComposite gates
+            // its text line on MODEL_DEFAULTS.appSideCoverType alone), so the
+            // contract is resolved with titleBaked false — under app-side
+            // typography the composite renders NO TEXT.
+            ...resolveCoverTextContract(coverKey, {
+              titleBaked: false,
+              title: storyTitle,
+              dedication: coverDedication,
+            }),
             storyMeta: { storyId: storyData?.id || null },
           }
         );
