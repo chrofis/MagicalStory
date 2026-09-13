@@ -119,6 +119,9 @@ const {
   FIGURE_COLORS,
 } = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
+// IMAGE_PROMPT for the judges = the string the model actually received.
+// Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
+const { resolveEvalImagePrompt } = require('./sceneMetadata');
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
 let storyHelpersModule = null;
 function getStoryHelpers() {
@@ -1391,8 +1394,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   });
 
   // Same 9-arg quality eval every non-avatar branch ran inline before.
+  // IMAGE_PROMPT = the string the provider actually received. `prompt` is the
+  // PRE-shrink text; over the model's cap _dispatchImageGeneration compresses
+  // it and returns the sent string as `raw.promptSent`. See
+  // sceneMetadata.resolveEvalImagePrompt for why judging the pre-shrink text
+  // manufactures "missing X" findings against instructions never given.
   const runEval = () => evaluateImageQuality(
-    raw.imageData, prompt, characterPhotos, evaluationType,
+    raw.imageData, resolveEvalImagePrompt({ promptSent: raw.promptSent, originalPrompt: prompt }),
+    characterPhotos, evaluationType,
     qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
   );
 
@@ -1654,7 +1663,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
         // Evaluate image quality with prompt and reference images
         log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
+        // Same rule as the runEval above: judge against what Gemini received.
+        // parts[0].text is the post-shrink text (it is also what this branch
+        // stamps as the result's `prompt`, a few lines down).
+        const qualityResult = await evaluateImageQuality(compressedImageData, resolveEvalImagePrompt({ promptSent: parts[0]?.text, originalPrompt: prompt }), characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
 
         // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
@@ -1862,7 +1874,15 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   if (raw.provider === 'grok-primary') {
     const finalResult = {
       imageData: raw.imageData,
-      prompt,
+      // The PROMPT ACTUALLY SENT, like every sibling branch in this function
+      // (runware-routed, grok-routed, the Gemini fallback). This one alone
+      // stamped the pre-shrink text, and grok-primary is the default page
+      // path — which is why staging job_1789301291267_ueh8h145m stores a
+      // 7,939-char prompt for a model whose cap is 7,900. Everything
+      // downstream that reads this field (the batch eval's ORIGINAL_PROMPT
+      // fallback, coverIterate's eval, the dev-mode "sent to Grok" panel)
+      // was therefore shown a string the model never received.
+      prompt: raw.promptSent,
       modelId: raw.modelId,
       usage: raw.usage,
       grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
@@ -2313,6 +2333,18 @@ async function evaluateImageBatch(images, options = {}) {
       // The clothing facts now travel as the CLOTHING CONTRACT input, built
       // inside evaluateImageQuality from these same photos — prepending them to
       // the prompt as well would state the outfit twice.
+      //
+      // NOT the sent prompt, deliberately — and a KNOWN GAP. This site feeds the
+      // judge the scene DESCRIPTION (the resolveEvalArtStyle call below depends
+      // on that: ORIGINAL_PROMPT here carries no ART STYLE block). When the
+      // page's built prompt went over the model cap, shrinkPromptForModel
+      // compressed the scene prose before sending it, so the description held
+      // here can name a clause the model never received. There is no stored
+      // post-shrink DESCRIPTION to substitute: the generation paths persist the
+      // post-shrink PROMPT (`img.prompt`) and nothing else. Swapping this to
+      // `img.prompt` would change what class of string every batch eval judges
+      // against — an owner decision, not a wiring fix. See
+      // sceneMetadata.resolveEvalImagePrompt.
       const sceneDescWithClothing = `${img.sceneDescription || img.prompt || ''}`;
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
@@ -4202,7 +4234,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       }
       try {
         iterQuality = await evaluateImageQuality(
-          genResult.imageData, imagePrompt, refApplied.characterPhotos, 'scene', null,
+          // genResult.prompt is the string generateImageOnly actually sent
+          // (post-shrink); imagePrompt is the pre-shrink build.
+          genResult.imageData, resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: imagePrompt }),
+          refApplied.characterPhotos, 'scene', null,
           iterLabel, null, null, sceneCharacters, {
             // Era-aware landmark protection — iterate uses the same refs it
             // just rendered from and the era it resolved above.

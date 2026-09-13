@@ -10,6 +10,7 @@ const { log } = require('../utils/logger');
 const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
+const { resolveEvalImagePrompt } = require('./sceneMetadata');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
@@ -1332,7 +1333,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // STYLE block, which the evaluator extracts itself (same as the old
         // gen-time eval did).
         const qualityResult = await evaluateImageQuality(
-          genResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
+          // IMAGE_PROMPT = what the model got. Covers carry the longest
+          // prompts in the system, so the shrinker fires here most of all;
+          // genResult.prompt is the post-shrink string generateImageOnly sent
+          // (the same value stamped at `prompt:` a few lines below). SCENE_HINT
+          // stays the cover brief — unchanged.
+          genResult.imageData,
+          resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: coverPrompt }),
+          coverCharacterPhotos, 'cover', null,
           iterateLabel, null, sceneDescription, selectedCoverCharacters, {
             // DETECT-THEN-EVAL (2026-09-13). The detection below this block used
             // to run after the eval, so the EXPECTED CAST roster on a cover was
@@ -1404,6 +1412,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
         log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: composite detection failed (${bboxErr.message})`);
       }
       try {
+        // COMPOSITE PATH KEEPS coverPrompt ON PURPOSE. The pre/post-shrink
+        // question does not arise here: coverPrompt is never sent to any
+        // model on this path — the composite generator sends its own pass-1 /
+        // pass-2 edit prompts ("blend these cut-outs into the plate"), which
+        // `imageResult.prompt` holds. Judging the cover against a blend
+        // instruction would be strictly worse than judging it against the
+        // cover brief it was assembled to depict.
         const qualityResult = await evaluateImageQuality(
           imageResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
           iterateLabel, null, sceneDescription, selectedCoverCharacters, {

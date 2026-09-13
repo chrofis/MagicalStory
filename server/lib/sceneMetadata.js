@@ -2022,6 +2022,42 @@ function resolveEvalSceneHint({ evaluationType, entryDescription = null, sceneDe
   return pick(entryDescription, sceneDescription, planLess, sceneHint);
 }
 
+/**
+ * IMAGE_PROMPT for the image evaluators = the string the image model ACTUALLY
+ * received.
+ *
+ * Every image judge is told IMAGE_PROMPT is "the expanded scene sent to the
+ * image model" and scores the render against it. But a prompt over the model's
+ * character cap does not reach the model as written: `shrinkPromptForModel`
+ * (images.js) LLM-compresses the HEAD of the prompt, holding back only the
+ * `**REQUIRED OBJECTS` / `**ART STYLE` tail, the reference-card colour map and
+ * the static rendering rules. Everything else — the scene prose itself — is
+ * rewritten shorter, and clauses go missing by design.
+ *
+ * Handing the judge the PRE-shrink text makes it score the image against
+ * instructions the generator never got: the compressor drops a clause, the
+ * model never draws it, and the judge files a full-severity "it is missing"
+ * against a render that obeyed everything it was told.
+ *
+ * Measured on staging 2026-09-13, job_1789301291267_ueh8h145m: page 1 stores a
+ * 7,939-char prompt and page 4 v0 an 8,317-char one, both rendered by
+ * grok-imagine-image-2.0 whose cap is 7,900 — i.e. the shrinker fired on those
+ * pages and the string the judge was given is not the string the model saw.
+ *
+ * The generation paths return the sent string as `promptSent` (stamped onto
+ * their result as `prompt`); `originalPrompt` is the pre-shrink text and stays
+ * as the last resort for callers/tests that have nothing else.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.promptSent] - the string handed to the provider
+ * @param {string|null} [sources.originalPrompt] - pre-shrink prompt (fallback only)
+ * @returns {string|null}
+ */
+function resolveEvalImagePrompt({ promptSent = null, originalPrompt = null } = {}) {
+  const pick = (...vals) => vals.find(v => typeof v === 'string' && v.trim()) || null;
+  return pick(promptSent, originalPrompt);
+}
+
 module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
@@ -2037,6 +2073,7 @@ module.exports = {
   mirrorLeftRight,
   extractSceneMetadata,
   resolveEvalSceneHint,
+  resolveEvalImagePrompt,
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,
   findCastMissingFromMetadata,
