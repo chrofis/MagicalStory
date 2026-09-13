@@ -855,7 +855,7 @@ const IMAGE_MODELS = {
     supportsThinking: false,
     temperature: 0.5,  // Lower temp for more consistent character reproduction
     maxPromptLength: 30000,  // Gemini supports very long prompts
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'gemini-3-pro-image-preview': {
     modelId: 'gemini-3-pro-image-preview',
@@ -869,28 +869,28 @@ const IMAGE_MODELS = {
     // 3.x, and a value left here would only read as a promise the API does not
     // keep. 2.5 still honours it and keeps its 0.5.
     maxPromptLength: 30000,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'flux-schnell': {
     modelId: 'runware:5@1',
     description: 'FLUX Schnell via Runware - Ultra fast, cheap ($0.0006/image)',
     backend: 'runware',
     maxPromptLength: 2900,  // Runware limit is 3000, leave margin
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'flux-dev': {
     modelId: 'runware:6@1',
     description: 'FLUX Dev via Runware - Better quality ($0.004/image)',
     backend: 'runware',
     maxPromptLength: 2900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'ace-plus-plus': {
     modelId: 'ace-plus-plus',
     description: 'ACE++ via Runware - Face-consistent avatar generation (~$0.005/image)',
     backend: 'runware',
     maxPromptLength: 2900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'grok-imagine': {
     modelId: 'grok-imagine-image',
@@ -902,7 +902,7 @@ const IMAGE_MODELS = {
     // compression pass that deleted four characters' hats. 100 chars of margin
     // is enough for the assembly slack; the compressor is the expensive guard.
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   // Imagine Image 2.0 — xAI's current recommended image model, shipped to the
   // API 2026-08-07 as `grok-imagine-image-2.0` ($0.04/image). Typography-aware,
@@ -917,7 +917,7 @@ const IMAGE_MODELS = {
     description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',
     backend: 'grok',
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
@@ -929,7 +929,7 @@ const IMAGE_MODELS = {
     // compression pass that deleted four characters' hats. 100 chars of margin
     // is enough for the assembly slack; the compressor is the expensive guard.
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   }
 };
 

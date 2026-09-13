@@ -34607,3 +34607,82 @@ Backlog entries closed: `tasks/eval-variance-backlog.md` (B2 + the open
 decision), `tasks/BACKLOG.md` (the B1 note).
 **Status:**    ✅ active — closed by owner ruling; re-opening needs new evidence,
 not the "objects have no subject" premise, which is false.
+
+## The scene reviewer's cast cap is 6 and a recommendation, and every removal it makes is declared (2026-09-13)
+
+**Context:** `prompts/scene-review.txt` check 5b `[cast_over_three]` faulted any
+page whose frame held more than **three** figures and prescribed the remedy
+"rewrite to three by pushing the extras to background depth … or by moving the
+shot wider so the group reads as one mass". On
+`job_1789207854566_l43qgl34w` (Fiona) the Art Director correctly commissioned
+five named, positioned characters on p7 and p15; the reviewer obeyed 5b and
+rewrote them into anonymous figures — p15 ships "Behind the chest, four soaked
+young pirates stand crowd…" with `characters: ["Fiona"]`, and p7 ships
+`characters: []` against a `briefsIn` cast of Fiona, Facundo, Sarah, Saira,
+Lorena. The owner's stories carry five commissioned characters, so this fired on
+every group page. Nothing downstream could see it: only the `FAULTED PAGES:`
+line of the reviewer's analysis is parsed (`beatsPipeline.js`), so a removal was
+expressible **only as an absence** — no delta, no reason. `docs/decisions.md`
+(scene-review tags are not parsed into typed findings) records the same gap.
+
+Two things in the original diagnosis were wrong and are corrected here.
+`MAX_CHARACTERS_PER_SCENE` was **not** 3: `promptBuilders.js:2408` is a `|| 3`
+fallback that production never reaches, and the real value came from
+`IMAGE_MODELS[MODEL_DEFAULTS.pageImage].maxCharactersPerScene`, which was **5**
+for all eight image models. A five-character page therefore never tripped check
+5 at all — the check that anonymised the cast was 5b, whose "three" was a
+literal in the prompt, unconnected to the cap.
+
+**Decision:**
+1. `maxCharactersPerScene` is **6** for every image model
+   (`server/config/models.js`, was 5). This supersedes both the 3-character cap
+   the fault report named and the 5 that was actually in force.
+2. Check 5b becomes `[cast_crowded]`: it reads `{MAX_CHARACTERS_PER_SCENE}`
+   instead of a literal three, and exceeding it is a **composition
+   recommendation**, not a fault. Check 5 `[cast_over_cap]` keeps its real fault
+   (a plan-line character missing from the brief) and frames the over-cap half
+   as a recommendation too.
+3. **The anonymisation remedy is gone.** The reviewer's only options for a
+   crowded frame are staging — background depth, behind another figure, at
+   distance, cropped at the frame edge — and every name stays in `characters[]`
+   and in the prose. "Never drop a character, and never replace a name with a
+   description of the figure" is now written into the check.
+4. New machine-readable output field `REMOVED CAST:` beside `FAULTED PAGES:`,
+   one entry per page (`page = name, name: reason`) or `NONE`. Parsed by
+   `parseCastRemovals()` and persisted on `sceneReviewReport.castRemovals`.
+5. `diffCastRemovals()` audits it mechanically: the cast name-set of each
+   rewritten brief before vs after, from `characters[]` only. A declared name is
+   subtracted; whatever remains is an **undeclared removal** and is logged at
+   ERROR with page and names (`beats_scene_review_removal_undeclared`). A
+   declared one logs at info. Stored on `sceneReviewReport.castRemovalAudit`.
+   A name that moved into `objects[]` (a Visual Bible secondary carried by its
+   CHR id — Fiona p13/p16 with `CHR001`) is **routing, not removal** and is not
+   reported.
+6. **Detection only.** The undeclared removal is not auto-reverted; the owner
+   rejected that shape on 2026-09-13. A deterministic gate is a separate
+   decision.
+
+**Rationale:** A commissioned character is drawn as themselves or not at all —
+turning one into "one in a blue tricorn" destroys the thing the customer paid
+for, and the prompt was explicitly asking for it. Raising the cap to 6 and
+demoting it to a recommendation removes the pressure that produced the rewrite,
+while the declared-removals channel makes the remaining cases auditable instead
+of invisible. A previous attempt to fix this by exempting "collective terms" in
+the prompt was reverted by the owner as a cheap trick; this changes the rule and
+its remedy rather than carving an exception out of it. The audit is name-set
+arithmetic over metadata, never prose inference — recognising "five soaked
+pirates" as an anonymisation in code would not generalise past this story.
+
+**Touched:** `prompts/scene-review.txt` (checks 5, 5b, OUTPUT FORMAT),
+`server/config/models.js` (8 × `maxCharactersPerScene`),
+`server/lib/sceneReviewGuard.js` (`parseCastRemovals`, `castNameSet`,
+`diffCastRemovals`), `server/lib/beatsPipeline.js` (parse, logging, persistence
+on `sceneReviewReport`), `tests/unit/scene-review-removals.test.ts`,
+`tasks/presence-signal-rewrite-2026-09-13.md`.
+
+**Status:**    ✅ active. Prompt-side effect is unproven on stored data — a real
+run must show the reviewer emitting a `REMOVED CAST:` line, and group pages
+keeping their named cast instead of being rewritten into anonymous figures.
+The `|| 3` fallbacks at `promptBuilders.js:2408/2638/3032/5281` and
+`testlab.js:3806/3854` are left alone: unreachable defaults, and changing them
+is a separate question.

@@ -110,6 +110,7 @@ const {
   getHistoricalLocations,
   getHistoricalObjects,
 } = require('./storyHelpers');
+const { parseCastRemovals, diffCastRemovals } = require('./sceneReviewGuard');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { stableCandidateIndex } = require('./outlineParser/shared');
 const { log } = require('../utils/logger');
@@ -1578,6 +1579,8 @@ ${bibleBody}` : bibleBody;
   // Same contract as beatsReviewReport above: null only when the review never
   // ran; an object with empty pages[] when it ran and rewrote nothing.
   let sceneReviewReport = null;
+  let castRemovalsDeclared = null;
+  let castRemovalAudit = [];
   // Mechanical clothing faults, computed here and handed to the review — the
   // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
   // image. Only the findings measured to carry signal are rendered
@@ -1766,6 +1769,54 @@ ${bibleBody}` : bibleBody;
       if (!faultLine) {
         log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
       }
+      // DECLARED REMOVALS (owner decision 2026-09-13). A rewrite that drops a
+      // character used to be expressible only as an absence — no delta, no
+      // reason, and nothing parsed. `REMOVED CAST:` in the output contract is
+      // that channel; this reads it, then checks it against what actually
+      // happened to `characters[]`, page by page. Mechanical name-set
+      // arithmetic over the brief metadata only — never an inference from
+      // description prose.
+      //
+      // Detection and loud reporting ONLY: an undeclared removal is NOT
+      // reverted here (owner, 2026-09-13 — a deterministic gate is its own
+      // decision). Evidence: job_1789207854566_l43qgl34w p7/p15, where five
+      // commissioned characters became "five soaked pirates: one in a blue
+      // tricorn…" with `characters: []` / `["Fiona"]` and nothing said.
+      const castRemovals = parseCastRemovals(sceneReviewAnalysis);
+      const metaOf = (brief) => (extractSceneMetadata(brief) || {});
+      castRemovalsDeclared = castRemovals;
+      castRemovalAudit = diffCastRemovals(
+        sceneDiffs.map(d => {
+          const mb = metaOf(d.before), ma = metaOf(d.after);
+          // `objects[]` carries the Visual Bible secondaries. A name that moved
+          // there is still commissioned — routing, not removal.
+          return {
+            pageNumber: d.pageNumber,
+            beforeCast: mb.characters || [],
+            afterCast: ma.characters || [],
+            afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
+          };
+        }),
+        castRemovals
+      );
+      if (castRemovals.malformed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
+        gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
+      }
+      for (const r of castRemovalAudit) {
+        if (r.declared.length === 0) continue;
+        const why = (castRemovals.pages.find(p => p.pageNumber === r.pageNumber) || {}).reason || '(no reason given)';
+        log.info(`📣 [BEATS] Scene review DECLARED removal on page ${r.pageNumber}: ${r.declared.join(', ')} — ${why}`);
+        gl.info('beats_scene_review_removal_declared', `Page ${r.pageNumber}: reviewer removed ${r.declared.join(', ')} — ${why}`, null, r);
+      }
+      const undeclaredRemovals = castRemovalAudit.filter(r => r.undeclared.length > 0);
+      if (undeclaredRemovals.length > 0) {
+        const detail = undeclaredRemovals.map(r => `page ${r.pageNumber}: ${r.undeclared.join(', ')}`).join('; ');
+        log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
+        gl.error('beats_scene_review_removal_undeclared',
+          `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
+      }
+
       const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
       if (faultedNotFixed.length > 0) {
         log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
@@ -2001,6 +2052,11 @@ ${bibleBody}` : bibleBody;
         durationMs: meta.timings.sceneReviewMs,
         changedPages: sceneDiffs.map(d => d.pageNumber),
         namedButNotRewritten: faultedNotFixed,
+        // The reviewer's declared-removals channel and the mechanical audit of
+        // it (2026-09-13). `castRemovalAudit` holds one row per page that lost
+        // a name, split into `declared` / `undeclared`.
+        castRemovals: castRemovalsDeclared,
+        castRemovalAudit,
         failed: sceneReviewFailed,
         analysis: sceneReviewAnalysis,
         pages: sceneDiffs,

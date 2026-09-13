@@ -85,4 +85,103 @@ function pickReviewedBrief(page, out, reviewer, expId) {
   return fixed || page.fromBeats;
 }
 
-module.exports = { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };
+
+/**
+ * The reviewer's DECLARED-REMOVALS channel (scene-review.txt OUTPUT FORMAT,
+ * 2026-09-13).
+ *
+ * Until this line existed a removal was expressible only as an absence: the
+ * reviewer shipped a rewritten brief with a name gone from `characters[]` and
+ * nothing said why. On job_1789207854566_l43qgl34w it rewrote five commissioned
+ * characters into "five soaked pirates: one in a blue tricorn, one tall in an
+ * orange tricorn…" and set `characters: []` (p7) / `["Fiona"]` (p15). Only the
+ * `FAULTED PAGES:` line was ever parsed, so nothing downstream could see it.
+ *
+ * Grammar, one line, anywhere in the analysis block:
+ *   REMOVED CAST: NONE
+ *   REMOVED CAST: 4 = Alice: off-frame in the plan line; 7 = Bob, Cara: crowd
+ *
+ * Anything that does not parse is reported rather than dropped, so a malformed
+ * line is never read as "no removals".
+ *
+ * @param {string} analysis raw ---ANALYSIS--- text
+ * @returns {{ present: boolean, none: boolean, pages: Array<{pageNumber:number, names:string[], reason:string}>, malformed: string[] }}
+ */
+function parseCastRemovals(analysis) {
+  const empty = { present: false, none: false, pages: [], malformed: [] };
+  const line = String(analysis || '').match(/^\s*REMOVED CAST:\s*(.*)\s*$/mi);
+  if (!line) return empty;
+  const body = String(line[1] || '').trim();
+  if (!body || /^none$/i.test(body)) return { present: true, none: true, pages: [], malformed: [] };
+  const pages = [];
+  const malformed = [];
+  for (const rawEntry of body.split(';')) {
+    const entry = rawEntry.trim();
+    if (!entry) continue;
+    const m = entry.match(/^(\d+)\s*=\s*([^:]+?)\s*:\s*(.+)$/);
+    if (!m) { malformed.push(entry); continue; }
+    const names = m[2].split(',').map(n => n.trim()).filter(Boolean);
+    if (!names.length) { malformed.push(entry); continue; }
+    pages.push({ pageNumber: Number(m[1]), names, reason: m[3].trim() });
+  }
+  return { present: true, none: pages.length === 0 && malformed.length === 0, pages, malformed };
+}
+
+/** Lower-cased, de-duplicated name set. Mechanical — no prose is ever read. */
+function castNameSet(names) {
+  return new Set((Array.isArray(names) ? names : [])
+    .map(c => (typeof c === 'string' ? c : (c && c.name)))
+    .filter(n => typeof n === 'string' && n.trim())
+    .map(n => n.trim().toLowerCase()));
+}
+
+/**
+ * Which characters a rewrite removed from a page WITHOUT declaring it.
+ *
+ * Pure name-set arithmetic over `characters[]` before vs after — never an
+ * inference from description text. A declared name is subtracted case-
+ * insensitively; whatever is left vanished silently.
+ *
+ * Detection and reporting only (owner, 2026-09-13): the caller logs, it does
+ * not revert. A deterministic gate is a separate decision.
+ *
+ * SECONDARY ROUTING IS NOT A REMOVAL. A Visual Bible secondary is commissioned
+ * through `objects[]` (its CHR id) rather than `characters[]`, so a rewrite that
+ * moves a name from one list to the other has changed how the figure is carried,
+ * not whether it is drawn. On job_1789207854566_l43qgl34w that is pages 13 and
+ * 16 (`CHR001` out of `characters[]`, still cited in `objects[]`) — and telling
+ * those apart from pages 7 and 15, where five commissioned characters simply
+ * vanished, is the whole point of the detector. Still a set membership test, on
+ * the after-brief's `objects[]`; no description text is read.
+ *
+ * @param {Array<{pageNumber:number, beforeCast:string[], afterCast:string[], afterObjects?:string[]}>} pages
+ * @param {ReturnType<typeof parseCastRemovals>} declared
+ * @returns {Array<{pageNumber:number, lost:string[], rerouted:string[], declared:string[], undeclared:string[]}>}
+ *          one row per page that lost at least one name to something other than
+ *          `objects[]`; `undeclared` may be empty when every loss was declared
+ */
+function diffCastRemovals(pages, declared) {
+  const byPage = new Map();
+  for (const p of (declared && declared.pages) || []) byPage.set(p.pageNumber, castNameSet(p.names));
+  const out = [];
+  for (const p of pages || []) {
+    const before = castNameSet(p.beforeCast);
+    const after = castNameSet(p.afterCast);
+    const objects = castNameSet(p.afterObjects);
+    const gone = [...before].filter(n => !after.has(n));
+    const rerouted = gone.filter(n => objects.has(n));
+    const lost = gone.filter(n => !objects.has(n));
+    if (!lost.length) continue;
+    const said = byPage.get(p.pageNumber) || new Set();
+    out.push({
+      pageNumber: p.pageNumber,
+      lost,
+      rerouted,
+      declared: lost.filter(n => said.has(n)),
+      undeclared: lost.filter(n => !said.has(n)),
+    });
+  }
+  return out;
+}
+
+module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };
