@@ -35245,7 +35245,7 @@ covered by its unit tests with a mocked model. Still owed: one real story
 showing zero `beats_vb_label_unresolved` and no shared REQUIRED OBJECTS lead
 end to end. Stored bibles are unaffected until re-authored.
 
-## 2026-09-13 — The same split-identity shape exists for CHARACTERS (measured, not yet fixed)
+## 2026-09-13 — The same split-identity shape exists for CHARACTERS (code-proven; no damage confirmed)
 **Context:**   A read-only hunt for the element-label shape elsewhere found four
 incompatible "does this string name that entry?" matchers for characters and
 secondaries: exact-or-containment (`promptBuilders.js:429-457`), token overlap
@@ -35254,12 +35254,14 @@ test (`phantomCharacters.js:48`), and plain `toLowerCase()` equality
 (`charRepairTarget.js:71,239`, `entityConsistency.js:1494`,
 `evalPipeline.js:928,1053`, `bboxDetection.js:190` — the last with no id
 fallback). `promptBuilders.js:485` keys the roster by the METADATA name while
-the prose uses the VB name. Confirmed on `job_1789163494908_kc2joi4ax`: p2
-`expectedCharacters` holds `"Mother"` for `ANI002 "Mother Dragon"`, p9 resolves
-`"Marroni Vendor"` in full — one story, one builder, two spellings. The judge
-writes "Mother Dragon", the repair target exact-matches a figure named
-"Mother", and `vbKind()` fails to resolve it, silently dropping the `(animal)`
-tag from EXPECTED CAST. Also found: costume label built in two casings and
+the prose uses the VB name. CORRECTION on re-check of `job_1789163494908_kc2joi4ax`:
+the bible carries BOTH `CHR001 "Mother"` (a human) and `ANI002 "Mother Dragon"`,
+so p2's `"Mother"` resolving to CHR001 is an exact, correct match, and p9's
+`"Vendor"` → `"Marroni Vendor"` is the containment fallback doing its job. No
+mis-resolution is confirmed on that story. What IS real: `phantomCharacters.js:48`
+`isKnownName` merges nested names in either direction by its own admission, and
+that story has exactly such a pair — a latent hazard, not a measured defect.
+Also found: costume label built in two casings and
 looked up case-sensitively (`clothingCategories.js:101` vs
 `clothingResolve.js:869` vs `entityConsistency.js:2939`); judge and generator
 build the clothing contract independently and only WARN on divergence
