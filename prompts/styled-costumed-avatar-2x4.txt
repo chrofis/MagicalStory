@@ -6,6 +6,8 @@ Row 1 (top) — head and shoulders, in the ORIGINAL reference photo's style. Whe
 Row 2 (bottom) — full body from head to feet, in {ART_STYLE_PROMPT} style, wearing {COSTUME_DESCRIPTION}. Plain light-grey background, figure standing. Each bottom-row figure fits entirely inside its panel with empty margin above the head and below the shoes; both feet and shoes fully visible; never cropped at the thigh, knee, or ankle.
   Panel 5: full body front. Panel 6: full body turned 45° right. Panel 7: full body side profile (90° right). Panel 8: full body rear turn — shoulders and body fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek show. Not a profile, not a flat back view.
 
+Footwear is part of the outfit: every bottom-row panel wears the footwear the reference photo shows, same type and colour, or plain everyday shoes suiting the costume when neither shows any. Bare feet only when the costume names them, or when the lower body is a tail, fin, or single fused form with no feet at all.
+
 Same person in every panel. Hair colour matches the reference photo exactly. If the reference person wears glasses, include glasses in all 8 panels; if not, none. Body proportions match the age below.
 
 Show only the person and the requested clothing. No arrows, symbols, letters, numbers, logos, badges, motifs, or decorative marks anywhere on skin, hair, face, or clothing. Rear-turn panels show plain hair and plain clothing, plus the sliver of face the head turn reveals.

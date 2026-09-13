@@ -35595,3 +35595,42 @@ wording is not pinned by policy; the behaviour shows on the next story.
 **Touched:** `prompts/scene-expansion-all.txt`
 **Status:**    🟡 conditional — verify on the next real story that an urgent
 page's `expression` fields and prose carry strain.
+
+## 2026-09-13 — The reference sheet must state that the figure is shod (barefoot books)
+**Context:**   Staging trial `job_1789296188291_thezv15y1` ("…Kastanie…", 6
+pages, German, autumn, outdoors on paving stones) rendered its main character
+barefoot on all six pages AND both covers. The chain: his body reference photo
+wears blue trainers → the pass-1 identity sheet (`buildBodyRowPrompt`) came
+back barefoot in all four body cells → pass-2 style transfer copied that →
+the styled sheet IS the per-page reference cell, so all eight images faithfully
+drew bare feet. Nothing upstream could catch it. The trial path sets
+`standard: { used: true, signature: 'none' }` with no description by design
+(`trial.js:2392` — the body photo is the reference), so `clothingDescription`
+resolved `null`, the sheet prompt got `Costume: standard outfit`, and the page
+prompts carried no clothing text at all. And every mention of shoes in the
+sheet prompts and their evaluators (`character2x4Sheet.js`,
+`sheet-row-bodies-eval.txt:8`, `sheet-2x4-evaluation.txt:21`) was a FRAMING
+rule — "both feet with shoes are fully visible", "cropped at the ankle scores
+1-3" — which a barefoot figure satisfies.
+**Decision:** One `buildFootwearRule(redress)` in `character2x4Sheet.js`,
+appended to both JS sheet prompts and mirrored in
+`styled-costumed-avatar-2x4.txt`: footwear is part of the outfit; the figure
+wears what the body reference shows (same type and colour), or plain everyday
+shoes suiting the outfit when neither reference nor outfit shows any. On a
+redress sheet the costume names the footwear and the reference is ignored.
+Bare feet only when the outfit names them, or when the lower body is a tail,
+fin, or fused form with no feet.
+**Rationale:** Generation side only, at the one site where the footwear was
+lost. The alternative — synthesising a clothing `description` for trial
+characters so footwear text flows downstream — would mean deriving outfit text
+from the source photo, which the "description must match the avatar / never
+correct traits toward the photo" rule forbids, and would not help the
+non-trial redress case where the reference outfit is deliberately ignored.
+Evaluator untouched: adding a scored "is the figure shod" sub-check is a
+five-site change (evalBuckets, scoring tables, consolidator, subType, vocab)
+and needs its own ask.
+**Touched:** `server/lib/character2x4Sheet.js`,
+`prompts/styled-costumed-avatar-2x4.txt`,
+`tests/unit/sheet-footwear-rule.test.ts`
+**Status:**    🟡 conditional — needs one live sheet generation to confirm the
+sheet comes back shod; the fix is unverifiable from stored evidence alone.
