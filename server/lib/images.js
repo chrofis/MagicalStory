@@ -3969,12 +3969,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         const iterateAboardId = iterateSceneMetadata?.aboard || null;
         const { buildEmptyScenePrompt } = require('../services/prompts');
         const { buildLandmarkFidelityBlock } = getStoryHelpers();
+        // Built BEFORE the prompt: which reference family is attached decides
+        // the REFERENCE line (referenceKind below), exactly as at the
+        // production page/vantage plate call sites and the Lab stage.
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId, iterateSceneMetadata?.objects || null);
         const emptyPrompt = buildEmptyScenePrompt({
           style: artStyleDesc,
           description: iterateSceneMetadata.emptyScenePrompt,
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
           landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0]),
+          // Tells the model what the attached reference IS (prompts.js
+          // REFERENCE line). Same expression every other plate call site uses —
+          // without it the repaired page's fresh plate got the landmark photo
+          // as pixels but no line saying the place in the scene IS that photo.
+          referenceKind: (pageLandmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
           visualBible,
           pageNumber,
           aboardId: iterateAboardId,
@@ -3982,7 +3991,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           // (AD is the authority on vehicle presence; VB pages is only the menu).
           sceneObjects: iterateSceneMetadata?.objects || null,
         });
-        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId, iterateSceneMetadata?.objects || null);
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           // Plates stay on the Standard tier regardless of the page tier.

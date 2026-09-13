@@ -1695,6 +1695,10 @@ async function buildCoverReferences({
       ];
       const emptyDesc = buildPlateDescription(emptyDescRaw, coverCastNames, visualBible, coverPageNumber);
       const { buildEmptyScenePrompt } = require('../services/prompts');
+      // Built BEFORE the prompt: which reference family is attached decides
+      // the REFERENCE line (referenceKind below), exactly as at the production
+      // page/vantage plate call sites and the Lab stage.
+      const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);
       const emptyPrompt = buildEmptyScenePrompt({
         style: artStyleDesc,
         // Covers paste the figures at a fixed bottom-centre position (see
@@ -1710,10 +1714,14 @@ async function buildCoverReferences({
         // Named landmark-fidelity block when a landmark photo is attached
         // below — '' otherwise (was trial-only).
         landmarkFidelity: getStoryHelpers().buildLandmarkFidelityBlock(landmarkPhotos?.[0]),
+        // Tells the model what the attached reference IS (prompts.js REFERENCE
+        // line). Same expression every other plate call site uses — without it
+        // the cover plate got the landmark photo as pixels but no line saying
+        // the place in the scene IS that photo.
+        referenceKind: (landmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
         visualBible,
         pageNumber: coverPageNumber,
       });
-      const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);
       const emptyOptions = {
         landmarkPhotos,
         visualBibleGrid: emptySceneVbGrid,
