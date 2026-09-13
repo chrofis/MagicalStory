@@ -4080,14 +4080,38 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // 2026-09-02). A mixed group still renders its canvas: the cast>0
         // pages need it, and the cast-0 page in the group simply rides along
         // on the shared plate.
+        // A vantage whose pages ALREADY have a plate needs no canvas either:
+        // the fan-out at the bottom of this block skips a pre-populated slot
+        // (`if (sceneBackgrounds[pn]) continue;`), so rendering the canvas —
+        // and running the QC vision call on it — produced an image that was
+        // thrown away. Trial mode is the one populator today (it renders one
+        // plate PER PAGE during outline streaming), and on a 6-page trial this
+        // cost one whole extra plate generation + one QC vision call whose
+        // result reached nothing. The condition is deliberately about the SLOTS
+        // rather than `trialMode`: it is the same fact the discard at the
+        // fan-out already tests, and the per-page path below (Phase 5a-pre)
+        // already skips on exactly this ("Skip if already generated"). A group
+        // where only SOME pages are pre-filled still renders — the unfilled
+        // pages genuinely need the canvas. A non-trial run reaches this block
+        // with `sceneBackgrounds` empty (it is declared empty and written only
+        // here and in 5a-pre, both of which run after), so `every()` is false
+        // for every group and nothing changes.
+        const prefilledGroups = allRealGroups.filter(([, group]) =>
+          group.pageNumbers.every(pn => sceneBackgrounds[pn]));
+        if (prefilledGroups.length > 0) {
+          log.info(`🏛️ [VANTAGE] Skipping ${prefilledGroups.length} canvas(es) — every page already has a plate: ${prefilledGroups.map(([vid, g]) => `${vid} (p${g.pageNumbers.join(',')})`).join('; ')}`);
+        }
         const realGroups = allRealGroups.filter(([, group]) =>
-          group.pageNumbers.some(pn => !platelessByRoute(pn)));
-        const castlessGroups = allRealGroups.length - realGroups.length;
-        if (castlessGroups > 0) {
-          const skipped = allRealGroups
-            .filter(([, group]) => group.pageNumbers.every(pn => platelessByRoute(pn)))
-            .map(([vid, group]) => `${vid} (p${group.pageNumbers.join(',')})`);
-          log.info(`🏛️ [VANTAGE] Skipping ${castlessGroups} canvas(es) — every page on them has cast=0: ${skipped.join('; ')}`);
+          group.pageNumbers.some(pn => !platelessByRoute(pn))
+          && !group.pageNumbers.every(pn => sceneBackgrounds[pn]));
+        // Counted independently of the pre-filled skip above — a group can be
+        // both castless and pre-filled, and subtracting both from the total
+        // would under- (or negatively) report.
+        const castlessSkipped = allRealGroups
+          .filter(([, group]) => group.pageNumbers.every(pn => platelessByRoute(pn)))
+          .map(([vid, group]) => `${vid} (p${group.pageNumbers.join(',')})`);
+        if (castlessSkipped.length > 0) {
+          log.info(`🏛️ [VANTAGE] Skipping ${castlessSkipped.length} canvas(es) — every page on them has cast=0: ${castlessSkipped.join('; ')}`);
         }
         // One canvas per VB vantage, reused across every page that uses it.
         // Sonnet assigns a distinct vantage (LOC###.N) whenever the same
