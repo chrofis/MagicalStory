@@ -34326,3 +34326,101 @@ run the audit and the deleter), `tasks/BACKLOG.md`. Read-only audit remains
 
 **Status:** ✅ active. Note the bucket will re-accumulate orphans until
 `0e07da278` is promoted to master.
+
+---
+
+## 2026-09-13 — Blind inventory describers measured against the pixels: 2.5-flash makes 4× the consequential errors of 3.7-flash, and the reasoning-OFF arm is void
+
+**Context:** The blind visual inventory (`prompts/image-inventory-unified.txt`,
+`runVisualInventory`) is the first thing that looks at a rendered page. Every
+field it fills becomes input to the blind compliance judge, so a wrong value
+there is not a cosmetic blemish — it commissions a defect and, at high enough
+severity, a paid repair. The trigger was an `items_held` entry naming an object
+that was not gripped. Nothing had ever graded these descriptions against the
+actual images; the Lab's existing `perField` numbers score whether a field was
+*delivered*, not whether it is *true*.
+
+**Decision:** Graded the `unified` arm of Test Lab experiments **#1237**
+(`gemini-2.5-flash`, today's production default) and **#1238**
+(`gemini-3.7-flash`) over the 10 `benchmark_scenes` pages (ids 3, 5, 6, 11, 21,
+24, 25, 27, 29, 31) by opening each page's graded image version and checking
+every claim that can drive a downstream finding: `items_held`, `headwear`,
+`eyewear`, `worn_carried`, `standing_surface`, `zone`, `facing`, `clipped_by`,
+the `figures[]` count, `objects[]`, and the four `rendering` flags. Honest
+uncertainty (`cannot tell at this size`) and hedged-but-not-wrong answers were
+scored correct; a mistake repeated across several figures of one page counts
+once. Measurement only — **no verdict on switching models; that is the owner's
+call.**
+
+Measured, consequential errors per page:
+
+| | 2.5-flash (#1237) | 3.7-flash (#1238) |
+|---|---|---|
+| Consequential errors, 10 pages | **16** | **4** |
+| Per page | **1.6** | **0.4** |
+| Clean pages | 2 of 10 | 7 of 10 |
+| False `rendering` alarms | 0 | 0 |
+
+The two disagreed on at least one graded field on **8 of 10 pages**; on 14 of
+those disagreements exactly one model was right, and 3.7-flash was the right
+one in 11 of the 14. Both were wrong together on exactly one page (bs11: a
+third midground child missed, and a child facing the viewer called "away from
+viewer").
+
+**Rationale — what the errors actually are, because the direction matters more
+than the count:**
+- **2.5-flash's errors are mostly hallucinated or inverted detail.** A phantom
+  "leather quiver with arrows" and a "wooden bow" on a figure wearing a
+  crossbow (bs5); a rider plainly riding toward the camera reported "away from
+  viewer" (bs6); a boy facing the viewer reported facing "right" (bs24); four
+  figures all cut by the bottom frame reported `clipped_by: none` (bs24), and
+  conversely a fully-visible seated man reported `clipped_by: frame` (bs25); a
+  visible pair of spectacles and a whole second guard missed in a
+  three-figure background group (bs3); belts on both figures and a
+  chest-high door plank missing entirely from `objects[]` (bs31).
+- **3.7-flash's 4 errors are concentrated in one place: it is the model that
+  invents held objects.** Both of its `items_held` errors are false positives —
+  sandals lying on the ground called "touching a pair of yellow sandals"
+  (bs27), and a grounded vertical plank the girl rests one hand on called "held
+  in both hands" (bs31, and its own `objects[]` marks that plank
+  `grounded: true` in the same response). 2.5-flash's single `items_held` error
+  is the opposite kind: an *omission* (bs3, a kneeling woman cupping the
+  elephant reported as holding "nothing"). **A false held object commissions a
+  repair; an omission usually does not.** So the field that started this
+  investigation is the one field where the more accurate model is the more
+  dangerous one.
+- **Neither model raises false `rendering` alarms** — all four flags were
+  `false` on all 20 descriptions, with no invented anatomy defects. Both also
+  missed the same two genuine faults on bs6: a smeared, unreadable face (which
+  `rendering.issues` is specified to catch) and a crossbow whose prod is
+  mounted in the plane of the shot, which passed as `physics_ok: true`.
+- **`objects[]` differences are not errors.** The prompt scopes it to "each
+  notable object, animal or vehicle"; scenery belongs in `setting`. 2.5-flash
+  routinely lists rivers, mountains and paths there, 3.7-flash does not. That
+  is 2.5-flash over-listing against the spec, not 3.7-flash missing things.
+
+**Reasoning-OFF arm (#1241) is VOID — it did not run 3.7-flash.** It records
+`params.model = 'gemini-3.7-flash'` with `reasoning: {enabled: false}`, but 7 of
+its 10 unified outputs are **byte-identical** (same MD5, same `outputTokens`) to
+the 2.5-flash arm, and the other 3 differ only by resample drift (915 vs 913,
+1202 vs 1205, 1563 vs 1583 tokens) — including 2.5-flash's distinctive wrong
+answers ("brown leather quiver with arrows", `clipped_by: frame` on the
+fully-visible man). `runVisualInventory` silently falls back to
+`gemini-2.5-flash` when the OpenRouter call throws or returns non-200
+(`server/lib/evalPipeline.js:103-114`), while the experiment row keeps the
+*requested* model — so the arm is unlabelled 2.5-flash output. **No conclusion
+about reasoning-off can be drawn from it**, and the fallback needs to surface in
+the experiment record rather than only in a log line. On the backlog.
+
+**Measured cost (per the run's own token counts), so the owner can price the
+choice:** 2.5-flash 1,990 in / 1,561 out per page; 3.7-flash 2,821 in / 2,710
+out per page. At $0.30/$2.50 and $0.75/$3.75 per 1M that is **$0.068 vs $0.184
+per 15-call story, +$0.12**. From 2027, at $1.50/$7.50, 3.7-flash is **$0.368,
++$0.30**.
+
+**Touched files:** none in `server/` — this entry, `docs/image-routing.md`
+(routing line), `tasks/BACKLOG.md`. Evidence: `testlab_experiments` #1237,
+#1238, #1241 on staging; re-run via the `inventory_ab` stage
+(`server/lib/testlab.js` `runInventoryAbStage`).
+
+**Status:** ✅ active as a measurement. The model choice is NOT decided here.
