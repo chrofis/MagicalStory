@@ -34686,3 +34686,44 @@ keeping their named cast instead of being rewritten into anonymous figures.
 The `|| 3` fallbacks at `promptBuilders.js:2408/2638/3032/5281` and
 `testlab.js:3806/3854` are left alone: unreachable defaults, and changing them
 is a separate question.
+
+## Trial gets four prompt-only ports from the full pipeline (2026-09-13)
+**Context:** Trial writes its story text AND its scene hints in ONE call
+(`story-trial.txt`), with no beats stage and no Art Director. Every rule that
+lives in `story-text-from-beats.txt` or `scene-expansion*.txt` therefore reaches
+zero trial pages. Measured: 45-48% of trial pages open with a character's name
+against 23% on staging full stories; the beats-vs-pre-beats control on the full
+pipeline moved 41% → 31%, so the gap is the rule, not the model. Separately, the
+`EXACT POSES` block was already wired into `buildImagePrompt` but never received
+data on the trial path — the trial scene-hint schema had no `interactions[]` —
+and the age-banded creature tone had no `{CREATURE_TONE}` fill site in the trial
+template.
+**Decision:** Four prompt-only changes, no new API call, model call, or latency:
+1. The page-opening variety rule ported verbatim from `story-text-from-beats.txt`
+   into the trial Rules block, UNGATED (no age-band conditional — owner's call).
+   The existing "Start with action, not weather or waking up" was rescoped to
+   "Page 1 starts with action…" so the two rules do not contradict.
+2. Six Art Director composition rules ported into the trial scene-hint section,
+   reworded for a scene hint rather than a full AD brief: one focal point,
+   one instant/no history, one level per frame, no partial immersion, footing,
+   close-up ends at the waist. Plus the prose/staging rule from
+   `story-text-from-beats.txt` in the Rules block.
+3. `{CREATURE_TONE}` placeholder in `story-trial.txt`, filled by the EXISTING
+   `buildCreatureToneSection(inputData)` — the same resolver the Art Director
+   uses. No level text is duplicated. 0-4 cute / 5-6 not-menacing / 7+ formidable.
+4. `interactions[]` added to the trial scene-hint schema, shaped
+   `{character, object, where, priority}` — the minimum `buildExactPosesBlock`
+   reads. `extractSceneMetadata` unwraps `{scene:{…}}` and runs the row through
+   `sanitizeInteractions`, so no parser change was needed.
+**Rationale:** These are the owner-approved SUBSET of the full-pipeline work that
+trial can afford. Trial's whole value is being fast and cheap, so anything that
+adds a stage, a review call or a second model pass was excluded by construction;
+prompt text is free. `EXACT POSES` is appended at the very end of the image
+prompt, after the `**REQUIRED OBJECTS` / `**ART STYLE` marker that
+`shrinkPromptForModel` uses as its protected-tail boundary, so the new
+interaction rows survive compression by construction rather than by obedience.
+Deliberately NOT done: `prompts/story-unified.txt` (the pre-beats writer) was
+left alone — it is not the trial path and not the measured 23% path.
+**Touched:** `prompts/story-trial.txt`, `server/lib/promptBuilders.js`
+(`buildTrialStoryPrompt` → `CREATURE_TONE`), `tests/unit/trial-prompt-parity.test.ts`
+**Status:** ✅ active

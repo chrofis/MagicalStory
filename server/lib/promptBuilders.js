@@ -7186,6 +7186,9 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
       CATEGORY_GUIDELINES: categoryGuidelines,
       AGE_MODE: buildAgeModeSection(inputData),
+      // Same resolver the full pipeline's Art Director uses. Trial has no Art
+      // Director, so without this the creature tone never reaches a trial page.
+      CREATURE_TONE: buildCreatureToneSection(inputData),
       AVATAR_SELECTION: avatarSelection,
       CLOTHING_ENUM: clothingEnum,
       CLOTHING_RULE: clothingRule,

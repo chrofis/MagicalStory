@@ -455,6 +455,14 @@ measurement, is lost).
 
 ## Verification pending (code shipped, proof not taken)
 
+- [ ] **Trial prompt parity — measure the four ported rules on a real trial run.** Shipped 2026-09-13 (prompt-only:
+      page-opening variety, six AD composition rules, `{CREATURE_TONE}`, `interactions[]` in the scene-hint schema).
+      Verified in the BUILT prompt + unit tests only; no trial story has been generated against them. Re-measure the
+      name-opening rate (baseline 45-48% trial vs 23% staging-full) and check EXACT POSES actually appears on trial
+      pages. → `docs/decisions.md` 2026-09-13 "Trial gets four prompt-only ports from the full pipeline"
+- [ ] **`prompts/story-unified.txt` (pre-beats writer) never got the page-opening variety rule.** Out of scope for the
+      trial port; decide whether the legacy unified path still needs it or is dead. → `prompts/story-unified.txt`
+
 - [ ] **`vb_element_overflow` at birth is 5/5 pages, not ~0, after the assignment trim — the check counts the UNION of
       trimmed bible claims and the Art Director's `objects[]` citations (pirate p12: 3 + 3 = 6), and `briefFixable`
       is false on 8/10 pages although the brief could withdraw its citations; round 2 ADDED ids on dragon p12/13/16.
