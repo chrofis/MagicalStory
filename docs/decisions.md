@@ -36284,3 +36284,47 @@ being silently discarded. Starting the stage fails at
 Stories-tab Review button), `server/routes/admin/testlab.js` (comment),
 `tests/unit/testlab-outline-review-retired.test.ts` (4 tests)
 **Status:** ✅ active
+
+### A Visual Bible entry shaped like a person states its hair (2026-09-14)
+**Context:** Prod `job_1789227389389_z18dmvnt6` drew all four fairies bald and
+doll-like on every page they appear. The render is faithful; the spec was
+incomplete. `ART004 Yellow Fairy` reads: "A tiny winged girl standing about 4 cm
+tall, bright sunshine-yellow glowing skin, large anime eyes with white highlight
+dots, rounded petal wings slightly larger than her torso, emitting a warm yellow
+radiance…, dressed in a tiny petal gown of golden yellow; her glow visibly dims
+and contracts in cold dark water." Skin, eyes, wings, gown, glow, size and a
+state change — and nothing above the eyes. All four entries are authored the
+same way, and what reached the image model on p7 ("golden yellow petal wings,
+and a tiny golden gown") carries no hair either.
+
+Nothing downstream could catch it. The fairies are `artifacts`, so they get none
+of the character machinery — no avatar, no reference-sheet identity pass, no
+entity-consistency check. The creature-tone band does not reach them either (it
+is scoped to animals and creatures). `image-semantic.txt` grades the image
+against the brief, and the brief never asked for hair, so there was nothing to
+fail. The omission is also self-reinforcing: the entry has a
+`referenceImageUrl`, so a reference image was rendered FROM the hairless
+description and then anchored every page — which is why all four are
+consistently bald rather than varying.
+
+**Decision:** One authoring rule in `prompts/scene-expansion-all.txt`, in the
+entry-authoring block beside the existing secondary-character sex/age rule: an
+entry shaped like a person — an invented figure, a small winged being, a doll, a
+figurine, a statue, a puppet — states its hair in `description` (colour, length,
+how it is worn) or states plainly that it has none.
+
+**Rationale:** Prompt-side per the standing "classification belongs to the
+PROMPT" rule. The alternative was a `auditVisualBibleContract` code, which would
+require code to decide "is this entry humanoid?" by reading its prose — the
+pattern `docs/SETTLED.md` forbids, and the reason the mirror-guard regex was
+built and removed the same day. No test accompanies this: the change is a rule
+clarification, and the project rule is to pin behaviour, never prompt wording.
+
+Considered and deferred (owner, 2026-09-14): promoting recurring named humanoids
+to `secondaryCharacters`, which would give them identity treatment properly —
+the fairies appear on 8 of 15 pages and are named, so they are arguably cast
+rather than props. Much larger change; revisit if the authoring rule proves
+insufficient.
+
+**Touched:** `prompts/scene-expansion-all.txt`
+**Status:** ✅ active
