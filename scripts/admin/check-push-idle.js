@@ -14,6 +14,11 @@
  *
  * Invoked by .githooks/pre-push with git's ref lines on stdin. Bypass a block
  * with `git push --no-verify` when you know the run is expendable.
+ *
+ * Run BY HAND (a TTY, no refs on stdin) it is the status check CLAUDE.md points
+ * at: it probes every environment it knows and reports each one. It used to
+ * print nothing and exit 0, which reads as "all clear" — the opposite of what an
+ * unreachable or busy environment means.
  */
 
 const ENVIRONMENTS = {
@@ -30,7 +35,7 @@ const ZERO_SHA = /^0+$/;
  */
 function readRefs() {
   return new Promise(resolve => {
-    if (process.stdin.isTTY) return resolve(parseRefs('')); // manual run — nothing to gate
+    if (process.stdin.isTTY) return resolve([]); // manual run — no refs to gate
     let raw = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => { raw += chunk; });
@@ -101,43 +106,82 @@ async function probe(base) {
   };
 }
 
-async function main() {
-  const refs = (await readRefs()).filter(r => !ZERO_SHA.test(r.localSha)); // branch deletions deploy nothing
-  const targets = [...new Set(refs.map(r => r.remoteRef))]
+/**
+ * One environment's probe result as output lines + whether it blocks.
+ *
+ * `manual: true` is the by-hand status report: it says what each environment is
+ * doing without the push-gate framing (there is no push to block, and "PUSH
+ * BLOCKED" on a status check is a lie). Hook mode (`manual: false`) is the
+ * original wording, byte for byte — this gate decides every push in the repo.
+ *
+ * Each line is [stream, text] with stream one of 'log' | 'warn' | 'error'.
+ */
+function renderVerdict(target, { verdict, reasons = [], detail }, { manual = false } = {}) {
+  if (verdict === 'idle') {
+    return { blocked: false, lines: [['log', `✓ ${target.name} is idle — ${detail}`]] };
+  }
+  if (verdict === 'ungated') {
+    return { blocked: false, lines: [['warn', `⚠ ${target.name} NOT CHECKED — ${detail}`]] };
+  }
+
+  if (manual) {
+    const lines = [];
+    if (verdict === 'busy') {
+      lines.push(['warn', `✗ ${target.name} is BUSY — a push would kill:`]);
+      for (const r of reasons) lines.push(['warn', `  • ${r}`]);
+    } else {
+      lines.push(['warn', `? ${target.name} — could not prove it is idle: ${detail}`]);
+    }
+    return { blocked: true, lines };
+  }
+
+  const lines = [];
+  if (verdict === 'busy') {
+    lines.push(['error', `\n✗ PUSH BLOCKED — ${target.name} is busy`]);
+    for (const r of reasons) lines.push(['error', `  • ${r}`]);
+    lines.push(['error', '\nThis push would restart the container and kill that work.']);
+  } else {
+    lines.push(['error', `\n✗ PUSH BLOCKED — could not prove ${target.name} is idle`]);
+    lines.push(['error', `  • ${detail}`]);
+    lines.push(['error', '\nUnknown is not idle: something may be running that a deploy would kill.']);
+  }
+  lines.push(['error', 'Wait for it to finish, or override with: git push --no-verify\n']);
+  return { blocked: true, lines };
+}
+
+/**
+ * Which environments this invocation reports on.
+ * Hook: only the ones the pushed refs actually deploy to (a feature branch or a
+ * tag deploys nothing, so it stays silent and ungated).
+ * Manual: all of them — the user asked for status, so give them status.
+ */
+function resolveTargets(refs, { manual = false } = {}) {
+  if (manual) return Object.values(ENVIRONMENTS);
+  return [...new Set(refs.filter(r => !ZERO_SHA.test(r.localSha)).map(r => r.remoteRef))]
     .map(ref => ENVIRONMENTS[ref])
     .filter(Boolean);
+}
+
+async function main() {
+  const manual = Boolean(process.stdin.isTTY);
+  const refs = await readRefs();
+  const targets = resolveTargets(refs, { manual });
 
   if (targets.length === 0) return; // feature branch / tag — no deploy, no gate
 
+  if (manual) console.log('Checking whether each environment is idle (a deploy restarts the container)…');
+
   let blocked = false;
   for (const target of targets) {
-    const { verdict, reasons, detail } = await probe(target.base);
-
-    if (verdict === 'idle') {
-      console.log(`✓ ${target.name} is idle — ${detail}`);
-      continue;
-    }
-
-    if (verdict === 'ungated') {
-      console.warn(`⚠ ${target.name} NOT CHECKED — ${detail}`);
-      continue;
-    }
-
-    blocked = true;
-    if (verdict === 'busy') {
-      console.error(`\n✗ PUSH BLOCKED — ${target.name} is busy`);
-      for (const r of reasons) console.error(`  • ${r}`);
-      console.error('\nThis push would restart the container and kill that work.');
-    } else {
-      console.error(`\n✗ PUSH BLOCKED — could not prove ${target.name} is idle`);
-      console.error(`  • ${detail}`);
-      console.error('\nUnknown is not idle: something may be running that a deploy would kill.');
-    }
-    console.error('Wait for it to finish, or override with: git push --no-verify\n');
+    const result = await probe(target.base);
+    const { blocked: b, lines } = renderVerdict(target, result, { manual });
+    if (b) blocked = true;
+    for (const [stream, text] of lines) console[stream](text);
   }
 
   // exitCode, not process.exit(): let stdio flush before the process ends.
-  process.exitCode = blocked ? 1 : 0;
+  // A manual status report never fails the process — it is a read, not a gate.
+  process.exitCode = (!manual && blocked) ? 1 : 0;
 }
 
 if (require.main === module) {
@@ -151,4 +195,4 @@ if (require.main === module) {
 
 // Exported for tests/manual/test-push-idle-gate.js — the verdict logic decides
 // whether every push in this repo is allowed, so it gets exercised directly.
-module.exports = { probe, parseRefs, ENVIRONMENTS };
+module.exports = { probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets };

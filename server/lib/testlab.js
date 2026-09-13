@@ -3143,8 +3143,13 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
   const { loadPromptTemplates, withTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { auditStoryBook } = require('./bookAudit');
+  const { calculateTextCost } = require('../config/models');
   const { storyData } = await loadStoryDataFull(target.storyId);
   const t0 = Date.now();
+  // Same collector every other paid Lab stage uses. Without a tracker
+  // bookAudit's `if (usageTracker …)` branch never fires, so a Lab audit spent
+  // real money and recorded nothing.
+  const usage = [];
   // withTemplates, not a global assignment: the override must be visible only
   // inside this run's async tree so two concurrent experiments cannot read each
   // other's prompt.
@@ -3155,11 +3160,21 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
     // is absent nothing is sent and the model keeps its own default, so a
     // production audit is unchanged.
     thinkingLevel: params.thinkingLevel || undefined,
+    // OpenRouter reports billed dollars (cost_usd); Gemini native reports tokens
+    // only, so those are priced with the same table production uses.
+    usageTracker: (provider, u, fnName, mid) => usage.push({
+      provider, fn: fnName, modelId: mid,
+      cost: u?.cost_usd ?? calculateTextCost(mid || '', u || {}),
+    }),
   }));
-  if (!audit) return { ok: false, elapsedMs: Date.now() - t0, faults: 0, byRoute: { IMG: [], TEXT: [] }, logLines: [] };
+  const modelCalls = usage.length;
+  const cost = usage.reduce((a, u) => a + (u.cost || 0), 0);
+  if (!audit) return { ok: false, elapsedMs: Date.now() - t0, faults: 0, byRoute: { IMG: [], TEXT: [] }, logLines: [], modelCalls, cost };
   return {
     ok: true,
     elapsedMs: Date.now() - t0,
+    modelCalls,
+    cost,
     modelId: audit.modelId,
     thinkingLevel: audit.thinkingLevel || null,
     usage: audit.usage,

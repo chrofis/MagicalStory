@@ -35787,3 +35787,44 @@ every language, not just French.
 (contract comment on `locateQuote`), `tests/unit/lector-sentence-span.test.ts`
 (6 tests, including a regression test that reproduces the shipped `de le doudou`)
 **Status:** ✅ active
+
+## 2026-09-13 — Two silent-nothing bugs: Lab book_audit recorded no spend, and the push-idle gate reported nothing by hand
+
+**Context:** Both are "the code ran and told nobody" faults, found by reading.
+(1) `runBookAuditStage` in `server/lib/testlab.js` called `auditStoryBook()`
+without a `usageTracker`. `bookAudit.js` only reports spend inside
+`if (usageTracker && …)`, so every Lab book-audit run paid for a multimodal
+judge over the whole book and recorded zero — the stage returned token counts
+but nothing landed in the Lab's own cost accounting the way every other paid
+stage's does. (2) `scripts/admin/check-push-idle.js` resolved an empty ref list
+on a TTY and then returned early on `targets.length === 0`, printing nothing and
+exiting 0. CLAUDE.md advertises it as the manual status check
+("Check status any time with `node scripts/admin/check-push-idle.js`"), and
+silence there reads as "idle, all clear" — the opposite of useful when an
+environment is busy or unreachable.
+
+**Decision:** (1) The stage builds the same usage collector the composite stages
+already use and returns `modelCalls` + `cost` on both exits (including the
+audit-failed one — failed chunks are still billed). Token-only responses are
+priced with `calculateTextCost`; OpenRouter's `cost_usd` is taken verbatim.
+(2) The script now distinguishes hook mode from manual mode explicitly. Manual
+(TTY, no refs) probes EVERY environment in `ENVIRONMENTS` and reports each one;
+the verdict rendering moved into a pure `renderVerdict(target, probeResult,
+{ manual })` so both modes share one reporting path. Hook mode's wording, stream
+choice and exit code are unchanged byte for byte; a manual report never sets a
+non-zero exit code — it is a read, not a gate.
+
+**Rationale:** A gate that decides every push in the repo may not change
+behaviour as a side effect of a usability fix, so the split is by an explicit
+flag with the hook branch left verbatim and pinned by tests (feature branch and
+branch-deletion stay silent and ungated; busy/unknown still block on stderr with
+`--no-verify` named). The "PUSH BLOCKED" framing is deliberately dropped in
+manual mode: there is no push to block, and printing it on a status check is
+simply false. On the Lab side, copying the existing collector rather than
+inventing a ledger write keeps one convention for stage cost.
+
+**Touched:** `server/lib/testlab.js` (`runBookAuditStage`),
+`scripts/admin/check-push-idle.js` (`readRefs`, new `renderVerdict` /
+`resolveTargets`, `main`), `tests/unit/book-audit-usage-tracked.test.ts` (5),
+`tests/unit/push-idle-manual-report.test.ts` (12)
+**Status:** ✅ active
