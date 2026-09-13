@@ -5926,6 +5926,14 @@ function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
   const band = resolveAgeBand(inputData);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
   const simple = SIMPLE_BANDS.has(band);
+  // The therapeutic payload of a life-skill book: the one CATEGORY_GUIDELINES
+  // clause ("include practical tips or coping strategies woven into the
+  // narrative") that no other beats stage carries. Restored to the arc rules
+  // 2026-09-14 (docs/decisions.md). Gated OFF for the simple bands, whose own
+  // life-skill guidelines say "no tips, no strategies, no moral" — a scoped
+  // clause beats an overridden one, and this file exists because four telling
+  // rules once demanded what those bands forbid.
+  const lifeSkillStrategy = String(inputData?.storyCategory || '') === 'life-challenge' && !simple;
   // A second thread is legitimate only at the standard band on the older
   // reading levels, where the STORY SHAPE explicitly allows one. Four of seven
   // measured arcs split the cast, including a band whose own budget says
@@ -5942,6 +5950,7 @@ function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
       ? '- The shape is repetition, not escalation: the same want, the same call, the same kind of try, page after page, until the last one works. Nothing gets worse, nothing is lost for good, and the goal never looks lost.'
       : '- Each challenge is met at a cost, each harder because the last was not clean; near the end the goal looks lost before it is won. No obstacle is removed in the moment that introduces it; passing one costs something named — time, a possession, a plan, help asked for.',
     '- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes an obstacle; adults may comfort, permit or watch.',
+    ...(lifeSkillStrategy ? ['- One thing the main character does to handle the topic works, and a child listening could do the same thing: it happens on the page, in what they do, never explained, recommended or named as a lesson.'] : []),
     '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
     '- Serve character coverage by giving several characters deeds inside the same event — never by opening a new event per character.',
     simple

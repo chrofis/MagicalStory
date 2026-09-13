@@ -36398,3 +36398,63 @@ re-verified on the day. Nothing truncates a story-text prompt.
   neither prompt ships an unfilled `{PLACEHOLDER}`)
 
 **Status:** ✅ active
+
+---
+
+## The coping-strategy clause is restored to the ARC rules, scoped off the simple bands (2026-09-14)
+
+**Context:** The beats pipeline stopped inheriting the unified writer's
+`{CATEGORY_GUIDELINES}` block. Six clauses of the life-skill branch went with
+it; five are carried elsewhere in the beats chain. One is carried nowhere:
+*"Include practical tips or coping strategies woven into the narrative."* That
+clause is the therapeutic payload of the product — the arc critique asks
+whether the skill drives the climax, never whether a child learns anything
+usable. Two constraints sat against restoring it: `RULES OF THE TELLING`
+already forbids bookkeeping and a stated moral, and `SIMPLE_BANDS` (routine
+0-1, quest 2, tries 3) forbid a lesson outright — `buildLifeSkillGuidelines`
+says "no tips, no strategies, no moral" at those ages.
+
+**Decision:** One conditional line in `buildTellingRulesSection`, which fills
+`{TELLING_RULES}` in **both** arc templates (`arc-create.txt` and
+`arc-retell.txt` — both declare the placeholder, verified on the built prompt).
+It fires only when `storyCategory === 'life-challenge'` **and** the resolved
+band is not a simple band. Wording is shown-not-told: the thing the character
+does happens on the page, "never explained, recommended or named as a lesson".
+
+**Rationale:** The arc is where the story's *content* is decided; a rule about
+what the book must contain belongs with the author, not with the reviewer that
+grades it (`story-arc-review.txt` would only mark the absence of something no
+stage ever asked for). Scoping the clause OFF the simple bands beats wording it
+to be overridden: this whole section exists because four telling rules once
+demanded exactly what those bands forbid (escalation, a low point, an unyielding
+blocker, a rival thread), and a contradiction the model must resolve is a
+contradiction that sometimes resolves the wrong way. Gated on category so a
+coping strategy is never pushed into an adventure or historical story.
+
+**Touched:**
+- `server/lib/promptBuilders.js` (`buildTellingRulesSection` — `lifeSkillStrategy`)
+- `tests/unit/coping-strategy-and-page-openings.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## The page-opening variety rule now ships in both unified variants (2026-09-14)
+
+**Context:** `prompts/story-text-from-beats.txt:50` tells the writer to vary how
+each page opens. Measured on the corpus: pre-beats unified opens 41% of pages
+with a character name, beats 31% — the presence of this one line is the
+difference. It was ported to `story-trial.txt` in `5dee460e0`; the unified
+templates were deliberately left out pending the owner's call, now given.
+
+**Decision:** The same sentence is added to the `TEXT LENGTH RULES` bullet list
+of **both** `story-unified.txt` and `story-unified-imagefirst.txt`. Both,
+because `storyPromptVariant` defaults to `imageFirst` — patching only
+`story-unified.txt` would have left the default production path unchanged.
+There is no third unified variant (`server/services/prompts.js` registers two).
+
+**Touched:**
+- `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`
+- `tests/unit/coping-strategy-and-page-openings.test.ts`
+
+**Status:** ✅ active

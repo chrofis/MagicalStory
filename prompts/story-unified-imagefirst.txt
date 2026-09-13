@@ -107,6 +107,7 @@ Visual Bible entry with full description (build, hair, face, signature look, clo
 - Dialogues flow inline with the narrative text
 - Scene changes or location changes = start a NEW PAGE, not a new paragraph
 - Create a readable, engaging style appropriate for the target age
+- Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way
 
 **Example of correct paragraph formatting:**
 ```
