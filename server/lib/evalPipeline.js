@@ -100,7 +100,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       // single upstream provider stalled 3 of 20 Lab pages (experiment 1053).
       const pageLabel = pageContext ? `[${pageContext}] ` : '';
       try {
-        p1Response = await require('./images').callOpenRouterVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
+        p1Response = await require('./images').callOpenRouterVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt, { reasoning: opts.reasoning || null });
       } catch (e) {
         log.warn(`⚠️ [QUALITY P1] ${pageLabel}${modelId} threw (${e.message}) — falling back to gemini-2.5-flash`);
         p1Response = null;
@@ -2176,11 +2176,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // (no detector count — covers today; witnesses disagreeing) the
       // evaluator's findings stand untouched, which is what keeps the surplus
       // detectable on the ~4 call sites that have no detector.
+      // Hoisted: the three-stage and semantic lists merge in further down, and
+      // they carry absence claims of their own. The two-witness filter this
+      // replaced covered all four lists; so does this.
+      let presenceDerived = false;
       {
         const presence = derivePresenceFinding({
           figures, matches, cast: expectedCast, detectedFigureCount: realFigureCount,
         });
         const spoke = presence.outcome !== 'declined';
+        presenceDerived = spoke;
         if (spoke) {
           const before = fixableIssues.length;
           fixableIssues = fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()));
@@ -2261,6 +2266,17 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          // ONE PRESENCE SIGNAL PER PAGE — same rule as the three-stage merge
+          // below. The semantic judge's vocabulary includes missing_character
+          // and it is scored on its own table, so an unfiltered absence here
+          // would rebuild the very pair the derivation exists to prevent.
+          if (presenceDerived && Array.isArray(semanticResult?.semanticIssues)) {
+            const kept = semanticResult.semanticIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || i?.subType || '').toLowerCase()));
+            if (kept.length !== semanticResult.semanticIssues.length) {
+              log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${semanticResult.semanticIssues.length - kept.length} semantic presence finding(s) superseded by the derivation`);
+              semanticResult.semanticIssues = kept;
+            }
+          }
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Semantic surcharge via the ONE shared table (scoring.js
             // SEMANTIC_ISSUE_PENALTY): the hand-copied chain here billed
@@ -2301,7 +2317,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // in `threeStageResult` so it never reads as "compliance found nothing".
             log.warn(`⚠️ [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}${threeStageResult.evalError}`);
           } else if (threeStageResult?.fixableIssues?.length) {
-            fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
+            // ONE PRESENCE SIGNAL PER PAGE. When the arithmetic has spoken it
+            // owns the pair across every judge, not just the quality one — the
+            // blind compliance judge's "not identified in matches[]" absence is
+            // exactly the inference the detector count already answered.
+            const incoming = presenceDerived
+              ? threeStageResult.fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()))
+              : threeStageResult.fixableIssues;
+            const skipped = threeStageResult.fixableIssues.length - incoming.length;
+            if (skipped) log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${skipped} three-stage presence finding(s) superseded by the derivation`);
+            fixableIssues = [...fixableIssues, ...incoming];
           }
           if (threeStageResult?.issuesSummary) {
             combinedIssuesSummary = combinedIssuesSummary
