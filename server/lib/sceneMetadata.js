@@ -1431,6 +1431,53 @@ function getCharactersInScene(sceneDescription, characters) {
 }
 
 /**
+ * The page's cast is the UNION of what the outline hint commissioned and what
+ * the brief prose describes — never one of the two alone.
+ *
+ * Both sources lie in opposite directions, and each covers the other's gap:
+ *
+ * - The HINT lies by omission. `characters: []` with the people described in
+ *   free prose is a real shape (job_1789207854566_l43qgl34w p7: the brief
+ *   commissions Frau Amrein plus five soaked pirates, the metadata `characters`
+ *   array is empty, and the only names anywhere in the JSON are two
+ *   `wornItems[].owner` values — two garment owners read as a cast of two).
+ * - The PROSE lies by anonymity. A brief may describe a cast member without
+ *   ever naming them ("a blonde in a red tricorn"), so a scan of the prose
+ *   alone drops them (same job, p1: three of five named, two described).
+ *
+ * A REPLACEMENT in either direction therefore deletes real cast. Only the
+ * union is safe, and the roster is the one input the presence arithmetic
+ * cannot be wrong about.
+ *
+ * @param {string} sceneDescription - brief prose (+ any ---METADATA--- block)
+ * @param {Array<string>} hintNames - names the outline hint commissioned
+ * @param {Array} characters - the story's photo-backed character records
+ * @returns {Array} character records, in `characters` order, deduped
+ */
+function unionPageCast(sceneDescription, hintNames, characters) {
+  const all = Array.isArray(characters) ? characters : [];
+  if (all.length === 0) return [];
+  const fromProse = getCharactersInScene(sceneDescription, all);
+  const wanted = new Set(fromProse.map(c => String(c?.name || '').toLowerCase()));
+  for (const raw of (Array.isArray(hintNames) ? hintNames : [])) {
+    // Hint entries arrive as plain names or as records; they may carry a
+    // parenthetical qualifier ("Sarah (background)").
+    const parsed = String((raw && typeof raw === 'object' ? raw.name : raw) || '')
+      .toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
+    if (!parsed) continue;
+    const match = all.find(c => {
+      const n = String(c?.name || '').toLowerCase().trim();
+      if (!n) return false;
+      return parsed === n || parsed === n.split(' ')[0];
+    });
+    if (match) wanted.add(String(match.name).toLowerCase());
+  }
+  // Story order, not discovery order — every downstream roster compares by set,
+  // and a stable order keeps logs and prompts diffable.
+  return all.filter(c => c?.name && wanted.has(String(c.name).toLowerCase()));
+}
+
+/**
  * Extract scene metadata (characters, setting, time, weather) from scene hint
  * Parses format: "Characters: Luis: knight, Noel: standard\nSetting: indoor | Time: midday | Weather: n/a"
  *
@@ -1871,6 +1918,7 @@ module.exports = {
   findCastMissingFromMetadata,
   isSameFigureName,
   getCharactersInScene,
+  unionPageCast,
   parseSceneHintMetadata,
   parseStoryPages,
   parseSceneDescriptions,

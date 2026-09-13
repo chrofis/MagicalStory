@@ -64,6 +64,7 @@ const {
 } = require('./server/lib/landmarkPhotos');
 const {
   getCharactersInScene,
+  unionPageCast,
   getCharacterPhotoDetails,
   buildCharacterReferenceList,
   buildReferenceCardColours,
@@ -1163,9 +1164,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           }
 
-          // Determine which characters appear in this scene
-          const sceneCharacters = getCharactersInScene(
+          // Determine which characters appear in this scene. Same union rule as
+          // the full-mode page cast (see unionPageCast): the hint's own
+          // `characters[]` / per-page clothing keys are commissioned cast even
+          // when the prose never names them.
+          const sceneCharacters = unionPageCast(
             (page.sceneHint || '') + '\n' + (page.text || ''),
+            [...(page.characters || []), ...Object.keys(perCharClothing || {})],
             inputData.characters
           );
 
@@ -3755,7 +3760,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.warn(`[SIDE-MIRROR] Page ${pageNum}: mirror step failed, continuing without flip — ${err.message}`);
         }
 
-        const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
+        // UNION, never replacement (see unionPageCast). The brief prose and the
+        // outline hint each drop cast the other keeps: a hint with an empty
+        // `characters[]` scans down to whatever names happen to sit in its JSON
+        // (garment owners), and prose that describes a figure without naming it
+        // scans down to the named subset. This is the roster every presence
+        // check downstream is measured against.
+        const sceneCharacters = unionPageCast(
+          scene.sceneDescription,
+          [...(scene.characters || []), ...Object.keys(scene.characterClothing || {})],
+          inputData.characters
+        );
         // Characters section takes priority over scene metadata JSON (may have stale costume data)
         const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
         const perCharClothing = {
