@@ -536,6 +536,549 @@
         "10-15": "grandparent-grandchild",
         "11-15": "parent-child"
       }
+    },
+    {
+      "id": "agebands",
+      "label": "Age Bands",
+      "email": "demo-agebands@magicalstory.ch",
+      "primaryLanguage": "de",
+      "characters": [
+        {
+          "id": 101,
+          "name": "Tobias",
+          "gender": "male",
+          "age": "1",
+          "ageCategory": "infant",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "very short",
+            "hairStyle": "soft tight curls",
+            "eyeColor": "dark brown",
+            "skinTone": "deep brown",
+            "build": "chubby",
+            "height": "very short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 1-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "plain mustard-yellow long-sleeve baby bodysuit",
+              "lowerBody": "soft grey baby leggings",
+              "shoes": "soft white baby socks (no shoes)"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 1-year-old baby boy named Tobias, clearly an infant of about twelve months: he is standing very unsteadily on a soft living-room rug holding onto nothing, with the unmistakable proportions of a one-year-old — very large head relative to the body, no neck visible, round belly, short chubby bent legs, bare chubby feet, tiny hands. He has very short soft black tightly-curled baby hair, dark brown eyes, deep brown skin, plump cheeks and an open drooly half-smile with only two or three tiny lower teeth showing. He wears a plain mustard-yellow long-sleeve baby bodysuit, soft grey baby leggings and white baby socks. He must read instantly as a baby, NOT a toddler or preschooler. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 102,
+          "name": "Mia",
+          "gender": "female",
+          "age": "1",
+          "ageCategory": "infant",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "blonde",
+            "hairLength": "very short",
+            "hairStyle": "wispy",
+            "eyeColor": "blue",
+            "skinTone": "fair",
+            "build": "chubby",
+            "height": "very short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 1-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "pale mint-green baby bodysuit",
+              "lowerBody": "white baby bloomers",
+              "shoes": "bare feet"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 1-year-old baby girl named Mia, clearly an infant of about twelve months: she is sitting on a blanket on a sunlit lawn, propped on her hands, with the unmistakable proportions of a one-year-old — very large head relative to the body, no visible neck, round belly, short chubby legs, bare chubby feet. She has very fine wispy pale-blonde baby hair (thin, barely covering the scalp), bright blue eyes, fair skin with soft pink cheeks, and a small open-mouthed baby expression. She wears a pale mint-green baby bodysuit and white baby bloomers, no shoes. She must read instantly as a baby, NOT a toddler or preschooler. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 103,
+          "name": "Kian",
+          "gender": "male",
+          "age": "2",
+          "ageCategory": "toddler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "short",
+            "hairStyle": "straight with a blunt fringe",
+            "eyeColor": "dark brown",
+            "skinTone": "light olive (East Asian)",
+            "build": "sturdy",
+            "height": "very short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 2-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "red long-sleeve toddler t-shirt",
+              "lowerBody": "navy-blue toddler joggers",
+              "shoes": "small grey velcro sneakers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 2-year-old toddler boy named Kian standing on a playground path. He is clearly two: short and stocky with a large head, rounded belly, short legs, a wide-legged unsteady toddler stance, and a nappy-shaped bulk under the trousers. He has straight black hair cut short with a blunt fringe, dark brown eyes, light olive East Asian skin, round cheeks, and a small uncertain half-smile. He wears a red long-sleeve toddler t-shirt, navy-blue joggers and small grey velcro sneakers. He must read as a 2-year-old toddler, clearly older than a baby but clearly younger than a preschooler. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 104,
+          "name": "Nora",
+          "gender": "female",
+          "age": "2",
+          "ageCategory": "toddler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "strawberry blonde",
+            "hairLength": "short",
+            "hairStyle": "fine and flyaway",
+            "eyeColor": "hazel",
+            "skinTone": "light",
+            "build": "sturdy",
+            "height": "very short",
+            "other": "light freckles on the nose"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 2-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "lilac toddler t-shirt",
+              "lowerBody": "denim pinafore dungaree dress",
+              "shoes": "pink velcro sandals"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 2-year-old toddler girl named Nora standing on a sunlit garden path. She is clearly two: short and round with a large head, rounded belly, short legs, and a wide-legged wobbly toddler stance. She has fine flyaway strawberry-blonde hair (short, barely long enough for a tiny clip), hazel eyes, light skin with a few faint freckles on the nose, very round cheeks, and a shy closed-mouth smile. She wears a lilac long-sleeve toddler t-shirt under a denim pinafore dungaree dress and pink velcro sandals. She must read as a 2-year-old toddler, clearly older than a baby but clearly younger than a preschooler. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 105,
+          "name": "Omar",
+          "gender": "male",
+          "age": "3",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "dark brown",
+            "hairLength": "short",
+            "hairStyle": "wavy",
+            "eyeColor": "brown",
+            "skinTone": "medium tan",
+            "build": "average",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 3-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "orange t-shirt with a small blue car print",
+              "lowerBody": "khaki shorts",
+              "shoes": "blue trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 3-year-old preschool boy named Omar standing in a sunlit courtyard. He is clearly three: small, with a still-large head but a slimmer body than a toddler, softer rounded cheeks, and a steady but slightly bandy-legged stance. He has short wavy dark brown hair, brown eyes, medium tan skin, and a small natural grin. He wears an orange t-shirt with a small blue cartoon car printed on the chest, khaki shorts and blue trainers with slightly scuffed toes. He must read as a 3-year-old — noticeably beyond toddler wobbliness but clearly a little preschooler, not school-age. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 106,
+          "name": "Ava",
+          "gender": "female",
+          "age": "3",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "light brown",
+            "hairLength": "chin-length",
+            "hairStyle": "bob",
+            "eyeColor": "green",
+            "skinTone": "light",
+            "build": "average",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 3-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "white t-shirt with a small strawberry print",
+              "lowerBody": "turquoise cotton skirt",
+              "shoes": "white sandals"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 3-year-old preschool girl named Ava standing on a sunlit lawn. She is clearly three: small, with a still-large head relative to her body, soft round cheeks, a little pot belly, and a slightly awkward stance. She has a chin-length light-brown bob with a soft fringe, green eyes, light skin, and a shy half-smile. She wears a white t-shirt with a small red strawberry printed on the chest, a turquoise cotton skirt and white sandals. She must read as a 3-year-old preschooler, clearly younger than a school-age child. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 107,
+          "name": "Elias",
+          "gender": "male",
+          "age": "4",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "sandy blonde",
+            "hairLength": "short",
+            "hairStyle": "straight with a fringe",
+            "eyeColor": "grey-blue",
+            "skinTone": "fair",
+            "build": "slim",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 4-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "green striped long-sleeve shirt",
+              "lowerBody": "brown corduroy trousers",
+              "shoes": "red trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 4-year-old boy named Elias standing on a sunlit park path. He is clearly four: slim and leggier than a toddler, losing the baby belly, head still large for the body, with a confident upright stance. He has short straight sandy-blonde hair with a fringe, grey-blue eyes, fair skin, and a lively natural smile showing small milk teeth. He wears a green-and-white striped long-sleeve shirt, brown corduroy trousers and red trainers. He must read as a 4-year-old, clearly older than a 3-year-old and clearly younger than a school child. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 108,
+          "name": "Zara",
+          "gender": "female",
+          "age": "4",
+          "ageCategory": "preschooler",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "short",
+            "hairStyle": "two coily afro puffs",
+            "eyeColor": "dark brown",
+            "skinTone": "deep brown",
+            "build": "slim",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 4-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "bright pink t-shirt",
+              "lowerBody": "yellow denim shorts",
+              "shoes": "white trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 4-year-old girl named Zara standing on a sunlit playground. She is clearly four: slim and leggier than a toddler, head still large for the body, standing confidently. She has black coily hair gathered into two small afro puffs, dark brown eyes, deep brown skin, and a wide happy natural smile with small milk teeth. She wears a bright pink t-shirt, yellow denim shorts and white trainers. She must read as a 4-year-old, clearly older than a toddler and clearly younger than a school child. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 109,
+          "name": "Samuel",
+          "gender": "male",
+          "age": "5",
+          "ageCategory": "kindergartner",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "medium brown",
+            "hairLength": "short",
+            "hairStyle": "straight",
+            "eyeColor": "brown",
+            "skinTone": "olive",
+            "build": "average",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 5-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "light blue t-shirt",
+              "lowerBody": "dark grey shorts",
+              "shoes": "grey trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 5-year-old kindergarten boy named Samuel standing on a grassy field. He is clearly five: taller and leaner than a preschooler, longer legs, flatter tummy, head noticeably more proportionate, a relaxed upright stance. He has short straight medium-brown hair, brown eyes, olive skin, and a natural open smile with a small gap where a milk tooth is loose. He wears a plain light-blue t-shirt, dark grey shorts and grey trainers with grass stains. He must read clearly as five years old — a kindergartner, not a preschooler and not a big school kid. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 110,
+          "name": "Ingrid",
+          "gender": "female",
+          "age": "5",
+          "ageCategory": "kindergartner",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "very light blonde",
+            "hairLength": "long",
+            "hairStyle": "two braids",
+            "eyeColor": "blue",
+            "skinTone": "very fair",
+            "build": "slim",
+            "height": "short"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 5-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "cream knitted jumper",
+              "lowerBody": "red pleated skirt with navy tights",
+              "shoes": "brown ankle boots"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 5-year-old kindergarten girl named Ingrid standing on a sunlit gravel path. She is clearly five: taller and leaner than a preschooler, longer legs, flatter tummy, more proportionate head, standing easily. She has very light blonde hair in two long braids, blue eyes, very fair skin with pink cheeks, and a small natural closed-mouth smile. She wears a cream knitted jumper, a red pleated skirt with navy tights and brown ankle boots. She must read clearly as five years old — a kindergartner, not a preschooler and not a big school kid. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 111,
+          "name": "Rohan",
+          "gender": "male",
+          "age": "8",
+          "ageCategory": "young-school-age",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "black",
+            "hairLength": "short",
+            "hairStyle": "thick and straight",
+            "eyeColor": "dark brown",
+            "skinTone": "brown (South Asian)",
+            "build": "slim",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 8-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "navy-blue hoodie",
+              "lowerBody": "dark jeans",
+              "shoes": "black trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 8-year-old school boy named Rohan standing on a sunlit schoolyard. He is clearly eight: distinctly school-age proportions — long limbs, slim body, adult-shaped face emerging with a longer jaw, none of the baby roundness left, standing casually with hands in his pockets. He has thick straight black hair cut short, dark brown eyes, brown South Asian skin, and an easy grin with slightly oversized adult front teeth. He wears a navy-blue zip hoodie, dark jeans and black trainers. He must read clearly as eight, not five and not a teenager. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 112,
+          "name": "Clara",
+          "gender": "female",
+          "age": "8",
+          "ageCategory": "young-school-age",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "chestnut brown",
+            "hairLength": "long",
+            "hairStyle": "high ponytail",
+            "eyeColor": "hazel",
+            "skinTone": "light",
+            "build": "slim",
+            "height": "average",
+            "other": "freckles across the nose"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 8-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "purple long-sleeve top",
+              "lowerBody": "blue jeans",
+              "shoes": "white trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 8-year-old school girl named Clara standing on a sunlit path. She is clearly eight: school-age proportions — long limbs, slim straight body with no adolescent shape yet, a longer face with the baby roundness gone, standing casually. She has long chestnut-brown hair pulled into a high ponytail, hazel eyes, light skin with freckles across her nose, and a natural smile with slightly large adult front teeth. She wears a purple long-sleeve top, blue jeans and white trainers. She must read clearly as eight, not five and not a teenager. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 113,
+          "name": "Marek",
+          "gender": "male",
+          "age": "12",
+          "ageCategory": "preteen",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "dark blonde",
+            "hairLength": "medium",
+            "hairStyle": "shaggy",
+            "eyeColor": "green",
+            "skinTone": "fair",
+            "build": "lanky",
+            "height": "tall"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 12-year-old male. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "grey graphic t-shirt",
+              "lowerBody": "black track trousers",
+              "shoes": "green trainers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 12-year-old preteen boy named Marek standing on a sunlit basketball court. He is clearly twelve: noticeably tall and lanky with long arms and legs, big feet and hands relative to his frame, a lengthening pre-adolescent face with a defined nose and jaw, no facial hair, narrow shoulders, slouching slightly with hands in his pockets. He has shaggy medium-length dark-blonde hair falling over his forehead, green eyes, fair skin, and a slightly self-conscious closed-mouth expression. He wears a plain grey t-shirt, black track trousers and green trainers. He must read clearly as twelve — a preteen, not a small child and not an adult. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        },
+        {
+          "id": 114,
+          "name": "Naomi",
+          "gender": "female",
+          "age": "12",
+          "ageCategory": "preteen",
+          "storyRole": "main",
+          "physical": {
+            "hairColor": "dark brown",
+            "hairLength": "long",
+            "hairStyle": "curly",
+            "eyeColor": "dark brown",
+            "skinTone": "medium brown",
+            "build": "slim",
+            "height": "average"
+          },
+          "traits": {
+            "strengths": [
+              "Curious",
+              "Friendly"
+            ],
+            "flaws": [
+              "Impatient"
+            ],
+            "challenges": [
+              "Trying new things"
+            ],
+            "specialDetails": "Independent age-band reference subject: 12-year-old female. Not related to the other characters on this account."
+          },
+          "clothing": {
+            "structured": {
+              "upperBody": "mustard cardigan over a white t-shirt",
+              "lowerBody": "blue denim skirt with black leggings",
+              "shoes": "white high-top sneakers"
+            }
+          },
+          "portraitPrompt": "Full-body candid snapshot of an ordinary 12-year-old preteen girl named Naomi standing on a sunlit street. She is clearly twelve: tall and slim with long limbs, a lengthening pre-adolescent face with defined cheekbones, none of the childhood roundness left, standing a little self-consciously with her arms loose. She has long dark-brown curly hair worn loose, dark brown eyes, medium brown skin, and a small reserved smile. She wears a mustard-yellow cardigan over a white t-shirt, a blue denim skirt with black leggings and white high-top sneakers. She must read clearly as twelve — a preteen, not a small child and not an adult. Photo-realistic candid snapshot like a parent's casual phone photo, natural daylight, slightly blurred background (bokeh), sharp focus on the figure, full body framed head to toe with a little headroom. Ordinary child, not a model, no doll-like polish, no retouching. No text, no watermarks."
+        }
+      ],
+      "relationships": {}
     }
   ]
 }
