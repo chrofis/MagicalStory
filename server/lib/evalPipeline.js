@@ -235,7 +235,13 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       return null;
     }
 
-    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens };
+    // `modelId` is reassigned by the fallbacks above, so it is the model that
+    // ACTUALLY answered — which the caller has no other way to learn. Lab #1241
+    // requested gemini-3.7-flash, every call 400'd ("reasoning is mandatory"),
+    // the documented 2.5-flash fallback served all 10 pages, and the experiment
+    // row still said 3.7: an A/B comparing a model with itself, caught only
+    // because the token counts came back byte-identical to the 2.5 arm.
+    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens, servedByModel: modelId };
 
     let inventoryJson;
     try {
@@ -267,6 +273,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
 
     return {
       figures,
+      servedByModel: modelId,
       // Everything the unified template produces travels with it. The narrowed
       // return is what made P1's scene_summary generated-and-discarded on every
       // page since February, and it would have silently dropped interactions,

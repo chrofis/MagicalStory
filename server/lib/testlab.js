@@ -3143,12 +3143,19 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
   const audit = await withTemplates({ bookAudit: promptOverride }, () => auditStoryBook(storyData, {
     storyId: target.storyId,
     modelId: params.modelId || undefined,
+    // Gemini 3 thinking level ('low'|'medium'|'high'). Lab-only: when the param
+    // is absent nothing is sent and the model keeps its own default, so a
+    // production audit is unchanged.
+    thinkingLevel: params.thinkingLevel || undefined,
   }));
   if (!audit) return { ok: false, elapsedMs: Date.now() - t0, faults: 0, byRoute: { IMG: [], TEXT: [] }, logLines: [] };
   return {
     ok: true,
     elapsedMs: Date.now() - t0,
     modelId: audit.modelId,
+    thinkingLevel: audit.thinkingLevel || null,
+    usage: audit.usage,
+    chunkUsage: audit.chunkUsage,
     faults: audit.faults,
     byRoute: audit.byRoute,
     pagesRead: audit.pagesRead,
@@ -6570,6 +6577,8 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
         res = await runVisualInventory(parts, modelId, apiKey, label, {
           promptOverride: arm.template,
           raw: true,
+          // params.reasoning measures what thinking costs on a describe-only pass.
+          ...(params.reasoning ? { reasoning: params.reasoning } : {}),
         });
       } catch (e) {
         log.warn(`[INVENTORY-AB] ${label} failed: ${e.message}`);
@@ -6594,6 +6603,11 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
         ...scoreArm(arm.key, parsed, rawText),
         inputTokens: res.inputTokens || 0,
         outputTokens: res.outputTokens || 0,
+        // The model that ANSWERED, not the one the experiment asked for. The
+        // inventory falls back to gemini-2.5-flash on any OpenRouter failure,
+        // so without this an arm can silently be the fallback and the row still
+        // reads as the requested model (#1241).
+        servedByModel: res.servedByModel || modelId,
         jsonParsed: arm.json ? parsed != null : null,
         output: rawText,
       });
