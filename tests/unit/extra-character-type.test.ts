@@ -110,8 +110,12 @@ describe('extra_character — scoring and taxonomy', () => {
     expect(bucketForType('missing_character')).toBe('character_presence');
   });
 
-  it('is not barred from inpaint (the removal route stays open)', () => {
-    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(false);
+  // Owner decision 2026-09-13: the type stays scored, but it may never cause a
+  // figure to be deleted. Inpaint was the removal route (a Grok whole-frame
+  // edit executing the old "Remove this figure" fix erased a commissioned child
+  // from a cover), so the route is closed at the type.
+  it('is barred from inpaint — the removal route is closed', () => {
+    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(true);
   });
 });
 
@@ -131,7 +135,7 @@ describe('extra_character — parse + score path', () => {
     fixable_issues: [
       { type: 'extra_character', severity: 'CRITICAL', character: 'figure 5',
         description: 'A fifth child stands at the right; the EXPECTED CAST lists four.',
-        fix: 'Remove this figure; the frame holds the EXPECTED CAST only.' },
+        fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT." },
     ],
   };
 
@@ -196,6 +200,15 @@ describe('extra_character — prompt vocabulary', () => {
     expect(t).toMatch(/`reference` is an EXPECTED CAST name .* or the literal `unmatched`/);
     // N-09 is scoped to a populated setting the prompt itself calls for.
     expect(t).toMatch(/N-09 Crowd extras\.\*\* Extra background figures ONLY when the USER_PROMPT itself calls for a populated setting/);
+  });
+
+  it('D-04b never instructs a removal (owner, 2026-09-13)', () => {
+    // Pins the PROPERTY, not the wording: whatever D-04b's fix says, it may not
+    // ask for the figure to be taken out of the frame.
+    const t = String(PROMPT_TEMPLATES.imageEvaluation || '');
+    const rule = t.split('\n').find(l => l.includes('D-04b `extra_character`')) || '';
+    expect(rule).not.toBe('');
+    expect(rule).not.toMatch(/\b(remove|delete|erase|paint out|take out)\b/i);
   });
 
   it('buildEvaluationPrompt renders the roster into the template', () => {

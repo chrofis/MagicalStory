@@ -699,6 +699,12 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
   // body form
   'scale',
+  // extra_character: the finding is an identity reconciliation, not a deletion
+  // (owner, 2026-09-13). Inpaint was the removal route — a Grok whole-frame
+  // edit executing "remove this figure" erased a commissioned child from a
+  // cover. The finding stays scored and stays in the shippedDefective report;
+  // only its ROUTE is closed, like every other entry here.
+  'extra_character',
 ]);
 
 /**
