@@ -1119,7 +1119,11 @@ async function extractInlineImagesToR2(storyId, data) {
   // upload the same bytes twice AND race two apply()s on the same field,
   // potentially leaving the base64 stale in the blob when the sweep's
   // apply() lands AFTER the per-field walker's apply() that cleared it.
-  const queuedInputs = new Set();
+  // Keyed by the byte string itself: identical content means the semantic
+  // upload the walker already queued IS this image, so a second PUT of the
+  // same bytes buys nothing. The value is the owning task, so the sweep can
+  // hand a still-inline sibling slot the semantic URL once it is known.
+  const queuedInputs = new Map();
   /**
    * Queue one R2 upload. No-op if `input` isn't actual byte data.
    * @param {string} input  — base64 / data: URI, or anything else (skipped).
@@ -1128,8 +1132,9 @@ async function extractInlineImagesToR2(storyId, data) {
    */
   const upload = (input, key, apply) => {
     if (!looksLikeBytes(input)) return;
-    queuedInputs.add(input);
-    tasks.push({ input, key, apply });
+    const task = { input, key, apply, url: null };
+    if (!queuedInputs.has(input)) queuedInputs.set(input, task);
+    tasks.push(task);
   };
 
   // sceneImages — per-page debug images
@@ -1512,25 +1517,45 @@ async function extractInlineImagesToR2(storyId, data) {
   // <img src> contexts work unchanged.
   //
   // Three guards keep it safe:
-  // - skips strings already queued by per-field walkers (looksLikeBytes
-  //   uses the same predicate; queued tasks' apply() clears the source)
+  // - skips bytes already queued by a per-field walker (consulting
+  //   `queuedInputs`; such a slot is resolved to the walker's SEMANTIC url
+  //   after the queue drains, and only if it still holds the base64). Until
+  //   2026-09-13 this guard was populated but never read, so every
+  //   explicitly-walked image was PUT twice and the /aux/ apply — queued
+  //   later, so usually landing last — overwrote the semantic URL.
   // - skips known-already-URL fields (looksLikeBytes returns false for http*)
   // - bounds key length (R2 limit 1024 bytes)
   const sanitizeKeySegment = (s) =>
     String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
   const sweptKeys = new Set(tasks.map(t => t.key));
   const seenObjects = new WeakSet();
+  // Slots holding bytes an explicit walker already owns. They are NOT queued
+  // again (that was the double-upload); instead they are resolved after the
+  // queue drains — and only if the slot still holds the base64 at that point.
+  // A walker that deliberately cleared its source field (landmarkPhotos moves
+  // photoData → photoUrl and undefines photoData) must stay cleared, while a
+  // genuinely separate field that happens to carry the same image gets the
+  // semantic URL instead of stale bytes the strip would drop.
+  const aliasSlots = [];
   const queueLeak = (parent, key, child, pathSegments) => {
+    const owner = queuedInputs.get(child);
+    if (owner) {
+      aliasSlots.push({ parent, key, input: child, owner });
+      return;
+    }
     const keyBase = `stories/${storyId}/aux/${[...pathSegments, sanitizeKeySegment(key)].join('-')}`;
     let k = `${keyBase}.jpg`;
     let suffix = 1;
     while (sweptKeys.has(k)) k = `${keyBase}__${suffix++}.jpg`;
     sweptKeys.add(k);
-    tasks.push({
+    const task = {
       input: child,
       key: k,
       apply: (url) => { parent[key] = url; },
-    });
+      url: null,
+    };
+    queuedInputs.set(child, task);   // a later slot with the same bytes aliases here
+    tasks.push(task);
   };
   function sweep(node, pathSegments) {
     if (!node || typeof node !== 'object') return;
@@ -1569,13 +1594,20 @@ async function extractInlineImagesToR2(storyId, data) {
       const t = tasks[myIdx];
       try {
         const url = await r2.uploadImage(t.input, t.key);
-        if (url) t.apply(url);
+        if (url) { t.url = url; t.apply(url); }
       } catch (err) {
         log.warn(`[R2-extract] upload failed for ${t.key}: ${err.message}`);
       }
     }
   });
   await Promise.all(workers);
+
+  // Resolve the sweep's alias slots against the upload that actually happened.
+  // Guarded on the slot still holding the bytes: a walker that cleared its
+  // own source field must not have it resurrected.
+  for (const a of aliasSlots) {
+    if (a.owner.url && a.parent[a.key] === a.input) a.parent[a.key] = a.owner.url;
+  }
 }
 
 /**
