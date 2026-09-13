@@ -383,6 +383,17 @@ measurement, is lost).
 
 ## Refactor + tech debt
 
+- [ ] **17 of 128 production stories are owned by a `user_id` with no `users` row** — stories
+      outliving their owner. Found during the 2026-09-13 R2 audit, independent of R2, NOT fixed.
+      Decide the rule (adopt to an owner / soft-delete / leave and document) and add a constraint
+      or a housekeeping check so it cannot silently recur
+      → `docs/decisions.md` (2026-09-13 "R2 garbage collection is COHORT-based", Measured)
+- [ ] **R2 orphan PREVENTION (`0e07da278`) is on `staging` only, not `master`** — production
+      deletion paths still drop rows without their objects, so the bucket re-accumulates orphans
+      and the 2026-09-13 cohort cleanup (22,011 objects / 3,107 MB) will need repeating until the
+      commit is promoted. Covered by the P0 promotion line, tracked here because the cost is
+      ongoing → `docs/r2-storage.md` §5
+
 - [ ] STR-1 — split `processUnifiedStoryJob` — **now ~6,559 lines (`storyJobPipeline.js:378-6937`,
       file total 7,570); it GREW ~40% since the ~4,600 estimate**; STR-2–STR-5 + VAR-1 each ship as
       their own PR → `docs/review-2026-07-04-structural-plan.md:3`

@@ -34203,3 +34203,106 @@ two-witness call site + rescore), `server/lib/identityAgreement.js`,
 `tasks/presence-signal-rewrite-2026-09-13.md`.
 
 **Status:** ✅ active (staging only at the time of writing — not on master).
+
+---
+
+## 2026-09-13 — R2 garbage collection is COHORT-based: "no database reference" is never, by itself, proof an object is dead
+
+**Context:** Production R2 held 116,189 objects / 20.66 GB. A real problem
+existed underneath: deletion paths removed database rows without removing the
+objects they pointed at, so the bucket accumulated genuine orphans. (The
+prevention-side fixes are commit `0e07da278`, "fix(r2): stop creating orphans
+— record failed prunes, and delete the object with its row" — **staging only,
+NOT on master** at the time of writing.)
+
+Three successive classifiers were built to find the dead objects. All three
+shipped a different FALSE POSITIVE class, and all three shared one unsound
+inference: **absence of a database reference means the object is dead.** That
+inference is the trap, and it is worth stating plainly because it is the
+obvious thing to reach for:
+
+1. **The `orders` blind spot.** Order PDFs are keyed `orders/{files.id}.pdf`.
+   When the `stories` and `files` rows are pruned, the `orders` row survives
+   forever — and an `orders` row never stores the PDF URL anywhere. A
+   URL-based scan is therefore *structurally* blind to it: no bug, no
+   oversight, the reference simply does not exist in the schema. 22 PDFs would
+   have been destroyed. They belonged to 4 stories / 20 paid orders of ONE
+   customer, who happened to be the owner's own account, so nothing real was
+   lost — but the same mechanism hits a paying customer next time.
+
+2. **The `migrated/` mis-parse.** `server/lib/dbHousekeeping.js:148` writes
+   `` `${table}/${safe(row.owner)}/${safe(row.id)}/migrated` `` — so for those
+   keys, path segment 2 is a **USER id**, not a story id. A scan that read
+   segment 2 as a story id filed live users' migrated page images under
+   "dead stories". Live user `1764881868108` (27 stories, 77 orders) was in
+   the delete list.
+
+3. **Id-space ambiguity.** Numeric ids are simultaneously user ids, character
+   ids, and values inside `stories.data` JSONB (e.g.
+   `{"id": 1765719852125, "name": "Roger"}`). A verification pass built on
+   `src::text LIKE '%id%'` substring matching returned 9 "false positives" out
+   of 40 that were themselves partly spurious — substring hits inside longer
+   numbers and inside unrelated JSONB payloads. The classifier was unreliable
+   AND so was the verifier written to check it.
+
+**Decision:** Garbage collection groups bucket keys by **owner prefix cohort**
+— `stories/{id}/`, `characters/{user}/{char}/` — and a cohort is DEAD only if
+**ZERO of its objects appear in any URL stored anywhere in the database**.
+
+- No id parsing, no substring matching, no type coercion. The only question
+  ever asked is whether an exact key string is a member of the referenced set.
+- `orders/`, `landmarks/` and **any unrecognised top-level prefix** are
+  protected in code regardless of reference state
+  (`cohortOf()` in `scripts/admin/delete-r2-dead-cohorts.js`).
+- A table that fails to scan is a FATAL stop, never a skip: a silent zero
+  would mark that whole table's objects deletable.
+- Dry-run by default; `--confirm --production` both required; a final
+  assertion that no victim key is in the referenced set; deletes in batches of
+  1000 (S3 API max); every deleted key logged.
+
+The rule is deliberately conservative: a cohort with even ONE referenced
+object is untouchable **in full**, so a live user holding both live and
+deleted stories keeps everything. That leaves some genuine orphans behind.
+Accepted.
+
+**Rationale:** Each of the three failures was a different unknown-unknown, and
+the pattern is that you cannot enumerate them in advance — there will always
+be one more place a reference legitimately does not exist. The cohort rule
+does not try to. It replaces "prove this object is dead" with the much weaker,
+checkable claim "this entire owner is untouched by the whole database", which
+survives all three mechanisms above: the `orders` prefix never enters the
+candidate set at all; `migrated/` keys sit inside their owner's cohort no
+matter which segment holds which id, because no segment is interpreted; and
+substring matching is simply not used. Validated against the three ids that
+broke the earlier attempts — all correctly excluded.
+
+**Measured, same day:**
+- Deleted **22,011 objects / 3,107 MB**, from 95 dead story cohorts and 235
+  dead character cohorts (≈100 deleted test accounts). Log:
+  `tasks/r2-deletion-log-2026-09-13.jsonl` (gitignored).
+- Kept 13.4 GB of live-owner content **including all pipeline diagnostics** —
+  owner's explicit call 2026-09-13: diagnostics are a research asset ("maybe
+  later we go and check all cases where x failed"), and at Cloudflare's
+  $0.015/GB-month (pricing page, fetched 2026-09-12) the *entire* bucket cost
+  ~$0.16/month. Cost was never the reason to delete; completeness of deletion
+  was.
+- `landmarks/` was **PRISTINE**: 16,143 objects, zero unreferenced. The
+  counter-example — that subsystem tracks its own storage correctly, which is
+  why it needs no sweep, only its blanket protection.
+- Showcase/demo characters were never at risk: the canonical photos live on
+  disk under `tests/fixtures/demo-photos/{berger,dubois,miller}/`, and all 21
+  demo characters in production were referenced. They are protected by the
+  general reference rule, **not** by an explicit carve-out like `landmarks/` —
+  the owner declined adding one.
+- Found while scanning, NOT fixed: **17 of 128 production stories are owned by
+  a `user_id` with no `users` row** — stories outliving their owner. A real
+  integrity problem, independent of R2. On the backlog.
+
+**Touched files:** `scripts/admin/delete-r2-dead-cohorts.js` (new),
+`docs/r2-storage.md` (new — prefix map, reference tables, cohort rule, how to
+run the audit and the deleter), `tasks/BACKLOG.md`. Read-only audit remains
+`scripts/admin/audit-r2-orphans.js`; the manifest-consuming
+`scripts/admin/delete-r2-orphans.js` is unchanged.
+
+**Status:** ✅ active. Note the bucket will re-accumulate orphans until
+`0e07da278` is promoted to master.
