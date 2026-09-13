@@ -217,7 +217,7 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
  * vision judge (Qwen3-VL, Qwen3.6 Plus, Kimi K2.6, MiniMax M3) through the
  * same parsing. Temperature 0 (SETTLED: eval judges run at temperature 0).
  */
-async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptText) {
+async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptText, options = {}) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     log.error('❌ [OPENROUTER VISION] OPENROUTER_API_KEY not configured');
@@ -232,7 +232,14 @@ async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptTex
     }
   }
   // No max_tokens (owner rule: no output caps): OpenRouter defaults to the upstream model's ceiling.
-  const body = { model: modelId, temperature: 0, messages: [{ role: 'user', content }] };
+  // `reasoning` is a passthrough, absent unless a caller asks: thinking tokens
+  // bill as output, and a describe-what-you-see pass has nothing to reason over.
+  // Measure per model before trusting a level — on deepseek-v4-pro {enabled:false}
+  // zeroed them while {effort:'low'} was ignored and cost 9x (textModels.js).
+  const body = {
+    model: modelId, temperature: 0, messages: [{ role: 'user', content }],
+    ...(options.reasoning ? { reasoning: options.reasoning } : {}),
+  };
   const startTime = Date.now();
   const response = await withRetry(async () => fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
