@@ -35887,3 +35887,72 @@ treated as unknown and logged.
 **Status:**    🟡 conditional — unit-proven and measured on stored data; one
 real story still owed to see `[CAST-RESOLVE]` stats on live pages and a
 single-spelling roster end to end.
+
+## 2026-09-13 — The TRIAL's avatar sheet is drawn for the story's season; the full path is untouched
+
+**Context:** A trial story states no outfit anywhere. `storyJobPipeline.js`
+builds the trial contract from config as `standard: { used: true, signature:
+'none' }`; `signature: 'none'` is explicitly discarded by every resolver
+(`clothingResolve.js:819,830`), so `buildClothingDescription` falls through its
+whole ladder to the hardcoded `categoryDefaults` (`entityConsistency.js:3013`,
+"Casual everyday clothing as shown in reference"). A full-text scan of all six
+scene briefs of staging `job_1789296188291_thezv15y1` for
+`wearing|t-shirt|shorts|shoes` returns zero hits, while the same briefs read
+"warm soft afternoon autumn light" and "fallen orange and yellow autumn leaves".
+The pixels therefore come entirely from the styled 2×4 sheet, which was built
+from the child's creation-time photo through a path with no season input — so a
+child photographed in summer clothes wears them through every autumn and winter
+trial book, deterministically.
+
+The FULL path does not have this gap: its outline writes a real
+`clothingRequirements[...].description` (the canonical outfit,
+`docs/SETTLED.md:71`) and, measured over stored data, already dresses the cast
+for the season it is given — 0 of 34 cold-season stories (22 staging, 12 prod)
+carry a summery non-costumed outfit with no warm layer.
+
+**Decision:** `server/lib/season.js` gains `seasonOutfitGuidance()`, the
+wardrobe-side sibling of `buildSeasonNote` (scenery) and
+`buildSeasonInstruction` (text), returning `{ season, label, outfit, footwear }`.
+It is threaded as an optional `seasonOutfit` through `prepareStyledAvatars` →
+`getOrCreateStyledAvatar` → `convertAvatarToStyle` → `generateCharacter2x4Sheet`
+and rendered into the body-row prompt. It is passed ONLY on trial call sites
+(`storyJobPipeline.js` `trialSeasonOutfit()`, and the `/api/trial/prepare-title`
+prewarm, which is where a no-costume trial's `standard` sheet is actually built).
+Suppressed whenever an outfit is already stated: a costumed sheet, and any
+`redress` sheet where a contract description drives the garments. Suppressed for
+`storyCategory === 'historical'`, mirroring the trial premise rule.
+
+**Rationale:** The sheet is the identity anchor, so the block names GARMENTS and
+then pins face, hair, skin tone, build and apparent age to the references — the
+season may change what the figure wears, never who it is. Warm seasons are as
+explicit as cold ones ("no outer layer at all" for summer), because a rule that
+only says "dress for the season" puts a child in a coat in July. Footwear is not
+a second rule: `buildFootwearRule(redress, seasonFootwear)` takes the seasonal
+kind instead of the "copy the body reference" carry-over, since the reference
+photo's sandals are exactly what a winter sheet must not copy; with no season
+passed it is byte-identical to the shipped rule.
+
+Nothing is written into `clothingRequirements` or `avatars.clothing`, so the
+judge and the generator keep resolving the same string they do today and the
+known judge/generator contract divergence (`tasks/BACKLOG.md`,
+`clothingResolve.js:559`) is not widened by a character. The consequence, which
+is the accepted cost of this shape, is that the trial's judge still has no
+clothing contract to check the sheet against (`image-evaluation.txt` N-16
+reports nothing on an empty contract, by design).
+
+**Cache:** not part of the styled-avatar cache key, deliberately. The key is
+`${cacheScope}${name}_${category}_${artStyle}` (`styledAvatars.js:273`) and the
+scope is per job (`trial-<userId>` for a trial), so it is already story-scoped
+and a story has exactly one season. Styled sheets are regenerated fresh per
+story by design (`styledAvatars.js:575-579, 616-620`), so season-dependence
+causes no extra generation. The one season-blind cross-story reuse of a sheet is
+`compositeCastBuilder.js:263-271`, which reads
+`characters.data.avatars.styledAvatars[artStyle][category]` and persists to it
+("for reuse across stories", `:304-309`) — that path is NOT made seasonal here.
+
+**Touched:** `server/lib/season.js`, `server/lib/character2x4Sheet.js`,
+`server/lib/styledAvatars.js`, `server/routes/trial.js`, `storyJobPipeline.js`;
+test `tests/unit/season-outfit-sheet.test.ts`.
+**Status:**    🟡 conditional — unit-proven and code-traced; no sheet has been
+generated with it (no paid calls were permitted), so warm/cold behaviour on real
+pixels is unverified. One `/try` run with the date in a cold season is the check.

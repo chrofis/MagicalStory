@@ -95,6 +95,33 @@ const { stripDataUriPrefix } = require('./server/lib/r2');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
 
 /**
+ * The season the TRIAL's avatar sheet is drawn for; null on every other path.
+ *
+ * Trial-only by measurement, not by caution. A full story's outline writes a
+ * real `clothingRequirements[...].description` — the canonical outfit
+ * (docs/SETTLED.md:71) — and already dresses its cast for the season it is
+ * given (0 summer-outfit cold-season stories across 34 stored ones). The trial
+ * has no outline: its contract is `standard: { used: true, signature: 'none' }`,
+ * which every resolver discards, so NO clothing text reaches any prompt and the
+ * styled 2×4 sheet is the only thing that decides what the child wears. That
+ * sheet was drawn from the creation-time photo with no season input at all, so a
+ * child photographed in a t-shirt wore a t-shirt through an autumn book
+ * (staging job_1789296188291_thezv15y1).
+ *
+ * `inputData.season` is stamped in `_processStoryJobImpl` (resolveSeason from
+ * the job's own created_at) before the pipeline is entered.
+ */
+function trialSeasonOutfit(inputData = {}) {
+  if (!inputData?.trialMode) return null;
+  try {
+    return require('./server/lib/season').seasonOutfitGuidance(inputData);
+  } catch (e) {
+    log.warn(`🍁 [TRIAL] seasonOutfitGuidance failed: ${e.message} — sheet drawn without a season`);
+    return null;
+  }
+}
+
+/**
  * Which covers a job renders. `inputData.coverTypes` is the explicit list
  * (trial: title page + back cover, no dedication page — trials store no
  * dedication); otherwise the legacy `titlePageOnly` boolean decides. One
@@ -814,7 +841,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // bodies/heads/identity/style eval. Measured on job_1786818831439:
           // 4 Gemini evals plus a body-row retry the trial cannot act on
           // anyway (no repair stage).
-          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true });
+          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true, seasonOutfit: trialSeasonOutfit(inputData) });
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
@@ -1972,7 +1999,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   characterNames: [char.name]
                 }));
               });
-              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
@@ -3188,7 +3215,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterNames: [char.name]
             }));
           });
-          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
           log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
@@ -3268,7 +3295,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         ? `coverage top-up (${getStyledAvatarCacheStats().size} already cached)`
         : 'early styling did not run';
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled-avatar reqs for ${artStyle} (${mode})`);
-      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)

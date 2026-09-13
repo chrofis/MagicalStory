@@ -292,7 +292,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null } = {}) {
   const startTime = Date.now();
 
   // CANONICAL PATH (2026-05-14): styled avatars are 2×4 reference sheets
@@ -343,6 +343,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       artStyle,
       usageTracker: addUsage,
       redress,
+      seasonOutfit,
       // The end of the chain: every caller above threads skipQualityEval, and
       // it died here — the sheet builder kept running its row reviews for
       // trials no matter what the pipeline asked for (job_1786826686448).
@@ -489,7 +490,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null } = {}) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first. A guarantee-seeded raw reference does NOT count — the
@@ -511,7 +512,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress });
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit });
       styledAvatarCache.set(cacheKey, styledAvatar);
       guaranteeSeededKeys.delete(cacheKey); // real sheet replaces any seeded raw reference
       return styledAvatar;
@@ -562,7 +563,15 @@ function rememberStyledAvatarOnCharacter(character, artStyle, clothingCategory, 
   }
 }
 
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
+// `seasonOutfit` ({ season, label, outfit, footwear } from season.js
+// `seasonOutfitGuidance`, or null): dresses the NON-costumed sheets for the
+// story's season. Passed only where nothing else states an outfit — the trial
+// path, whose contract is `signature: 'none'` and therefore resolves to a
+// generic default, leaving the creation-time photo as the sole source of the
+// outfit (a t-shirt in a winter book). Costumed sheets never take it: the
+// costume is the outfit. Not part of the cache key deliberately — the key is
+// already story-scoped (`getCacheScope()`), and a story has exactly one season.
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false, seasonOutfit = null } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // For realistic style, skip standard/winter/summer style conversion (photos are already realistic)
@@ -774,6 +783,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
             // scene reads the body cell, and the eval — which checks the story
             // outfit — desyncs → repaint loop.
             redress: outfitChanged,
+            // Season dresses a sheet only when the outfit is NOT already
+            // dictated: a contract description (or a costume) states the
+            // garments itself, and a second, seasonal opinion would fight it.
+            seasonOutfit: (outfitChanged || isCostumedCat) ? null : seasonOutfit,
             character: char  // Pass full character object for physical traits
           });
         }
@@ -859,9 +872,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   }
 
   // Standard style conversion promises (run simultaneously with costumed)
-  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, redress, character }] of neededAvatars) {
+  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, redress, seasonOutfit: entrySeasonOutfit, character }] of neededAvatars) {
     allPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress })
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit: entrySeasonOutfit })
         .then(styledAvatar => ({ type: 'standard', cacheKey, characterName, clothingCategory, character, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);

@@ -2449,8 +2449,18 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         }
       }
 
-      // Prepare styled avatars (costumed only for trial — see decision above)
-      await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
+      // Prepare styled avatars (costumed only for trial — see decision above).
+      //
+      // The season rides along for the same reason the premise takes one at
+      // :2194: /try asks the visitor nothing, so it resolves from the date —
+      // the same default the trial job's own `resolveSeason` lands on minutes
+      // later, so the prewarmed sheet and the job agree. It only bites on the
+      // no-costume branch below, where a `standard` sheet IS generated here and
+      // nothing else in a trial ever states an outfit; a costumed sheet ignores
+      // it (the costume is the outfit).
+      const { seasonOutfitGuidance } = require('../lib/season');
+      const seasonOutfit = seasonOutfitGuidance({ storyCategory });
+      await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit });
       log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
       // Export styled avatars so the pipeline can reuse them (avoid regenerating)
