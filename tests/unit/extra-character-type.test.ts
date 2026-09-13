@@ -26,8 +26,24 @@ const visualBible = {
 
 describe('buildExpectedCastBlock — page roster', () => {
   it('is blank when the caller knows NO cast (null), so the evaluator does not judge the count', () => {
-    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false });
+    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false });
     expect(buildExpectedCastBlock({}).block).toBe('');
+  });
+
+  // CROWD FLAG (owner, 2026-09-13). The derivation has no equivalent of the
+  // evaluator's N-09 crowd exemption, so the brief declares it and the roster
+  // carries it. Absent must read as "no crowd" — every story stored before the
+  // field existed depends on that.
+  it('carries the brief\'s crowd flag, and absent/false/garbage all read as no crowd', () => {
+    const hint = (meta: object) => 'A busy square.\n\n---METADATA---\n' + JSON.stringify({ characters: [{ name: 'Aaron' }], ...meta });
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, sceneHint: hint({ crowdExpected: true }) }).crowdExpected).toBe(true);
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, sceneHint: hint({ crowdExpected: false }) }).crowdExpected).toBe(false);
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, sceneHint: hint({}) }).crowdExpected).toBe(false);
+    // A row that predates the field, and a truthy non-boolean, are both "no crowd".
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, sceneMetadata: {} }).crowdExpected).toBe(false);
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, sceneMetadata: { crowdExpected: 'yes' } }).crowdExpected).toBe(false);
+    // Also readable off fullData, which is where the prose-format parser keeps it.
+    expect(buildExpectedCastBlock({ sceneCharacters: boys, sceneMetadata: { fullData: { crowdExpected: true } } }).crowdExpected).toBe(true);
   });
 
   it('a DECLARED cast of zero is a roster of zero, not a blank (D6, 2026-09-11)', () => {

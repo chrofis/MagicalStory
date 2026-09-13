@@ -136,6 +136,7 @@ Then a single-line JSON object:
     {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view, head turned toward right shoulder", "depth": "background", "looksAt": "ART001", "expression": "one eye and cheek visible, calm, faint smile"}
   ],
   "shot": "medium",
+  "crowdExpected": false,
   "aboard": "VEH001",
   "landmarkView": "exterior",
   "era": "present day",
@@ -170,6 +171,7 @@ Then a single-line JSON object:
 - `looksAt` on every foreground/midground character: another character's name, a Visual Bible id (`ART001`, `CHR001`), `camera`, or `away`. Eyes only — see rule 8j. Never the object a character merely holds.
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.
 - `shot` is the page's camera framing: `close-up`, `medium`, or `wide`. Decide it once — the scene prose, the emptyScenePrompt, and the metadata all use this same framing. Omitting it makes the empty scene default to a wide shot.
+- `crowdExpected` is `true` only when the page is written to hold unnamed background people beyond its listed cast — a crowd, a market, a busy street, a gathering, a body of troops. A page whose prose names its figures and nobody else is `false`. Omit it and the page is read as `false`.
 - `landmarkView` is how the page sees a real landmark, when one is cited: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping, or feet-on-ground contact, and nothing placed behind the character. The outfit list still names all garments including footwear. A beat that needs below-waist action is a `medium` shot, not a close-up.
 - Only add `depth` when the character is in the background (default is foreground/midground).

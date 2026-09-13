@@ -3934,6 +3934,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,
     textZoneDescription: newSceneMetadata?.textZoneDescription || savedMeta.textZoneDescription || null,
     aboard: newSceneMetadata?.aboard || savedMeta.aboard || savedMeta.fullData?.aboard || null,
+    // Same class as era/textZoneDescription: scene-iteration.txt does not emit
+    // the crowd flag, so a repaired page would lose it and its background
+    // extras would come back as a derived extra_character.
+    crowdExpected: newSceneMetadata?.crowdExpected === true
+      || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
   };
 
   // Route by scene complexity when no explicit model override

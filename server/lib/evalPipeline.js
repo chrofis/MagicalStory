@@ -933,9 +933,14 @@ function buildExpectedCastBlock({
   // roster was supplied — and keeps the blank block.
   const castDeclared = Array.isArray(sceneCharacters);
   for (const c of (castDeclared ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
-  if (!castDeclared) return { block: '', names: [], count: 0, declared: false };
+  if (!castDeclared) return { block: '', names: [], count: 0, declared: false, crowdExpected: false };
 
   const sh = getStoryHelpers();
+  // CROWD FLAG (2026-09-13). Carried on the roster so the presence derivation
+  // can skip its surplus branch on a page the brief wrote as populated —
+  // arithmetic has no equivalent of the evaluator's N-09. Never inferred from
+  // prose: either the brief set the flag or this page has no crowd.
+  let crowdExpected = false;
   try {
     // THE HINT IS NOT ALWAYS THE BRIEF (2026-09-12). The repair pipeline hands
     // the eval `scene.outlineExtract` — the PLAN line — which carries no
@@ -946,6 +951,7 @@ function buildExpectedCastBlock({
     // cites as CHR001). The parsed metadata is passed in where the caller
     // holds it; parsing a hint stays the fallback.
     const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
+    crowdExpected = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
     // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The
     // detector-side roster in storyJobPipeline has always read the VB
@@ -986,7 +992,7 @@ function buildExpectedCastBlock({
   if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
     lines.push(`Detector figure count (GroundingDINO): ${det}`);
   }
-  return { block: lines.join('\n'), names, count: names.length, declared: true };
+  return { block: lines.join('\n'), names, count: names.length, declared: true, crowdExpected };
 }
 
 /**

@@ -874,6 +874,7 @@ function extractSceneMetadata(sceneDescription) {
         wornItems,
         imageSummary: prose,
         shot: metadata.shot || null,
+        crowdExpected: metadata.crowdExpected === true,
         setting: metadata.setting || null,
         // time/weather passthroughs removed 2026-08-11: written for months,
         // read by nothing (metadata-migration audit).
@@ -894,6 +895,12 @@ function extractSceneMetadata(sceneDescription) {
       // VB id of the vehicle/structure the camera stands on or inside — makes
       // the plate render the surfaces around the camera, not the element's exterior.
       aboard: metadata.aboard || null,
+      // CROWD FLAG (2026-09-13). The brief saying this page holds unnamed
+      // background people beyond its cast. The presence derivation
+      // (evalPipeline.derivePresenceFinding) skips its surplus branch when set.
+      // Strictly `=== true`: absent, null and every stored row that predates
+      // the field read as "no crowd", which is the pre-existing behaviour.
+      crowdExpected: metadata.crowdExpected === true,
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
@@ -1053,6 +1060,8 @@ function extractSceneMetadata(sceneDescription) {
       // VB id of the vehicle/structure the camera stands on or inside — makes
       // the plate render the surfaces around the camera, not the element's exterior.
       aboard: parsedData.aboard || null,
+      // See the crowdExpected note in the prose-format branch above.
+      crowdExpected: parsedData.crowdExpected === true,
       emptyScenePrompt: parsedData.emptyScenePrompt || null,
       // Whether the existing empty scene background can be reused (iteration only)
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
@@ -1130,13 +1139,14 @@ function extractSceneMetadata(sceneDescription) {
         clothing: null,
         objects: [],
         interactions: null,
-        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose },
+        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose, crowdExpected: false },
         thinking: null,
         translatedSummary: null,
         imageSummary: prose,
         landmarkVariants: null,
         setting: null,
         sceneComplexity: 'simple',
+        crowdExpected: false,
         emptyScenePrompt: null,
         reuseEmptyScene: null,
         textPosition: null,
