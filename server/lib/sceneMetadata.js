@@ -879,6 +879,12 @@ function extractSceneMetadata(sceneDescription) {
         // time/weather passthroughs removed 2026-08-11: written for months,
         // read by nothing (metadata-migration audit).
         background: metadata.background || null,
+        // The Art Director writes `sceneIntent` on every page and this
+        // allowlist dropped it, so it reached zero consumers: measured
+        // 2026-09-13 over five staging stories, present in 83/83 briefs and
+        // 0/83 stored rows. Null when a brief (or a row written before this
+        // date) carries none — readers must treat absent as "not declared".
+        sceneIntent: metadata.sceneIntent || null,
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
