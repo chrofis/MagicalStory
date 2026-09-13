@@ -24,6 +24,7 @@ const { getCurrentLogger } = require('./generationLogger');
 const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
+const { canonicalName } = require('./castResolver');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -1516,7 +1517,8 @@ function collectSecondaryEntities(visualBible, sceneImages = []) {
     const detected = new Set();
     for (const img of sceneImages) {
       const figs = img?.bboxDetection?.figures || [];
-      if (figs.some(f => (f?.name || '').toLowerCase() === String(e.name).toLowerCase())) {
+      // COMPARE: two stored names from the same run — one normaliser.
+      if (figs.some(f => canonicalName(f?.name) === canonicalName(e.name))) {
         detected.add(img.pageNumber);
       }
     }
@@ -1710,8 +1712,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // Case-insensitive lookup — scene metadata can key characterClothing
           // with different casing than the canonical character name, and an
           // exact-key miss silently degraded the eval to the fallback category.
+          // COMPARE: one normaliser (canonicalName) instead of a local
+          // lowercase rule that missed diacritics and trailing parentheticals.
           const charClothingKey = Object.keys(charClothing)
-            .find(k => k.toLowerCase() === name.toLowerCase());
+            .find(k => canonicalName(k) === canonicalName(name));
           const clothingCategory = (charClothingKey && charClothing[charClothingKey]) || fallbackCategory;
           // Resolve category to actual clothing description.
           // buildClothingDescription prefers this story's clothingRequirements
@@ -1841,7 +1845,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         }
         const clothing = normalizeClothingCategory(rawClothing);
         // Determine confidence based on how we matched
-        const confidence = (matchingFigure.name || '').toLowerCase() === charNameLower
+        // COMPARE: stored figure name vs stored character name.
+        const confidence = canonicalName(matchingFigure.name) === canonicalName(charName)
           ? (matchingFigure.confidence === 'high' ? 0.95 : matchingFigure.confidence === 'medium' ? 0.8 : 0.65)
           : 0.5;  // Lower confidence for label-based match
 

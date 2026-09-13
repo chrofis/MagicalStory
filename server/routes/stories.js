@@ -7,6 +7,7 @@
  */
 
 const express = require('express');
+const { canonicalName } = require('../lib/castResolver');
 const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync, stripInlineImagesFromStoryData } = require('../services/database');
@@ -2236,7 +2237,8 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
         return null;
       };
       for (const name of Object.keys(meta.bboxes)) {
-        const char = chars.find(c => (c?.name || '').toLowerCase() === name.toLowerCase());
+        // COMPARE: stored bbox key vs stored character name.
+        const char = chars.find(c => canonicalName(c?.name) === canonicalName(name));
         if (!char?.avatars?.styledAvatars) continue;
         // NO DEFAULT CLOTHING (owner, 2026-08-07).
         if (!perChar[name]) {

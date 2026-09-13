@@ -19,41 +19,41 @@
 const { log } = require('../utils/logger');
 const { callClaudeAPI } = require('./textModels');
 
-// Phantom strings matching this pattern are Visual Bible ID placeholders that
-// Claude emitted in scene metadata without declaring an actual entry — not
-// literal character names. Store them as the entry's `id`, not `name`.
-const VB_ID_PATTERN = /^CHR\d+$/i;
+const { baseVbId } = require('./vbIdGuard');
+const { buildCastIndex, resolveEntity, canonicalName } = require('./castResolver');
 
-function normalizeName(name) {
-  return (name || '').trim().toLowerCase();
-}
+// Phantom strings that are whole Visual Bible ID handles are placeholders
+// Claude emitted in scene metadata without declaring an actual entry — not
+// literal character names. Store them as the entry's `id`, not `name`. The
+// grammar has ONE home (vbIdGuard); the local `^CHR\d+$` copy was deleted.
+const isVbIdPlaceholder = (n) => !!baseVbId(n);
+
+// COMPARE helper: the comparable form of a stored name. Alias of the
+// resolver's canonicalName so every module folds names the same way.
+const normalizeName = canonicalName;
 
 /**
- * True when `norm` names an already-declared entity, allowing for the bible
- * and the prose using different forms of the same name.
+ * True when `norm` names an already-declared entity.
  *
- * Exact matching alone treated "Silvio" in the scene metadata as undeclared
- * while the bible held "Zauberer Silvio" (job_1786913768533) — so the patcher
- * paid for a Haiku call and wrote a SECOND entry for him, with a contradictory
- * face description. Bibles routinely carry a title or honorific that the prose
- * then drops, and the reverse happens too.
+ * RESOLVE: with a cast index, the one resolver decides (VB id → exact
+ * canonical name → unique whole-word subset either direction). Without one,
+ * exact canonical membership ONLY.
  *
- * Match is whole-word subset in either direction, never substring: "silvio" ⊂
- * "zauberer silvio" matches, "ida" ⊄ "freida" does not. The accepted cost is
- * that two genuinely different characters whose names nest (a "Felix" and a
- * separate "Grossvater Felix") merge into one — rarer than the duplicate it
- * prevents, and it fails toward fewer invented entries rather than more.
+ * BEHAVIOUR CHANGE (2026-09-13): the old whole-word-subset loop took the FIRST
+ * match, so two distinct nesting names merged — a secondary "Mother" (CHR001)
+ * and an animal "Mother Dragon" (ANI002) on job_1789163494908_kc2joi4ax were
+ * one entity to it. Nested distinct names no longer merge, and an AMBIGUOUS
+ * reference is now treated as unknown and logged by the resolver rather than
+ * silently patched onto whichever entry came first.
+ *
+ * @param {string} norm - already canonicalised name
+ * @param {Set<string>} known - canonicalised declared names
+ * @param {object|null} index - optional cast index from buildCastIndex
  */
-function isKnownName(norm, known) {
+function isKnownName(norm, known, index = null) {
   if (!norm) return true;
-  if (known.has(norm)) return true;
-  const words = norm.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return true;
-  for (const k of known) {
-    const kw = k.split(/\s+/).filter(Boolean);
-    if (kw.length === 0) continue;
-    if (words.every(w => kw.includes(w)) || kw.every(w => words.includes(w))) return true;
-  }
+  if (known && known.has(norm)) return true;
+  if (index && resolveEntity(norm, index, { log })) return true;
   return false;
 }
 
@@ -91,12 +91,17 @@ function findPhantomNames(storyPages, visualBible, inputCharacters) {
     }
   }
 
+  // The index covers the same pools the resolver knows (photo cast + VB
+  // secondaries + animals); `known` still carries the wider VB lists
+  // (vehicles, artifacts, locations) it cannot see.
+  const index = buildCastIndex({ characters: inputCharacters || [] }, visualBible || null);
+
   const phantoms = new Map(); // normalizedName -> originalName
   for (const page of (storyPages || [])) {
     const names = Object.keys(page.characterClothing || {});
     for (const name of names) {
       const norm = normalizeName(name);
-      if (isKnownName(norm, known)) continue;
+      if (isKnownName(norm, known, index)) continue;
       if (!phantoms.has(norm)) phantoms.set(norm, name.trim());
     }
   }
@@ -124,7 +129,7 @@ function buildPatchPrompt(phantomNames, storyPages, knownNames) {
   // Without this, Claude echoes back the placeholder (e.g. "CHR001") as the name
   // and downstream code mistakes the entry's name for a VB id.
   const phantomLines = phantomNames.map(n => {
-    return VB_ID_PATTERN.test(n)
+    return isVbIdPlaceholder(n)
       ? `- ${n}  [placeholder ID — invent a descriptive name from the passages]`
       : `- ${n}`;
   }).join('\n');
@@ -292,13 +297,13 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
 
     // ID-pattern phantom (e.g. "CHR001") → preserve the placeholder as the id.
     // Regular name phantom (e.g. "Oma") → sequential CHR id, name echoed.
-    if (VB_ID_PATTERN.test(matchedPhantom)) {
-      entry.id = matchedPhantom.toUpperCase();
+    if (isVbIdPlaceholder(matchedPhantom)) {
+      entry.id = baseVbId(matchedPhantom) || matchedPhantom.toUpperCase();
       existingIds.add(entry.id);
       // entry.name should be the descriptive name Claude invented. If Claude
       // ignored the instruction and echoed the placeholder, fall back to a
       // generic label so downstream name-based lookups don't re-trip the VB-id regex.
-      if (!entry.name || VB_ID_PATTERN.test(entry.name)) {
+      if (!entry.name || isVbIdPlaceholder(entry.name)) {
         entry.name = 'unnamed character';
       }
     } else {

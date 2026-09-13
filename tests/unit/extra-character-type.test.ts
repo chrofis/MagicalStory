@@ -665,6 +665,22 @@ describe('derivePresenceFinding — COUNT PEOPLE AGAINST PEOPLE', () => {
     expect(r.finding.description).toMatch(/2 person-figure\(s\).*EXPECTED CAST of 1 person\(s\)/);
   });
 
+  it('a short-form roster token for a VB animal is still subtracted (Kapitanin Rossa / Rossa)', () => {
+    // vbKind used to exact-match name-or-id, so the short form the brief uses
+    // lost its "(animal)" tag and the arithmetic counted the ship's cat as a
+    // person — a false extra_character CRITICAL.
+    const vb = { secondaryCharacters: [], animals: [{ id: 'ANI007', name: 'Kapitanin Rossa', species: 'cat' }] };
+    const cast = buildExpectedCastBlock({ sceneCharacters: [{ name: 'Liz' }, { name: 'Rossa' }], visualBible: vb });
+    expect(cast.names).toEqual(['Liz', 'Rossa']);
+    expect(cast.nonHumanNames).toEqual(['Rossa']);
+    // Detector sees ONE person; the evaluator names both figures. Arithmetic
+    // unchanged: 2 - 1 non-human = 1 person vs a people-cast of 1.
+    const r = derivePresenceFinding({
+      figures: figs(2), matches: matched(['Liz', 'Rossa']), cast, detectedFigureCount: 1,
+    });
+    expect(r).toEqual({ outcome: 'reconciled', reason: null, finding: null });
+  });
+
   it('a human-only page is unchanged, with or without the field', () => {
     const args = { figures: figs(3), matches: matched(['Aaron', 'Ben', 'Carl']), detectedFigureCount: 3 };
     const withField = derivePresenceFinding({ ...args, cast: roster(['Aaron', 'Ben', 'Carl', 'Dan'], []) });

@@ -31,6 +31,7 @@ const { persistStyledAvatar } = require('../services/database');
 const { slugifyCostume } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
 const { resolveCellPose } = require('./storyAvatars');
+const { buildCastIndex, resolveEntity, canonicalName, lookupByName } = require('./castResolver');
 
 /**
  * Split an interaction's `character` field into the names it actually refers
@@ -56,9 +57,11 @@ function splitInteractionNames(raw) {
 function resolveLooksAt(raw, visualBible) {
   const t = String(raw || '').trim();
   if (!t) return null;
-  const m = t.match(/^(CHR|ANI|ART|VEH|LOC)(\d+)/i);
-  if (!m) return t;
-  const base = (m[1] + m[2]).toUpperCase();
+  // RESOLVE: the VB-id grammar has ONE definition (vbIdGuard) — a local copy
+  // here missed the dotted vantage form and let `LOC005.1` through as a name.
+  const { baseVbId } = require('./vbIdGuard');
+  const base = baseVbId(t);
+  if (!base) return t;
   for (const pool of ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations']) {
     const hit = (visualBible?.[pool] || []).find(e => String(e?.id || '').toUpperCase() === base);
     if (hit?.name) return String(hit.name);
@@ -161,11 +164,16 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
   }
 
   const artStyleKey = inputData.artStyle || 'watercolor';
+  // ONE cast index per build — every name below resolves through it (RESOLVE).
+  const castIdx = buildCastIndex({ characters: inputData.characters || [] }, visualBible);
   const out = [];
   for (const sc of sceneChars) {
     const name = typeof sc === 'string' ? sc : (sc.name || '');
     if (!name) continue;
-    const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
+    // RESOLVE: one resolver decides which entry a scene name refers to; a
+    // photo-backed character is the `cast` pool.
+    const resolved = resolveEntity(name, castIdx, { log });
+    const character = resolved && resolved.kind === 'cast' ? resolved.entry : null;
     if (!character) {
       // Not a user character — a Visual Bible SECONDARY character (a story's
       // captain, guard, antagonist). These never have an avatar sheet, and
@@ -182,17 +190,10 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       // exact first, then one name's tokens being a subset of the other's, so
       // a title or an epithet does not break the link but two different people
       // who merely share a word do not collide.
-      const { significantEntityTokens } = require('./visualBible');
-      const wantTokens = significantEntityTokens(name);
-      const secondaries = visualBible?.secondaryCharacters || [];
-      const vbEntry = secondaries.find(sc =>
-        (sc.name || '').toLowerCase() === String(name).toLowerCase())
-        || (wantTokens.size ? secondaries.find(sc => {
-          const have = significantEntityTokens(sc.name);
-          if (!have.size) return false;
-          const subset = (a, b) => [...a].every(t => b.has(t));
-          return subset(wantTokens, have) || subset(have, wantTokens);
-        }) : null);
+      // RESOLVE: the short-form/title mismatch ("Rossa" vs "Kapitänin Rossa")
+      // is the resolver's rule 3 now — and unlike the old first-match subset
+      // it refuses an ambiguous reference instead of picking a namesake.
+      const vbEntry = resolved && resolved.kind === 'secondary' ? resolved.entry : null;
       const vbRef = vbEntry?.referenceImageUrl || vbEntry?.referenceImageData || null;
       if (!vbRef) {
         // No avatar AND no VB sheet — an unnamed walk-on the story never drew
@@ -524,6 +525,10 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   const artNames = (coverHint._artifactNames && typeof coverHint._artifactNames === 'object')
     ? coverHint._artifactNames
     : {};
+  const coverIdx = buildCastIndex(
+    { characters: Array.isArray(characters) ? characters : [] },
+    storyData && storyData.visualBible ? storyData.visualBible : (deps.visualBible || null)
+  );
 
   // Map holds → action phrase. Same wording as coverComposite so the two
   // paths produce comparable cast actions. Cover gaze is code-owned
@@ -578,7 +583,10 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
         return resolved;
       })(),
     });
-    const detail = details[c.name] || Object.values(details).find(d => d?.name?.toLowerCase() === nameLower);
+    // RESOLVE: cover-hint detail blocks are keyed by whatever spelling the
+    // hint used; the value's own `name` stays a COMPARE-only last resort.
+    const detail = (lookupByName(details, c.name, coverIdx) || {}).value
+      || Object.values(details).find(d => canonicalName(d?.name) === canonicalName(c.name));
     const action = buildAction(detail);
     if (detail && action) {
       interactions.push({

@@ -39,6 +39,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
+const { canonicalName } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
@@ -195,7 +196,9 @@ function buildObjectGroundingHints(entries, visualBible) {
   const byName = new Map();
   const addPool = (list, kind) => {
     for (const e of (list || [])) {
-      if (e && e.name) byName.set(String(e.name).toLowerCase(), { text: String(e.description || ''), kind });
+      // COMPARE: keys are canonicalised so the reader's canonicalName(label)
+      // hits the same key regardless of diacritics/spacing.
+      if (e && e.name) byName.set(canonicalName(e.name), { text: String(e.description || ''), kind });
     }
   };
   addPool(vb.artifacts, 'artifact');
@@ -205,8 +208,9 @@ function buildObjectGroundingHints(entries, visualBible) {
   addPool(vb.locations, 'location');
   const hints = {};
   for (const label of (entries || [])) {
-    const h = byName.get(String(label).toLowerCase());
-    if (h) hints[String(label).toLowerCase()] = h;
+    const key = canonicalName(label);
+    const h = byName.get(key);
+    if (h) hints[key] = h;
   }
   return hints;
 }

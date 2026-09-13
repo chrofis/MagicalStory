@@ -42,6 +42,20 @@ function getStoryHelpers() {
   return storyHelpersModule;
 }
 
+// ONE NAME-MATCHING RULE (2026-09-13). Five competing rules used to decide
+// whether two cast tokens meant the same person; `castResolver` is the single
+// one. Every consumer here states which of the two categories it is:
+//   RESOLVE — a brief/roster token → an entity (resolveEntity/sameEntity)
+//   COMPARE — two stored names from the SAME run (canonicalName equality only)
+// Lazy for the same circular-dependency reason as storyHelpers.
+let castResolverModule = null;
+function getCastResolver() {
+  if (!castResolverModule) {
+    castResolverModule = require('./castResolver');
+  }
+  return castResolverModule;
+}
+
 // Quality-eval sampling knobs (env-overridable for A/B). Defaults chosen from
 // a local variance test on job_1781310332569 p4 (4 runs × 3 configs):
 //   temp 0.3 + thinking 8192 (old): mean 6.3 issues, count spread 4 (noisy)
@@ -908,7 +922,11 @@ function buildExpectedCastBlock({
   sceneMetadata = null,
   pageNumber = null,
   extraNames = [],
+  storyData = null,
 } = {}) {
+  // RESOLVE. One index for every name question this builder asks.
+  const { buildCastIndex, resolveEntity, kindLabel, dedupeByEntity, canonicalName, flushResolverStats } = getCastResolver();
+  const idx = buildCastIndex(storyData, visualBible);
   const names = [];
   const labels = [];
   const seen = new Set();
@@ -917,19 +935,18 @@ function buildExpectedCastBlock({
   // the substitution the cover evaluator accepted at 0.9 confidence.
   const add = (n, kind = null) => {
     const name = String(n || '').trim();
-    if (!name || seen.has(name.toLowerCase())) return;
-    seen.add(name.toLowerCase());
+    if (!name || seen.has(canonicalName(name))) return;
+    seen.add(canonicalName(name));
     names.push(name);
     labels.push(kind ? `${name} (${kind})` : name);
   };
+  // RESOLVE. Exact name-or-id matching lost the tag on every short-form token
+  // ("Rossa" for the Bible's "Kapitänin Rossa"), and an untagged animal is
+  // counted as a person by derivePresenceFinding — a false extra_character
+  // CRITICAL. The resolver answers the same question for every consumer.
   const vbKind = (nameOrId) => {
-    const key = String(nameOrId || '').toLowerCase();
-    const byKey = (list) => (Array.isArray(list) ? list : []).find(e =>
-      String(e?.name || '').toLowerCase() === key || String(e?.id || '').toLowerCase() === key);
-    const animal = byKey(visualBible?.animals);
-    if (animal) return animal.species ? `animal, ${animal.species}` : 'animal';
-    if (byKey(visualBible?.secondaryCharacters)) return 'secondary character';
-    return null;
+    const e = resolveEntity(nameOrId, idx, { pageLabel });
+    return e ? kindLabel(e) : null;
   };
   // AN EMPTY CAST IS A NUMBER, NOT A BLANK (2026-09-11). `sceneCharacters: []`
   // is the brief SAYING this frame holds nobody — a creature-only page, a
@@ -990,6 +1007,16 @@ function buildExpectedCastBlock({
     } catch { /* cover keeps its commissioned cast */ }
   }
 
+  // RESOLVE. A roster never carries two spellings of one entity: the p9 shape
+  // of job_1789163494908_kc2joi4ax put "Vendor" and "Marroni Vendor" on the
+  // same list, and every downstream count then read one person as two.
+  const kept = new Set(dedupeByEntity(names, idx));
+  for (let i = names.length - 1; i >= 0; i--) {
+    if (kept.has(names[i])) continue;
+    names.splice(i, 1);
+    labels.splice(i, 1);
+  }
+
   const lines = [names.length === 0
     // Spelled out, not an empty list: the count is the instruction, and "none"
     // has to read as a roster of zero rather than as a missing roster.
@@ -1004,8 +1031,14 @@ function buildExpectedCastBlock({
   // them. The roster ARITHMETIC reads is people-only, and this is which entries
   // are not. One source with the detector call (`vbNonHumanNames`), never a
   // second guess about what is non-human.
-  const nonHumanSet = new Set(require('./bboxDetection').vbNonHumanNames(visualBible));
-  const nonHumanNames = names.filter(n => nonHumanSet.has(String(n).toLowerCase()));
+  // RESOLVE, tolerant: the resolver catches the short-form token the exact-name
+  // list cannot ("Rossa" for the Bible's "Kapitänin Rossa"), and `vbNonHumanNames`
+  // stays the authority for everything it does name.
+  const { isNonHuman } = getCastResolver();
+  const nonHumanSet = new Set(require('./bboxDetection').vbNonHumanNames(visualBible).map(n => canonicalName(n)));
+  const nonHumanNames = names.filter(n =>
+    nonHumanSet.has(canonicalName(n)) || isNonHuman(resolveEntity(n, idx, { pageLabel })));
+  if (pageLabel) flushResolverStats(idx, log, pageLabel);
   return { block: lines.join('\n'), names, count: names.length, declared: true, crowdExpected, nonHumanNames };
 }
 
@@ -1028,8 +1061,11 @@ function buildExpectedCastBlock({
  */
 function resolveExpectedCastNames(opts = {}) {
   const cast = buildExpectedCastBlock(opts);
+  // COMPARE. Still a lowercase-keyed Map — keyed through `canonicalName` so
+  // every membership test in the pipeline normalises the same way.
+  const { canonicalName } = getCastResolver();
   const byLower = new Map();
-  for (const n of cast.names) byLower.set(String(n).toLowerCase(), n);
+  for (const n of cast.names) byLower.set(canonicalName(n), n);
   return { names: cast.names, byLower, declared: cast.declared };
 }
 
@@ -1043,6 +1079,10 @@ function resolveExpectedCastNames(opts = {}) {
  * authoritative roster holds and this list lacks is appended, described from
  * the Visual Bible when the Bible knows it and name-only when it does not.
  *
+ * "Lacks" is ENTITY-EQUAL, not case-insensitive string equality: a detector
+ * entry and a roster name that resolve to the same Visual Bible entry are the
+ * same person however each of them spells it.
+ *
  * Appending only. A detector list is allowed to be richer than the roster in
  * one direction (a VB secondary resolved by a path the roster has not been
  * given yet); deleting from it on that basis would blind the identity call —
@@ -1051,14 +1091,21 @@ function resolveExpectedCastNames(opts = {}) {
  *
  * @returns {{entries: Array, names: Array<string>, added: Array<string>}}
  */
-function reconcileDetectorCast(entries, authoritative, { visualBible = null, pageLabel = '' } = {}) {
+function reconcileDetectorCast(entries, authoritative, { visualBible = null, pageLabel = '', storyData = null } = {}) {
   const list = Array.isArray(entries) ? entries.slice() : [];
   const auth = authoritative && authoritative.byLower instanceof Map ? authoritative : null;
   if (!auth || auth.names.length === 0) {
     return { entries: list, names: list.map(e => e?.name).filter(Boolean), added: [] };
   }
-  const have = new Set(list.map(e => String(e?.name || '').toLowerCase()).filter(Boolean));
-  const missing = auth.names.filter(n => !have.has(String(n).toLowerCase()));
+  // RESOLVE. `have` used to hold the DETECTOR spellings lowercased and
+  // `missing` compared the ROSTER names to it by string, so a short form and a
+  // long form of one person never met and the same person was appended twice —
+  // job_1789163494908_kc2joi4ax p9 stored ["Julian","Max","Kiaan","Vendor",
+  // "Marroni Vendor"]. Membership is an ENTITY question, asked of the resolver.
+  const { buildCastIndex, sameEntity, canonicalName } = getCastResolver();
+  const idx = buildCastIndex(storyData, visualBible);
+  const have = new Set(list.map(e => canonicalName(String(e?.name || ''))).filter(Boolean));
+  const missing = auth.names.filter(n => !list.some(e => sameEntity(e?.name, n, idx)));
   const added = [];
   if (missing.length > 0) {
     let described = {};
@@ -1067,7 +1114,8 @@ function reconcileDetectorCast(entries, authoritative, { visualBible = null, pag
         visualBible, missing, [...have], pageLabel, { includeAnimals: true }) || {};
     } catch { /* a roster name the Bible cannot describe still joins, name-only */ }
     for (const n of missing) {
-      const hit = Object.keys(described).find(k => k.toLowerCase() === String(n).toLowerCase());
+      // COMPARE: two spellings produced by this same run.
+      const hit = Object.keys(described).find(k => canonicalName(k) === canonicalName(n));
       list.push({ name: hit || n, description: hit ? (described[hit].richDescription || '') : '' });
       added.push(hit || n);
     }
@@ -1166,7 +1214,10 @@ function presenceCounterName(presence, spoke) {
   return spoke ? `presence_${presence?.outcome}${reason}` : `presence_declined${reason}`;
 }
 
-function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, referenceNames } = {}) {
+function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, referenceNames, castIndex = null } = {}) {
+  // RESOLVE (castIndex, when the caller has one) + COMPARE (everything else:
+  // both sides of every name test below are strings this same run produced).
+  const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
   const decline = (reason) => ({ outcome: 'declined', reason, finding: null });
 
   if (!cast || cast.declared !== true) return decline('roster_not_declared');
@@ -1199,15 +1250,24 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
   //
   // There is deliberately no non-human presence check to replace this: a
   // missing fairy simply stops being arithmetic evidence (owner).
-  const nonHuman = new Set((Array.isArray(cast.nonHumanNames) ? cast.nonHumanNames : [])
-    .map(n => String(n).trim().toLowerCase()).filter(Boolean));
-  const refOf = (m) => String(m?.reference || '').trim().toLowerCase();
+  const nonHumanSet = new Set((Array.isArray(cast.nonHumanNames) ? cast.nonHumanNames : [])
+    .map(n => canonicalName(n)).filter(Boolean));
+  // Tolerant: the roster's own list first, then the resolver for a short-form
+  // token the list spells out in full. Without an index the canonical match is
+  // the whole answer, exactly as before.
+  const isNonHumanName = (n) => {
+    const k = canonicalName(n);
+    if (!k) return false;
+    if (nonHumanSet.has(k)) return true;
+    return castIndex ? isNonHuman(resolveEntity(n, castIndex)) : false;
+  };
+  const refOf = (m) => canonicalName(m?.reference || '');
   const isUnnamed = (r) => !r || r === 'unmatched' || r === 'unknown';
-  const evaluatorPeople = figs.length - mts.filter(m => nonHuman.has(refOf(m))).length;
+  const evaluatorPeople = figs.length - mts.filter(m => isNonHumanName(m?.reference)).length;
   if (det !== evaluatorPeople) return decline('witnesses_disagree');
 
   const castNames = (Array.isArray(cast.names) ? cast.names : [])
-    .filter(n => !nonHuman.has(String(n).trim().toLowerCase()));
+    .filter(n => !isNonHumanName(n));
   const castCount = castNames.length;
   // Who did the evaluator place in the picture? Names only, lowercased.
   const claimed = new Set();
@@ -1215,7 +1275,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
     const r = refOf(m);
     if (!isUnnamed(r)) claimed.add(r);
   }
-  const unclaimedCast = castNames.filter(n => !claimed.has(String(n).toLowerCase()));
+  const unclaimedCast = castNames.filter(n => !claimed.has(canonicalName(n)));
   const unmatchedFigures = mts.filter(m => isUnnamed(refOf(m)));
 
   const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER });
@@ -1280,9 +1340,9 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
   // owns the pair and still drops the evaluator's arithmetically impossible
   // surplus on those pages. It just has no identity claim to make.
   const refs = Array.isArray(referenceNames)
-    ? new Set(referenceNames.map(n => String(n || '').trim().toLowerCase()).filter(Boolean))
+    ? new Set(referenceNames.map(n => canonicalName(n || '')).filter(Boolean))
     : null;
-  const referenced = refs ? unclaimedCast.filter(n => refs.has(String(n).toLowerCase())) : unclaimedCast;
+  const referenced = refs ? unclaimedCast.filter(n => refs.has(canonicalName(n))) : unclaimedCast;
   // At equal counts an unmatched figure always leaves a cast name unclaimed
   // (distinct claims <= figures - unmatched < castCount), so this is exactly
   // the question "is the entry it should be one the evaluator had an image of".
@@ -1490,13 +1550,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // (COUNT PEOPLE AGAINST PEOPLE, owner 2026-08-18). The EXPECTED CAST block
     // keeps printing `realFigureCount`: the roster it prints holds the fairies
     // too, so that pair still matches.
+    // RESOLVE. One index for this page's name questions — the detector's own
+    // figure labels are brief/roster tokens and may be short forms.
+    const castIdx = getCastResolver().buildCastIndex(evalOptions.storyData || null, evalOptions.visualBible || null);
     const detectedPeopleCount = (() => {
       if (!Array.isArray(evalOptions.detectedFigures)) return realFigureCount;
       const { countRealFigures, vbNonHumanNames } = require('./bboxDetection');
-      const nh = new Set(vbNonHumanNames(evalOptions.visualBible || null));
+      const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
+      const nh = new Set(vbNonHumanNames(evalOptions.visualBible || null).map(n => canonicalName(n)));
       if (nh.size === 0) return realFigureCount;
-      return countRealFigures(evalOptions.detectedFigures
-        .filter(f => !nh.has(String(f?.name || '').trim().toLowerCase())));
+      const nonHumanFigure = (name) =>
+        nh.has(canonicalName(name || '')) || isNonHuman(resolveEntity(name, castIdx));
+      return countRealFigures(evalOptions.detectedFigures.filter(f => !nonHumanFigure(f?.name)));
     })();
     // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
     // attach loop below with the names that reached the critique as a labelled
@@ -1512,6 +1577,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       detectedFigureCount: realFigureCount,
       pageLabel: pageContext ? `${pageContext} ` : '',
       sceneMetadata: evalOptions.sceneMetadata || null,
+      storyData: evalOptions.storyData || null,
       // ONE ROSTER: the two inputs only the detector-side builder used to have.
       pageNumber: evalOptions.pageNumber ?? null,
       extraNames: evalOptions.outlineCharacters || [],
@@ -2307,6 +2373,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         const presence = derivePresenceFinding({
           figures, matches, cast: expectedCast, detectedFigureCount: detectedPeopleCount,
           referenceNames: attachedReferenceNames,
+          castIndex: castIdx,
         });
         const spoke = presence.outcome !== 'declined';
         presenceDerived = spoke;

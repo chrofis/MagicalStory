@@ -18,6 +18,8 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
+const { canonicalName } = require('./castResolver');
+const { baseVbId } = require('./vbIdGuard');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
 const { getCurrentLogger } = require('./generationLogger');
 
@@ -1283,7 +1285,10 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     for (const b of badges) {
       const raw = String(answers[b.letter] || '').trim();
       if (!raw || /^unknown$/i.test(raw)) continue;
-      const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
+      // COMPARE: the SoM answer against the roster we sent it. Exact first
+      // (fast path), then the one normaliser.
+      const name = [...validNames].find(n => n === raw)
+        || [...validNames].find(n => canonicalName(n) === canonicalName(raw));
       if (!name) continue;
       if (!claims.has(name)) claims.set(name, []);
       claims.get(name).push(b.detIdx);
@@ -1918,8 +1923,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     _boxIouXyxy([bodyBox[1], bodyBox[0], bodyBox[3], bodyBox[2]], [f.bodyBox[1], f.bodyBox[0], f.bodyBox[3], f.bodyBox[2]])));
   for (const raw of (groundObjects ? expectedObjects : [])) {
     const cleaned = String(raw || '').trim();
-    if (!cleaned || /^[A-Z]{3}\d{3}(\.\d+)?$/.test(cleaned)) continue; // opaque VB id — nothing to ground
-    const hint = objectGroundingHints?.[cleaned.toLowerCase()];
+    // COMPARE: the VB-id grammar has ONE definition (vbIdGuard) — the local
+    // copy here did not know the pools and matched any 3-letter+3-digit token.
+    if (!cleaned || baseVbId(cleaned)) continue; // opaque VB id — nothing to ground
+    const hint = objectGroundingHints?.[canonicalName(cleaned)];
     if (hint?.kind === 'location') { diag.objects.push({ name: cleaned, skipped: 'location' }); continue; }
     const src = (hint?.text || cleaned);
     let text = src.split(/[—,;(.]/)[0].trim().toLowerCase();

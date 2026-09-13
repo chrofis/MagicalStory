@@ -82,6 +82,19 @@ describe('resolveCharBbox — entity tier carries the cast for neighbour protect
     const r = resolveCharBbox('Max', { bestEval, entityReport, pageNumber: -2 });
     expect(r.source).not.toBe('entity');
   });
+
+  // NEGATIVE (2026-09-13): tier 2 matched on `f.label.includes(name)`, so a
+  // label merely CONTAINING the target name selected a DIFFERENT person's
+  // figure — the whited-out-head bug of job_1787514666616_yw9qsv1vf p15.
+  it('REGRESSION: a figure whose label contains the name but whose name is someone else is NOT selected', () => {
+    const figures = [
+      { name: 'Rossa', label: 'Sarah is standing beside Rossa', faceBox: [0.1, 0.1, 0.2, 0.2], bodyBox: [0.1, 0.1, 0.4, 0.3] },
+    ];
+    const r = resolveCharBbox('Sarah', { bestEval: { bboxDetection: { figures } }, entityReport: null, pageNumber: -2 });
+    expect(r.source).toBe(null);
+    expect(r.faceBbox).toBe(null);
+    expect(r.bodyBbox).toBe(null);
+  });
 });
 
 // @ts-expect-error - JS module without types

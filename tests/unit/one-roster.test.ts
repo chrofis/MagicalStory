@@ -122,6 +122,31 @@ describe('reconcileDetectorCast', () => {
     expect(out.added).toEqual([]);
   });
 
+  // ONE NAME-MATCHING RULE (2026-09-13). `have` held the DETECTOR spellings and
+  // `missing` compared the ROSTER names to it by string, so a short form and a
+  // long form of one person never met: job_1789163494908_kc2joi4ax p9 stored
+  // expectedCharacters = ["Julian","Max","Kiaan","Vendor","Marroni Vendor"] —
+  // one person, appended twice.
+  it('a detector short form "Vendor" gains NOTHING when the roster holds "Marroni Vendor"', () => {
+    const VB2 = {
+      secondaryCharacters: [{ id: 'CHR009', name: 'Marroni Vendor', description: 'stooped, striped apron' }],
+      animals: [],
+    };
+    const det = [
+      { name: 'Julian', description: 'boy, red scarf' },
+      { name: 'Vendor', description: 'stooped, striped apron' },
+    ];
+    const auth = resolveExpectedCastNames({
+      sceneCharacters: [{ name: 'Julian' }],
+      visualBible: VB2,
+      sceneMetadata: { objects: ['CHR009'] },
+    });
+    expect(auth.names).toContain('Marroni Vendor');
+    const out = reconcileDetectorCast(det, auth, { visualBible: VB2 });
+    expect(out.added).toEqual([]);
+    expect(out.names).toEqual(['Julian', 'Vendor']);
+  });
+
   it('matches names case-insensitively so no duplicate is appended', () => {
     const auth = resolveExpectedCastNames({ sceneCharacters: ['fiona', 'SARAH'] });
     const out = reconcileDetectorCast(detector, auth, { visualBible: VB });

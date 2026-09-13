@@ -26,6 +26,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { lookupByName } = require('./castResolver');
 const { resolveCharacterReqs } = require('./clothingCategories');
 const { resolveWornItemsForPage } = require('./wornItems');
 
@@ -173,8 +174,7 @@ function checkPage(page, clothingRequirements, opts = {}) {
   // Outfit text per character on this page.
   const outfits = new Map();
   for (const name of cast) {
-    const catKey = Object.keys(perChar).find(k => k.trim().toLowerCase() === name.trim().toLowerCase());
-    const category = catKey ? perChar[catKey] : null;
+    const category = (lookupByName(perChar, name, null) || {}).value || null;  // RESOLVE
     if (!category) continue; // no per-page category is a different check's problem
     const reqs = resolveCharacterReqs(clothingRequirements, name);
     const entry = reqs && (reqs[category] || (String(category).startsWith('costumed') ? reqs.costumed : null));

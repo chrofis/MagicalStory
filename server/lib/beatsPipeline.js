@@ -1,6 +1,7 @@
 
 
 const { runPlanCounters, collectPlaceNames, highActionPageBudget } = require('./planCounters');
+const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
 const { buildCharacterDescription } = require('./visualBible');
@@ -1341,9 +1342,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         for (const fix of parsed.entries) {
           // Match the character case-insensitively — the reviewer echoes the
           // name back and case drift must not silently drop a correction.
-          const name = Object.keys(clothingRequirements)
-            .find(n => n.toLowerCase() === fix.name.toLowerCase());
-          let entry = name ? clothingRequirements[name]?.[fix.category] : null;
+          // RESOLVE: one name-keyed-map reader for the reviewer's echoed name.
+          const hit = lookupByName(clothingRequirements, fix.name, null);
+          const name = hit ? hit.key : null;
+          let entry = hit ? hit.value?.[fix.category] : null;
           // Check 9 (coverage) ADDS a category the bible missed: a beat that
           // transforms or costumes a character whose wardrobe has no entry for
           // it. Accepted only in the explicit `costumed:<name>` form — a plain

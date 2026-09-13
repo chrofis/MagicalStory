@@ -25,6 +25,7 @@
 
 // Canonical buckets — the ONLY valid cache key values
 const CANONICAL = Object.freeze(['standard', 'winter', 'summer', 'costumed']);
+const { buildCastIndex, lookupByName } = require('./castResolver');
 
 // The three avatar slots that every character is expected to have (excludes
 // story-specific 'costumed', which is generated on demand).
@@ -89,10 +90,9 @@ function normalizeClothingCategory(category) {
 function getUsedClothingCategories(clothingRequirements, characterName) {
   if (!clothingRequirements || !characterName) return [];
   // Case-insensitive lookup — Claude is inconsistent about character name casing
-  const charNameLower = String(characterName).trim().toLowerCase();
-  const charReqs = Object.entries(clothingRequirements).find(
-    ([name]) => name.trim().toLowerCase() === charNameLower
-  )?.[1];
+  // RESOLVE: one name-keyed-map reader (lookupByName). No index here — the
+  // caller has no story data — so it resolves exact + canonical key only.
+  const charReqs = (lookupByName(clothingRequirements, characterName, null) || {}).value;
   if (!charReqs || typeof charReqs !== 'object') return [];
 
   const used = [];
@@ -243,13 +243,13 @@ function reconcilePageClothingWithRequirements(perCharClothing, clothingRequirem
  * @param {string|null|undefined} name - character name
  * @returns {object|null} the per-category requirements for this character
  */
-function resolveCharacterReqs(clothingRequirements, name) {
+function resolveCharacterReqs(clothingRequirements, name, index = null) {
   if (!clothingRequirements || !name) return null;
-  const direct = clothingRequirements[name] || clothingRequirements[String(name).trim()];
-  if (direct) return direct;
-  const lower = String(name).trim().toLowerCase();
-  const key = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === lower);
-  return key ? clothingRequirements[key] : null;
+  // RESOLVE: exact key, canonical key, then — when the caller can supply a
+  // cast index — the same entry under a different spelling ("Rossa" for
+  // "Kapitänin Rossa").
+  const hit = lookupByName(clothingRequirements, name, index);
+  return hit ? hit.value : null;
 }
 
 /**
@@ -263,6 +263,7 @@ function resolveCharacterReqs(clothingRequirements, name) {
  */
 function resolvePageClothingCategory(storyData, pageNumber, charName) {
   const pc = storyData?.pageClothing;
+  const castIdx = buildCastIndex(storyData || null, storyData?.visualBible || null);
   // COVERS (negative page numbers) never appear in pageClothing — their cast's
   // outfits live on the outline's coverHints. Without this the covers resolved
   // to null and every cover-side consumer skipped (observed live after the
@@ -273,9 +274,8 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
     const hint = coverKey ? storyData?.coverHints?.[coverKey] : null;
     const byChar = hint?.characterClothing;
     if (byChar && typeof byChar === 'object') {
-      const lower = String(charName || '').trim().toLowerCase();
-      const key = Object.keys(byChar).find(k => k.trim().toLowerCase() === lower);
-      if (key && byChar[key]) return normalizeClothingCategory(byChar[key]);
+      const hit = lookupByName(byChar, charName, castIdx);   // RESOLVE
+      if (hit && hit.value) return normalizeClothingCategory(hit.value);
     }
     // The story's primary category is canonical, not a guess: it is what the
     // writer decided the book's cast wears.
@@ -285,9 +285,8 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
   const entry = pc?.pageClothing?.[pageNumber] ?? pc?.[pageNumber];
   if (typeof entry === 'string' && entry.trim()) return normalizeClothingCategory(entry);
   if (entry && typeof entry === 'object') {
-    const lower = String(charName || '').trim().toLowerCase();
-    const key = Object.keys(entry).find(k => k.trim().toLowerCase() === lower);
-    if (key && entry[key]) return normalizeClothingCategory(entry[key]);
+    const hit = lookupByName(entry, charName, castIdx);      // RESOLVE
+    if (hit && hit.value) return normalizeClothingCategory(hit.value);
     const first = Object.values(entry).find(v => typeof v === 'string' && v.trim());
     if (first) return normalizeClothingCategory(first);
   }

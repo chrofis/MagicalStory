@@ -15,6 +15,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { normalizeName, isKnownName } = require('./phantomCharacters');
+const { canonicalName, buildCastIndex, sameEntity } = require('./castResolver');
 const { getUsedClothingCategories } = require('./clothingCategories');
 
 // Hard cap on figures a cover may declare (title page is narrowed to mains).
@@ -358,7 +359,7 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
     if (!m || !d?.name) continue;
     const id = m[1].toUpperCase();
     heldIds.add(id);
-    const key = String(d.name).trim().toLowerCase();
+    const key = canonicalName(d.name);  // COMPARE
     if (!heldByChar.has(key)) heldByChar.set(key, new Set());
     heldByChar.get(key).add(id);
   }
@@ -386,7 +387,7 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
   const outPhotos = list.map(photo => {
     const clothing = photo?.clothingDescription;
     if (!clothing) return photo;
-    const charKey = String(photo.name || '').trim().toLowerCase();
+    const charKey = canonicalName(photo.name);  // COMPARE
     const heldHere = heldByChar.get(charKey) || new Set();
     const segments = String(clothing).split(/\s*[,;]\s*/).filter(Boolean);
     const kept = [];
@@ -538,6 +539,8 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
   const ids = Array.isArray(mainIds) ? mainIds : [];
   const isMain = (c) => c.isMainCharacter === true || (ids.length > 0 && ids.includes(c.id));
   const known = new Set(cast.map(c => normalizeName(c.name)));
+  // RESOLVE: hint tokens → cast entries, through the one resolver.
+  const castIdx = buildCastIndex({ characters: cast }, null);
   // Refill priority: mains first, then everyone else in cast order.
   const byPriority = [...cast.filter(isMain), ...cast.filter(c => !isMain(c))];
   const baseOf = (n) => String(n || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
@@ -555,7 +558,7 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
     let kept = 0;
     for (const name of declared) {
       if (!name) continue;
-      if (isKnownName(normalizeName(name), known)) { kept++; continue; }
+      if (isKnownName(normalizeName(name), known, castIdx)) { kept++; continue; }
       phantoms.add(name);
     }
 
@@ -580,7 +583,8 @@ function validateCoverHintCast(coverHints, characters, opts = {}) {
       const norm = normalizeName(c.name);
       for (const d of declared) {
         if (phantoms.has(d)) continue;
-        if (normalizeName(d) === norm || isKnownName(normalizeName(d), new Set([norm]))) return true;
+        // COMPARE: is this already-declared hint name the same person as `c`?
+        if (normalizeName(d) === norm || sameEntity(d, c.name, castIdx)) return true;
       }
       return false;
     };
@@ -835,7 +839,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // Primary: use outline's character list (matches initial generation logic)
     const hintCharNames = Object.keys(hintCharClothing);
     selectedCoverCharacters = mergedCharacters.filter(c =>
-      hintCharNames.some(name => name.trim().toLowerCase() === String(c.name || '').trim().toLowerCase())
+      hintCharNames.some(name => canonicalName(name) === canonicalName(c.name))  // COMPARE
     ).slice(0, MAX_COVER_CHARACTERS);
     // Merge hint clothing into clothingRequirements for avatar lookup
     const mergedClothing = { ...clothingRequirements };
@@ -1959,7 +1963,7 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   const charSentences = sortedDetails.map(d => {
     const pos = d.position ? `in the ${d.position}` : '';
     const physChar = Array.isArray(characters)
-      ? characters.find(c => String(c?.name || '').trim().toLowerCase() === String(d.name || '').trim().toLowerCase())
+      ? characters.find(c => canonicalName(c?.name) === canonicalName(d.name))  // COMPARE
       : null;
     // Brief physical descriptor — the cover prompt template's CHARACTER_REFERENCE_LIST
     // also provides per-character details, but mentioning the name in prose ties

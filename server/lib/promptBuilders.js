@@ -2715,8 +2715,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   const perPageCategoryFor = (name) => {
     if (!characterClothing) return null;
     if (typeof characterClothing === 'string') return characterClothing;
-    const key = Object.keys(characterClothing).find(k => k.trim().toLowerCase() === String(name).trim().toLowerCase());
-    return key ? characterClothing[key] : null;
+    // RESOLVE: one name-keyed-map reader (castResolver.lookupByName).
+    const hit = require('./castResolver').lookupByName(characterClothing, name, null);
+    return hit ? hit.value : null;
   };
   const characterDetails = characters.map((c, idx) => {
     // Track Visual Bible matches for logging

@@ -6,6 +6,7 @@
  */
 
 const express = require('express');
+const { buildCastIndex, resolveEntity, canonicalName } = require('../lib/castResolver');
 const router = express.Router();
 const crypto = require('crypto');
 const pLimit = require('p-limit');
@@ -4588,11 +4589,15 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       // generation scene site.
       const shCover = require('../lib/storyHelpers');
       const coverCat = parseClothingCategory(scene.description || '') || storyData.pageClothing?.primaryClothing || 'standard';
+      const coverCastIdx = buildCastIndex(storyData, storyData.visualBible || null);
       for (const name of Object.keys(expectedPositions)) {
         const existing = expectedClothing[name];
         const isCat = typeof existing === 'string' && /^(standard|winter|summer|costumed(:.*)?)$/i.test(existing.trim());
         if (existing && !isCat) continue;
-        const chObj = (storyData.characters || []).find(ch => (ch.name || '').toLowerCase() === String(name).toLowerCase());
+        // RESOLVE: expectedPositions is keyed by whatever spelling the cover
+        // hint used; one resolver decides which roster entry that is.
+        const chResolved = resolveEntity(name, coverCastIdx, { log, pageLabel: `${coverKeyD} ` });
+        const chObj = chResolved && chResolved.kind === 'cast' ? chResolved.entry : null;
         if (!chObj) continue;
         try {
           const txt = shCover.buildIdentityClothingText(chObj, (isCat ? existing.trim() : coverCat), storyData.artStyle, storyData.clothingRequirements || null, { label: `${coverKeyD} ` });
@@ -5798,7 +5803,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           if (protectionSource?.figures) {
             for (const fig of protectionSource.figures) {
               if (!fig.name || fig.name === 'UNKNOWN') continue;
-              if (fig.name.toLowerCase() === characterName.toLowerCase()) continue;
+              if (canonicalName(fig.name) === canonicalName(characterName)) continue;  // COMPARE
               if (fig.faceBox) {
                 const fb = toRect(fig.faceBox);
                 protectedFaces.push(fb);

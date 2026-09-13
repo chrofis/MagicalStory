@@ -35828,3 +35828,62 @@ inventing a ledger write keeps one convention for stage cost.
 `resolveTargets`, `main`), `tests/unit/book-audit-usage-tracked.test.ts` (5),
 `tests/unit/push-idle-manual-report.test.ts` (12)
 **Status:** ✅ active
+
+## 2026-09-13 — One cast resolver: a character string becomes an entry only through `castResolver.resolveEntity`
+**Context:**   Characters come from three pools — the photo-backed cast, Visual
+Bible secondaries (CHR###) and animals (ANI###) — and briefs name them by
+string: full names, title-less short forms ("Vendor" for "Marroni Vendor"), or
+VB id placeholders. FIVE rules decided whether a string named an entry: exact
+`toLowerCase()` equality at ~20 sites, unique word-boundary containment
+(`promptBuilders.buildSecondaryCharacterDescriptions`), discriminating-token
+overlap (`entryNamedByRow`), whole-word subset with FIRST MATCH WINS
+(`phantomCharacters.isKnownName`), and four separate VB-id regexes. No site
+stripped diacritics. `charRepairTarget` also matched a figure by
+`label.includes(name)` — the mechanism behind the whited-out-wrong-head incident
+(a "Sarah" repair landing on Rossa).
+
+Measured over the 60 most recent staging stories (686 pages, 8,952 name
+references): **32 stored rosters carry one person twice**, in three collision
+shapes — `Name` beside `Name (CHR00N)`, short form beside full form
+(`Vendor` / `Marroni Vendor`, job_1789163494908_kc2joi4ax p9), and
+article-prefixed (`girl from the walk` / `The girl from the walk`). The cause
+is `reconcileDetectorCast` deduping by string. Under the new strict rule:
+unresolved 2 (0.02%, one bible-less crowd token "net mender"), ambiguous 0.
+**Decision:** `server/lib/castResolver.js` is the single source:
+`canonicalName` (trim, collapse, lowercase, NFD diacritics stripped, trailing
+parenthetical removed), `buildCastIndex` (pool order cast → secondary →
+animal), `resolveEntity` (VB id literal → exact canonical → unique whole-word
+subset either direction; 0 or ≥2 candidates → null + WARN, NEVER first-match),
+`sameEntity`, `dedupeByEntity`, `displayName` (always `entry.name`, never an
+id), `isNonHuman`, `kindLabel`, `lookupByName` (for the name-keyed
+`clothingRequirements` / `characterClothing` / `characterPositions` maps),
+`flushResolverStats` (one INFO line per page).
+Every consumer is one of two kinds, stated in its comment: RESOLVE (a brief or
+roster token → entity) or COMPARE (two stored names from the same run →
+`canonicalName` equality only). READ-TIME ONLY (owner): stored page data stays
+name-keyed, no new persisted field, no migration; `derivePresenceFinding` with
+no index is byte-identical to before.
+Deleted: the containment block and first-pass equality in
+`buildSecondaryCharacterDescriptions`; `isKnownName`'s subset loop;
+`charRepairTarget`'s `label.includes` branch; the local VB-id regex copies in
+`phantomCharacters`, `figureDetection`, `compositeCastBuilder` (→ `vbIdGuard`).
+**Rationale:** Same shape as the element `label` fix earlier today: one
+canonical identity, read through one function, or the sixth rule appears next
+month. Ambiguity refuses rather than guesses because a wrong guess repairs the
+wrong person; at 0 ambiguous references across 686 pages the strictness is
+free. The intended behaviour change: nested distinct names ("Mother",
+"Mother Dragon") no longer merge on first match; an ambiguous reference is
+treated as unknown and logged.
+**Touched:** `server/lib/castResolver.js` (new); RESOLVE/COMPARE migrations in
+`evalPipeline.js`, `promptBuilders.js`, `charRepairTarget.js`, `faceRepair.js`,
+`phantomCharacters.js`, `coverIterate.js`, `compositeCastBuilder.js`,
+`entityConsistency.js`, `bboxDetection.js`, `figureDetection.js`,
+`feedbackConsolidator.js`, `images.js`, `clothingCategories.js`,
+`clothingResolve.js`, `clothingCheck.js`, `beatsPipeline.js`,
+`characterFrames.js`, `routes/regeneration.js`, `routes/stories.js`; tests
+`cast-resolver.test.ts`, `cast-resolver-replay.test.ts`,
+`cast-lookup-by-name.test.ts` (new) + `one-roster`, `extra-character-type`,
+`char-repair-protection` extended.
+**Status:**    🟡 conditional — unit-proven and measured on stored data; one
+real story still owed to see `[CAST-RESOLVE]` stats on live pages and a
+single-spelling roster end to end.

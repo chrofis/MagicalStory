@@ -13,6 +13,7 @@ const pLimit = require('p-limit');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
+const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn } = require('./grok');
 const { MODEL_PRICING } = require('../config/models');
@@ -3089,6 +3090,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   }
   // Find reference images for missing characters/animals from Visual Bible (still useful)
   const missingItems = combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
+  const missingIdx = buildCastIndex({ characters: characters || [] }, visualBible);
   for (const missing of missingItems) {
     const itemName = (missing.item || '').toLowerCase().trim();
     if (!itemName) continue;
@@ -3097,7 +3099,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // lives on a state row, so a raw check drops it from repair references.
     const hasRef = require('./visualBible').hasElementReference;
 
-    const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
+    // RESOLVE: one resolver decides who "item" names across the three people
+    // pools; artifacts stay on their own (name/id) matching below — an
+    // artifact is not a character.
+    const missingEntry = resolveEntity(missing.item, missingIdx, { log, pageLabel: `P${pageNumber} ` });
+    const vbAnimal = (missingEntry && missingEntry.kind === 'animal' && hasRef(missingEntry.entry))
+      ? missingEntry.entry : null;
     if (vbAnimal) {
       const bytes = await loadVbReferenceBytes(vbAnimal);
       if (bytes) {
@@ -3107,7 +3114,8 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         continue;
       }
     }
-    const vbChar = visualBible?.secondaryCharacters?.find(c => (c.name?.toLowerCase() === itemName || c.id?.toLowerCase() === itemName) && hasRef(c));
+    const vbChar = (missingEntry && missingEntry.kind === 'secondary' && hasRef(missingEntry.entry))
+      ? missingEntry.entry : null;
     if (vbChar) {
       const bytes = await loadVbReferenceBytes(vbChar);
       if (bytes) {
@@ -3128,7 +3136,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       }
     }
     if (characters) {
-      const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
+      const mainChar = (missingEntry && missingEntry.kind === 'cast') ? missingEntry.entry : null;
       if (mainChar) {
         const pageClothing = clothingFor(mainChar.name);
         if (!pageClothing) {
@@ -3467,7 +3475,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // every page of job_1786147254924_8nuyywjii. If we do not know who is on the
   // page, we do not guess — we fail here.
   const analysisCharacters = (() => {
-    const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
+    // RESOLVE: page cast names → roster entries through the one resolver.
+    const iterateIdx = buildCastIndex({ characters: characters || [] }, visualBible);
+    const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim()).filter(Boolean);
     if (names.length === 0) {
       // An EMPTY cast and an UNKNOWN cast are different states. A landscape page
       // legitimately has nobody in it; a page whose prose names people the roster
@@ -3490,19 +3500,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       // the ROSTER only, so a page whose cast is entirely secondary yields an
       // empty sceneCharacters — that is correct, not unknown. Only a name that
       // is in neither place means we genuinely do not know who is in the picture.
-      const secondaryNames = new Set(
-        ((visualBible?.secondaryCharacters) || [])
-          .map(sc => String(sc?.name || '').trim().toLowerCase())
-          .filter(Boolean)
-      );
-      const unknown = metaNames.filter(n => !secondaryNames.has(n.trim().toLowerCase()));
+      const unknown = metaNames.filter((n) => {
+        const e = resolveEntity(n, iterateIdx, { log, pageLabel: `P${pageNumber} ` });
+        return !(e && e.kind === 'secondary');
+      });
       if (unknown.length === 0) {
         log.info(`🔄 [ITERATE] Page ${pageNumber}: cast is entirely secondary characters (${metaNames.join(', ')}) — no roster identities to analyse`);
         return [];
       }
       throw new Error(`[ITERATE] Page ${pageNumber}: the scene names ${unknown.join(', ')}, who are in neither the story roster (${characters.map(c => c.name).join(', ')}) nor the Visual Bible's secondary characters. Refusing to fall back to the whole roster.`);
     }
-    const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
+    const wanted = new Set(names
+      .map(n => resolveEntity(n, iterateIdx, { log, pageLabel: `P${pageNumber} ` }))
+      .filter(e => e && e.kind === 'cast')
+      .map(e => e.entry));
+    const matched = characters.filter(c => wanted.has(c));
     if (matched.length === 0) {
       throw new Error(`[ITERATE] Page ${pageNumber}: none of the page's characters (${names.join(', ')}) match the story roster (${characters.map(c => c.name).join(', ')}). Refusing to fall back to the whole roster.`);
     }
@@ -3596,14 +3608,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       try {
         const meta = sceneMetadata?.characters;
         if (Array.isArray(meta) && meta.length > 0) {
-          return meta.map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
+          return meta.map(c => String(c?.name || '').trim()).filter(Boolean);
         }
       } catch { /* fall through */ }
       return null;
     })();
-    const lockedCast = originalSceneCharNames
-      ? characters.filter(c => originalSceneCharNames.includes(String(c.name || '').trim().toLowerCase()))
-      : characters;
+    // RESOLVE: lock the cast by ENTRY, not by a lowercased string compare.
+    const lockIdx = buildCastIndex({ characters: characters || [] }, visualBible);
+    const lockWanted = originalSceneCharNames
+      ? new Set(originalSceneCharNames
+          .map(n => resolveEntity(n, lockIdx, { log, pageLabel: `P${pageNumber} ` }))
+          .filter(e => e && e.kind === 'cast')
+          .map(e => e.entry))
+      : null;
+    const lockedCast = lockWanted ? characters.filter(c => lockWanted.has(c)) : characters;
     if (originalSceneCharNames && lockedCast.length !== originalSceneCharNames.length) {
       log.warn(`🔄 [ITERATE] Page ${pageNumber}: Locked cast resolved ${lockedCast.length}/${originalSceneCharNames.length} from original scene metadata`);
     } else if (originalSceneCharNames) {

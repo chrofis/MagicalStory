@@ -14,6 +14,8 @@
 // character got no frame and no prompt mapping, leaving one figure unbound on
 // every 5-cast page.
 
+const { canonicalName } = require('./castResolver');
+
 const FRAME_COLORS = [
   { label: 'RED',    rgb: { r: 222, g: 36,  b: 36  } },
   { label: 'BLUE',   rgb: { r: 33,  g: 90,  b: 222 } },
@@ -38,7 +40,8 @@ function frameColorForName(name, allNames) {
   // solo page). Return null so both the baked card frame (grok.js) AND the
   // prompt's "<colour> = <name>" mapping (buildImagePrompt) drop out together.
   if (canon.length <= 1) return null;
-  const idx = canon.findIndex((n) => n.toLowerCase() === String(name).toLowerCase());
+  // COMPARE: two stored names from the same run — one normaliser.
+  const idx = canon.findIndex((n) => canonicalName(n) === canonicalName(name));
   if (idx < 0 || idx >= FRAME_COLORS.length) return null;
   return FRAME_COLORS[idx];
 }

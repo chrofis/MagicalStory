@@ -574,7 +574,9 @@ function buildActionContext(sceneDescription, charName, visualBible = null) {
   try {
     const { extractSceneMetadata } = require('./storyHelpers');
     const md = extractSceneMetadata(sceneDescription);
-    const charData = md?.fullData?.characters?.find(c => c.name?.toLowerCase() === charName.toLowerCase());
+    // COMPARE: stored scene-metadata name vs the stored target name.
+    const { canonicalName } = require('./castResolver');
+    const charData = md?.fullData?.characters?.find(c => canonicalName(c.name) === canonicalName(charName));
     if (charData) {
       const parts = [];
       if (charData.expression) parts.push(`Expression: ${charData.expression}`);

@@ -13,6 +13,7 @@
  */
 
 const { callTextModel } = require('./textModels');
+const { buildCastIndex, lookupByName } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
@@ -371,13 +372,12 @@ async function consolidateFeedback({
     // override. The override matters for costumed scenes — without it, the
     // description reads the default modern outfit and fix instructions
     // redress medieval characters in hoodies.
+    // RESOLVE: the scene keys this map with whatever spelling the brief used
+    // ("Rossa" for "Kapitänin Rossa"); one resolver decides who that is.
+    const castIdx = buildCastIndex({ characters }, visualBible);
     const clothingLookup = (name) => {
-      if (!sceneClothing || !name) return null;
-      const lower = String(name).toLowerCase();
-      for (const [k, v] of Object.entries(sceneClothing)) {
-        if (k.toLowerCase() === lower) return v || null;
-      }
-      return null;
+      const hit = lookupByName(sceneClothing, name, castIdx);
+      return hit ? (hit.value || null) : null;
     };
 
     const characterDescriptions = {};
