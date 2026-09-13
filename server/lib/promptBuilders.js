@@ -416,6 +416,12 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
   // A malformed Visual Bible (object instead of array, missing entirely) must
   // not throw — the page still renders, it just has no secondary to add.
   if (!lists.some(l => Array.isArray(l.list) && l.list.length > 0)) return out;
+  // Required lazily: this module is loaded from prompt paths that must not
+  // acquire a load-order dependency on the resolver.
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  // The photo-backed cast is represented by `knownNames` (the exclusion set),
+  // so the index covers the Visual Bible pools only.
+  const idx = buildCastIndex(null, visualBible);
   const known = new Set((knownNames || []).map(n => String(n).toLowerCase()));
   const seen = new Set();
   for (const raw of (sceneNames || [])) {
@@ -424,42 +430,20 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     const key = name.toLowerCase();
     if (known.has(key) || seen.has(key)) continue;
     seen.add(key);
-    let matched = null;
-    for (const { list, kind } of lists) {
-      if (!Array.isArray(list)) continue;
-      const entry = list.find(e => (e?.name && e.name.toLowerCase() === key)
-        || (e?.id && e.id.toLowerCase() === key));
-      if (entry) { matched = { entry, kind }; break; }
-    }
-    // A TITLE IS NOT A DIFFERENT PERSON (owner, 2026-08-25). The Visual Bible
-    // names secondaries in full ("Kapitänin Rossa", "König Ludwig"); the scene
-    // metadata refers to them the way the prose does ("Rossa"). Exact match
-    // alone therefore resolved neither, and the detector was never told that
-    // figure exists — so it borrowed a user character's name for her instead.
-    // Measured on p15 of job_1787514666616_yw9qsv1vf: "Sarah" landed on Rossa
-    // and a face repair whited out the wrong person's head.
-    //
-    // Word-boundary containment either way, and ONLY when exactly one entry
-    // matches: two candidates mean the reference is genuinely ambiguous, and
-    // guessing between them is how the wrong description gets attached.
+    // RESOLVE (brief/plan token → entity). On p15 of job_1787514666616_yw9qsv1vf
+    // an unresolved scene reference let the detector borrow a user character's
+    // name for a Visual Bible secondary — "Sarah" landed on Rossa and a face
+    // repair whited out the wrong person's head. castResolver is now the one
+    // ladder (VB id → exact canonical name → unique whole-word subset either
+    // direction); it warns on its own for unresolved and ambiguous refs.
+    const resolved = resolveEntity(name, idx, { log, pageLabel });
+    // The animal pool is indexed but only in scope when `includeAnimals` asked
+    // for it (see the roster note above).
+    const matched = (resolved && (includeAnimals || resolved.kind !== 'animal'))
+      ? { entry: resolved.entry, kind: resolved.kind === 'animal' ? 'animal' : 'secondary character' }
+      : null;
     if (!matched) {
-      const asWord = (haystack, needle) =>
-        new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`, 'i').test(haystack);
-      for (const { list, kind } of lists) {
-        if (!Array.isArray(list)) continue;
-        const candidates = list.filter(e => e?.name
-          && (asWord(e.name, name) || asWord(name, e.name)));
-        if (candidates.length === 1) { matched = { entry: candidates[0], kind }; break; }
-        if (candidates.length > 1) {
-          log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene reference "${name}" matches ${candidates.length} Visual Bible entries (${candidates.map(c => c.name).join(', ')}) — too ambiguous to resolve`);
-        }
-      }
-      if (matched) {
-        log.debug(`[BBOX-BUILD] ${pageLabel}Resolved scene reference "${name}" to Visual Bible entry "${matched.entry.name}"`);
-      }
-    }
-    if (!matched) {
-      log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene references "${name}" but no Visual Bible entry resolves it — the detector will report it as missing`);
+      log.debug(`[BBOX-BUILD] ${pageLabel}Scene references "${name}" but no Visual Bible entry resolves it — the detector will report it as missing`);
       continue;
     }
     const e = matched.entry;
@@ -482,7 +466,7 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     const rich = baseDesc ? `${label} (${matched.kind}). ${baseDesc}` : `${label} (${matched.kind})`;
     // Key by the metadata name (may be a VB id placeholder like "CHR001")
     // so buildExpectedCharactersForBbox finds it via the same key.
-    out[name] = { richDescription: rich };
+    out[name] = { richDescription: rich, entryName: e.name || label, entryId: e.id || null };
   }
   return out;
 }
@@ -2434,6 +2418,13 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // 2026-09-11), from
     // the same constant the mechanical check and the code-side truncation use.
     VB_ELEMENT_BUDGET,
+    // Season governs foliage, ground cover and daylight colour, and it must be
+    // the SAME on every page. The per-page builder has passed it since the
+    // placeholder existed; the batch builder — the beats path, which is the
+    // production pipeline — did not, so the Art Director wrote every book
+    // season-blind. `inputData` is the job's inputData; the resolver falls
+    // back to the date.
+    SEASON: seasonLabel(inputData || {})
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
