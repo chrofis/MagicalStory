@@ -330,6 +330,8 @@ measurement, is lost).
       but a raw 98 became a production 5 on one page) → `tasks/eval-variance-backlog.md`
 - [ ] C3 — entity consistency's own run-to-run variance is unmeasured
       → `tasks/eval-variance-backlog.md`
+- [ ] C4 — **the BOOK AUDIT judge's severity grade is a lottery, and severity now gates
+      behaviour** (measured 2026-09-13, Lab #1258/#1259) → `tasks/eval-variance-backlog.md`
 - [ ] Three severity tables, five deduction buckets, and `evalScore` redundancy want
       collapsing → `docs/scoring-simplification-review.md:170`
 - [x] D3 — guard against a second taxonomy in `scoring.js` — **done**, pre-push gate 6

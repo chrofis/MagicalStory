@@ -111,3 +111,45 @@ subject. Do not read these as unbuilt.
   (`evalPipeline.js:915` + `:621-633`). Merging collapses the cross-check into
   self-confirmation and cannot hold two sampling regimes. Reopening needs evidence that P1 and
   Stage 1 rarely disagree.
+
+## C4 — the book-audit judge's severity grade is a lottery (measured 2026-09-13)
+
+Lab experiments **#1258 / #1259**, on prod story `job_1789227389389_z18dmvnt6` copied to
+staging. Identical shipped bytes both runs (`input_tokens` 7,018 each), `gemini-2.5-flash` at
+temperature 0.
+
+- **28 vs 26 faults**; 22 in common — 84.6% overlap, Jaccard 68.8%.
+- **5 of the 22 common faults (22.7%) changed SEVERITY GRADE between the two runs** —
+  p3 MAJOR↔CRITICAL, p14 CRITICAL↔MAJOR, and three more.
+- The **route tag (IMG/TEXT) was stable**: zero divergences across both runs, all IMG. The
+  route flipping recorded for `gemini-3.7-flash` is that model's behaviour, not a property of
+  the stage — do not generalise one judge's instability to the others.
+- **A same-model double read does NOT fix recall.** Both runs scored 5/7 on the eye-verified
+  defect list, and so did their UNION; #1229 contributed zero unique observations. A repeat
+  buys ~23% more observations and nothing the model cannot see. The cheap recall win is a
+  CROSS-MODEL union (2.5-flash + 3.7-flash = 6/7 for $0.071).
+- **G6 (a prop rendered as a glowing orb containing a different creature) was missed by ALL
+  SEVEN configs tested** — 2.5-flash, 3.7-flash at three thinking levels, 3.8-flash, qwen,
+  grok, gpt. Some defects are invisible to VLM judges; a judge upgrade does not close a recall
+  gap by itself.
+
+**Why this is now load-bearing, not just an observation.** Before 2026-09-13 severity in the
+book audit was reporting only. The final-audit change (commit `deab72254`) admits a page to
+ONE extra repair round on `CRITICAL`/`CATASTROPHIC` only (`AUDIT_ADMIT_SEVERITIES`,
+`repairLogic.js`). A 22.7% grade lottery now sits directly under that gate: the same defect on
+the same bytes can buy a repair round in one run and not in the next.
+
+Published literature says this is normal, not a misconfiguration: "The Coin Flip Judge?"
+(arXiv:2606.13685) measures a 13.6% mean verdict flip rate on repeated identical calls and
+needs 11 trials for a majority vote to match a 50-trial reference. MLLM-as-a-Judge
+(arXiv:2402.04788) finds MLLMs track humans on pairwise comparison and diverge badly on
+absolute scoring — which is what a severity grade is.
+
+**Owner 2026-09-13: file it, do not change the gate yet.** The two options weighed, both
+deferred: widen admission to MAJOR+ (costs repair budget on more pages), or admit on the
+FAULT plus a low page score rather than on the grade (sidesteps the lottery entirely — the
+preferred shape if this is ever picked up). Accepting is also defensible: the grant is capped
+at one per book, so a lost grant costs one round on one page.
+
+Related: the recall half of this is what `BACKLOG.md` cluster work on `prompts/image-semantic.txt`
+addresses; C4 is the measurement, not another instance.
