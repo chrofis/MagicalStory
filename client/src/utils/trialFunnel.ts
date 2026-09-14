@@ -139,7 +139,11 @@ export function captureAttribution(): Attribution {
  * Record one funnel step. Safe to call repeatedly for the same step.
  *
  * @param step - one of TrialStep
- * @param meta - small, bounded context only (never image bytes)
+ * @param meta - small, bounded context only (never image bytes). The server
+ *   keeps an ALLOWLIST (TRIAL_META_SCHEMA in server/routes/trial.js) and drops
+ *   everything else silently, so a new key here needs a matching entry there or
+ *   it is simply never stored. Ids and flags only — never anything a visitor
+ *   typed, and never the child's name.
  */
 export function trackTrialStep(step: TrialStep, meta?: Record<string, unknown>): void {
   try {

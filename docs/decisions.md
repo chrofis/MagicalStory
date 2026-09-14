@@ -2375,6 +2375,51 @@ causes with independent fixes.
 (scoring rules + JSON schema).
 **Status:** ✅ active.
 
+### The trial funnel records WHICH topic was chosen, and whether a deep link had already fixed it (2026-09-14)
+**Context:** `topic_selected` fired on every visit that got that far, but `meta`
+was NULL on all 9 stored rows — the endpoint recorded THAT a topic was picked
+and threw away WHICH. That is the highest-intent signal in the funnel and it is
+free to capture. Separately, the SEO theme pages deep-link in as
+`/try?category=…&topic=…` with a React-Router `<Link>`, so `document.referrer`
+never changes, `captureAttribution()` only ever looked at utm/gclid/referrer,
+and `TrialWizard` read the params into state and dropped the provenance:
+0 of 29 `landing` rows carried meta and none carried an internal referrer. So we
+could not say what share of trials arrive with the topic ALREADY fixed — which
+is exactly the number that decides whether curating the in-wizard topic grid
+buys anything, since 43 of the 59 life challenges are reachable only by deep
+link.
+**Decision:** `topic_selected` now carries `{category, topic, theme,
+preselected, age}` and `landing` carries `{deepLink, category, topic}` when the
+arrival URL had those params. The `meta` JSONB column already existed
+(migration 024, verified against the staging DB — no migration). The endpoint
+no longer stores whatever object the client sent: `sanitizeTrialEventMeta()`
+keeps an allowlist (`TRIAL_META_SCHEMA`) of eight keys, each only in its
+declared shape — booleans must be booleans, ids must match the catalogue-slug
+regex `^[a-z0-9][a-z0-9-]{0,39}$`, age must be an integer 0-18 — and everything
+else is dropped silently rather than rejecting the event.
+**Rationale:** The five fields are the minimum that make the signal readable and
+nothing more. `topic` is the measurement; `category` groups it; `theme` is the
+adventure branch's equivalent of a topic id, without which the majority of
+trials would record an empty choice; `age` is the denominator, because the age
+band decides which six tiles were even shown and a pick rate is meaningless
+against the wrong population; `preselected` compares the ARRIVAL topic to the
+chosen one, so a visitor who deep-linked and then changed their mind in the grid
+is not miscounted. **This exists to replace the authored `liveness` weights in
+`client/src/constants/storyTypes.ts` with measurement** — those numbers are
+today one person's judgement of what parents want, and within a few weeks these
+rows say what parents actually pick. The allowlist rather than a length cap: a
+slug shape cannot carry a child's name or anything a parent typed, and it keeps
+the row far under the 2000-char truncation in `recordTrialEvent()` — which, being
+a `.slice()` on serialised JSON, would otherwise write unparseable JSONB.
+Dropping bad fields instead of rejecting the event keeps a measurement bug from
+costing the funnel step itself.
+**Touched:** `server/routes/trial.js` (`TRIAL_META_SCHEMA`,
+`sanitizeTrialEventMeta`, the `/event` handler's meta argument, the export);
+`client/src/pages/TrialWizard.tsx` (`deepLink` ref, the `landing` and
+`topic_selected` calls); `client/src/utils/trialFunnel.ts` (allowlist note on
+`trackTrialStep`); `tests/unit/trial-funnel-topic-meta.test.ts`.
+**Status:** ✅ active.
+
 ## Performance
 
 ### Landing+nav static images shipped as WebP at display-resolution

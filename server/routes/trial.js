@@ -435,6 +435,54 @@ function _trim(value, max) {
   return s.slice(0, max);
 }
 
+// Every key a funnel event may carry in `meta`, with the shape it must have.
+// The endpoint used to store whatever JSON object the client sent; an allowlist
+// keeps arbitrary client-supplied data (and anything a visitor typed) out of the
+// table, and keeps the row small enough that the 2000-char truncation in
+// recordTrialEvent can never fire and produce unparseable JSONB.
+//
+// `slug` is deliberately the catalogue-id shape (lowercase, hyphens, no spaces):
+// a topic/theme/category id passes, and free text a parent typed cannot.
+const TRIAL_META_SCHEMA = {
+  multipleFaces: 'bool',   // photo_analyzed: did the face modal appear
+  method: 'slug',          // account_created: 'email' | 'google'
+  // topic_selected + landing: WHAT was chosen, and whether it was already fixed
+  // by a /try?category=…&topic=… deep link before the visitor saw the grid.
+  category: 'slug',
+  topic: 'slug',
+  theme: 'slug',
+  preselected: 'bool',
+  deepLink: 'bool',
+  age: 'age',              // the child's declared age — decides which tiles were shown
+};
+
+const TRIAL_META_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/**
+ * Keep only the allowlisted keys, each only in its declared shape. Anything
+ * else — an unknown key, a wrong type, an over-long or free-text value — is
+ * dropped silently rather than rejecting the event: a mis-shaped meta must
+ * never cost us the funnel step itself.
+ *
+ * @returns {object|null} the surviving fields, or null if nothing survived.
+ */
+function sanitizeTrialEventMeta(meta) {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const clean = {};
+  for (const [key, kind] of Object.entries(TRIAL_META_SCHEMA)) {
+    const value = meta[key];
+    if (value === undefined || value === null) continue;
+    if (kind === 'bool') {
+      if (typeof value === 'boolean') clean[key] = value;
+    } else if (kind === 'slug') {
+      if (typeof value === 'string' && TRIAL_META_SLUG_RE.test(value)) clean[key] = value;
+    } else if (kind === 'age') {
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 18) clean[key] = value;
+    }
+  }
+  return Object.keys(clean).length ? clean : null;
+}
+
 /**
  * Record one funnel step for one visit.
  *
@@ -533,7 +581,7 @@ router.post('/event', trialEventLimiter, async (req, res) => {
       language: req.body.language,
       device: /mobile|android|iphone|ipad/i.test(ua) ? 'mobile' : 'desktop',
       userId,
-      meta: req.body.meta && typeof req.body.meta === 'object' ? req.body.meta : null,
+      meta: sanitizeTrialEventMeta(req.body.meta),
     });
   } catch (err) {
     log.warn(`[TRIAL FUNNEL] Failed to record event: ${err.message}`);
@@ -3156,6 +3204,7 @@ module.exports.getTrialFunnel = getTrialFunnel;
 module.exports.getTrialStepFunnel = getTrialStepFunnel;
 module.exports.TRIAL_FUNNEL_STEPS = TRIAL_FUNNEL_STEPS;
 module.exports.OPTIONAL_TRIAL_STEPS = OPTIONAL_TRIAL_STEPS;
+module.exports.sanitizeTrialEventMeta = sanitizeTrialEventMeta;
 module.exports.buildTrialFunnelRows = buildTrialFunnelRows;
 module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
