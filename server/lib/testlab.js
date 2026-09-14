@@ -7976,9 +7976,9 @@ function groupIdeasBySubject(ideas, threshold = 0.5) {
  * params.overlap   — word-overlap threshold for the repeat grouping (default 0.5)
  */
 async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = null }) {
-  const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildTrialIdeaCostumeInstructions, buildAgeModeSection, getTeachingGuide } = require('./promptBuilders');
+  const { buildTrialIdeaPrompts, getTeachingGuide } = require('./promptBuilders');
   const { buildSeasonInstruction } = require('./season');
   const { getLanguageInstruction } = require('./languages');
   const { callTextModelStreaming } = require('./textModels');
@@ -8047,37 +8047,27 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   const trialTitle = getTrialTitle(storyTopic, storyCategory, mainChar.gender, language);
   const { getTrialCostumeForStory } = require('../config/trialCostumes');
   const ideaCostume = getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender: mainChar.gender });
-  const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
   const seasonInstruction = storyCategory === 'historical' ? '' : buildSeasonInstruction({});
 
-  const orig = PROMPT_TEMPLATES.trialIdea;
-  if (promptOverride) PROMPT_TEMPLATES.trialIdea = promptOverride;
-  let base;
-  try {
-    base = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
-      SEASON: seasonInstruction,
-      CHARACTER: charDesc,
-      CATEGORY_CONTEXT: categoryContext,
-      TITLE: trialTitle || '',
-      LANDMARKS: '',
-      LANG_INSTRUCTION: getLanguageInstruction(language),
-      AGE_MODE: buildAgeModeSection({ characters: [mainChar] }),
-      COSTUME_RULE: costumeRule,
-    });
-  } finally {
-    PROMPT_TEMPLATES.trialIdea = orig;
-  }
-  if (!base || !base.trim()) throw new Error('trial-idea template unavailable');
-
   const townName = userLocation?.city || '';
-  const townClause = townName ? `in ${townName}` : `in the child's own town`;
-  const noInventedPlaces = landmarksText
-    ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
-    : '';
-  const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
-  const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
-  const promptLocal = base + localIdea;
-  const promptFantasy = base + fantasyIdea;
+  // The route and this stage share ONE assembly (buildTrialIdeaPrompts) — a
+  // hand-copied mirror measures a prompt production does not send. The variety
+  // axis rotates per arm, so the prompts are rebuilt inside the draw loop.
+  const ideaArgs = {
+    template: promptOverride || null,
+    characters: [mainChar],
+    charDesc,
+    categoryContext,
+    landmarksText,
+    townName,
+    storyTheme,
+    trialTitle,
+    langInstruction: getLanguageInstruction(language),
+    seasonInstruction,
+    ideaCostume,
+  };
+  let promptLocal = '';
+  let promptFantasy = '';
 
   const t0 = Date.now();
   const usage = [];
@@ -8087,13 +8077,16 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     // Both ideas of a pair in parallel, as the route does. One flaky response
     // must not lose the whole run — the draw records its error and the rest
     // still get generated (score_rejudge takes the same line).
+    const drawPrompts = buildTrialIdeaPrompts(ideaArgs);
+    if (i === 1) { promptLocal = drawPrompts.local; promptFantasy = drawPrompts.fantasy; }
     const [localRes, fantasyRes] = await Promise.all([
-      callTextModelStreaming(promptLocal, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
-      callTextModelStreaming(promptFantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+      callTextModelStreaming(drawPrompts.local, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+      callTextModelStreaming(drawPrompts.fantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
     ]);
     for (const r of [localRes, fantasyRes]) if (!r.error) usage.push({ cost: costOf(r), modelId: r.modelId, usage: r.usage });
     pairs.push({
       draw: i,
+      axes: { local: drawPrompts.axes.local.want, fantasy: drawPrompts.axes.fantasy.want },
       local: localRes.error ? null : String(localRes.text || '').trim(),
       fantasy: fantasyRes.error ? null : String(fantasyRes.text || '').trim(),
       errors: [localRes.error, fantasyRes.error].filter(Boolean),

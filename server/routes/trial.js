@@ -2219,11 +2219,6 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     const mainGender = mainChar?.gender || 'male';
     const trialTitle = getTrialTitle(storyTopic, storyCategory, mainGender, language);
 
-    // Load prompt template from prompts/trial-idea.txt
-    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
-
-    const { buildAgeModeSection } = require('../lib/promptBuilders');
-
     // A trial's clothing does not come from the writer — it comes from the
     // static costume table, and a theme with no entry gets no costumed avatar
     // sheet. An idea that has the child put a costume ON is then unrenderable:
@@ -2232,8 +2227,6 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // is, so the premise never asks for what cannot be worn.
     const { getTrialCostumeForStory } = require('../config/trialCostumes');
     const ideaCostume = getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender: mainGender });
-    const { buildTrialIdeaCostumeInstructions } = require('../lib/promptBuilders');
-    const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
     if (!ideaCostume) log.debug(`  [COSTUME] none configured for ${storyCategory}/${storyTheme || storyTopic} — ideas stay costume-free`);
 
     // /try asks the visitor nothing about the season, so it resolves from the
@@ -2244,16 +2237,6 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     const { buildSeasonInstruction } = require('../lib/season');
     const seasonInstruction = storyCategory === 'historical' ? '' : buildSeasonInstruction({});
 
-    const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
-      SEASON: seasonInstruction,
-      CHARACTER: charDesc,
-      CATEGORY_CONTEXT: categoryContext,
-      TITLE: trialTitle || '',
-      LANDMARKS: '',
-      LANG_INSTRUCTION: langInstruction,
-      AGE_MODE: buildAgeModeSection({ characters }),
-      COSTUME_RULE: costumeRule,
-    });
     // The two ideas exist to offer a real choice, so they differ in KIND, not
     // just in detail (owner, 2026-08-25): one grounded in the child's own town
     // at its real landmarks, one in a make-believe world entered from home.
@@ -2268,15 +2251,25 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // around it fills the rest of the geography in from general knowledge, and
     // gets it wrong (a real trial put a town on the wrong river). Name the town,
     // and let no other place be invented beside the ones supplied.
-    const townName = userLocation?.city || '';
-    const townClause = townName ? `in ${townName}` : `in the child's own town`;
-    const noInventedPlaces = landmarksText
-      ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
-      : '';
-    const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
-    const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
-    const prompt1Local = prompt1 + localIdea;
-    const prompt2 = prompt1 + fantasyIdea;
+    // The arms fire in parallel, so neither can be told to differ from the
+    // other — the difference is built in: the own-town arm carries the band's
+    // plot mechanics, the make-believe arm only its tone, and each arm draws its
+    // own rotated variety axis (Lab 1273, docs/decisions.md 2026-09-14).
+    // Assembly lives in buildTrialIdeaPrompts so the Lab's variety stage
+    // measures the prompt production actually sends.
+    const { buildTrialIdeaPrompts } = require('../lib/promptBuilders');
+    const { local: prompt1Local, fantasy: prompt2 } = buildTrialIdeaPrompts({
+      characters,
+      charDesc,
+      categoryContext,
+      landmarksText,
+      townName: userLocation?.city || '',
+      storyTheme,
+      trialTitle,
+      langInstruction,
+      seasonInstruction,
+      ideaCostume,
+    });
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);

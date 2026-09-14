@@ -39,26 +39,28 @@ describe('both stages are registered on BOTH sides', () => {
   }
 });
 
-describe('the idea stage still mirrors the production idea prompt', () => {
-  // The two branch sentences that make the pair differ in KIND. Both are built
-  // inline in trial.js; the stage copies them verbatim.
-  const shared = [
-    'Set this idea ${townClause}, at the real local places named above.',
-    'Generate a DIFFERENT idea than the first one, set in a make-believe ',
-    'Name no place beyond the landmarks listed above',
-    'At least one scene must take place at one of these real local landmarks: ',
-  ];
-  for (const sentence of shared) {
-    it(`"${sentence.slice(0, 40)}…" is identical in trial.js and the Lab stage`, () => {
-      expect(trialRoute).toContain(sentence);
-      expect(ideaStage).toContain(sentence);
+describe('the idea stage runs the production idea prompt, not a copy of it', () => {
+  // The hand-copied mirror was the drift hazard. Assembly now lives in ONE
+  // builder (buildTrialIdeaPrompts) that both sites call, so the pin is that
+  // neither site rebuilds the branch sentences for itself.
+  it('both the route and the stage call the shared builder', () => {
+    for (const src of [trialRoute, ideaStage]) expect(src).toMatch(/buildTrialIdeaPrompts\(/);
+  });
+
+  for (const [where, src] of [['trial.js', () => trialRoute], ['the Lab stage', () => ideaStage]] as const) {
+    it(`${where} hand-builds no part of the idea prompt`, () => {
+      expect(src()).not.toContain('Set this idea ');
+      expect(src()).not.toContain('Name no place beyond the landmarks listed above');
+      expect(src()).not.toMatch(/PROMPT_TEMPLATES\.trialIdea/);
     });
   }
 
-  it('fills the same template placeholders the route fills', () => {
-    for (const key of ['SEASON', 'CHARACTER', 'CATEGORY_CONTEXT', 'TITLE', 'LANDMARKS', 'LANG_INSTRUCTION', 'AGE_MODE', 'COSTUME_RULE']) {
-      expect(ideaStage).toContain(`${key}:`);
-    }
+  it('passes the stage prompt override through the builder rather than mutating the template table', () => {
+    expect(ideaStage).toMatch(/template: promptOverride \|\| null/);
+  });
+
+  it('rebuilds the prompts per draw, so the rotated variety axis is exercised', () => {
+    expect(ideaStage).toMatch(/for \(let i = 1; i <= draws; i\+\+\)[\s\S]*buildTrialIdeaPrompts\(ideaArgs\)/);
   });
 
   it('uses the production idea model by default', () => {

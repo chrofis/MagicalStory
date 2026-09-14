@@ -3,22 +3,22 @@
 The child this book is for is three. Write for that child. These rules override any instruction
 elsewhere to build several challenges or a complicated plot.
 
-**One problem, met three times.** The book has a single concrete problem, plain enough to point at:
-something is stuck, too high, too heavy, spilled, or an animal friend cannot manage on their own. For
+[[plot]]**One problem, met three times.** The book has a single concrete problem, plain enough to point at.[[book]]
+It is something stuck, too high, too heavy, spilled, or an animal friend who cannot manage alone. For
 a life-skill topic the problem is the outside event that makes the skill necessary — one thing wanted
 by two at once, the last piece, something lost or broken — never a feeling on its own, and never the
-same request made three times. Three tries, no more. Each try is a different kind of attempt, not
+same request made three times.[[/book]] Three tries, no more. Each try is a different kind of attempt, not
 more of the last one — pulling harder after pulling is the same try twice. The first two do not work.
 The third one does.
 
 **The child's own doing.** Before the third try the main character notices something about the
-problem the first two missed: the thing is caught on something, it is lighter from the other end,
-there is a way in from another side. The third try comes from that noticing. Never luck, never a
+problem the first two missed.[[book]] The thing is caught on something, it is lighter from the other end,
+there is a way in from another side.[[/book]] The third try comes from that noticing. Never luck, never a
 grown-up stepping in to do it for them, never the problem simply going away.
 
 **Small noticing, not cleverness.** What the main character notices is the size of a three-year-old's
-noticing — looking at the thing from another side, moving what is in the way first, asking the right
-friend for a hand. Never a plan, a trick, or a child who reasons like a grown-up.
+noticing.[[book]] Looking at the thing from another side, moving what is in the way first, asking the right
+friend for a hand.[[/book]] Never a plan, a trick, or a child who reasons like a grown-up.[[/plot]]
 
 **Kindness is the motive.** Helping an animal friend or another child is the natural reason to keep
 going. Heroism at this age is being kind and not giving up.
@@ -27,7 +27,7 @@ going. Heroism at this age is being kind and not giving up.
 thing, the weather, or a size — not a person who means harm.
 
 **Feelings named plainly.** Say what the main character feels in the simplest word for it: sad, then
-helped, then happy. One feeling per turn of the story, on the face and in what the body does.
+helped, then happy.[[book]] One feeling per turn of the story, on the face and in what the body does.
 
 **Food.** Only ordinary food a child of this age eats, named plainly. Never anything a small child
 cannot chew or swallow safely.
@@ -36,4 +36,4 @@ cannot chew or swallow safely.
 do the same way. Never something they explain, put right, or are told the meaning of.
 
 **Ending.** The problem is solved and somebody is glad. Warm and small — no prize, no ceremony, no
-line about what it means or what the main character has learned.
+line about what it means or what the main character has learned.[[/book]]

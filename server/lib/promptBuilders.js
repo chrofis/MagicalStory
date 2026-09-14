@@ -4938,14 +4938,49 @@ const AGE_BAND_TEMPLATE_KEYS = {
 };
 
 /**
+ * The three readers of an age-band file want three different slices of it, and
+ * ONE file carries all three so they cannot drift apart. Spans are tagged in
+ * prompts/age-band-*.txt:
+ *   [[book]] — book craft and the worked example menus. Writer only.
+ *   [[plot]] — the plot mechanics of the band. Writer and the own-town premise.
+ *   untagged — tone and safety. Every reader.
+ * A 40-word premise cannot honour a per-turn feeling rule or an ending rule, and
+ * a menu read at premise size is read as the answer (Lab 1273).
+ */
+const BAND_VIEW_DROPS = {
+  writer: [],
+  premise: ['book'],
+  tone: ['book', 'plot'],
+};
+
+function applyBandView(text, view = 'writer') {
+  if (!text) return '';
+  const drops = BAND_VIEW_DROPS[view];
+  if (!drops) throw new Error(`Unknown age-band view "${view}"`);
+  // The writer reads the file whole: strip the tags and change nothing else, so
+  // no view can quietly cost the writer a rule.
+  if (!drops.length) return String(text).replace(/\[\[\/?(?:book|plot)\]\]/g, '');
+  let out = String(text);
+  for (const tag of drops) {
+    out = out.replace(new RegExp(`\\[\\[${tag}\\]\\][\\s\\S]*?\\[\\[\\/${tag}\\]\\]`, 'g'), '');
+  }
+  return out
+    .replace(/\[\[\/?(?:book|plot)\]\]/g, '')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
  * The plot-shape rules for the resolved band (prompts/age-band-*.txt), or '' at
  * age 6 and up. Scope is deliberately narrow — WHAT the story is about and what
  * happens in it. Text length belongs to the reading level and is not touched
  * here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0, still standing).
+ * `bandView` slices the band for a reader that is not the writer.
  */
-function buildAgeModeSection(inputData = {}) {
+function buildAgeModeSection(inputData = {}, { bandView = 'writer' } = {}) {
   const key = AGE_BAND_TEMPLATE_KEYS[resolveAgeBand(inputData)];
-  const band = key ? (PROMPT_TEMPLATES[key] || '') : '';
+  const band = key ? applyBandView(PROMPT_TEMPLATES[key] || '', bandView) : '';
   const window = buildTopicWindowSection(inputData);
   return [band, window].filter(Boolean).join('\n\n');
 }
@@ -7642,6 +7677,93 @@ function buildTrialIdeaCostumeInstructions(costume) {
   };
 }
 
+/**
+ * Two draws of a trial idea differ by construction, not by being asked to.
+ * One axis pair is injected per arm and rotated; the lists are coprime in
+ * length, so the pairing turns over rather than repeating every cycle. Lab 1273
+ * measured the unrotated prompt collapsing to one premise 10 times out of 10.
+ */
+const IDEA_WANT_AXES = [
+  'something the main character wants to give away, not to get',
+  'something that has to be put back where it belongs',
+  'somewhere the main character wants to reach',
+  'something that has to be finished before a moment passes',
+  'someone the main character wants to bring along',
+  'something the main character wants to make',
+  'something that has to be carried safely to the end',
+];
+const IDEA_COMPANION_AXES = [
+  'an animal',
+  'one other child',
+  'a grown-up who stays out of the solving',
+  'a favourite object treated as a friend',
+];
+let ideaAxisCursor = 0;
+
+function nextIdeaVarietyAxis() {
+  const i = ideaAxisCursor++;
+  const want = IDEA_WANT_AXES[i % IDEA_WANT_AXES.length];
+  const companion = IDEA_COMPANION_AXES[i % IDEA_COMPANION_AXES.length];
+  return { want, companion, text: `This idea's want: ${want}. Whoever comes along: ${companion}.` };
+}
+
+/**
+ * The two trial idea prompts, built once for every caller (the /try route and
+ * the Lab's variety stage, which has to measure what production sends).
+ *
+ * The arms differ in KIND (owner, 2026-08-25): own town at real landmarks vs a
+ * make-believe world entered from home. They fire in parallel, so neither can
+ * refer to the other — the fantasy arm gets the band's TONE only, never its
+ * plot mechanics, which is what makes it a different story rather than the same
+ * story relocated.
+ */
+function buildTrialIdeaPrompts({
+  template,
+  characters = [],
+  charDesc = '',
+  categoryContext = '',
+  landmarksText = '',
+  townName = '',
+  storyTheme = '',
+  trialTitle = '',
+  langInstruction = '',
+  seasonInstruction = '',
+  ideaCostume = null,
+} = {}) {
+  const tpl = template || PROMPT_TEMPLATES.trialIdea;
+  if (!tpl || !String(tpl).trim()) throw new Error('trial-idea template unavailable');
+  const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
+  const title = String(trialTitle || '').trim();
+  const axes = { local: nextIdeaVarietyAxis(), fantasy: nextIdeaVarietyAxis() };
+
+  const base = (bandView, axis) => fillTemplate(tpl, {
+    SEASON: seasonInstruction,
+    CHARACTER: charDesc,
+    CATEGORY_CONTEXT: categoryContext,
+    TITLE: title,
+    TITLE_LINE: title ? `Story title: ${title}` : '',
+    TITLE_RULE: title ? 'The idea must fit the title above and never repeats it. ' : '',
+    VARIETY_AXIS: axis.text,
+    LANDMARKS: '',
+    LANG_INSTRUCTION: langInstruction,
+    AGE_MODE: buildAgeModeSection({ characters }, { bandView }),
+    COSTUME_RULE: costumeRule,
+  });
+
+  const townClause = townName ? `in ${townName}` : `in the child's own town`;
+  const noInventedPlaces = landmarksText
+    ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
+    : '';
+  const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
+  const fantasyIdea = `\nSet this idea in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
+
+  return {
+    local: base('premise', axes.local) + localIdea,
+    fantasy: base('tone', axes.fantasy) + fantasyIdea,
+    axes,
+  };
+}
+
 module.exports = {
   wrapUserInput,
   getPhysicalFromChar,
@@ -7719,6 +7841,10 @@ module.exports = {
   buildImagePrompt,
   looksAtPhrase,
   sanitizeVbIdsInPrompt,
+  collectVbObjectCitations,
+  vbObjectIdOf,
+  droppedVbCitations,
+  warnDroppedVbCitations,
   elementLeadLabel,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
@@ -7789,5 +7915,8 @@ module.exports = {
   buildTrialStoryPrompt,
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,
+  buildTrialIdeaPrompts,
+  nextIdeaVarietyAxis,
+  applyBandView,
   buildPreviousScenesContext
 };
