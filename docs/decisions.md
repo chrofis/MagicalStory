@@ -37387,3 +37387,43 @@ to avoid.
 `tests/unit/batch-eval-whole-cast-refs.test.ts`.
 
 **Status:** ✅ active — recording only, scoring untouched by design.
+
+### Audit-admitted pages bypass the per-round repair cap, up to five (2026-09-14)
+**Context:** The first two staging stories to run with the final-audit grant
+(`job_1789348171785_9oxos7dwv`, `job_1789343124794_z2c779f7i`) showed the extra
+round buying almost nothing — book-audit faults went 26→24 on one story and
+29→29 on the other, and one extra round scored 0 improved / 3 regressed. The
+cause was not that extra rounds are worthless. **The audit admitted 7 pages on
+CATASTROPHIC/CRITICAL faults and six of them were never repaired.**
+
+Admitted pages were appended to `badPageNums` BEFORE `applyRoundCap`, which
+keeps 30% of bad pages on a later round ranked **worst-first by score**. An
+audit-admitted page is by definition not low-scoring — its score is precisely
+what failed to notice the fault. So the cap discarded exactly the pages the
+grant existed to rescue. Two dropped pages, both verified by eye:
+- Story A p16 shipped at **80**: the text has the egg still tapping from inside
+  the shell, the picture already shows it split open with the dragon hatched and
+  sitting on the pavement — the book's one reveal, spent a page early.
+- Story B p12 shipped at **85**: the picture is page 11's biscuit scene, with no
+  tipped sledge, no cave and no fallen trunk from p12's own text.
+
+Both are immaculate illustrations judged against their own brief, which is why
+the page scorer rated them highly and only a judge reading the words beside the
+picture could object.
+
+**Decision:** `applyRoundCap` runs on the score-ranked pages FIRST; audit-admitted
+pages are appended afterwards as a **reserved allowance on top of** the round's
+budget, not a share of it, bounded by `AUDIT_ADMIT_MAX = 5` (owner, 2026-09-14).
+Nothing the cap chose is displaced, and worst-first ordering is preserved because
+the admitted pages sit at the end.
+
+**Rationale:** The grant is worth nothing if the cap can throw it away, and the
+bound exists because the audit is a noisy judge (22.7% severity churn between
+identical runs — `tasks/eval-variance-backlog.md` C4): without a ceiling one
+noisy audit could turn a single extra round into a whole-book regeneration. Five
+is the owner's number and covers both measured stories (2 and 5 admitted pages).
+
+**Touched:** `server/lib/repairLogic.js` (`AUDIT_ADMIT_MAX`),
+`server/lib/repairPipeline.js` (admission moved after the cap),
+`tests/unit/final-book-audit-round.test.ts` (+6 tests)
+**Status:** ✅ active

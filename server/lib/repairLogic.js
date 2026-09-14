@@ -150,6 +150,15 @@ function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed }
 const AUDIT_ADMIT_SEVERITIES = new Set(['CRITICAL', 'CATASTROPHIC']);
 
 /**
+ * How many audit-admitted pages one round may repair OVER its normal cap
+ * (owner, 2026-09-14). The allowance is reserved, not shared: admitted pages
+ * are appended after `applyRoundCap` so a low-scoring page cannot displace a
+ * page the reader's-eye audit called CATASTROPHIC. Bounded so a noisy audit
+ * cannot turn one extra round into a whole-book regeneration.
+ */
+const AUDIT_ADMIT_MAX = 5;
+
+/**
  * Which pages a final book audit re-admits to repair.
  *
  * Severity is the ONLY thing code reads here, and it decides ONE thing: whether
@@ -891,4 +900,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

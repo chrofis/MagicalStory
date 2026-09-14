@@ -120,3 +120,70 @@ describe('repair pipeline wiring', () => {
     expect(pipeline).toContain('finalChecksReport.bookAuditRounds = pipelineBookAuditRounds');
   });
 });
+
+// @ts-ignore — CommonJS lib
+const { applyRoundCap: cap, AUDIT_ADMIT_MAX } = require('../../server/lib/repairLogic.js');
+
+/**
+ * THE DEFECT THIS PINS (staging job_1789348171785_9oxos7dwv and
+ * job_1789343124794_z2c779f7i, the first two stories to run with the grant).
+ *
+ * Admitted pages were appended to badPageNums BEFORE applyRoundCap. The cap
+ * keeps 30% of bad pages ranked WORST-FIRST BY SCORE, and an audit-admitted
+ * page is by definition not low-scoring — its score is exactly what failed to
+ * notice the fault. Six of seven admitted pages were dropped: p16 ("the dragon
+ * is already hatched while the text has it still tapping inside the shell")
+ * scored 80, p12 ("the picture shows page 11's scene") scored 85.
+ *
+ * The pipeline now caps the score-ranked pages first and appends admitted pages
+ * afterwards, bounded by AUDIT_ADMIT_MAX. These tests pin the ordering contract
+ * the pipeline relies on, and the allowance itself.
+ */
+describe('audit-admitted pages are exempt from the round cap', () => {
+  // The pipeline's sequence, extracted so the contract is testable without a run.
+  const selectRoundPages = (ranked: number[], admitted: number[], opts: any) => {
+    const capped = cap(ranked, opts).admitted;
+    const already = new Set(capped);
+    return [...capped, ...admitted.filter(p => !already.has(p)).slice(0, AUDIT_ADMIT_MAX)];
+  };
+
+  it('THE REGRESSION: a high-scoring admitted page survives a cap that would have dropped it', () => {
+    // 18 pages, round 2 → cap keeps ~30%. p16 is admitted but ranks last by score.
+    const ranked = [5, 7, 11, 15, 2, 8, 10, 13];
+    const out = selectRoundPages(ranked, [16, 6], { round: 2, totalPages: 18 });
+    expect(out).toContain(16);
+    expect(out).toContain(6);
+  });
+
+  it('the allowance is RESERVED, not a share of the round budget', () => {
+    const ranked = [5, 7, 11, 15, 2, 8, 10, 13];
+    const capped = cap(ranked, { round: 2, totalPages: 18 }).admitted;
+    const out = selectRoundPages(ranked, [16, 6], { round: 2, totalPages: 18 });
+    // Nothing the cap chose was displaced to make room.
+    for (const p of capped) expect(out).toContain(p);
+    expect(out.length).toBe(capped.length + 2);
+  });
+
+  it('is bounded at AUDIT_ADMIT_MAX so a noisy audit cannot regenerate the book', () => {
+    const out = selectRoundPages([1, 2], [10, 11, 12, 13, 14, 15, 16], { round: 2, totalPages: 18 });
+    const extras = out.filter(p => p >= 10);
+    expect(extras).toHaveLength(AUDIT_ADMIT_MAX);
+    expect(AUDIT_ADMIT_MAX).toBe(5);
+  });
+
+  it('an admitted page the cap already kept is not added twice', () => {
+    const out = selectRoundPages([5, 7, 11], [7], { round: 2, totalPages: 18 });
+    expect(out.filter(p => p === 7)).toHaveLength(1);
+  });
+
+  it('admitted pages keep their place AFTER the score-ranked ones (worst-first preserved)', () => {
+    const out = selectRoundPages([5, 7, 11], [16], { round: 2, totalPages: 18 });
+    expect(out[out.length - 1]).toBe(16);
+  });
+
+  it('no admitted pages leaves the capped selection exactly as it was', () => {
+    const ranked = [5, 7, 11, 15, 2];
+    expect(selectRoundPages(ranked, [], { round: 2, totalPages: 18 }))
+      .toEqual(cap(ranked, { round: 2, totalPages: 18 }).admitted);
+  });
+});

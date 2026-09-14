@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
@@ -1993,16 +1993,27 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // AUDIT-ADMITTED PAGES (owner, 2026-09-13). A page the final book audit hit
     // with a CRITICAL/CATASTROPHIC IMG fault re-enters repair even when its
     // score says it is fine — the audit is the only judge that reads the words
-    // and the picture together. Appended AFTER the score-ranked pages so
-    // worst-first is preserved, and subject to the same per-round cap below.
-    if (auditAdmittedNums.length > 0) {
-      const added = auditAdmittedNums.filter(pn => !badPageNums.includes(pn) && roundEvalPages[pn]);
-      if (added.length > 0) {
-        log.info(`📖 [BOOK-AUDIT] Round ${round}: ${added.length} page(s) admitted to repair by the final audit: ${added.join(', ')}`);
-        badPageNums = [...badPageNums, ...added];
-      }
-      auditAdmittedNums = [];
-    }
+    // and the picture together.
+    //
+    // THEY BYPASS THE PER-ROUND CAP (owner, 2026-09-14), up to AUDIT_ADMIT_MAX.
+    // Measured on the first two stories that ran with the grant
+    // (job_1789348171785_9oxos7dwv, job_1789343124794_z2c779f7i): the audit
+    // admitted 7 pages on CATASTROPHIC/CRITICAL faults and SIX were never
+    // repaired. They were appended before `applyRoundCap`, which keeps 30% of
+    // bad pages ranked WORST-FIRST BY SCORE — and an admitted page is by
+    // definition not low-scoring, because its score is exactly what failed to
+    // notice the fault. p16 of the first story ("the dragon is already hatched
+    // while the text has it still tapping inside the shell") scored 80 and was
+    // dropped; p12 of the second ("the picture shows page 11's scene") scored
+    // 85 and was dropped. The cap was discarding precisely the pages the grant
+    // existed to rescue.
+    //
+    // So the cap is applied to the score-ranked pages FIRST, and admitted pages
+    // are appended afterwards — a reserved allowance on top of the round's
+    // budget, not a share of it. The allowance is bounded so a noisy audit
+    // cannot turn one extra round into a whole-book regeneration.
+    const auditAdmittedForRound = auditAdmittedNums.filter(pn => roundEvalPages[pn]);
+    auditAdmittedNums = [];
     // PER-ROUND CAP (owner, 2026-09-09): a round may work on at most 50% (round 1)
     // / 30% (later rounds) of the story's pages, worst first. Capped-out pages are
     // DEFERRED — they are still bad next round and come back. Never fails a job.
@@ -2012,6 +2023,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       totalPages: Object.keys(roundEvalPages).length,
     });
     badPageNums = cappedRound.admitted;
+    // The reserved allowance, appended AFTER the cap so it cannot be displaced.
+    if (auditAdmittedForRound.length > 0) {
+      const alreadyIn = new Set(badPageNums);
+      const added = auditAdmittedForRound.filter(pn => !alreadyIn.has(pn)).slice(0, AUDIT_ADMIT_MAX);
+      const overflow = auditAdmittedForRound.filter(pn => !alreadyIn.has(pn)).length - added.length;
+      if (added.length > 0) {
+        log.info(`📖 [BOOK-AUDIT] Round ${round}: ${added.length} page(s) admitted by the final audit, exempt from the round cap: ${added.join(', ')}${overflow > 0 ? ` (${overflow} over the ${AUDIT_ADMIT_MAX}-page allowance, dropped)` : ''}`);
+        badPageNums = [...badPageNums, ...added];
+      }
+    }
     // A page whose ONLY fault is garment colour scores fine — colour carries no
     // severity by design — so findBadPages never returns it and it would never
     // be touched. A flagged garment is a reason to work on a page.
