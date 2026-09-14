@@ -7970,29 +7970,119 @@ function ideaSubjectWords(text) {
 }
 
 /**
- * Greedy grouping of ideas by shared content words. Two ideas land in the same
- * group when their word overlap (Jaccard) reaches `threshold`. Crude on purpose
- * — the owner reads the ideas; this only says which ones to read together.
+ * Compound-aware word equality. German ideas compound freely — "Herbstblätter"
+ * and "Blätter", "Laubhaufen" and "Haufen" are the same premise slot written two
+ * ways, and exact string equality scores them as different subjects. Containment
+ * (with a length floor so "sein" does not swallow half the vocabulary) catches
+ * that without a stemmer.
  */
-function groupIdeasBySubject(ideas, threshold = 0.5) {
+function ideaWordsMatch(a, b) {
+  if (a === b) return true;
+  return a.length >= 5 && b.length >= 5 && (a.includes(b) || b.includes(a));
+}
+
+/** How many draws in `sigs` contain a word matching `word`. */
+function ideaWordDrawCount(sigs, word) {
+  return sigs.reduce((n, s) => n + (s.some(w => ideaWordsMatch(w, word)) ? 1 : 0), 0);
+}
+
+/**
+ * The PREMISE SKELETON of a set of ideas: the content words that recur across
+ * most of them, compound-deduped. This is what a human reads as "the same idea
+ * again" — an animal, an obstacle, and the resolving action, restated with
+ * different nouns each draw.
+ *
+ * Returned as a plain array, largest-recurrence first, empty when the ideas
+ * share no recurring frame.
+ */
+function ideaPremiseSkeleton(sigs, presenceRatio = 0.6, constantWords = []) {
+  if (sigs.length < 2) return [];
+  const need = Math.max(2, Math.ceil(presenceRatio * sigs.length));
+  // Words the experiment HOLDS CONSTANT — the child's name, the town, the
+  // landmark names — recur in every draw by construction and say nothing about
+  // the premise. Counting them inflates the skeleton of any arm and made a set
+  // of five genuinely different wants look like one repeated idea.
+  const vocab = [...new Set(sigs.flat())].filter(w => !constantWords.some(c => ideaWordsMatch(c, w)));
+  const scored = vocab
+    .map(w => ({ w, n: ideaWordDrawCount(sigs, w) }))
+    .filter(x => x.n >= need)
+    .sort((a, b) => b.n - a.n || b.w.length - a.w.length);
+  const skeleton = [];
+  for (const { w } of scored) if (!skeleton.some(k => ideaWordsMatch(k, w))) skeleton.push(w);
+  return skeleton;
+}
+
+/**
+ * Group ideas by PREMISE, not by raw text similarity.
+ *
+ * Why not Jaccard over the full word set (what this did until 2026-09-14, and
+ * what made it anti-correlated with the truth): two ~30-word ideas that restate
+ * one premise with a different animal and a different obstacle overlap ~0.15-0.4
+ * in raw words, so no threshold separates them from genuinely different ideas —
+ * measured on experiment 1273, where a human read all five draws of an arm as
+ * one premise and the old metric reported `distinctSubjects: 5, repeatCount: 0`.
+ * On that data the pairwise Jaccard floor was 0.18 and its ceiling 0.52; there is
+ * no line to draw.
+ *
+ * What separates instead is the RECURRING FRAME. Extract the skeleton (words
+ * present in ≥`presenceRatio` of the ideas), then ask each idea how much of that
+ * skeleton it carries. Ideas carrying ≥`coverage` of it are restatements of one
+ * premise. Leftovers are re-skeletonised, so a set with two competing premises
+ * yields two groups; when nothing recurs, every idea stands alone.
+ *
+ * LIMITS, stated plainly: this is lexical. It sees that the same frame is being
+ * reused; it cannot see that "Igel" and "Eichhörnchen" are both small woodland
+ * animals, so a set that swaps EVERY word while keeping the premise will still
+ * read as distinct. It is a convergence detector, not a semantic one — the owner
+ * still reads the ideas. Guards against the opposite failure (calling everything
+ * a repeat): the skeleton must have ≥`minSkeleton` words AND be ≥`minShare` of a
+ * typical idea, otherwise no group forms at all.
+ */
+function groupIdeasByPremise(ideas, opts = {}) {
+  const { coverage = 0.6, presenceRatio = 0.6, minSkeleton = 4, minShare = 0.3, constantWords = [] } = opts;
+  const entries = ideas.map(idea => ({ idea, sig: [...ideaSubjectWords(idea.text)] }));
   const groups = [];
-  for (const idea of ideas) {
-    const words = ideaSubjectWords(idea.text);
-    let placed = null;
-    for (const g of groups) {
-      const inter = [...words].filter(w => g.words.has(w)).length;
-      const union = new Set([...words, ...g.words]).size || 1;
-      if (inter / union >= threshold) { placed = g; break; }
+  let pool = entries;
+
+  while (pool.length > 1) {
+    const sigs = pool.map(e => e.sig);
+    const sizes = sigs.map(s => s.length).sort((a, b) => a - b);
+    const median = sizes[Math.floor(sizes.length / 2)] || 1;
+
+    // Look for the LARGEST subset that shares a frame, not only a frame the
+    // whole pool shares: a couple of unrelated ideas mixed in otherwise dilute
+    // the skeleton below the guards and hide a real repeat. Walk the required
+    // presence down from "all of them" and take the first level that yields a
+    // group at least that large. The guards below are what keep the low levels
+    // honest — they do not loosen as the level drops.
+    let best = null;
+    for (let need = pool.length; need >= Math.max(2, Math.ceil(0.4 * pool.length)); need--) {
+      const skeleton = ideaPremiseSkeleton(sigs, need / pool.length, constantWords);
+      if (skeleton.length < minSkeleton || skeleton.length / median < minShare) continue;
+      const covered = pool.filter(e =>
+        skeleton.filter(k => e.sig.some(w => ideaWordsMatch(w, k))).length / skeleton.length >= coverage);
+      if (covered.length >= Math.max(2, need)) { best = { covered, skeleton }; break; }
     }
-    if (placed) {
-      placed.members.push(idea);
-      for (const w of words) placed.words.add(w);
-    } else {
-      groups.push({ words: new Set(words), members: [idea] });
-    }
+    if (!best) break;
+
+    groups.push({ members: best.covered, premiseWords: best.skeleton });
+    pool = pool.filter(e => !best.covered.includes(e));
   }
+  for (const e of pool) groups.push({ members: [e], premiseWords: [] });
+
   return groups
-    .map(g => ({ size: g.members.length, members: g.members, sharedWords: [...g.words].slice(0, 25) }))
+    .map(g => ({
+      size: g.members.length,
+      members: g.members.map(m => m.idea),
+      // The recurring frame these ideas share — empty for a group of one.
+      premiseWords: g.premiseWords.slice(0, 25),
+      // TRUE intersection: words every member actually contains. The old field
+      // called this `sharedWords` while accumulating the UNION, so it listed
+      // words only one member had.
+      wordsInAllMembers: g.members.length < 2 ? [] : g.members[0].sig
+        .filter(w => g.members.every(m => m.sig.some(x => ideaWordsMatch(x, w))))
+        .slice(0, 25),
+    }))
     .sort((a, b) => b.size - a.size);
 }
 
@@ -8018,7 +8108,8 @@ function groupIdeasBySubject(ideas, threshold = 0.5) {
  * params.name / age / gender / traits — override the story's main character
  * params.town / language / storyCategory / storyTopic / storyTheme — override the rest
  * params.landmarks — 'false' skips the landmark lookup (ideas then name no real place)
- * params.overlap   — word-overlap threshold for the repeat grouping (default 0.5)
+ * params.overlap   — premise-skeleton coverage an idea needs to join a repeat
+ *                    group (default 0.6; see groupIdeasByPremise)
  */
 async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -8034,7 +8125,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   const draws = Math.min(Math.max(parseInt(params.draws, 10) || 5, 1), 20);
   const model = params.model || 'claude-sonnet';
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
-  const overlap = Number.isFinite(Number(params.overlap)) ? Number(params.overlap) : 0.5;
+  const overlap = Number.isFinite(Number(params.overlap)) ? Number(params.overlap) : 0.6;
 
   // The inputs, held identical across every draw — that is the whole experiment.
   const storedChar = (storyData.characters || [])[0] || {};
@@ -8138,12 +8229,17 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     });
   }
 
+  // Held constant across every draw by the experiment's own design, so they are
+  // no evidence of a repeated premise (see ideaPremiseSkeleton).
+  const constantWords = [...ideaSubjectWords(
+    [mainChar.name, townName, landmarkNames.join(' '), trialTitle, storyTopic].filter(Boolean).join(' '))];
+
   // Repeats are counted WITHIN an arm: the two arms are required to differ in
   // kind, so pooling them would report the design as repetition.
   const arms = {};
   for (const arm of ['local', 'fantasy']) {
     const ideas = pairs.filter(p => p[arm]).map(p => ({ draw: p.draw, text: p[arm] }));
-    const groups = groupIdeasBySubject(ideas, overlap);
+    const groups = groupIdeasByPremise(ideas, { coverage: overlap, constantWords });
     const repeated = groups.filter(g => g.size > 1);
     // Raw word frequency across the arm — the cheapest "is it always chestnuts?"
     // read there is, and it needs no grouping decision to be trusted.
@@ -8155,7 +8251,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
       repeatedGroups: repeated.length,
       // "How many draws landed on a subject some other draw also landed on."
       repeatCount: repeated.reduce((s, g) => s + g.size, 0),
-      groups: groups.map(g => ({ size: g.size, draws: g.members.map(m => m.draw), ideas: g.members.map(m => m.text), sharedWords: g.sharedWords })),
+      groups: groups.map(g => ({ size: g.size, draws: g.members.map(m => m.draw), ideas: g.members.map(m => m.text), premiseWords: g.premiseWords, wordsInAllMembers: g.wordsInAllMembers })),
       wordsInEveryDraw: [...freq.entries()].filter(([, n]) => n === ideas.length && ideas.length > 1).map(([w]) => w).sort(),
       topWords: [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([w, n]) => `${w} ×${n}`),
     };
@@ -8166,7 +8262,8 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     model,
     modelId: usage[0]?.modelId || null,
     draws,
-    overlapThreshold: overlap,
+    premiseCoverageThreshold: overlap,
+    premiseConstantWords: constantWords,
     elapsedMs: Date.now() - t0,
     modelCalls: usage.length,
     cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
@@ -8525,6 +8622,10 @@ async function checkRuleGenericity(ruleText, storyId) {
 
 module.exports = {
   applyReviewerPages,
+  // exported for tests/unit/idea-premise-grouping.test.js
+  groupIdeasByPremise,
+  ideaPremiseSkeleton,
+  ideaSubjectWords,
   STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)],
   STORY_STAGES: Object.keys(STORY_STAGES),
   AVATAR_STAGE_NAMES: Object.keys(AVATAR_STAGES),
