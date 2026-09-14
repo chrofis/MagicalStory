@@ -150,11 +150,32 @@ function resolveExpectedObjectLabels(entries, visualBible, language = 'en') {
   const { elementLeadLabel } = require('./promptBuilders');
   const vb = visualBible || {};
   const byId = new Map();
+  // DEDUPE KEY = THE RESOLVED ENTITY, NOT THE STRING. The two sources of this
+  // list spell one element differently: scene metadata gives the VB id, while
+  // the page prompt's REQUIRED OBJECTS lead gives a bold name that (a) carries
+  // a two-sided prop's trailing `(qualifier)` inside the bold, and (b) for an
+  // ANIMAL is `entry.name` verbatim rather than the lead label (deliberate —
+  // an animal's proper name is its identity anchor; promptBuilders says so and
+  // it is NOT changed here). Either divergence used to let both spellings
+  // through, and the detector was asked for one object twice; the second ask
+  // comes back found:false, which manufactures a fake absence and buys a
+  // repair round on a correct page. This index maps every spelling an entry
+  // can be named by back to that entry's single lead label, so the collapse
+  // happens on identity. Only the KEY changes — the string emitted is still
+  // the first spelling to arrive, so this can only shrink the list.
+  const keyByAlias = new Map();
+  const stripQualifier = (s) => String(s || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
   const addPool = (list, type) => {
     for (const e of (list || [])) {
       if (!e || !e.id) continue;
       const label = elementLeadLabel(e, { language, type });
       if (label) byId.set(String(e.id).toUpperCase(), label);
+      if (!label) continue;
+      const canonical = label.toLowerCase();
+      for (const alias of [label, e.label, e.name, stripQualifier(e.name), stripQualifier(label)]) {
+        const a = String(alias || '').trim().toLowerCase();
+        if (a) keyByAlias.set(a, canonical);
+      }
     }
   };
   addPool(vb.artifacts, 'object');
@@ -186,7 +207,15 @@ function resolveExpectedObjectLabels(entries, visualBible, language = 'en') {
         continue;
       }
     }
-    const key = name.toLowerCase();
+    // Identity key: the entry's lead label when this spelling names a known
+    // entry (bare or with a trailing qualifier stripped), else the literal
+    // string — an unknown name is its own entity and must not merge with
+    // anything (a mother creature and its young share words but are two
+    // entries, and over-merging would hide a genuinely missing object).
+    const lower = name.toLowerCase();
+    const key = keyByAlias.get(lower)
+      || keyByAlias.get(stripQualifier(name).toLowerCase())
+      || stripQualifier(lower) || lower;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(name);

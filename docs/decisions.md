@@ -38355,3 +38355,53 @@ Prompt-side per owner decision; a code backstop was considered and left unbuilt.
 **Touched files:** `prompts/feedback-consolidator.txt` (spec-check section + a
 generic worked pair in the `spec_conflicts` output example),
 `tests/unit/single-instance-object-holder-conflict.test.ts`
+
+## The expected-object merge dedupes on the resolved ENTITY, not on the string (2026-09-14)
+**Context:** `server/lib/images.js:2605-2611` builds the eval/bbox expectation set from TWO
+sources: `sceneMetadata.objects` (Visual Bible ids — `ART003`, `LOC001.2`) and
+`parseVisualBibleObjects(img.prompt)` (the bold names in the page prompt's REQUIRED OBJECTS
+block). The merge filter was an exact, case-sensitive `Array.includes`; the real collapse
+happened later inside `resolveExpectedObjectLabels`, which lowercases into a `seen` set AFTER
+resolving ids to labels. Both sources usually derive from `elementLeadLabel`, so they usually
+collapsed. This was latent until 2026-09-14: `parseVisualBibleObjects` returned `[]` for every
+real prompt until commit 3f46e79bc fixed it (previous entry), so the second source was empty and
+the merge was a no-op. It can now fire on every page that declares Visual Bible elements.
+
+Two measured divergences where the two spellings do NOT collapse, both verified in source:
+1. **Trailing qualifier inside the bold name.** `promptBuilders.js:3961-3967` emits
+   `**${refName}${qualifier}** (${type})` — a two-sided prop's orientation (`(turned away)`)
+   rides *inside* the bold lead. The parser captures it as part of the name, while
+   `elementLeadLabel` strips a trailing parenthetical, so the id-resolved label and the parsed
+   name differ and BOTH survive.
+2. **Animals lead with `obj.name`, not the lead label.** Same site: `(obj.type === 'animal' &&
+   obj.name) ? obj.name : elementLeadLabel(...)`. This is DELIBERATE — an animal's proper name is
+   its identity anchor (the comment at that site and the one in `resolveExpectedObjectLabels` both
+   say so) — so it was NOT changed; the dedupe now works around it.
+
+**Failure mode (why it matters):** the detector is asked to find the same object twice under two
+spellings. One of the two comes back `found:false`. An absence is exactly what derives a
+missing-element finding, so a correct page produces a FALSE finding, and that finding commissions
+a repair round on an image that was right. Same shape as the false clothing CRITICAL on story A
+p6, whose two repair rounds destroyed the dragon egg.
+
+**Decision:** dedupe on the resolved entity inside `resolveExpectedObjectLabels`. No new
+normaliser was invented: the existing `elementLeadLabel` (already the single authority for this
+list, and the string the REQUIRED OBJECTS lead, GroundingDINO and entity-consistency all share)
+is reused as the identity key, following the `castResolver` precedent of one resolver keyed by
+entity. An alias index maps every spelling an entry can be named by — its label, its `name`, and
+each of those with a trailing parenthetical stripped — back to that entry's lead label. An
+unknown name keys as itself, so two genuinely different entries that share words (a mother
+creature and its young) stay two expectations; over-merging would hide a genuinely missing
+object, which is the worse failure. Only the dedupe KEY changed: the emitted string is still the
+first spelling to arrive, so the expectation set can only shrink or stay identical, never grow.
+
+**Measured blast radius:** replaying the merge over the stored page prompts and stored
+`sceneMetadata.objects` of `job_1789337998754_apslnsq1z`, `job_1789343124794_z2c779f7i` and
+`job_1789348171785_9oxos7dwv` (read-only, staging DB): **0 of 53 object-bearing pages** would
+have produced a duplicate expectation under today's fixed parser. Those three stories contain no
+two-sided prop (0 pages with a qualified bold name) and every animal's authored label equals its
+name (0 divergent animals across 13 animal-bearing pages), so the flaw is real but unexercised by
+this corpus — the guard is pre-emptive, not a repair of observed damage.
+
+**Touched files:** `server/lib/bboxDetection.js` (`resolveExpectedObjectLabels`),
+`tests/unit/expected-object-dedupe.test.ts` (new, 4 tests).
