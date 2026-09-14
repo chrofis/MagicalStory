@@ -91,6 +91,32 @@
       "storyTopic": "",
       "storyDetails": "",
       "description": "Agebands/DE — Omar (3), Abenteuer, freies Thema — Altersband 'tries'"
+    },
+    {
+      "index": 7,
+      "family": "agebands",
+      "face": "Tobias.jpg",
+      "name": "Tobias",
+      "age": "1",
+      "gender": "male",
+      "language": "de",
+      "storyCategory": "adventure",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Agebands/DE — Tobias (1), Abenteuer, freies Thema — Altersband 'routine'"
+    },
+    {
+      "index": 8,
+      "family": "agebands",
+      "face": "Rohan.jpg",
+      "name": "Rohan",
+      "age": "8",
+      "gender": "male",
+      "language": "de",
+      "storyCategory": "adventure",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Agebands/DE — Rohan (8), Abenteuer, freies Thema — Altersband 'standard' (kein Altersmodus-Text)"
     }
   ]
 }
