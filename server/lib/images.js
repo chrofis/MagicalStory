@@ -2469,6 +2469,12 @@ async function evaluateImageBatch(images, options = {}) {
           // used to render raw VB ids into a judge's prompt.
           visualBible,
           artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+          // Same reason the style is read off the built prompt here: the
+          // REQUIRED OBJECTS checklist lives in the prompt TAIL, which the
+          // judge's ORIGINAL_PROMPT (the scene description) deliberately does
+          // not carry. Passed as its own input so D-16b can fire; falls back to
+          // sceneMetadata.objects when no prompt was stored.
+          pagePrompt: img.prompt || null,
           storyData,
           clothingRequirements,
           // Structured cover text contract from the pseudo-page record

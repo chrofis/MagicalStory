@@ -39194,3 +39194,64 @@ world-lighting exclusion survives intact.
 - `docs/SETTLED.md`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-14 — D-16b was inert from birth; REQUIRED OBJECTS is now its own evaluator input
+
+**Context.** Eval rule D-16b (the held-object swap: a hand closes around a prop
+the brief never names while the commissioned one lies unhandled) was added
+2026-09-13 reading the page's REQUIRED OBJECTS checklist out of `ORIGINAL_PROMPT`,
+and skipping itself when that block is absent. On the batch evaluator — the one
+the production pipeline runs for pages AND covers — `ORIGINAL_PROMPT` is the
+scene DESCRIPTION, never the built prompt: `resolveEvalSceneDescription`
+(`server/lib/sceneMetadata.js` ~:2112) keeps it that way so `resolveEvalArtStyle`'s
+"ORIGINAL_PROMPT carries no `**ART STYLE` block" invariant holds, and the
+checklist is emitted into that same prompt tail. The block was therefore never
+present and the rule's own skip clause skipped it on every page of every story.
+The 2026-09-13 entry already recorded the POSITIVE case as unproven; this is why.
+
+The other paths were checked too, not assumed. The admin re-evaluate endpoint
+(`regeneration.js`) and the Test Lab stages pass a scene description, same as the
+batch path. The one family of call sites that DOES hand the judge the sent prompt
+(`callGeminiAPIForImage`'s `runEval` / inline eval, via `resolveEvalImagePrompt`)
+has no page callers left after the 2026-08 pipeline unification — its three
+surviving callers are reference-sheet and Lab avatar renders, and the `'avatar'`
+branch returns before the quality eval runs. Stored evidence agrees: a sweep of
+60 recent staging stories' `fixableIssues` found `action_interaction` findings in
+quantity, but every one of them cites what "the prompt declares / requires /
+states" — i.e. D-16 against DECLARED INTERACTIONS. None has D-16b's signature of
+a held object named nowhere in the brief, reported against a required object.
+
+**Decision.** REQUIRED OBJECTS becomes its own evaluator input (input 9,
+`{REQUIRED_OBJECTS}`), exactly as ART STYLE and the CLOTHING CONTRACT already
+are and for exactly the same reason — the prompt tail is not reachable from what
+the judge is fed. `buildEvalRequiredObjects` (`server/lib/evalPipeline.js`)
+resolves it from two sources in fidelity order: the page's stored built prompt
+via `parseVisualBibleObjects` (the verbatim checklist leads, locations already
+excluded), else the parsed `sceneMetadata.objects[]` VB ids through
+`resolveExpectedObjectLabels` with locations dropped to match. Empty resolves to
+an empty block and D-16b skips, and the absence is recorded as a `held_objects`
+/ `no_required_objects` notEvaluated entry rather than passing for silence.
+D-16b's wording now points at input 9.
+
+**Rationale.** Making it live is the cheap half of the owner's "we do not leave
+dead things in the code": no generator-side change, no change to what
+`ORIGINAL_PROMPT` contains, no `---METADATA---` block on covers — both of those
+were ruled out as disproportionate, and neither is needed. Deleting the rule
+would have lost a real check with a working precedent available. **This turns on
+a check that has never run**, on every page and cover: new MAJOR
+`action_interaction` findings are now possible. Route check —
+`action_interaction` is absent from `SAFE_REPAIRABLE_TYPES`, so it opens no
+inpaint; the char-fix and page-claim gates are CRITICAL-only and D-16b is MAJOR.
+Its only consequence is a normal MAJOR deduction, which can contribute to a page
+falling under the redo threshold. No destructive route opens.
+
+**Touched:** `prompts/image-evaluation.txt` (input 9 + D-16b wording),
+`server/services/prompts.js` (`buildEvaluationPrompt` requiredObjects),
+`server/lib/evalPipeline.js` (`buildEvalRequiredObjects`, both prompt builds,
+notEvaluated record), `server/lib/images.js` (batch site passes `pagePrompt`),
+`tests/unit/eval-required-objects.test.ts`,
+`tests/unit/fixtures/eval-required-objects-job_1789348171785_9oxos7dwv.json`.
+
+**Status:** ✅ active — live but unexercised; first real firing is still unseen.

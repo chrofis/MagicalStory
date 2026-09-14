@@ -1537,6 +1537,61 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
  * @returns {{block: string, error: string|null}} `block` empty means no
  *          contract could be built — the caller decides how loudly to say so.
  */
+/**
+ * REQUIRED OBJECTS as its own evaluator input (2026-09-14).
+ *
+ * Third member of the ART_STYLE / CLOTHING_CONTRACT family, and it exists for
+ * the identical reason: the batch evaluator's ORIGINAL_PROMPT is the scene
+ * DESCRIPTION, never the built prompt (`resolveEvalSceneDescription` keeps it
+ * that way so `resolveEvalArtStyle`'s "no **ART STYLE block" invariant holds),
+ * and the REQUIRED OBJECTS checklist is emitted into that same prompt tail. A
+ * rule reading the checklist out of ORIGINAL_PROMPT therefore never fires on
+ * the production path — which is what happened to D-16b (the held-object swap)
+ * from the day it was written.
+ *
+ * Two sources, in fidelity order:
+ *  1. the page's BUILT prompt — `parseVisualBibleObjects` returns the exact
+ *     bold leads the checklist emitted (locations already excluded);
+ *  2. the parsed scene metadata's `objects[]`, which in stored data is VB ids
+ *     ("ART001", "ANI001", "LOC001") — resolved through the same
+ *     `elementLeadLabel` the checklist uses, with locations dropped to match.
+ *
+ * @returns {{block: string, source: string|null}} `block` empty means nothing
+ *          could be resolved; the template then tells the judge to skip.
+ */
+function buildEvalRequiredObjects({ pagePrompt = null, sceneMetadata = null, visualBible = null, language = 'en' } = {}) {
+  const dedupe = (names) => {
+    const seen = new Set();
+    const out = [];
+    for (const n of names) {
+      const s = String(n || '').trim();
+      if (!s) continue;
+      const k = s.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(s);
+    }
+    return out;
+  };
+  try {
+    const { parseVisualBibleObjects, resolveExpectedObjectLabels } = require('./bboxDetection');
+    if (pagePrompt && typeof pagePrompt === 'string') {
+      const fromPrompt = dedupe(parseVisualBibleObjects(pagePrompt));
+      if (fromPrompt.length) return { block: fromPrompt.join(', '), source: 'prompt' };
+    }
+    const ids = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+    if (!ids.length) return { block: '', source: null };
+    // Locations are not props: the checklist skips them and so does the
+    // prompt parser, so the fallback must too or the judge is handed a place
+    // name as something a hand could be holding.
+    const isLocationId = (raw) => /^LOC\d{3}(?:\.\d+)?$/i.test(String(raw || '').trim());
+    const labels = dedupe(resolveExpectedObjectLabels(ids.filter(id => !isLocationId(id)), visualBible, language));
+    return labels.length ? { block: labels.join(', '), source: 'sceneMetadata' } : { block: '', source: null };
+  } catch {
+    return { block: '', source: null };
+  }
+}
+
 function buildEvalClothingContract({
   sceneCharacters = null,
   referenceImages = null,
@@ -1692,6 +1747,23 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // return a normal score with nothing saying clothing went unjudged.
       notEvaluated.record('clothing', 'no_clothing_contract',
         'No per-character outfit block could be built - clothing findings are suppressed (N-16)');
+    }
+
+    // REQUIRED OBJECTS, same family as the two blocks above and for the same
+    // reason (see buildEvalRequiredObjects). Empty is the honest default:
+    // D-16b skips rather than inventing a checklist.
+    const requiredObjects = buildEvalRequiredObjects({
+      pagePrompt: evalOptions.pagePrompt || null,
+      sceneMetadata: evalOptions.sceneMetadata || null,
+      visualBible: evalOptions.visualBible || null,
+      // The label must match the lead the page prompt actually emitted, which
+      // is language-dependent (elementLeadLabel).
+      language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
+    });
+    const requiredObjectsBlock = requiredObjects.block;
+    if (!requiredObjectsBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
+      notEvaluated.record('held_objects', 'no_required_objects',
+        'No REQUIRED OBJECTS list could be resolved - held-object swaps (D-16b) were not judged');
     }
 
     // EXPECTED CAST roster + count (see buildExpectedCastBlock). Built once,
@@ -1953,6 +2025,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           interactionsBlock,
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
+          requiredObjects: requiredObjectsBlock,
           expectedCast: expectedCast.block,
           template: evalOptions.evalTemplateOverride || undefined,
         })
@@ -2154,6 +2227,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             interactionsBlock,
             sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
+            requiredObjects: requiredObjectsBlock,
             expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,
           })
@@ -3011,6 +3085,7 @@ module.exports = {
   sanitizeForGemini,
   evaluateImageQuality,
   buildEvalClothingContract,
+  buildEvalRequiredObjects,
   buildExpectedCastBlock,
   resolveExpectedCastNames,
   reconcileDetectorCast,

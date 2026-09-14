@@ -786,6 +786,12 @@ function buildEvaluationPrompt(opts = {}) {
     // Empty when the caller has no prompt to read a style from — the template
     // then tells the model to skip the style rule and judge normally.
     ART_STYLE: opts.artStyle || extractArtStyle(opts.originalPrompt) || '',
+    // The page's REQUIRED OBJECTS checklist, passed as its own input for the
+    // same reason ART_STYLE and CLOTHING_CONTRACT are: ORIGINAL_PROMPT on the
+    // batch path is the scene DESCRIPTION, which carries no prompt tail, so a
+    // rule reading the tail out of it can never fire. Empty when the caller
+    // could not resolve the list — D-16b then skips.
+    REQUIRED_OBJECTS: opts.requiredObjects || '',
   });
 }
 
