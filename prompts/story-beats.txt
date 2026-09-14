@@ -78,7 +78,7 @@ Requirements:
 
 # OUTPUT FORMAT
 
-Only the block below. No preamble, no commentary. One line per page, through page {PAGE_COUNT}.
+Only the block below. No preamble, no commentary. {OUTPUT_SCOPE}
 
 ---PAGE PLAN---
 Page <N>: <shot> — <who is in frame> — <the instant the picture shows> — <what is true after this page that was not before>

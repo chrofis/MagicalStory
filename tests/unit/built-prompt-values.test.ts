@@ -431,3 +431,53 @@ describe('the Art Director is told to name a size ratio', () => {
       .not.toMatch(/shrinkPromptForModel|truncatePromptForModel/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The re-plan asks for the NAMED pages only (owner decision, 2026-09-14).
+//
+// The RE-DIVIDE block used to contradict itself in one breath — "Return ONLY
+// the pages a finding names ... and nothing else" next to "Output the full plan
+// again" — and the template's OUTPUT FORMAT broke the tie the wrong way ("One
+// line per page, through page N"). Two of three signals demanded the whole
+// book, and that is what the planner delivered: 8 and 9 unnamed pages rewritten
+// in consecutive rounds. What is pinned here is the CONTRACT, not the wording:
+// a re-plan build asks for the named pages and carries no full-plan demand; a
+// first-plan build still demands every page through the page count.
+// ---------------------------------------------------------------------------
+describe('the re-plan asks for only the pages a finding named', () => {
+  const FINDINGS = [{ check: 9, line: 'Page 3 holds two actions.', pages: [3] }];
+  const PLAN = 'Page 1: wide — the main character — she sets out — she is on the road\nPage 3: close — the main character — she opens the box and runs — the box is open';
+  const replanSection = () => PB.buildReplanSection(PLAN, FINDINGS);
+  const replanPrompt = () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE, replan: replanSection() });
+  const firstPrompt = () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE });
+
+  it('the RE-DIVIDE block still demands the named pages and nothing else', () => {
+    const block = replanSection();
+    expect(block).toMatch(/ONLY the pages a finding names/);
+    expect(block, 'the full-plan demand is back — it contradicts the named-pages contract')
+      .not.toMatch(/full plan/i);
+  });
+
+  it('must-fix precedence and the one-action/merge paragraph survive', () => {
+    const block = replanSection();
+    expect(block).toMatch(/must-fix wins/);
+    expect(block).toMatch(/more than one action/);
+    expect(block).toMatch(/Keep the page count by merging/);
+  });
+
+  it('a re-plan build does not demand every page through the page count', () => {
+    const p = replanPrompt();
+    expect(p).toMatch(/RE-DIVIDE/);
+    expect(p, 'the template still orders a whole-book reply on a re-plan')
+      .not.toMatch(/One line per page, through page/);
+    expect(p).toMatch(/named under RE-DIVIDE/);
+    expect(unfilled(p)).toEqual([]);
+  });
+
+  it('a first plan still demands every page through the page count', () => {
+    const p = firstPrompt();
+    expect(p).toMatch(/One line per page, through page 4\./);
+    expect(p).not.toMatch(/named under RE-DIVIDE/);
+    expect(unfilled(p)).toEqual([]);
+  });
+});

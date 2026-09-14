@@ -3842,12 +3842,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // object itself stays listed.
         const resolved = resolveObjectState(artifact, handle, pageNumber, metadata, { visualBible });
         let state = resolved.state;
+        // ONE OBJECT, ONE POSITION PER PAGE PROMPT. This block's own header
+        // promises each element "appears exactly as the scene description
+        // places it", so where the brief places the object the state's
+        // placement half is not asserted against it (the delta's appearance
+        // half always stays — that is what the state is FOR).
+        let stateDelta = state ? resolved.promptDelta : '';
+        if (state && resolved.placementDropped.length > 0) {
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta || '(nothing — the clause was placement only)'}"`);
+        }
         if (resolved.contradicted) {
           const why = resolved.contradictedBy === 'appearance'
             ? `the page's instant asserts ${resolved.rival.id} ("${resolved.rival.name}": "${resolved.rival.delta}") instead — "${resolved.evidence}"`
             : `the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} but the state says the object is ${state.held ? 'in hand' : 'untouched'}`;
           log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") — ${why} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
           state = null;
+          stateDelta = '';
         }
         // The RECEIVER of another row's result never carries a state clause
         // on the acting page: the bible writes the effect onto it ("water
@@ -3858,8 +3868,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         if (receiverRow) {
           log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${state.id} ("${state.name}") is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
           state = null;
+          stateDelta = '';
         }
-        pushRequired({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state });
+        pushRequired({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state, stateDelta });
         continue;
       }
 
@@ -4011,7 +4022,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // grounding label and the entity-consistency key - one object would
         // read as several across the book, which is the defect this whole
         // model exists to remove.
-        const stateNote = obj.state ? ` — ${trimStateClause(obj.state.delta, obj.state)}` : '';
+        // `stateDelta` is the state's delta minus any placement half the page's
+        // own brief already states (visualBible.splitStatePlacement). It is
+        // empty when the whole delta was placement — then the object is listed
+        // with no state clause and the scene description's placement stands
+        // alone, which is what the header promises.
+        const stateNote = (obj.state && obj.stateDelta) ? ` — ${trimStateClause(obj.stateDelta, obj.state)}` : '';
         requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {
@@ -5819,7 +5835,7 @@ function buildReplanSection(pagePlan, findingLines) {
   return [
     '# RE-DIVIDE',
     '',
-    'You divided this story once. Your plan and the findings against it follow. Return ONLY the pages a finding names, one line each in the same format, and nothing else — every other page stands exactly as it is and must not be repeated. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Output the full plan again.',
+    'You divided this story once. Your plan and the findings against it follow. Return ONLY the pages a finding names, one line each in the same format, and nothing else — every other page stands exactly as it is and must not be repeated. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Every page number you return is already in the plan above.',
     'When a page is named for holding more than one action, its instant keeps the first action alone. What follows from it belongs in "what is true after", or on its own page when it earns a picture of its own. Dropping the action is not a fix: every action in the division above is still in the division you return. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.',
     '',
     '## YOUR PAGE PLAN',
@@ -5851,6 +5867,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
     PAGE_COUNT: pageCount,
+    // The output scope follows the mode. A first plan (no replan section)
+    // owes every page; a re-plan owes only the pages a finding named — the
+    // merge in beatsPipeline restores the rest from the division that stands.
+    OUTPUT_SCOPE: String(replan || '').trim()
+      ? 'One line for each page named under RE-DIVIDE, and for no other page.'
+      : `One line per page, through page ${pageCount}.`,
     // Mechanical budget, computed in code and injected — never prose (owner,
     // 2026-09-05: 2-3 pages per story may stage a high-action instant).
     HIGH_ACTION_PAGES: highActionPagesPhrase(pageCount),
