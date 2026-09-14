@@ -37427,3 +37427,78 @@ is the owner's number and covers both measured stories (2 and 5 admitted pages).
 `server/lib/repairPipeline.js` (admission moved after the cap),
 `tests/unit/final-book-audit-round.test.ts` (+6 tests)
 **Status:** ✅ active
+
+## 2026-09-14 — Every model-facing prompt builder is pinned to the VALUE it carries (Guard C)
+
+**Context:** Three checks shipped blind on 2026-09-14, all one shape — a rule that LOOKS
+present in the template layer but receives nothing at runtime, and fails silently because
+"no findings" is indistinguishable from "nothing to find":
+
+- the batch quality judge was handed `[]` reference photos and no clothing contract (dead
+  since Feb 2026, `bugs.json` `batch-eval-whole-cast-refs-always-empty`, fixed f5a511730);
+- a reference sheet's cell-identification reply was destroyed by a greedy regex;
+- `evaluateSheetRow`'s heads branch handed the judge the literal string `{REQUESTED_OUTFIT}`
+  because `fillTemplate` ran on the bodies branch only (fixed b15600c49).
+
+Guard A (4161d0562) asserts at the model-call boundary that no `{PLACEHOLDER}` reaches a
+model. Guard B (dd6064f46) makes a check that could not run say so in its RESULT. Neither
+answers the remaining question: did the INPUT arrive at all? None of the three had a test
+asserting it.
+
+**Decision:** One unit case per model-facing prompt BUILDER, in
+`tests/unit/built-prompt-values.test.ts`. Each builds the prompt from realistic inputs
+carrying a distinctive probe value (a garment description, a place, a page of prose), then
+asserts (1) the substantive VALUE is in the built string, (2) no `{TOKEN}` survived, and
+(3) the probe is ABSENT when that input is withheld — the negative control that separates
+"the value arrived" from "the template's own boilerplate happens to contain those words".
+Everything is offline and free; the one builder reachable only through a model call
+(`evaluateSheetRow` — the actual bug site) runs against a stubbed `fetch`.
+
+24 builders are now pinned: `buildImagePrompt`, `buildCoverPrompt`, `buildEmptyScenePrompt`,
+`buildEvaluationPrompt`, `buildReferenceSheetPrompt`, `buildSceneExpansionPrompt`,
+`buildSceneExpansionAllPrompt`, `buildSceneReviewPrompt`, `buildBeatsPrompt`,
+`buildPlanCheckPrompt`, `buildArcCreatePrompt`, `buildArcRetellPrompt`,
+`buildStoryTextFromBeatsPrompt`, `buildStoryBibleFromBeatsPrompt`,
+`buildClothingReviewPrompt`, `buildTextProofreadPrompt`, `buildTextDiffPrompt`,
+`buildTextAuditPrompt`, `buildTextAuditBlindPrompt`, `buildOutlineReviewPrompt`,
+`buildTextRefinePrompt`, `buildUnifiedStoryPrompt`, `buildTrialStoryPrompt`,
+`buildStyleTransferPrompt`, plus the two 2×4 sheet row builders and the two sheet judges
+(`evaluateSheetRow`, `evaluateIdentity`) driven through a stubbed judge call.
+
+NOT pinned, and why: `faceRepair.js` `buildPrompt` (the four character-repair templates) is
+not exported and is `async` over image buffers — reaching it needs either a new export or a
+sharp/mask harness, and Guard C is tests only; the inline `fillTemplate` in `evalPipeline.js`
+(three-stage compliance) and in `entityConsistency.js` / `bookAudit.js` / `feedbackConsolidator.js`
+sits inside the network-calling function with no extractable builder, so pinning it would
+mean either a refactor or stubbing four more clients. Every one of those is a candidate for
+the same treatment if a builder is ever extracted.
+
+**Rationale:** Pin BEHAVIOUR — the value reaching the prompt — never the prompt's wording
+(memory rule "behaviour change ships with its tests"). A prompt may be reworded freely; it
+may not stop carrying its input. The negative control is what makes the assertion honest: a
+`toContain('clothing')` passes on template boilerplate alone, which is exactly how a blind
+check looks healthy.
+
+**Two coverage gaps found while inventorying (reported, NOT changed — runtime behaviour is
+the owner's call):**
+
+1. `fillTemplate`'s "Unfilled placeholder(s) stripped" warning and `assertPromptFilled`'s
+   `PLACEHOLDER_RE` both match `\{[A-Z][A-Z0-9_]*\}` — UPPERCASE only. The four
+   character-repair templates use camelCase tokens (`{charName}`, `{appearanceContext}`,
+   `{clothingContext}`, `{actionContext}`, `{issueContext}`, `{textPositionContext}`,
+   `{artStyleContext}`, `{sceneMediumLine}`), and `bbox-refine.txt` uses `{figuresSummary}`.
+   An unfilled camelCase token is neither warned, nor stripped, nor caught at the boundary —
+   it ships verbatim to the image model. Proposal: widen both regexes to accept a leading
+   lowercase letter, or rename those tokens to upper case.
+2. Two live sheet judges fill BARE-WORD tokens with `.replace(/WORD/g, …)`, entirely outside
+   `fillTemplate`: `sheet-2x4-style-eval.txt` (`REQUESTED_STYLE`, `CHARACTER_AGE`) and
+   `sheet-row-identity-eval.txt` (`CHARACTER_AGE`). No brace, so no guard can see an unfilled
+   one — the literal word `CHARACTER_AGE` would ship to the judge. This is the same family as
+   the `{REQUESTED_OUTFIT}` bug, one step further out of reach. `sheet-2x4-evaluation.txt` was
+   already converted to braces + `fillTemplate` for exactly this reason; these two were not.
+   Both are pinned by VALUE here so a regression is caught, but the fill mechanism is
+   unchanged. Proposal: brace the tokens and route them through `fillTemplate`.
+
+**Touched files:** `tests/unit/built-prompt-values.test.ts` (new, +32 tests),
+`docs/decisions.md`, `tasks/BACKLOG.md`
+**Status:** ✅ active
