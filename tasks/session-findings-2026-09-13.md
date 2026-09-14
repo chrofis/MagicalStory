@@ -196,3 +196,24 @@ standing `feedback_shared_tree_discipline` hazard.
   today).
 - Season-appropriate clothing, 6 open questions → `tasks/seasonal-clothing-2026-09-13.md`.
 - Trial prompt parity, four ported rules unmeasured → BACKLOG "Verification pending".
+
+---
+
+## Trial validation runs judged quality from `'A fun adventure'` (fixed 2026-09-14)
+
+`scripts/admin/trial-showcase.js` posted `storyDetails: entry.storyDetails || ''` straight to
+`/api/trial/create-story` and never called the ideas endpoint. Every rotation entry ships
+`"storyDetails": ""`, so the premise fell through to the literal fallback at
+`server/lib/promptBuilders.js:7464` — `inputData.storyDetails || inputData.storyTheme || 'A fun adventure'`.
+The trial writer was handed no premise at all.
+
+A real user cannot reach that state: `client/src/pages/TrialWizard.tsx:371-379` requires an idea
+selection and posts `selectedIdea.title + '\n' + selectedIdea.summary`.
+
+Consequence: conclusions about STORY QUALITY drawn from `job_1789296188291_thezv15y1` and
+`job_1789337873076_qf2at21ui` are suspect — both ran on the empty-premise path, which is also
+why two runs of the same entry came back near-identical. Findings about speed, pipeline mode,
+images or avatars from those jobs are unaffected.
+
+Fixed: the harness now calls `POST /api/trial/generate-ideas-stream`, parses the cards exactly
+as `TrialIdeasStep.tsx` does, and posts the selected one in the client's shape.

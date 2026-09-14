@@ -4,7 +4,8 @@
  *
  * The trial equivalent of scripts/admin/showcase.js. Drives the same public
  * trial API the /try wizard uses (no browser): analyze-photo →
- * generate-preview-avatar → create-anonymous-account → create-story → poll.
+ * generate-preview-avatar → create-anonymous-account → generate-ideas-stream →
+ * create-story → poll.
  * Turnstile and the fingerprint check are bypassed with the purpose-scoped
  * admin HMAC from GET /api/trial/admin-bypass-token (5-min TTL, admin JWT
  * required) — the same bypass tests/trial-to-full.spec.ts uses.
@@ -22,9 +23,22 @@
  *   node scripts/admin/trial-showcase.js --base=https://magicalstory.ch
  *   node scripts/admin/trial-showcase.js --dry-run        # print the plan, call nothing paid
  *   node scripts/admin/trial-showcase.js --no-wait        # fire and exit (job id printed)
+ *   node scripts/admin/trial-showcase.js --idea=makebelieve  # take the fantasy card
+ *
+ * STORY PREMISE — the wizard never posts an empty storyDetails. A real user
+ * picks one of the two cards on the ideas step and the client sends
+ * `idea.title + '\n' + idea.summary` (TrialWizard.tsx handleCreate). Before
+ * 2026-09-14 this harness posted `entry.storyDetails || ''`, and an empty one
+ * fell through to the literal 'A fun adventure' in the trial prompt builder —
+ * so every scripted run judged story quality from an input no user can
+ * produce (two runs of the same entry came back near-identical). It now calls
+ * /api/trial/generate-ideas-stream and parses the cards exactly as
+ * TrialIdeasStep.tsx does, posting the selected one in the same shape.
  *
  * COST: one trial = 5 pages + title page + one preview avatar ≈ CHF 0.20–0.35.
- * Per CLAUDE.md this is a paid run — only launch when the owner asked for it.
+ * The idea call adds two claude-sonnet completions (~1.5k in / ~300 out each)
+ * ≈ USD 0.02. Per CLAUDE.md this is a paid run — only launch when the owner
+ * asked for it.
  */
 
 const fs = require('fs');
@@ -47,7 +61,7 @@ const POLL_TIMEOUT_MS = 20 * 60 * 1000;
 const JOB_BASELINE_SECS = 123;
 
 function parseArgs() {
-  const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true, over: {} };
+  const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true, idea: 'grounded', over: {} };
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--entry=')) out.entry = Number(a.split('=')[1]);
     else if (a.startsWith('--base=')) out.base = a.split('=')[1].replace(/\/$/, '');
@@ -60,12 +74,92 @@ function parseArgs() {
     // Without this the server geolocates the caller's IP — every run from the
     // owner's machine landed in Adlikon.
     else if (a.startsWith('--city=')) out.over.city = a.split('=')[1];
+    // Which of the two idea cards to take. 'grounded' (card 1, the child's own
+    // town + landmark mandate) is the default — see IDEA_MODES.
+    else if (a.startsWith('--idea=')) out.idea = a.split('=')[1];
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--no-wait') out.wait = false;
     else if (a === '--help' || a === '-h') { console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0]); process.exit(0); }
     else { console.error(`unknown arg: ${a}`); process.exit(1); }
   }
+  if (!IDEA_MODES.includes(out.idea)) {
+    console.error(`--idea must be one of: ${IDEA_MODES.join('|')}`);
+    process.exit(1);
+  }
   return out;
+}
+
+// The ideas endpoint always returns exactly two cards and they differ in KIND,
+// not in detail (server/routes/trial.js, localIdea/fantasyIdea): card 1 is set
+// in the child's real town at its indexed landmarks, card 2 in a make-believe
+// world. 'first' would therefore never be a neutral pick — it is always the
+// grounded one — so the modes are named by kind, not by position.
+const IDEA_MODES = ['grounded', 'makebelieve', 'first', 'random'];
+
+// Parse a streamed idea card into {title, summary} EXACTLY as
+// TrialIdeasStep.tsx does (the parseIdea closure in its finals effect, and the
+// same parse in the textarea onChange). Any drift here makes the harness feed
+// the writer something no user could send.
+function parseIdea(text) {
+  const lines = String(text || '').trim().split('\n').filter(l => l.trim());
+  const title = (lines[0] || '').replace(/^[#*\s]+/, '').replace(/[*]+$/, '').trim();
+  const summary = lines.slice(1).join('\n').trim();
+  return { title, summary };
+}
+
+// POST /api/trial/generate-ideas-stream and return the two final cards.
+// SSE: each `data:` line is a JSON frame; story1/story2 carry the growing text
+// and the last one for each is flagged isFinal. Mirrors the client's reader.
+async function generateIdeas(base, entry) {
+  const res = await fetch(`${base}/api/trial/generate-ideas-stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      storyCategory: entry.storyCategory,
+      storyTopic: entry.storyTopic || '',
+      storyTheme: entry.storyTheme || '',
+      language: entry.language,
+      pages: 10,
+      characters: [{
+        name: entry.name, age: entry.age, gender: entry.gender,
+        isMain: true, traits: Array.isArray(entry.traits) ? entry.traits : [],
+      }],
+      ...(entry.city ? { userLocation: { city: entry.city, country: 'Switzerland' } } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`generate-ideas-stream → ${res.status}: ${(await res.text()).slice(0, 300)}`);
+
+  const texts = ['', ''];
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let streamError = null;
+  for await (const chunk of res.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      let data;
+      try { data = JSON.parse(line.slice(6)); } catch { continue; }
+      if (data.error) { streamError = data.error; continue; }
+      if (data.story1 !== undefined) texts[0] = data.story1;
+      if (data.story2 !== undefined) texts[1] = data.story2;
+    }
+  }
+  // An error frame for ONE card still leaves the other usable, but a run that
+  // silently proceeds on half an answer is exactly the fidelity bug this fixes.
+  if (streamError) throw new Error(`idea stream reported: ${streamError}`);
+  const ideas = texts.map(parseIdea);
+  if (!ideas[0].title || !ideas[1].title) {
+    throw new Error(`idea stream returned an unusable card (titles: ${JSON.stringify(ideas.map(i => i.title))})`);
+  }
+  return ideas;
+}
+
+function pickIdeaIndex(mode) {
+  if (mode === 'makebelieve') return 1;
+  if (mode === 'random') return Math.random() < 0.5 ? 0 : 1;
+  return 0; // 'grounded' and 'first' are the same card
 }
 
 function pickEntry(explicitIndex) {
@@ -130,10 +224,22 @@ function faceDataUri(entry) {
   console.log(`  character   : ${entry.name} (${entry.age}, ${entry.gender}) — ${entry.family}/${entry.face}`);
   console.log(`  story       : ${entry.storyCategory}${entry.storyTopic ? ` / ${entry.storyTopic}` : ''} [${entry.language}]`);
   console.log(`  started     : ${ch(new Date())}`);
+  // PRECEDENCE for the premise: an explicit --details= wins, then a non-empty
+  // storyDetails on the rotation entry, then a generated idea card. Nothing
+  // ever posts an empty storyDetails again.
+  const presetDetails = (entry.storyDetails || '').trim();
+  console.log(`  premise     : ${presetDetails ? 'from the rotation entry / --details' : `generated idea card (--idea=${args.idea})`}`);
   console.log('─'.repeat(72));
 
   if (args.dryRun) {
     console.log('--dry-run: no paid calls made. Photo resolves:', path.join(PHOTO_ROOT, entry.family, entry.face));
+    if (presetDetails) {
+      console.log('storyDetails that would be posted:');
+      console.log(presetDetails.split('\n').map(l => '  | ' + l).join('\n'));
+    } else {
+      console.log(`storyDetails would come from POST /api/trial/generate-ideas-stream (two claude-sonnet cards, ~USD 0.02),`);
+      console.log(`taking the ${args.idea === 'makebelieve' ? 'make-believe-world card (card 2)' : args.idea === 'random' ? 'randomly chosen card' : "child's-own-town card (card 1)"} as \`title + '\\n' + summary\` — the same shape TrialWizard.tsx posts.`);
+    }
     return;
   }
 
@@ -199,14 +305,34 @@ function faceDataUri(entry) {
   });
   console.log(`[${chTime(new Date())}] trial account ${acct.userId} created`);
 
-  // 4. Start the story.
+  // 4. The premise. A real user reaches create-story only through the ideas
+  //    step, so the harness does too — unless the rotation entry (or --details)
+  //    already states one. A failure here is FATAL: falling through to an empty
+  //    storyDetails is the bug this step exists to prevent.
+  let storyDetails = presetDetails;
+  let ideaKind = null;
+  if (!storyDetails) {
+    const ideas = await generateIdeas(args.base, entry);
+    const idx = pickIdeaIndex(args.idea);
+    const idea = ideas[idx];
+    // Byte-for-byte the client's shape (TrialWizard.tsx handleCreate).
+    storyDetails = idea.title + '\n' + idea.summary;
+    // The server reads ideaKind to decide whether the landmark mandate applies
+    // ('fantasy' = card 2). The client stamps it from the card index; so do we.
+    ideaKind = idx === 1 ? 'fantasy' : 'local';
+    console.log(`[${chTime(new Date())}] ideas generated — took card ${idx + 1} (${ideaKind}): ${idea.title}`);
+    console.log(storyDetails.split('\n').map(l => '    | ' + l).join('\n'));
+  }
+
+  // 5. Start the story.
   const started = await api(args.base, '/api/trial/create-story', {
     bearer: acct.sessionToken,
     body: {
       storyCategory: entry.storyCategory,
       storyTopic: entry.storyTopic || '',
       storyTheme: entry.storyTheme || '',
-      storyDetails: entry.storyDetails || '',
+      storyDetails,
+      ...(ideaKind ? { ideaKind } : {}),
       language: entry.language,
       ...(entry.city ? { userLocation: { city: entry.city, country: 'Switzerland' } } : {}),
     },
@@ -221,7 +347,7 @@ function faceDataUri(entry) {
     return;
   }
 
-  // 5. Poll to completion.
+  // 6. Poll to completion.
   let last = -1;
   while (Date.now() - t0 < POLL_TIMEOUT_MS) {
     await new Promise(r => setTimeout(r, 10000));
