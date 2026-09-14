@@ -4061,12 +4061,20 @@ def split_reference_sheet():
             cols = int(data['cols'])
             rows = int(data['rows'])
         else:
-            # Default layouts matching the JS-side prompt builder:
-            # 2x2 only for exactly 4 elements, single column for everything else
-            if count == 4:
+            # Default layouts mirroring referenceSheetLayout() in
+            # server/lib/referenceSheets.js (the JS caller always sends the
+            # cols/rows hints, so this is a backstop):
+            # 1 -> 1x1, 2 -> 2x1, 3-4 -> 2x2, 5-6 -> 3x2
+            if count <= 1:
+                cols, rows = 1, 1
+            elif count == 2:
+                cols, rows = 2, 1
+            elif count <= 4:
                 cols, rows = 2, 2
+            elif count <= 6:
+                cols, rows = 3, 2
             else:
-                cols, rows = 1, count
+                cols, rows = 3, -(-count // 3)
 
         if cols * rows < count:
             return jsonify({

@@ -121,8 +121,9 @@ describe('buildReferenceSheetPrompt / batches with the new cells', () => {
   });
   it('a multi-cell sheet carries the kind sentences and the blanket no-text rule', () => {
     const p = buildReferenceSheetPrompt([scale, { ...scale, id: 'ART002', name: 'large dragon scale', label: 'large dragon scale' }], 'soft watercolor');
-    expect(p).toContain('Row 1: This is the small dragon scale, a single reptile scale: ');
-    expect(p).toContain('Row 2: This is the large dragon scale, a single reptile scale: ');
+    // Two cells lay out side by side since 2026-09-14 (referenceSheetLayout).
+    expect(p).toContain('Left: This is the small dragon scale, a single reptile scale: ');
+    expect(p).toContain('Right: This is the large dragon scale, a single reptile scale: ');
     expect(p).toContain('Zero text, zero labels');
     expect(p).not.toContain('{TEXT_RULE}');
   });

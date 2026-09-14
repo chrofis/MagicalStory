@@ -12,7 +12,7 @@
  *  3. Both state cells of a creature entry drew four children and a dog,
  *     because its description named them to convey the creature's size.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 const { rejectMultiPanelAssignments } = require('../../server/lib/sheetGrid');
 const { buildReferenceSheetPrompt } = require('../../server/lib/referenceSheets');
@@ -248,5 +248,203 @@ describe('an element with no cell is re-rendered solo', () => {
     const renderSolo = async () => [null];
     const out = await fillMissingReferencesSolo(refs, [batch[0]], renderSolo, {});
     expect(out.stillMissing).toEqual(['Egg']);
+  });
+});
+
+// ── Requested sheet geometry (2026-09-14) ──────────────────────────────────
+// Until this change every count except 4 was requested as a single column and
+// models drew something else: five `vb_sheet_layout_mismatch` events across
+// three stories on 2026-09-14 (9 cells for 3 requested, 1 for 2, 4 for 2).
+// The layout table below is the requested shape; the point of the tests is
+// that the PROMPT's shape and the CROP geometry are the same shape.
+const {
+  referenceSheetLayout,
+  referencesFromCells,
+  expandElementStateCells,
+  splitGridIntoReferences,
+} = require('../../server/lib/referenceSheets');
+const sharpLib = require('sharp');
+
+describe('reference sheet layout table', () => {
+  const table: Array<[number, number, number, number[]]> = [
+    // count, cols, rows, cell -> element map
+    [1, 1, 1, [0]],
+    [2, 2, 1, [0, 1]],
+    [3, 2, 2, [0, 1, 2, 0]],
+    [4, 2, 2, [0, 1, 2, 3]],
+    [5, 3, 2, [0, 1, 2, 3, 4, 0]],
+    [6, 3, 2, [0, 1, 2, 3, 4, 5]],
+  ];
+
+  for (const [count, cols, rows, map] of table) {
+    it(`asks for ${cols}x${rows} for ${count} element(s)`, () => {
+      const layout = referenceSheetLayout(count);
+      expect([layout.cols, layout.rows]).toEqual([cols, rows]);
+      expect(layout.cells).toBe(cols * rows);
+      expect(layout.map).toEqual(map);
+    });
+  }
+
+  it('never leaves a spare cell unassigned', () => {
+    for (let n = 1; n <= 6; n++) {
+      const layout = referenceSheetLayout(n);
+      expect(layout.map).toHaveLength(layout.cells);
+      expect(layout.map.every((e: number) => Number.isInteger(e) && e >= 0 && e < n)).toBe(true);
+      for (let e = 0; e < n; e++) expect(layout.map).toContain(e);
+    }
+  });
+
+  it('keeps a sane grid above six cells', () => {
+    const layout = referenceSheetLayout(7);
+    expect(layout.cells).toBeGreaterThanOrEqual(7);
+    expect(layout.map).toHaveLength(layout.cells);
+  });
+});
+
+describe('count 3 — the first element is drawn twice', () => {
+  const els = [
+    { id: 'ART001', name: 'One', type: 'artifact', description: 'a small wooden box' },
+    { id: 'ART002', name: 'Two', type: 'artifact', description: 'a coiled rope' },
+    { id: 'ART003', name: 'Three', type: 'artifact', description: 'a brass key' },
+  ];
+
+  it('asks for four cells, with the first element in the top-left AND the bottom-right', () => {
+    const prompt = buildReferenceSheetPrompt(els, 'watercolor', null);
+    expect(prompt).toMatch(/^Top-left: /m);
+    expect(prompt).toMatch(/^Top-right: /m);
+    expect(prompt).toMatch(/^Bottom-left: /m);
+    expect(prompt).toMatch(/^Bottom-right: /m);
+    const bottomRight = prompt.split('\n').find((l: string) => l.startsWith('Bottom-right:')) || '';
+    expect(bottomRight).toContain('Top-left');
+    expect(bottomRight).toContain('a small wooden box');
+  });
+
+  it('returns exactly three references from the four cells', () => {
+    const layout = referenceSheetLayout(3);
+    const refs = referencesFromCells(['a', 'b', 'c', 'd'], layout, 3);
+    expect(refs).toEqual(['a', 'b', 'c']);
+  });
+
+  it('falls back to the duplicate cell when the top-left crop is unusable', () => {
+    const layout = referenceSheetLayout(3);
+    expect(referencesFromCells([null, 'b', 'c', 'd'], layout, 3)).toEqual(['d', 'b', 'c']);
+  });
+
+  it('leaves an element null when neither of its cells cropped', () => {
+    const layout = referenceSheetLayout(3);
+    expect(referencesFromCells([null, 'b', null, null], layout, 3)).toEqual([null, 'b', null]);
+  });
+});
+
+// The crop geometry must be the SAME shape the prompt asked for — if the two
+// disagree, every cell mis-crops in silence. Synthetic sheets are drawn in the
+// requested shape with real gutters, so the production splitter runs
+// end-to-end: pixel grid detection, then the crop.
+describe('crop geometry matches the requested shape', () => {
+  const CELL = 120;
+  const GUTTER = 8;
+  const colourFor = (i: number) => [30 + i * 33, 70 + (i % 3) * 20, 190 - i * 28];
+
+  // A flat colour block has zero variance along a line, which the gutter
+  // detector reads as a gutter — real cells hold paint. Speckle each cell.
+  const cellPixels = (i: number) => {
+    const [r, g, b] = colourFor(i);
+    const buf = Buffer.alloc(CELL * CELL * 3);
+    for (let p = 0; p < CELL * CELL; p++) {
+      const n = ((p * 2654435761) % 97) - 48; // deterministic ±48 speckle
+      buf[p * 3] = Math.min(255, Math.max(0, r + n));
+      buf[p * 3 + 1] = Math.min(255, Math.max(0, g + n));
+      buf[p * 3 + 2] = Math.min(255, Math.max(0, b + n));
+    }
+    return buf;
+  };
+
+  const makeSheet = async (cols: number, rows: number) => {
+    const composites = [];
+    for (let i = 0; i < cols * rows; i++) {
+      composites.push({
+        input: cellPixels(i),
+        raw: { width: CELL, height: CELL, channels: 3 },
+        left: (i % cols) * (CELL + GUTTER),
+        top: Math.floor(i / cols) * (CELL + GUTTER),
+      });
+    }
+    const width = cols * CELL + (cols - 1) * GUTTER;
+    const height = rows * CELL + (rows - 1) * GUTTER;
+    return sharpLib({ create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .composite(composites as any).png().toBuffer();
+  };
+
+  const meanRgb = async (b64: string) => {
+    const stats = await sharpLib(Buffer.from(b64, 'base64')).stats();
+    return stats.channels.slice(0, 3).map((c: any) => Math.round(c.mean));
+  };
+  const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) <= 12);
+
+  let realFetch: any;
+  beforeAll(() => {
+    realFetch = (globalThis as any).fetch;
+    (globalThis as any).fetch = async () => { throw new Error('no network in this suite'); };
+  });
+  afterAll(() => { (globalThis as any).fetch = realFetch; });
+
+  for (let count = 1; count <= 6; count++) {
+    it(`cuts ${count} element(s) on the requested grid`, async () => {
+      const layout = referenceSheetLayout(count);
+      const sheet = await makeSheet(layout.cols, layout.rows);
+      const elements = Array.from({ length: count }, (_, i) => ({ id: `ART00${i + 1}`, name: `E${i + 1}` }));
+      const refs = await splitGridIntoReferences(sheet, count, elements);
+      expect(refs).toHaveLength(count);
+      for (let e = 0; e < count; e++) {
+        // The element's own cell, row-major — for a repeated element the
+        // FIRST cell it occupies (top-left).
+        const cell = layout.map.indexOf(e);
+        expect(refs[e], `element ${e} has no crop`).toBeTruthy();
+        const got = await meanRgb(refs[e]);
+        expect(near(got, colourFor(cell)), `element ${e}: ${got} vs cell ${cell} ${colourFor(cell)}`).toBe(true);
+      }
+    });
+  }
+});
+
+describe('an object with more than four states', () => {
+  const logger = {
+    events: [] as any[],
+    warn(t: string, m: string, s?: string) { this.events.push({ t, m, s }); },
+    info() {},
+  };
+  const { setCurrentLogger, clearCurrentLogger } = require('../../server/lib/generationLogger');
+
+  it('warns and still renders every state', () => {
+    logger.events = [];
+    setCurrentLogger(logger);
+    try {
+      const el = {
+        id: 'ART001', name: 'Prop', type: 'artifact', description: 'a small wooden box',
+        states: [1, 2, 3, 4, 5].map(i => ({ id: `ART001.${i}`, name: `state ${i}`, delta: `delta ${i}` })),
+      };
+      const cells = expandElementStateCells(el);
+      // NOT clamped — no authored state is dropped.
+      expect(cells).toHaveLength(5);
+      expect(cells.map((c: any) => c.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3', 'ART001.4', 'ART001.5']);
+      expect(logger.events.some(e => e.t === 'vb_sheet_state_overflow')).toBe(true);
+    } finally {
+      clearCurrentLogger();
+    }
+  });
+
+  it('says nothing for four states', () => {
+    logger.events = [];
+    setCurrentLogger(logger);
+    try {
+      const el = {
+        id: 'ART002', name: 'Prop', type: 'artifact', description: 'a coiled rope',
+        states: [1, 2, 3, 4].map(i => ({ id: `ART002.${i}`, name: `state ${i}`, delta: `delta ${i}` })),
+      };
+      expect(expandElementStateCells(el)).toHaveLength(4);
+      expect(logger.events.some(e => e.t === 'vb_sheet_state_overflow')).toBe(false);
+    } finally {
+      clearCurrentLogger();
+    }
   });
 });

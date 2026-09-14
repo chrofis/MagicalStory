@@ -36954,3 +36954,73 @@ nothing — a real loss, logged as one.
 **Status:** ✅ active on staging — the next story with a
 `vb_sheet_layout_mismatch` proves it: no element in that batch should reach the
 pages without a `referenceImageUrl`.
+
+---
+
+## 2026-09-14 — A reference sheet is asked for in a shape models actually draw
+
+**Context:** Every reference-sheet batch except a 4-element one was requested as
+a SINGLE COLUMN (`cols = count === 4 ? 2 : 1`, in two places: the prompt's
+`GRID_SHAPE_PHRASE` and the sharp crop geometry). Image models routinely ignored
+it: five `vb_sheet_layout_mismatch` events across three stories on 2026-09-14 —
+9 cells drawn for 3 requested, 1 for 2, 4 for 2. Each mismatch costs an
+identification call to map drawn cells onto elements, and before `5c0dba8b0` a
+single unparseable reply cost the whole batch its reference pictures. The file's
+own comment already named the bad shape: a 4-state object pushed to 5 cells
+"lay[s] out as a 1x5 column of narrow, low-detail references instead of a 2x2".
+
+**Decision:** One helper, `referenceSheetLayout(count)`, is the single source of
+the requested shape, the crop geometry and the cell→element map. Requested
+shapes:
+
+| cells | shape |
+|---|---|
+| 1 | one cell, no gridlines (unchanged) |
+| 2 | 2 cols × 1 row |
+| 3 | 2×2 — element 0 drawn TWICE: top-left and bottom-right |
+| 4 | 2×2 (unchanged) |
+| 5–6 | 3 cols × 2 rows |
+| >6 | should not occur; 3 columns and a loud `log.error` |
+
+A partial row is never left blank (owner, 2026-09-14): a blank cell invites the
+model to fill it with an invented object or a stray duplicate that then has to
+be told apart from the real one. The spare cell repeats element 0 instead, named
+explicitly in the LAYOUT line ("the same element as Top-left, drawn a second
+time"). For a state batch element 0 is `states[0]`, the unaltered look by
+construction (`defaultObjectState`) — the most load-bearing cell on the sheet,
+which therefore gets two shots: `referencesFromCells` takes the first usable
+crop, so a duplicate cell is the fallback when the top-left crop is missing. The
+cell→element map for count 3 is `[0, 1, 2, 0]` and the batch still returns
+exactly three references — a repeat never adds an entry, which `isStateBatch`
+(`references.every(Boolean)`) depends on.
+
+An object authoring more than four states is WARNED, never clamped
+(`vb_sheet_state_overflow`, warn level, naming the object and its state count).
+The AD prompt asks for at most four states and nothing in code enforces it; with
+5–6 now laid out as a 3×2 the overflow is handled rather than catastrophic, but
+silently dropping an authored state would lose data the story then cites on a
+page.
+
+**Rationale:** `5c0dba8b0` fixed the RECOVERY and deliberately left the trigger
+alone. This is the trigger: a shape a model will draw produces no mismatch, no
+identification call, and no chance of a misaligned crop. The identification
+path, its one retry and the bounded solo re-render all stay exactly as they are
+— they remain the net for a model that ignores the new shapes too, and
+`rejectMultiPanelAssignments` is untouched. The two grid-computing sites were
+merged into the one helper because a requested shape that disagrees with the
+crop geometry mis-crops every cell in silence; the analyzer's
+`/split-reference-sheet` now also receives explicit `cols`/`rows` hints (its
+stale default was updated to mirror the table as a backstop).
+
+**Touched:**
+- `server/lib/referenceSheets.js` (`referenceSheetLayout`, `referencesFromCells`,
+  `cellPositionName`, `splitGridIntoReferences`, `buildReferenceSheetPrompt`,
+  `expandElementStateCells`)
+- `photo_analyzer.py` (`/split-reference-sheet` default layout)
+- `tests/unit/reference-sheet-mismatch.test.ts`,
+  `tests/unit/vb-element-cell-prompt.test.ts`
+
+**Status:** ✅ active on staging. **Watch the mismatch rate on the next
+stories** — this changes the requested geometry for every story, so
+`vb_sheet_layout_mismatch` should become rare; if it does not, the new shapes
+are wrong rather than the recovery.

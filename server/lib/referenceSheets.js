@@ -97,6 +97,54 @@ async function identifySheetCellsWithRetry(buffer, cells, elements, genLog = nul
 }
 
 /**
+ * The grid shape a sheet of `count` elements is ASKED for — the single source
+ * of truth for the requested layout, the crop geometry and the cell/element
+ * mapping. Two sites used to compute `cols = count === 4 ? 2 : 1` separately
+ * (the prompt phrase and the sharp fallback); a helper keeps them from
+ * drifting, because a requested shape that disagrees with the crop geometry
+ * mis-crops every cell in silence.
+ *
+ * Until 2026-09-14 every count except 4 was requested as a single column, and
+ * image models routinely ignored it (five `vb_sheet_layout_mismatch` events
+ * across three stories on 2026-09-14: 9 cells drawn for 3, 1 for 2, 4 for 2).
+ * The shapes below are ones a model actually draws.
+ *
+ *   1 → one cell, no gridlines      4 → 2x2
+ *   2 → 2 cols x 1 row              5-6 → 3 cols x 2 rows
+ *   3 → 2x2, element 0 drawn twice (top-left AND bottom-right)
+ *
+ * A partial row is never left blank: a blank cell invites the model to fill it
+ * with an invented object or a stray duplicate (owner, 2026-09-14). The spare
+ * cells repeat element 0 instead — for a state batch that is `states[0]`, the
+ * unaltered look by construction (defaultObjectState in visualBible.js), i.e.
+ * the most load-bearing cell on the sheet, which therefore gets two shots.
+ *
+ * @param {number} count elements requested
+ * @returns {{cols:number, rows:number, cells:number, map:number[]}}
+ *          `map` is cell index -> element index, row-major, length `cells`.
+ */
+function referenceSheetLayout(count) {
+  const n = Math.max(1, Number(count) || 1);
+  let cols;
+  let rows;
+  if (n === 1) { cols = 1; rows = 1; }
+  else if (n === 2) { cols = 2; rows = 1; }
+  else if (n <= 4) { cols = 2; rows = 2; }
+  else if (n <= 6) { cols = 3; rows = 2; }
+  else {
+    // Should not occur: buildReferenceSheetBatches caps a multi-element batch
+    // at 4, and a state batch is capped by the AD prompt at 4 states.
+    cols = 3;
+    rows = Math.ceil(n / 3);
+    log.error(`❌ [REF-SHEET] ${n} cells requested on one sheet — no layout is defined above six; falling back to ${cols}x${rows}`);
+  }
+  const cells = cols * rows;
+  // Row-major: the elements in order, then element 0 again in any spare cell.
+  const map = Array.from({ length: cells }, (_, i) => (i < n ? i : 0));
+  return { cols, rows, cells, map };
+}
+
+/**
  * At most this many solo re-renders per sheet batch.
  *
  * An element that ends the split with no cell is re-rendered on its own rather
@@ -211,6 +259,30 @@ async function countPanelsPerCell(crops, map) {
  *                for the identification call; without them a mismatch can only
  *                fall back to row-major order.
  */
+/**
+ * Cell-indexed crops -> element-indexed references, through the requested
+ * layout's cell map.
+ *
+ * The first usable crop for an element wins, so a repeated element takes its
+ * primary cell (top-left) and falls back to the duplicate only when that crop
+ * is missing. Length is always the element count: a repeat never adds an entry
+ * (`isStateBatch` tests `references.every(Boolean)` over exactly the batch).
+ *
+ * @param {Array<string|null>} crops row-major, cell-indexed
+ * @param {{map:number[]}} layout from referenceSheetLayout
+ * @param {number} count elements requested
+ * @returns {Array<string|null>} element-indexed, length `count`
+ */
+function referencesFromCells(crops, layout, count) {
+  const refs = new Array(count).fill(null);
+  for (let cell = 0; cell < layout.map.length; cell++) {
+    const el = layout.map[cell];
+    if (el >= count || refs[el]) continue;
+    refs[el] = crops[cell] || null;
+  }
+  return refs;
+}
+
 async function splitGridIntoReferences(gridImage, count, elements = null) {
   // Convert input to BOTH a Buffer (for sharp) and a base64 string
   // (for the Python call) so we don't pay the conversion twice.
@@ -224,19 +296,23 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     base64 = buffer.toString('base64');
   }
 
+  // The shape the PROMPT asked for — which is not the element count when a
+  // partial row repeats element 0 (count 3 asks for four cells).
+  const layout = referenceSheetLayout(count);
+
   // ── Measure the real grid before trusting the requested count ──────────
   let grid = null;
   try {
     grid = await detectSheetGrid(buffer);
-    log.info(`[REF-SHEET] Grid detected from pixels: ${grid.cols}x${grid.rows} = ${grid.count} cell(s) (requested ${count}) — separators h=[${grid.separators.horizontal.join(',')}] v=[${grid.separators.vertical.join(',')}]`);
+    log.info(`[REF-SHEET] Grid detected from pixels: ${grid.cols}x${grid.rows} = ${grid.count} cell(s) (requested ${layout.cols}x${layout.rows} = ${layout.cells} for ${count} element(s)) — separators h=[${grid.separators.horizontal.join(',')}] v=[${grid.separators.vertical.join(',')}]`);
   } catch (err) {
     log.warn(`[REF-SHEET] Grid detection failed (${err.message}) — falling back to the requested-count split`);
   }
 
-  if (grid && grid.count !== count) {
-    log.warn(`⚠️ [REF-SHEET] Sheet layout mismatch: asked for ${count} cell(s), the model drew ${grid.count} (${grid.cols}x${grid.rows}). Cell order cannot be assumed — running one identification call.`);
+  if (grid && grid.count !== layout.cells) {
+    log.warn(`⚠️ [REF-SHEET] Sheet layout mismatch: asked for ${layout.cells} cell(s), the model drew ${grid.count} (${grid.cols}x${grid.rows}). Cell order cannot be assumed — running one identification call.`);
     const genLog = require('./generationLogger').getCurrentLogger();
-    genLog?.warn('vb_sheet_layout_mismatch', `Reference sheet drew ${grid.count} cells (${grid.cols}x${grid.rows}) for ${count} requested element(s)`);
+    genLog?.warn('vb_sheet_layout_mismatch', `Reference sheet drew ${grid.count} cells (${grid.cols}x${grid.rows}) for ${layout.cells} requested cell(s) / ${count} element(s)`);
 
     if (grid.count < count) {
       log.warn(`⚠️ [REF-SHEET] Fewer cells than elements — at least one detected cell must hold more than one element; every crop is checked for merged panels`);
@@ -281,10 +357,10 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     return new Array(count).fill(null);
   }
 
-  if (grid && grid.count === count) {
+  if (grid && grid.count === layout.cells) {
     // Fast path: the model drew exactly what was asked for, so row-major
     // order is the prompt's order. Cut on the detected boundaries.
-    return cropCells(buffer, grid.cells);
+    return referencesFromCells(await cropCells(buffer, grid.cells), layout, count);
   }
 
   // Try Python service first — variance-based separator detection that
@@ -296,18 +372,20 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         image: `data:image/png;base64,${base64}`,
-        count,
+        count: layout.cells,
+        cols: layout.cols,
+        rows: layout.rows,
       }),
       signal: AbortSignal.timeout(10000),
     });
 
     if (response.ok) {
       const result = await response.json();
-      if (result.success && Array.isArray(result.cells) && result.cells.length === count) {
+      if (result.success && Array.isArray(result.cells) && result.cells.length === layout.cells) {
         log.info(`[REF-SHEET] Python split: ${result.layout.cols}x${result.layout.rows}, separators v=[${result.separators.vertical.join(',')}] h=[${result.separators.horizontal.join(',')}]`);
-        return result.cells;
+        return referencesFromCells(result.cells, layout, count);
       }
-      log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${count}) — falling back to sharp`);
+      log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${layout.cells}) — falling back to sharp`);
     } else {
       log.debug(`[REF-SHEET] Python service unavailable (${response.status}) — using sharp fallback`);
     }
@@ -324,16 +402,16 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     throw new Error('Could not get grid image dimensions');
   }
 
-  // Calculate grid layout — match prompt logic: 2x2 only for exactly 4, otherwise single column
-  const cols = count === 4 ? 2 : 1;
-  const rows = count === 4 ? 2 : count;
+  // Grid layout — the SAME requested shape the prompt asked for (one helper,
+  // so the crop geometry can never disagree with what was requested).
+  const { cols, rows } = layout;
   const cellWidth = Math.floor(width / cols);
   const cellHeight = Math.floor(height / rows);
 
   log.debug(`[REF-SHEET] Sharp fallback: ${width}x${height} → ${cols}x${rows} cells (${cellWidth}x${cellHeight} each)`);
 
-  const references = [];
-  for (let i = 0; i < count; i++) {
+  const crops = [];
+  for (let i = 0; i < layout.cells; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
 
@@ -348,15 +426,15 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
         .png()
         .toBuffer();
 
-      references.push(cropped.toString('base64'));
-      log.debug(`[REF-SHEET] Sharp extracted cell ${i + 1}/${count} (col=${col}, row=${row})`);
+      crops.push(cropped.toString('base64'));
+      log.debug(`[REF-SHEET] Sharp extracted cell ${i + 1}/${layout.cells} (col=${col}, row=${row})`);
     } catch (err) {
       log.error(`[REF-SHEET] Sharp failed to extract cell ${i}: ${err.message}`);
-      references.push(null);
+      crops.push(null);
     }
   }
 
-  return references;
+  return referencesFromCells(crops, layout, count);
 }
 
 /**
@@ -460,6 +538,34 @@ function elementCellText(el) {
   return `${elementKindSentence(el)}${desc}${stop}${textSentence}`;
 }
 
+// Words, never digits: a literal "2x2" in the prompt used to get painted onto
+// the rendered sheet as a label.
+const numWord = (n) => ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n] || String(n);
+
+/**
+ * The plain-English name of one cell in a cols x rows grid, row-major —
+ * "Top-left", "Top-centre", "Bottom-right", "Left", "Right". The names are
+ * what tie a LAYOUT line to a place on the sheet, and the same row-major order
+ * is what the crop geometry uses.
+ *
+ * @param {number} i cell index, row-major
+ * @param {number} cols
+ * @param {number} rows
+ * @returns {string}
+ */
+function cellPositionName(i, cols, rows) {
+  const rowWords = rows === 1 ? [''] : rows === 2 ? ['Top', 'Bottom'] : ['Top', 'Middle', 'Bottom'];
+  const colWords = cols === 1 ? [''] : cols === 2 ? ['left', 'right'] : ['left', 'centre', 'right'];
+  const row = rowWords[Math.floor(i / cols)];
+  const col = colWords[i % cols];
+  // More rows or columns than there are words for (only the >6 fallback).
+  if (row === undefined || col === undefined) return `Cell ${numWord(i + 1)}`;
+  if (row && col) return `${row}-${col}`;
+  if (row) return row;
+  if (col) return col.charAt(0).toUpperCase() + col.slice(1);
+  return `Cell ${numWord(i + 1)}`;
+}
+
 /**
  * Build reference sheet prompt for a batch of elements
  *
@@ -469,11 +575,11 @@ function elementCellText(el) {
  */
 function buildReferenceSheetPrompt(elements, styleDescription, visualBible = null, gateReason = null) {
   const count = elements.length;
-  // Only use 2x2 for exactly 4 elements. Everything else uses a single column
-  // to avoid partial rows (e.g. 3 elements in a 2x2 leaves an empty cell that
-  // confuses image models and grid splitters).
-  const cols = count === 4 ? 2 : 1;
-  const rows = count === 4 ? 2 : count;
+  // The requested shape and the crop geometry come from ONE helper — see
+  // referenceSheetLayout for the table and why a partial row repeats element 0
+  // rather than being left blank.
+  const layout = referenceSheetLayout(count);
+  const { cols, rows } = layout;
 
   // Build grid layout description.
   // We deliberately omit el.name from the per-cell line. The model treats
@@ -484,9 +590,9 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   // Pure visual prose — no labels, no IDs — keeps the cell intent clear to
   // the model without giving it strings to render. Splitter still works on
   // the grid borders.
-  const positions2x2 = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
-  const gridLayoutLines = elements.map((el, i) => {
-    const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
+  const gridLayoutLines = layout.map.map((elIdx, cellIdx) => {
+    const el = elements[elIdx];
+    const pos = cellPositionName(cellIdx, cols, rows);
     const desc = elementCellText(el) + characterAgeCue(el);
     // A reference image carries POSE, not just appearance: reference-conditioned
     // models reproduce a referenced object's exact appearance AND pose whatever
@@ -507,21 +613,26 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     // and also put the orientation into the page prompt.
     // A solo call has no position to name — a bare "Row 1:" prefix is a stringy
     // label on an image with nothing to index.
-    return count === 1 ? desc : `${pos}: ${desc}`;
+    if (count === 1) return desc;
+    // A spare cell repeats element 0. Say so: a cell the model cannot place is
+    // a cell it invents something for.
+    if (cellIdx >= count) {
+      return `${pos}: the same element as ${cellPositionName(0, cols, rows)}, drawn a second time, identical in every detail: ${desc}`;
+    }
+    return `${pos}: ${desc}`;
   });
 
   // Describe the grid in natural language. Passing literal digit-strings like
   // "2x2" used to bake "2x2" onto the rendered image (the model treated it as
   // a label). Use words for the count and an explicit row/column phrase so the
   // model never sees a stringy template token to copy.
-  const numWord = (n) => ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] || String(n);
   const gridShapePhrase = count === 1
     ? 'single full-frame illustration with no grid and no dividing lines'
-    : (cols === 2 && rows === 2)
-      ? 'square grid with two rows and two columns (four cells total)'
-      : (cols === 1)
-        ? `single vertical column with ${numWord(rows)} cell${rows === 1 ? '' : 's'} stacked top-to-bottom`
-        : `${numWord(rows)}-row by ${numWord(cols)}-column grid`;
+    : (cols === 2 && rows === 1)
+      ? 'single horizontal row of two cells side by side'
+      : (cols === 2 && rows === 2)
+        ? 'square grid with two rows and two columns (four cells total)'
+        : `grid with ${numWord(rows)} rows and ${numWord(cols)} columns (${numWord(cols * rows)} cells total)`;
 
   // A ONE-element call must not ask for gridlines. The template is written for
   // a sheet — "cells separated by thick black gridlines", three times over —
@@ -866,10 +977,24 @@ function expandElementStateCells(el) {
     states.forEach((st, i) => { if (!st.id) st.id = `${parent}.${i + 1}`; });
   }
   const baseDesc = String(el.extractedDescription || el.description || '').trim().replace(/[.;\s]+$/, '');
+  // A state batch bypasses maxPerBatch by construction (all states of one
+  // object render in one call), and the AD prompt asks for at most four states
+  // — but nothing enforces that, so an over-authored entry silently produces a
+  // 5- or 6-cell sheet. Since 2026-09-14 that lays out as a 3x2 rather than a
+  // 1x5 column, so it is handled, not catastrophic; it is still worth seeing.
+  // NOT clamped: dropping an authored state would silently lose data the story
+  // then cites on a page.
+  if (states.length > 4) {
+    log.warn(`⚠️ [REF-SHEET] "${el.name}" authors ${states.length} states — more than the four the sheet asks for; all of them render, on a wider grid`);
+    require('./generationLogger').getCurrentLogger()?.warn(
+      'vb_sheet_state_overflow',
+      `Object authors ${states.length} states (more than four) — every state still renders, on a wider grid`,
+      el.name,
+    );
+  }
   // The STATES ARE THE PICTURES. No separate base cell: the unaltered look is
   // itself one of the states (the first), so minting a base cell would render
-  // the default twice and push a 4-state object to 5 cells — and 5 cells lay
-  // out as a 1x5 column of narrow, low-detail references instead of a 2x2.
+  // the default twice and push a 4-state object to 5 cells.
   return [
     ...states.map(s => ({
       ...el,
@@ -1652,6 +1777,9 @@ module.exports = {
   checkStateCellsConsistency,
   checkStateBatch,
   splitGridIntoReferences,
+  referenceSheetLayout,
+  referencesFromCells,
+  cellPositionName,
   identifySheetCellsWithRetry,
   fillMissingReferencesSolo,
   MAX_SOLO_REFERENCE_RERENDERS,
