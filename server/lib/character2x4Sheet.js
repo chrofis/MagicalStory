@@ -306,7 +306,7 @@ ${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlo
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions matching the person's apparent age in Image 3. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
-Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).
+Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).${declaredAgeBlock(character)}
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
 The outfit is identical in all four cells, layers included. When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
@@ -329,7 +329,7 @@ Image 3 is the character's full-body reference sheet — match the SAME face, ha
 ${buildGarmentRule()}${hairBlock}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-SHOULDERS close-up of the SAME PERSON — the head, neck, and the top of the shoulders wearing the costume; a little of the shoulders and collar showing is good, no bare skin below the neck. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3. No text, numbers, labels, arrows, or symbols.`;
+Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No text, numbers, labels, arrows, or symbols.`;
 }
 
 // Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
@@ -456,10 +456,28 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
 
   // ── Stage 1: body row (max 1 retry, keep least-bad) ──
   let bestBody = null;
+  let bodyGenError = null;
   for (let t = 1; t <= 2; t++) {
     // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
     // 16:9 from a squarer output would slice the figures' heads/feet off.
-    const res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    // A THROWN backend call consumes ONE try — it must never escape this loop.
+    // The 120s AbortSignal timeout in editWithGrok used to propagate straight
+    // out of generateComposited2x4, killing the whole sheet on try 1 and
+    // leaving the provisioned retry unused (measured: staging runs
+    // job_1789337998754_apslnsq1z / job_1789343124794_z2c779f7i, "The
+    // operation was aborted due to timeout"). Same containment Pass 2 already
+    // has (stage 'gen-error'); the eval calls below are wrapped for the same
+    // reason. If BOTH tries throw, the sheet still fails loudly at the throw
+    // after the loop, carrying the last provider error.
+    let res;
+    try {
+      res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    } catch (err) {
+      bodyGenError = err?.message || String(err);
+      attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
+      log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t}/2 threw: ${bodyGenError}${t < 2 ? ' — retrying' : ''}`);
+      continue;
+    }
     if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_body_row', res.modelId);
     // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
@@ -484,7 +502,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
   }
-  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}`);
+  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}${bodyGenError ? ` (last provider error: ${bodyGenError})` : ''}`);
 
   // ── Stage 2: head row on the accepted body (max 1 retry, keep least-bad) ──
   // Head row uses 20:9 — the widest/shortest ratio in Grok's aspect enum
@@ -493,11 +511,21 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   // no padding/squeeze; full-width, no side margins. See stackRowsInto2x4.
   const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
   let bestHead = null;
+  let headGenError = null;
   for (let t = 1; t <= 2; t++) {
     // skipOutputCrop — 20:9 is the extreme end of Grok's enum and drift is
     // common; cropping a near-square output down to 20:9 would decapitate the
     // head row. stackRowsInto2x4 resizes by width and keeps the full row.
-    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    // A thrown backend call consumes ONE try — see the body row above.
+    let res;
+    try {
+      res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    } catch (err) {
+      headGenError = err?.message || String(err);
+      attemptHistory.push({ stage: 'head', try: t, error: `gen-error: ${headGenError}` });
+      log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t}/2 threw: ${headGenError}${t < 2 ? ' — retrying' : ''}`);
+      continue;
+    }
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
     let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
@@ -515,7 +543,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
   }
-  if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}`);
+  if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}${headGenError ? ` (last provider error: ${headGenError})` : ''}`);
 
   // ── Composite + build the evaluateSheetSplit-shape verdict from the reviews ──
   const { imageData, splitY } = await stackRowsInto2x4(bestHead.row, bestBody.row);
@@ -551,6 +579,39 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   };
 }
 
+/**
+ * The DECLARED age, as a proportion instruction (2026-09-14).
+ *
+ * The sheet prompt used to carry the age only as "match the person's apparent
+ * age in Image 3", plus a four-row table whose child rows are "a young child
+ * about 5 to 6 [heads], a toddler about 4". Two consequences, both measured on
+ * prod job_1789227389389_z18dmvnt6: a declared 5-year-old and a declared
+ * 11-year-old produce a BYTE-IDENTICAL prompt, and the only thing separating
+ * them is what the model reads off a photograph — against an adult yardstick.
+ * Liz (5) came back reading 7-9 and Ayan (8) reading 12-14, and every page
+ * then copied those sheets faithfully.
+ *
+ * The declared age never reached this prompt at all: a grep of the stored
+ * 4,511-char prompt found zero occurrences of "preschool", "school-age",
+ * "Age cues", "years old", "apparentAge" — or even the word "child".
+ *
+ * This injects the SAME getAgeCategory → getAgeMarkers text the page prompts
+ * and the commissioned reference sheets already use (six child buckets between
+ * infant and preteen, at 3.5 / 4 / 4.5 / 5 / 5.5 / 6 head-heights) so the sheet
+ * is anchored on the age the parent typed rather than inferred from a photo.
+ *
+ * Lazy require: promptBuilders pulls in services/prompts at load.
+ */
+function declaredAgeBlock(character) {
+  const raw = character?.age ?? character?.declaredAge;
+  const age = parseInt(raw, 10);
+  if (!Number.isFinite(age) || age < 0) return '';
+  const { getAgeCategory, getAgeMarkers } = require('./promptBuilders');
+  const markers = getAgeMarkers(getAgeCategory(age));
+  if (!markers) return '';
+  return ` This person is ${age} years old: ${markers}. That stated age decides the proportions in every cell — it outranks any impression of age taken from the photo, and the figure is never drawn older or taller than it.`;
+}
+
 function buildPrompt(_artStyle, costumeDescription, character = null, redress = false, costumeName = null, seasonOutfit = null) {
   const hairBlock = buildHairBlock(character);
   // redress=true: the story dressed this character in an outfit that DIFFERS
@@ -571,14 +632,14 @@ ${bodyRef}
 
 ${outfitRule}${buildSeasonOutfitBlock(seasonOutfit, redress)}
 ${hairBlock}
-Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, with natural proportions matching the person's apparent age in Image 3. No cartoon stylisation, no chibi, no anime, no watercolour — those treatments are applied later by downstream steps. This sheet is an identity anchor.
+Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, with natural proportions matching the person's apparent age in Image 3.${declaredAgeBlock(character)} No cartoon stylisation, no chibi, no anime, no watercolour — those treatments are applied later by downstream steps. This sheet is an identity anchor.
 
 Output a 2×4 grid with thin black dividing lines and pure white background, in the same cell layout as Image 1.
 
 The horizontal mid-row divider must be drawn as one unbroken thin black line running edge to edge. The three vertical column dividers must be drawn the same way. Nothing crosses any divider: every figure stays fully inside its own cell, surrounded by white space on all four sides. No head, no hair, no hand, no foot, no shadow, no clothing detail extends beyond the cell's borders. If a figure would not fit inside its cell, scale it down so it fits.
 
 Cells 1-4 (top row): head and shoulders, no full torso and no arms. Where the neckline or collar shows, it is the same garment cells 5-8 wear, in the same colour and with the same neckline — never a collar, placket, hood or trim the costume does not name. Cell 1 front, cell 2 three-quarter, cell 3 profile. Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible — never a second profile, never a flat back of the head with no face showing. The head occupies roughly the middle of the cell with white margin above the hairline and below the neck — the neck stops cleanly, it never continues into the bottom row.
-Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile. Cell 8 matches cell 4's rear-turn pose: shoulders and body fully away from camera, head rotated back over the right shoulder so one eye and the near cheek are visible — never a second profile, never a flat back view with no face showing. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row, and both feet with their shoes are fully visible with a strip of white margin below the shoes. Never crop a bottom-row figure at the thigh, knee, or ankle; if it does not fit, scale the whole figure down until head and both feet sit inside the cell. Body proportions must match the person's apparent age in Image 3: an adult is roughly 7 to 8 heads tall, a teenager about 7, a young child about 5 to 6, a toddler about 4. Do NOT render an adult with child-like short/stubby proportions or an oversized head on a small body — the full-body figures must read as the same age as the head cells.
+Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile. Cell 8 matches cell 4's rear-turn pose: shoulders and body fully away from camera, head rotated back over the right shoulder so one eye and the near cheek are visible — never a second profile, never a flat back view with no face showing. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row, and both feet with their shoes are fully visible with a strip of white margin below the shoes. Never crop a bottom-row figure at the thigh, knee, or ankle; if it does not fit, scale the whole figure down until head and both feet sit inside the cell. Body proportions must match the person's apparent age in Image 3: an adult is roughly 7 to 8 heads tall, a teenager about 7, a young child about 5 to 6, a toddler about 4.${declaredAgeBlock(character)} Do NOT render an adult with child-like short/stubby proportions or an oversized head on a small body — the full-body figures must read as the same age as the head cells.
 
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
@@ -1672,6 +1733,11 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
 
 module.exports = {
   generateCharacter2x4Sheet,
+  // Exported for tests: the declared-age proportion block must reach the prompt.
+  declaredAgeBlock,
+  buildPrompt,
+  buildBodyRowPrompt,
+  buildHeadRowPrompt,
   loadPhantom,
   // Standalone Pass 2 (style transfer from an existing realistic sheet) +
   // face-photo resolver — used by Test Lab to reuse one realistic anchor
