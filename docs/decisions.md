@@ -38616,3 +38616,58 @@ finding.
 
 **Touched:** `prompts/cover-composition.txt`, `prompts/scene-expansion-all.txt`
 **Status:** ✅ active
+
+
+---
+
+## A thrown Pass-1 row call consumes one try, never the whole 2×4 sheet (2026-09-14)
+
+**Context:** `avatar_guarantee_fallback` fired on two of the three 2026-09-14
+staging validation runs — **Max** on `job_1789337998754_apslnsq1z`, **Julian**
+on `job_1789343124794_z2c779f7i` (`job_1789348171785_9oxos7dwv` clean). The
+stored `styledAvatarGeneration` audit named one reason both times:
+
+> `generation threw: [CHARACTER 2×4] pass-1 generation failed for <name>: The operation was aborted due to timeout`
+
+That is the 120 s `AbortSignal.timeout` on `editWithGrok`, i.e. a transient
+provider/network timeout. It is **neither** of the two causes this failure mode
+is usually assumed to have: not a Gemini `IMAGE_OTHER` safety refusal (Pass 2
+runs on Grok and was never reached), and not a gate/eval rejection (no Pass-2
+structural-check or verdict failure is stored for either character). It does not
+correlate with clothing, age band or art style either — both characters are the
+same age band, same 'standard' category, same watercolor story, and each
+succeeded in the runs where the other failed.
+
+The mechanism: `generateComposited2x4` runs each row (body, then head) in a
+`for (t = 1; t <= 2)` loop that keeps the least-bad result. The *eval* calls
+inside that loop are wrapped in try/catch with an explicit comment that losing
+the sheet costs the character its face on every page. The **generation** call was
+not. A throw on try 1 therefore propagated out of the loop, out of
+`generateComposited2x4`, and killed the sheet with the second try unused. Pass 2
+already had exactly this containment (`stage: 'gen-error'`, layer 1 of the
+2026-07-30 styled-avatar guarantee); Pass 1 was left out of it.
+
+**Decision:** a thrown row call is caught inside the loop, recorded in
+`attemptHistory` as `{ stage, try, error: 'gen-error: …' }`, logged at warn, and
+consumes ONE try. If every try of a row throws, the existing
+`… row produced no image for <name>` throw still fires and now carries the last
+provider error, so the failure reaches the avatar-guarantee backstop and its
+`avatar_guarantee_fallback` ERROR exactly as before.
+
+**Rationale:** nothing is silenced — the failed attempt is stored, the log line
+is loud, and the all-tries-failed path is unchanged. The retry the code already
+provisioned simply gets used against the failure mode that actually occurred.
+The measured downstream cost on these three runs was **zero pages**: the
+avatars-stage coverage top-up regenerated both sheets at score 9 before the
+images stage began (23:01:55 CH < 23:02:44 CH; 00:23:49 CH < 00:24:42 CH), so no
+page rendered against the seeded raw photo. The cost was ~13 min of latency and a
+duplicated paid sheet — and a narrower timing window would have put a degraded
+identity reference on every page of that character. Not re-litigated here: the
+Pass-2 backend default (Grok) and the guarantee backstop itself.
+
+**Touched:** `server/lib/character2x4Sheet.js` (`generateComposited2x4` body and
+head row loops), `tests/unit/avatar-sheet-row-gen-error.test.ts` (6 checks:
+retry-after-throw per row, attemptHistory record, both-tries-throw still throws,
+clean run unaffected).
+
+**Status:** ✅ active.
