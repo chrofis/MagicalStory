@@ -38281,3 +38281,302 @@ that; the merge in `images.js` is an exact-string `includes` check.
 comments), `tests/unit/parse-visual-bible-objects.test.ts` (new, 7 tests — 5 fail against the old
 regex), `tasks/BACKLOG.md`.
 **Status:** ✅ active
+
+
+## The re-plan returns only the pages a finding named (2026-09-14)
+**Context:**   The `# RE-DIVIDE` block contradicted itself inside one paragraph: "Return ONLY the pages a finding names, one line each ... and nothing else" sat next to "Output the full plan again." (`promptBuilders.js` `buildReplanSection`). A third signal broke the tie the wrong way — `prompts/story-beats.txt` OUTPUT FORMAT said "One line per page, through page {PAGE_COUNT}" on every build, re-plan included. Two of three instructions ordered the whole book, and that is what the planner delivered: `beats_replan_unnamed_pages` fired 4 times across two stories, one story rewriting 8 unnamed pages in round 1 and 9 in round 2.
+**Decision:**  Owner decision, 2026-09-14: the re-plan returns ONLY the pages a finding names. The full-plan demand is removed and replaced with "Every page number you return is already in the plan above." (the page-count brake, backlog #42 — a re-plan once delivered 19 pages for an 18-page order). The template's scope sentence became `{OUTPUT_SCOPE}`, filled by `buildBeatsPrompt` from the replan section: empty replan (first plan) → "One line per page, through page N."; non-empty → "One line for each page named under RE-DIVIDE, and for no other page."
+**Rationale:** The merge in `beatsPipeline.js:1283-1295` already supports a partial reply — unreturned pages are filled from the standing division and returned-but-unnamed pages are reverted with a warning — so no code change was needed on the consuming side; only the three conflicting instructions had to agree. Honest limit: the revert guard only ever protected UNNAMED pages. The named-page lines in already-shipped stories were produced during whole-book rewrites and this change does not retroactively fix them. Compliance is unverified — it needs a paid Lab round of the stage that calls `buildBeatsPrompt` with a non-empty replan section, measuring pages returned per round against pages named.
+**Open:**      The second RE-DIVIDE paragraph's count-neutral remedy ("Keep the page count by merging two pages ... or by dropping the weakest") assumes the whole division is in view; under a partial reply a merge would have to return — and renumber — pages no finding named, which the revert guard would undo. It is left in place unchanged as a brake against inventing pages; reworking it is an owner call.
+**Touched:**   `server/lib/promptBuilders.js` (`buildReplanSection`, `buildBeatsPrompt`), `prompts/story-beats.txt`, `tests/unit/built-prompt-values.test.ts`
+**Status:**    ✅ active
+
+## The writer's "---" page rule is trimmed off the END of a page's text (2026-09-14)
+**Context:**  Story `job_1789348171785_9oxos7dwv` (staging) shipped pages 1, 2 and 8
+with a bare `---` under the last sentence ("... beobachtete alles genau.
+
+---").
+This is READER-VISIBLE: `pageText` is rendered in the book and in the PDF. The text
+writer separates pages with a rule line; `parseRefinedText` cuts a page at the NEXT
+"## Page N" heading, so a rule the model wrote INSIDE the page body was never removed
+by anything — it was not "stripped only on its own line", it was not stripped at all.
+**Decision:** `stripTrailingSeparator()` (`server/lib/sceneMetadata.js`, the page-text
+helper module) removes ONE trailing delimiter, applied at the two sites that produce
+stored page text: the beats page assembly and the text-refine rewrite merge. A
+delimiter is, deliberately narrowly: a run of **two or more** dash characters
+(`-` `‐` `‑` `‒` `–` `—` `―`, mixed allowed), standing at the very end of the text
+with only whitespace after it, and preceded by whitespace (or being the whole
+string). Any leftover trailing whitespace goes with it. Everything else is returned
+byte-identical.
+**Rationale:** A **single** trailing dash is never touched — German and French
+children's prose legitimately ends a line on an em-dash ("Und dann —"), and dialogue
+uses dashes mid-clause; a two-dash run is not punctuation in any language we ship.
+Requiring the run to stand alone keeps word-attached typography ("Wort--") intact.
+The fix is applied at the page-text sites rather than inside `parseRefinedText`
+because that parser is also the SCENES/brief parser (briefs are not reader-visible)
+— and it lives in `promptBuilders.js`, which was locked by a concurrent session.
+Consolidating it into the parser is a fair later cleanup.
+**Touched files:** `server/lib/sceneMetadata.js`, `server/lib/beatsPipeline.js`,
+`server/lib/textRefine.js`, `tests/unit/page-text-trailing-separator.test.ts`
+
+## A single-instance object has one holder — two conflicting holder findings are a spec conflict, not two repair jobs (2026-09-14)
+**Context:**  Staging story `job_1789348171785_9oxos7dwv` page 7 shipped with TWO
+copies of the book's one plot prop. The v0 consolidated plan carried two
+`action_interaction` findings naming two DIFFERENT characters as the prop's holder
+(`[CRITICAL]` "declared to carry <prop> but hands empty" on one, `[MAJOR]` "holds
+<prop> with only left hand" on the other) and wrote a per-character fix for EACH.
+Round 2's inpaint instruction obeyed both verbatim — "Add red egg in this
+character's hands" AND "Adjust this character's pose so both arms encircle the red
+egg" — the render put the prop in two pairs of hands, the next eval returned a
+`[CRITICAL]` for exactly that, and it landed in `unrepairedCritical` and SHIPPED
+because `repairMaxPasses` was exhausted. `spec_conflicts` was `[]` in all three
+rounds. The declared spec was never ambiguous: the scene description's prose gives
+the prop to ONE character ("both arms wrapped around the <prop>") and the
+`sceneIntent` repeats it; the second finding simply contradicted the spec.
+**Decision:** Extend the consolidator's existing `## Spec check (required)` — the
+mechanism that already emits NO fixes for a listed pair and records both findings
+in `dropped_issues` with reason `"spec_conflict"` — to a third shape: a prop the
+scene description declares once, in the singular, and gives to one character has
+exactly one holder, so two findings naming two different characters as its holder,
+carrier or wearer are ONE conflict, not two jobs. The object is resolved through
+the DECLARED spec, never by matching the findings' wording, and the prompt says
+explicitly that the prose and the `sceneIntent` declare the holder as well as the
+`interactions` list.
+**Rationale:** A unique prop cannot be in two places at once any more than a body
+part can — the same class as the check's existing body-part shape, one case covered
+and the other not. Keying on the spec rather than the findings is not a style
+preference but a requirement of the evidence: the two real findings named the prop
+DIFFERENTLY (its story name in one, a plain description in the other), so a rule
+matching description wording would have caught nothing, and CLAUDE.md forbids
+working out what a finding means from its prose. The holder declaration is likewise
+NOT in `interactions[]` on this page (its one entry is "walking") — it is in the
+prose and the intent, which is why the deterministic `detectDeclaredSpecConflicts`
+body-part check in code could not have been extended to cover it as written.
+Prompt-side per owner decision; a code backstop was considered and left unbuilt.
+**Touched files:** `prompts/feedback-consolidator.txt` (spec-check section + a
+generic worked pair in the `spec_conflicts` output example),
+`tests/unit/single-instance-object-holder-conflict.test.ts`
+
+## The expected-object merge dedupes on the resolved ENTITY, not on the string (2026-09-14)
+**Context:** `server/lib/images.js:2605-2611` builds the eval/bbox expectation set from TWO
+sources: `sceneMetadata.objects` (Visual Bible ids — `ART003`, `LOC001.2`) and
+`parseVisualBibleObjects(img.prompt)` (the bold names in the page prompt's REQUIRED OBJECTS
+block). The merge filter was an exact, case-sensitive `Array.includes`; the real collapse
+happened later inside `resolveExpectedObjectLabels`, which lowercases into a `seen` set AFTER
+resolving ids to labels. Both sources usually derive from `elementLeadLabel`, so they usually
+collapsed. This was latent until 2026-09-14: `parseVisualBibleObjects` returned `[]` for every
+real prompt until commit 3f46e79bc fixed it (previous entry), so the second source was empty and
+the merge was a no-op. It can now fire on every page that declares Visual Bible elements.
+
+Two measured divergences where the two spellings do NOT collapse, both verified in source:
+1. **Trailing qualifier inside the bold name.** `promptBuilders.js:3961-3967` emits
+   `**${refName}${qualifier}** (${type})` — a two-sided prop's orientation (`(turned away)`)
+   rides *inside* the bold lead. The parser captures it as part of the name, while
+   `elementLeadLabel` strips a trailing parenthetical, so the id-resolved label and the parsed
+   name differ and BOTH survive.
+2. **Animals lead with `obj.name`, not the lead label.** Same site: `(obj.type === 'animal' &&
+   obj.name) ? obj.name : elementLeadLabel(...)`. This is DELIBERATE — an animal's proper name is
+   its identity anchor (the comment at that site and the one in `resolveExpectedObjectLabels` both
+   say so) — so it was NOT changed; the dedupe now works around it.
+
+**Failure mode (why it matters):** the detector is asked to find the same object twice under two
+spellings. One of the two comes back `found:false`. An absence is exactly what derives a
+missing-element finding, so a correct page produces a FALSE finding, and that finding commissions
+a repair round on an image that was right. Same shape as the false clothing CRITICAL on story A
+p6, whose two repair rounds destroyed the dragon egg.
+
+**Decision:** dedupe on the resolved entity inside `resolveExpectedObjectLabels`. No new
+normaliser was invented: the existing `elementLeadLabel` (already the single authority for this
+list, and the string the REQUIRED OBJECTS lead, GroundingDINO and entity-consistency all share)
+is reused as the identity key, following the `castResolver` precedent of one resolver keyed by
+entity. An alias index maps every spelling an entry can be named by — its label, its `name`, and
+each of those with a trailing parenthetical stripped — back to that entry's lead label. An
+unknown name keys as itself, so two genuinely different entries that share words (a mother
+creature and its young) stay two expectations; over-merging would hide a genuinely missing
+object, which is the worse failure. Only the dedupe KEY changed: the emitted string is still the
+first spelling to arrive, so the expectation set can only shrink or stay identical, never grow.
+
+**Measured blast radius:** replaying the merge over the stored page prompts and stored
+`sceneMetadata.objects` of `job_1789337998754_apslnsq1z`, `job_1789343124794_z2c779f7i` and
+`job_1789348171785_9oxos7dwv` (read-only, staging DB): **0 of 53 object-bearing pages** would
+have produced a duplicate expectation under today's fixed parser. Those three stories contain no
+two-sided prop (0 pages with a qualified bold name) and every animal's authored label equals its
+name (0 divergent animals across 13 animal-bearing pages), so the flaw is real but unexercised by
+this corpus — the guard is pre-emptive, not a repair of observed damage.
+
+**Touched files:** `server/lib/bboxDetection.js` (`resolveExpectedObjectLabels`),
+`tests/unit/expected-object-dedupe.test.ts` (new, 4 tests).
+
+## Findings record WHO said them — one field, `sources[]`, stamped by the emitter (2026-09-14)
+**Context:** A finding's ORIGIN is the first thing needed to judge it, and it was absent from
+most of them. Four diagnoses on 2026-09-14 each turned on reconstructing the emitter after the
+fact: (1) a false clothing CRITICAL that came from ONE judge grading one character against
+another character's outfit, which commissioned two repair rounds that destroyed a story's
+central prop; (2) a `missing_character` CRITICAL that turned out to come from the book-audit
+READER pass rather than the per-page brief checker — which flipped it from a bug into
+by-design; (3) a state contradiction charged to the wrong element; (4) a contract warning whose
+age half was a false positive. Lab #1263 shows the symptom directly: half the findings render
+as `[?]` and the rest as `three-stage`. Backlog #50.
+
+**Decision:** `sources: string[]` — the field that ALREADY existed — is the single source of
+truth for provenance, and every emitter now stamps it. No new field was added.
+- New `server/lib/findingSources.js` owns the closed vocabulary (`quality`, `semantic`,
+  `compliance`, `entity`, `reader`, `final_checks` — the same list
+  `prompts/feedback-consolidator.txt:104` already gives the model) plus `stampFindingSource`
+  (fills only where absent, never overwrites, throws on an unknown name), `sourcesOf` and
+  `mergeSources`.
+- Stamped at the emitters: the quality judge at the ONE chokepoint where the page's merged list
+  is finalised (so it also covers the coherence gate, the style gate and the multi-judge jury
+  rebuild, which reconstructs the list from bucket vectors and would have dropped an earlier
+  stamp); the three-stage compliance mapper; the semantic judge's parse; entity consistency's
+  per-character issue push; and the presence DERIVATION, which is stamped `final_checks`
+  because this file's own arithmetic authored it, not the judge whose list it joins.
+- Carried across the two merges that were dropping it: the consolidator's entity whitelists
+  (`flattenEntityIssues` and the pre-flattened path), and `repairPipeline`'s book-audit fan-out
+  into `readerFindingsByPage`, which rebuilt each fault as `{severity, line}` — that merge is
+  exactly why diagnosis (2) above was expensive.
+- The Lab panel (`ImageHistoryModal`) now READS the stamp instead of guessing. Its old rule was
+  literally "when `source` is missing, the issue is from the quality eval"; the legacy singular
+  `source` survives only as the fallback for versions stored before this change.
+
+**Rationale:** Why extend `sources` rather than add a provenance field: it is already the
+closest thing to an authority, and adding a second would have put a parallel truth next to a
+field that repair ROUTING reads. `repairLogic.js:114`/`:768` refuse automatic repair when
+`sources.every(s => s === 'entity')` (owner, 2026-09-04); `scoring.js:357` already passes it
+through into the stored deductions; `textRefine.js:91` already stamps it on every parsed
+book-audit finding; the consolidator prompt already defines the vocabulary. The gap was never
+the field — it was that most emitters wrote nothing into it.
+
+Routing is unchanged in both directions, and that is a deliberate property of the stamp, not a
+hope: it only ever ADDS the field where it was absent, and each call site passes its own pool.
+A quality/semantic/compliance/reader finding therefore goes from no `sources` to a one-entry
+list that is not `['entity']` — both guards test `sources.length && sources.every(...)`, false
+before (length 0) and false after. Entity findings are stamped `['entity']`, which is what the
+consolidator already wrote for them and what the raw path already bucketed them as.
+`server/lib/scoring.js` was NOT touched (protected by a same-day owner decision) and did not
+need to be — it already carries `sources` through `normalizeIssues`. No type, severity or
+deduction changed.
+
+Provenance is stamped by the EMITTER and never derived downstream, per docs/SETTLED.md:28 —
+nothing reads a finding's description prose to work out where it came from. The singular
+`source` is left exactly as it is and is NOT provenance: on an entity finding it is the
+detection channel, on a three-stage finding a display tag, and inside `scoring.normalizeIssues`
+the deduction bucket.
+
+**Touched files:** `server/lib/findingSources.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/entityConsistency.js`,
+`server/lib/feedbackConsolidator.js`, `server/lib/repairPipeline.js`,
+`client/src/components/generation/story/ImageHistoryModal.tsx`,
+`tests/unit/finding-provenance.test.ts`
+**Status:** ✅ active
+
+## The text-refine join has no deadline — it waits for the chain (2026-09-14)
+**Context:** Two facts collided. (1) `2beda5425` moved the text-refine join
+from AFTER the repair pipeline to the end of pure page generation, so the
+mid-loop book audit inside that pipeline would judge the FINAL shipped prose
+instead of superseded text (97% of pages are rewritten by the refiner). That
+ordering is correct and stays. (2) That commit's own latency argument was
+**wrong**, and this entry exists so nobody re-derives it from the commit
+message: it claimed "the refiner measures ~184s against a ~25-min image phase,
+so it has long finished by the new join point". **Pure page generation is ~55s**
+(Grok, 18 pages, parallel); the ~25 minutes is the REPAIR phase — precisely
+what the join was moved in front of. The refiner's headroom fell from ~1460s to
+~99s. Measured on staging: before the commit 5 of 37 non-trial stories lost
+refine rounds (13.5%); after it, **3 of 3 (100%)** — two shipped
+`text_refine_join_timeout` with ZERO rounds and the original text, one shipped
+`text_refine_join_partial` with 1 round of 3. Round 1 alone measures 294.8s on
+`job_1789348171785_9oxos7dwv`; full chains measure 400-600s, with 743/770/841/878s
+all inside the last month. `8b23eacbe` raised the budget to 600s + 10s/page +
+a 120s grace, which covers the 600s case and not the 740-880s ones.
+**Decision:** Remove the deadline (owner's call, chosen over scaling the budget
+to the measured chain). `joinTextRefinement` now calls
+`awaitTextRefineJoin(promise, () => partial, { warnAfterMs, onSlow })`, which
+**awaits** the chain: it is never truncated, and because the join still sits
+before the repair pipeline, the book audit and every stage below it still read
+the FINAL refined text. Both requirements hold at once — the wait is at the
+point of use rather than a timer cutting the chain short. The old budget
+(`computeTextRefineJoinTimeoutMs` → `computeTextRefineJoinWarnMs`, env
+`TEXT_REFINE_JOIN_TIMEOUT_MS` → `TEXT_REFINE_JOIN_WARN_MS`) survives only as
+the point at which a still-running chain logs `text_refine_join_slow` and keeps
+waiting; `text_refine_join_grace*` and the grace helpers are gone. Salvage
+stays for a chain that FAILS partway (`text_refine_join_partial`, and
+`text_refine_join_failed` at error when nothing landed — renamed from
+`text_refine_join_timeout`, which can no longer happen).
+**Rationale:** Nothing cancels the refine when the race is lost — the chain
+finishes and bills in full either way (`job_1789348171785_9oxos7dwv` billed
+$1.01 of `text_refine` AFTER its join gave up) — so the deadline never saved
+money; it discarded paid work and, with it, the whole text-quality gate
+including the text/picture MISMATCH check. On the unbounded-hang question: the
+wait cannot be infinite. Every model call in the chain is bounded by
+`textModels`' streaming ceiling (>=1500s) plus its 120s inactivity abort, each
+audit additionally by its own 900s hostage guard (`AUDIT_DEADLINE_MS`), and
+every step catches its own failure, so `refineStoryText` always settles. What
+remains is latency, and per the gates-are-guidelines rule that ships as a
+warning, never as a kill on a paid run. Trials still skip refinement entirely
+(no repair phase to hide the chain behind) — which matters MORE now, not less.
+**Touched:** `storyJobPipeline.js` (`joinTextRefinement` — the race, the grace
+and the timeout events replaced by the awaited join + `text_refine_join_slow`;
+the "~25 min image phase" comments corrected), `server/lib/textRefine.js`
+(`awaitTextRefineJoin`, `computeTextRefineJoinWarnMs`; `shouldGraceJoin` and
+`TEXT_REFINE_JOIN_GRACE_MS` removed), `tests/unit/text-refine-join.test.ts`,
+`tests/unit/book-audit-reads-shipped-book.test.ts`
+**Status:** ✅ active — supersedes the 2026-09-14 "one budget for every reading
+level, plus a bounded grace" entry above. Verify on the next long story that
+`text_refine_complete` appears with all rounds and that no
+`text_refine_join_partial` is logged.
+
+### A cover stands somewhere its cast can stand, and carries only that place's props (2026-09-14)
+**Context:** The back cover of prod `job_1789227389389_z18dmvnt6` shows the
+family in winter coats on a dry cobbled quay beside a **lit** gas lamp, with
+open green water, descending light shafts and rising bubbles behind them — a
+flame burning underwater and dry scarves in a lake. It is not a failure to
+follow the brief. It is a faithful resolution of a brief that contradicted
+itself, and the stored prompt shows both halves:
+
+- the scene: *"A wide group portrait set before Lake Léman Underwater — Open
+  Water (**no floor visible**, only open dark green water in all directions…)"*
+- `cover-composition.txt`, in all three sections: *"All characters stand firmly
+  on solid ground — feet flat on a stable surface (floor, pavement,
+  **cobblestones**, grass, path). **Never standing in or on water**, never
+  floating, never mid-air."*
+
+The cast was not described as swimming, so no exception applied. Told the
+setting has no floor and that every figure must stand on solid ground with
+cobblestones named as valid, the renderer paved the lake. The same prompt also
+carried `ART009 Quay Lamp` verbatim — *"bolted to the stone paving; the lamp is
+lit"* — a land fixture, specified as lit, in open water.
+
+Note `prompts/image-generation.txt:14` has carried the exception all along
+("…unless the scene description has them swim, float, or fly"). Covers were
+strictly *stricter* than pages, which is what made the conflict unresolvable.
+
+**Decision:** Two prompt-side rules.
+1. `cover-composition.txt` — the canonical cover solid-ground bullet gains the
+   water/air exception, added identically to all three sections (front,
+   initialPage, back): in water or air the characters swim, float or fly, no
+   ground is invented under them, and no land fixture is planted in the scene.
+2. `scene-expansion-all.txt` — every cover backdrop is a LOC the cast can stand
+   in (the Title Page already had a narrower version of this; the Initial Page
+   and Back Cover had none), and a cover's `Objects:` hold only props belonging
+   to that backdrop — a fixture described as mounted, bolted or planted
+   elsewhere does not travel, and a light source is only lit where it would burn.
+
+**Rationale:** Rule 2 prevents the incoherent scene being requested at all; rule
+1 makes covers consistent with pages for the cases where water is genuinely
+right. Both are prompt-side per the standing "classification belongs to the
+PROMPT" rule — the rejected alternative was code validating a location against
+its props, which needs code to decide "is this location wet" from prose, the
+pattern `docs/SETTLED.md` forbids and that got a regex guard built and removed
+in a day.
+
+`docs/SETTLED.md` carries "SOLID-GROUND rule: one canonical wording per prompt
+layer" (decisions.md 2026-07-11). Adding the same clause to all three cover
+sections **preserves** that verdict rather than reversing it — it remains one
+wording for the cover layer — so no reversal protocol is triggered.
+
+**Also covered:** the front cover of the same story (mermaid tails on the dry
+quay) is the same assembly defect pointing the other way, not a separate
+finding.
+
+**Touched:** `prompts/cover-composition.txt`, `prompts/scene-expansion-all.txt`
+**Status:** ✅ active
