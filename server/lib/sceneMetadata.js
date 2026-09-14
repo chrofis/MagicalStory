@@ -459,7 +459,13 @@ function buildTextFromJson(scene) {
     const objectLines = scene.objects.map(obj => {
       const cleanName = stripEntityIds(obj.name || '');
       const expandedPos = stripEntityIds(expandPositionAbbreviations(obj.position) || '');
-      return `${cleanName}${expandedPos ? ': ' + expandedPos : ''}`;
+      // Per-page scale anchor. The trial path has no Art Director and no rule
+      // 8g, so this hint field is the only place a page can say how big the
+      // object is in THIS shot; the bible's own `size` still rides the
+      // REQUIRED OBJECTS line for every path.
+      const size = typeof obj.size === 'string' ? stripEntityIds(obj.size).trim() : '';
+      const sizeClause = size ? ` (${size})` : '';
+      return `${cleanName}${expandedPos ? ': ' + expandedPos : ''}${sizeClause}`;
     });
     if (objectLines.length > 0) {
       lines.push('');
