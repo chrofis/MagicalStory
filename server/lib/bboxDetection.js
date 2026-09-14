@@ -91,14 +91,26 @@ function parseVisualBibleObjects(prompt) {
 
   const objects = [];
 
-  // Look for REQUIRED OBJECTS section
-  const requiredSection = prompt.match(/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i);
+  // Look for REQUIRED OBJECTS section.
+  // TERMINATOR: a blank line, or the next bold HEADING — a `**` at the START
+  // of a line. It must never be "any bold token", because EVERY entry in this
+  // block opens with `* **Name**`: the previous form `(?=\n\n|\*\*[A-Z]|$)`
+  // ended the capture two characters in (the `/i` flag made `[A-Z]` match the
+  // lowercase `d` of `**dragon egg**`), so this parser returned `[]` for every
+  // real prompt ever built. Dropping `/i` alone does not fix it — `\*\*[A-Z]`
+  // then stops at the second entry's `**Mother Dragon**`. Entry names are
+  // arbitrary, so nothing about their first letter may be load-bearing; the
+  // line-start anchor is what separates a heading from an entry.
+  const requiredSection = prompt.match(/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\r?\n[ \t]*\r?\n|\r?\n\*\*|$)/i);
   if (requiredSection) {
     // Match entries like: * **ObjectName** (type): Description
     // Trailing colon optional: the block is a NAME-ONLY checklist since
     // 2026-09-02 (descriptions moved into the Art Director prose). Stored
     // prompts from before that still carry "(type): description".
-    const entryPattern = /\*\s*\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/g;
+    // Anchored to line start (/m): the block's trailing plain lines (the
+    // "attached reference images" line, the markings line) are deliberately
+    // written WITHOUT a `* **` prefix and must not parse as objects.
+    const entryPattern = /^[ \t]*\*\s+\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/gm;
     let match;
     while ((match = entryPattern.exec(requiredSection[1])) !== null) {
       const name = match[1].trim();

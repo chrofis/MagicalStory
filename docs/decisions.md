@@ -38229,3 +38229,55 @@ database.
 `server/lib/evalBuckets.js` + `server/lib/evalReplayInputs.js` +
 `scripts/admin/eval-findings-stats.js` (comments/messages name the right table),
 `tests/unit/eval-finding-stats-sink.test.ts` (new), `tasks/BACKLOG.md`.
+
+## REQUIRED OBJECTS parser terminated on its own first list entry — the prompt format was engineered around a consumer that never returned anything (2026-09-14)
+**Context:** `parseVisualBibleObjects` (`server/lib/bboxDetection.js`) reads the
+`**REQUIRED OBJECTS IN THIS SCENE …**` block out of a built page prompt and feeds the names
+into the eval/bbox expected-objects set (`server/lib/images.js:2605-2611`). Its section regex
+`/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i` carried the `/i` flag,
+which makes `[A-Z]` match ANY letter — so the lookahead terminator `\*\*[A-Z]`, meant to stop at
+the next bold HEADING, fired on the opening `**` of the FIRST list entry. The capture was two
+characters (`"* "`) and the entry pattern matched nothing. Reproduced by execution against a real
+p17 block: `parseVisualBibleObjects(...) -> []`. The function has therefore returned `[]` for every
+prompt ever built, and the merge into `expectedObjects` has always been a no-op: every downstream
+consumer (`resolveExpectedObjectLabels` → GroundingDINO object pass → entity consistency) has only
+ever seen objects from `sceneMetadata.objects`.
+
+Dropping `/i` is NOT sufficient: `\*\*[A-Z]` then legitimately matches the second entry's
+`**Mother Dragon**` and truncates the list after one item. Entry names are arbitrary
+(`dragon egg`, `Mother Dragon`, `Funkli`), so no property of an entry's first letter can separate
+a heading from an entry.
+
+**Decision:** Terminate the section on a blank line or on a `**` at the START of a line
+(`(?=\r?\n[ \t]*\r?\n|\r?\n\*\*|$)`), and anchor the entry pattern to line start with `/gm`
+(`/^[ \t]*\*\s+\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/gm`). Every entry is written as `* **Name** (type)`,
+never bare `**` at column 0, so a list entry can no longer terminate its own section. `location`
+entries stay excluded; both the current name-only shape and the pre-2026-09-02
+`* **Name** (type): description` shape still parse. No gating or suppression was added on top of
+the newly-live path — that is the owner's call.
+
+**Rationale:** The prompt-side format contract was maintained in good faith for months against a
+consumer that could never observe it. Four comments in `server/lib/promptBuilders.js` name this
+parser explicitly and shaped the emitted text around it: `:3902` (image prompts are English-only
+because localized headers break `/REQUIRED OBJECTS/`), `:4009` (object STATE sits AFTER the type,
+never inside the bold name, because the parser captures what is between the asterisks and a state
+in the name would become the GroundingDINO grounding key), `:4018` and `:4025` (the trailing
+"attached reference images" line and the markings line are written as PLAIN lines with no `* **`
+prefix precisely so the entry regex never reads them as objects). All four remain accurate under the
+new regex, and `:4018`/`:4025` are now actually load-bearing rather than defensive.
+
+**Behaviour change (reported, not gated):** the expected-objects set now genuinely grows on pages
+that declare VB elements. The detector is asked to find more things, which can produce new
+`found:false` entries and new eval findings. `resolveExpectedObjectLabels` passes an
+already-natural-language name through unchanged (only a `^[A-Z]{3}\d{3}(\.\d+)?$` token is
+translated; a dotted facet resolves to its BASE entry's lead label) and deduplicates
+case-insensitively, so an ID from `sceneMetadata.objects` and the prompt lead for the same element
+normally collapse — both derive from `elementLeadLabel`. They can still diverge where the prompt
+lead appends a trailing `(qualifier)` to the bold name, or where an animal leads with `obj.name`
+instead of `elementLeadLabel`: that yields two expectations for one object. Nothing guards against
+that; the merge in `images.js` is an exact-string `includes` check.
+
+**Touched:** `server/lib/bboxDetection.js` (`parseVisualBibleObjects` section + entry regexes,
+comments), `tests/unit/parse-visual-bible-objects.test.ts` (new, 7 tests — 5 fail against the old
+regex), `tasks/BACKLOG.md`.
+**Status:** ✅ active
