@@ -1889,7 +1889,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     if (detection) {
       carried = { ...detection };
       if (detection._gdinoMasks) {
-        Object.defineProperty(carried, '_gdinoMasks', { value: detection._gdinoMasks, enumerable: false });
+        Object.defineProperty(carried, '_gdinoMasks', { value: detection._gdinoMasks, enumerable: false, configurable: true });
       }
       // Same fingerprint function the stamping wrapper uses (imageFingerprint)
       // — hashImageData is a different keyspace and would never match a verify.

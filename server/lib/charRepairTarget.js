@@ -96,8 +96,9 @@ function buildPageCast({
       pageLabel: label,
       sceneMetadata,
       extraNames: outlineCharacters || [],
+      storyData,
     });
-    return reconcileDetectorCast(expected, authoritative, { visualBible: vb, pageLabel: label }).entries;
+    return reconcileDetectorCast(expected, authoritative, { visualBible: vb, pageLabel: label, storyData }).entries;
   } catch (err) {
     log.debug(`[CHAR-REPAIR TARGET] ${label}roster reconciliation skipped: ${err.message}`);
     return expected;

@@ -153,3 +153,27 @@ describe('reconcileDetectorCast', () => {
     expect(out.added).toEqual([]);
   });
 });
+
+describe('reconcileDetectorCast — the main cast reaches the resolver index', () => {
+  // Three call sites built their index without `storyData`, so every
+  // photo-backed name logged "unresolved" and two spellings of one person
+  // could never meet (job_1789348171785_9oxos7dwv).
+  const storyData = { characters: [{ name: 'Levin Meier' }, { name: 'Julian' }] };
+
+  it('treats a long and a short spelling of a main character as one person', () => {
+    const auth = resolveExpectedCastNames({
+      sceneCharacters: [{ name: 'Levin' }],
+      storyData,
+    });
+    const out = reconcileDetectorCast([{ name: 'Levin Meier', description: 'boy, red jacket' }],
+      auth, { storyData });
+    expect(out.names).toEqual(['Levin Meier']);
+    expect(out.added).toEqual([]);
+  });
+
+  it('without the story the same two spellings are two people', () => {
+    const auth = resolveExpectedCastNames({ sceneCharacters: [{ name: 'Levin' }] });
+    const out = reconcileDetectorCast([{ name: 'Levin Meier', description: 'boy, red jacket' }], auth, {});
+    expect(out.added).toEqual(['Levin']);
+  });
+});

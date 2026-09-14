@@ -118,7 +118,11 @@ function parseCastRemovals(analysis) {
   for (const rawEntry of body.split(';')) {
     const entry = rawEntry.trim();
     if (!entry) continue;
-    const m = entry.match(/^(\d+)\s*=\s*([^:]+?)\s*:\s*(.+)$/);
+    // The prompt's grammar line says `page = name…`, and the reviewer reads
+    // that literally: `page 5 = Levin: …`. Accept the word form as well as the
+    // bare number — a prefixed entry used to land in `malformed` and then be
+    // re-raised as an undeclared removal (job_1789348171785_9oxos7dwv).
+    const m = entry.match(/^(?:(?:page|seite|p\.?)\s*)?(\d+)\s*=\s*([^:]+?)\s*:\s*(.+)$/i);
     if (!m) { malformed.push(entry); continue; }
     const names = m[2].split(',').map(n => n.trim()).filter(Boolean);
     if (!names.length) { malformed.push(entry); continue; }

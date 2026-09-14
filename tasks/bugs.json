@@ -1007,6 +1007,36 @@
       "fixedAt": "2026-09-14",
       "fixedIn": "see git log - commit titled 'fix(eval): the batch judge gets the whole cast as references again'",
       "fix": "One builder for the whole-cast reference list: clothingResolve.buildWholeCastReferencePhotos(characters, artStyle, clothingRequirements) = getCharacterPhotoDetails(..., 'standard', ...) + applyStyledAvatars - exactly what the generation path does (storyJobPipeline.js:4104-4107). Called from repairPipeline.runUnifiedRepairPipeline and both regeneration.js re-evaluate endpoints. images.js: new pure composeEvalReferencePhotos(pagePhotos, wholeCastPhotos) - page photos first (they carry the outfit the page was generated against), whole-cast entries appended only for names not on the page, compared case-insensitively; an empty list never wins over a non-empty one. evaluateImageBatch also accepts storyData and forwards storyData + clothingRequirements into evalOptions; all five repairPipeline call sites pass storyData. Tests: tests/unit/batch-eval-whole-cast-refs.test.ts (7), tests/unit/batch-eval-story-context.test.ts (1)."
+    },
+    {
+      "id": "gdino-masks-redefine-throws",
+      "title": "Attaching SAM masks to Gemini extra figures threw 'Cannot redefine property: _gdinoMasks', so the extras stayed maskless",
+      "reportedAt": "2026-09-14",
+      "source": "Live Railway log, staging story job_1789348171785_9oxos7dwv (2026-09-14): '[BBOX-DETECT] [PAGE 16] SAM mask attach on Gemini extras failed (Cannot redefine property: _gdinoMasks) - extras stay maskless' (also PAGE 18). bboxDetection.js:446 defined the non-enumerable rider WITHOUT configurable, so the DINO-undercount merge at :1042, which redefines it with [...dinoMasks, ...extraMasks], threw and was swallowed by the catch at :1044.",
+      "status": "fixed",
+      "fixedAt": "2026-09-14",
+      "fixedIn": "see git log - commit titled 'fix(detect,review,cast): _gdinoMasks is redefinable; REMOVED CAST accepts the page-prefixed form; three resolver sites get the main cast'",
+      "fix": "Every _gdinoMasks writer declares configurable: true (bboxDetection.js:446/1043/1971, repairPipeline.js:1892). Still non-enumerable, so JSONB persistence never sees the masks. Guarded by tests/unit/gdino-mask-rider.test.ts, which also scans the sources for a writer that forgets the flag."
+    },
+    {
+      "id": "removed-cast-parser-rejects-page-prefix",
+      "title": "The REMOVED CAST parser rejected the page-prefixed entry the prompt's own grammar line invites, raising a false undeclared-removal ERROR",
+      "reportedAt": "2026-09-14",
+      "source": "Live Railway log, staging story job_1789348171785_9oxos7dwv (2026-09-14). prompts/scene-review.txt:85 states the grammar as `page = name, name: why`; the reviewer wrote 'page 5 = Levin: ...; page 9 = Julian: ...; page 16 = Levin: ...'. parseCastRemovals matched a bare page number only, so all three entries landed in `malformed`, and diffCastRemovals then raised beats_scene_review_removal_undeclared 'page 5: levin; page 9: julian; page 16: levin' into generationLog for removals the reviewer HAD declared.",
+      "status": "fixed",
+      "fixedAt": "2026-09-14",
+      "fixedIn": "see git log - commit titled 'fix(detect,review,cast): _gdinoMasks is redefinable; REMOVED CAST accepts the page-prefixed form; three resolver sites get the main cast'",
+      "fix": "parseCastRemovals accepts an optional case-insensitive page/p/p./seite prefix before the number; the bare number keeps working. CODE only - the prompt line is unchanged. Cases added to tests/unit/scene-review-removals.test.ts, including a still-malformed entry with no '='."
+    },
+    {
+      "id": "cast-resolver-sites-without-story-data",
+      "title": "Three cast-resolver call sites built their index without storyData, so every photo-backed main character logged as unresolved",
+      "reportedAt": "2026-09-14",
+      "source": "Live Railway log, staging story job_1789348171785_9oxos7dwv (2026-09-14): the batch quality eval reported '[CAST-RESOLVE] PAGE n ... 0 unresolved' after f5a511730 while other sites still reported '4 unresolved (Levin, Julian)'. resolveExpectedCastNames / reconcileDetectorCast were called without `storyData` at storyJobPipeline.js Phase 5b-pre, charRepairTarget.js (where storyData was in scope two lines above) and the evaluateImageBatch reconcile in images.js, so buildCastIndex(storyData, visualBible) saw no cast pool and no main name could resolve - two spellings of one person then never met.",
+      "status": "fixed",
+      "fixedAt": "2026-09-14",
+      "fixedIn": "see git log - commit titled 'fix(detect,review,cast): _gdinoMasks is redefinable; REMOVED CAST accepts the page-prefixed form; three resolver sites get the main cast'",
+      "fix": "All three sites pass storyData: charRepairTarget and images.js forward the object already in scope; the Phase 5b-pre site passes { characters: inputData.characters || [], visualBible }, the shape compositeCastBuilder.js:168 already uses. Guarded by tests/unit/one-roster.test.ts ('the main cast reaches the resolver index')."
     }
   ]
 }

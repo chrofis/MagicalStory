@@ -5994,9 +5994,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneMetadata,
               pageNumber: img.pageNumber,
               extraNames: img.scene?.outlineCharacters || [],
+              // The photo-backed cast, so the resolver's index knows the main
+              // characters — without it every main name came back unresolved.
+              storyData: { characters: inputData.characters || [], visualBible },
             });
             const reconciled = reconcileDetectorCast(expectedCharacters, authoritativeCast,
-              { visualBible, pageLabel: `PAGE ${img.pageNumber} ` });
+              { visualBible, pageLabel: `PAGE ${img.pageNumber} `,
+                storyData: { characters: inputData.characters || [], visualBible } });
             const expectedObjects = Array.isArray(sceneMetadata.objects)
               ? sceneMetadata.objects.filter(o => typeof o === 'string')
               : [];

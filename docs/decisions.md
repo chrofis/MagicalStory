@@ -36622,3 +36622,39 @@ re-evaluate endpoints), `server/lib/images.js`
 `tests/unit/batch-eval-story-context.test.ts`
 **Status:**    ✅ active — visible on the next story run as a populated
 `Character matches:` list and no N-16 suppression line.
+
+### Three small faults from one staging run: the mask rider, the removal parser, the cast index (2026-09-14)
+**Context:** Staging story `job_1789348171785_9oxos7dwv` surfaced three
+independent faults in one live log. (1) `Cannot redefine property:
+_gdinoMasks` — the non-enumerable mask rider was defined without
+`configurable`, so the Gemini-extras merge could never attach SAM masks to the
+extra figures (p16, p18). (2) The scene reviewer declared its removals in the
+exact form `prompts/scene-review.txt` invites (`page 5 = Levin: …`) and the
+parser accepted a bare page number only, so every declared removal landed in
+`malformed` and came back as a false `beats_scene_review_removal_undeclared`
+ERROR. (3) After `f5a511730` the batch quality eval resolved the main cast, but
+three other call sites still built their index without `storyData` and logged
+every photo-backed character unresolved.
+
+**Decision:** Every `_gdinoMasks` writer declares `configurable: true` (it stays
+non-enumerable — JSONB persistence must never see the masks). `parseCastRemovals`
+accepts an optional `page`/`p`/`p.`/`seite` prefix before the number, in code
+only; the prompt's grammar line is unchanged. `resolveExpectedCastNames` and
+`reconcileDetectorCast` receive `storyData` at the Phase 5b-pre detection, in
+`buildCharRepairExpectedCast` and in `evaluateImageBatch`.
+
+**Rationale:** A rider that is written once and merged later must be
+redefinable; a `try/catch` that only logs made the failure look like an
+analyzer problem for weeks. The parser is the side that can be fixed without a
+prompt change and without asking a model to be more literal than its own
+grammar line — prompt wording is the owner's call. And `buildCastIndex` has no
+cast pool without `storyData`: a main character then resolves to nothing and
+two spellings of one person can never meet, which is the exact failure the ONE
+ROSTER rule exists to prevent.
+
+**Touched:** `server/lib/bboxDetection.js`, `server/lib/repairPipeline.js`,
+`server/lib/sceneReviewGuard.js`, `storyJobPipeline.js` (Phase 5b-pre),
+`server/lib/charRepairTarget.js`, `server/lib/images.js`,
+`tests/unit/gdino-mask-rider.test.ts`,
+`tests/unit/scene-review-removals.test.ts`, `tests/unit/one-roster.test.ts`
+**Status:**    ✅ active

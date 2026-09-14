@@ -442,8 +442,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         };
         // Per-figure mask PNGs ride along non-enumerably: the overlay renderer
         // uses them for the cutout strip, JSON persistence (stories.data JSONB)
-        // and the raw API response never see them.
-        Object.defineProperty(result, '_gdinoMasks', { value: gd.masks || [], enumerable: false });
+        // and the raw API response never see them. configurable so a later
+        // merge (Gemini extras below) can redefine the list instead of throwing.
+        Object.defineProperty(result, '_gdinoMasks', { value: gd.masks || [], enumerable: false, configurable: true });
         if (gd.diag?.undercount) {
           // Don't trust-or-discard yet — stash and fall through to the Gemini
           // detection below, which acts as the second opinion. Not cached: the
@@ -1040,7 +1041,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
           const extraMasks = await attachSamMasksToFigures(imageData, extras, { pageLabel });
           const dinoMasks = dinoUndercountResult._gdinoMasks || [];
           Object.defineProperty(dinoUndercountResult, '_gdinoMasks',
-            { value: [...dinoMasks, ...extraMasks], enumerable: false });
+            { value: [...dinoMasks, ...extraMasks], enumerable: false, configurable: true });
         } catch (maskErr) {
           log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}SAM mask attach on Gemini extras failed (${maskErr.message}) — extras stay maskless`);
         }
@@ -1967,7 +1968,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   // Carry the in-process SAM mask PNGs across to the overlay renderer
   // (non-enumerable — never serialized into stories.data).
   if (allDetections._gdinoMasks) {
-    Object.defineProperty(detectionHistory, '_gdinoMasks', { value: allDetections._gdinoMasks, enumerable: false });
+    Object.defineProperty(detectionHistory, '_gdinoMasks', { value: allDetections._gdinoMasks, enumerable: false, configurable: true });
   }
 
   // If no issues to fix, just return the detections

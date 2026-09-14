@@ -54,6 +54,32 @@ describe('parseCastRemovals — the REMOVED CAST line', () => {
   });
 });
 
+describe('parseCastRemovals — the page-prefixed form the prompt invites', () => {
+  // The grammar line reads `page = name, name: why`, and the reviewer wrote
+  // `page 5 = Levin: …`. Every entry landed in `malformed` and came back as a
+  // false undeclared-removal ERROR (job_1789348171785_9oxos7dwv).
+  it('accepts `page N =`, `P N =` and the bare number alike', () => {
+    const r = parseCastRemovals(
+      'REMOVED CAST: page 5 = Levin: the plan line does not stage him; P9 = Julian: crowd; 16 = Levin: off-frame');
+    expect(r.malformed).toEqual([]);
+    expect(r.pages.map(p => p.pageNumber)).toEqual([5, 9, 16]);
+    expect(r.pages[0].names).toEqual(['Levin']);
+  });
+
+  it('reads `Seite N =` and is case-insensitive about the prefix', () => {
+    const r = parseCastRemovals('REMOVED CAST: Seite 4 = Alice: off-frame; PAGE 7 = Bob, Cara: crowd');
+    expect(r.malformed).toEqual([]);
+    expect(r.pages.map(p => p.pageNumber)).toEqual([4, 7]);
+    expect(r.pages[1].names).toEqual(['Bob', 'Cara']);
+  });
+
+  it('an entry with no `=` is still malformed', () => {
+    const r = parseCastRemovals('REMOVED CAST: page 5 Levin: no equals sign');
+    expect(r.pages).toEqual([]);
+    expect(r.malformed).toEqual(['page 5 Levin: no equals sign']);
+  });
+});
+
 describe('diffCastRemovals — an undeclared removal is detectable', () => {
   const declaredNone = parseCastRemovals('REMOVED CAST: NONE');
 

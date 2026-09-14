@@ -2562,11 +2562,12 @@ async function evaluateImageBatch(images, options = {}) {
         sceneMetadata,
         pageNumber: img.pageNumber,
         extraNames: img.outlineCharacters || img.scene?.outlineCharacters || [],
+        storyData,
       });
       const castReconciled = reconcileDetectorCast(
         Object.entries(characterDescriptions).map(([name, d]) => ({ name, description: d?.richDescription || '' })),
         authoritativeCast,
-        { visualBible, pageLabel: `PAGE ${img.pageNumber} ` }
+        { visualBible, pageLabel: `PAGE ${img.pageNumber} `, storyData }
       );
       for (const name of castReconciled.added) {
         if (!characterDescriptions[name]) {
