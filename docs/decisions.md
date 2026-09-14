@@ -39010,3 +39010,92 @@ The ✅ came from Lab work, not from a shipped path: memory `project_image_model
 **Touched:** `docs/image-routing.md` (Face repair row, Page (scene) image row).
 
 **Status:** ✅ active.
+
+---
+
+### Test Lab clothing/costume experiments predating `38e17173b` are not evidence
+
+**Date:** 2026-09-14
+
+**Context:** `38e17173b` proved that six Test Lab eval call sites handed
+`evaluateImageQuality` / `evaluateSemanticFidelity` a hand-spelled SUBSET of what
+production's one page-eval funnel (`images.js` `evaluateImagesBatch`) passes. The Lab
+omitted `visualBible`, `clothingRequirements`, `storyData` and `artStyle`; it hard-coded
+`evaluationType: 'scene'`, so a cover target skipped the cover fidelity reference, the
+gaze/flat-title exemptions and `textMode: 'appOverlay'`; and `semantic_eval` omitted the
+ENTIRE sixth argument (`artStyle`, `clothingContract`, `expectedCast`).
+
+The clothing consequence is mechanical, not speculative:
+`wornItems.resolveGeneratedOutfit` returns the outfit **unchanged** when `visualBible` is
+falsy, so every Lab judge was handed the unstripped story-level clothing contract from the
+stored reference photos. A garment the generator correctly omitted (worn-item state `off`)
+was still in the judge's contract, so the judge filed it as missing.
+
+**Decision:** Every Test Lab experiment on `image`, `quality_eval`, `eval_variance`,
+`semantic_eval`, `repair_round` or `scene_composite` created **before `38e17173b`
+(2026-09-14)** whose subject is clothing, costume, outfit, garment, worn items or attire is
+**annotated in place and may not be cited as evidence**. They are NOT re-run (owner's call,
+2026-09-14: annotate, do not spend). The annotation lives in `testlab_experiments.label`,
+which is the only stored field the Lab UI renders both in the experiment list
+(`TestLab.tsx:1361`, chip at `:641`) and in the detail header (`:1894`) — a note in a
+git-tracked doc alone would never reach someone reading the experiment.
+
+Affected experiments (15), verified present in `testlab_experiments`:
+
+| id | stage | date | subject |
+|----|-------|------|---------|
+| 44 | semantic_eval | 2026-07-18 | Spec-conflict v2 — semantic eval, first attempt |
+| 93 | semantic_eval | 2026-07-18 | Semantic calibration A/B — expression/gaze prominence |
+| 143 | image | 2026-07-19 | validate clothing backstop + EXPRESSIONS tail |
+| 144 | image | 2026-07-19 | validate clothing backstop + EXPRESSIONS tail |
+| 459 | image | 2026-08-09 | P8 redo — a character painted in another's striped shirt |
+| 501 | quality_eval | 2026-08-11 | compliance B: style+clothing inputs (deployed) |
+| 521 | image | 2026-08-12 | p9 redo — Art Director outfit-text fix |
+| 522 | image | 2026-08-12 | p9 redo v2 — real beat + outfit-text fix |
+| 540 | image | 2026-08-12 | p9 v5 — compression + budget + outfit fix |
+| 547 | quality_eval | 2026-08-13 | D-05c clothing_sex — p3 vs p10 control |
+| 590 | image | 2026-08-14 | costumedHead-Ref — head from the costumed panel |
+| 592 | image | 2026-08-14 | costumedHead via shared headOnly path |
+| 798 | quality_eval | 2026-08-21 | PROOF 3 — shorts colour must type `garment_colour` |
+| 1263 | quality_eval | 2026-09-13 | Story A repro — p6 clothing contract |
+| 1272 | image | 2026-09-14 | CLO001 off verify p14 (worn-item fix `3cec0bf4b`) |
+
+Both `semantic_eval` experiments ever run (44, 93) are on the list: that judge ran with no
+clothing contract, no art style and no cast roster at all, whatever its subject.
+
+**#1272 is superseded outright, not merely doubted.** Its recorded conclusion — that the
+worn-item fix `3cec0bf4b` did not take — is WRONG. The fix works: it is verified on the
+regenerated pixels and on the prompt actually sent, which correctly omits the garment. The
+Lab judge was blind to it, because its contract still carried the unstripped
+"red zip-up hoodie" from the stored reference photo.
+
+**#1263's clothing half is now unreliable in the entry that cites it.** The 2026-09-14
+`sources`/re-plan-guard entry above concluded from #1263 that the p6 "Levin wears Kiaan's
+outfit" CRITICAL was judge noise "because the judge received the correct per-character
+block". It did not — `quality_eval` passed neither `clothingRequirements` nor `visualBible`.
+That sub-conclusion is withdrawn; the finding's cause is **unknown**, not noise. The rest of
+that entry (the `[?]` provenance rendering symptom, the re-plan guard,
+`repairAttemptFromResult`) does not depend on the clothing inputs and stands.
+
+**Secondary class, not annotated:** all 9 `repair_round` experiments passed only three keys
+(`sceneMetadata`, `pageNumber`, `detectedFigures`) to the fresh eval that decides the repair
+ROUTE — no bible, no wardrobe, no cast index, no art style, no landmark protection. Their
+routing verdicts are weaker than production's, but none of the 9 is about clothing, so they
+are recorded here rather than relabelled.
+
+**Rationale:** Measured facts live in the repo where agents can see them, so the class is
+recorded here even though the operative annotation is a DB write that could later be lost.
+Re-running is the only way to recover the verdicts, and the owner declined the spend; an
+unreliable verdict left unmarked is worse than no verdict, because the next session acts on
+it — #1272 would have someone "re-fix" a working fix.
+
+**No SETTLED line rests on any of these.** `docs/SETTLED.md`'s clothing lines are the
+canonical-source rule (`clothingRequirements`, from the codebase audit) and the
+classification-belongs-to-the-prompt rule (from the regex mirror-guard incident); neither
+cites a Lab experiment. Nothing on SETTLED.md is reversed or annotated here.
+
+**Touched:** `docs/decisions.md` only. `testlab_experiments.label` for the 15 ids above is a
+data change proposed to the owner, not applied by this session. No code changed, so no test
+was added.
+
+**Status:** ✅ active.
