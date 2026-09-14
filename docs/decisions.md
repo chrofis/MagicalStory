@@ -37040,3 +37040,68 @@ get a fallback cell, and it avoids asking for three identical cells out of four
 LAYOUT phrasing now names the cell a spare actually repeats (the bottom-right
 repeats the **Top-right** here), not a hardcoded top-left. The 2×1 row is no
 longer requested by any count.
+
+## Naming a garment's parts was not enough — the parts must be bound into ONE garment, and the head row must be told the garment at all (2026-09-14)
+**Context:** A character's styled watercolour 2×4 identity sheet drew dungarees
+incoherently: the body row showed blue shoulder straps over what read as a
+separate pair of jeans, and the head row showed no straps at all — the two rows
+of the SAME sheet disagreeing about the garment. The styled sheet is the
+identity reference handed to every page, so the fault propagated: page-level
+judge findings on `job_1789348171785_9oxos7dwv` p5 ("rendered as plain blue
+jeans, missing the bib panel and shoulder straps as specified in the clothing
+contract") and `job_1789343124794_z2c779f7i` p1/p5/p9/p11 ("brown trousers
+missing the square bib panel and shoulder straps") were CORRECT — the reference
+they were graded against already had the fault.
+
+The documented mitigation was already in force. `prompts/story-bible-from-beats.txt`
+requires structural parts to be named, and both contracts did name them
+verbatim — traced hop by hop, the string arrives at the Grok prompt unmangled
+(`resolveCharacterReqs` is a pure lookup, `styledAvatars.js` only `.trim()`s,
+nothing truncates, and the ~5 KB prompt is far under Grok's 7900 cap, so
+`shrinkPromptForModel` never runs). Spelling the parts out is therefore
+necessary but not sufficient: a parts list invites a parts ASSEMBLY.
+
+**Decision:** Three changes, all on the sheet's own path:
+1. One shared `buildGarmentRule()` states that a garment named with its parts is
+   ONE continuous piece — a bib-and-brace garment's bib and straps are cut in one
+   with its trousers, never straps laid over separate trousers — and that both
+   rows show that same garment. One clause, used by every sheet generator.
+2. `buildHeadRowPrompt` now receives the costume text. It previously took only
+   the character and said merely "wearing the costume", generating the head row
+   from the body IMAGE alone; a part the body row rendered ambiguously was simply
+   dropped, which is exactly "head row shows no straps".
+3. `evaluateSheetRow` fills `{REQUESTED_OUTFIT}` for the `heads` row, not only
+   `bodies`. The head-row garment check added by D15 (commit 9238f8230) shipped
+   **inert** — the judge received the literal `{REQUESTED_OUTFIT}` token and had
+   nothing to compare against. Both row evaluators now also penalise a NAMED part
+   that is MISSING, not only an invented one; the previous wording enumerated
+   invented trim ("a collar, placket, hood or trim the outfit does not name")
+   and a missing bib scored clean.
+
+**Rationale:** The contract text was innocent, so rewording it again would have
+been a symptom fix. The root is that nothing downstream bound the parts into one
+garment, and that the only two gates which could have caught the disagreement
+were unreachable in production — the heads check had no outfit, and the
+whole-sheet cross-row check (`sheet-2x4-evaluation.txt`) runs only in the Test
+Lab. Pass 2 is correctly innocent: style transfer is never told the garments and
+its evaluator deliberately does not score the outfit, so the fix belongs in
+pass 1.
+
+**Touched:**
+- `server/lib/character2x4Sheet.js` (`buildGarmentRule`, `buildHeadRowPrompt`,
+  `evaluateSheetRow`, `reviewHeadRow` + call sites, `_internal` exports)
+- `prompts/sheet-row-heads-eval.txt` (missing named part scores 1-3)
+- `prompts/sheet-2x4-evaluation.txt` (cross-row check covers any named part)
+- `tests/unit/sheet-row-garment-agreement.test.ts`
+
+**Status:** ✅ active
+
+**Not changed (flagged, needs a decision):** no gate compares the two rows
+against each other in PRODUCTION — the cross-row check lives only in the
+whole-sheet evaluator, which the Test Lab alone calls. Wiring it in would add a
+paid Gemini call per sheet, so it is a proposal, not part of this change.
+Separately, `buildClothingDescription` (`server/lib/entityConsistency.js`, the
+PAGE path) prefers `signature` over `description`, the inverse of
+`styledAvatars.js`. Harmless for these two stories (no `signature` key exists),
+but on an outline emitting both, pages would get the short signature while the
+sheet gets the full parts text.

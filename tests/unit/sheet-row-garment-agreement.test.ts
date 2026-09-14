@@ -44,15 +44,16 @@ describe('the head row may be clothed, in the SAME garment as the body row', () 
     expect(t).toMatch(/TASK 3: COVERAGE AND GARMENT/);
     expect(t).toMatch(/it is the garment REQUESTED_OUTFIT names/);
     expect(t).toMatch(/a collared polo where a plain crew neck was asked for — scores 1-3/);
-    // The placeholder must exist or the check has nothing to compare against;
-    // the filler already supplies REQUESTED_OUTFIT to both row evaluators.
+    // The placeholder must exist or the check has nothing to compare against.
+    // It is FILLED for the heads row only since 2026-09-14 — see the wiring
+    // test below; before that the judge received the literal token.
     expect(t).toMatch(/\{REQUESTED_OUTFIT\}/);
   });
 
   it('the whole-sheet evaluator compares the two rows against each other', () => {
     const t = read('prompts/sheet-2x4-evaluation.txt');
     expect(t).toMatch(/Cross-ROW consistency/);
-    expect(t).toMatch(/present in the top row and absent from the bottom row \(or the reverse\) scores 1-3/);
+    expect(t).toMatch(/present in one row and absent from the other scores 1-3/);
     expect(t).toMatch(/`outfitScore` = LOWEST of item-match, cross-cell consistency and cross-row consistency/);
     expect(t).toMatch(/"crossRowConsistency"/);
   });
@@ -69,5 +70,84 @@ describe('the head row may be clothed, in the SAME garment as the body row', () 
     for (const f of ['prompts/avatar-main-prompt.txt', 'prompts/avatar-ace-prompt.txt']) {
       expect(read(f)).toMatch(/No shoulders, no neck, no clothing visible/);
     }
+  });
+});
+
+/**
+ * 2026-09-14 — the dungaree fault. Naming the garment's PARTS was already in
+ * force (prompts/story-bible-from-beats.txt) and both contracts spelled them
+ * out; the sheet still drew straps over separate trousers in the body row and
+ * no straps at all in the head row.
+ *
+ * Three roots, none of them the contract text (which arrives verbatim):
+ *   1. buildHeadRowPrompt never received the costume — the head row was
+ *      generated from the body IMAGE alone, so an ambiguous part was dropped.
+ *   2. evaluateSheetRow filled {REQUESTED_OUTFIT} only on the 'bodies' branch,
+ *      so the heads garment check shipped inert — the judge saw the literal
+ *      token and had no outfit to compare against.
+ *   3. Nothing said a garment named with its parts is ONE continuous piece, so
+ *      a parts list invited a parts assembly.
+ *
+ * Pins the behaviour, not the wording.
+ */
+describe('a garment named with its parts is one garment, in both rows', () => {
+  const sheet = require('../../server/lib/character2x4Sheet');
+  const { buildBodyRowPrompt, buildHeadRowPrompt, buildGarmentRule } = sheet._internal;
+  const OUTFIT = 'brown corduroy dungaree trousers — square bib panel over the chest held by two shoulder straps';
+
+  it('the head-row prompt names the garment instead of inferring it from the body image', () => {
+    const p = buildHeadRowPrompt({ name: 'A', physical: {} }, OUTFIT);
+    expect(p).toContain(OUTFIT);
+    // Without a costume it must not emit an empty "Costume:" line.
+    expect(buildHeadRowPrompt({ name: 'A', physical: {} })).not.toMatch(/Costume:\s*$/m);
+  });
+
+  it('the generator says the parts are one continuous garment, not items worn together', () => {
+    const rule = buildGarmentRule();
+    expect(rule).toMatch(/ONE continuous piece/);
+    expect(rule).toMatch(/cut in one with its trousers/);
+    expect(rule).toMatch(/never straps laid over a separate pair of trousers/);
+    // The row-agreement half lives in the SAME clause, so both rows inherit it
+    // from one place rather than two drifting copies.
+    expect(rule).toMatch(/both rows of the sheet show that same garment/);
+    for (const p of [buildBodyRowPrompt(OUTFIT, null, false, null), buildHeadRowPrompt(null, OUTFIT)]) {
+      expect(p).toContain(rule);
+    }
+  });
+
+  it('the heads evaluator is actually given the outfit — the check is not inert', () => {
+    // The garment check in the heads template names REQUESTED_OUTFIT. Until
+    // 2026-09-14 fillTemplate ran only on the 'bodies' branch, so the heads
+    // judge was handed the literal token: the check could never fire. Pin that
+    // the fill is no longer conditional on the row.
+    const src = read('server/lib/character2x4Sheet.js');
+    const fn = src.slice(src.indexOf('async function evaluateSheetRow'));
+    const body = fn.slice(0, fn.indexOf('\nasync function', 1));
+    expect(body).toMatch(/REQUESTED_OUTFIT/);
+    // The fill must no longer sit behind a bodies-only guard.
+    expect(body).not.toMatch(/if \(which === 'bodies'\)[\s\S]{0,40}fillTemplate/);
+    // And the production caller forwards it.
+    expect(src).toMatch(/evaluateSheetRow\(headRowData, 'heads', \{ costumeDescription/);
+    expect(src).toMatch(/reviewHeadRow\(res\.imageData, \{[^}]*costumeDescription/);
+
+    // A filled heads prompt carries the outfit and no leftover placeholder.
+    const { fillTemplate } = require('../../server/services/prompts');
+    const filled = fillTemplate(read('prompts/sheet-row-heads-eval.txt'), {
+      REQUESTED_OUTFIT: `REQUESTED_OUTFIT: ${OUTFIT}`,
+    });
+    expect(filled).not.toMatch(/\{REQUESTED_OUTFIT\}/);
+    expect(filled).toContain(OUTFIT);
+  });
+
+  it('both row evaluators penalise a NAMED part that is missing, not only an invented one', () => {
+    const heads = read('prompts/sheet-row-heads-eval.txt');
+    expect(heads).toMatch(/A part the outfit DOES name and this row omits scores 1-3/);
+    const whole = read('prompts/sheet-2x4-evaluation.txt');
+    expect(whole).toMatch(/present in one row and absent from the other scores 1-3/);
+    expect(whole).toMatch(/one continuous piece in one row and as separate items in the other/);
+  });
+
+  it('the garment rule stays generic — no story nouns', () => {
+    expect(buildGarmentRule()).not.toMatch(/Julian|Funkli|Drachenei|dungarees? are blue/i);
   });
 });

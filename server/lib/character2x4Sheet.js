@@ -256,6 +256,17 @@ function buildFootwearRule(redress = false, seasonFootwear = null) {
   return `${source} Bare feet only when the outfit names them, or when the lower body is a tail, fin, or single fused form with no feet at all.`;
 }
 
+// A garment named with its PARTS is still one garment. The story bible spells
+// structural parts out ("... — square bib panel over the chest held by two
+// shoulder straps — ...") because a garment named alone renders as a plain one;
+// but a parts list invites a parts ASSEMBLY — straps laid over a separate pair
+// of trousers — and the two rows are generated separately, so each row picks its
+// own reading. One clause owns both halves: the parts are cut in one, and both
+// rows show that same garment. Generic by design — no story nouns.
+function buildGarmentRule() {
+  return 'A garment named with its parts is ONE continuous piece, not separate items worn together: a bib-and-brace garment has its bib panel and shoulder straps cut in one with its trousers, same fabric and same colour, never straps laid over a separate pair of trousers. Every named part is present in every cell whose crop reaches it, and both rows of the sheet show that same garment.';
+}
+
 // The season reaches the sheet as an OUTFIT instruction and nothing else. The
 // sheet is the identity anchor: the season may change what the figure wears,
 // never who the figure is — so the block names the garments and then pins face,
@@ -295,17 +306,25 @@ Render every cell as a REALISTIC reference — the same visual style as the sour
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
 Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
+${buildGarmentRule()}
 The outfit is identical in all four cells, layers included. When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
 }
 
 // Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
 // Refs: Image 1 = mannequin head row (angles), Image 2 = face photo (identity),
 // Image 3 = the body row from call 1 (match its rendered face/hair).
-function buildHeadRowPrompt(character = null) {
+function buildHeadRowPrompt(character = null, costumeDescription = '') {
   const hairBlock = buildHairBlock(character);
+  // The costume text reaches this call at all only since the dungaree fault
+  // (2026-09-14): the row was generated from the body IMAGE alone, so a part
+  // that the body row rendered ambiguously — a bib panel and its straps — was
+  // simply dropped here, and the two rows disagreed about the garment.
+  const outfitLine = costumeDescription ? `
+Costume: ${costumeDescription} — the same garment the body sheet wears. Every part of it that the head-and-shoulders crop reaches, straps and neckline included, is drawn.` : '';
   return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction; ignore its face and features, and never draw arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
-Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${hairBlock}
+Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${outfitLine}
+${buildGarmentRule()}${hairBlock}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-SHOULDERS close-up of the SAME PERSON — the head, neck, and the top of the shoulders wearing the costume; a little of the shoulders and collar showing is good, no bare skin below the neck. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
 Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3. No text, numbers, labels, arrows, or symbols.`;
@@ -399,10 +418,10 @@ async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = nu
 }
 
 // Review the 1×4 head row: heads-structure eval + identity vs face photo/avatar.
-async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null }) {
+async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null, costumeDescription = '' }) {
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, identityR] = await Promise.all([
-    evaluateSheetRow(headRowData, 'heads', { model, usageTracker }),
+    evaluateSheetRow(headRowData, 'heads', { costumeDescription, model, usageTracker }),
     hasRefs ? evaluateIdentity(headRowData, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge }) : Promise.resolve(null),
   ]);
   const heads = headsR.report;
@@ -428,7 +447,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const model = MODEL_DEFAULTS.sheetEvalModel;
   const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
   const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
-  const headPrompt = buildHeadRowPrompt(character);
+  const headPrompt = buildHeadRowPrompt(character, costumeDescription);
   const attemptHistory = [];
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
@@ -482,7 +501,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
     if (!skipReview) {
       try {
-        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age });
+        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription });
       } catch (err) {
         log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
         review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
@@ -560,6 +579,7 @@ Cells 1-4 (top row): head and shoulders, no full torso and no arms. Where the ne
 Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile. Cell 8 matches cell 4's rear-turn pose: shoulders and body fully away from camera, head rotated back over the right shoulder so one eye and the near cheek are visible — never a second profile, never a flat back view with no face showing. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row, and both feet with their shoes are fully visible with a strip of white margin below the shoes. Never crop a bottom-row figure at the thigh, knee, or ankle; if it does not fit, scale the whole figure down until head and both feet sit inside the cell. Body proportions must match the person's apparent age in Image 3: an adult is roughly 7 to 8 heads tall, a teenager about 7, a young child about 5 to 6, a toddler about 4. Do NOT render an adult with child-like short/stubby proportions or an oversized head on a small body — the full-body figures must read as the same age as the head cells.
 
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
+${buildGarmentRule()}
 
 Every cell faces in the same direction as the matching cell in Image 1, except cells 4 and 8 — Image 1's cells 4 and 8 are plain placeholder silhouettes; ignore their exact head angle and render the rear-turn pose described above instead. Every head in cells 1-4 and every body in cells 5-8 shows THE SAME PERSON as Image 3 — same face structure, same hair, same skin tone, same apparent age. The same costume — every accessory — appears in cells 5, 6, 7, and 8. No text, no numbers, no labels, no arrows, no symbols, no coloured direction markers anywhere in the output.`;
 }
@@ -1113,12 +1133,12 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
-  if (which === 'bodies') {
-    prompt = fillTemplate(prompt, {
-      REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
-      REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '',
-    });
-  }
+  prompt = fillTemplate(prompt, {
+    REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
+    ...(which === 'bodies'
+      ? { REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '' }
+      : {}),
+  });
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
   // No cap (owner rule: no output caps): a 4000 cap once truncated the bodies
   // JSON mid-string, and the throw cost three characters their whole ref sheet.
@@ -1169,7 +1189,7 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, bodiesR, identityR, poseHeads] = await Promise.all([
-    evaluateSheetRow(topHeads, 'heads', { model, promptOverride, usageTracker }),
+    evaluateSheetRow(topHeads, 'heads', { costumeDescription, model, promptOverride, usageTracker }),
     // Bodies row (flash): feet / angles / outfit / proportions / background. It
     // does NOT judge head presence — a VLM hallucinates a head on a headless torso
     // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
@@ -1657,5 +1677,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildPrompt, buildBodyRowPrompt, buildFootwearRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
+  _internal: { parseJudgeJson, buildPrompt, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
 };
