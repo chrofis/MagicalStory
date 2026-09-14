@@ -37927,3 +37927,28 @@ no longer use that code for an `(animal)` entry.
 - `scripts/analysis/rerun-eval-sonnet.js` (replay sends the same untruncated prompt production does)
 - `tests/unit/animal-cast-classification.test.ts`, `tests/unit/fixtures/animal-cast-job_1789348171785_9oxos7dwv.json`
 **Status:** ✅ active
+
+## An appearance word is ATTRIBUTED to an element before it may contradict that element's state (2026-09-14)
+**Context:**   `appearanceContradiction` (`server/lib/visualBible.js`) reads the sentences of
+`sceneIntent` that name a stated object, and fires `vb_state_contradicted` when they speak a
+sibling state's vocabulary. It filtered sentences by "this element is named in it" only. Lab
+experiment #1266 page 12 cites two stated objects — ART001.3 (a muddy egg) and ART002.1 (a jacket
+in its unaltered state) — and one sentence names both. "muddy" belongs to the egg; the check
+charged the JACKET's unaltered state with being contradicted. The scene reviewer examined the
+finding and correctly declined it ("muddy names the egg, not the jacket"), so nothing wrong
+reached the book — the cost is a wasted mechanical finding slot and a wasted reviewer round on
+every page where two stated objects co-occur.
+**Decision:** A sentence votes only when the page's cited elements put exactly ONE of them in it.
+Attribution comes from the brief's own structure — the entries cited by `objects[]`, matched by
+the naming tokens that are distinctive to a single cited element — never from reading the prose's
+meaning. When a clause names two cited elements the attribution is ambiguous and the check emits
+NOTHING for either.
+**Rationale:** Silence is the cheap side here: a false finding costs a reviewer round, while a
+missed one costs nothing new — the state guard is not the only protection on a page, and the check
+was already documented as under-firing by design. The alternative (an NLP heuristic that decides
+which noun an adjective attaches to) is forbidden by the eval-classification rule in CLAUDE.md and
+would not generalise past the story it was tuned on.
+**Touched:** `server/lib/visualBible.js` (`appearanceContradiction`),
+`tests/unit/vb-state-review.test.ts` (both the suppressed false positive and the still-firing true
+positive)
+**Status:**    ✅ active

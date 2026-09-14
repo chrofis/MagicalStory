@@ -97,6 +97,76 @@ describe('vb_state_contradicted — the page\'s instant disagrees with the state
   });
 });
 
+/**
+ * Lab #1266 p12: a page cites two stated objects (a muddy egg and a jacket in
+ * its unaltered state) and one sentence names both. "muddy" belongs to the
+ * egg; the check charged the JACKET's unaltered state with being contradicted.
+ * The reviewer declined it — the cost is a wasted finding slot, on every page
+ * where two stated objects co-occur.
+ */
+function twoStatedObjectsBible(): any {
+  return {
+    artifacts: [
+      {
+        id: 'ART001',
+        name: 'creature egg',
+        type: 'egg',
+        description: DESCRIPTION,
+        appearsInPages: [11, 12],
+        states: [
+          { id: 'ART001.1', name: 'unaltered', delta: 'the shell as described, unmarked', pages: [11] },
+          { id: 'ART001.3', name: 'muddy', delta: 'covered in thick dark mud', pages: [12] },
+        ],
+      },
+    ],
+    clothing: [
+      {
+        id: 'ART002',
+        name: 'travelling jacket',
+        type: 'jacket',
+        description: 'a short canvas travelling jacket with two front pockets',
+        appearsInPages: [11, 12],
+        states: [
+          { id: 'ART002.1', name: 'unaltered', delta: 'spotless and dry', pages: [11, 12] },
+          { id: 'ART002.2', name: 'muddy', delta: 'streaked with thick dark mud', pages: [13] },
+        ],
+      },
+    ],
+    secondaryCharacters: [], animals: [], vehicles: [], locations: [],
+  };
+}
+
+const page12 = (sceneIntent: string): any => ({
+  pageNumber: 12,
+  brief: 'The child stands at the bank.',
+  metadata: {
+    objects: ['ART001.3', 'ART002.1'],
+    characters: [{ name: 'the older child' }],
+    sceneIntent,
+  },
+});
+
+describe('vb_state_contradicted — an appearance word is attributed before it is charged', () => {
+  it('does not charge the second element when the appearance word belongs to the first (Lab #1266 p12)', () => {
+    const findings = checkPage(
+      page12('She clutches the muddy egg against her jacket.'),
+      ['the older child'], twoStatedObjectsBible(), {}
+    );
+    const hits = findings.filter((f: any) => f.type === 'vb_state_contradicted' && f.ids.includes('ART002'));
+    expect(hits).toHaveLength(0);
+  });
+
+  it('still fires when the appearance word belongs to the element it contradicts', () => {
+    const findings = checkPage(
+      page12('The jacket hangs streaked with mud.'),
+      ['the older child'], twoStatedObjectsBible(), {}
+    );
+    const hits = findings.filter((f: any) => f.type === 'vb_state_contradicted' && f.ids.includes('ART002'));
+    expect(hits).toHaveLength(1);
+    expect(hits[0].detail).toContain('ART002.1');
+  });
+});
+
 describe('vb_state_no_base — the unaltered look is missing or mis-ranged', () => {
   const pages = () => [
     { pageNumber: 3, brief: 'x', metadata: { objects: ['ART003'] } },

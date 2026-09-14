@@ -337,10 +337,25 @@ function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
   const taken = new Set(others.flatMap(e => [...nameTokens(e)]));
   const naming = [...nameTokens(entry)].filter(t => !taken.has(t));
   if (naming.length === 0) return null;
+  // The naming tokens of the OTHER cited elements, each kept only where it
+  // names that element alone.
+  const namingOther = new Map(others.map(e => [e, [...nameTokens(e)].filter(t => {
+    if (nameTokens(entry).has(t)) return false;
+    return !others.some(o => o !== e && nameTokens(o).has(t));
+  })]));
 
+  // Attribution, from the brief's structure, not from the prose's meaning: a
+  // sentence votes only when the page's cited elements put exactly ONE of them
+  // in it. A sentence naming two stated objects ("she clutches the muddy egg
+  // against her jacket") cannot say which of them "muddy" belongs to, and
+  // guessing charges an arbitrary element — Lab #1266 p12 charged the jacket
+  // with the egg's mud. So an ambiguous clause EMITS NOTHING: a false finding
+  // costs a reviewer round, and silence costs nothing here, because the state
+  // guard is not the only protection on the page.
   const sentences = intent.split(/(?<=[.!?])\s+/)
     .map(text => ({ text, toks: appearanceTokens(text) }))
-    .filter(s => naming.some(t => s.toks.has(t)));
+    .filter(s => naming.some(t => s.toks.has(t))
+      && ![...namingOther.values()].some(toks => toks.some(t => s.toks.has(t))));
   if (sentences.length === 0) return null;
   const said = new Set(sentences.flatMap(s => [...s.toks]));
 
