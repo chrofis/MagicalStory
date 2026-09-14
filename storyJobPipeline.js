@@ -93,6 +93,7 @@ const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
+const { applyCoverEvalMirror } = require('./server/lib/coverEvalMirror');
 
 /**
  * The season the TRIAL's avatar sheet is drawn for; null on every other path.
@@ -6331,22 +6332,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (img.pageNumber < 0) {
             const coverKey = COVER_TYPE_MAP[String(img.pageNumber)];
             if (coverKey && coverImages[coverKey]) {
-              // Update cover with pipeline eval results
-              coverImages[coverKey].qualityScore = img.qualityScore;
-              // Covers get the same canonical mirror as scenes (see the
-              // sceneImages mapping above). This whitelist dropped finalScore,
-              // so every stored cover root had finalScore undefined and
-              // database.js fell back to qualityScore — covers and pages
-              // ended up carrying different fields for "the score".
-              coverImages[coverKey].finalScore = img.finalScore ?? null;
-              coverImages[coverKey].qualityReasoning = img.qualityReasoning;
-              coverImages[coverKey].fixTargets = img.fixTargets;
-              coverImages[coverKey].fixableIssues = img.fixableIssues;
-              coverImages[coverKey].semanticResult = img.semanticResult;
-              coverImages[coverKey].semanticScore = img.semanticScore;
-              coverImages[coverKey].issuesSummary = img.issuesSummary;
-              coverImages[coverKey].bboxDetection = img.bboxDetection;
-              coverImages[coverKey].bboxOverlayImage = img.bboxOverlayImage;
+              // Update cover with pipeline eval results.
+              //
+              // ONE mirror, shared and guarded (2026-09-14). This used to be a
+              // hand-listed assignment block, and it went stale exactly the way
+              // the finalScore line below it records: it dropped
+              // `threeStageResult`, `qualityRawOutput`, `evalTemplateHash`,
+              // `identityAgreement`, `unrepairedCritical` and `notEvaluated`.
+              // Measured on staging: 61 stored cover roots carried a
+              // threeStageResult 0 times, while 78 of 78 of the same covers'
+              // VERSION records carried one — the compliance judge had been
+              // running on covers since 2026-06-28 and only the root lost its
+              // verdict. `img` here is the repair pipeline's page mapping, the
+              // same record a scene page is stored from, so the mirror is a
+              // field-for-field copy. See server/lib/coverEvalMirror.js.
+              applyCoverEvalMirror(coverImages[coverKey], img);
               // Copy imageVersions if pipeline produced new ones (regen, character fix, or first time)
               if (img.wasRegenerated || img.wasCharacterFixed || !coverImages[coverKey].imageVersions?.length ||
                   (img.imageVersions?.length > (coverImages[coverKey].imageVersions?.length || 0))) {

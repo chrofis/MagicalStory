@@ -38671,3 +38671,65 @@ retry-after-throw per row, attemptHistory record, both-tries-throw still throws,
 clean run unaffected).
 
 **Status:** ✅ active.
+
+---
+
+## A cover stores the same evaluation record a page does — the compliance judge was already running, only its verdict was dropped (2026-09-14)
+
+**Context.** A sweep of 40 staging stories found `threeStageResult` on 0 of 96 stored
+cover records, and the working theory was that the prompt-compliance evaluator — the
+stage that catches duplicated props and cast defects — does not run on covers. It does.
+`evalPipeline.evaluateImageQuality` launches it for `evaluationType === 'scene' || isCover`
+and has since `4e36d92fd` (2026-06-28), covers enter the repair pipeline as pseudo-pages
+(`pageNumber` -1/-2/-3) and go through the identical batch eval, and its findings already
+merge into each cover's `fixableIssues` and penalise its `finalScore`. Measured on staging
+job_1789348171785_9oxos7dwv and 24 sibling stories: 61 cover ROOT records carry a
+`threeStageResult` 0 times, while 78 of 78 of those same covers' `imageVersions` entries
+carry one, complete with `complianceResult` and a score (70 / 60 / 100 on one story's three
+covers).
+
+The loss was at persistence. Pages are stored as the repair pipeline's mapped record
+verbatim; covers were copied back into `data.coverImages[key]` by a hand-listed assignment
+block (`storyJobPipeline.js`, Phase 5 write-back) that had gone stale. Field diff against a
+real page record of the same story: pages carry 18 eval fields, cover roots 10. Missing:
+`threeStageResult`, `qualityRawOutput`, `evalTemplateHash`, `identityAgreement`,
+`unrepairedCritical`, `notEvaluated`. That block had already been patched once for exactly
+this (its own comment records `finalScore` having been dropped the same way).
+
+**Decision.** One shared mirror — `server/lib/coverEvalMirror.js`, exporting
+`COVER_EVAL_MIRROR_FIELDS` and `applyCoverEvalMirror(coverRecord, img)` — replaces the
+hand-listed block. Every eval field of the pipeline's mapped record is copied with
+`?? null`, so a field absent from a later round CLEARS the previous round's value instead
+of leaving a stale finding on a repaired cover. Cover-specific fields (`imageData`,
+`imageVersions`, `titleBaked`, prompt/description) stay with the caller, which has cover
+rules for them. A drift-guard test holds the field list against a REAL stored page record,
+and a wiring guard asserts no per-field `coverImages[coverKey].<field> =` assignment
+returns.
+
+**Rationale.** "Cover and normal pages must be the same." A cover is a page in this
+pipeline; a hand-maintained field whitelist between the two is a drift generator, and this
+is its second recorded instance. Cost of the change is **zero added API spend** — no new
+model call is made, on covers or anywhere; the compliance request was already paid for on
+every cover of every story and its answer was being thrown away at the last step. No new
+repair route opens either: the char-fix, clothing-repair and inpaint gates are all
+`pageNumber > 0`, and `extra_character` is in `NOT_INPAINTABLE_TYPES`, so a compliance
+finding on a cover remains reportable but never destructive — unchanged from before, since
+the findings themselves already existed in `fixableIssues`.
+
+**Not done, and why.** Giving cover prompts a REQUIRED OBJECTS block to enable rule D-16b
+(the held-object swap) was investigated and stopped. D-16b reads that block out of
+`ORIGINAL_PROMPT`, and the batch evaluator — the one that runs in the pipeline — is fed the
+scene DESCRIPTION rather than the built prompt, *deliberately*: `resolveEvalSceneDescription`
+(sceneMetadata.js) documents that `resolveEvalArtStyle` depends on ORIGINAL_PROMPT carrying
+no `**ART STYLE` block, and REQUIRED OBJECTS is emitted into the same prompt tail. So D-16b
+is inert on the batch path for PAGES too — it is not a cover-specific drift, and turning it
+on for covers means either changing what every page's judge is fed or flipping covers onto
+the prose+metadata template branch (`parseProseMetadataFormat` requires a `characters[]`
+block, which would change `isProseFormat` and therefore the cover GENERATOR's template).
+Both are generator-side changes with a recorded rationale behind the current shape; left
+for the owner to rule on.
+
+**Touched:** `server/lib/coverEvalMirror.js` (new), `storyJobPipeline.js` (cover write-back),
+`tests/unit/cover-eval-mirror.test.ts`,
+`tests/unit/fixtures/cover-eval-mirror-job_1789348171785_9oxos7dwv.json`.
+**Status:** ✅ active
