@@ -36824,3 +36824,59 @@ not a staging rule).
 **Touched:** `prompts/scene-expansion-all.txt` (the `objects[]` citation rules)
 **Status:** ✅ active — verify on a Lab `beats_scenes` run that a creature named
 before it appears is not cited until the page it is seen.
+
+## The text-refine join gets one budget for every reading level, plus a bounded grace for a round in flight (2026-09-14)
+**Context:** The pipeline joins the parallel text-refine stage against a
+deadline (`storyJobPipeline.js`, `joinTextRefinement`) and, on timeout, ships
+the last published snapshot or the ORIGINAL text. The budget was
+reading-level-split: 600s for `standard`/`advanced`, 300s for everything else,
+plus 10s per page beyond ten. Measured on the three 2026-09-14 validation
+stories, two of the three hit the wall. `job_1789343124794_z2c779f7i` — 18
+pages, young-reader level — got **380s**, no round finished
+(`text_refine_join_timeout`), the original text shipped, and with it the fault
+the audit checklist exists to catch: its page 10 text told page 11's instant
+and every page through 14 ran one ahead of its picture.
+**Decision:** One base for every reading level — 600s — keeping the per-page
+term and the `TEXT_REFINE_JOIN_TIMEOUT_MS` override. The same 18-page book now
+gets **680s**, not 380s. And when the deadline fires with a refine step
+actually in flight, the join waits a bounded extra 120s
+(`TEXT_REFINE_JOIN_GRACE_MS`) for it to land before taking what is published.
+Nothing in flight at the deadline → unchanged behaviour.
+**Rationale:** The decisive fact is that **nothing cancels the refine when the
+race is lost**. The chain runs to completion and bills in full regardless —
+`job_1789348171785_9oxos7dwv`'s ledger records `text_refine: claude-opus-5
+(21,012 in / 36,267 out) $1.0117` logged *after* its join had already given up.
+So the deadline never saved a franc; it only ever discarded work already paid
+for, and the only thing it buys is latency, on a stage that runs behind a
+~25-minute image phase. The reading-level split was measured on audit output
+TOKENS, which is a cost argument, not a latency one, and a short-level book
+runs the same two audits, the same repair and the same lector. The grace is
+bounded and conditional so a stalled provider still cannot hold a user's story.
+The in-flight signal is honest, not inferred: `refineStoryText` now publishes
+its snapshot with `inFlight: true` at the start of each model step
+(`beginStep()`) and clears it in the `publish()` after the step, so the join
+reads a live fact rather than guessing from round counts.
+Second, the two existing events under-reported the loss. `text_refine_join_timeout`
+said "original text kept" at WARN — a sentence that names a benign fallback and
+nothing that was lost, for an event that means the entire text-quality gate was
+discarded: twelve checks a page, two auditors, the text/picture MISMATCH check
+included. `avatar_guarantee_fallback` is an ERROR for losing one character's
+styled avatar. So: a total loss (nothing published) is now `genLog.error` /
+`log.error`, a partial loss stays at warn, and both messages name the
+consequence — the audit did not apply, those pages went unchecked, alignment
+among the faults — while keeping the numbers a later reader needs (the budget in
+seconds, rounds kept, pages rewritten). The event NAMES are unchanged: log
+searches and stored-story analyses match on them. One predicate,
+`isTotalTextAuditLoss(partial)`, decides the level at every site, including the
+expired grace, and it is what the tests assert — never the wording.
+**Touched:**
+- `storyJobPipeline.js` (`joinTextRefinement` — budget call, grace, the three
+  `text_refine_join_grace*` genLog events, the severity of
+  `text_refine_join_timeout` / `_grace_expired`)
+- `server/lib/textRefine.js` (`computeTextRefineJoinTimeoutMs`,
+  `selectJoinResult`, `shouldGraceJoin`, `isTotalTextAuditLoss`, `beginStep()` /
+  `inFlight` snapshot)
+- `tests/unit/text-refine-join.test.ts`
+**Status:** ✅ active — the next long story proves it: `text_refine_join_grace`
+in the generation log says the grace was entered, `…_grace_landed` /
+`…_grace_expired` says whether the round made it.

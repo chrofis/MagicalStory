@@ -611,8 +611,24 @@ async function refineStoryText(storyData, pages, opts = {}) {
     repetition,
     wordBudget,
     partial: true,
+    // IN FLIGHT (2026-09-14). The join's grace period needs to know whether a
+    // step is RUNNING at the moment its deadline fires, and the published
+    // snapshot is the only channel the caller has. `beginStep()` publishes the
+    // state so far with this set; the publish() after the step clears it.
+    inFlight: stepInFlight,
   });
+  // Set by beginStep(), cleared by every publish() that follows a completed step.
+  let stepInFlight = false;
   const publish = () => {
+    stepInFlight = false;
+    if (typeof opts.onProgress !== 'function') return;
+    try { opts.onProgress(snapshot()); } catch (e) {
+      log.warn(`⚠️ [TEXT-REFINE] onProgress threw (${e.message}) — ignored`);
+    }
+  };
+  // Announce that a model step is starting: same snapshot, flagged in flight.
+  const beginStep = () => {
+    stepInFlight = true;
     if (typeof opts.onProgress !== 'function') return;
     try { opts.onProgress(snapshot()); } catch (e) {
       log.warn(`⚠️ [TEXT-REFINE] onProgress threw (${e.message}) — ignored`);
@@ -691,6 +707,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // audit is simply absent from the merge, exactly like a failed one. The
   // abandoned call keeps streaming until the provider ends it — its tokens are
   // spent either way, and waiting for them costs the whole stage instead.
+  beginStep();   // the audits are the first model step — see the join's grace period
   const AUDIT_DEADLINE_MS = Number(opts.auditTimeoutMs) || 900000;
   const withDeadline = (p, source) => {
     let timer = null;
@@ -797,6 +814,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
 
   let repairEntry = null;
   try {
+    beginStep();
     const { next, entry } = await runRepairPass(merged.text, current);
     rounds.push(entry);
     repairEntry = entry;
@@ -828,6 +846,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (hits.length) {
       log.warn(`🔁 [TEXT-REPETITION] ${hits.map(h => `p${h.pages[0]}/p${h.pages[1]} (${h.sharedCount} shared)`).join(', ')} — one corrective pass`);
       try {
+        beginStep();
         const { next, entry } = await runRepairPass(buildRepetitionFindings(hits, current), current, 'repetition_fix');
         rounds.push(entry);
         repetitionEntry = entry;
@@ -891,6 +910,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       const lines = stillRaw.split(/\n/);
       log.warn(`🔢 [TEXT-COUNTER] ${lines.length} page(s) still outside the word budget after the whole-page passes — one corrective pass`);
       try {
+        beginStep();
         const { next, entry } = await runRepairPass(stillRaw, current, 'length_fix');
         rounds.push(entry);
         current = next;
@@ -956,6 +976,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       .map(p => ({ pageNumber: p.pageNumber, before: original.find(o => o.pageNumber === p.pageNumber)?.text, after: p.text }));
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
     if (diffPrompt && TEXT_MODELS[diffModel]) {
+      beginStep();
       const t0 = Date.now();
       // null = the model's own limit (owner rule: no output caps).
       // temperature 0, same reason as the lector: it must quote, not paraphrase.
@@ -1041,6 +1062,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   try {
     const lectorPrompt = buildTextProofreadPrompt(storyData, current);
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
+      beginStep();
       const t0 = Date.now();
       // null = the model's own limit (owner rule: no output caps). A finding
       // list is a few hundred tokens — the cost of this call is decided by the
@@ -1107,6 +1129,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   } catch (le) {
     log.warn(`⚠️ [LECTOR] failed (${le.message}) — text kept as the repair pass left it`);
+    publish();   // clears the in-flight flag the join's grace period reads
   }
 
   const changed = current
@@ -1188,6 +1211,75 @@ function startBackgroundRefine(storyData, pages, opts = {}) {
     });
 }
 
+// ── THE PIPELINE'S JOIN BUDGET ───────────────────────────────────────────────
+//
+// Extracted here (2026-09-14) because the join lives deep inside
+// storyJobPipeline's generation function and could not be tested there.
+//
+// ONE BASE FOR EVERY READING LEVEL. The split that gave `standard`/`advanced`
+// double the base was measured on output TOKENS, but the deadline buys latency
+// and nothing else: nothing cancels the refine when the race is lost, so the
+// chain runs to completion and bills in full either way (staging
+// job_1789348171785_9oxos7dwv billed $1.01 of text_refine AFTER its join had
+// given up). A short-level book runs the same two audits, the same repair and
+// the same lector, so it gets the same base. An 18-page young-reader book goes
+// from 380s to 680s — job_1789343124794_z2c779f7i timed out at 380s with no
+// round finished and shipped a five-page text/picture mismatch its audit
+// checklist exists to catch.
+const TEXT_REFINE_JOIN_BASE_MS = 600000;
+const TEXT_REFINE_JOIN_PER_PAGE_MS = 10000;
+const TEXT_REFINE_JOIN_FREE_PAGES = 10;
+// Bounded grace: only entered when a step is actually in flight at the deadline.
+const TEXT_REFINE_JOIN_GRACE_MS = 120000;
+
+/**
+ * How long the pipeline waits for the refiner once the images are done.
+ * @param {number} pageCount      pages in the book
+ * @param {string|number} [envOverride]  TEXT_REFINE_JOIN_TIMEOUT_MS, wins outright
+ * @returns {number} ms
+ */
+function computeTextRefineJoinTimeoutMs(pageCount, envOverride) {
+  const override = Number(envOverride);
+  if (override) return override;
+  const pages = Number(pageCount) || 0;
+  return TEXT_REFINE_JOIN_BASE_MS
+    + Math.max(0, pages - TEXT_REFINE_JOIN_FREE_PAGES) * TEXT_REFINE_JOIN_PER_PAGE_MS;
+}
+
+/**
+ * What the join ships once its race (and any grace) has settled. Pure.
+ * @param {object|null} refined  the refiner's own result — null if it failed
+ * @param {object|null} partial  the last snapshot the refiner published
+ * @param {boolean} timedOut     true if the deadline won the race
+ * @returns {{usable: object|null, source: 'complete'|'failed'|'partial'|'original'}}
+ */
+function selectJoinResult(refined, partial, timedOut) {
+  if (!timedOut) return { usable: refined || null, source: refined ? 'complete' : 'failed' };
+  if (partial?.changed?.length) return { usable: partial, source: 'partial' };
+  return { usable: partial || null, source: 'original' };
+}
+
+/**
+ * Whether the deadline firing opens the grace period. Pure.
+ * A step is in flight when the last published snapshot was published by
+ * beginStep() and no completed step has published since.
+ */
+function shouldGraceJoin(partial) {
+  return partial?.inFlight === true;
+}
+
+/**
+ * Did the join lose the WHOLE text-quality gate? Pure — and it decides the log
+ * LEVEL, not just the wording (owner, 2026-09-14): nothing published means the
+ * two audits, the repair and the lector all failed to apply, including the
+ * text/picture MISMATCH check, which ranks as an error the way a lost styled
+ * avatar does. A snapshot with rewritten pages is a partial loss — a warning.
+ * @param {object|null} partial  the last snapshot the refiner published
+ */
+function isTotalTextAuditLoss(partial) {
+  return !partial?.changed?.length;
+}
+
 module.exports = {
   refineStoryText,
   extractRefinablePages,
@@ -1206,4 +1298,11 @@ module.exports = {
   findRepeatedPassages,
   buildRepetitionFindings,
   SHINGLE_WORDS,
+  computeTextRefineJoinTimeoutMs,
+  selectJoinResult,
+  shouldGraceJoin,
+  isTotalTextAuditLoss,
+  TEXT_REFINE_JOIN_BASE_MS,
+  TEXT_REFINE_JOIN_PER_PAGE_MS,
+  TEXT_REFINE_JOIN_GRACE_MS,
 };
