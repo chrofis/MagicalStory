@@ -38991,3 +38991,22 @@ No cap was raised or added.
 `tests/unit/fixtures/scene-brief-cut-job_1789207854566-p7.json`.
 
 **Status:** ✅ active.
+
+## The routing hub implied a production Qwen face-repair path that was never wired (doc fix, no code change)
+
+**Context:** `docs/image-routing.md` listed **Face repair → Qwen `qwen-image-edit@2511` (Runware) + SAM head mask, ✅ $0.008** in the decision matrix, in the same shape as every row that describes what production runs. Production has never called it. Verified 2026-09-14:
+- `resolveRepairAxes` defaults `model: 'grok'` (`server/lib/faceRepair.js:1339`).
+- `decideRepairMethod` calls it without a model on both char-fix routes (`server/lib/repairLogic.js:714`, `:781`).
+- `executeCharFixAction` hardcodes `imageBackend: 'grok'` in the `buildCharRepairRequest` payload (`server/lib/repairPipeline.js:1457`).
+- `repairCharacterMismatch` branches only grok / gemini — there is no qwen branch (`server/lib/images.js:4537`).
+- `model: 'qwen'` exists in `callModel` (`server/lib/faceRepair.js:546`); its only caller is the Test Lab `qwen_insert` stage (`server/lib/testlab.js:2722`, `params.backend || 'qwen'`).
+
+The ✅ came from Lab work, not from a shipped path: memory `project_image_model_tests.md` records the winning recipe and then states **"Production status: … REMAINING PORT (user-approved, staging only): qwen face-repair backend + hard-union blend into repairCharacterMismatch."** The port was approved and never done. `docs/SETTLED.md` carries **no** Qwen or face-repair-model line, so no settled verdict is touched (the row's "image_model_tests SETTLED" ref pointed at the memory file, not at SETTLED.md).
+
+**Decision:** Fix the doc, not the code (owner's ruling). The Face repair row now states three things separately: production runs **Grok** (with the four file:line facts), the Qwen result is a **Lab measurement** kept in full ($0.008, union-hard-pad6 blend), and that result has **never been wired to production** — wiring it is a new decision. Swept the rest of the matrix for the same class: the **Page (scene) image** row still claimed a prod `grok-imagine` / staging `grok-imagine-2` split, which `runtime.js:95` removed on 2026-09-06 (`pageRenderModel` is `grok-imagine-2` in every environment, no longer `perEnvironment`); corrected, with the Standard tier noted where it does still apply (plates, char repair). No other row contradicted the dispatch in `images.js` / `repairPipeline.js` / `repairLogic.js` / `grok.js`.
+
+**Rationale:** The hub exists so routing is trusted without re-deriving it; a row that reads as production behaviour but describes a Lab result is worse than no row. Deleting the Qwen measurement would lose a real verdict, so it stays recorded and is relabelled instead.
+
+**Touched:** `docs/image-routing.md` (Face repair row, Page (scene) image row).
+
+**Status:** ✅ active.
