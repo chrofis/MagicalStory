@@ -1037,6 +1037,16 @@
       "fixedAt": "2026-09-14",
       "fixedIn": "see git log - commit titled 'fix(detect,review,cast): _gdinoMasks is redefinable; REMOVED CAST accepts the page-prefixed form; three resolver sites get the main cast'",
       "fix": "All three sites pass storyData: charRepairTarget and images.js forward the object already in scope; the Phase 5b-pre site passes { characters: inputData.characters || [], visualBible }, the shape compositeCastBuilder.js:168 already uses. Guarded by tests/unit/one-roster.test.ts ('the main cast reaches the resolver index')."
+        },
+    {
+      "id": "review-bible-correction-drops-a-state",
+      "title": "The scene review's bible correction replaced states[] wholesale, so a returned list missing a paged state silently deleted it and re-pointed the pages already citing its handle",
+      "reportedAt": "2026-09-14",
+      "source": "Test Lab experiment #1264 (staging, 2026-09-14). The Art Director authored ART001 (\"dragon egg\") with .1 mud-smeared pages [9,12,13], .2 cracked pages [14,15], .3 broken pages [17]. The reviewer correctly spotted that no state covered the pages citing the bare id and returned {\"artifacts\":[{\"id\":\"ART001\",\"states\":[{\"id\":\"ART001.1\",\"name\":\"unaltered\",\"delta\":\"golden and glowing brightly from within\",\"pages\":[3,5,7,8,16]},{\"id\":\"ART001.2\",\"name\":\"mud-smeared\",\"delta\":\"thickly covered in dark wet mud\",\"pages\":[9,10,11,12,13]},{\"id\":\"ART001.3\",\"name\":\"cracked\",\"delta\":\"covered in mud and split by a jagged crack\",\"pages\":[14,15]}]}]} - the inserted unaltered first state is right, but \"broken\" (pages [17]) is absent, and applyReviewBibleCorrections (added in 7c906a783) replaces states[] wholesale, so it was deleted. Page 17, where the egg breaks open, cites ART001.3, which after the merge means \"cracked\".",
+      "status": "fixed",
+      "fixedAt": "2026-09-14",
+      "fixedIn": "see git log - commit titled 'fix(beats): a bible correction may not lose a paged state or re-point a cited handle'",
+      "fix": "Two rules in applyReviewBibleCorrections, both fail-safe the way the rest of the merge already is - the entry's correction is dropped, the Art Director's bible stands, and beats_scene_review_bible_rejected carries the reason. (1) Every current state carrying a non-empty pages[] must come back, matched on its NAME normalised by trim+lowercase (stateKey) rather than its id, because the reviewer renumbers ids when it reorders. (2) An optional citedHandles argument (a Set of dotted handles the briefs cite, built at the call site from each expansion's metadata.objects) is checked: if a cited ID.N carries a different name after the correction than before, the entry is rejected naming the handle, the old meaning and the new. The signature stays backward compatible - a call without citedHandles simply skips rule 2. Guarded by tests/unit/vb-state-review.test.ts ('a correction that loses a look')."
     }
   ]
 }

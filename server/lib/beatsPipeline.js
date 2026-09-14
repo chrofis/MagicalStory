@@ -279,10 +279,26 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
  * already holds, and every structural problem drops that entry's correction
  * with a warning — a malformed review section must never end a paid run.
  *
+ * A correction may also LOSE a look. On Lab 1264 the reviewer inserted the
+ * missing unaltered state and returned three states where the bible held four,
+ * silently dropping "broken" (page 17, the page the object breaks open) — and
+ * because the merge replaces `states[]` wholesale, the brief on p17 citing
+ * `ART001.3` afterwards read "cracked". Two rules guard that, both dropping the
+ * whole entry's correction so the authored bible stands:
+ *   1. every current state carrying pages must come back, matched on its
+ *      NAME (the reviewer renumbers ids when it reorders, so the id is not
+ *      identity here);
+ *   2. a handle a brief already cites (`ID.N`) must still mean the same name.
+ *
+ * @param {Set<string>|Array<string>} [citedHandles] dotted handles the briefs
+ *   cite (e.g. `ART001.3`). Omitted → rule 2 is skipped.
  * @returns {{applied: Array, rejected: Array}} applied entries carry
  *   {id, name, oldPages, newPages}; rejected carry {id, reason}.
  */
-function applyReviewBibleCorrections(raw, visualBible, pageCount) {
+/** A state's identity for comparison: its name, trimmed and lowercased. */
+function stateKey(name) { return String(name == null ? '' : name).trim().toLowerCase(); }
+
+function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) {
   const out = { applied: [], rejected: [] };
   const text = String(raw || '');
   if (!text || !visualBible || typeof visualBible !== 'object') return out;
@@ -349,6 +365,43 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount) {
     // Ids stay canonical: numbered by position, never carried over from the
     // review (which renumbers nothing when it reorders).
     states.forEach((st, i) => { st.id = `${id}.${i + 1}`; });
+
+    const current = Array.isArray(entry.states) ? entry.states.filter(Boolean) : [];
+    const incomingNames = new Set(states.map(st => stateKey(st.name)));
+    // RULE 1 — a look the story still stands on may not vanish.
+    const dropped = current.find(o => Array.isArray(o.pages) && o.pages.length > 0
+      && !incomingNames.has(stateKey(o.name)));
+    if (dropped) {
+      out.rejected.push({
+        id,
+        reason: `correction drops state ${dropped.id || `${id}.?`} ("${dropped.name}") which covers page(s) `
+          + `${JSON.stringify(dropped.pages)} — no incoming state carries that name`,
+      });
+      continue;
+    }
+    // RULE 2 — a handle a brief already cites may not change meaning.
+    const cited = citedHandles instanceof Set ? citedHandles
+      : (Array.isArray(citedHandles) ? new Set(citedHandles) : null);
+    if (cited && cited.size > 0) {
+      let repointed = null;
+      for (const o of current) {
+        const handle = String(o.id || '').trim().toUpperCase();
+        if (!handle || !handle.includes('.')) continue;
+        let isCited = false;
+        for (const h of cited) { if (String(h || '').trim().toUpperCase() === handle) { isCited = true; break; } }
+        if (!isCited) continue;
+        const now = states.find(st => String(st.id).toUpperCase() === handle);
+        if (now && stateKey(now.name) !== stateKey(o.name)) { repointed = { handle, was: o.name, is: now.name }; break; }
+      }
+      if (repointed) {
+        out.rejected.push({
+          id,
+          reason: `correction re-points cited handle ${repointed.handle}: a brief cites it meaning `
+            + `"${repointed.was}", the correction makes it "${repointed.is}"`,
+        });
+        continue;
+      }
+    }
     const oldPages = (Array.isArray(entry.states) ? entry.states : [])
       .map(o => `${o && o.name}=${JSON.stringify((o && o.pages) || [])}`).join(' ');
     entry.states = states;
@@ -2075,7 +2128,18 @@ ${bibleBody}` : bibleBody;
       // merge is strict and fail-soft; see applyReviewBibleCorrections.
       if (visualBible && !srTruncated) {
         try {
-          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, expansions.length);
+          // The handles the briefs ALREADY cite: a correction that renames one
+          // of them re-points a page at a different look (Lab 1264).
+          const citedHandles = new Set();
+          for (const ex of (Array.isArray(expansions) ? expansions : [])) {
+            const meta = extractSceneMetadata(ex && ex.brief) || {};
+            const objs = Array.isArray(meta.objects) ? meta.objects : [];
+            for (const o of objs) {
+              const h = typeof o === 'string' ? o.trim().toUpperCase() : '';
+              if (h.includes('.')) citedHandles.add(h);
+            }
+          }
+          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, expansions.length, citedHandles);
           bibleCorrections = corr;
           for (const r of corr.rejected) {
             log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);

@@ -188,7 +188,11 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
       states: [
         { name: 'unaltered', delta: 'the shell as described, unmarked', pages: [3, 4, 5, 7, 8] },
         { name: 'muddy', delta: 'covered in thick dark mud', pages: [9] },
-        { name: 'muddy and cracked', delta: 'mud with a jagged crack', pages: [10, 11] },
+        { name: 'muddy and cracked', delta: 'mud with a jagged crack', pages: [10, 11, 12, 13, 14, 15] },
+        // Every state the bible holds with pages comes back — dropping one is
+        // refused outright (Lab 1264, below).
+        { name: 'shining and cracked', delta: 'wiped clean, a jagged crack', pages: [16] },
+        { name: 'broken open', delta: 'broken open into two empty shell halves', pages: [17] },
       ],
     }],
   };
@@ -201,7 +205,7 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
     const entry = vb.artifacts[0];
     expect(entry.description).toBe(DESCRIPTION);            // untouched
     expect(entry.appearsInPages).toHaveLength(14);          // untouched
-    expect(entry.states.map((s: any) => s.id)).toEqual(['ART003.1', 'ART003.2', 'ART003.3']);
+    expect(entry.states.map((s: any) => s.id)).toEqual(['ART003.1', 'ART003.2', 'ART003.3', 'ART003.4', 'ART003.5']);
     expect(entry.states[0].name).toBe('unaltered');
     expect(entry.states[0].pages).toEqual([3, 4, 5, 7, 8]);
   });
@@ -241,5 +245,104 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
     expect(() => applyReviewBibleCorrections('---VISUAL BIBLE---\n```json\n{not json\n```', vb, 17)).not.toThrow();
     expect(applyReviewBibleCorrections('---VISUAL BIBLE---\nnonsense', vb, 17).applied).toHaveLength(0);
     expect(() => applyReviewBibleCorrections(null, vb, 17)).not.toThrow();
+  });
+  // ── Lab #1264 (staging, 2026-09-14). The reviewer correctly inserted the
+  // missing unaltered state and returned THREE states where the bible held
+  // four — "broken" (page 17, the page the object breaks open) was absent, and
+  // the wholesale replacement deleted it. The p17 brief cites ART001.3, which
+  // after the merge meant "cracked". Both guards drop the whole correction.
+  describe('a correction that loses a look', () => {
+    const labBible = (): any => ({
+      artifacts: [{
+        id: 'ART001',
+        name: 'dragon egg',
+        description: DESCRIPTION,
+        appearsInPages: [3, 5, 7, 8, 9, 12, 13, 14, 15, 16, 17],
+        states: [
+          { id: 'ART001.1', name: 'mud-smeared', delta: 'thickly covered in dark wet mud', pages: [9, 12, 13] },
+          { id: 'ART001.2', name: 'cracked', delta: 'covered in mud and split by a jagged crack', pages: [14, 15] },
+          { id: 'ART001.3', name: 'broken', delta: 'broken open into two empty shell halves', pages: [17] },
+        ],
+      }],
+      secondaryCharacters: [], animals: [], vehicles: [], locations: [], clothing: [],
+    });
+    const labCorrection = {
+      artifacts: [{
+        id: 'ART001',
+        states: [
+          { id: 'ART001.1', name: 'unaltered', delta: 'golden and glowing brightly from within', pages: [3, 5, 7, 8, 16] },
+          { id: 'ART001.2', name: 'mud-smeared', delta: 'thickly covered in dark wet mud', pages: [9, 10, 11, 12, 13] },
+          { id: 'ART001.3', name: 'cracked', delta: 'covered in mud and split by a jagged crack', pages: [14, 15] },
+        ],
+      }],
+    };
+
+    it('rejects the whole entry when a state carrying pages is absent from the correction', () => {
+      const vb = labBible();
+      const res = applyReviewBibleCorrections(section(labCorrection), vb, 17);
+      expect(res.applied).toHaveLength(0);
+      expect(res.rejected).toHaveLength(1);
+      expect(res.rejected[0].id).toBe('ART001');
+      expect(res.rejected[0].reason).toContain('ART001.3');
+      expect(res.rejected[0].reason).toContain('broken');
+      // The authored bible stands, untouched.
+      expect(vb.artifacts[0].states).toHaveLength(3);
+      expect(vb.artifacts[0].states[2]).toMatchObject({ id: 'ART001.3', name: 'broken', pages: [17] });
+    });
+
+    it('accepts a correction that drops a state carrying NO pages — nothing referenced it', () => {
+      const vb = labBible();
+      vb.artifacts[0].states[2].pages = [];
+      const res = applyReviewBibleCorrections(section(labCorrection), vb, 17);
+      expect(res.applied).toHaveLength(1);
+      expect(res.rejected).toHaveLength(0);
+      expect(vb.artifacts[0].states.map((s: any) => s.name)).toEqual(['unaltered', 'mud-smeared', 'cracked']);
+    });
+
+    it('accepts a reorder that keeps every paged state, re-minting the ids by position', () => {
+      const vb = labBible();
+      const reordered = {
+        artifacts: [{
+          id: 'ART001',
+          states: [
+            { name: 'Broken ', delta: 'broken open into two empty shell halves', pages: [17] },
+            { name: 'mud-smeared', delta: 'thickly covered in dark wet mud', pages: [9, 12, 13] },
+            { name: 'cracked', delta: 'covered in mud and split by a jagged crack', pages: [14, 15] },
+          ],
+        }],
+      };
+      const res = applyReviewBibleCorrections(section(reordered), vb, 17);
+      expect(res.rejected).toHaveLength(0);
+      expect(res.applied).toHaveLength(1);
+      expect(vb.artifacts[0].states.map((s: any) => s.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3']);
+      expect(vb.artifacts[0].states[0].name).toBe('Broken');
+    });
+
+    it('rejects a correction that re-points a handle a brief cites — and skips the rule when none are passed', () => {
+      // Every paged state survives, but ART001.3 means "broken" before and
+      // "cracked" after: page 17 already asked for the handle.
+      const renumbered = {
+        artifacts: [{
+          id: 'ART001',
+          states: [
+            { name: 'mud-smeared', delta: 'thickly covered in dark wet mud', pages: [9, 12, 13] },
+            { name: 'broken', delta: 'broken open into two empty shell halves', pages: [17] },
+            { name: 'cracked', delta: 'covered in mud and split by a jagged crack', pages: [14, 15] },
+          ],
+        }],
+      };
+      const vb = labBible();
+      const res = applyReviewBibleCorrections(section(renumbered), vb, 17, new Set(['ART001.3']));
+      expect(res.applied).toHaveLength(0);
+      expect(res.rejected[0].reason).toContain('ART001.3');
+      expect(res.rejected[0].reason).toContain('broken');
+      expect(res.rejected[0].reason).toContain('cracked');
+      expect(vb.artifacts[0].states[2].name).toBe('broken');
+
+      const vb2 = labBible();
+      const res2 = applyReviewBibleCorrections(section(renumbered), vb2, 17);
+      expect(res2.rejected).toHaveLength(0);
+      expect(res2.applied).toHaveLength(1);
+    });
   });
 });
