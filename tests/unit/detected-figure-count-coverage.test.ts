@@ -67,11 +67,20 @@ describe('the eval is given a figure count wherever a detection exists', () => {
   });
 
   it('every Test Lab eval stage states a figure count, explicitly null where there is none', () => {
+    // Since the eval stages were repointed onto buildEvalReplayOptions
+    // (server/lib/evalReplayInputs.js) the count is stated at the RESOLVER call,
+    // not at the evaluateImageQuality call — and there is one resolver call per
+    // eval stage, including the semantic stage, which has no
+    // evaluateImageQuality of its own but still needs the count for its
+    // EXPECTED CAST roster. So: every resolver call states a count, and there
+    // are at least as many resolver calls as evaluator calls.
     const src = read('server/lib/testlab.js');
     const evals = (src.match(/await evaluateImageQuality\(/g) || []).length;
+    const replays = (src.match(/buildEvalReplayOptions\(/g) || []).length;
     const feeds = (src.match(/detectedFigures:/g) || []).length;
     expect(evals).toBeGreaterThan(0);
-    expect(feeds).toBe(evals);
+    expect(replays).toBeGreaterThanOrEqual(evals);
+    expect(feeds).toBe(replays);
   });
 
   it('a pinned Test Lab version never borrows the active version\'s count', () => {

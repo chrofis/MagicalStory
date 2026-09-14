@@ -1434,6 +1434,74 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
   };
 }
 
+/**
+ * THE CLOTHING CONTRACT every evaluator is handed — one builder.
+ *
+ * Extracted verbatim from evaluateImageQuality (2026-09-14) so the Test Lab's
+ * standalone `semantic_eval` stage can pass the SAME block production's
+ * semantic judge gets. Production builds it once and hands it to the quality,
+ * semantic and compliance judges alike; the Lab stage called
+ * evaluateSemanticFidelity with no options at all, so its judge ran with no
+ * contract, no art style and no cast roster and its verdicts were never
+ * comparable to production's.
+ *
+ * Two sources, one block. The reference photos already carry the resolved
+ * per-page outfit (`clothingDescription`, set by the prompt builder) and that
+ * is what every call site has in scope; `clothingRequirements` is the explicit
+ * override for callers that resolved it themselves.
+ *
+ * @returns {{block: string, error: string|null}} `block` empty means no
+ *          contract could be built — the caller decides how loudly to say so.
+ */
+function buildEvalClothingContract({
+  sceneCharacters = null,
+  referenceImages = null,
+  artStyle = null,
+  visualBible = null,
+  clothingRequirements = null,
+  sceneMetadata = null,
+  sceneHint = null,
+  originalPrompt = null,
+} = {}) {
+  try {
+    const lines = [];
+    // WORN ITEMS. A page can declare a garment OFF (`wornItems[]`), and the
+    // generator honours it — the judge must be handed the SAME stripped
+    // outfit or it scores the render against a garment the brief removed and
+    // orders a paid repair round to repaint it. One resolver, shared with the
+    // generator's own strip. See wornItems.resolveGeneratedOutfit — which
+    // returns the outfit UNCHANGED when `visualBible` is falsy, so a caller
+    // that omits the bible gets the unstripped story-level outfit and no
+    // warning whatsoever.
+    const { resolveGeneratedOutfit } = require('./wornItems');
+    const wornMeta = sceneMetadata
+      || (() => { try { return getStoryHelpers().extractSceneMetadata(sceneHint || originalPrompt); } catch { return null; } })();
+    const wornCtx = { visualBible: visualBible || null, sceneMetadata: wornMeta };
+    const asWorn = (name, outfit) => resolveGeneratedOutfit(outfit, name, wornCtx);
+    const reqs = clothingRequirements || null;
+    if (reqs) {
+      const { buildClothingDescription } = require('./entityConsistency');
+      for (const c of (sceneCharacters || [])) {
+        if (!c?.name) continue;
+        const category = reqs[c.name]?._currentClothing;
+        if (!category) continue;
+        const outfit = asWorn(c.name, buildClothingDescription(c, category, artStyle, reqs));
+        if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
+      }
+    }
+    if (lines.length === 0) {
+      for (const p of (referenceImages || [])) {
+        if (!p?.name || !p?.clothingDescription) continue;
+        const outfit = asWorn(p.name, p.clothingDescription);
+        if (outfit && String(outfit).trim()) lines.push(`- ${p.name}: ${String(outfit).trim()}`);
+      }
+    }
+    return { block: lines.join('\n'), error: null };
+  } catch (err) {
+    return { block: '', error: err.message };
+  }
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -1517,51 +1585,29 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // per-page outfit (`clothingDescription`, set by the prompt builder) and
     // that is what every call site has in scope; evalOptions.clothingRequirements
     // is the explicit override for callers that resolved it themselves.
-    let clothingContractBlock = '';
-    try {
-      const lines = [];
-      // WORN ITEMS. A page can declare a garment OFF (`wornItems[]`), and the
-      // generator honours it — the judge must be handed the SAME stripped
-      // outfit or it scores the render against a garment the brief removed and
-      // orders a paid repair round to repaint it. One resolver, shared with the
-      // generator's own strip. See wornItems.resolveGeneratedOutfit.
-      const { resolveGeneratedOutfit } = require('./wornItems');
-      const wornMeta = evalOptions.sceneMetadata
-        || (() => { try { return getStoryHelpers().extractSceneMetadata(sceneHint || originalPrompt); } catch { return null; } })();
-      const wornCtx = { visualBible: evalOptions.visualBible || null, sceneMetadata: wornMeta };
-      const asWorn = (name, outfit) => resolveGeneratedOutfit(outfit, name, wornCtx);
-      const reqs = evalOptions.clothingRequirements || null;
-      if (reqs) {
-        const { buildClothingDescription } = require('./entityConsistency');
-        for (const c of (sceneCharacters || [])) {
-          if (!c?.name) continue;
-          const category = reqs[c.name]?._currentClothing;
-          if (!category) continue;
-          const outfit = asWorn(c.name, buildClothingDescription(c, category, artStyleForEval, reqs));
-          if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
-        }
-      }
-      if (lines.length === 0) {
-        for (const p of (referenceImages || [])) {
-          if (!p?.name || !p?.clothingDescription) continue;
-          const outfit = asWorn(p.name, p.clothingDescription);
-          if (outfit && String(outfit).trim()) lines.push(`- ${p.name}: ${String(outfit).trim()}`);
-        }
-      }
-      clothingContractBlock = lines.join('\n');
-      if (!clothingContractBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
-        // Loud, because an empty contract is what let the judge invent one.
-        // Covers included: the 'scene'-only gate hid exactly the cover case
-        // where an empty contract let the judge strip a requested costume.
-        log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
-        // The log line above existed and did not help: the eval went on to
-        // return a normal score with nothing saying clothing went unjudged.
-        notEvaluated.record('clothing', 'no_clothing_contract',
-          'No per-character outfit block could be built - clothing findings are suppressed (N-16)');
-      }
-    } catch (err) {
-      log.debug(`[EVAL] clothing contract block skipped: ${err.message}`);
-      notEvaluated.record('clothing', 'clothing_contract_build_failed', err.message);
+    const contract = buildEvalClothingContract({
+      sceneCharacters,
+      referenceImages,
+      artStyle: artStyleForEval,
+      visualBible: evalOptions.visualBible || null,
+      clothingRequirements: evalOptions.clothingRequirements || null,
+      sceneMetadata: evalOptions.sceneMetadata || null,
+      sceneHint,
+      originalPrompt,
+    });
+    const clothingContractBlock = contract.block;
+    if (contract.error) {
+      log.debug(`[EVAL] clothing contract block skipped: ${contract.error}`);
+      notEvaluated.record('clothing', 'clothing_contract_build_failed', contract.error);
+    } else if (!clothingContractBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
+      // Loud, because an empty contract is what let the judge invent one.
+      // Covers included: the 'scene'-only gate hid exactly the cover case
+      // where an empty contract let the judge strip a requested costume.
+      log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
+      // The log line above existed and did not help: the eval went on to
+      // return a normal score with nothing saying clothing went unjudged.
+      notEvaluated.record('clothing', 'no_clothing_contract',
+        'No per-character outfit block could be built - clothing findings are suppressed (N-16)');
     }
 
     // EXPECTED CAST roster + count (see buildExpectedCastBlock). Built once,
@@ -2863,6 +2909,7 @@ module.exports = {
   evaluateThreeStage,
   sanitizeForGemini,
   evaluateImageQuality,
+  buildEvalClothingContract,
   buildExpectedCastBlock,
   resolveExpectedCastNames,
   reconcileDetectorCast,

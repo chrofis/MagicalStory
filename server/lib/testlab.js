@@ -24,6 +24,10 @@ const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = r
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
 const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints } = require('./beatsReplayInputs');
+// Production's evalOptions for evaluateImageQuality, resolved from a stored
+// story. Same rule as above: every eval stage builds its options through this
+// so a thinner, silently-check-disabling expression cannot be written again.
+const { buildEvalReplayOptions } = require('./evalReplayInputs');
 
 // ─────────────────────────────────────────────────────────────────────
 // Context loading
@@ -577,21 +581,25 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   if (autoEval) {
     try {
       const { evaluateImageQuality } = require('./images');
+      // PRODUCTION'S OPTION SET, one resolver (buildEvalReplayOptions). This
+      // site used to pass five keys; without visualBible the judge's CLOTHING
+      // CONTRACT still named a garment the page declared `off`, and without
+      // artStyle every style-dependent rule skipped. See evalReplayInputs.js.
+      // No figure count: these are FRESH bytes and no detector runs in this
+      // stage, so the stored detection belongs to a different image. Null makes
+      // the roster decline to judge the count rather than judge it against the
+      // wrong picture.
+      const replay = buildEvalReplayOptions(ctx, {
+        detectedFigures: null,
+        // The A/B renders in params.artStyleOverride when set — the judge must
+        // be told the style it is actually looking at, not the story's.
+        artStyleKey: params.artStyleOverride || undefined,
+      });
       const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), 'scene',
+        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), replay.evaluationType,
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        {
-          landmarkPhotos: ctx.scene.landmarkPhotos || null,
-          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-          sceneMetadata: ctx.scene.sceneMetadata || null,
-          pageNumber: ctx.pageNumber,
-          // No figure count: these are FRESH bytes and no detector runs in this
-          // stage, so the stored detection belongs to a different image. Null
-          // makes the roster decline to judge the count rather than judge it
-          // against the wrong picture.
-          detectedFigures: null,
-        }
+        replay.options
       );
       if (evalRes) {
         scores = {
@@ -720,34 +728,32 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   // the repair that replaced it — could not be scored against each other.
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const t0 = Date.now();
-  const result = await evaluateImageQuality(
-    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
-    // Quality-judge A/B (2026-09-08): params.model swaps the P2 judge (and,
-    // because an override wins there too, the P1 inventory) for one experiment.
-    params.model || null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-    {
+  // PRODUCTION'S OPTION SET (buildEvalReplayOptions) + this stage's explicit
+  // A/B knobs. The baseline must equal production; the overrides are the point
+  // of the experiment. visualBible / clothingRequirements / storyData were all
+  // missing here, which is why every clothing finding this stage has ever
+  // produced was judged against the unstripped story-level outfit.
+  const replay = buildEvalReplayOptions(ctx, {
+    // The stored detection was made on the ACTIVE version's bytes. When a
+    // different version is pinned it describes a different picture, so the
+    // count is withheld rather than guessed.
+    detectedFigures: (ctx.versionIndex ?? null) === null
+      ? (ctx.scene.bboxDetection?.figures || null) : null,
+    overrides: {
       evalTemplateOverride: promptOverride || null,
-      // Lab/staging parity: the SAME resolver the production repair-round eval
-      // uses, from the same source (the story's art-style key). Never re-derive
-      // this locally - a second derivation is how the Lab silently stopped
-      // reproducing production for style-dependent rules.
-      artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
       // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
       // template to test the over-strict-CRITICAL problem.
       complianceModelOverride: params.complianceModel || null,
       compliancePromptOverride: params.compliancePrompt || null,
-      // Era-aware landmark protection (2026-09-05) — Lab parity with production.
-      landmarkPhotos: ctx.scene.landmarkPhotos || null,
-      era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-      sceneMetadata: ctx.scene.sceneMetadata || null,
-      pageNumber: ctx.pageNumber,
-      // The stored detection was made on the ACTIVE version's bytes. When a
-      // different version is pinned it describes a different picture, so the
-      // count is withheld rather than guessed.
-      detectedFigures: (ctx.versionIndex ?? null) === null
-        ? (ctx.scene.bboxDetection?.figures || null) : null,
-    }
+    },
+  });
+  const result = await evaluateImageQuality(
+    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
+    // Quality-judge A/B (2026-09-08): params.model swaps the P2 judge (and,
+    // because an override wins there too, the P1 inventory) for one experiment.
+    params.model || null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+    replay.options
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Quality evaluation returned null');
@@ -854,7 +860,18 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
   // per run would let an input drift and be mistaken for judge variance.
   const sceneDescription = evalSceneDescription(ctx);
   const referencePhotos = evalReferencePhotos(ctx);
-  const artStyle = require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null);
+  // Production's option set, frozen with everything else. Measuring the judge's
+  // variance against a THINNER input set than production's measures a different
+  // judge: a missing visualBible turns the clothing contract into the
+  // unstripped story-level outfit, and worn-item findings then flip on every
+  // repeat for a reason that has nothing to do with judge stability.
+  const replay = buildEvalReplayOptions(ctx, {
+    // Frozen with the other inputs: a count that changed between repeats would
+    // be read as judge variance. Withheld when a version is pinned (the stored
+    // detection is the active version's).
+    detectedFigures: versionIndex === null
+      ? (ctx.scene.bboxDetection?.figures || null) : null,
+  });
 
   const runs = [];
   for (let i = 1; i <= repeats; i++) {
@@ -863,21 +880,10 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
     let error = null;
     try {
       evalResult = await evaluateImageQuality(
-        imageData, sceneDescription, referencePhotos, 'scene',
+        imageData, sceneDescription, referencePhotos, replay.evaluationType,
         null, `testlab-var${experimentId}-P${ctx.pageNumber}-r${i}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        {
-          artStyle,
-          landmarkPhotos: ctx.scene.landmarkPhotos || null,
-          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-          sceneMetadata: ctx.scene.sceneMetadata || null,
-          pageNumber: ctx.pageNumber,
-          // Frozen with the other inputs: a count that changed between repeats
-          // would be read as judge variance. Withheld when a version is pinned
-          // (the stored detection is the active version's).
-          detectedFigures: versionIndex === null
-            ? (ctx.scene.bboxDetection?.figures || null) : null,
-        }
+        replay.options
       );
     } catch (err) { error = err.message; }
     const elapsedMs = Date.now() - t0;
@@ -1094,10 +1100,47 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   const storyText = ctx.scene.text || null;
   if (!storyText) throw new Error('Scene has no story text — semantic eval needs it');
 
+  // THE SIXTH ARGUMENT. Production never calls evaluateSemanticFidelity bare —
+  // evalPipeline.js hands it the art style, the CLOTHING CONTRACT and the
+  // EXPECTED CAST roster it built for all three judges. This stage passed none
+  // of them, so its judge saw no outfit contract at all (clothing findings
+  // suppressed outright) and no kind labels to keep an `(animal)` entry out of
+  // the named-character count. Same three inputs, same builders.
+  const replay = buildEvalReplayOptions(ctx, {
+    detectedFigures: ctx.scene.bboxDetection?.figures || null,
+  });
+  const { buildExpectedCastBlock, buildEvalClothingContract } = require('./evalPipeline');
+  const semanticOpts = {
+    artStyle: replay.options.artStyle,
+    clothingContract: buildEvalClothingContract({
+      sceneCharacters: ctx.scene.sceneCharacters || null,
+      referenceImages: evalReferencePhotos(ctx),
+      artStyle: replay.options.artStyle,
+      visualBible: replay.options.visualBible,
+      clothingRequirements: replay.options.clothingRequirements,
+      sceneMetadata: replay.options.sceneMetadata,
+      sceneHint: ctx.outlineHint,
+      originalPrompt: ctx.scene.sceneDescription || '',
+    }).block,
+    expectedCast: buildExpectedCastBlock({
+      sceneCharacters: ctx.scene.sceneCharacters || null,
+      sceneHint: ctx.outlineHint,
+      originalPrompt: ctx.scene.sceneDescription || '',
+      visualBible: replay.options.visualBible,
+      evaluationType: replay.evaluationType,
+      detectedFigureCount: Array.isArray(replay.options.detectedFigures)
+        ? require('./bboxDetection').countRealFigures(replay.options.detectedFigures) : null,
+      pageLabel: `testlab-exp${experimentId}-P${ctx.pageNumber} `,
+      sceneMetadata: replay.options.sceneMetadata,
+      storyData: replay.options.storyData,
+      pageNumber: replay.options.pageNumber,
+    }).block,
+  };
+
   const t0 = Date.now();
   const result = await evaluateSemanticFidelity(
     imageData, storyText, ctx.scene.sceneDescription,
-    ctx.outlineHint, promptOverride || null
+    ctx.outlineHint, promptOverride || null, semanticOpts
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Semantic evaluation returned null');
@@ -4454,19 +4497,17 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     let promptOverride = params.blendPrompt || null;
     if (params.blendMode === 'evalRepair') {
       const { evaluateImageQuality } = require('./evalPipeline');
+      // Production's option set (buildEvalReplayOptions). A replayed paste
+      // canvas has no detection for its bytes, so the figure count is withheld.
+      // This arm feeds the evaluator's findings straight into a PAID repair
+      // call, so a finding invented against an unstripped clothing contract is
+      // an order to repaint a garment the brief deliberately removed.
+      const replay = buildEvalReplayOptions(ctx, { detectedFigures: null });
       const ev = await evaluateImageQuality(
-        img.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
+        img.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}-composite`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        {
-          artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
-          landmarkPhotos: ctx.scene.landmarkPhotos || null,
-          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-          sceneMetadata: ctx.scene.sceneMetadata || null,
-          pageNumber: ctx.pageNumber,
-          // A replayed paste canvas — no detection exists for these bytes.
-          detectedFigures: null,
-        },
+        replay.options,
       );
       if (!ev) throw new Error('evalRepair: the evaluator returned nothing');
       const RANK = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1 };
@@ -4758,16 +4799,20 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
   if (params.freshEval) {
     const { evaluateImageQuality } = require('./images');
     const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+    // Production's option set (buildEvalReplayOptions). This site passed the
+    // three thinnest keys of all five, so the eval that decides the repair
+    // ROUTE ran with no bible, no wardrobe, no cast index, no art style and no
+    // landmark protection — a decision-reliability run measured a decision
+    // production never makes. The stored detection belongs to the ACTIVE image,
+    // which is what is being evaluated here.
+    const replay = buildEvalReplayOptions(ctx, {
+      detectedFigures: ctx.scene.bboxDetection?.figures || null,
+    });
     const fresh = await evaluateImageQuality(
-      imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
+      imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
       null, `testlab-exp${experimentId}-P${ctx.pageNumber}-decide`,
       ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-      {
-        sceneMetadata: ctx.scene.sceneMetadata || null,
-        pageNumber: ctx.pageNumber,
-        // The ACTIVE image, which is what the stored detection was made on.
-        detectedFigures: ctx.scene.bboxDetection?.figures || null,
-      }
+      replay.options
     );
     if (!fresh) throw new Error('Fresh evaluation returned null');
     // Production stamps the consolidated plan onto the eval at scoring time;
