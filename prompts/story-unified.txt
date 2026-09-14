@@ -97,6 +97,8 @@ Visual Bible entry with full description (build, hair, face, signature look, clo
 
 {AGE_MODE}
 
+{RISK_FRAMING}
+
 # TEXT LENGTH RULES
 
 **{READING_LEVEL}**

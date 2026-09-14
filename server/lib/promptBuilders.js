@@ -6134,6 +6134,27 @@ function buildArcBudgetSection(inputData, pageCount) {
 }
 
 /**
+ * The risk-FRAMING rule, one string for every stage that writes story prose.
+ *
+ * Distinct from the peril rule beside it, which is a ceiling on threat
+ * MAGNITUDE (nothing that could lead to death). This one governs how a risk the
+ * story is allowed to keep is TOLD: a child may do a risky thing, and an adult
+ * may permit it — what must not happen is the story treating it as simply fine,
+ * with nobody wary, no risk named and an approving close.
+ *
+ * Deliberately narrow. It is not "children may not do dangerous things": that
+ * would collide with the rule two lines above it — the children resolve it
+ * themselves, adults may comfort, permit or watch — and flatten the stakes the
+ * 2026-08-19 round RAISED. See docs/decisions.md 2026-09-14.
+ *
+ * One constant, four consumers: {TELLING_RULES} (arc-create / arc-retell) and
+ * the {RISK_FRAMING} placeholder in story-trial.txt, story-unified.txt and
+ * story-unified-imagefirst.txt — the three templates the shared block never
+ * reaches. Byte-identical everywhere by construction, not by discipline.
+ */
+const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
+
+/**
  * # RULES OF THE TELLING for the arc prompts ({TELLING_RULES} in arc-create and
  * arc-retell). Interpolated rather than baked into the templates because four
  * of its lines demanded exactly what the simple bands forbid: escalation, a
@@ -6184,6 +6205,7 @@ function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
     '- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.',
     ...(simple ? [] : ['- A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.']),
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
+    RISK_FRAMING_RULE,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
     '- The ending is the page the child remembers: one emotion or one image that stays — never bookkeeping, never a stated moral. Settle debts and props before the final page; the last page belongs to the feeling.',
     '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
@@ -7481,6 +7503,9 @@ ${adventureGuide}` : ''}`;
       // coping/empowering demand above may push (2026-09-13).
       STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
       AGE_MODE: buildAgeModeSection(inputData),
+      // Same string the arc prompts get inside {TELLING_RULES}; these templates
+      // never receive that block.
+      RISK_FRAMING: RISK_FRAMING_RULE,
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
       MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
       // Reader age for the title pick the writer makes in its ---TITLE---
@@ -7673,6 +7698,10 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // instructions this template already carries.
       STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
       AGE_MODE: buildAgeModeSection(inputData),
+      // Same string the arc prompts get inside {TELLING_RULES}. The trial runs
+      // no review stage of any kind, so the writer prompt is the only place a
+      // framing rule can reach a trial story.
+      RISK_FRAMING: RISK_FRAMING_RULE,
       // Same resolver the full pipeline's Art Director uses. Trial has no Art
       // Director, so without this the creature tone never reaches a trial page.
       CREATURE_TONE: buildCreatureToneSection(inputData),
@@ -8034,6 +8063,7 @@ module.exports = {
   buildArcHintsPrompt,
   buildArcBudgetSection,
   buildTellingRulesSection,
+  RISK_FRAMING_RULE,
   parseArcHints,
   parseArcCreate,
   parseArcRetell,

@@ -19,6 +19,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - Show character personality through actions
 - Never describe a character's hair, eye colour, skin or clothing in the story text — appearance belongs to the scene hints and the illustrations
 - No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
+{RISK_FRAMING}
 
 # Story Parameters
 

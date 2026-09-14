@@ -1106,3 +1106,12 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
       re-derive from a surviving story, or mark the claim unfalsifiable. Prevention shipped —
       `stories.evidence_reason` (migration 038) → `docs/decisions.md` 2026-09-14 "A story can be
       marked as EVIDENCE", `server/lib/evidenceStories.js`
+
+- [ ] **Ages 6-18 receive NO age-band rules at all — band `'standard'` has no file.**
+      `resolveAgeBand` (`server/lib/promptBuilders.js:5080-5086`) maps everything from 6 upward to
+      `'standard'`, and `AGE_BAND_TEMPLATE_KEYS` (`:5095`) has no entry for it, so the whole band
+      silently gets nothing. A missing or unparseable age falls through to `'standard'` too.
+      `prompts/story-arc-judge.txt:40` scores the rubric "hard" precisely where the band is absent.
+      This is where the 7-8 endorsement-without-caution cases cluster → `docs/decisions.md`
+      2026-09-14 "Real physical risk must be FRAMED, not forbidden"
+

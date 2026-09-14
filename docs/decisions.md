@@ -7,6 +7,48 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-14 — Real physical risk must be FRAMED, not forbidden: the endorsement-without-caution rule
+
+**Context:** a story had an 8-year-old climb a bell tower alone ahead of a storm. The owner's
+objection was not the act and not that he was unsupervised — it was that the telling endorsed it
+without caution: the only weather mention was an adult's "you have time, but not much", nobody was
+wary, no risk was named anywhere, and the close was an approving smile. Nothing in the pipeline
+guards this.
+
+- The peril rule ("nothing dangerous enough that it could lead to death") is a ceiling on threat
+  MAGNITUDE, not a check on how a permitted risk is told. A lone climb clears it easily.
+- `prompts/story-trial.txt` carried ZERO safety language in 229 lines, and the trial runs no review
+  stage of any kind — the writer prompt is the only place a rule can reach a trial story. This is
+  the path the incident happened on.
+- `prompts/scene-expansion`'s `scene-hazard-audit.txt` is about RENDER hazards and is Test Lab only.
+- The pattern recurs and clusters at ages 7-8 — exactly where `AGE_BANDS` resolves to `'standard'`,
+  for which no band file exists, so those stories receive no age-band rules at all.
+
+**Decision:** one new telling rule, scoped to FRAMING rather than prohibition. Danger may appear and
+a child may do a risky thing; what may not happen is the story treating it as simply fine.
+
+> - Where a child does something with real physical risk, the risk is present in the telling:
+>   someone is careful, names it aloud, or the child feels it — and the close does not treat it as
+>   nothing. An adult who permits it still says what to watch for.
+
+One constant, `RISK_FRAMING_RULE` in `promptBuilders.js`, with four consumers: the shared
+`{TELLING_RULES}` block (arc-create / arc-retell) and a new `{RISK_FRAMING}` placeholder in the
+three templates that block never reaches — `story-trial.txt`, `story-unified.txt` and
+`story-unified-imagefirst.txt` (the latter is the DEFAULT unified template, so it needed it most).
+No copies: the existing peril rule lives in four near-copies and is the warning against that.
+
+**Rationale:** the narrowest of the three candidate rules, chosen deliberately. "Children may not do
+dangerous things" would collide with the rule two lines above it — *the children resolve it
+themselves; adults may comfort, permit or watch* — and would flatten stakes, which is the exact
+failure the 2026-08-19 round was fixing when it RAISED risk after the reviewer kept removing it.
+The permission clause extends "adults may permit" rather than contradicting it. This is a NEW
+decision, not a reversal: nothing in `docs/SETTLED.md` governs risk framing.
+
+**Touched:** `server/lib/promptBuilders.js` (`RISK_FRAMING_RULE`, `buildTellingRulesSection`, the
+unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `tests/unit/risk-framing-rule-reach.test.ts`.
+**Status:** ✅ active — no corpus run yet (no paid calls were authorised for this change).
+
 ## Title (one sentence verdict)
 **Context:**   what problem / constraint led here
 **Decision:**  what we actually do
