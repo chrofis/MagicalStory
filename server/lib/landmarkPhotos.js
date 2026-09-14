@@ -2870,9 +2870,11 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
  *
  * Lookup order:
  *   1. exact city name (with diacritic + comma + first-word fallbacks)
- *   2. when (1) returns 0 and lat/lon are supplied, proximity search at
- *      20km → 50km → 100km radius (handles unindexed villages like
- *      Wabern → falls back to nearby Bern landmarks).
+ *   2. when (1) returns 0, proximity search at 20km → 50km → 100km radius
+ *      (handles unindexed villages like Wabern → falls back to nearby Bern
+ *      landmarks). The centre is the caller's lat/lon when supplied; failing
+ *      that, the coordinates of a row the name lookup matched but could not
+ *      serve (a town's own aerial).
  *
  * @param {string|Object} cityOrLocation
  * @param {number} limit
@@ -3007,11 +3009,42 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       result = { rows: [] };
     }
 
-    if (result.rows.length === 0 && typeof latitude === 'number' && typeof longitude === 'number') {
+    // The caller's coordinates are optional — but a row we MATCHED is itself a
+    // place on the map, and `landmark_index` stores its latitude/longitude.
+    // When the name lookup produced only unusable rows (the town's own aerial,
+    // or a photoless ruin) and the caller supplied no coordinates, that row's
+    // own position IS the town's position. Using it as the proximity centre is
+    // the difference between serving the aerial and finding a real landmark
+    // next door: Fislisbach's only row is its village overview, and from its
+    // coordinates the 20km rung reaches the Holzbrücke and the Zeitturm in
+    // Mellingen, ~3km away.
+    //
+    // Deliberately gated on the caller having given NOTHING: when coords come
+    // in, they win, and this cannot change what the search does. DECIMAL
+    // columns arrive from node-pg as STRINGS, so coerce rather than
+    // typeof-check (the caller's own values were normalised to number|null at
+    // the top of this function).
+    const rowCoord = v => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    let searchLat = latitude;
+    let searchLon = longitude;
+    if (typeof searchLat !== 'number' || typeof searchLon !== 'number') {
+      const anchor = weakRows.find(r => rowCoord(r.latitude) !== null && rowCoord(r.longitude) !== null);
+      if (anchor) {
+        searchLat = rowCoord(anchor.latitude);
+        searchLon = rowCoord(anchor.longitude);
+        log.info(`[LANDMARK-INDEX] "${city}": no caller coordinates — using matched row "${anchor.name}" (${searchLat}, ${searchLon}) as the proximity centre`);
+      }
+    }
+
+    if (result.rows.length === 0 && typeof searchLat === 'number' && typeof searchLon === 'number') {
       for (const radiusKm of [20, 50, 100]) {
-        const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit, city);
+        const nearby = await getIndexedLandmarksNearLocation(searchLat, searchLon, radiusKm, limit, city);
         if (nearby.length > 0) {
-          log.info(`[LANDMARK-INDEX] Proximity fallback: "${city}" → ${nearby.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
+          log.info(`[LANDMARK-INDEX] Proximity fallback: "${city}" → ${nearby.length} landmarks within ${radiusKm}km of (${searchLat}, ${searchLon})`);
           return nearby;
         }
       }
