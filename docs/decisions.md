@@ -38733,3 +38733,56 @@ for the owner to rule on.
 `tests/unit/cover-eval-mirror.test.ts`,
 `tests/unit/fixtures/cover-eval-mirror-job_1789348171785_9oxos7dwv.json`.
 **Status:** ✅ active
+
+---
+
+## The iterate GENERATOR gets the page's beat; the JUDGE still must not (2026-09-14)
+
+**Context.** `iteratePageCore` rewrites a page's whole brief and regenerates the frame. It
+passed `null` for `rawOutlineContext`, and with that null `buildSceneDescriptionPrompt`
+filled BOTH beat-shaped slots — `{SCENE_SUMMARY}` and `{DRAFT_SCENE_DESCRIPTION}` ("your
+starting point — do not reinvent") — from `extractSceneMetadata(currentScene.description).imageSummary`,
+i.e. the previous brief's own one-line summary. `scene-iteration.txt` rule 1 told the
+rewriter "the scene hint and outline are authoritative" about an input it never received:
+no outline, no plan line, only a self-summary of the artefact being rewritten. A brief that
+had already drifted could only drift further, because the only narrative anchor in the
+prompt was the drift. The beat is stored on the page the whole time
+(`sceneDescriptions[].outlineExtract`, written by `beatsPipeline.js:2641`).
+
+**Decision.** The iterate prompt receives the page's plan line as `rawOutlineContext.planLine`,
+rendered into `{SCENE_SUMMARY}` as the authoritative statement of what happens and who is
+staged; the previous brief stays in `{DRAFT_SCENE_DESCRIPTION}` as the starting point. The
+semantic JUDGE is **not** touched: commit `3b3070dce` repointed it away from the plan line
+onto the reviewed brief and that stands.
+
+**Rationale — why the two are deliberately asymmetric, and why nobody should "unify" them.**
+The Art Director trims cast on purpose to keep an image readable, and the owner has ruled
+that legitimate. Judging a picture against the beat therefore manufactures false findings
+(that is what `3b3070dce` fixed), which is why the judge's expected roster comes from the
+brief's own `characters[]`/`objects[]` (`buildExpectedCastBlock`, `evalPipeline.js:1023`).
+The generator has the opposite need: it is rewriting the brief, so the brief cannot also be
+its authority. Feeding the beat to the generator alone opens exactly one hazard — the
+rewriter reinstates a trimmed figure in the PROSE, the judge reads the undeclared roster,
+and the reinstated figure scores as `extra_character`. The rule that closes it is
+**whatever the rewrite draws, the rewrite declares**: stated in `scene-iteration.txt` rule
+3a (and free-mode rule 18), and verified afterwards by `iterateBeat.checkRewrittenBrief`,
+which reuses `sceneBriefCheck.checkPage` with the page's plan line set — the
+owner-sanctioned non-fidelity use of the beat, and the two types (`cast_unlisted`,
+`element_uncited`) the first-generation path already runs and the iterate path ran neither
+of. One corrective re-ask, then ship with a loud warning: a gate is a guideline and an
+iterate round is paid.
+
+**Also fixed in the same change.** The "Cast is locked" list kept only `kind === 'cast'`
+entries, so visual-bible ANIMALS and SECONDARY characters staged on the page reached the
+rewriter only inside the bulk `RECURRING_ELEMENTS` dump while rule 3 said "no character
+outside the list may be added". Measured on staging `job_1789348171785_9oxos7dwv` p7, whose
+beat reads "all four boys and Nia": the rewrite kept the animal but stripped its identity
+("the scruffy terrier mix dog"), leaving the detector an unmatched figure. `collectStagedFigures`
+now names them in a `{STAGED_FIGURES}` block. Rare — 1 of 145 iterate versions in 30 days —
+but sharply evidenced. The plan line was also added to the anchored-object allow-list's
+haystack (`images.js`), so the scrub cannot undo a reinstatement the beat asked for.
+
+**Touched:** `server/lib/iterateBeat.js` (new), `server/lib/images.js` (`iteratePageCore`),
+`server/lib/promptBuilders.js` (`buildSceneDescriptionPrompt`), `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`, `tests/unit/iterateBeat.test.ts`.
+**Status:** ✅ active

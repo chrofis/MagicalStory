@@ -2738,7 +2738,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null, options = {}) {
-  const { freeIterate = false, textInImage = false, extraRule = null } = options;
+  const { freeIterate = false, textInImage = false, extraRule = null, stagedFigures = '' } = options;
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -2873,7 +2873,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   let previousScenesText = '';
   let sceneContextText = '';
 
-  if (rawOutlineContext) {
+  // A `planLine`-only context (the iterate path — see iterateBeat.js) carries no
+  // raw outline BLOCKS, so it must not take this branch: doing so would drop the
+  // reconstructed PREVIOUS_SCENES an iterate prompt has always carried. It is
+  // read further down, where it fills SCENE_SUMMARY.
+  if (rawOutlineContext && (rawOutlineContext.previousPages || rawOutlineContext.currentPage)) {
     // SIMPLE: Use raw outline blocks directly
     if (rawOutlineContext.previousPages) {
       previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
@@ -2950,6 +2954,17 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (rawOutlineContext?.currentPage) {
       // Raw outline block already contains TEXT, SCENE HINT, Characters, Setting, Time, Weather
       sceneSummary = rawOutlineContext.currentPage + '\n\n';
+    } else if (rawOutlineContext?.planLine) {
+      // THE BEAT (iterate path, 2026-09-14). Before this, both beat-shaped slots
+      // were filled from the previous brief's own one-line summary, so a rewrite
+      // had no narrative anchor outside the artefact it was rewriting — while
+      // rule 1 claimed the outline was authoritative. The plan line goes in the
+      // authoritative slot; DRAFT_SCENE_DESCRIPTION below keeps the previous
+      // brief as the starting point, which is a different job.
+      sceneSummary = `Page plan line (the page's narrative beat — authoritative for what happens on this page and who is staged in it):\n${rawOutlineContext.planLine}\n\n`;
+      if (shortSceneDesc) {
+        sceneSummary += `Previous brief summary (what was drawn last time): ${shortSceneDesc}\n\n`;
+      }
     } else if (shortSceneDesc) {
       sceneSummary = `Scene Summary: ${shortSceneDesc}\n\n`;
     }
@@ -3079,6 +3094,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
+      // Named visual-bible figures staged on this page (animals, secondaries).
+      // The locked-cast list is roster characters only; without this block those
+      // figures reach the rewriter as anonymous entries in the bulk recurring
+      // dump and come back described by species instead of by name.
+      STAGED_FIGURES: stagedFigures || '',
       RECURRING_ELEMENTS: recurringElements,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       EXPECTED_CLOTHING: expectedClothingText,

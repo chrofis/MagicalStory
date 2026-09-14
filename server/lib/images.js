@@ -3683,6 +3683,27 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
 
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback (mode=${freeIterate ? 'free' : 'strict'})...`);
 
+  // THE BEAT (owner, 2026-09-14). An iterate rewrites the whole brief, so it
+  // needs the page's narrative intent — not a summary of the artefact it is
+  // rewriting. See iterateBeat.js for what this fixes and for the rule that
+  // keeps the rewriter's roster and the judge's roster the same one.
+  const {
+    resolvePlanLine, collectStagedFigures, renderStagedFiguresBlock,
+    checkRewrittenBrief, describeBriefFindings,
+  } = require('./iterateBeat');
+  const planLine = resolvePlanLine(currentScene, savedScene);
+  if (!planLine) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: no stored plan line (outlineExtract) — the rewrite runs on the previous brief alone`);
+  }
+  // Named non-roster figures staged on the page. They are cast, and the locked
+  // list below is roster-only by construction, so they are carried separately
+  // and named — a figure that reaches the rewriter only through the bulk
+  // recurring-elements dump comes back described by species.
+  const stagedFigures = collectStagedFigures({ visualBible, sceneMetadata, savedScene, planLine });
+  if (stagedFigures.length > 0) {
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: staged non-roster figures: ${stagedFigures.map(f => `${f.name} (${f.id})`).join(', ')}`);
+  }
+
   // Strict mode: lock cast to the original scene's characters so iterate can't
   // drop/swap them. Free mode: pass the full roster so iterate can reframe.
   let promptCharacters = characters;
@@ -3735,13 +3756,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     expectedClothing,
     '',  // No correction notes for iteration
     availableAvatars,
-    null,  // rawOutlineContext
+    // rawOutlineContext — the page's plan line. NEVER `null` here again: with a
+    // null, buildSceneDescriptionPrompt fills the authoritative SCENE_SUMMARY
+    // slot from the previous brief's own imageSummary, and the rewrite has no
+    // narrative anchor outside the artefact it is rewriting.
+    { planLine },
     previewFeedback,  // The actual image analysis feedback!
     // clothingRequirements so the EXPECTED_CLOTHING block can state each
     // character's actual outfit TEXT. Without it the Art Director only sees the
     // category key and writes it into the prose ("wearing her standard clothes"),
     // which the evaluator then judges the render against.
-    { freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements }
+    {
+      freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements,
+      stagedFigures: renderStagedFiguresBlock(stagedFigures),
+    }
   );
 
   // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).
@@ -3796,6 +3824,59 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
+  // THE REINSTATEMENT BACKSTOP (owner, 2026-09-14). The rewriter now receives
+  // the page's beat, so it can bring back a figure the previous brief had
+  // trimmed. The semantic judge builds its expected roster from the brief's own
+  // `characters[]` / `objects[]` (buildExpectedCastBlock) and never from a plan
+  // line — commit 3b3070dce, which stands. A figure reinstated in the PROSE
+  // ALONE therefore renders as an extra character and is scored as one. The
+  // prompt states the rule; this verifies it happened, reusing the same
+  // sceneBriefCheck types the first-generation path already runs
+  // (cast_unlisted, element_uncited) with the page's plan line set — the
+  // owner-sanctioned non-fidelity use of the beat.
+  //
+  // One corrective re-ask, then ship with a warning: a gate is a guideline and
+  // an iterate round is paid, so this never fails the round.
+  // Same roster the first-generation path checks against: main cast plus
+  // visual-bible SECONDARY characters, animals deliberately excluded (owner,
+  // 2026-08-16 — beatsPipeline.js:1955 carries the measurement). A named animal
+  // is covered by element_uncited through the plan line instead.
+  const castNamesForCheck = (() => {
+    const secondaries = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    const seen = new Set();
+    return [...(characters || []), ...secondaries]
+      .map(c => String(c?.name || '').trim())
+      .filter(n => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+  })();
+  let consistencyFindings = checkRewrittenBrief({
+    pageNumber, brief: newSceneDescription, planLine, castNames: castNamesForCheck, visualBible,
+  });
+  if (consistencyFindings.length > 0) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewritten brief does not declare everything it draws:\n${describeBriefFindings(consistencyFindings)}`);
+    const fixed = await callClaudeAPI(
+      `${scenePrompt}\n\nYour previous answer put figures in the picture that its own metadata does not declare:\n${describeBriefFindings(consistencyFindings)}\n\nReturn the whole brief again. Keep the same moment; either declare each of those figures (a person in "characters[]" by name, a staged animal or secondary figure in "objects[]" by its id) or take them out of the prose.`,
+      null, effectiveSceneModel, { usageLabel: 'scene_iterate_declare' }
+    );
+    if (usageTracker && fixed.usage) {
+      usageTracker('anthropic', fixed.usage, 'scene_iterate', fixed.modelId || effectiveSceneModel);
+    }
+    const fixedGuard = assessIterateBrief(fixed.text, { truncation: fixed.truncation });
+    const fixedFindings = fixedGuard.usable
+      ? checkRewrittenBrief({ pageNumber, brief: fixed.text, planLine, castNames: castNamesForCheck, visualBible })
+      : null;
+    if (fixedGuard.usable && fixedFindings.length < consistencyFindings.length) {
+      sceneResult = fixed;
+      newSceneDescription = fixed.text;
+      consistencyFindings = fixedFindings;
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: declaration re-ask resolved ${fixedFindings.length === 0 ? 'every' : 'some'} undeclared figure(s)`);
+    }
+    if (consistencyFindings.length > 0) {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a brief with undeclared figure(s) — the judge will read a different roster than the rewrite drew:\n${describeBriefFindings(consistencyFindings)}`);
+    }
+  }
+
   // Extract previewMismatches + checks from the metadata JSON block. parseProseMetadataFormat
   // splits on ---METADATA--- and parses the JSON — the fields live alongside scene structure.
   let previewMismatches = [];
@@ -3832,7 +3913,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   if (rewriteObjects.length > 0) {
     const baseId = (o) => String(o).trim().toUpperCase().split('.')[0];
     const origSet = new Set(origObjects.map(baseId));
-    const haystack = `${JSON.stringify(evaluationFeedback || {})}\n${pageText || ''}`.toLowerCase();
+    // The plan line is an anchor source since the rewriter started receiving it
+    // (2026-09-14): an element the page's own beat stages is asked for by the
+    // beat, and scrubbing it would undo the reinstatement in the same breath.
+    const haystack = `${JSON.stringify(evaluationFeedback || {})}\n${pageText || ''}\n${planLine || ''}`.toLowerCase();
     const vbEntityById = new Map();
     for (const pool of [visualBible?.artifacts, visualBible?.animals, visualBible?.vehicles, visualBible?.locations, visualBible?.secondaryCharacters]) {
       for (const e of (pool || [])) if (e?.id) vbEntityById.set(baseId(e.id), e);
