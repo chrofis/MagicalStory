@@ -1806,8 +1806,8 @@ function escapeXml(str) {
  *
  * COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18) needs to know which cast
  * names a "person" prompt can never be expected to satisfy. The Visual Bible's
- * `animals` and `creatures` are that list and the only non-fuzzy one; a story's
- * fairies live in `animals`, the same place its dog does. Extracted from
+ * `animals` pool is that list and the only non-fuzzy one; a story's fairies and
+ * dragons live in `animals`, the same place its dog does. Extracted from
  * `enrichWithBoundingBoxes`, which had it inline, so the detector call and
  * every consumer of the detector's count read the SAME set rather than each
  * deciding for itself what is non-human.
@@ -1817,7 +1817,14 @@ function escapeXml(str) {
  */
 function vbNonHumanNames(visualBible) {
   const out = [];
-  for (const e of [...((visualBible?.animals) || []), ...((visualBible?.creatures) || [])]) {
+  // `animals` ONLY (2026-09-14). This used to also read `visualBible.creatures`,
+  // a pool nothing in the pipeline writes: the Visual Bible's collections are
+  // mainCharacters / secondaryCharacters / animals / artifacts / vehicles /
+  // locations / clothing (visualBible.js), no prompt asks the Art Director for
+  // `creatures`, and 0 of 122 staging stories carry the key. Even
+  // `resolveSceneCreatures`, which paints "creatures" into the composite plate,
+  // reads `animals`. A dead read that looks like coverage is worse than none.
+  for (const e of ((visualBible?.animals) || [])) {
     // BOTH SPELLINGS. A roster entry is sometimes the VB id, not the name — the
     // Art Director files a page's animals in `objects[]` as `ANI001` and the
     // cast collector carries that id through verbatim. Matching on the name

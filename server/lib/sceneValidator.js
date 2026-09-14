@@ -761,6 +761,34 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {string} sceneHint - Direct statement of what image should show (most authoritative)
  * @returns {Promise<{score: number, verdict: string, semanticIssues: Array, usage: Object}>}
  */
+/**
+ * The semantic judge's prompt, built. Split out of `evaluateSemanticFidelity`
+ * so the BUILT prompt — not the template, not a replica of the fill — can be
+ * asserted without a model call. Pure.
+ *
+ * @param {string} template - PROMPT_TEMPLATES.imageSemantic, or an A/B override
+ * @param {object} parts - the per-page inputs, already resolved by the caller
+ * @param {'light'|'full'} level - Gemini-safety sanitisation level
+ */
+function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, evalContext = {} } = {}, level = 'light') {
+  const { sanitizeForGemini } = require('./images');
+  const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
+  return fillTemplate(template, {
+    STORY_TEXT: clean(storyText),
+    SCENE_HINT: clean(sceneHint) || 'Not provided',
+    IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
+    INTERACTIONS_BLOCK: interactionsBlock || '(none declared)',
+    ELEMENTS_BLOCK: elementsBlock || '(none)',
+    ART_STYLE: evalContext.artStyle || '',
+    CLOTHING_CONTRACT: evalContext.clothingContract || '',
+    // ONE ROSTER (2026-09-14). buildExpectedCastBlock's block with its kind
+    // labels, so an `(animal)` entry is never weighed as a named character.
+    // '' for a caller that has no roster — the prompt then judges from the
+    // hint alone, exactly as before.
+    EXPECTED_CAST: evalContext.expectedCast || '',
+  });
+}
+
 async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null, evalContext = {}) {
   // evalContext.artStyle / .clothingContract: the same resolved values every
   // other evaluator gets — commissioned style and per-character outfits are
@@ -820,18 +848,9 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   }
 
   // Build prompt at a given sanitization level
-  const buildPrompt = (level) => {
-    const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
-    return fillTemplate(template, {
-      STORY_TEXT: clean(storyText),
-      SCENE_HINT: clean(sceneHint) || 'Not provided',
-      IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
-      INTERACTIONS_BLOCK: interactionsBlock,
-      ELEMENTS_BLOCK: elementsBlock,
-      ART_STYLE: evalContext.artStyle || '',
-      CLOTHING_CONTRACT: evalContext.clothingContract || '',
-    });
-  };
+  const buildPrompt = (level) => buildSemanticPrompt(template, {
+    storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, evalContext,
+  }, level);
 
   // Parse the Gemini/Grok response text into a result object
   const parseResponse = (text, usageMeta, elapsed) => {
@@ -960,5 +979,6 @@ module.exports = {
   buildPreviewPrompt,
   generatePreviewFeedback,
   buildSimplePreviewPrompt,
-  evaluateSemanticFidelity
+  evaluateSemanticFidelity,
+  buildSemanticPrompt
 };

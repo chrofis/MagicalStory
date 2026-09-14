@@ -1,0 +1,741 @@
+{
+  "storyId": "job_1789348171785_9oxos7dwv",
+  "visualBible": {
+    "animals": [
+      {
+        "id": "ANI001",
+        "name": "Nia",
+        "species": "terrier mix dog",
+        "size": "comes up to a preschooler's knee",
+        "coloring": "scruffy light brown and white coat",
+        "features": "floppy ears, short tail, plain red collar, large round friendly eyes",
+        "description": "terrier mix dog. comes up to a preschooler's knee. scruffy light brown and white coat. floppy ears, short tail, plain red collar, large round friendly eyes",
+        "pages": [
+          5,
+          7,
+          12,
+          13,
+          15,
+          17
+        ],
+        "appearsInPages": [
+          5,
+          7,
+          12,
+          13,
+          15,
+          17
+        ]
+      },
+      {
+        "id": "ANI002",
+        "name": "Ofeli",
+        "species": "small dragon",
+        "size": "about the size of a large cat",
+        "coloring": "rusty red and gold scales",
+        "features": "soft rounded snout, large friendly round orange eyes, small blunt crest on the head, short rounded wings, upright friendly posture",
+        "description": "small dragon. about the size of a large cat. rusty red and gold scales. soft rounded snout, large friendly round orange eyes, small blunt crest on the head, short rounded wings, upright friendly posture",
+        "pages": [
+          7,
+          8,
+          10,
+          11,
+          13,
+          16,
+          17,
+          18
+        ],
+        "appearsInPages": [
+          7,
+          8,
+          10,
+          11,
+          13,
+          16,
+          17,
+          18
+        ]
+      }
+    ],
+    "secondaryCharacters": [
+      {
+        "id": "CHR001",
+        "name": "Frau Brunner",
+        "age": 55,
+        "hair": "grey, straight, tied back in a low bun",
+        "build": "a woman, average height, sturdy broad-shouldered build",
+        "pages": [
+          9,
+          13,
+          15,
+          16
+        ]
+      }
+    ],
+    "mainCharacters": [
+      {
+        "id": 1786902471660,
+        "name": "Levin"
+      },
+      {
+        "id": 1786902747333,
+        "name": "Julian"
+      },
+      {
+        "id": 1786904058132,
+        "name": "Max"
+      },
+      {
+        "id": 1786904387136,
+        "name": "Kiaan"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "pageNumber": 5,
+      "prompt": "**THIS IMAGE DEPICTS:** Max lunges forward with right arm outstretched toward the large rusty-red stone-like egg that Julian holds tightly against his chest in the Lindenhof square.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nWhen the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.\n\n**HEIGHT ORDER (shortest to tallest):** Max (shortest) -> Julian (slightly taller)\n\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n- Julian: toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby, clearly smaller than a preschooler\n- Max: preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child\n\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n- RED frame = Julian\n- BLUE frame = Max\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n\nJulian — a preschooler with short curly light brown hair, brown eyes, wearing a yellow quilted vest, white long-sleeve shirt, blue dungarees, and white sneakers — stands centered in the foreground of the Lindenhof square, facing right, holding the large rusty-red stone-like egg tight against his chest with both hands, gaze fixed downward at the egg. Max — a preschooler four-and-a-half heads tall with short curly light brown hair, brown eyes, wearing a green crew-neck pullover sweater, orange corduroy trousers, and grey velcro-strap sneakers — lunges forward from the left, right foot planted, left leg swinging forward, right arm fully extended toward the egg, fingers spread, body angled slightly left, face focused on the egg, not Julian. Nia — a scruffy light brown and white terrier mix dog with floppy ears, short tail, plain red collar, and large round friendly eyes, coming up to a preschooler’s knee — trots directly behind Max, nose pointed forward, ears perked, positioned just outside the left edge of the central action zone. The thick trunk of the large linden tree fills the right background; yellow autumn leaves drift in crisp air. No buildings, no chess board, no adults, no extraneous objects. Medium shot, eye-level, shallow depth — only Julian, Max, Nia, the egg, and the tree trunk visible.\n\n**Composition:**\n- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.\n- The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting.\n- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly. Outside a close-up, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.\n- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.\n- Depth: `foreground` is large and dominates the lower half; `midground` sits in the middle band, smaller and further back; `background` is small and distant. Foreground > midground > background in size.\n\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object)\n* **Nia** (animal) — comes up to a preschooler's knee\nThe attached reference images include a rough image of Nia — match its look at the size and placement the scene description gives it.\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n\nEXACT POSES:\n- Julian: holds the large rusty-red stone-like egg tight against his chest with both hands\n- Max: reaches his right arm out toward the egg\n- Nia: looking off into the scene, not at the viewer\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Julian: focused downward, mouth closed, brows neutral\n- Max: intense focus, mouth slightly open, brows lowered\n- Nia: alert, ears perked, eyes forward",
+      "sceneCharacters": [
+        {
+          "id": 1786902747333,
+          "age": "3",
+          "name": "Julian",
+          "gender": "male",
+          "height": "102",
+          "ageCategory": "preschooler"
+        },
+        {
+          "id": 1786904058132,
+          "age": "3",
+          "name": "Max",
+          "gender": "male",
+          "height": "98",
+          "ageCategory": "preschooler"
+        }
+      ],
+      "sceneMetadata": {
+        "era": null,
+        "aboard": null,
+        "objects": [
+          "LOC001",
+          "ART001",
+          "ANI001"
+        ],
+        "setting": null,
+        "clothing": null,
+        "fullData": {
+          "shot": null,
+          "objects": [
+            "LOC001",
+            "ART001",
+            "ANI001"
+          ],
+          "setting": null,
+          "wornItems": [],
+          "background": null,
+          "characters": [
+            {
+              "name": "Julian",
+              "clothing": "standard",
+              "position": "centered in the foreground",
+              "expression": "focused downward, mouth closed, brows neutral",
+              "perspective": "facing right"
+            },
+            {
+              "name": "Max",
+              "clothing": "standard",
+              "position": "lunging forward from the left",
+              "expression": "intense focus, mouth slightly open, brows lowered",
+              "perspective": "facing right"
+            },
+            {
+              "name": "Nia",
+              "clothing": "none",
+              "position": "directly behind Max",
+              "expression": "alert, ears perked, eyes forward",
+              "perspective": "side view, trotting"
+            }
+          ],
+          "sceneIntent": "Max lunges forward with right arm outstretched toward the large rusty-red stone-like egg that Julian holds tightly against his chest in the Lindenhof square.",
+          "imageSummary": "Julian — a preschooler with short curly light brown hair, brown eyes, wearing a yellow quilted vest, white long-sleeve shirt, blue dungarees, and white sneakers — stands centered in the foreground of the Lindenhof square, facing right, holding the large rusty-red stone-like egg tight against his chest with both hands, gaze fixed downward at the egg. Max — a preschooler four-and-a-half heads tall with short curly light brown hair, brown eyes, wearing a green crew-neck pullover sweater, orange corduroy trousers, and grey velcro-strap sneakers — lunges forward from the left, right foot planted, left leg swinging forward, right arm fully extended toward the egg, fingers spread, body angled slightly left, face focused on the egg, not Julian. Nia — a scruffy light brown and white terrier mix dog with floppy ears, short tail, plain red collar, and large round friendly eyes, coming up to a preschooler’s knee — trots directly behind Max, nose pointed forward, ears perked, positioned just outside the left edge of the central action zone. The thick trunk of the large linden tree fills the right background; yellow autumn leaves drift in crisp air. No buildings, no chess board, no adults, no extraneous objects. Medium shot, eye-level, shallow depth — only Julian, Max, Nia, the egg, and the tree trunk visible.",
+          "interactions": [
+            {
+              "where": "holds the large rusty-red stone-like egg tight against his chest with both hands",
+              "object": "ART001",
+              "priority": "essential",
+              "character": "Julian",
+              "storyRelevant": true
+            },
+            {
+              "where": "reaches his right arm out toward the egg",
+              "object": "ART001",
+              "priority": "essential",
+              "character": "Max",
+              "storyRelevant": true
+            }
+          ],
+          "crowdExpected": false
+        },
+        "thinking": null,
+        "wornItems": [],
+        "background": null,
+        "characters": [
+          "Julian",
+          "Max",
+          "Nia"
+        ],
+        "sceneIntent": "Max lunges forward with right arm outstretched toward the large rusty-red stone-like egg that Julian holds tightly against his chest in the Lindenhof square.",
+        "imageSummary": "Julian — a preschooler with short curly light brown hair, brown eyes, wearing a yellow quilted vest, white long-sleeve shirt, blue dungarees, and white sneakers — stands centered in the foreground of the Lindenhof square, facing right, holding the large rusty-red stone-like egg tight against his chest with both hands, gaze fixed downward at the egg. Max — a preschooler four-and-a-half heads tall with short curly light brown hair, brown eyes, wearing a green crew-neck pullover sweater, orange corduroy trousers, and grey velcro-strap sneakers — lunges forward from the left, right foot planted, left leg swinging forward, right arm fully extended toward the egg, fingers spread, body angled slightly left, face focused on the egg, not Julian. Nia — a scruffy light brown and white terrier mix dog with floppy ears, short tail, plain red collar, and large round friendly eyes, coming up to a preschooler’s knee — trots directly behind Max, nose pointed forward, ears perked, positioned just outside the left edge of the central action zone. The thick trunk of the large linden tree fills the right background; yellow autumn leaves drift in crisp air. No buildings, no chess board, no adults, no extraneous objects. Medium shot, eye-level, shallow depth — only Julian, Max, Nia, the egg, and the tree trunk visible.",
+        "interactions": [
+          {
+            "where": "holds the large rusty-red stone-like egg tight against his chest with both hands",
+            "object": "ART001",
+            "priority": "essential",
+            "character": "Julian",
+            "storyRelevant": true
+          },
+          {
+            "where": "reaches his right arm out toward the egg",
+            "object": "ART001",
+            "priority": "essential",
+            "character": "Max",
+            "storyRelevant": true
+          }
+        ],
+        "isJsonFormat": true,
+        "landmarkView": null,
+        "textPosition": null,
+        "crowdExpected": false,
+        "isProseFormat": true,
+        "framingPattern": null,
+        "reuseEmptyScene": false,
+        "sceneComplexity": "simple",
+        "emptyScenePrompt": "The Lindenhof square in autumn daylight: wide cobblestone expanse under canopy of a single massive linden tree with thick trunk and yellow falling leaves. Crisp air, soft directional light casting shallow shadows. No buildings, no benches, no chess board, no people — only tree roots visible at base. Medium shot, eye-level, shallow depth of field. Background blurred to soft green-gold bokeh.",
+        "landmarkVariants": null,
+        "characterClothing": {
+          "Max": "standard",
+          "Nia": "standard",
+          "Julian": "standard"
+        },
+        "translatedSummary": "Max stürmt nach vorn und streckt den rechten Arm nach dem grossen rostrot-marmorierten steinartigen Ei aus, das Julian fest an seine Brust drückt, während die kleine zottige Hündin Nia direkt hinter ihm trabt — alles im Lindenhof, einem herbstlichen Platz mit grosser Linde.",
+        "characterPositions": {
+          "Max": "lunging forward from the left",
+          "Nia": "directly behind Max",
+          "Julian": "centered in the foreground"
+        },
+        "textZoneDescription": null,
+        "characterPerspectives": {
+          "Max": {
+            "perspective": "facing right"
+          },
+          "Nia": {
+            "perspective": "side view, trotting"
+          },
+          "Julian": {
+            "perspective": "facing right"
+          }
+        }
+      },
+      "threeStageResult": {
+        "score": 80,
+        "verdict": "SOFT_FAIL",
+        "fixableIssues": [
+          {
+            "fix": "Replace green long-sleeved shirt with green crew-neck pullover sweater and brown pants with orange corduroy trousers on the child in left-foreground",
+            "type": "clothing",
+            "source": "three-stage",
+            "severity": "MAJOR",
+            "character": "Max",
+            "description": "Max wears green long-sleeved shirt and brown pants instead of green crew-neck pullover sweater and orange corduroy trousers per clothing contract"
+          }
+        ],
+        "complianceResult": {
+          "scene": {
+            "extra": [],
+            "missing": [],
+            "all_present": true,
+            "setting_match": true
+          },
+          "verdict": "SOFT_FAIL",
+          "fixable_issues": [
+            {
+              "fix": "Replace green long-sleeved shirt with green crew-neck pullover sweater and brown pants with orange corduroy trousers on the child in left-foreground",
+              "type": "clothing",
+              "severity": "MAJOR",
+              "character": "Max",
+              "description": "Max wears green long-sleeved shirt and brown pants instead of green crew-neck pullover sweater and orange corduroy trousers per clothing contract"
+            }
+          ],
+          "issues_summary": "Max's clothing does not match contract: green long-sleeve shirt and brown pants instead of green pullover and orange corduroy trousers",
+          "main_action_check": {
+            "issue": "",
+            "match": true,
+            "severity": "NONE",
+            "prompt_action": "Julian holds egg; Max lunges forward reaching for it",
+            "inventory_action": "Child in yellow holds large red speckled egg; child in green extends arm toward them",
+            "story_text_action": "Max says 'I saw it first' and reaches for the egg; Julian holds it tightly and doesn't move"
+          },
+          "character_compliance": [
+            {
+              "name": "Julian",
+              "label": "the child in yellow",
+              "severity": "NONE",
+              "facing_issue": "",
+              "facing_match": true,
+              "clothing_issue": "",
+              "clothing_match": true
+            },
+            {
+              "name": "Max",
+              "label": "the child in green",
+              "severity": "MAJOR",
+              "facing_issue": "",
+              "facing_match": true,
+              "clothing_issue": "wearing green long-sleeved shirt and brown pants instead of green crew-neck pullover sweater and orange corduroy trousers",
+              "clothing_match": false
+            }
+          ],
+          "interaction_compliance": [
+            {
+              "match": true,
+              "actual": "arms bent at elbows, hands holding a large red speckled egg close to body",
+              "object": "egg",
+              "expected": "holds the large rusty-red stone-like egg tight against his chest with both hands",
+              "severity": "NONE",
+              "character": "Julian"
+            },
+            {
+              "match": true,
+              "actual": "left arm extended forward and slightly to the right toward the child in yellow (who holds the egg)",
+              "object": "egg",
+              "expected": "reaches his right arm out toward the egg",
+              "severity": "NONE",
+              "character": "Max"
+            }
+          ]
+        },
+        "visionInventoryObjects": [
+          {
+            "what": "a small dog",
+            "colour": "brown and white fur, red collar",
+            "material": "fur",
+            "position": "left-foreground",
+            "grounded": true,
+            "relative_size": "about half the height of the child in green",
+            "complete": true
+          },
+          {
+            "what": "a large red speckled egg",
+            "colour": "red with dark speckles",
+            "material": "smooth, possibly ceramic or painted surface",
+            "position": "center-foreground, held by the child in yellow",
+            "grounded": false,
+            "relative_size": "larger than the child's head",
+            "complete": true
+          },
+          {
+            "what": "a tree with autumn leaves",
+            "colour": "yellow, orange, and brown leaves; dark gray-brown bark",
+            "material": "wood and foliage",
+            "position": "right-foreground to center-background",
+            "grounded": true,
+            "relative_size": "taller than both children",
+            "complete": true
+          }
+        ],
+        "visionInventoryFigureCount": 2
+      }
+    },
+    {
+      "pageNumber": 7,
+      "prompt": "**THIS IMAGE DEPICTS:** The group walks away down the steep stone stairs, seen from behind. Julian leads slowly, carrying the egg, while Levin, Max, Kiaan, and the dog follow his pace.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nWhen the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.\n\n**HEIGHT ORDER (shortest to tallest):** Max (shortest) -> Julian (slightly taller) -> Kiaan (similar height) -> Levin (slightly taller)\n\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n- Levin, Max, Kiaan: preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child\n- Julian: toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby, clearly smaller than a preschooler\n\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n- GREEN frame = Levin\n- RED frame = Julian\n- PURPLE frame = Max\n- BLUE frame = Kiaan\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n\nSeen from behind, Julian — the toddler in his yellow vest, white shirt, blue dungarees, and white sneakers — walks at the front on a lower step, both arms wrapped around the heavy red stone-like egg, Ofeli. Seen from behind, Levin, in his red hoodie, dark grey trousers, and brown boots, takes the steps carefully behind him. Seen from behind, Max, in his green pullover, orange corduroy trousers, and grey velcro-strap sneakers, follows at the same slow rhythm. Seen from behind, Kiaan, in his purple anorak, brown trousers, and dark brown leather ankle boots, follows close to Max, while the scruffy terrier mix dog pads along on the step beside Max. The wide shot, angled slightly downward from the top of the stairs, watches the friends depart toward the lower town.\n\n**Perspective:**\n- Julian: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.\n- Levin: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.\n- Max: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.\n- Kiaan: back view — shoulders, head, hips, and both feet turned away from the camera. Back of head visible, heels visible, toes pointing away. No twisting; feet and body face the same direction.\n\n**Composition:**\n- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.\n- The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting.\n- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly. Outside a close-up, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.\n- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.\n- Depth: `foreground` is large and dominates the lower half; `midground` sits in the middle band, smaller and further back; `background` is small and distant. Foreground > midground > background in size.\n\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object)\n* **Nia** (animal) — comes up to a preschooler's knee\n* **Ofeli** (animal) — about the size of a large cat\nThe attached reference images include rough images of: Nia; Ofeli — match each one's look at the size and placement the scene description gives it.\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n\nEXACT POSES:\n- Levin: walk down the stone stairs\n- Julian: walk down the stone stairs\n- Max: walk down the stone stairs\n- Kiaan: walk down the stone stairs\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Julian: face not visible; eyes turned away from everyone in the frame\n- Levin: face not visible; eyes turned away from everyone in the frame\n- Max: face not visible; eyes turned away from everyone in the frame\n- Kiaan: face not visible; eyes turned away from everyone in the frame",
+      "sceneCharacters": [
+        {
+          "id": 1786902471660,
+          "age": "5",
+          "name": "Levin",
+          "gender": "male",
+          "height": "110",
+          "ageCategory": "kindergartner"
+        },
+        {
+          "id": 1786902747333,
+          "age": "3",
+          "name": "Julian",
+          "gender": "male",
+          "height": "102",
+          "ageCategory": "preschooler"
+        },
+        {
+          "id": 1786904058132,
+          "age": "3",
+          "name": "Max",
+          "gender": "male",
+          "height": "98",
+          "ageCategory": "preschooler"
+        },
+        {
+          "id": 1786904387136,
+          "age": "3",
+          "name": "Kiaan",
+          "gender": "male",
+          "height": "102",
+          "ageCategory": "preschooler"
+        }
+      ],
+      "sceneMetadata": {
+        "era": "present day",
+        "aboard": null,
+        "objects": [
+          "LOC001",
+          "ART001",
+          "ANI001",
+          "ANI002"
+        ],
+        "setting": null,
+        "clothing": null,
+        "fullData": {
+          "shot": "wide",
+          "objects": [
+            "LOC001",
+            "ART001",
+            "ANI001",
+            "ANI002"
+          ],
+          "setting": null,
+          "wornItems": [],
+          "background": null,
+          "characters": [
+            {
+              "name": "Julian",
+              "depth": "midground",
+              "looksAt": "away",
+              "clothing": "standard",
+              "position": "center midground",
+              "expression": "face not visible",
+              "perspective": "back view"
+            },
+            {
+              "name": "Levin",
+              "depth": "foreground",
+              "looksAt": "away",
+              "clothing": "standard",
+              "position": "left foreground",
+              "expression": "face not visible",
+              "perspective": "back view"
+            },
+            {
+              "name": "Max",
+              "depth": "foreground",
+              "looksAt": "away",
+              "clothing": "standard",
+              "position": "center foreground",
+              "expression": "face not visible",
+              "perspective": "back view"
+            },
+            {
+              "name": "Kiaan",
+              "depth": "foreground",
+              "looksAt": "away",
+              "clothing": "standard",
+              "position": "right foreground",
+              "expression": "face not visible",
+              "perspective": "back view"
+            }
+          ],
+          "sceneIntent": "The group walks away down the steep stone stairs, seen from behind. Julian leads slowly, carrying the egg, while Levin, Max, Kiaan, and the dog follow his pace.",
+          "imageSummary": "Seen from behind, Julian — the toddler in his yellow vest, white shirt, blue dungarees, and white sneakers — walks at the front on a lower step, both arms wrapped around the heavy red stone-like egg, Ofeli. Seen from behind, Levin, in his red hoodie, dark grey trousers, and brown boots, takes the steps carefully behind him. Seen from behind, Max, in his green pullover, orange corduroy trousers, and grey velcro-strap sneakers, follows at the same slow rhythm. Seen from behind, Kiaan, in his purple anorak, brown trousers, and dark brown leather ankle boots, follows close to Max, while the scruffy terrier mix dog pads along on the step beside Max. The wide shot, angled slightly downward from the top of the stairs, watches the friends depart toward the lower town.",
+          "interactions": [
+            {
+              "where": "walk down the stone stairs",
+              "action": "walking",
+              "object": "the stairs",
+              "priority": "normal",
+              "character": "Levin + Julian + Max + Kiaan",
+              "storyRelevant": false
+            }
+          ],
+          "crowdExpected": false
+        },
+        "thinking": null,
+        "wornItems": [],
+        "background": null,
+        "characters": [
+          "Julian",
+          "Levin",
+          "Max",
+          "Kiaan"
+        ],
+        "sceneIntent": "The group walks away down the steep stone stairs, seen from behind. Julian leads slowly, carrying the egg, while Levin, Max, Kiaan, and the dog follow his pace.",
+        "imageSummary": "Seen from behind, Julian — the toddler in his yellow vest, white shirt, blue dungarees, and white sneakers — walks at the front on a lower step, both arms wrapped around the heavy red stone-like egg, Ofeli. Seen from behind, Levin, in his red hoodie, dark grey trousers, and brown boots, takes the steps carefully behind him. Seen from behind, Max, in his green pullover, orange corduroy trousers, and grey velcro-strap sneakers, follows at the same slow rhythm. Seen from behind, Kiaan, in his purple anorak, brown trousers, and dark brown leather ankle boots, follows close to Max, while the scruffy terrier mix dog pads along on the step beside Max. The wide shot, angled slightly downward from the top of the stairs, watches the friends depart toward the lower town.",
+        "interactions": [
+          {
+            "where": "walk down the stone stairs",
+            "action": "walking",
+            "object": "the stairs",
+            "priority": "normal",
+            "character": "Levin + Julian + Max + Kiaan",
+            "storyRelevant": false
+          }
+        ],
+        "isJsonFormat": true,
+        "landmarkView": "exterior",
+        "textPosition": null,
+        "crowdExpected": false,
+        "isProseFormat": true,
+        "framingPattern": null,
+        "reuseEmptyScene": null,
+        "sceneComplexity": "simple",
+        "emptyScenePrompt": "Steep stone steps descend away from the camera, leading down from a high park area into the lower town. Wrought iron handrails run down the sides, and dry autumn leaves litter the grey stone treads under a darkening late afternoon sky.",
+        "landmarkVariants": null,
+        "characterClothing": {
+          "Max": "standard",
+          "Kiaan": "standard",
+          "Levin": "standard",
+          "Julian": "standard"
+        },
+        "translatedSummary": null,
+        "characterPositions": {
+          "Max": "center foreground",
+          "Kiaan": "right foreground",
+          "Levin": "left foreground",
+          "Julian": "center midground"
+        },
+        "textZoneDescription": null,
+        "characterPerspectives": {
+          "Max": {
+            "depth": "foreground",
+            "perspective": "back view"
+          },
+          "Kiaan": {
+            "depth": "foreground",
+            "perspective": "back view"
+          },
+          "Levin": {
+            "depth": "foreground",
+            "perspective": "back view"
+          },
+          "Julian": {
+            "depth": "midground",
+            "perspective": "back view"
+          }
+        }
+      },
+      "threeStageResult": {
+        "score": 30,
+        "verdict": "HARD_FAIL",
+        "fixableIssues": [
+          {
+            "fix": "Change short-sleeved shirt to long-sleeve green pullover sweater on figure labeled 'the boy in green shirt'",
+            "type": "clothing_detail",
+            "source": "three-stage",
+            "severity": "MODERATE",
+            "character": "Max",
+            "description": "Max wears green short-sleeved shirt instead of green crew-neck pullover sweater per clothing contract"
+          },
+          {
+            "fix": "Remove red egg from Kiaan's hands; ensure only Julian holds Ofeli",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "severity": "CRITICAL",
+            "character": "Kiaan",
+            "description": "Kiaan holds the red egg (Ofeli), but only Julian should be holding it according to prompt and story text"
+          },
+          {
+            "fix": "Adjust rendering to show features consistent with a waterproof anorak (e.g., hood, zip front) rather than generic jacket",
+            "type": "clothing_detail",
+            "source": "three-stage",
+            "severity": "MODERATE",
+            "character": "Kiaan",
+            "description": "Kiaan's outer layer described as 'purple jacket' but contract specifies 'purple waterproof anorak'"
+          },
+          {
+            "fix": "Relabel or remove identification of figure 5 as 'Nia'; if the dog was misidentified as a human, correct matching upstream",
+            "type": "extra_character",
+            "source": "three-stage",
+            "severity": "MAJOR",
+            "character": "Nia",
+            "description": "Figure matched as 'Nia' appears in QUALITY_FIGURES.matches[] but no such character exists in ORIGINAL_PROMPT or STORY_TEXT"
+          }
+        ],
+        "complianceResult": {
+          "scene": {
+            "extra": [
+              {
+                "id": 5,
+                "note": "Dog listed as figure in QUALITY_FIGURES but is correctly listed as object in VISION_INVENTORY; however, 'Nia' appears in matches[] with reference name not in prompt — extra named character",
+                "type": "extra_character",
+                "label": "Nia"
+              }
+            ],
+            "missing": [],
+            "all_present": true,
+            "setting_match": true
+          },
+          "verdict": "HARD_FAIL",
+          "fixable_issues": [
+            {
+              "fix": "Change short-sleeved shirt to long-sleeve green pullover sweater on figure labeled 'the boy in green shirt'",
+              "type": "clothing_detail",
+              "severity": "MODERATE",
+              "character": "Max",
+              "description": "Max wears green short-sleeved shirt instead of green crew-neck pullover sweater per clothing contract"
+            },
+            {
+              "fix": "Remove red egg from Kiaan's hands; ensure only Julian holds Ofeli",
+              "type": "action_interaction",
+              "severity": "CRITICAL",
+              "character": "Kiaan",
+              "description": "Kiaan holds the red egg (Ofeli), but only Julian should be holding it according to prompt and story text"
+            },
+            {
+              "fix": "Adjust rendering to show features consistent with a waterproof anorak (e.g., hood, zip front) rather than generic jacket",
+              "type": "clothing_detail",
+              "severity": "MODERATE",
+              "character": "Kiaan",
+              "description": "Kiaan's outer layer described as 'purple jacket' but contract specifies 'purple waterproof anorak'"
+            },
+            {
+              "fix": "Relabel or remove identification of figure 5 as 'Nia'; if the dog was misidentified as a human, correct matching upstream",
+              "type": "extra_character",
+              "severity": "MAJOR",
+              "character": "Nia",
+              "description": "Figure matched as 'Nia' appears in QUALITY_FIGURES.matches[] but no such character exists in ORIGINAL_PROMPT or STORY_TEXT"
+            }
+          ],
+          "issues_summary": "Kiaan incorrectly holding Ofeli; Max's top is short-sleeve not pullover; extra character Nia present; clothing terminology for Kiaan imprecise",
+          "main_action_check": {
+            "issue": "wrong_action: two characters holding the egg contradicts narrative that Julian alone carries Ofeli at this moment",
+            "match": false,
+            "severity": "CRITICAL",
+            "prompt_action": "Julian walks at front holding Ofeli; others follow without holding it",
+            "inventory_action": "Both Julian and Kiaan are holding the same red egg-shaped object",
+            "story_text_action": "Julian holds Ofeli; Max says 'I carry Ofeli' but Kiaan says 'Levin’s oven is nearest' — implies only Julian currently holds it"
+          },
+          "character_compliance": [
+            {
+              "name": "Julian",
+              "label": "the child in yellow vest",
+              "severity": "PASS",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": null,
+              "clothing_match": true
+            },
+            {
+              "name": "Levin",
+              "label": "the boy in red hoodie",
+              "severity": "PASS",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": null,
+              "clothing_match": true
+            },
+            {
+              "name": "Max",
+              "label": "the boy in green shirt",
+              "severity": "MODERATE",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": "wearing green short-sleeved shirt instead of green pullover; orange trousers described as corduroy in contract but inventory says just 'orange pants'",
+              "clothing_match": false
+            },
+            {
+              "name": "Kiaan",
+              "label": "the boy in purple jacket",
+              "severity": "MAJOR",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": "described as wearing 'purple jacket' but contract specifies 'purple waterproof anorak'; also, holding red egg contrary to prompt (only Julian should hold it)",
+              "clothing_match": false
+            }
+          ],
+          "interaction_compliance": [
+            {
+              "match": false,
+              "actual": "holds red egg together with Kiaan",
+              "object": "Ofeli (red egg)",
+              "expected": "holds the red egg alone at front",
+              "severity": "CRITICAL",
+              "character": "Julian"
+            },
+            {
+              "match": false,
+              "actual": "holds red egg",
+              "object": "Ofeli (red egg)",
+              "expected": "does not hold the egg",
+              "severity": "CRITICAL",
+              "character": "Kiaan"
+            }
+          ]
+        },
+        "visionInventoryObjects": [
+          {
+            "what": "a small dog",
+            "colour": "light brown, fluffy fur",
+            "material": "fur",
+            "position": "right-foreground",
+            "grounded": true,
+            "relative_size": "reaches the boy's knees",
+            "complete": true
+          },
+          {
+            "what": "a large red egg-shaped object",
+            "colour": "red with speckles",
+            "material": "appears smooth, possibly ceramic or plastic",
+            "position": "held by the child in yellow vest and the boy in purple jacket",
+            "grounded": false,
+            "relative_size": "larger than the child's torso",
+            "complete": true
+          },
+          {
+            "what": "stone steps",
+            "colour": "grey",
+            "material": "stone",
+            "position": "center-foreground to midground",
+            "grounded": true,
+            "relative_size": "extends across the foreground, wider than any figure",
+            "complete": true
+          },
+          {
+            "what": "autumn leaves",
+            "colour": "yellow and orange",
+            "material": "dry foliage",
+            "position": "scattered on stone steps and ground",
+            "grounded": true,
+            "relative_size": "small, scattered across steps",
+            "complete": true
+          },
+          {
+            "what": "tree with yellow leaves",
+            "colour": "yellow leaves, dark brown trunk",
+            "material": "wood and foliage",
+            "position": "right-midground to background",
+            "grounded": true,
+            "relative_size": "taller than the figures",
+            "complete": true
+          },
+          {
+            "what": "white buildings with brown roofs",
+            "colour": "white walls, brown tiles, blue shutters",
+            "material": "plaster, wood, tile",
+            "position": "background",
+            "grounded": true,
+            "relative_size": "larger than the figures",
+            "complete": true
+          },
+          {
+            "what": "church spires",
+            "colour": "white and grey",
+            "material": "stone",
+            "position": "center-background",
+            "grounded": true,
+            "relative_size": "taller than the buildings",
+            "complete": true
+          }
+        ],
+        "visionInventoryFigureCount": 4
+      }
+    }
+  ]
+}

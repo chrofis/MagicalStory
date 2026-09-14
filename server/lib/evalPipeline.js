@@ -612,6 +612,13 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     compliancePromptOverride = null,  // Stage-2 template A/B
     artStyle = null,                  // resolved style — same value the quality eval gets
     clothingContract = null,          // per-character outfit block — same value the quality eval gets
+    // THE ROSTER, FOR A BLIND JUDGE (2026-09-14). `buildExpectedCastBlock`'s
+    // block, kind labels and all — the same string the quality evaluator gets.
+    // Without it this judge had no cast list at all and improvised a label for
+    // any orphan it could not pair, which is how one animal drew
+    // `missing_character`, `extra_character` and `duplicate_identity` on one
+    // story. '' keeps the pre-roster behaviour: judge membership from the prompt.
+    expectedCast = '',
     // Era-aware landmark protection (2026-09-05). A page rendered from a real
     // landmark photo in a present-day story must not have that landmark's
     // structures classified as unrequested/modern; a historical page keeps the
@@ -718,16 +725,24 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     }
 
     const complianceInput = fillTemplate(complianceTemplate, {
-      ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
-      // Passed separately: ORIGINAL_PROMPT is truncated at 3000 chars and the
-      // ART STYLE and CLOTHING blocks can sit past the cut, so the compliance
-      // judge never saw them and treated required style/costume elements as
-      // unrequested additions (a steampunk cover's goggles drew a CRITICAL).
+      // THE WHOLE PROMPT (2026-09-14). This was `.substring(0, 3000)`. Real page
+      // prompts run 5,400-8,000 chars and a cast member introduced late in the
+      // prose sat past the cut — measured on one 18-page story, the animal's own
+      // block landed at chars 3,914-5,565 on five of its six pages, so the judge
+      // read a prompt that never named it and filed the figure it could not
+      // place as extra/absent. An arbitrary input cut on a judge is the same
+      // species of bug as an output cap: removed, not enlarged.
+      ORIGINAL_PROMPT: imagePrompt || '',
+      // Passed separately as well: the ART STYLE and CLOTHING blocks are spec,
+      // not prose, and each judge receives them explicitly rather than hoping to
+      // find them inside the prompt (a steampunk cover's goggles drew a CRITICAL
+      // when the truncation hid them).
       ART_STYLE: artStyle || require('../services/prompts').extractArtStyle(imagePrompt),
       CLOTHING_CONTRACT: clothingContract || '',
       EXPECTED_AGES: expectedAges || '',
       VISUAL_INVENTORY: visionText,
       QUALITY_FIGURES: qualityFiguresBlock,
+      EXPECTED_CAST: expectedCast || '',
       INTERACTIONS_BLOCK: interactionsBlock,
       STORY_TEXT: (storyText || '(not provided)').substring(0, 2000),
       LANDMARK_CONTEXT: buildLandmarkComplianceBlock(landmarkProtection) || '(none)'
@@ -1163,6 +1178,38 @@ const PRESENCE_DERIVED_MARKER = 'presence-arithmetic';
 const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
 
 /**
+ * Drop the compliance judge's presence findings from the RECORD once the
+ * arithmetic has spoken (2026-09-14).
+ *
+ * The merge used to filter a local copy on its way into the page's merged
+ * `fixableIssues`, and the finding lived on untouched inside `threeStageResult`
+ * — which is the object `scoring.js` reads for the compliance bucket
+ * (`evalResult.threeStageResult.fixableIssues`) and again for
+ * `scoreBreakdown.threeStage.issues`. From there it reached
+ * `consolidatedPlan.deduped_issues` and the repair pipeline, so a finding the
+ * derivation had superseded was still repaired against. Both lists — the mapped
+ * one and the judge's own `complianceResult.fixable_issues` — are pruned here.
+ *
+ * Mutates in place, by design: the stored record and the merged list must be
+ * the same answer. Returns how many entries went.
+ */
+function supersedePresenceFindings(threeStageResult) {
+  if (!threeStageResult || typeof threeStageResult !== 'object') return 0;
+  const isPresenceType = (t) => PRESENCE_COUNT_TYPES.has(String(t || '').toLowerCase());
+  let dropped = 0;
+  if (Array.isArray(threeStageResult.fixableIssues)) {
+    const before = threeStageResult.fixableIssues.length;
+    threeStageResult.fixableIssues = threeStageResult.fixableIssues.filter(i => !isPresenceType(i?.type));
+    dropped = before - threeStageResult.fixableIssues.length;
+  }
+  if (Array.isArray(threeStageResult.complianceResult?.fixable_issues)) {
+    threeStageResult.complianceResult.fixable_issues =
+      threeStageResult.complianceResult.fixable_issues.filter(i => !isPresenceType(i?.type));
+  }
+  return dropped;
+}
+
+/**
  * THE PRESENCE SIGNAL (owner, 2026-09-13). One page, one outcome, mutually
  * exclusive by construction.
  *
@@ -1203,7 +1250,7 @@ const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
  * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean,
  *          nonHumanNames: string[]}} args.cast
  *        the roster from buildExpectedCastBlock. `nonHumanNames` are the entries
- *        a "person" detector can never satisfy (the VB's animals and creatures);
+ *        a "person" detector can never satisfy (the VB's `animals` pool);
  *        every count below is taken with those removed from BOTH sides.
  * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures),
  *        with the figures the detector itself named as non-human removed — a
@@ -1517,53 +1564,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       notEvaluated.record('clothing', 'clothing_contract_build_failed', err.message);
     }
 
-    // Start semantic evaluation in parallel when we have a reference (page prose
-    // or cover brief).
-    if (!runFidelity && (evaluationType === 'scene' || isCover)) {
-      notEvaluated.record('semantic_fidelity', 'no_fidelity_reference',
-        'Neither page prose nor a cover brief was supplied - semantic fidelity did not run');
-    }
-    if (runFidelity) {
-      const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
-        artStyle: artStyleForEval,
-        clothingContract: clothingContractBlock,
-      });
-      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
-    }
-
-    // DECLARED AGES for the compliance judge. The evaluator used to receive
-    // head-to-body ratios ("- Daniel: 1:8") and check them itself. That failed
-    // twice over: it fired once in 271 versions, and that once was false —
-    // three adults all listed 1:8, and the judge read the colon as a ratio
-    // BETWEEN two of them ("Daniel is not roughly one-fifth the height of
-    // Hans") and demanded an adult be shrunk to a fifth of another adult.
-    //
-    // Age is the readable form of the same fact. The blind inventory estimates
-    // each figure's apparent age from head-to-body proportion without knowing
-    // who anyone is, identity supplies the name, and the judge compares that
-    // estimate against the number below. No notation to misread, and no
-    // cross-character comparison to invent.
-    //
-    // Declared HERE, above the three-stage launch that reads it. It was first
-    // written below that call, where `let` put every read in the temporal dead
-    // zone: `evaluateImageQuality` threw ReferenceError on entry, the outer
-    // catch returned null, and two whole books (34 pages, staging + prod) were
-    // generated with no quality score, no semantic score and no auto-repair
-    // before anyone noticed. Same failure class as the hoisted promise handles
-    // above. Nothing between here and the call may move below it.
-    let expectedAgesBlock = '';
-    try {
-      const lines = [];
-      for (const c of (sceneCharacters || [])) {
-        const age = parseInt(c?.age, 10);
-        if (c?.name && Number.isFinite(age)) lines.push(`- ${c.name}: ${age} years old`);
-      }
-      if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
-    } catch { /* silent — the judge tolerates an empty block */ }
-
     // EXPECTED CAST roster + count (see buildExpectedCastBlock). Built once,
-    // read by the quality prompt and by the post-parse count diagnostic.
+    // read by the quality prompt, the semantic judge, the compliance judge and
+    // the post-parse count diagnostic. ONE ROSTER means all four, so this block
+    // sits ABOVE the semantic launch below — nothing between here and the two
+    // parallel eval launches may move above it.
     // COUNT ONLY REAL FIGURES. A caller that hands over the figures array
     // gets them filtered here (see isMicroFigure); a caller that only has a
     // number is trusted to have filtered already — images.js does. Hoisted:
@@ -1617,6 +1622,55 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug(`👥 [EVAL] ${pageContext}: expected cast (${expectedCast.count}) ${expectedCast.names.join(', ')}`);
     }
 
+    // Start semantic evaluation in parallel when we have a reference (page prose
+    // or cover brief).
+    if (!runFidelity && (evaluationType === 'scene' || isCover)) {
+      notEvaluated.record('semantic_fidelity', 'no_fidelity_reference',
+        'Neither page prose nor a cover brief was supplied - semantic fidelity did not run');
+    }
+    if (runFidelity) {
+      const { evaluateSemanticFidelity } = require('./sceneValidator');
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
+        artStyle: artStyleForEval,
+        clothingContract: clothingContractBlock,
+        // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
+        // what keep an `(animal)` entry out of the named-character count.
+        expectedCast: expectedCast.block,
+      });
+      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
+    }
+
+    // DECLARED AGES for the compliance judge. The evaluator used to receive
+    // head-to-body ratios ("- Daniel: 1:8") and check them itself. That failed
+    // twice over: it fired once in 271 versions, and that once was false —
+    // three adults all listed 1:8, and the judge read the colon as a ratio
+    // BETWEEN two of them ("Daniel is not roughly one-fifth the height of
+    // Hans") and demanded an adult be shrunk to a fifth of another adult.
+    //
+    // Age is the readable form of the same fact. The blind inventory estimates
+    // each figure's apparent age from head-to-body proportion without knowing
+    // who anyone is, identity supplies the name, and the judge compares that
+    // estimate against the number below. No notation to misread, and no
+    // cross-character comparison to invent.
+    //
+    // Declared HERE, above the three-stage launch that reads it. It was first
+    // written below that call, where `let` put every read in the temporal dead
+    // zone: `evaluateImageQuality` threw ReferenceError on entry, the outer
+    // catch returned null, and two whole books (34 pages, staging + prod) were
+    // generated with no quality score, no semantic score and no auto-repair
+    // before anyone noticed. Same failure class as the hoisted promise handles
+    // above. Nothing between here and the call may move below it.
+    let expectedAgesBlock = '';
+    try {
+      const lines = [];
+      for (const c of (sceneCharacters || [])) {
+        const age = parseInt(c?.age, 10);
+        if (c?.name && Number.isFinite(age)) lines.push(`- ${c.name}: ${age} years old`);
+      }
+      if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
+    } catch { /* silent — the judge tolerates an empty block */ }
+
+
     // Start three-stage eval in parallel for scene evaluations.
     // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
     // can pair each named character with the blind vision inventory by zone. We expose
@@ -1651,6 +1705,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         compliancePromptOverride: evalOptions.compliancePromptOverride || null,
         artStyle: artStyleForEval,
         clothingContract: clothingContractBlock,
+        // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
+        expectedCast: expectedCast.block,
         // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
         // caller has a bible; without one they still become generic nouns.
         visualBible: evalOptions.visualBible || null,
@@ -2555,12 +2611,23 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // owns the pair across every judge, not just the quality one — the
             // blind compliance judge's "not identified in matches[]" absence is
             // exactly the inference the detector count already answered.
-            const incoming = presenceDerived
-              ? threeStageResult.fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()))
-              : threeStageResult.fixableIssues;
-            const skipped = threeStageResult.fixableIssues.length - incoming.length;
-            if (skipped) log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${skipped} three-stage presence finding(s) superseded by the derivation`);
-            fixableIssues = [...fixableIssues, ...incoming];
+            //
+            // FILTER THE RECORD, NOT A COPY (2026-09-14). This used to prune a
+            // local `incoming` array on its way into the merged list, and the
+            // finding survived verbatim on `threeStageResult` — which is the
+            // object scoring.js reads for the compliance bucket
+            // (`evalResult.threeStageResult.fixableIssues`, and again for
+            // `scoreBreakdown.threeStage.issues`), so the superseded finding
+            // still reached `consolidatedPlan.deduped_issues` and the repair
+            // pipeline. Measured: a page whose `missing_character` WAS dropped
+            // from the version's own fixableIssues and still appeared in its
+            // consolidated plan. Both the mapped list and the judge's raw
+            // `complianceResult.fixable_issues` are pruned in place.
+            if (presenceDerived) {
+              const skipped = supersedePresenceFindings(threeStageResult);
+              if (skipped) log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${skipped} three-stage presence finding(s) superseded by the derivation`);
+            }
+            fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
           }
           if (threeStageResult?.issuesSummary) {
             combinedIssuesSummary = combinedIssuesSummary
@@ -2801,6 +2868,7 @@ module.exports = {
   reconcileDetectorCast,
   parseFixableIssues,
   derivePresenceFinding,
+  supersedePresenceFindings,
   PRESENCE_DERIVED_MARKER,
   PRESENCE_COUNT_TYPES,
   IMAGE_QUALITY_THRESHOLD,

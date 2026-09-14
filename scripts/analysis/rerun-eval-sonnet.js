@@ -67,7 +67,9 @@ const { Pool } = require('pg');
   // --- Stage 2: compliance (CLAUDE-SONNET, text only) ---
   const complianceTemplate = PROMPT_TEMPLATES.imagePromptCompliance;
   const complianceInput = complianceTemplate
-    .replace('{ORIGINAL_PROMPT}', (storedPrompt || '').substring(0, 3000))
+    // No cut — evalPipeline stopped truncating ORIGINAL_PROMPT (2026-09-14) and
+    // this replay has to send the judge the same prompt production does.
+    .replace('{ORIGINAL_PROMPT}', storedPrompt || '')
     .replace('{VISUAL_INVENTORY}', visionText)
     .replace('{INTERACTIONS_BLOCK}', interactionsBlock);
 

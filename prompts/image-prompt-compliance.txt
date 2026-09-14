@@ -14,6 +14,8 @@ You are an Illustration QA Scoring Analyst. You have NOT seen the image. Base al
    {EXPECTED_AGES}
 9. LANDMARK CONTEXT (empty when this page carries no real-world landmark reference):
    {LANDMARK_CONTEXT}
+10. EXPECTED CAST — every person and animal this frame was written for, each entry tagged with its kind, e.g. `(animal)` or `(secondary character)`. Blank when no roster was supplied, and then you judge cast membership from ORIGINAL_PROMPT alone:
+   {EXPECTED_CAST}
 
 ---
 
@@ -50,7 +52,9 @@ Wrongness is a finding; absence is a guess. When the inventory NAMES the item an
 
 A `matches[]` entry whose `reference` is `unmatched` (or null) names nobody: never pair it with a prompt-named character and never report it — the quality evaluator owns that figure (`extra_character`).
 
-For each `matches[]` entry in QUALITY_FIGURES, take the figure's zone from QUALITY_FIGURES.figures[]. Find the VISION_INVENTORY figure in the same zone (or the nearest one — do not require an exact zone match) and output a pairing `{name, label, zone, vision_description}`, carrying that figure's VISION_INVENTORY label verbatim. Zone mismatch is a position note, not an absence.
+**An EXPECTED CAST entry tagged `(animal)` pairs against `VISION_INVENTORY.objects[]`, never `figures[]`** — the inventory files every animal there. Named in `objects` → present; pair it with that object's description. Not found there → `unverified_absence` at most, never `missing_character`, `extra_character` or `duplicate_identity`; those three are about people-figures, and an animal neither satisfies nor breaks a figure count. A `matches[]` entry whose `reference` is an `(animal)` cast name is that animal filed as a figure upstream: present, and never a surplus figure.
+
+For each remaining `matches[]` entry in QUALITY_FIGURES, take the figure's zone from QUALITY_FIGURES.figures[]. Find the VISION_INVENTORY figure in the same zone (or the nearest one — do not require an exact zone match) and output a pairing `{name, label, zone, vision_description}`, carrying that figure's VISION_INVENTORY label verbatim. Zone mismatch is a position note, not an absence.
 
 The ONLY case for `missing_character`: a character named in ORIGINAL_PROMPT that has NO entry in `QUALITY_FIGURES.matches[]` AND no plausibly-matching VISION figure at all. If they are in `matches[]`, they are present — stop. `missing_character` is at most MAJOR, never CRITICAL — you have not seen the image, so an absence you infer from the inputs is a report, not proof.
 

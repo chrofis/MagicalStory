@@ -37838,3 +37838,92 @@ runs the MediaPipe Tasks fallback, which is now clearly logged.
 **Touched:** `photo_analyzer.py` (health totals, dev-server fallback host,
 stream line buffering), `tests/manual/test_health_rss_null.py`
 **Status:** ✅ active
+
+---
+
+## 2026-09-14 — An animal is a cast entry for people-judges and an OBJECT for the blind inventory; the judges that read both are told which
+
+**Context:** One story reported the same animal (a VB `animals[0]` entry) as
+`missing_character`, `extra_character` AND `duplicate_identity` — three
+contradictory verdicts about one entity. Prevalence: 24 of the 41 staging
+stories that have VB animals carried at least one finding naming the animal;
+the worst page set carried 14. The presence arithmetic was NOT the cause —
+every such finding stored `derivedBy: null`, and `derivePresenceFinding`
+correctly removes non-humans from both sides and stays silent.
+
+Three inputs disagreed instead. `prompts/image-evaluation.txt` tells the
+quality evaluator that `matches[]` references an EXPECTED CAST name and that
+D-04b covers "a person **or animal** figure", so the animal lands in
+`matches[]` as a FIGURE. `prompts/image-inventory-unified.txt` tells the blind
+inventory that `objects` holds "each notable object, **animal** or vehicle", so
+the same animal lands in `objects[]` as an OBJECT. The compliance judge
+(`image-prompt-compliance.txt`) receives both lists, had **no EXPECTED CAST
+roster at all**, and its STEP 1 says to pair each `matches[]` entry with a
+VISION_INVENTORY *figure* — so the animal had no partner and the judge
+improvised a label for the orphan. Worse, its copy of the prompt was cut at
+3,000 chars while real page prompts run 5,400–8,000 and the animal's own cast
+block sat at chars 3,914–5,565 on five of one story's six animal pages: the
+judge was asked to place a figure whose name its prompt never contained.
+
+**Decision:** Four changes, none of them a reclassification of the animal.
+
+1. **The blind judges get the roster.** `buildExpectedCastBlock`'s block — kind
+   labels (`(animal)`, `(secondary character)`) included — is now passed to the
+   compliance judge and the semantic judge, the same string the quality
+   evaluator already got. The compliance prompt's STEP 1 states that an
+   `(animal)` entry pairs against `VISION_INVENTORY.objects[]`, never
+   `figures[]`, and that failing to find it there is `unverified_absence` at
+   most — never `missing_character`, `extra_character` or `duplicate_identity`.
+   The semantic prompt states that an `(animal)` entry is never counted among
+   the named characters. The roster build was hoisted above the semantic launch
+   so all four judges read one roster.
+2. **The judge's prompt is no longer truncated.** `ORIGINAL_PROMPT` was
+   `imagePrompt.substring(0, 3000)`; it is now the whole prompt. Per the
+   owner's standing no-output-caps principle, an arbitrary input cut on a judge
+   is the same species of bug — removed, not enlarged. (ART STYLE and CLOTHING
+   are still passed separately; that was the 2026-08 patch for the same cut.)
+3. **The presence filter governs the record the consolidator reads.**
+   `PRESENCE_COUNT_TYPES` filtering pruned a local copy on its way into the
+   page's merged `fixableIssues`; the finding survived verbatim on
+   `threeStageResult.fixableIssues` and `complianceResult.fixable_issues`,
+   which is what `scoring.js` reads for the compliance bucket and for
+   `scoreBreakdown.threeStage.issues`, and from there it reached
+   `consolidatedPlan.deduped_issues` and the repair pipeline. Both lists are
+   now pruned in place by `supersedePresenceFindings`.
+4. **`creatures` deleted as a source.** `vbNonHumanNames` read
+   `visualBible.creatures`, a pool nothing writes: the Bible's collections are
+   mainCharacters / secondaryCharacters / animals / artifacts / vehicles /
+   locations / clothing, no prompt asks the Art Director for `creatures`, 0 of
+   122 staging stories carry the key, and even `resolveSceneCreatures` — which
+   paints "creatures" into the composite plate — reads `animals`. A dead read
+   that looks like coverage is worse than none.
+
+**Rationale:** The two alternatives were rejected. Making animals FIGURES
+everywhere hands a dog a schema built for people (`hair`, `eyewear`,
+`facial_hair`). Making them OBJECTS everywhere reverses the settled cast rule
+written after a cover evaluator accepted a fifth human child at 0.9 confidence
+in place of a named dog — a roster entry has to say what KIND it is, and an
+animal entry must be unsatisfiable by a person. So the split classification
+stays and the judge that reads both lists is told the mapping, which is the
+sanctioned shape: **classification is the prompt's job.** No finding
+description is pattern-matched anywhere in this change.
+
+`duplicate_identity` was deliberately NOT added to `PRESENCE_COUNT_TYPES`. That
+set is what the presence ARITHMETIC owns once it has spoken, and the arithmetic
+answers exactly one question — figure count vs roster count. It never emits
+`duplicate_identity` and has no substitute verdict for it, so adding it there
+would silently delete a real and unrelated finding class (an uncommissioned
+extra rendered with a named character's hair, face and contract garments) on
+every page where the count happened to balance. The animal's false
+`duplicate_identity` is fixed at its source instead — the compliance prompt may
+no longer use that code for an `(animal)` entry.
+
+**Touched:**
+- `prompts/image-prompt-compliance.txt` (EXPECTED CAST input; STEP 1 animal-pairing rule)
+- `prompts/image-semantic.txt` (EXPECTED CAST input; STEP 2 animal rule)
+- `server/lib/evalPipeline.js` (`expectedCast` option on `evaluateThreeStage`, untruncated `ORIGINAL_PROMPT`, roster hoisted above the semantic launch and passed to both blind judges, new `supersedePresenceFindings`)
+- `server/lib/sceneValidator.js` (`EXPECTED_CAST` fill; `buildSemanticPrompt` extracted so the BUILT prompt is assertable)
+- `server/lib/bboxDetection.js` (`vbNonHumanNames` reads `animals` only)
+- `scripts/analysis/rerun-eval-sonnet.js` (replay sends the same untruncated prompt production does)
+- `tests/unit/animal-cast-classification.test.ts`, `tests/unit/fixtures/animal-cast-job_1789348171785_9oxos7dwv.json`
+**Status:** ✅ active

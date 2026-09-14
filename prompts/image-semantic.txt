@@ -5,6 +5,7 @@ Check whether this illustration shows the right STORY BEAT. You are not grading 
 **STORY_TEXT (narrative context only — do NOT treat as a checklist):** "{STORY_TEXT}"
 **DECLARED INTERACTIONS (character-to-object placements the scene requires):** {INTERACTIONS_BLOCK}
 **PAGE ELEMENTS (the objects, animals and figures this page is built from — id, then what it is):** {ELEMENTS_BLOCK}
+**EXPECTED CAST (every person and animal this frame was written for, each tagged with its kind, e.g. `(animal)` — empty if not supplied):** {EXPECTED_CAST}
 **ART STYLE (the commissioned medium — empty if not supplied):** {ART_STYLE}
 **CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied):** {CLOTHING_CONTRACT}
 
@@ -26,7 +27,7 @@ List what you see:
 
 **STEP 2: DETERMINE EXPECTED CHARACTERS**
 
-Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are the ONLY characters expected in the illustration.
+Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are the ONLY characters expected in the illustration. Where an EXPECTED CAST roster is supplied it names the same set with each entry's kind: an entry tagged `(animal)` is checked as an animal in the picture and never counted among the named characters — it can be neither a missing named character nor a stand-in for one.
 
 ---
 
