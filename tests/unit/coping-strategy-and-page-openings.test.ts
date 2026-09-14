@@ -57,7 +57,10 @@ describe('coping-strategy clause in the arc rules', () => {
 
   it('does not fire for the simple bands, which forbid tips outright', () => {
     for (const age of [0, 1, 2, 3]) {
-      expect(pb.resolveAgeBand(base(age, LIFE))).not.toBe('standard');
+      // The clause is gated on SIMPLE_BANDS, so what matters is that these ages
+      // ARE simple bands — not that they are anything-but-'standard', which no
+      // age has resolved to since the shape/pacing split (2026-09-14).
+      expect(['routine', 'quest', 'tries']).toContain(pb.resolveAgeBand(base(age, LIFE)));
       for (const prompt of arcPrompts(base(age, LIFE))) {
         expect(prompt, `age ${age}`).not.toContain(CLAUSE);
         expect(unfilled(prompt), `age ${age} unfilled`).toEqual([]);

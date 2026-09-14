@@ -10,6 +10,7 @@ const require_ = createRequire(import.meta.url);
 const { loadPromptTemplates } = require_('../../server/services/prompts');
 const {
   resolveAgeBand,
+  resolvePacingBand,
   pickMainCharacters,
   buildAgeModeSection,
   buildStoryShapeSection,
@@ -27,7 +28,10 @@ const solo = (age: number) => ({ characters: [char(1, 'A', age, true)], mainChar
 /**
  * Owner rules: five whole-year plot bands below six (2026-09-04), decided by
  * the OLDEST MAIN character and never by a secondary (2026-08-25, retained).
- * See docs/decisions.md.
+ * From 2026-09-14 there is NO 'standard' shape band and no upper cap: every age
+ * from six up, and an unknown age, resolves to `journey`. Before that the band
+ * array simply ran out at index 5 and ages 6+ received no plot-shape rules at
+ * all. See docs/decisions.md.
  */
 describe('resolveAgeBand', () => {
   it('maps every whole year 0..7 to its band', () => {
@@ -37,8 +41,21 @@ describe('resolveAgeBand', () => {
     expect(resolveAgeBand(solo(3))).toBe('tries');
     expect(resolveAgeBand(solo(4))).toBe('fear-choice');
     expect(resolveAgeBand(solo(5))).toBe('journey');
-    expect(resolveAgeBand(solo(6))).toBe('standard');
-    expect(resolveAgeBand(solo(7))).toBe('standard');
+    expect(resolveAgeBand(solo(6))).toBe('journey');
+    expect(resolveAgeBand(solo(7))).toBe('journey');
+  });
+
+  it('routes every age from six up to journey, with NO upper cap', () => {
+    // The owner's rule: "what would a mother or grandmother get that try it out,
+    // should also work for them". An adult main is a reader, not a gap.
+    for (const age of [6, 7, 8, 10, 12, 16, 17, 18, 38, 68, 99]) {
+      expect(resolveAgeBand(solo(age)), `age ${age}`).toBe('journey');
+    }
+  });
+
+  it('keeps ages 0-5 on their own bands, unchanged', () => {
+    expect([0, 1, 2, 3, 4, 5].map(age => resolveAgeBand(solo(age))))
+      .toEqual(['routine', 'routine', 'quest', 'tries', 'fear-choice', 'journey']);
   });
 
   it('lets the OLDEST main decide when two mains span two bands', () => {
@@ -56,7 +73,7 @@ describe('resolveAgeBand', () => {
   });
 
   it('reads isMain flags when no mainCharacters id array is given (idea-generation payload)', () => {
-    expect(resolveAgeBand({ characters: [char(1, 'A', 8, true), char(2, 'B', 1, true)] })).toBe('standard');
+    expect(resolveAgeBand({ characters: [char(1, 'A', 8, true), char(2, 'B', 1, true)] })).toBe('journey');
     expect(resolveAgeBand({ characters: [char(1, 'A', 2, true), char(2, 'B', 5, false)] })).toBe('quest');
   });
 
@@ -64,13 +81,42 @@ describe('resolveAgeBand', () => {
     const pipelineChar = (id: number, name: string, age: number, main: boolean) =>
       ({ id, name, age: String(age), gender: 'male', role: main ? 'main' : 'secondary', isMainCharacter: main });
     expect(resolveAgeBand({ characters: [pipelineChar(1, 'A', 3, true), pipelineChar(2, 'B', 9, false)] })).toBe('tries');
-    expect(resolveAgeBand({ characters: [pipelineChar(1, 'A', 9, true), pipelineChar(2, 'B', 1, false)] })).toBe('standard');
+    expect(resolveAgeBand({ characters: [pipelineChar(1, 'A', 9, true), pipelineChar(2, 'B', 1, false)] })).toBe('journey');
   });
 
-  it('falls back to standard when the age is missing or the cast is empty', () => {
-    expect(resolveAgeBand({ characters: [{ id: 1, name: 'A', isMain: true }], mainCharacters: [1] })).toBe('standard');
-    expect(resolveAgeBand({ characters: [] })).toBe('standard');
-    expect(resolveAgeBand({})).toBe('standard');
+  it('falls back to journey — never to silence — when the age is missing or the cast is empty', () => {
+    // Pre-2026-09-14 these returned 'standard', which had no template and so
+    // meant NO plot-shape rules. The journey rules are generic story craft and
+    // are wrong for nobody but a toddler, and a toddler book always has an age.
+    expect(resolveAgeBand({ characters: [{ id: 1, name: 'A', isMain: true }], mainCharacters: [1] })).toBe('journey');
+    expect(resolveAgeBand({ characters: [] })).toBe('journey');
+    expect(resolveAgeBand({})).toBe('journey');
+  });
+});
+
+/**
+ * The PACING band is the second axis, split out of resolveAgeBand on
+ * 2026-09-14: the journey SHAPE suits 6 and 16 alike, the five-year-old's event
+ * budget does not. It is what the maturity tables key on, and it still hands
+ * over to the reading level at 'standard' from six up.
+ */
+describe('resolvePacingBand', () => {
+  it('keeps the pre-2026-09-14 mapping, including standard from six up', () => {
+    expect([0, 1, 2, 3, 4, 5].map(a => resolvePacingBand(solo(a))))
+      .toEqual(['routine', 'routine', 'quest', 'tries', 'fear-choice', 'journey']);
+    for (const age of [6, 8, 12, 16, 38, 68]) {
+      expect(resolvePacingBand(solo(age)), `age ${age}`).toBe('standard');
+    }
+    expect(resolvePacingBand({})).toBe('standard');
+  });
+
+  it('diverges from the shape band exactly from age six', () => {
+    for (const age of [0, 1, 2, 3, 4, 5]) {
+      expect(resolvePacingBand(solo(age)), `age ${age}`).toBe(resolveAgeBand(solo(age)));
+    }
+    for (const age of [6, 12, 38]) {
+      expect(resolvePacingBand(solo(age)), `age ${age}`).not.toBe(resolveAgeBand(solo(age)));
+    }
   });
 });
 
@@ -107,10 +153,50 @@ describe('buildAgeModeSection', () => {
     expect(buildAgeModeSection(solo(5))).toContain("# MINI HERO'S JOURNEY");
   });
 
-  it('is empty from age six up and when the age is unknown', () => {
-    expect(buildAgeModeSection(solo(6))).toBe('');
-    expect(buildAgeModeSection(solo(9))).toBe('');
-    expect(buildAgeModeSection({ characters: [{ id: 1, name: 'A', isMain: true }] })).toBe('');
+  it('gives ages six and up the journey rules — never nothing (2026-09-14)', () => {
+    // The regression this pins: ages 6-18 used to receive NO band at all, which
+    // is how job_1789420083330_5si0z6ze1 (age 8) shipped a father handing the
+    // child a key that removed the only obstacle, with no low point.
+    for (const age of [6, 8, 12, 16, 38, 68]) {
+      const section = buildAgeModeSection(solo(age));
+      expect(section, `age ${age}`).toContain("HERO'S JOURNEY");
+      expect(section, `age ${age}`).toMatch(/A real low point is required/);
+      expect(section, `age ${age}`).toMatch(/never a\s+grown-up arriving to fix it/);
+      expect(section, `age ${age}`).toMatch(/They are never carried\s+through their own story/);
+    }
+  });
+
+  it('gives an unknown age the journey rules with no age claimed', () => {
+    const section = buildAgeModeSection({ characters: [{ id: 1, name: 'A', isMain: true }] });
+    expect(section.split('\n')[0]).toBe("# HERO'S JOURNEY");
+    expect(section).not.toMatch(/\(age\s*\)/);
+    expect(section).toContain('A real low point is required');
+  });
+
+  it('scales the journey framing across the whole range and leaves no token unfilled', () => {
+    const head = (age: number) => buildAgeModeSection(solo(age)).split('\n').slice(0, 5).join('\n');
+    // MINI and "in small" are the owner's wording for a five- or six-year-old.
+    expect(head(5)).toContain("# MINI HERO'S JOURNEY (age 5)");
+    expect(head(5)).toContain('The child this book is for is five.');
+    expect(head(5)).toContain('The full shape, in small.');
+    expect(head(6)).toContain("# MINI HERO'S JOURNEY (age 6)");
+    expect(head(6)).toContain('The full shape, in small.');
+    // From seven it is a full hero's journey, not a miniature one.
+    expect(head(8)).toContain("# HERO'S JOURNEY (age 8)");
+    expect(head(8)).not.toContain('MINI');
+    expect(head(8)).toContain('The child this book is for is eight.');
+    expect(head(8)).toContain('The full shape, at full size.');
+    expect(head(12)).toContain('The child this book is for is twelve.');
+    // A teenager is a reader, not a child...
+    expect(head(16)).toContain('The reader this book is for is sixteen.');
+    expect(head(16)).toContain('a young adult, not a small child');
+    // ...and an adult trying the product gets an adult's book.
+    expect(head(38)).toContain("# HERO'S JOURNEY (adult reader, age 38)");
+    expect(head(38)).toContain('The reader this book is for is an adult of 38.');
+    expect(head(68)).toContain('an adult of 68');
+    for (const age of [5, 6, 8, 12, 16, 38, 68]) {
+      expect(buildAgeModeSection(solo(age)).match(/\{[A-Z][A-Z0-9_]*\}/g), `age ${age}`).toBeNull();
+    }
   });
 
   it('never prescribes a text length — that belongs to the reading level', () => {
@@ -193,14 +279,28 @@ describe('buildStoryShapeSection', () => {
     expect(arc).not.toMatch(/Page budget/);
   });
 
-  it('leaves age six and up on the standard shape with no band rule and no soften line', () => {
+  it('keeps age six and up on the full page-budget shape AND gives it the journey rule', () => {
+    // Until 2026-09-14 this asserted NO band rule at six and up — the same gap
+    // that left the age-band section empty. The page arithmetic is unchanged;
+    // what is added is the one difficulty line, matching the band file these
+    // readers now receive.
     const shape = shapeAt(6, 24);
     expect(shape).toContain('major challenge');
     expect(shape).toMatch(/Challenges: exactly \d/);
-    expect(shape).not.toMatch(/low point before the end/);
-    expect(shape).not.toMatch(/own choice/);
+    expect(shape).toMatch(/A real low point before the end is required/);
+    expect(shape).toMatch(/never a grown-up arriving to fix it/);
+    // Still not the fear-choice band's rule, which belongs to age four alone.
+    expect(shape).not.toMatch(/An opponent is beaten by wit or kindness/);
     // The old blanket "the focus character is very young" soften is gone.
     expect(shape).not.toMatch(/focus character is very young/);
+    // The reading-level difficulty line rides alongside it, not replaced by it.
+    expect(shape).toMatch(/The reading level allows real difficulty/);
+  });
+
+  it('carries the journey rule at every age from six up, with no cap', () => {
+    for (const age of [6, 8, 12, 16, 38, 68]) {
+      expect(shapeAt(age, 24), `age ${age}`).toMatch(/A real low point before the end is required/);
+    }
   });
 
   // Traits are optional (owner, 2026-08-25): "it can be that we do not have any

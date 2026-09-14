@@ -126,15 +126,19 @@ describe('values spread into a prompt actually reach it', () => {
     expect(lf(buildUnifiedStoryPrompt(inWindow, 12))).toContain(firstLine);
   });
 
-  it('a reader past the bands adds nothing — an empty AGE_MODE leaves no stray heading', () => {
-    // Age 6 and up resolves to no band template, and an in-window topic emits
-    // no nudge: the block is empty by design, and the prompt must simply not
-    // gain anything (never a literal placeholder, never a dangling heading).
+  it('an older reader gets the journey band, and it reaches the prompt whole', () => {
+    // There is no longer a "past the bands" reader: from 2026-09-14 age 6 and
+    // up resolves to journey rather than to silence. This used to assert an
+    // EMPTY block, which is the bug it was pinning in place. What still has to
+    // hold is that nothing arrives as a literal placeholder.
     const older = {
       ...base,
       characters: [{ ...base.characters[0], age: 9 }, base.characters[1]],
     };
-    expect(String(buildAgeModeSection(older) || '').trim()).toBe('');
+    const ageMode = String(buildAgeModeSection(older) || '').trim();
+    expect(ageMode).toContain("# HERO'S JOURNEY (age 9)");
+    expect(ageMode).not.toMatch(/\{[A-Z][A-Z0-9_]*\}/);
+    expect(lf(buildUnifiedStoryPrompt(older, 12))).toContain(ageMode.split('\n')[0]);
     expect(unfilled(buildUnifiedStoryPrompt(older, 12))).toEqual([]);
   });
 });

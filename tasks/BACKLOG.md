@@ -1107,11 +1107,30 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
       `stories.evidence_reason` (migration 038) → `docs/decisions.md` 2026-09-14 "A story can be
       marked as EVIDENCE", `server/lib/evidenceStories.js`
 
-- [ ] **Ages 6-18 receive NO age-band rules at all — band `'standard'` has no file.**
-      `resolveAgeBand` (`server/lib/promptBuilders.js:5080-5086`) maps everything from 6 upward to
-      `'standard'`, and `AGE_BAND_TEMPLATE_KEYS` (`:5095`) has no entry for it, so the whole band
-      silently gets nothing. A missing or unparseable age falls through to `'standard'` too.
-      `prompts/story-arc-judge.txt:40` scores the rubric "hard" precisely where the band is absent.
-      This is where the 7-8 endorsement-without-caution cases cluster → `docs/decisions.md`
-      2026-09-14 "Real physical risk must be FRAMED, not forbidden"
+- [x] **DONE 2026-09-14 — ages 6+ (no upper cap) now get the `journey` band; there is no
+      `'standard'` shape band any more.** `resolveAgeBand` mapped everything from 6 upward to
+      `'standard'`, for which `AGE_BAND_TEMPLATE_KEYS` has no entry, so `buildAgeModeSection`
+      returned `''` — most of the product's readers got no plot-shape rules at all, which is how
+      `job_1789420083330_5si0z6ze1` (age 8) shipped a father handing the child a key that removed
+      the only obstacle, with no low point. Ages 6+ and an unknown age now resolve to `journey`;
+      `age-band-journey.txt`'s age-specific framing scales via `{BAND_TITLE}` / `{READER_LINE}` /
+      `{SHAPE_SCALE}` (MINI + "in small" at 5-6, full size from 7, "the reader" at 13+, an adult's
+      book at 18+, no cap — a grandmother trying it out is a reader). The maturity tables were split
+      onto a second axis, `resolvePacingBand`, so a 12-year-old keeps their own budgets and
+      catalogue bands. → `docs/decisions.md` 2026-09-14 "Ages 6 and up get the `journey` band",
+      `server/lib/promptBuilders.js`, `prompts/age-band-journey.txt`
+- [ ] **`prompts/story-arc-judge.txt:40` now has a dead clause** — *"Where the BRIEF carries no
+      age-band section the whole rubric applies unchanged, and hard"* can no longer fire for anyone,
+      since every brief carries a band section. Left in place deliberately (dead, not wrong);
+      removing judge text is a prompt behaviour change that needs its own owner call →
+      `prompts/story-arc-judge.txt:40`, `docs/decisions.md` 2026-09-14 "Ages 6 and up get the
+      `journey` band"
+- [ ] **OPEN QUESTION for the owner: is the reader the OLDEST main or the YOUNGEST?**
+      `resolveAgeBand` reads `pickMainCharacters().focus`, which sorts mains oldest-first, so a
+      mother making a book for her five-year-old with both as mains gets the MOTHER'S band. Meanwhile
+      `youngestMainAge()` (`server/lib/promptBuilders.js`) already encodes "the youngest main is the
+      reader" and feeds the child critic. Ages alone may not separate "a grandmother trying it for
+      herself" (she IS the reader) from "a mother making it for her child" (she is not). Raised
+      2026-09-14 alongside the journey-band change; deliberately NOT changed →
+      `server/lib/promptBuilders.js` `pickMainCharacters` / `resolveAgeBand` / `youngestMainAge`
 

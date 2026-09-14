@@ -353,8 +353,9 @@ async function loadPromptTemplates() {
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     // Plot-shape rules per age band of the OLDEST MAIN character. One of these
-    // is injected as {AGE_MODE} into the idea, trial, arc and beats prompts;
-    // empty from age 6 up — see buildAgeModeSection in promptBuilders.js.
+    // is injected as {AGE_MODE} into the idea, trial, arc and beats prompts.
+    // Never empty: ages 6 and up read age-band-journey.txt, whose {BAND_TITLE},
+    // {READER_LINE} and {SHAPE_SCALE} are filled by fillBandTokens (2026-09-14).
     ['ageBandRoutine', 'age-band-routine.txt'],
     ['ageBandQuest', 'age-band-quest.txt'],
     ['ageBandTries', 'age-band-tries.txt'],

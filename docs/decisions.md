@@ -39337,3 +39337,105 @@ Neither is built; re-testing costs ~$1.50 per Art Director call.
 
 **Touched:** `tests/manual/cover-backdrop-rule-b.js`
 **Status:** ✅ active (a measurement, not a behaviour change)
+
+## 2026-09-14 — Ages 6 and up get the `journey` band: there is no `standard` shape band, and no upper age cap
+
+**Supersedes the `6+ | standard | unchanged current behaviour` row of "Five whole-year age bands
+replace toddler-vs-standard" (2026-09-04, `bae4d540d`, `docs/decisions.md` line ~26416).** Every
+other line of that entry stands: the five whole-year bands below six, the oldest-main rule, the
+deleted `focusAge <= 5` soften.
+
+**Context:** `AGE_BANDS` was a six-element array, so every age from 6 up fell through to the band
+name `'standard'` — and `AGE_BAND_TEMPLATE_KEYS` has no `standard` key, so `buildAgeModeSection`
+returned `''`. **Ages 6 to adult — most of the product's readers — received no plot-shape rules of
+any kind.** That was never a stated intent. The 2026-09-04 entry's "6+ standard — unchanged current
+behaviour" meant *the pipeline's other machinery is unchanged*; it read as a deliberate band and was
+in fact the array simply running out at index 5. Nothing else in the codebase supplied the gap: the
+`journey` band file was one array index away and no other stage carries its rules.
+
+Measured on `job_1789420083330_5si0z6ze1`, an age-8 story: the father hands the child a key that
+removes the story's only obstacle, there is no low point, no emotional beat, and an approving close.
+`prompts/age-band-journey.txt` already forbids all four in as many words — *"never a grown-up
+arriving to fix it"*, *"never a power handed over at the last moment"*, *"They are never carried
+through their own story"*, *"A real low point is required"*. The same gap is named independently in
+today's risk-framing entry: *"The pattern recurs and clusters at ages 7-8 — exactly where `AGE_BANDS`
+resolves to `'standard'`, for which no band file exists."*
+
+**Decision:**
+
+1. **`resolveAgeBand` returns `journey` for every age from 6 up, with no upper cap.** Owner, verbatim:
+   *"No upper cap, what would a mother or grandmother get that try it out, should also work for them."*
+   A 38- or 68-year-old main character is a reader, not a gap. **There is no longer a `standard` SHAPE
+   band** — every age resolves to a band that has a template file.
+
+2. **A missing, unparseable or negative age also resolves to `journey`,** where it previously resolved
+   to `'standard'` and therefore to silence. The 2026-09-04 entry called `standard` "the safe
+   direction to be wrong in"; it is not, because it is the direction that shipped the failure above.
+   The journey rules are generic story craft — a real low point, the hero's own idea turns it, the
+   hero is never carried through their own story — and are wrong for nobody except a toddler, and a
+   toddler book is never commissioned without an age.
+
+3. **The band and the PACING tables are split into two axes.** The hero's-journey SHAPE suits a
+   6-year-old and a 16-year-old alike; the five-year-old's event budget does not. A new
+   `resolvePacingBand()` returns exactly what `resolveAgeBand` used to return (`standard` from 6 up)
+   and is what the four maturity tables now read: `EVENT_BUDGETS`, `INVENTED_FIGURE_BASE`,
+   `ACTION_SHAPE_STANDARD`/`READER_AGE_BY_BAND` in `buildArcBudgetSection`, the beats `READER_LINES`,
+   and `challengeCatalogueBands`. Without this split a 12-year-old's advanced book would have
+   inherited a five-year-old's budgets — verified by static render: at age 12 / advanced the budget
+   block is byte-identical before and after (8-11 events, three-to-four actions per page, 9 invented
+   figures), and `challengeCatalogueBands` still returns `['6','9']` rather than `journey`'s
+   `['3','6']`. `'standard'` survives ONLY as a pacing-band key, the name under which the tables hand
+   over to the reading level.
+
+4. **The journey band's age-specific framing scales; its rules do not change.** `age-band-journey.txt`
+   was hardcoded to five (`# MINI HERO'S JOURNEY (age 5)`, *"The child this book is for is five"*,
+   *"The full shape, in small"*). Three tokens — `{BAND_TITLE}`, `{READER_LINE}`, `{SHAPE_SCALE}` —
+   are filled by `fillBandTokens()` inside `buildAgeModeSection`:
+
+   | Age | Title | Reader line | Shape |
+   |---|---|---|---|
+   | 5, 6 | `MINI HERO'S JOURNEY (age N)` | "The child this book is for is five." | ", in small" |
+   | 7–12 | `HERO'S JOURNEY (age N)` | "The child this book is for is eight." | ", at full size" |
+   | 13–17 | `HERO'S JOURNEY (age N)` | "The reader … is sixteen … a young adult, not a small child." | ", at full size" |
+   | 18+ | `HERO'S JOURNEY (adult reader, age N)` | "…an adult of 38 … never a children's book about a grown-up." | ", at full size" |
+   | unknown | `HERO'S JOURNEY` | "No age is recorded…" | ", at full size" |
+
+   MINI and "in small" are kept for five and six on the owner's wording; from seven it reads as a
+   full hero's journey rather than a miniature one. **Filled in JS, not by the caller's
+   `fillTemplate`:** the band text is interpolated into ~8 parent templates, and any token reaching
+   `fillTemplate` unfilled is stripped to nothing with only a log warning. Only the journey file
+   carries tokens — the four bands below it are single-year files whose wording is already exact.
+
+**Rationale for scaling rather than forking the file:** the rules are the same rules at every age
+(a low point, the hero's own idea, competence, a real antagonist) — only how the reader is addressed
+differs. A second `age-band-journey-older.txt` would duplicate eight rules across two files and let
+them drift, which is the failure mode `BAND_VIEW_DROPS` exists to prevent one level down.
+
+**Knock-ons found and their disposition:**
+- `SIMPLE_BANDS` — `journey` is not in it and never was, so ages 6+ keep challenge budgeting and the
+  catalogue draw exactly as before. No change needed; `challengeCatalogueBands` is the one place that
+  needed the age-aware tweak, delivered by the pacing split above.
+- `buildStoryShapeSection` — `band === 'journey'` now fires for 6+, so the page-budget shape gains the
+  one line *"A real low point before the end is required … never a grown-up arriving to fix it."* The
+  page arithmetic, threads, subject and entrances are untouched. This is intended: the shape section
+  and the band file must not contradict each other.
+- `prompts/story-arc-judge.txt:40` — *"Where the BRIEF carries no age-band section the whole rubric
+  applies unchanged, and hard"* is now unreachable, because every brief carries a band section. **Left
+  unchanged deliberately.** It is dead prose, not wrong prose, and deleting judge text is a prompt
+  behaviour change that belongs to its own owner decision rather than riding along with this one.
+- `buildLifeSkillGuidelines`, `buildTellingRulesSection` — gated on `SIMPLE_BANDS` only; identical
+  under either axis, left on `resolveAgeBand`.
+- `server/services/prompts.js` band-registration comment and three table comments said "empty from
+  age 6 up" / "at 6+ no band applies"; corrected to name the pacing axis.
+
+**Touched:** `server/lib/promptBuilders.js` (`focusAge`, `resolveAgeBand`, new `resolvePacingBand`,
+`fillBandTokens`, `buildAgeModeSection`, `challengeCatalogueBands`, `arcInventedAllowance`,
+`buildArcBudgetSection`, beats `READER_LINES`, exports), `prompts/age-band-journey.txt`,
+`server/services/prompts.js` (comment), `tests/unit/age-band.test.ts`,
+`tests/unit/spread-values-reach-their-template.test.ts`,
+`tests/unit/coping-strategy-and-page-openings.test.ts`.
+
+**Status:** ✅ active — committed locally, NOT pushed (a story may be generating on staging).
+Verified statically: full unit suite 188 files / 2367 tests / 0 failures; the age-8 arc-create prompt
+renders the journey band whole with zero unfilled placeholders; ages 5/6/8/12/16/38/68 and a missing
+age each render their intended framing. No paid call and no story run was made.

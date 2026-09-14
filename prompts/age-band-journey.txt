@@ -1,8 +1,8 @@
-# MINI HERO'S JOURNEY (age 5)
+# {BAND_TITLE}
 
-The child this book is for is five. Write for that child.
+{READER_LINE}
 
-[[plot]]**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,
+[[plot]]**The full shape{SHAPE_SCALE}.** Ordinary world, then a call that pulls the main character out of it,
 then challenges that get harder, then a moment where all seems lost, then the turn, then home —
 changed. Every one of those beats is on the page, in that order.
 

@@ -5057,7 +5057,18 @@ function hasAnyTraits(char) {
 }
 
 /**
- * Which age band the story is written for — the plot SHAPE a child of that age
+ * The age of the character the band rules are written for — the focus main.
+ * ONE reader of `focus.age`, so the shape band, the pacing band and the band
+ * file's own age line can never disagree about whose age they mean.
+ * @returns {number|null} null when no usable age is recorded
+ */
+function focusAge(inputData = {}) {
+  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  return Number.isFinite(age) && age >= 0 ? age : null;
+}
+
+/**
+ * Which age band the story is written for — the plot SHAPE a reader of that age
  * can follow (owner, 2026-09-04; supersedes the two-way toddler/standard split
  * of 2026-08-25, see docs/decisions.md).
  *
@@ -5066,7 +5077,22 @@ function hasAnyTraits(char) {
  *   3   tries       one problem, try-fail-fail-succeed
  *   4   fear-choice something scary resolved by the hero's own choice
  *   5   journey     mini hero's journey with a real low point
- *   6+  standard    the full pipeline behaviour, unchanged
+ *   6+  journey     the same hero's-journey shape, at full size
+ *
+ * THERE IS NO 'standard' SHAPE BAND (owner, 2026-09-14). The 2026-09-04 table
+ * above stopped at index 5, so every age from 6 up fell through to a band name
+ * `AGE_BAND_TEMPLATE_KEYS` has no entry for — and `buildAgeModeSection`
+ * returned ''. Most of the product's readers therefore received NO plot-shape
+ * rules at all. That was a consequence of the array's length, never a stated
+ * intent; measured on job_1789420083330_5si0z6ze1, an age-8 story where the
+ * father handed the child a key that removed the only obstacle, with no low
+ * point and an approving close — four things prompts/age-band-journey.txt
+ * already forbids. Ages 6 and up now read that file, with the age-specific
+ * framing scaled to the reader (see buildAgeModeSection).
+ *
+ * NO UPPER CAP (owner, 2026-09-14): "what would a mother or grandmother get
+ * that try it out, should also work for them". A 38- or 68-year-old main gets
+ * the journey shape, not silence.
  *
  * Owner rule (2026-08-25, retained): the OLDEST main character decides, and
  * secondary characters never do. Two mains aged 5 and 1 get a 5-year-old's
@@ -5074,14 +5100,38 @@ function hasAnyTraits(char) {
  * Because pickMainCharacters already sorts mains oldest-first, the focus
  * character IS the oldest main.
  *
- * An unreadable or absent age falls back to 'standard' — the existing
- * behaviour, and the safe direction to be wrong in.
+ * An unreadable or absent age resolves to 'journey' as well. Silence is no
+ * longer the safe direction to be wrong in: it is what shipped the failure
+ * above. The journey rules are generic story craft — a real low point, the
+ * hero's own idea, never carried through their own story — so an unknown age
+ * gets the shape that is wrong for nobody except a toddler, and a toddler book
+ * is never commissioned without an age.
  */
 const AGE_BANDS = ['routine', 'routine', 'quest', 'tries', 'fear-choice', 'journey'];
 
 function resolveAgeBand(inputData = {}) {
-  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
-  if (!Number.isFinite(age) || age < 0) return 'standard';
+  const age = focusAge(inputData);
+  if (age === null) return 'journey';
+  return AGE_BANDS[age] || 'journey';
+}
+
+/**
+ * The PACING band — how much a reader of this age carries per page and per
+ * book. A SECOND axis, deliberately not the shape band: the hero's-journey
+ * SHAPE is right for a 6-year-old and for a 16-year-old, but the 5-year-old's
+ * event budget, invented-figure allowance and one-action-per-page shape are
+ * not. From 6 up this returns 'standard', which is not a shape band and has no
+ * template file — it is the key under which the maturity tables
+ * (EVENT_BUDGETS_STANDARD, INVENTED_FIGURE_BASE_STANDARD, ACTION_SHAPE_STANDARD)
+ * hand over to the reading level.
+ *
+ * Before 2026-09-14 the two axes were one function, which is why routing ages
+ * 6+ to the journey SHAPE had to split them: without the split a 12-year-old's
+ * advanced book would have inherited a five-year-old's budgets.
+ */
+function resolvePacingBand(inputData = {}) {
+  const age = focusAge(inputData);
+  if (age === null) return 'standard';
   return AGE_BANDS[age] || 'standard';
 }
 
@@ -5134,16 +5184,75 @@ function applyBandView(text, view = 'writer') {
     .trim();
 }
 
+const NUMBER_WORDS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen',
+];
+const ageWord = age => NUMBER_WORDS[age] || String(age);
+
 /**
- * The plot-shape rules for the resolved band (prompts/age-band-*.txt), or '' at
- * age 6 and up. Scope is deliberately narrow — WHAT the story is about and what
+ * The age-specific FRAMING of a band file, filled in JS so one template serves
+ * the whole range the band covers.
+ *
+ * Only `age-band-journey.txt` carries these tokens, because only it covers more
+ * than one year: the four bands below it are single-year files whose wording is
+ * already exact. From 2026-09-14 journey runs from 5 with no upper cap (owner:
+ * "what would a mother or grandmother get that try it out, should also work for
+ * them"), so its three age-specific phrasings are computed rather than written:
+ *
+ *   BAND_TITLE   MINI at 5-6, plain from 7, and "adult reader" from 18
+ *   READER_LINE  "the child this book is for" up to 12, "the reader" for a
+ *                teenager, and an adult reading their own book from 18
+ *   SHAPE_SCALE  ", in small" at 5-6 — the owner's wording, right for that
+ *                reader — and ", at full size" above it
+ *
+ * The RULES themselves are untouched and identical at every age: the low point,
+ * the hero's own idea, the ban on a grown-up arriving to fix it. Only how the
+ * reader is addressed scales.
+ *
+ * A missing age (the band still resolves — see resolveAgeBand) gets the
+ * full-size framing with no age claimed, never an empty "(age )".
+ *
+ * Filled HERE rather than left to the caller's fillTemplate: the band text is
+ * interpolated into ~8 different parent templates, and a token that reached
+ * fillTemplate unfilled would be stripped to nothing with only a log warning.
+ */
+function fillBandTokens(text, inputData = {}) {
+  if (!text || !text.includes('{')) return text;
+  const age = focusAge(inputData);
+  const mini = age !== null && age <= 6;
+  const title = age === null
+    ? "HERO'S JOURNEY"
+    : `${mini ? "MINI HERO'S JOURNEY" : "HERO'S JOURNEY"} (${age >= 18 ? 'adult reader, ' : ''}age ${age})`;
+  let readerLine;
+  if (age === null) {
+    readerLine = 'No age is recorded for the main character. Write for a reader who can follow a whole story from end to end.';
+  } else if (age <= 12) {
+    readerLine = `The child this book is for is ${ageWord(age)}. Write for that child.`;
+  } else if (age <= 17) {
+    readerLine = `The reader this book is for is ${ageWord(age)}. Write for that reader — a young adult, not a small child.`;
+  } else {
+    readerLine = `The reader this book is for is an adult of ${age}. Write a book an adult reads for themselves: the shape below is the same one, told at adult weight — never a children's book about a grown-up.`;
+  }
+  return text
+    .replace(/\{BAND_TITLE\}/g, title)
+    .replace(/\{READER_LINE\}/g, readerLine)
+    .replace(/\{SHAPE_SCALE\}/g, mini ? ', in small' : ', at full size');
+}
+
+/**
+ * The plot-shape rules for the resolved band (prompts/age-band-*.txt). Scope is
+ * deliberately narrow — WHAT the story is about and what
  * happens in it. Text length belongs to the reading level and is not touched
  * here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0, still standing).
  * `bandView` slices the band for a reader that is not the writer.
  */
 function buildAgeModeSection(inputData = {}, { bandView = 'writer' } = {}) {
   const key = AGE_BAND_TEMPLATE_KEYS[resolveAgeBand(inputData)];
-  const band = key ? applyBandView(PROMPT_TEMPLATES[key] || '', bandView) : '';
+  const band = key
+    ? fillBandTokens(applyBandView(PROMPT_TEMPLATES[key] || '', bandView), inputData)
+    : '';
   const window = buildTopicWindowSection(inputData);
   return [band, window].filter(Boolean).join('\n\n');
 }
@@ -5224,8 +5333,8 @@ function buildTopicWindowSection(inputData = {}) {
  * Owner boundaries (2026-09-09): 0-4 really cute, 5-6 not menacing, 7+ formidable
  * where the story means it to be — a ceiling that is lifted, never a floor: a
  * gentle creature stays gentle at every level.
- * Keyed on the AGE, not the band name — `AGE_BANDS` collapses everything from 6
- * upward into `standard` and so cannot separate 6 from 7. Same age source as
+ * Keyed on the AGE, not the band name — the shape band is `journey` at every
+ * age from 6 up and the pacing band `standard`, so neither separates 6 from 7. Same age source as
  * `resolveAgeBand` (`pickMainCharacters(inputData).focus?.age`).
  * An unparseable or missing age emits NOTHING — it must not harden creatures in
  * a story whose reader age we cannot read.
@@ -5291,7 +5400,11 @@ function buildCreatureToneSection(inputData = {}) {
  * site, being a safety rule rather than a plot-shape one.
  */
 function challengeCatalogueBands(inputData = {}) {
-  const band = resolveAgeBand(inputData);
+  // PACING, not shape: obstacle difficulty follows what the reader can carry.
+  // Keyed on the shape band this would hand a 12-year-old the age-5 columns
+  // ['3','6'] from 2026-09-14 onward, instead of the ['6','9'] the age ladder
+  // below gives them.
+  const band = resolvePacingBand(inputData);
   if (SIMPLE_BANDS.has(band)) return [];
   if (band === 'fear-choice') return ['3'];
   if (band === 'journey') return ['3', '6'];
@@ -5880,7 +5993,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     'fear-choice': 'preschool age (about four)',
     journey: 'kindergarten age (about five)',
   };
-  const readerLine = READER_LINES[resolveAgeBand(inputData)]
+  // PACING band: the fallback line is what every reader from 6 up wants, and
+  // the shape band would send a 12-year-old "kindergarten age (about five)".
+  const readerLine = READER_LINES[resolvePacingBand(inputData)]
     || `elementary-school age (about ${readerAge(inputData)} years old)`;
   return fillTemplate(template, {
     LANGUAGE: ctx.LANGUAGE,
@@ -6024,7 +6139,8 @@ const EVENT_BUDGETS = {
   'fear-choice': { lo: 6, hi: 4 },
   journey: { lo: 5, hi: 4 },
 };
-// At 6+ no band applies — the reading level is the maturity proxy.
+// At 6+ no PACING band applies — the reading level is the maturity proxy.
+// (The SHAPE band is `journey` at every age from 6 up; these are the other axis.)
 const EVENT_BUDGETS_STANDARD = {
   '1st-grade': { lo: 4, hi: 3 },
   standard: { lo: 3, hi: 2 },
@@ -6040,14 +6156,14 @@ const INVENTED_FIGURE_BASE = {
   'fear-choice': 2,
   journey: 3,
 };
-// At 6+ no band applies; the ceiling rises with the reading level, not length.
+// At 6+ no PACING band applies; the ceiling rises with the reading level, not length.
 const INVENTED_FIGURE_BASE_STANDARD = {
   '1st-grade': 3,
   standard: 6,
   advanced: 9,
 };
 
-// Per-page action shape at 6+ where no band applies. Every band, and the
+// Per-page action shape at 6+ where no PACING band applies. Every band, and the
 // 1st-grade level here, gets the young shape (one action, at most two).
 // advanced dropped 5-8 -> 3-4 on measured evidence: an advanced arc wrote
 // 2.17 actions/page unprompted, less than half its old band.
@@ -6076,7 +6192,8 @@ const READER_AGE_BY_BAND = {
  */
 function arcInventedAllowance(inputData) {
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
-  const band = resolveAgeBand(inputData);
+  // PACING band — the tables below hand over to the reading level at 'standard'.
+  const band = resolvePacingBand(inputData);
   const cast = (inputData?.characters || []).length || 1;
   const base = INVENTED_FIGURE_BASE[band]
     ?? INVENTED_FIGURE_BASE_STANDARD[lvl]
@@ -6087,7 +6204,10 @@ function arcInventedAllowance(inputData) {
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
-  const band = resolveAgeBand(inputData);
+  // PACING band throughout this builder: every table it reads (EVENT_BUDGETS,
+  // ACTION_SHAPE_STANDARD, READER_AGE_BY_BAND, and arcInventedAllowance inside
+  // it) prices what the reader can carry, not the shape of the plot.
+  const band = resolvePacingBand(inputData);
   const rule = EVENT_BUDGETS[band]
     || EVENT_BUDGETS_STANDARD[lvl]
     || EVENT_BUDGETS_STANDARD.standard;
@@ -6107,6 +6227,7 @@ function buildArcBudgetSection(inputData, pageCount) {
   // Per-page SHAPE, never a book total: a total is an arithmetic claim the
   // model re-granulates until it passes (two models self-certified compliance
   // while overrunning it). A shape has nothing to count.
+  // `band` here is the PACING band, so 'standard' still means "6 and up".
   const olderShape = band === 'standard' ? (ACTION_SHAPE_STANDARD[lvl] || null) : null;
   const actionsLine = olderShape
     ? `- A page carries ${olderShape} actions, and one of them is the main one — the picture renders that one. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`
@@ -8090,6 +8211,8 @@ module.exports = {
   buildStoryShapeSection,
   pickMainCharacters,
   resolveAgeBand,
+  resolvePacingBand,
+  focusAge,
   buildAgeModeSection,
   buildLifeSkillGuidelines,
   buildTopicWindowSection,
