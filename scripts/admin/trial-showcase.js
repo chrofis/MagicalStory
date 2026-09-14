@@ -162,17 +162,21 @@ function pickIdeaIndex(mode) {
   return 0; // 'grounded' and 'first' are the same card
 }
 
+// Returns `fromRotation` so the caller knows whether the shared pointer in
+// STATE_PATH selected this entry. Only a rotation run may advance it: the file
+// is shared across sessions, and a targeted --entry=N run that moved it (the
+// behaviour until 2026-09-14) silently destroyed another session's position.
 function pickEntry(explicitIndex) {
   const { entries } = JSON.parse(fs.readFileSync(ROTATION_PATH, 'utf8'));
   if (explicitIndex != null) {
     const e = entries.find(x => x.index === explicitIndex);
     if (!e) { console.error(`no rotation entry with index ${explicitIndex} (0..${entries.length - 1})`); process.exit(1); }
-    return { entry: e, entries };
+    return { entry: e, entries, fromRotation: false };
   }
   let next = 0;
   try { next = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')).nextIndex ?? 0; } catch { /* first run */ }
   const entry = entries.find(x => x.index === next % entries.length) || entries[0];
-  return { entry, entries };
+  return { entry, entries, fromRotation: true };
 }
 
 function advanceState(entry, entries) {
@@ -217,6 +221,11 @@ function faceDataUri(entry) {
   const entries = picked.entries;
   const entry = { ...picked.entry, ...args.over };
   const envLabel = /staging\./.test(args.base) ? 'STAGING' : 'PRODUCTION';
+  // Printed in the banner, before anything runs, because this used to be
+  // invisible: a targeted run moved the shared pointer and nobody saw it.
+  const rotationNote = picked.fromRotation
+    ? `rotation run — pointer advances to ${(entry.index + 1) % entries.length} on start`
+    : `explicit --entry=${picked.entry.index} — rotation pointer NOT advanced (tests/trial-showcase-state.json untouched)`;
 
   console.log('─'.repeat(72));
   console.log(`TRIAL SHOWCASE — entry ${entry.index}: ${entry.description}`);
@@ -224,6 +233,7 @@ function faceDataUri(entry) {
   console.log(`  character   : ${entry.name} (${entry.age}, ${entry.gender}) — ${entry.family}/${entry.face}`);
   console.log(`  story       : ${entry.storyCategory}${entry.storyTopic ? ` / ${entry.storyTopic}` : ''} [${entry.language}]`);
   console.log(`  started     : ${ch(new Date())}`);
+  console.log(`  rotation    : ${rotationNote}`);
   // PRECEDENCE for the premise: an explicit --details= wins, then a non-empty
   // storyDetails on the rotation entry, then a generated idea card. Nothing
   // ever posts an empty storyDetails again.
@@ -340,7 +350,9 @@ function faceDataUri(entry) {
   const jobId = started.jobId || started.id;
   tJobStart = Date.now();
   console.log(`[${chTime(new Date())}] story job ${jobId} started — setup took ${Math.round((tJobStart - t0) / 1000)}s (photo analysis + preview avatar; not part of the job baseline)`);
-  advanceState(entry, entries);
+  if (picked.fromRotation) {
+    advanceState(entry, entries);
+  }
 
   if (!args.wait) {
     console.log(`--no-wait: poll yourself → GET ${args.base}/api/trial/job-status/${jobId}`);
