@@ -6734,9 +6734,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Quality aggregates — one implementation, in server/lib/storyMetrics.js,
     // so the "not measured vs measured zero" rule is pinned by unit tests and
     // cannot drift between this writer and the metrics collector that reads it.
-    const { computeQualityAnalytics } = require('./server/lib/storyMetrics');
+    const { computeQualityAnalytics, getBuildInfo } = require('./server/lib/storyMetrics');
     const {
-      qualityEvaluated, qualityEvalSkipReason,
+      qualityEvaluated, qualityEvalSkipReason, attemptsMeasured, attemptSource,
       avgQualityScore, minQualityScore, maxQualityScore,
       firstAttemptPassRate, totalRetries, pagesWithIssues, contentBlocked,
     } = computeQualityAnalytics(allImages, { skipQualityEval });
@@ -6879,6 +6879,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // `true` means the numbers are real, including a truthful 0 / 100.
         qualityEvaluated,
         qualityEvalSkipReason: qualityEvaluated ? null : 'skipQualityEval',
+        // `attemptsMeasured: false` marks firstAttemptPassRate/totalRetries as
+        // NOT MEASURED — no page carried an attempt counter. They were
+        // previously derived from `totalAttempts`, which no generation path
+        // writes, so an evaluated run with 14 real retries reported 100 / 0
+        // (staging job_1789348171785_9oxos7dwv). Counter source now:
+        // retryHistory. `attemptSource` names it.
+        attemptsMeasured,
+        attemptSource,
         avgQualityScore,
         minQualityScore,
         maxQualityScore,
@@ -6891,8 +6899,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         sceneCount: allImages.length,
         coverCount: Object.keys(coverImages || {}).filter(k => coverImages[k]?.imageData || coverImages[k]?.hasImage).length,
         // Pipeline config
+        // Which code produced this story. Same env var /api/health reports
+        // (RAILWAY_GIT_COMMIT_SHA); null on a local run, never a throw. Without
+        // it, "did that fix hold?" means reconstructing the deploy history from
+        // timestamps — guesswork when a push lands minutes before a job starts.
+        build: getBuildInfo(),
         pipelineConfig: {
           enableFullRepair,
+          // The pipeline this run actually took (beats | unified).
+          pipelineMode,
           // Recorded alongside it because repair is unreachable when eval is
           // skipped: without this the row could not be read back correctly.
           skipQualityEval,

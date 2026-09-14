@@ -37428,6 +37428,46 @@ is the owner's number and covers both measured stories (2 and 5 admitted pages).
 `tests/unit/final-book-audit-round.test.ts` (+6 tests)
 **Status:** ✅ active
 
+## 2026-09-14 — The trial showcase harness picks a story idea, like every real trial user
+
+**Context:** `scripts/admin/trial-showcase.js` posted `storyDetails: entry.storyDetails || ''`
+and never called the ideas endpoint. Every rotation entry in
+`tests/helpers/trial-rotation.json` leaves `storyDetails` empty, so the premise fell through
+to the literal `'A fun adventure'` fallback at `server/lib/promptBuilders.js:7464` — the writer
+received no premise at all. No real user can reach that state:
+`client/src/pages/TrialWizard.tsx:371-379` requires an idea selection and posts
+`selectedIdea.title + '\n' + selectedIdea.summary`. The harness also never sent `ideaKind`,
+which `server/routes/trial.js:1478-1480` reads to decide whether the landmark mandate applies,
+so the showcase exercised a different branch from the one users hit.
+
+The symptom that exposed it: two showcase runs of the same rotation entry
+(`job_1789296188291_thezv15y1`, `job_1789337873076_qf2at21ui`) came back as near-identical
+chestnut stories. With no premise, the writer had nothing to diverge on.
+
+**Decision:** The harness calls `POST /api/trial/generate-ideas-stream` between
+`create-anonymous-account` and `create-story`, parses the two cards exactly as
+`TrialIdeasStep.tsx` does, and posts the selected one in the wizard's shape, stamping
+`ideaKind` (`local` for card 1, `fantasy` for card 2) so the landmark mandate matches the card.
+New flag `--idea=grounded|makebelieve|first|random`, default `grounded` (card 1 = the child's
+real town with its indexed landmarks; card 2 = a make-believe world). Precedence:
+`--details=` → a non-empty `entry.storyDetails` → a generated idea card. An idea failure is
+fatal — the harness never silently falls back to the empty path.
+
+**Rationale:** A validation harness that cannot reach the state real users are in measures
+nothing about what users get. Cost is ~USD 0.02 per run (two `claude-sonnet-4-6` calls,
+~1.5k in / ~300 out each) and 5-10 s of setup, against a trial showcase of CHF 0.20-0.35 —
+negligible next to the alternative of judging story quality from a three-word placeholder.
+
+**Consequence for past findings:** every trial validation run before 2026-09-14 judged story
+quality from `'A fun adventure'`. **Story-quality conclusions drawn from
+`job_1789296188291_thezv15y1` and `job_1789337873076_qf2at21ui` — premise fidelity, plot
+variety, arc, text quality — are suspect and should not be cited.** Their speed, pipeline-mode
+and image findings are unaffected: those paths do not read the premise.
+
+**Touched:** `scripts/admin/trial-showcase.js` (commit `19f896fde`),
+`.claude/skills/running-trial-showcases/SKILL.md`
+**Status:** ✅ active
+
 ## 2026-09-14 — Every model-facing prompt builder is pinned to the VALUE it carries (Guard C)
 
 **Context:** Three checks shipped blind on 2026-09-14, all one shape — a rule that LOOKS
@@ -37501,4 +37541,63 @@ the owner's call):**
 
 **Touched files:** `tests/unit/built-prompt-values.test.ts` (new, +32 tests),
 `docs/decisions.md`, `tasks/BACKLOG.md`
+**Status:** ✅ active
+
+### Attempt counts come from retryHistory; every run is stamped with its build
+**Context:** The 2026-09-13 honesty fix ("Unevaluated runs report not-measured")
+closed the hole for runs that SKIP quality eval, but left it open for runs that
+were evaluated. Staging `job_1789348171785_9oxos7dwv` (created 2026-09-14
+03:09:31 CH, 18 pages, beats, non-trial) stored
+`qualityEvaluated: true, pagesWithIssues: 7, firstAttemptPassRate: 100,
+totalRetries: 0` — while `runMetrics` on the same story recorded
+`redo_trigger: 17, consistency_regen: 7, char_repair_run: 7,
+shipped_defective_pages: 7`, and the pages' own `retryHistory` arrays are 1-3
+entries long (9 pages × 1 attempt, 4 × 2, 5 × 3 = 14 real retries, 50 % clean).
+Root cause: `computeQualityAnalytics` derived both numbers from
+`img.totalAttempts`, and **all 18 pages had `totalAttempts: undefined`** — an
+absent counter read as "1 attempt, passed first time". Sibling audit: no
+generation path writes page-level `totalAttempts` at all (quality-retry was
+deleted in the 2026-08 pipeline unification). It survives only on the
+regeneration/iterate endpoints (`server/routes/regeneration.js`,
+`server/lib/images.js`, `server/lib/coverIterate.js`,
+`server/lib/coverComposite.js`), where it means "provider attempts inside one
+regen call" — a different quantity. So the aggregate was wrong on EVERY
+evaluated run, not only beats. Separately, no story recorded which code
+produced it: `generationLog`, `analytics`, `runMetrics` and `metadata` carry no
+commit, so "did that fix hold?" meant reconstructing the deploy history from
+timestamps.
+**Decision:**
+1. Attempt counts come from `retryHistory` (new `pageAttemptCount()` in
+   `server/lib/storyMetrics.js`). The repair pipeline builds it with exactly
+   one entry per persisted version — `{attempt: idx+1, type:
+   'unified_pipeline', source: 'original' | 'inpaint-round-N' | 'char-fix-N'}`
+   (`server/lib/repairPipeline.js`) — verified against the stored story: its
+   lengths match `imageVersions` per page. `totalAttempts` is kept as a
+   fallback for pages that carry it and no history (the regen paths).
+2. When NEITHER exists, the aggregate is **null** and the new
+   `analytics.attemptsMeasured: false` says why; `attemptSource` names the
+   counter that was used. A run that genuinely passed every page first time
+   still reports a truthful `100` / `0`. Writing `totalAttempts` on the beats
+   path was rejected: it would overload one field with two meanings
+   (page renders vs provider attempts inside one call) across paths that
+   already read it.
+3. Every run is stamped: `analytics.build = {commit, commitFull, branch,
+   environment}` from `getBuildInfo()`, reading the SAME
+   `RAILWAY_GIT_COMMIT_SHA` (with the `SOURCE_VERSION` alias) that
+   `/api/health` and `/api/admin/diagnostics` already report — no second
+   mechanism. A local run has neither and records null, never throws.
+   `analytics.pipelineConfig.pipelineMode` records the pipeline actually taken.
+**Rationale:** Analytics, not the job row, is the right home: it already holds
+every other run-provenance value, it is snapshotted into `story_metrics.detail`
+by the collector, it survives independently of `story_jobs` (which is pruned),
+and it needs no migration (schema changes are migrations-only). Deriving from
+`retryHistory` rather than back-filling a counter means the number is read from
+the ledger the pipeline already keeps for debugging — one source of truth, and
+it works retroactively on every stored story (recomputing the evidence story
+yields 50 / 14, matching its runMetrics).
+**Touched files:** `server/lib/storyMetrics.js` (`pageAttemptCount`,
+`getBuildInfo`, `computeQualityAnalytics`, metrics `detail.analytics`),
+`storyJobPipeline.js` (analytics block: `attemptsMeasured`, `attemptSource`,
+`build`, `pipelineConfig.pipelineMode`),
+`tests/unit/quality-analytics-not-measured.test.ts`
 **Status:** ✅ active

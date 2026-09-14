@@ -365,6 +365,12 @@ function computeMetrics(data, jobRow) {
         // false = the run skipped evaluation entirely (trials), null = the
         // story predates the flag (2026-09-13).
         qualityEvaluated: analytics.qualityEvaluated ?? null,
+        // Same distinction one level down: false = evaluated run whose pages
+        // carried no attempt counter, so the two fields below are null by
+        // honesty, not by absence of retries (2026-09-14).
+        attemptsMeasured: analytics.attemptsMeasured ?? null,
+        // Which code produced the story (null on a local run with no SHA).
+        build: analytics.build ?? null,
         avgQualityScore: analytics.avgQualityScore ?? null,
         firstAttemptPassRate: analytics.firstAttemptPassRate ?? null,
         totalRetries: analytics.totalRetries ?? null,
@@ -489,6 +495,56 @@ async function collectStoryMetrics(storyId, { pool, environment } = {}) {
 }
 
 /**
+ * How many times a page was actually rendered.
+ *
+ * SOURCE OF TRUTH = `retryHistory` (2026-09-14). The repair pipeline builds it
+ * with exactly one entry per persisted version — `{attempt: idx+1, type:
+ * 'unified_pipeline', source: 'original' | 'inpaint-round-1' | 'char-fix-2' …}`
+ * (`server/lib/repairPipeline.js`, buildVersionEntry/retryHistory) — so its
+ * length IS the attempt count. `totalAttempts` is NOT written by any generation
+ * path: it survives only on the regeneration/iterate endpoints
+ * (`server/routes/regeneration.js`, `server/lib/images.js`, `coverIterate.js`),
+ * where it means "provider attempts inside one regen call". It is honoured as a
+ * fallback for pages that carry it and no history.
+ *
+ * Returns null when NEITHER exists — an absent counter is not "1 attempt".
+ *
+ * @param {object} img
+ * @returns {number|null}
+ */
+function pageAttemptCount(img) {
+  if (!img) return null;
+  const rh = Array.isArray(img.retryHistory) ? img.retryHistory : null;
+  if (rh && rh.length > 0) {
+    // Prefer the larger of length and the highest `attempt` index: a history
+    // that lost an entry still cannot under-report the attempts it recorded.
+    const maxIdx = rh.reduce(
+      (m, e) => (e && Number.isFinite(e.attempt) ? Math.max(m, e.attempt) : m), 0);
+    return Math.max(rh.length, maxIdx);
+  }
+  if (Number.isFinite(img.totalAttempts) && img.totalAttempts >= 1) return img.totalAttempts;
+  return null;
+}
+
+/**
+ * Build provenance for a run: which code produced this story.
+ *
+ * Reads the SAME env var `/api/health` and `/api/admin/diagnostics` already
+ * report (`RAILWAY_GIT_COMMIT_SHA`, with Railway's `SOURCE_VERSION` alias) —
+ * no second mechanism. A local dev run has neither and records null; nothing
+ * throws.
+ */
+function getBuildInfo() {
+  const sha = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.SOURCE_VERSION || null;
+  return {
+    commit: sha ? String(sha).slice(0, 8) : null,
+    commitFull: sha ? String(sha) : null,
+    branch: process.env.RAILWAY_GIT_BRANCH || null,
+    environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_ENVIRONMENT || null,
+  };
+}
+
+/**
  * Quality aggregates for stories.data.analytics.
  *
  * NOT MEASURED is not MEASURED ZERO (2026-09-13). A run with
@@ -504,7 +560,8 @@ async function collectStoryMetrics(storyId, { pool, environment } = {}) {
  *
  * @param {Array<object>} images - the final sceneImages (+ covers) of the run
  * @param {{ skipQualityEval?: boolean }} opts
- * @returns {{qualityEvaluated: boolean, qualityEvalSkipReason: string|null,
+ * @returns {{qualityEvaluated: boolean, attemptsMeasured: boolean,
+ *   attemptSource: 'retryHistory'|'totalAttempts'|null, qualityEvalSkipReason: string|null,
  *   avgQualityScore: number|null, minQualityScore: number|null,
  *   maxQualityScore: number|null, firstAttemptPassRate: number|null,
  *   totalRetries: number|null, pagesWithIssues: number|null,
@@ -523,18 +580,36 @@ function computeQualityAnalytics(images, { skipQualityEval = false } = {}) {
   // only when at least one image actually carries a history to count.
   const sawRetryHistory = all.some(img => img && Array.isArray(img.retryHistory));
 
+  // Attempts: measured per page, and only over the pages that actually carry a
+  // counter. The 2026-09-13 fix closed this hole for SKIPPED runs only; on an
+  // EVALUATED beats run every page had `totalAttempts: undefined` and the
+  // absent counter was read as "1 attempt, passed first time" — staging
+  // job_1789348171785_9oxos7dwv shipped firstAttemptPassRate 100 / totalRetries
+  // 0 over 18 pages whose retryHistory arrays were 1-3 entries long (14 real
+  // retries, 9 of 18 pages clean = 50%).
+  const attempts = qualityEvaluated ? all.map(pageAttemptCount) : [];
+  const measured = attempts.filter(n => n != null);
+  const attemptsMeasured = measured.length > 0;
+
   return {
     qualityEvaluated,
+    // false = the run was evaluated but no page carried an attempt counter, so
+    // firstAttemptPassRate/totalRetries are null rather than a flattering 100/0.
+    attemptsMeasured: qualityEvaluated ? attemptsMeasured : false,
+    attemptSource: (qualityEvaluated && attemptsMeasured)
+      ? (all.some(img => Array.isArray(img?.retryHistory) && img.retryHistory.length > 0)
+        ? 'retryHistory' : 'totalAttempts')
+      : null,
     qualityEvalSkipReason: qualityEvaluated ? null : 'skipQualityEval',
     avgQualityScore: scores.length > 0
       ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
     minQualityScore: scores.length > 0 ? Math.min(...scores) : null,
     maxQualityScore: scores.length > 0 ? Math.max(...scores) : null,
-    firstAttemptPassRate: (qualityEvaluated && all.length > 0)
-      ? Math.round(all.filter(img => !img.totalAttempts || img.totalAttempts <= 1).length / all.length * 100)
+    firstAttemptPassRate: attemptsMeasured
+      ? Math.round(measured.filter(n => n <= 1).length / measured.length * 100)
       : null,
-    totalRetries: qualityEvaluated
-      ? all.reduce((sum, img) => sum + Math.max(0, ((img && img.totalAttempts) || 1) - 1), 0)
+    totalRetries: attemptsMeasured
+      ? measured.reduce((sum, n) => sum + (n - 1), 0)
       : null,
     pagesWithIssues: qualityEvaluated ? scores.filter(s => s < 70).length : null,
     contentBlocked: sawRetryHistory
@@ -543,5 +618,5 @@ function computeQualityAnalytics(images, { skipQualityEval = false } = {}) {
   };
 }
 
-module.exports = { collectStoryMetrics, computeMetrics, extractOutlineSections, compareStoryDraftVsFinal, computeQualityAnalytics };
+module.exports = { collectStoryMetrics, computeMetrics, extractOutlineSections, compareStoryDraftVsFinal, computeQualityAnalytics, pageAttemptCount, getBuildInfo };
 
