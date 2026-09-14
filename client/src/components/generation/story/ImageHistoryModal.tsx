@@ -697,24 +697,41 @@ export function ImageHistoryModal({
 
                     // Group by source. Order matters: quality eval first (broadest),
                     // then semantic, then entity, then image checks.
-                    const SOURCE_ORDER = ['quality eval', 'three-stage', 'semantic', 'entity check', 'image checks'];
+                    const SOURCE_ORDER = ['quality eval', 'three-stage', 'semantic', 'entity check', 'reader', 'final checks', 'image checks'];
                     const SOURCE_META: Record<string, { label: string; subtitle: string; bg: string; border: string; labelColor: string }> = {
                       'quality eval':  { label: language === 'de' ? 'Qualitäts-Eval (Gemini Vision)'  : 'Quality eval (Gemini vision)',     subtitle: language === 'de' ? 'image-evaluation.txt'         : 'from image-evaluation.txt',                       bg: 'bg-gray-50',    border: 'border-gray-300',    labelColor: 'text-gray-700' },
                       'three-stage':   { label: language === 'de' ? 'Compliance-Eval (Sonnet)'         : 'Compliance eval (Sonnet 2-stage)',  subtitle: language === 'de' ? 'image-vision-inventory + image-prompt-compliance.txt' : 'image-vision-inventory + image-prompt-compliance.txt', bg: 'bg-blue-50',    border: 'border-blue-300',    labelColor: 'text-blue-700' },
                       'semantic':      { label: language === 'de' ? 'Semantik-Prüfung'                 : 'Semantic check',                    subtitle: language === 'de' ? 'image-semantic.txt'           : 'from image-semantic.txt',                          bg: 'bg-indigo-50',  border: 'border-indigo-300',  labelColor: 'text-indigo-700' },
                       'entity check':  { label: language === 'de' ? 'Charakter-Konsistenz'              : 'Entity consistency',                subtitle: language === 'de' ? 'entityConsistency.js'         : 'from entityConsistency.js',                        bg: 'bg-orange-50',  border: 'border-orange-300',  labelColor: 'text-orange-700' },
+                      'reader':        { label: language === 'de' ? 'Leser-Audit (ganzes Buch)'      : 'Reader audit (whole book)',         subtitle: language === 'de' ? 'bookAudit.js — Text + Bild zusammen' : 'bookAudit.js — words + picture together', bg: 'bg-purple-50',  border: 'border-purple-300',  labelColor: 'text-purple-700' },
+                      'final checks':  { label: language === 'de' ? 'Mechanische Checks'              : 'Mechanical checks',                 subtitle: language === 'de' ? 'im Code berechnet, kein Judge' : 'computed in code, not a judge',        bg: 'bg-teal-50',    border: 'border-teal-300',    labelColor: 'text-teal-700' },
                       'image checks':  { label: language === 'de' ? 'Bild-Checks'                       : 'Image checks',                      subtitle: language === 'de' ? 'Text-Overlay & Ränder'        : 'text overlay & borders',                           bg: 'bg-amber-50',   border: 'border-amber-300',   labelColor: 'text-amber-700' },
                     };
-                    // Issues stored on a version's fixableIssues come straight from the
-                    // per-image Gemini quality evaluator — they carry `type` (composition,
-                    // scale, hair, …) but no `source` field; that's only attached at the
-                    // orchestration layer when issues from multiple evaluators are merged.
-                    // So when `source` is missing, the issue is from the quality eval.
-                    // Semantic issues (added via the merge above) and entity/image-check
-                    // issues (added by the orchestrator) DO carry `source`.
+                    // PROVENANCE (2026-09-14). `sources[]` is stamped BY THE EMITTER
+                    // (server/lib/findingSources.js) and is the authority. Before it
+                    // existed this panel GUESSED — "when `source` is missing, the issue
+                    // is from the quality eval" — which is how Lab #1263 rendered half
+                    // its findings as `[?]` and why four separate diagnoses that day
+                    // had to reconstruct the emitter after the fact. The old singular
+                    // `source` is kept only as the fallback for versions stored before
+                    // the stamp; nothing is inferred from a description any more.
+                    const PROVENANCE_TO_PANEL: Record<string, string> = {
+                      quality: 'quality eval',
+                      compliance: 'three-stage',
+                      semantic: 'semantic',
+                      entity: 'entity check',
+                      reader: 'reader',
+                      final_checks: 'final checks',
+                    };
                     const grouped = new Map<string, any[]>();
                     for (const it of allIssues) {
-                      const src = it.source || 'quality eval';
+                      const stamped = Array.isArray(it.sources)
+                        ? it.sources.filter((s: any) => typeof s === 'string')
+                        : [];
+                      const src = (stamped.length === 1 && PROVENANCE_TO_PANEL[stamped[0].toLowerCase()])
+                        || (stamped.length > 1 ? stamped.map((s: string) => s.toLowerCase()).sort().join(' + ') : null)
+                        || it.source
+                        || 'quality eval';
                       if (!grouped.has(src)) grouped.set(src, []);
                       grouped.get(src)!.push(it);
                     }

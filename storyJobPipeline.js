@@ -3707,17 +3707,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // ── TEXT REFINEMENT, IN PARALLEL WITH IMAGES ──────────────────────────
     // Scenes are locked at this point, so image generation and prose polishing
     // are independent: the refiner receives the scene outlines READ-ONLY and may
-    // only rewrite page prose, never events. Running it here costs no wall-clock
-    // — images take ~25 min on a 10-page story, refinement ~2-4 min — whereas a
-    // pass after images would add its full duration to the total.
+    // only rewrite page prose, never events. Running it here hides most of its
+    // wall-clock behind the phases that follow, whereas a pass started after
+    // them would add its full duration to the total.
+    // WHAT THE NUMBERS ACTUALLY ARE (corrected 2026-09-14). An older version of
+    // this comment — and the commit that moved the join, 2beda5425 — claimed
+    // "images take ~25 min". They do not: PURE page generation is ~55s (Grok,
+    // 18 pages, parallel). The ~25 minutes is the REPAIR phase, which starts
+    // after the join. The refine chain measures 400-600s and up to ~880s, so it
+    // is NOT hidden behind pure generation; the join waits for it.
     // Never blocks and never throws: a failed refinement leaves the original
     // text in place (startBackgroundRefine swallows and logs).
     // TRIAL SKIPS REFINEMENT (owner 2026-08-15). The "costs no wall-clock"
     // premise above holds only when images take minutes: a trial renders all 5
-    // pages in ~15s (Grok, no eval, no repair), so a ~184s polish pass can
-    // never finish behind them. Measured on both staging trials: refinement hit
-    // the 90s join cap every time and the refined text was DISCARDED — 90s of a
-    // ~230s run, plus two rounds of tokens, for nothing.
+    // pages in ~15s (Grok, no eval, no repair) and has no repair phase behind
+    // which the chain could run, so a minutes-long polish pass would be added
+    // wholesale to a ~230s run. Measured on both staging trials when it was
+    // still enabled: refinement hit the join cap every time and the refined
+    // text was DISCARDED — the wait, plus two rounds of tokens, for nothing.
+    // The cap is gone now, which makes the trial exclusion MORE important, not
+    // less: without it the trial would wait out the whole chain.
     const refineEnabled = process.env.TEXT_REFINE !== 'false' && !inputData.trialMode;
     let textRefinePromise = null;
     // Per-page before/after, filled at the join so dev mode can show WHAT the
@@ -3744,20 +3753,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (textRefineJoined) return;
       textRefineJoined = true;
       // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
-      // Started back at pagesStart; on a normal run it finished long ago and this
-      // await returns immediately. Resolves to null on any failure — the original
-      // text simply stays.
+      // Started back at pagesStart. Resolves to null on any failure — the
+      // original text simply stays.
       //
-      // BOUNDED (2026-08-10). This await used to be open-ended, resting on
-      // "on a normal run it finished long ago" — an assumption, not a guarantee.
-      // The stage already fails safe (null → original text kept) but had no guard
-      // against being SLOW: a stalled provider or a retrying round would hold the
-      // whole story here, after every image is finished, with a user waiting.
-      // Measured normal cost is ~184s against a ~25-min image phase, so anything
-      // still running at this point is anomalous. Refinement is a polish pass —
-      // shipping the unrefined text is always better than not shipping.
+      // UNBOUNDED, AND THAT IS THE POINT (owner, 2026-09-14). This await was
+      // bounded from 2026-08-10 on the premise that "images take ~25 min, so
+      // anything still running here is anomalous". The premise was wrong, and
+      // the commit that moved this join (2beda5425) repeated it: PURE page
+      // generation is ~55s (Grok, 18 pages, parallel) — the ~25 minutes is the
+      // REPAIR phase, which now runs AFTER this point. The refiner's headroom
+      // went from ~1460s to ~99s and the race started losing every time: 3 of 3
+      // staging stories after that commit, two of them with ZERO refine rounds.
+      // Measured chains run 400-600s, with 743/770/841/878s inside one month.
+      // Nothing cancels the chain when the race is lost, so the deadline never
+      // saved a franc — it discarded ~$1.01 of paid work and the whole text
+      // audit with it. The join therefore WAITS: the chain is never truncated,
+      // and the book audit downstream reads the FINAL text.
+      // It cannot wait forever — every model call in the chain is bounded by
+      // textModels' streaming ceiling (>=1500s) and its 120s inactivity abort,
+      // each audit by its own 900s hostage guard, and every step catches its
+      // own failure. Slowness is reported, never acted on: see the warning
+      // below. (docs/decisions.md, 2026-09-14.)
       if (textRefinePromise) {
-        // 300s, not 90s (owner 2026-08-17). The cap exists so a slow refiner cannot
+        // HISTORY OF THE CAP THAT IS NOW GONE — kept so it is not re-derived.
+        // 300s, not 90s (owner 2026-08-17). The cap existed so a slow refiner could not
         // add its full duration to a story, but 90s was shorter than the refiner's
         // own runtime: deepseek needs ~2-4 min for two rounds, so a fast image phase
         // meant the pass was DISCARDED after being paid for (staging
@@ -3774,85 +3793,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // decides how long a user waits for the last round.
         // UNSPLIT (2026-09-14). The reading-level halves are gone — every book
         // gets the long base; the per-page allowance stays.
-        // ONE BASE FOR EVERY READING LEVEL + A BOUNDED GRACE (owner, 2026-09-14).
-        // The reading-level split is gone and the budget computation lives in
-        // textRefine.js (computeTextRefineJoinTimeoutMs) so it can be tested.
-        // The decisive fact behind both changes: NOTHING cancels the refine when
-        // this race is lost, so the chain finishes and bills in full either way —
-        // the deadline only ever discards paid work. See docs/decisions.md.
+        // NO DEADLINE (owner, 2026-09-14). The budget above is now only the
+        // point at which a still-running chain is worth a log line; the join
+        // waits for the chain either way. See awaitTextRefineJoin.
         const {
-          computeTextRefineJoinTimeoutMs, selectJoinResult, shouldGraceJoin, isTotalTextAuditLoss,
-          TEXT_REFINE_JOIN_GRACE_MS,
+          computeTextRefineJoinWarnMs, awaitTextRefineJoin, isTotalTextAuditLoss,
         } = require('./server/lib/textRefine');
-        const JOIN_TIMEOUT_MS = computeTextRefineJoinTimeoutMs(
+        const JOIN_WARN_MS = computeTextRefineJoinWarnMs(
           expandedScenes?.length || 0,
-          process.env.TEXT_REFINE_JOIN_TIMEOUT_MS,
+          process.env.TEXT_REFINE_JOIN_WARN_MS,
         );
-        const TIMED_OUT = Symbol('text-refine-join-timeout');
-        const raceAgainst = (ms) => {
-          let timer = null;
-          return Promise.race([
-            textRefinePromise,
-            // NOT unref'd on purpose: an unref'd timer does not keep the loop
-            // alive, so if this ever ran somewhere the loop could drain, the race
-            // would never settle. `clearTimeout` in the finally below is what stops
-            // it leaking, and that runs on both branches.
-            new Promise((resolve) => { timer = setTimeout(() => resolve(TIMED_OUT), ms); }),
-          ]).finally(() => { if (timer) clearTimeout(timer); });
-        };
-        let refined = await raceAgainst(JOIN_TIMEOUT_MS);
-        const secs = (JOIN_TIMEOUT_MS / 1000).toFixed(0);
-        // GRACE: a step that is RUNNING at the deadline is already paid for, and
-        // abandoning it buys nothing but latency. Wait a bounded extra for it —
-        // and only for it: if nothing is in flight, this behaves exactly as before.
-        if (refined === TIMED_OUT && shouldGraceJoin(textRefinePartial)) {
-          const graceSecs = (TEXT_REFINE_JOIN_GRACE_MS / 1000).toFixed(0);
-          log.warn(`⚠️ [TEXT-REFINE] ${secs}s deadline fired with a round in flight — waiting up to ${graceSecs}s more`);
-          genLog.warn('text_refine_join_grace', `Text refinement did not finish within ${secs}s of images completing but a round was in flight — waiting up to ${graceSecs}s more`);
-          const graced = await raceAgainst(TEXT_REFINE_JOIN_GRACE_MS);
-          if (graced !== TIMED_OUT) {
-            refined = graced;
-            log.info(`✍️  [TEXT-REFINE] the in-flight round landed inside the ${graceSecs}s grace — shipping the complete run`);
-            genLog.warn('text_refine_join_grace_landed', `The in-flight refinement round landed within the ${graceSecs}s grace after the ${secs}s deadline — complete run kept`);
-          } else {
-            // Ranked the same way as the fallback it causes: if nothing had been
-            // published, abandoning this round discards the WHOLE text-quality
-            // gate, and that is an error, not a warning.
-            const totalLoss = isTotalTextAuditLoss(textRefinePartial);
-            const graceMsg = `The in-flight refinement round did not land within the ${graceSecs}s grace after the ${secs}s deadline — ${totalLoss
-              ? 'nothing had been published, so the text audit did not apply at all: the pages go unchecked for the faults it exists to catch, text/picture alignment among them'
-              : `falling back to the ${textRefinePartial.rounds.length} round(s) already published`}`;
-            if (totalLoss) {
-              log.error(`❌ [TEXT-REFINE] the in-flight round did not land inside the ${graceSecs}s grace and nothing had been published`);
-              genLog.error('text_refine_join_grace_expired', graceMsg);
-            } else {
-              log.warn(`⚠️ [TEXT-REFINE] the in-flight round did not land inside the ${graceSecs}s grace`);
-              genLog.warn('text_refine_join_grace_expired', graceMsg);
-            }
+        const { usable, source, waitedMs, slow } = await awaitTextRefineJoin(
+          textRefinePromise,
+          () => textRefinePartial,
+          {
+            warnAfterMs: JOIN_WARN_MS,
+            onSlow: (ms) => {
+              const secs = (ms / 1000).toFixed(0);
+              log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — waiting for it, the book audit downstream must read the final text`);
+              genLog.warn('text_refine_join_slow', `Text refinement is still running ${secs}s after images completed — the pipeline waits for it rather than truncating the chain, because every stage below (the book audit first) must read the text that ships. The chain's own per-call ceilings bound this wait.`);
+            },
           }
-        }
-        // SALVAGE: on timeout, fall back to the last state the refiner published
-        // rather than throwing the whole stage away. Everything below reads
-        // `usable`, so a partial snapshot ships exactly like a complete run.
-        const { usable } = selectJoinResult(
-          refined === TIMED_OUT ? null : refined,
-          textRefinePartial,
-          refined === TIMED_OUT,
         );
-        if (refined === TIMED_OUT) {
-          // The same predicate decides the level in both places.
+        if (slow) {
+          genLog.info('text_refine_join_slow_done', `Text refinement finished after a ${(waitedMs / 1000).toFixed(1)}s join wait (${source})`);
+        }
+        if (source === 'partial' || source === 'original' || source === 'failed') {
+          // The chain FAILED — it was never cut short. Salvage whatever it
+          // published, and rank the loss the way the gate's loss deserves.
           if (!isTotalTextAuditLoss(usable)) {
-            // PARTIAL loss — warn. Some of the gate landed and shipped.
-            log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — shipping ${usable.rounds.length} completed round(s), abandoning the one in flight`);
-            genLog.warn('text_refine_join_partial', `Text refinement did not finish within ${secs}s of images completing — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}; the abandoned step's share of the text audit did not apply, so those pages went unchecked for the faults it exists to catch, text/picture alignment among them`);
+            log.warn(`⚠️ [TEXT-REFINE] the chain did not deliver a complete result — shipping ${usable.rounds.length} completed round(s)`);
+            genLog.warn('text_refine_join_partial', `Text refinement failed before it finished — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}; the unfinished step's share of the text audit did not apply, so those pages went unchecked for the faults it exists to catch, text/picture alignment among them`);
           } else {
             // TOTAL loss — ERROR, not warn (owner, 2026-09-14). Nothing landed:
             // the whole text-quality gate is gone, which is a bigger loss than
             // one styled avatar (avatar_guarantee_fallback, logged at error).
             // The old wording — "original text kept" — read like a benign
             // fallback and named nothing that was lost.
-            log.error(`❌ [TEXT-REFINE] still running ${secs}s after images completed and no round had finished — the ENTIRE text audit is discarded, the unchecked text ships`);
-            genLog.error('text_refine_join_timeout', `Text refinement did not finish within ${secs}s of images completing and no round landed — the text audit did not apply: nothing checked these pages for the twelve faults its two auditors exist to catch, text/picture alignment among them; the unrefined text ships as written`);
+            log.error(`❌ [TEXT-REFINE] the chain failed with no round finished — the ENTIRE text audit is discarded, the unchecked text ships`);
+            genLog.error('text_refine_join_failed', `Text refinement failed and no round landed — the text audit did not apply: nothing checked these pages for the faults its two auditors exist to catch, text/picture alignment among them; the unrefined text ships as written`);
           }
         }
         if (usable?.changed?.length) {
@@ -4032,9 +4011,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
-          // Latest completed state, so the bounded join below can salvage the
-          // audit and any finished round instead of discarding paid work when
-          // the round still in flight runs past the deadline.
+          // Latest completed state, so the join below can salvage the audit and
+          // any finished round if the chain FAILS partway. (It is no longer a
+          // deadline fallback — the join has no deadline.)
           onProgress: (snap) => { textRefinePartial = snap; },
         });
       }

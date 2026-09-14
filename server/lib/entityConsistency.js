@@ -1312,7 +1312,14 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             fixInstruction: annotateCells(issue.fix || issue.fixInstruction, cellToPage),
           };
           delete annotated._gridCellToPage; // internal-only; don't persist
-          report.characters[charName].issues.push(annotated);
+          // PROVENANCE (2026-09-14). `['entity']` is what the consolidator has
+          // always written for these and what `repairLogic` routes on
+          // (`sources.every(s => s === 'entity')` → no automatic repair, owner
+          // 2026-09-04); stamping it at the emitter makes the raw path agree
+          // with the consolidated one instead of leaving it blank.
+          report.characters[charName].issues.push(
+            require('./findingSources').stampFindingSource([annotated], require('./findingSources').FINDING_SOURCES.ENTITY)[0]
+          );
         }
 
         for (const m of (evalResult.garmentColourMismatches || [])) {

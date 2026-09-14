@@ -2729,7 +2729,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // to a consolidator call, which is per page.
             if (f.page == null) continue;
             if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
-            readerFindingsByPage.get(f.page).push({ severity: f.severity || null, line: f.line });
+            // PROVENANCE (2026-09-14): a `missing_character` CRITICAL that came
+            // from the READER pass rather than a per-page judge is by design, not
+            // a bug — a diagnosis that cost an investigation because this merge
+            // dropped the origin. `reader` rides along from here.
+            const fs_ = require('./findingSources');
+            readerFindingsByPage.get(f.page).push({
+              severity: f.severity || null,
+              line: f.line,
+              sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
+            });
           }
           // Compact per-round record — same shape as entityHistory's entries.
           // The full `raw` transcript is kept for the FINAL audit only.

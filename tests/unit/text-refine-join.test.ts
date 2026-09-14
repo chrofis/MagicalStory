@@ -1,141 +1,198 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 
 // @ts-ignore — CommonJS lib
 import {
-  computeTextRefineJoinTimeoutMs,
+  computeTextRefineJoinWarnMs,
+  awaitTextRefineJoin,
   selectJoinResult,
-  shouldGraceJoin,
   isTotalTextAuditLoss,
-  TEXT_REFINE_JOIN_GRACE_MS,
 } from '../../server/lib/textRefine.js';
 
 /**
- * The pipeline joins the text-refine stage against a deadline. Nothing cancels
- * the refine when that race is lost — the chain runs to completion and bills in
- * full — so the deadline only ever discards paid work (owner ruling
- * 2026-09-14). Two things follow, and both are pinned here:
+ * THE JOIN HAS NO DEADLINE (owner, 2026-09-14).
  *
- *   1. One base for every reading level. The old split gave `standard` and
- *      `advanced` 600s and everything else 300s.
- *   2. A bounded grace when a round is actually in flight at the deadline.
+ * It used to race the refine chain against a budget and take whatever had been
+ * published when the timer fired. Nothing cancels the chain when that race is
+ * lost, so it ran to completion and billed in full either way — the deadline
+ * only ever discarded paid work, and the text audit's checks with it.
  *
- * The regression that motivated it: staging job_1789343124794_z2c779f7i, an
- * 18-page young-reader book, got 380s, no round finished, and it shipped a
- * five-page text/picture mismatch the audit checklist exists to catch.
+ * The race became unwinnable when 2beda5425 moved the join from after the
+ * repair pipeline to the end of pure generation, on the stated premise that
+ * "images take ~25 min". They do not: pure page generation is ~55s and the ~25
+ * minutes is the repair phase. Headroom fell from ~1460s to ~99s and 3 of 3
+ * staging stories lost the race, two of them with ZERO refine rounds
+ * (job_1789348171785_9oxos7dwv: round 1 alone took 294.8s and $1.01 of paid
+ * text_refine/audit/lector work was thrown away).
+ *
+ * These tests pin BEHAVIOUR: the chain is never truncated, and what the join
+ * hands downstream is the FINAL result, not an intermediate snapshot.
  */
-describe('computeTextRefineJoinTimeoutMs', () => {
-  it('gives every reading level the same base — the level is not an input', () => {
-    // `standard`, `advanced`, a young-reader level and an absent one all used to
-    // pick a different base; the budget no longer takes a level at all, and a
-    // stray third argument cannot change the answer.
-    expect(computeTextRefineJoinTimeoutMs(10)).toBe(600000);
-    expect(computeTextRefineJoinTimeoutMs(0)).toBe(600000);
-    for (const level of ['standard', 'advanced', '1st-grade', undefined]) {
-      expect((computeTextRefineJoinTimeoutMs as any)(18, undefined, level)).toBe(680000);
-    }
+
+/** Real snapshot shape — as published by textRefine's publish()/beginStep(). */
+const snapshot = (over: any = {}) => ({
+  pages: [{ pageNumber: 3, text: 'Julian legte seine Wange gegen die Schale.' }],
+  original: [{ pageNumber: 3, text: 'Julian legte seine Wange gegen die Schale.' }],
+  changed: [],
+  rounds: [],
+  audits: [],
+  mergedFindings: [],
+  partial: true,
+  inFlight: true,
+  ...over,
+});
+
+/** Real completed-result shape — job_1789348171785_9oxos7dwv, repair round 1. */
+const completeResult = {
+  pages: [{ pageNumber: 3, text: 'Julian legte seine Wange an die Schale. Er schloss die Augen halb und lächelte.' }],
+  original: [{ pageNumber: 3, text: 'Julian legte seine Wange gegen die Schale.' }],
+  changed: [3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+  rounds: [{ round: 1, kind: 'repair', ok: true, elapsedMs: 294781, changedPages: [3, 4, 5] }],
+  audits: [{ source: 'arc-informed', ok: true, faults: 7 }, { source: 'blind', ok: true, faults: 4 }],
+  mergedFindings: [],
+};
+
+describe('awaitTextRefineJoin — the chain is never truncated', () => {
+  it('a chain that outlives the warn budget is still awaited in full', async () => {
+    // The old code raced this promise against the budget and took the snapshot.
+    // Here the budget is 5ms and the chain answers at ~60ms: the join must
+    // still return the COMPLETE result.
+    let published: any = snapshot({ changed: [3], rounds: [{ round: 1, ok: true }] });
+    const promise = new Promise((resolve) => setTimeout(() => resolve(completeResult), 60));
+    const slowSeen: number[] = [];
+    const out = await awaitTextRefineJoin(promise, () => published, {
+      warnAfterMs: 5,
+      onSlow: (ms: number) => slowSeen.push(ms),
+    });
+    expect(out.source).toBe('complete');
+    expect(out.usable).toBe(completeResult);
+    expect(out.slow).toBe(true);
+    expect(slowSeen).toEqual([5]);          // reported, not acted on
+    expect(out.waitedMs).toBeGreaterThanOrEqual(5);
   });
 
-  it('adds 10s per page beyond ten', () => {
-    expect(computeTextRefineJoinTimeoutMs(11)).toBe(610000);
-    expect(computeTextRefineJoinTimeoutMs(18)).toBe(680000);
-    expect(computeTextRefineJoinTimeoutMs(24)).toBe(740000);
+  it('the downstream text is the FINAL wording, not the intermediate snapshot', async () => {
+    // The published snapshot carries the pre-repair prose; the completed chain
+    // carries the rewrite. The old join shipped the snapshot whenever the timer
+    // won — which is how a book audit got prose the book would not contain.
+    const published = snapshot({ changed: [3], rounds: [{ round: 1, ok: true }] });
+    const promise = new Promise((resolve) => setTimeout(() => resolve(completeResult), 40));
+    const { usable } = await awaitTextRefineJoin(promise, () => published, { warnAfterMs: 1 });
+    expect(usable.pages[0].text).toBe(completeResult.pages[0].text);
+    expect(usable.pages[0].text).not.toBe(published.pages[0].text);
+    expect(usable.partial).toBeUndefined();  // a complete run is not flagged partial
   });
 
-  it('never subtracts for a short book', () => {
-    expect(computeTextRefineJoinTimeoutMs(4)).toBe(600000);
+  it('reads the snapshot getter at join time, never a value captured at call time', async () => {
+    // textRefinePartial is reassigned by onProgress while the join waits.
+    let published: any = null;
+    const promise = new Promise((resolve) => setTimeout(() => { resolve(null); }, 20));
+    setTimeout(() => { published = snapshot({ changed: [3], rounds: [{ round: 1, ok: true }] }); }, 5);
+    const { usable, source } = await awaitTextRefineJoin(promise, () => published, {});
+    expect(source).toBe('partial');
+    expect(usable.changed).toEqual([3]);
   });
 
-  it('REGRESSION: an 18-page young-reader book gets 680000, not 380000', () => {
-    expect(computeTextRefineJoinTimeoutMs(18)).toBe(680000);
-    expect(computeTextRefineJoinTimeoutMs(18)).not.toBe(380000);
+  it('no warning fires when the chain finishes inside the budget', async () => {
+    const slowSeen: number[] = [];
+    const out = await awaitTextRefineJoin(Promise.resolve(completeResult), () => null, {
+      warnAfterMs: 5000,
+      onSlow: (ms: number) => slowSeen.push(ms),
+    });
+    expect(out.slow).toBe(false);
+    expect(slowSeen).toEqual([]);
+    expect(out.source).toBe('complete');
   });
 
-  it('lets the env override win outright', () => {
-    expect(computeTextRefineJoinTimeoutMs(18, '90000')).toBe(90000);
-    expect(computeTextRefineJoinTimeoutMs(18, 90000)).toBe(90000);
+  it('a failed chain salvages the last published snapshot instead of losing the stage', async () => {
+    const published = snapshot({ changed: [3, 4], rounds: [{ round: 1, ok: true }] });
+    const { usable, source } = await awaitTextRefineJoin(Promise.resolve(null), () => published, {});
+    expect(source).toBe('partial');
+    expect(usable).toBe(published);
   });
 
-  it('ignores an unset or unparsable override', () => {
-    expect(computeTextRefineJoinTimeoutMs(18, undefined)).toBe(680000);
-    expect(computeTextRefineJoinTimeoutMs(18, '')).toBe(680000);
-    expect(computeTextRefineJoinTimeoutMs(18, 'soon')).toBe(680000);
-    expect(computeTextRefineJoinTimeoutMs(18, '0')).toBe(680000);
+  it('a REJECTED chain never throws the story away', async () => {
+    const published = snapshot({ changed: [3], rounds: [{ round: 1, ok: true }] });
+    const { usable, source } = await awaitTextRefineJoin(
+      Promise.reject(new Error('provider exploded')), () => published, {}
+    );
+    expect(source).toBe('partial');
+    expect(usable).toBe(published);
   });
 
-  it('handles a missing page count', () => {
-    expect(computeTextRefineJoinTimeoutMs(undefined)).toBe(600000);
-    expect(computeTextRefineJoinTimeoutMs(null)).toBe(600000);
+  it('a chain that failed with nothing published leaves the original text', async () => {
+    const { usable, source } = await awaitTextRefineJoin(Promise.resolve(null), () => null, {});
+    expect(source).toBe('original');
+    expect(usable).toBe(null);
   });
 });
 
-describe('shouldGraceJoin', () => {
-  it('opens the grace only when a step is in flight at the deadline', () => {
-    expect(shouldGraceJoin({ inFlight: true, changed: [] })).toBe(true);
+describe('computeTextRefineJoinWarnMs — a warning threshold, not a deadline', () => {
+  it('is the same base for every reading level', () => {
+    expect(computeTextRefineJoinWarnMs(10)).toBe(600000);
+    expect(computeTextRefineJoinWarnMs(0)).toBe(600000);
+    for (const level of ['standard', 'advanced', '1st-grade', undefined]) {
+      expect((computeTextRefineJoinWarnMs as any)(18, undefined, level)).toBe(680000);
+    }
   });
 
-  it('does not open it when the last published step had completed', () => {
-    expect(shouldGraceJoin({ inFlight: false, changed: [3] })).toBe(false);
+  it('adds 10s per page beyond ten and never subtracts', () => {
+    expect(computeTextRefineJoinWarnMs(11)).toBe(610000);
+    expect(computeTextRefineJoinWarnMs(18)).toBe(680000);
+    expect(computeTextRefineJoinWarnMs(4)).toBe(600000);
+    expect(computeTextRefineJoinWarnMs(undefined)).toBe(600000);
   });
 
-  it('does not open it when the refiner never published', () => {
-    expect(shouldGraceJoin(null)).toBe(false);
-    expect(shouldGraceJoin(undefined)).toBe(false);
-    expect(shouldGraceJoin({})).toBe(false);
-  });
-
-  it('keeps the grace bounded', () => {
-    expect(TEXT_REFINE_JOIN_GRACE_MS).toBe(120000);
+  it('lets the env override win, and ignores junk', () => {
+    expect(computeTextRefineJoinWarnMs(18, '90000')).toBe(90000);
+    expect(computeTextRefineJoinWarnMs(18, '')).toBe(680000);
+    expect(computeTextRefineJoinWarnMs(18, 'soon')).toBe(680000);
+    expect(computeTextRefineJoinWarnMs(18, '0')).toBe(680000);
   });
 });
 
 describe('selectJoinResult', () => {
-  const complete = { changed: [1, 2], rounds: [{}, {}] };
   const partial = { changed: [5], rounds: [{}] };
-  const nothingYet = { changed: [], rounds: [] };
 
-  it('ships the refiner’s own result when it won the race', () => {
-    expect(selectJoinResult(complete, partial, false)).toEqual({ usable: complete, source: 'complete' });
+  it('ships the chain’s own result when there is one', () => {
+    expect(selectJoinResult(completeResult, partial, false)).toEqual({ usable: completeResult, source: 'complete' });
   });
 
-  it('keeps a failed refine failed — it does not silently promote a snapshot', () => {
-    expect(selectJoinResult(null, partial, false)).toEqual({ usable: null, source: 'failed' });
-  });
-
-  it('salvages the last published snapshot on timeout', () => {
+  it('salvages the last published snapshot when there is not', () => {
     expect(selectJoinResult(null, partial, true)).toEqual({ usable: partial, source: 'partial' });
-  });
-
-  it('falls back to the original text when no round had finished', () => {
-    expect(selectJoinResult(null, nothingYet, true)).toEqual({ usable: nothingYet, source: 'original' });
     expect(selectJoinResult(null, null, true)).toEqual({ usable: null, source: 'original' });
-  });
-
-  it('a round that landed inside the grace ships as a complete run', () => {
-    // The grace hands the join the refiner's real result, so the caller reports
-    // `timedOut` as false from that point on.
-    expect(selectJoinResult(complete, partial, false).source).toBe('complete');
   });
 });
 
 /**
- * The predicate that decides the LOG LEVEL of a lost join (owner, 2026-09-14):
- * losing the whole text-quality gate ranks as an error, a partial loss as a
- * warning. Asserted on the severity decision, never on the sentence.
+ * The predicate that decides the LOG LEVEL of a lost refine (owner,
+ * 2026-09-14): losing the whole text-quality gate ranks as an error, a partial
+ * loss as a warning. Asserted on the severity decision, never on the sentence.
  */
 describe('isTotalTextAuditLoss', () => {
   it('is a total loss — error level — when nothing was published', () => {
     expect(isTotalTextAuditLoss(null)).toBe(true);
-    expect(isTotalTextAuditLoss(undefined)).toBe(true);
     expect(isTotalTextAuditLoss({ changed: [], rounds: [] })).toBe(true);
   });
 
   it('is a partial loss — warn level — when rewritten pages shipped', () => {
     expect(isTotalTextAuditLoss({ changed: [3], rounds: [{}] })).toBe(false);
-    expect(isTotalTextAuditLoss({ changed: [3, 4, 5], rounds: [{}] })).toBe(false);
+  });
+});
+
+describe('wiring: the join cannot be re-bounded', () => {
+  const pipeline = fs.readFileSync(new URL('../../storyJobPipeline.js', import.meta.url), 'utf8');
+  const lib = fs.readFileSync(new URL('../../server/lib/textRefine.js', import.meta.url), 'utf8');
+
+  it('the pipeline joins through awaitTextRefineJoin and races nothing', () => {
+    expect(pipeline).toContain('awaitTextRefineJoin(');
+    // The exact regressed shape: the refine promise inside a Promise.race.
+    expect(pipeline).not.toMatch(/Promise\.race\(\[\s*textRefinePromise/);
+    expect(pipeline).not.toContain('text-refine-join-timeout');
   });
 
-  it('a round that finished and changed nothing still checked the pages — but ships no evidence, so it ranks as a total loss', () => {
-    // Pinning the current contract: `changed` is the only signal the join has.
-    expect(isTotalTextAuditLoss({ changed: [], rounds: [{ ok: true }] })).toBe(true);
+  it('the deadline machinery is gone from the library too', () => {
+    expect(lib).not.toContain('computeTextRefineJoinTimeoutMs');
+    expect(lib).not.toContain('shouldGraceJoin');
   });
 });

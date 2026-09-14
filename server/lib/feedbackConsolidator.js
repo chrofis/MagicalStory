@@ -17,6 +17,7 @@ const { buildCastIndex, lookupByName } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
+const { FINDING_SOURCES, sourcesOf, mergeSources } = require('./findingSources');
 
 /**
  * Build the Haiku input text from all feedback sources.
@@ -208,6 +209,10 @@ function flattenEntityIssues(entityReport) {
         type: iss.subType || iss.type || iss.category || null,
         severity: iss.severity || 'MODERATE',
         pageNumbers: iss.pageNumbers,
+        // PROVENANCE. This whitelist is a drop site: anything not named here is
+        // gone. Carried, never re-derived — an entity finding that arrives
+        // without one is stamped, because THIS is the entity pool.
+        sources: mergeSources(sourcesOf(iss), [FINDING_SOURCES.ENTITY]),
       });
     }
   }
@@ -355,6 +360,8 @@ async function consolidateFeedback({
         characterName: e.characterName || e.name || '(unknown)',
         description: e.description || e.issue || '',
         severity: e.severity || 'MODERATE',
+        // Same drop site as flattenEntityIssues, same rule (2026-09-14).
+        sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
       }));
     } else {
       entityIssues = flattenEntityIssues(entityReport);

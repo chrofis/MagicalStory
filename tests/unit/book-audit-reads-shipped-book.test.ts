@@ -76,6 +76,38 @@ describe('buildAuditPages — the page list the judge reads', () => {
   });
 });
 
+/**
+ * THE JOIN FEEDS THE AUDIT (2026-09-14). The join no longer races a deadline —
+ * it awaits the chain — so what reaches buildAuditPages is the chain's FINAL
+ * wording even when the chain outlives the old budget. Pinned end to end:
+ * chain result → the write-back onto the page objects the pipeline hands
+ * downstream → the page list the judge reads.
+ */
+describe('the audit reads the FINAL refined text, not an intermediate snapshot', () => {
+  it('a chain that finishes after the old deadline still reaches the judge', async () => {
+    // @ts-expect-error - JS module without types
+    const { awaitTextRefineJoin } = await import('../../server/lib/textRefine.js');
+    // rawImages[].text is a COPY taken when the page was prepared — pre-refine.
+    const rawImages = [{ pageNumber: 3, text: 'Julian legte seine Wange gegen die Schale.', imageData: 'data:image/png;base64,AAA' }];
+    const published = { changed: [3], rounds: [{ round: 1, ok: true }], partial: true, inFlight: true,
+      pages: [{ pageNumber: 3, text: 'Julian legte seine Wange gegen die Schale.' }] };
+    const finalText = 'Julian legte seine Wange an die Schale. Er schloss die Augen halb und lächelte.';
+    const chain = new Promise((resolve) => setTimeout(() => resolve({
+      changed: [3], rounds: [{ round: 1, kind: 'repair', ok: true, elapsedMs: 294781 }],
+      pages: [{ pageNumber: 3, text: finalText }],
+    }), 40));
+
+    const { usable } = await awaitTextRefineJoin(chain, () => published, { warnAfterMs: 1 });
+    // The pipeline's write-back, same shape: by-page map onto every target list.
+    const byPage = new Map(usable.pages.map((p: any) => [p.pageNumber, p.text]));
+    for (const img of rawImages) { const t = byPage.get(img.pageNumber); if (t) img.text = t as string; }
+
+    const auditPages = buildAuditPages(rawImages, null);
+    expect(auditPages[0].text).toBe(finalText);
+    expect(auditPages[0].text).not.toBe(published.pages[0].text);
+  });
+});
+
 describe('wiring: the audit cannot be rebuilt on stale text or a stale version', () => {
   const repair = fs.readFileSync(new URL('../../server/lib/repairPipeline.js', import.meta.url), 'utf8');
   const pipeline = fs.readFileSync(new URL('../../storyJobPipeline.js', import.meta.url), 'utf8');

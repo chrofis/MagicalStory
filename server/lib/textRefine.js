@@ -611,10 +611,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
     repetition,
     wordBudget,
     partial: true,
-    // IN FLIGHT (2026-09-14). The join's grace period needs to know whether a
-    // step is RUNNING at the moment its deadline fires, and the published
-    // snapshot is the only channel the caller has. `beginStep()` publishes the
-    // state so far with this set; the publish() after the step clears it.
+    // IN FLIGHT (2026-09-14). Whether a model step is RUNNING right now.
+    // `beginStep()` publishes the state so far with this set; the publish()
+    // after the step clears it. The join no longer has a deadline to grace, so
+    // this is now diagnostic: it says whether a slow join is waiting on a call
+    // or on nothing.
     inFlight: stepInFlight,
   });
   // Set by beginStep(), cleared by every publish() that follows a completed step.
@@ -1214,34 +1215,41 @@ function startBackgroundRefine(storyData, pages, opts = {}) {
     });
 }
 
-// ── THE PIPELINE'S JOIN BUDGET ───────────────────────────────────────────────
+// ── THE PIPELINE'S JOIN ──────────────────────────────────────────────────────
 //
 // Extracted here (2026-09-14) because the join lives deep inside
 // storyJobPipeline's generation function and could not be tested there.
 //
-// ONE BASE FOR EVERY READING LEVEL. The split that gave `standard`/`advanced`
-// double the base was measured on output TOKENS, but the deadline buys latency
-// and nothing else: nothing cancels the refine when the race is lost, so the
-// chain runs to completion and bills in full either way (staging
-// job_1789348171785_9oxos7dwv billed $1.01 of text_refine AFTER its join had
-// given up). A short-level book runs the same two audits, the same repair and
-// the same lector, so it gets the same base. An 18-page young-reader book goes
-// from 380s to 680s — job_1789343124794_z2c779f7i timed out at 380s with no
-// round finished and shipped a five-page text/picture mismatch its audit
-// checklist exists to catch.
+// NO DEADLINE (owner, 2026-09-14). The join used to race the refine chain
+// against a budget and take whatever had been published when the timer fired.
+// Nothing cancels the refine when that race is lost, so the chain runs to
+// completion and bills in full either way (staging job_1789348171785_9oxos7dwv
+// billed $1.01 of text_refine AFTER its join had given up) — the deadline only
+// ever discarded paid work, and with it the text audit's checks, the
+// text/picture alignment one among them. The join now WAITS: the chain is
+// never truncated, and every downstream consumer — the book audit inside the
+// repair pipeline first among them — reads the FINAL refined text.
+//
+// It cannot wait forever: every model call in the chain is bounded by
+// textModels' own streaming ceiling (>=1500s) plus its 120s inactivity abort,
+// each audit additionally by AUDIT_DEADLINE_MS (900s), and every step catches
+// its own failure, so the chain always settles. What is left is a LATENCY
+// question, and that is answered with a warning, not a kill (a gate ships with
+// a warning; it never destroys a paid run): once the wait passes the budget
+// below, the join logs how long it has been waiting and keeps waiting.
 const TEXT_REFINE_JOIN_BASE_MS = 600000;
 const TEXT_REFINE_JOIN_PER_PAGE_MS = 10000;
 const TEXT_REFINE_JOIN_FREE_PAGES = 10;
-// Bounded grace: only entered when a step is actually in flight at the deadline.
-const TEXT_REFINE_JOIN_GRACE_MS = 120000;
 
 /**
- * How long the pipeline waits for the refiner once the images are done.
+ * After how long an unfinished refine chain is worth a warning. Measured
+ * chains run 400-600s, with 743/770/841/878s all seen in one month, so this is
+ * "slower than usual", not "too slow to keep".
  * @param {number} pageCount      pages in the book
- * @param {string|number} [envOverride]  TEXT_REFINE_JOIN_TIMEOUT_MS, wins outright
+ * @param {string|number} [envOverride]  TEXT_REFINE_JOIN_WARN_MS, wins outright
  * @returns {number} ms
  */
-function computeTextRefineJoinTimeoutMs(pageCount, envOverride) {
+function computeTextRefineJoinWarnMs(pageCount, envOverride) {
   const override = Number(envOverride);
   if (override) return override;
   const pages = Number(pageCount) || 0;
@@ -1250,25 +1258,61 @@ function computeTextRefineJoinTimeoutMs(pageCount, envOverride) {
 }
 
 /**
- * What the join ships once its race (and any grace) has settled. Pure.
- * @param {object|null} refined  the refiner's own result — null if it failed
+ * What the join ships. Pure.
+ * @param {object|null} refined  the refiner's own result — null if the chain failed
  * @param {object|null} partial  the last snapshot the refiner published
- * @param {boolean} timedOut     true if the deadline won the race
+ * @param {boolean} salvage      true when no complete result is available
  * @returns {{usable: object|null, source: 'complete'|'failed'|'partial'|'original'}}
  */
-function selectJoinResult(refined, partial, timedOut) {
-  if (!timedOut) return { usable: refined || null, source: refined ? 'complete' : 'failed' };
+function selectJoinResult(refined, partial, salvage) {
+  if (!salvage) return { usable: refined || null, source: refined ? 'complete' : 'failed' };
   if (partial?.changed?.length) return { usable: partial, source: 'partial' };
   return { usable: partial || null, source: 'original' };
 }
 
 /**
- * Whether the deadline firing opens the grace period. Pure.
- * A step is in flight when the last published snapshot was published by
- * beginStep() and no completed step has published since.
+ * THE JOIN ITSELF — await the chain, never truncate it.
+ *
+ * Resolves only once the refiner has settled. A chain that outlives
+ * `warnAfterMs` is reported through `onSlow` and then still awaited in full,
+ * so the result is the COMPLETE run and never an intermediate snapshot. A
+ * chain that fails (or, defensively, rejects) salvages the last published
+ * snapshot instead of throwing the stage away.
+ *
+ * @param {Promise<object|null>} promise  startBackgroundRefine's promise
+ * @param {function|object|null} getPartial  latest published snapshot, or a getter for it
+ * @param {{warnAfterMs?: number, onSlow?: function}} [opts]
+ * @returns {Promise<{usable: object|null, source: string, waitedMs: number, slow: boolean}>}
  */
-function shouldGraceJoin(partial) {
-  return partial?.inFlight === true;
+async function awaitTextRefineJoin(promise, getPartial, opts = {}) {
+  const t0 = Date.now();
+  const warnAfterMs = Number(opts.warnAfterMs) || 0;
+  let slow = false;
+  let timer = null;
+  if (warnAfterMs > 0) {
+    // NOT unref'd: an unref'd timer does not keep the loop alive. clearTimeout
+    // in the finally is what stops it leaking, and that runs on every branch.
+    timer = setTimeout(() => {
+      slow = true;
+      if (typeof opts.onSlow === 'function') {
+        try { opts.onSlow(warnAfterMs); } catch { /* a logging failure never breaks the join */ }
+      }
+    }, warnAfterMs);
+  }
+  let refined = null;
+  try {
+    refined = await promise;
+  } catch (e) {
+    // startBackgroundRefine already swallows; this is belt-and-braces so a
+    // future caller cannot make a polish pass throw a paid story away.
+    log.warn(`⚠️ [TEXT-REFINE] join saw a rejected chain (${e.message}) — salvaging the last published snapshot`);
+    refined = null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+  const partial = typeof getPartial === 'function' ? getPartial() : getPartial;
+  const sel = selectJoinResult(refined, partial, !refined);
+  return { ...sel, waitedMs: Date.now() - t0, slow };
 }
 
 /**
@@ -1301,11 +1345,10 @@ module.exports = {
   findRepeatedPassages,
   buildRepetitionFindings,
   SHINGLE_WORDS,
-  computeTextRefineJoinTimeoutMs,
+  computeTextRefineJoinWarnMs,
+  awaitTextRefineJoin,
   selectJoinResult,
-  shouldGraceJoin,
   isTotalTextAuditLoss,
   TEXT_REFINE_JOIN_BASE_MS,
   TEXT_REFINE_JOIN_PER_PAGE_MS,
-  TEXT_REFINE_JOIN_GRACE_MS,
 };

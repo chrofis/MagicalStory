@@ -875,7 +875,12 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     // returns one. The score is computed from semanticIssues below.
     // Unified issue array (2026-08-08). semantic_issues is the pre-unification
     // name and stays readable so stored evaluations keep parsing.
-    const semanticIssues = analysis.fixable_issues || analysis.semantic_issues || [];
+    // PROVENANCE (2026-09-14): every finding names its emitter, in the one
+    // field routing reads and scoring passes through (server/lib/findingSources.js).
+    const semanticIssues = require('./findingSources').stampFindingSource(
+      analysis.fixable_issues || analysis.semantic_issues || [],
+      require('./findingSources').FINDING_SOURCES.SEMANTIC
+    );
 
     log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
