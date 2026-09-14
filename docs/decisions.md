@@ -37601,3 +37601,43 @@ yields 50 / 14, matching its runMetrics).
 `build`, `pipelineConfig.pipelineMode`),
 `tests/unit/quality-analytics-not-measured.test.ts`
 **Status:** ✅ active
+
+## 2026-09-14 — The trial showcase harness picks a story idea, like every real trial user
+
+**Context:** `scripts/admin/trial-showcase.js` posted `storyDetails: entry.storyDetails || ''`
+and never called the ideas endpoint. Every rotation entry in
+`tests/helpers/trial-rotation.json` leaves `storyDetails` empty, so the premise fell through
+to the literal `'A fun adventure'` fallback at `server/lib/promptBuilders.js:7464` — the writer
+received no premise at all. No real user can reach that state:
+`client/src/pages/TrialWizard.tsx:371-379` requires an idea selection and posts
+`selectedIdea.title + '\n' + selectedIdea.summary`. The harness also never sent `ideaKind`,
+which `server/routes/trial.js:1478-1480` reads to decide whether the landmark mandate applies,
+so the showcase exercised a different branch from the one users hit.
+
+The symptom that exposed it: two showcase runs of the same rotation entry
+(`job_1789296188291_thezv15y1`, `job_1789337873076_qf2at21ui`) came back as near-identical
+chestnut stories. With no premise, the writer had nothing to diverge on.
+
+**Decision:** The harness calls `POST /api/trial/generate-ideas-stream` between
+`create-anonymous-account` and `create-story`, parses the two cards exactly as
+`TrialIdeasStep.tsx` does, and posts the selected one in the wizard's shape, stamping
+`ideaKind` (`local` for card 1, `fantasy` for card 2) so the landmark mandate matches the card.
+New flag `--idea=grounded|makebelieve|first|random`, default `grounded` (card 1 = the child's
+real town with its indexed landmarks; card 2 = a make-believe world). Precedence:
+`--details=` → a non-empty `entry.storyDetails` → a generated idea card. An idea failure is
+fatal — the harness never silently falls back to the empty path.
+
+**Rationale:** A validation harness that cannot reach the state real users are in measures
+nothing about what users get. Cost is ~USD 0.02 per run (two `claude-sonnet-4-6` calls,
+~1.5k in / ~300 out each) and 5-10 s of setup, against a trial showcase of CHF 0.20-0.35 —
+negligible next to the alternative of judging story quality from a three-word placeholder.
+
+**Consequence for past findings:** every trial validation run before 2026-09-14 judged story
+quality from `'A fun adventure'`. **Story-quality conclusions drawn from
+`job_1789296188291_thezv15y1` and `job_1789337873076_qf2at21ui` — premise fidelity, plot
+variety, arc, text quality — are suspect and should not be cited.** Their speed, pipeline-mode
+and image findings are unaffected: those paths do not read the premise.
+
+**Touched:** `scripts/admin/trial-showcase.js` (commit `19f896fde`),
+`.claude/skills/running-trial-showcases/SKILL.md`
+**Status:** ✅ active
