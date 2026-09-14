@@ -2917,9 +2917,26 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   // page's own prop lost its reference image without a word in the log. The
   // handle itself is kept as the value so the state's own cell can be picked
   // below.
+  //
+  // The cited list is the UNION of the brief's `objects[]` and any VB-OBJECT id
+  // the brief filed under `characters[]` (2026-09-14). 41cde02d0 established
+  // that union for the REQUIRED OBJECTS text block; it did NOT reach here, so a
+  // repair rewrite that reclassified an animal from `objects[]` into
+  // `characters[]` kept the entity's name and size clause in the prompt while
+  // its reference-CELL claim was silently dropped — and an element with no cell
+  // is drawn from the model's imagination, drifting page to page (backlog #65,
+  // the egg that rendered stone, then glossy red, then speckled).
+  // `collectVbObjectCitations` takes ONLY ANI/ART/CLO/LOC/VEH-shaped ids from
+  // `characters[]`; a human cast member is a name or a CHR id and resolves to
+  // null, so the cast path is untouched and no cell is ever gained by a name.
+  const { collectVbObjectCitations } = require('./promptBuilders');
+  const citedHandles = [
+    ...(Array.isArray(sceneObjectIds) ? sceneObjectIds : []),
+    ...collectVbObjectCitations(sceneMetadata ? { characters: sceneMetadata.characters, fullData: sceneMetadata.fullData } : null)
+  ];
   const askedFor = new Map();
-  for (const raw of (Array.isArray(sceneObjectIds) ? sceneObjectIds : [])) {
-    const handle = String(raw || '').trim().toUpperCase();
+  for (const raw of citedHandles) {
+    const handle = String((raw && typeof raw === 'object' ? raw.id : raw) || '').trim().toUpperCase();
     if (!handle) continue;
     const parent = baseVbId(handle) || handle;
     // A bare id never overwrites a dotted one: a brief that names both takes

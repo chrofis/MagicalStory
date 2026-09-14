@@ -21,6 +21,56 @@ superseded and link forward.
 
 ---
 
+## A reference-cell claim resolves from the citation UNION, not from `objects[]` alone (2026-09-14)
+
+**Context.** `41cde02d0` (backlog #76) established that a Visual Bible entity citation
+resolves from the UNION of a page's `objects[]` and `characters[]`, because a repair
+rewrite can reclassify an entity from one list to the other. That fix covered **only the
+REQUIRED OBJECTS text block** in the page prompt. The reference-cell grid — the thing that
+decides which reference IMAGES are attached to the page — still read the raw
+`sceneMetadata.objects`. So a repair that moved an animal into `characters[]` kept its name
+and its size clause in the prompt text while its reference-CELL claim was dropped without a
+word in the log. An element with no cell is drawn from the image model's imagination and
+drifts page to page: that is what rendered one egg as dull mottled stone, then smooth
+glossy red, then speckled, across a single story (backlog #65).
+
+**Measured population: ZERO.** The grid was never simply broken.
+`getElementReferenceImagesForPage` gates on `if (!onPage && !named)`, where `onPage` comes
+from the entry's own `appearsInPages` — the bible's page list already rescues the ordinary
+case. The residual is narrow: an entity whose `appearsInPages` does NOT cover the page,
+which the page genuinely cites, where the citation sits in `characters[]`. Replayed against
+the three stored staging stories (`job_1789337998754_apslnsq1z`,
+`job_1789343124794_z2c779f7i`, `job_1789348171785_9oxos7dwv`): **0 pages** by the
+VB-id-shaped rule (those stories file `characters[]` as bare names — `["Mother Dragon",
+"Funkli", ...]` — which the resolver deliberately does not resolve), and **0 pages** by the
+looser bare-name rule as well (3 such citations exist; `appearsInPages` covers all 3).
+
+**Decision.** Ship the union as PREVENTION anyway, at the single consumer — the same call
+made for #79, which was also measured at 0. `getElementReferenceImagesForPage` now builds
+its `askedFor` map from `sceneObjectIds` PLUS `collectVbObjectCitations(sceneMetadata)`
+over `characters[]`/`fullData.characters`. One site covers all four callers
+(`storyJobPipeline.js`, `images.js` iterate via `buildPageCompositeRefs`, `testlab.js`,
+`regeneration.js`) instead of patching each producer.
+
+**Rationale.**
+- **No second resolver.** `collectVbObjectCitations` / `vbObjectIdOf` were built and tested
+  the same day for the text-block fix. Object prefixes are `ANI|ART|CLO|LOC|VEH`; CHR ids
+  and bare names resolve to `null`, so the human cast path is untouched and the cell set can
+  never grow merely because a name appears somewhere.
+- **The worn-item dedupe still rules.** Owner ruling 2026-09-06: a garment named inside a
+  character's own clothing line gets no standalone cell, because the avatar reference
+  already wears it and sending the plate made the model paint it twice. That dedupe runs
+  downstream of this union and is unchanged — a test pins it, and its log line fires in the
+  test run, proving the union pulls the garment in and the dedupe removes it.
+- **Measured-at-zero is not the same as theoretical.** The failure mode is silent and its
+  symptom (identity drift across pages) is the expensive one; the guard costs one map build.
+
+**Touched files.** `server/lib/visualBible.js`
+(`getElementReferenceImagesForPage` — `askedFor` now built from the citation union),
+`tests/unit/vb-ref-cell-citation-union.test.ts` (new, 4 tests), `tasks/BACKLOG.md`.
+
+---
+
 ## The plate pixel-QC judges a uniform patch by shape and position, not by a bare count (2026-09-14)
 
 **Context.** `vantage_plate_qc_failed` fired 5 times across the 2026-09-14 validation
