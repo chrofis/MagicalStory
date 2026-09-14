@@ -25,6 +25,8 @@
  * the `wornAs` link names. Nothing is inferred from prose.
  */
 
+const { log } = require('../utils/logger');
+
 /** Canonical outfit slots (same vocabulary as clothingCheck's SLOT_LABELS). */
 const WORN_SLOTS = ['headwear', 'top', 'bottom', 'footwear', 'belt/waist', 'outer layer', 'accessories'];
 
@@ -102,22 +104,89 @@ function wornAsEntries(visualBible) {
   return out;
 }
 
+/** Look one VB id up across the pools that can hold a worn element. */
+function findVbEntryById(visualBible, id) {
+  const want = String(id || '').trim().toUpperCase();
+  if (!want) return null;
+  for (const pool of ['artifacts', 'clothing', 'vehicles']) {
+    const list = Array.isArray(visualBible && visualBible[pool]) ? visualBible[pool] : [];
+    for (const entry of list) {
+      if (entry && String(entry.id || '').trim().toUpperCase() === want) return { entry, pool };
+    }
+  }
+  return null;
+}
+
 /**
- * Per-page worn state for every wornAs item whose OWNER is in the page cast.
+ * Which outfit slot a VB element belongs to, from its own NAME.
  *
- * `state` is always one of 'worn' | 'off'. When the brief declared nothing (or
- * declared an off state with no location) the entry is marked `missing` — the
- * mechanical check reports it, the review gets one fed-back retry, and if it
- * still comes back undeclared the state DEFAULTS TO 'worn', because the avatar
- * reference wears the full outfit (decisions.md 2026-09-06).
+ * Read the SLOT_NOUNS caveat above: this never decides whether something is
+ * clothing and never decides a state — the Art Director has already DECLARED
+ * this id as a worn item of a named owner, and the only open question is which
+ * clause of that owner's outfit text the declaration is about. When the name
+ * matches nouns from more than one slot, or from none, the answer is null and
+ * the caller must treat the item as unmappable rather than guess.
+ *
+ * The NAME only, never the description: a description ("a scarf-sized square of
+ * cloth she ties over her hair") can carry nouns from slots the item is not in.
  */
-function resolveWornItemsForPage(visualBible, cast, sceneMetadata) {
+function deriveSlotFromName(name) {
+  const text = String(name || '');
+  if (!text.trim()) return null;
+  const hits = WORN_SLOTS.filter((slot) => {
+    const nouns = SLOT_NOUNS[slot];
+    return nouns && new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i').test(text);
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/**
+ * Per-page worn state for every worn element whose OWNER is in the page cast.
+ *
+ * TWO sources, and the second is why e403345b1 was inert in practice
+ * (staging job_1789348171785_9oxos7dwv, CLO001 "red zip-up hoodie", declared
+ * `off` on six pages and stripped from nothing):
+ *
+ *  1. `wornAsEntries` — VB entries the STORY WRITER linked with `wornAs`. Only
+ *     these are enumerated by default, so an undeclared one defaults to 'worn'
+ *     and is reported `missing` by the mechanical check (decisions.md
+ *     2026-09-06). That default must stay keyed on the writer's link: it is the
+ *     writer that promised the item is part of an outfit on every page.
+ *
+ *  2. Rows the ART DIRECTOR declared in the brief's `wornItems[]` that point at
+ *     a VB id with NO `wornAs` link. The writer emits `wornAs` only for one
+ *     narrow documented exception — a prop the plot turns into costume — which
+ *     measured 9 of 482 clothing/artifact/vehicle entries over 59 staging
+ *     stories, and NEVER on a `clothing`-pool entry (0 of 6; that pool carries
+ *     `wornBy` + `howWorn` and has no slot field at all). The Art Director, by
+ *     contrast, declares a row for anything it sees worn: 32 of 51 declared
+ *     rows over those stories pointed at an unlinked id, 12 of them `off`. Each
+ *     of those silently stripped nothing — the generator kept drawing the
+ *     garment and every judge kept demanding it.
+ *
+ *     A declared row is itself authoritative: it names the id AND the owner.
+ *     What it does not name is the outfit SLOT, which is derived from the VB
+ *     entry's own name through the closed SLOT_NOUNS vocabulary. When no single
+ *     slot can be derived the item is UNMAPPABLE — it is left out and, if the
+ *     row declared it `off`, logged as an error. Silence here is what made this
+ *     bug invisible for a day.
+ *
+ * `state` is always one of 'worn' | 'off'. Source-2 items are never `missing`:
+ * they were declared, and the `removal_unstated` check's scope stays exactly
+ * the writer-linked set it has always been.
+ */
+function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {}) {
   const castNames = (Array.isArray(cast) ? cast : [])
     .map(c => (typeof c === 'string' ? c : c && c.name))
     .filter(Boolean);
   const declared = new Map(wornItemsFromMetadata(sceneMetadata).map(w => [w.id, w]));
+  const pageLabel = options.pageNumber
+    ?? (sceneMetadata && (sceneMetadata.pageNumber ?? (sceneMetadata.fullData && sceneMetadata.fullData.pageNumber)))
+    ?? '?';
   const out = [];
+  const linked = new Set();
   for (const item of wornAsEntries(visualBible)) {
+    linked.add(item.id);
     if (!castNames.some(n => sameName(n, item.owner))) continue;
     const d = declared.get(item.id) || null;
     const stateDeclared = d && d.state ? d.state : null;
@@ -134,6 +203,46 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata) {
       declared: !!stateDeclared,
       defaulted: !stateDeclared,
       missing,
+    });
+  }
+
+  // Source 2 — declared rows with no writer link.
+  for (const d of declared.values()) {
+    if (linked.has(d.id) || !d.state) continue;
+    const found = findVbEntryById(visualBible, d.id);
+    const entry = found ? found.entry : null;
+    const owner = String((entry && entry.wornBy) || d.owner || '').trim();
+    const slot = entry ? deriveSlotFromName(entry.name || entry.id) : null;
+    if (!entry || !owner || !slot) {
+      // Loud, and only for the state that silently changes nothing downstream:
+      // an `off` the resolver cannot map leaves the garment in the generator's
+      // outfit text AND in every judge's clothing contract. Never kills the run
+      // (gates are guidelines) — the page renders, the fault is on the record.
+      if (d.state === 'off') {
+        const why = !entry
+          ? 'no Visual Bible element carries that id'
+          : (!owner ? 'the element names no wearer and the row names no owner'
+            : `no single outfit slot can be derived from its name "${entry.name || entry.id}"`);
+        log.error(`[WORN] Page ${pageLabel}: ${d.id} is declared "off" but cannot be mapped to an outfit — ${why}. `
+          + `Nothing is stripped: the image model is still told to draw it and every clothing judge still demands it.`);
+      }
+      continue;
+    }
+    if (!castNames.some(n => sameName(n, owner))) continue;
+    out.push({
+      id: d.id,
+      name: entry.name || entry.id,
+      owner,
+      slot,
+      entry,
+      state: d.state,
+      location: d.location || null,
+      declared: true,
+      defaulted: false,
+      // Declared rows are outside the writer-linked set the `removal_unstated`
+      // check governs; flagging them would invent findings on a path that has
+      // never produced one.
+      missing: false,
     });
   }
   return out;
@@ -187,6 +296,66 @@ function splitClauses(description) {
     .filter(Boolean);
 }
 
+/** Every garment noun in the closed vocabulary, across all slots. */
+const ALL_GARMENT_NOUNS = [...new Set(Object.values(SLOT_NOUNS).flat())];
+
+/** The layering connectives an outfit sentence uses to stack two garments. */
+const LAYER_SPLIT_RE = /\s*\b(?:worn\s+(?:over|under|beneath|underneath)|layered\s+over|on\s+top\s+of|over|under|beneath|underneath)\b\s*/i;
+
+const garmentNounsIn = (text, vocab) =>
+  vocab.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(text || '')));
+
+/**
+ * How many distinct garments a phrase names — SPANS, not vocabulary hits. The
+ * vocabulary overlaps itself ("shirt" sits inside "t-shirt", "hood" inside
+ * "hoodie"), so counting matched nouns reads one garment as two and every
+ * clause looks layered.
+ */
+function countGarments(text) {
+  const re = new RegExp(`\\b(?:${ALL_GARMENT_NOUNS.join('|')})\\b`, 'gi');
+  const spans = [];
+  let m;
+  while ((m = re.exec(String(text || ''))) !== null) {
+    const start = m.index;
+    const end = start + m[0].length;
+    const prev = spans[spans.length - 1];
+    if (prev && start < prev.end) prev.end = Math.max(prev.end, end);
+    else spans.push({ start, end });
+  }
+  return spans.length;
+}
+
+/**
+ * What is left of ONE outfit clause once the declared item is taken out of it.
+ *
+ * Three answers, and the third is the one that keeps this bounded:
+ *   `null`  — the clause is only about this item; drop the whole clause.
+ *   string  — the clause layered this item over another garment; this is the
+ *             other garment's half, and it stays in the outfit.
+ *   `false` — the clause names another garment but no connective separates
+ *             them, so no part of it can be removed without taking a garment
+ *             the page never declared off. Nothing is removed; the explicit
+ *             "is NOT wearing" prompt line still carries the instruction.
+ *
+ * `slotNouns` identifies the declared item when the element name is unknown.
+ */
+function clauseRemainderWithoutItem(clause, slotNouns, itemName) {
+  if (countGarments(clause) <= 1) return null;
+  const itemNouns = (itemName ? garmentNounsIn(itemName, slotNouns) : []);
+  const mine = itemNouns.length > 0 ? itemNouns : garmentNounsIn(clause, slotNouns);
+  if (mine.length === 0) return false;
+  const mineRe = new RegExp(`\\b(?:${mine.join('|')})\\b`, 'i');
+  const parts = String(clause).split(LAYER_SPLIT_RE).map(s => s.trim()).filter(Boolean);
+  if (parts.length < 2) return false;
+  const dropped = parts.filter(p => mineRe.test(p));
+  const keptParts = parts.filter(p => !mineRe.test(p));
+  // Every part must land on exactly one side, and something must survive.
+  if (dropped.length === 0 || keptParts.length === 0) return false;
+  // A surviving part with no garment noun is a fragment, not a garment.
+  if (!keptParts.every(p => countGarments(p) > 0)) return false;
+  return keptParts.join(', ');
+}
+
 /**
  * Remove exactly the clause of an outfit description that belongs to `slot`.
  *
@@ -203,7 +372,7 @@ function splitClauses(description) {
  * Never removes more than one clause. That bound is what separates it from the
  * rejected 2026-08-08 filter, which sieved EVERY clause against prose.
  */
-function removeWornItemFromOutfit(description, slot) {
+function removeWornItemFromOutfit(description, slot, itemName = null) {
   const raw = String(description || '').trim();
   const key = String(slot || '').trim().toLowerCase();
   if (!raw || !key) return { text: raw, removed: false, reason: 'no-input' };
@@ -231,16 +400,39 @@ function removeWornItemFromOutfit(description, slot) {
   const clauses = splitClauses(raw);
   if (clauses.length < 2) return { text: raw, removed: false, reason: 'single-clause-outfit' };
   const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
-  const hits = clauses.map((c, i) => (nounRe.test(c) ? i : -1)).filter(i => i >= 0);
+  let hits = clauses.map((c, i) => (nounRe.test(c) ? i : -1)).filter(i => i >= 0);
+  // A slot can hold two garments at once — a hoodie over a t-shirt, a cape over
+  // a jacket — and then the slot alone cannot say which clause the declaration
+  // is about. The ELEMENT'S OWN NAME can. Narrow by the garment nouns the name
+  // itself carries, drawn from the same closed vocabulary; nothing is inferred
+  // from prose and the one-clause bound below still holds.
+  if (hits.length > 1 && itemName) {
+    const nameNouns = nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(itemName)));
+    if (nameNouns.length > 0) {
+      const nameRe = new RegExp(`\\b(?:${nameNouns.join('|')})\\b`, 'i');
+      const narrowed = hits.filter(i => nameRe.test(clauses[i]));
+      if (narrowed.length === 1) hits = narrowed;
+    }
+  }
   if (hits.length !== 1) {
     return { text: raw, removed: false, reason: hits.length === 0 ? 'slot-clause-not-found' : 'slot-clause-ambiguous' };
   }
-  const kept = clauses.filter((_, i) => i !== hits[0]);
+  // A layered clause names TWO garments at once ("a hoodie worn over a
+  // pullover"), and dropping the whole clause takes the undeclared one with it
+  // — measured on staging job_1789348171785_9oxos7dwv p9/p13/p14, where a
+  // whole-clause drop left the character with no top at all. Split the clause
+  // on its layering connective and keep the part the declaration is NOT about.
+  const survivor = clauseRemainderWithoutItem(clauses[hits[0]], nouns, itemName);
+  if (survivor === false) {
+    return { text: raw, removed: false, reason: 'slot-clause-carries-another-garment' };
+  }
+  const kept = clauses.map((c, i) => (i === hits[0] ? survivor : c)).filter(c => c !== null && c !== '');
+  if (kept.length === 0) return { text: raw, removed: false, reason: 'would-empty-outfit' };
   let text = kept.join(', ').replace(/^\s*and\s+/i, '').trim();
   // Restore sentence shape: the dropped clause may have carried the capital.
   text = text.charAt(0).toUpperCase() + text.slice(1);
   if (/[.!?]$/.test(raw) && !/[.!?]$/.test(text)) text += '.';
-  return { text, removed: true, reason: 'slot-clause' };
+  return { text, removed: true, reason: survivor === null ? 'slot-clause' : 'slot-clause-layer' };
 }
 
 /**
@@ -253,7 +445,7 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
   for (const r of (resolved || [])) {
     if (r.state !== 'off') continue;
     if (!sameName(r.owner, characterName)) continue;
-    const res = removeWornItemFromOutfit(text, r.slot);
+    const res = removeWornItemFromOutfit(text, r.slot, r.name);
     removals.push({ id: r.id, slot: r.slot, removed: res.removed, reason: res.reason });
     if (res.removed) text = res.text;
   }
@@ -294,7 +486,7 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
  * Returns the text unchanged whenever anything is missing or the strip is not
  * structurally unambiguous — see removeWornItemFromOutfit.
  */
-function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sceneMetadata = null, sceneMetadatas = null } = {}) {
+function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sceneMetadata = null, sceneMetadatas = null, pageNumber = null } = {}) {
   const text = String(outfitText || '');
   if (!text.trim() || !ownerName || !visualBible) return text;
   const metas = Array.isArray(sceneMetadatas) ? sceneMetadatas : (sceneMetadata ? [sceneMetadata] : []);
@@ -303,7 +495,7 @@ function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sce
   const off = [];
   for (const meta of metas) {
     if (!meta) continue;
-    for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta)) {
+    for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta, { pageNumber: pageNumber || undefined })) {
       if (r.state !== 'off' || seen.has(r.id)) continue;
       seen.add(r.id);
       off.push(r);
@@ -321,6 +513,8 @@ module.exports = {
   parseWornItems,
   wornItemsFromMetadata,
   wornAsEntries,
+  findVbEntryById,
+  deriveSlotFromName,
   resolveWornItemsForPage,
   wornStateById,
   buildWornStateLines,

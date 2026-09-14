@@ -313,6 +313,7 @@ function checkPage(page, clothingRequirements, opts = {}) {
     opts.visualBible || { artifacts: opts.artifacts || [], clothing: opts.clothing || [] },
     cast,
     { wornItems: page.wornItems || [] },
+    { pageNumber: page.pageNumber },
   )) {
     if (!r.missing) continue;
     const what = r.declared

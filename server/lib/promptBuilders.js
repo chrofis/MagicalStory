@@ -3430,7 +3430,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     resolveWornItemsForPage, wornStateById, stripOffItemsFromOutfit, buildWornStateBlock,
   } = require('./wornItems');
   const wornResolved = (visualBible && metadata)
-    ? resolveWornItemsForPage(visualBible, metadata.characters || [], metadata)
+    ? resolveWornItemsForPage(visualBible, metadata.characters || [], metadata, { pageNumber })
     : [];
   const wornById = wornStateById(wornResolved);
   // The owner's outfit text must not still list an item this page takes off.
