@@ -68,6 +68,7 @@ function getCastResolver() {
 // condemns good images). Semantic / three-stage evals are unaffected — they
 // keep their own calls and can keep thinking where reasoning genuinely helps.
 const { EVAL_TEMPERATURE } = require('../config/models');
+const { FINDING_SOURCES, stampFindingSource } = require('./findingSources');
 const EVAL_THINKING_BUDGET = process.env.EVAL_THINKING_BUDGET != null ? Number(process.env.EVAL_THINKING_BUDGET) : 0;
 
 // Quality threshold from environment or default
@@ -313,6 +314,76 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
 }
 
 /**
+ * Largest contiguous INTERIOR uniform patch, as a fraction of all blocks.
+ *
+ * Why not a bare count (the 2026-09-14 fix): the old check summed uniform
+ * blocks ANYWHERE and compared that to the threshold, so a watercolour paper
+ * border — a thin uniform band hugging the perimeter, an intended part of the
+ * art style — accumulated enough blocks to trip it even though no rectangular
+ * glitch existed in the picture. A real AI box artifact is a CONTIGUOUS patch
+ * sitting in the interior; a border, vignette or deckle edge is a band on the
+ * rim. So we discriminate on shape and position.
+ *
+ * Two steps, in this order:
+ *  1. Peel a perimeter band. From each of the four sides inward, a line is
+ *     peeled only while it is uniform ACROSS ITS WHOLE SPAN. That is the
+ *     deliberately conservative part: a border runs edge to edge, a glitch
+ *     does not — so an artifact that merely touches an edge is never peeled
+ *     (this is why we do not just ignore all edge blocks). Peeling is capped at
+ *     15% of the dimension so an entirely uniform frame — blank or broken —
+ *     still leaves a large interior and is still flagged.
+ *  2. Take the largest 4-connected component of what survives. Scattered
+ *     uniform blocks summing past the threshold are not a box and no longer
+ *     fire; a genuine box is one component and is unaffected.
+ *
+ * The denominator stays the full block count, so the 0.08 threshold keeps its
+ * original meaning for an interior patch.
+ */
+function largestInteriorUniformFraction(mask, rows, cols) {
+  const total = rows * cols;
+  if (total === 0) return 0;
+  const frame = new Uint8Array(total);
+  const maxR = Math.max(1, Math.floor(rows * 0.15));
+  const maxC = Math.max(1, Math.floor(cols * 0.15));
+
+  const rowUniform = (r) => { for (let c = 0; c < cols; c++) if (!mask[r * cols + c]) return false; return true; };
+  const colUniform = (c) => { for (let r = 0; r < rows; r++) if (!mask[r * cols + c]) return false; return true; };
+  const markRow = (r) => { for (let c = 0; c < cols; c++) frame[r * cols + c] = 1; };
+  const markCol = (c) => { for (let r = 0; r < rows; r++) frame[r * cols + c] = 1; };
+
+  for (let t = 0; t < maxR && rowUniform(t); t++) markRow(t);
+  for (let t = 0; t < maxR && rowUniform(rows - 1 - t); t++) markRow(rows - 1 - t);
+  for (let t = 0; t < maxC && colUniform(t); t++) markCol(t);
+  for (let t = 0; t < maxC && colUniform(cols - 1 - t); t++) markCol(cols - 1 - t);
+
+  // Largest 4-connected component of the un-peeled uniform blocks.
+  const seen = new Uint8Array(total);
+  const stack = [];
+  let best = 0;
+  for (let start = 0; start < total; start++) {
+    if (!mask[start] || frame[start] || seen[start]) continue;
+    seen[start] = 1;
+    stack.length = 0;
+    stack.push(start);
+    let size = 0;
+    while (stack.length) {
+      const i = stack.pop();
+      size++;
+      const r = Math.floor(i / cols);
+      const c = i - r * cols;
+      const nbrs = [r > 0 ? i - cols : -1, r < rows - 1 ? i + cols : -1, c > 0 ? i - 1 : -1, c < cols - 1 ? i + 1 : -1];
+      for (const n of nbrs) {
+        if (n < 0 || seen[n] || !mask[n] || frame[n]) continue;
+        seen[n] = 1;
+        stack.push(n);
+      }
+    }
+    if (size > best) best = size;
+  }
+  return best / total;
+}
+
+/**
  * Validate an empty scene (background-only) image.
  * Two-phase check:
  * Phase 1 (pixel): calmness heatmap — white boxes, too dark, text area readiness (<50ms, free)
@@ -374,14 +445,18 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     // Check 1: uniform-patch artifact detection — a flat white OR a flat
     // black rectangle is an AI glitch regardless of the expected tone. Flag
     // either if it exceeds the artifact threshold.
-    let whiteBoxBlocks = 0;
-    let blackBoxBlocks = 0;
+    const whiteMask = new Uint8Array(rows * cols);
+    const blackMask = new Uint8Array(rows * cols);
     for (let i = 0; i < rows * cols; i++) {
-      if (blockBrightness[i] > 240 && blockVariance[i] < 5) whiteBoxBlocks++;
-      if (blockBrightness[i] < 15 && blockVariance[i] < 5) blackBoxBlocks++;
+      if (blockBrightness[i] > 240 && blockVariance[i] < 5) whiteMask[i] = 1;
+      if (blockBrightness[i] < 15 && blockVariance[i] < 5) blackMask[i] = 1;
     }
-    const whiteBoxPct = whiteBoxBlocks / (rows * cols);
-    const blackBoxPct = blackBoxBlocks / (rows * cols);
+    // Shape and position, not a bare count: the fraction is the LARGEST
+    // 4-connected uniform patch left after a full-width/height perimeter band
+    // is peeled off. Both twins get it — a dark deckle edge false-positives the
+    // black check exactly as a watercolour paper border did the white one.
+    const whiteBoxPct = largestInteriorUniformFraction(whiteMask, rows, cols);
+    const blackBoxPct = largestInteriorUniformFraction(blackMask, rows, cols);
     if (whiteBoxPct > 0.08) {
       issues.push(`white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
     }
@@ -815,7 +890,11 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         // also matches `issue.character` to a figure to aim a repair, so the
         // loss cost targeted repairs too.
         character: i.character || i.name || null,
-        source: 'three-stage'
+        // Legacy DISPLAY tag; the Lab groups on it. Provenance is `sources`.
+        source: 'three-stage',
+        // PROVENANCE (2026-09-14): the one field every emitter stamps, the one
+        // the consolidator re-emits, routing reads and scoring passes through.
+        sources: [FINDING_SOURCES.COMPLIANCE],
       }));
     // Never-CRITICAL gate on identity-absence findings (see helper above):
     // presence is an INPUT to this blind judge, never its judgment.
@@ -1340,7 +1419,12 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
   const unclaimedCast = castNames.filter(n => !claimed.has(canonicalName(n)));
   const unmatchedFigures = mts.filter(m => isUnnamed(refOf(m)));
 
-  const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER });
+  // PROVENANCE (2026-09-14). This finding is authored by THIS FILE's arithmetic,
+  // not by the quality judge whose list it joins — `final_checks` is the
+  // vocabulary's entry for a code-authored mechanical check. Stamped here so the
+  // quality stamp at the merge chokepoint, which never overwrites, leaves it be;
+  // without it the derivation would read back as a judge's opinion.
+  const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER, sources: [FINDING_SOURCES.FINAL_CHECKS] });
 
   if (det < castCount) {
     const who = unclaimedCast[0] || null;
@@ -2753,7 +2837,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
-        fixableIssues: Array.isArray(fixableIssues) ? fixableIssues : [],  // always an array — eliminates downstream null-checks
+        // PROVENANCE (2026-09-14). ONE stamp, at the point the page's merged
+        // list is finalised, so it covers every branch that reached it: the
+        // evaluator's own `fixable_issues`, the coherence and style gates
+        // authored above, and the multi-judge jury rebuild (which reconstructs
+        // the list from bucket vectors and would have dropped a stamp made
+        // earlier). `stampFindingSource` never overwrites, so the three-stage
+        // compliance findings merged in above keep `compliance` and the
+        // presence derivation keeps `final_checks`; only the quality judge's
+        // own findings are filled in here.
+        fixableIssues: stampFindingSource(Array.isArray(fixableIssues) ? fixableIssues : [], FINDING_SOURCES.QUALITY),  // always an array — eliminates downstream null-checks
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         coherenceGate,                    // STEP 0 gate {applied, reason} — drives the forced redo above
@@ -2912,6 +3005,7 @@ module.exports = {
   presenceCounterName,
   runVisualInventory,
   validateEmptyScene,
+  largestInteriorUniformFraction,
   capComplianceIdentitySeverity,
   evaluateThreeStage,
   sanitizeForGemini,

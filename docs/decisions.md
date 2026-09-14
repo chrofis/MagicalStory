@@ -21,6 +21,43 @@ superseded and link forward.
 
 ---
 
+## The plate pixel-QC judges a uniform patch by shape and position, not by a bare count (2026-09-14)
+
+**Context.** `vantage_plate_qc_failed` fired 5 times across the 2026-09-14 validation
+stories. All five were reviewed. THREE were genuine — the Phase-2 semantic judge caught
+genuinely wrong plates, and all three re-renders passed. The remaining ones came from the
+Phase-1 PIXEL heuristic only: the offending plate was downloaded and viewed, and the
+"white box" is a watercolour paper border around the edge of the image — an intended part
+of the art style, not an AI glitch. The check counted uniform blocks ANYWHERE and compared
+the raw fraction to 0.08, so a thin uniform frame around the perimeter accumulated enough
+blocks to trip it with no rectangular glitch present anywhere in the picture.
+
+**Decision.** The Check-1 fraction is now the largest 4-connected uniform patch remaining
+after a perimeter band is peeled, via `largestInteriorUniformFraction()`. A line is peeled
+inward from a side only while it is uniform across its WHOLE span (capped at 15% of the
+dimension), then the biggest surviving component is measured against the unchanged 0.08
+threshold over the unchanged full-block denominator. The BLACK twin gets the identical
+treatment — a dark deckle edge or vignette false-positives it for exactly the same reason,
+and fixing one and leaving the other would just move the bug. The Phase-2 semantic plate
+checks are untouched: they were correct on all three genuine failures. The gate keeps its
+ship-with-warning behaviour; nothing here can kill a paid run.
+
+**Rationale.** A real AI box artifact is a contiguous patch in the INTERIOR of the frame; a
+paper border, vignette or deckle edge is a thin band hugging the PERIMETER. Requiring a
+full-span uniform line before peeling is what keeps this from being "ignore the edges": a
+glitch that merely touches an edge does not span it, so it is never peeled, and its body is
+still measured. Sensitivity to a genuine artifact did not drop — a real box is one
+connected component, so the largest-component fraction equals what the old count saw; only
+uniform blocks scattered across the frame, which were never a box, stop firing. An entirely
+uniform image still trips the check, because peeling is capped and a large interior
+survives. Pinned by `tests/unit/empty-scene-uniform-patch-shape.test.ts` (perimeter band
+white, perimeter band black, interior patch just over threshold plus an edge-touching one,
+fully uniform frame).
+
+**Touched files.** `server/lib/evalPipeline.js` (`largestInteriorUniformFraction`,
+Check 1 of `validateEmptyScene`), `tests/unit/empty-scene-uniform-patch-shape.test.ts`,
+`tasks/BACKLOG.md`.
+
 ## Story generation
 
 ### Trial stories skip draft → analysis → revise
@@ -38405,3 +38442,121 @@ this corpus — the guard is pre-emptive, not a repair of observed damage.
 
 **Touched files:** `server/lib/bboxDetection.js` (`resolveExpectedObjectLabels`),
 `tests/unit/expected-object-dedupe.test.ts` (new, 4 tests).
+
+## Findings record WHO said them — one field, `sources[]`, stamped by the emitter (2026-09-14)
+**Context:** A finding's ORIGIN is the first thing needed to judge it, and it was absent from
+most of them. Four diagnoses on 2026-09-14 each turned on reconstructing the emitter after the
+fact: (1) a false clothing CRITICAL that came from ONE judge grading one character against
+another character's outfit, which commissioned two repair rounds that destroyed a story's
+central prop; (2) a `missing_character` CRITICAL that turned out to come from the book-audit
+READER pass rather than the per-page brief checker — which flipped it from a bug into
+by-design; (3) a state contradiction charged to the wrong element; (4) a contract warning whose
+age half was a false positive. Lab #1263 shows the symptom directly: half the findings render
+as `[?]` and the rest as `three-stage`. Backlog #50.
+
+**Decision:** `sources: string[]` — the field that ALREADY existed — is the single source of
+truth for provenance, and every emitter now stamps it. No new field was added.
+- New `server/lib/findingSources.js` owns the closed vocabulary (`quality`, `semantic`,
+  `compliance`, `entity`, `reader`, `final_checks` — the same list
+  `prompts/feedback-consolidator.txt:104` already gives the model) plus `stampFindingSource`
+  (fills only where absent, never overwrites, throws on an unknown name), `sourcesOf` and
+  `mergeSources`.
+- Stamped at the emitters: the quality judge at the ONE chokepoint where the page's merged list
+  is finalised (so it also covers the coherence gate, the style gate and the multi-judge jury
+  rebuild, which reconstructs the list from bucket vectors and would have dropped an earlier
+  stamp); the three-stage compliance mapper; the semantic judge's parse; entity consistency's
+  per-character issue push; and the presence DERIVATION, which is stamped `final_checks`
+  because this file's own arithmetic authored it, not the judge whose list it joins.
+- Carried across the two merges that were dropping it: the consolidator's entity whitelists
+  (`flattenEntityIssues` and the pre-flattened path), and `repairPipeline`'s book-audit fan-out
+  into `readerFindingsByPage`, which rebuilt each fault as `{severity, line}` — that merge is
+  exactly why diagnosis (2) above was expensive.
+- The Lab panel (`ImageHistoryModal`) now READS the stamp instead of guessing. Its old rule was
+  literally "when `source` is missing, the issue is from the quality eval"; the legacy singular
+  `source` survives only as the fallback for versions stored before this change.
+
+**Rationale:** Why extend `sources` rather than add a provenance field: it is already the
+closest thing to an authority, and adding a second would have put a parallel truth next to a
+field that repair ROUTING reads. `repairLogic.js:114`/`:768` refuse automatic repair when
+`sources.every(s => s === 'entity')` (owner, 2026-09-04); `scoring.js:357` already passes it
+through into the stored deductions; `textRefine.js:91` already stamps it on every parsed
+book-audit finding; the consolidator prompt already defines the vocabulary. The gap was never
+the field — it was that most emitters wrote nothing into it.
+
+Routing is unchanged in both directions, and that is a deliberate property of the stamp, not a
+hope: it only ever ADDS the field where it was absent, and each call site passes its own pool.
+A quality/semantic/compliance/reader finding therefore goes from no `sources` to a one-entry
+list that is not `['entity']` — both guards test `sources.length && sources.every(...)`, false
+before (length 0) and false after. Entity findings are stamped `['entity']`, which is what the
+consolidator already wrote for them and what the raw path already bucketed them as.
+`server/lib/scoring.js` was NOT touched (protected by a same-day owner decision) and did not
+need to be — it already carries `sources` through `normalizeIssues`. No type, severity or
+deduction changed.
+
+Provenance is stamped by the EMITTER and never derived downstream, per docs/SETTLED.md:28 —
+nothing reads a finding's description prose to work out where it came from. The singular
+`source` is left exactly as it is and is NOT provenance: on an entity finding it is the
+detection channel, on a three-stage finding a display tag, and inside `scoring.normalizeIssues`
+the deduction bucket.
+
+**Touched files:** `server/lib/findingSources.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/entityConsistency.js`,
+`server/lib/feedbackConsolidator.js`, `server/lib/repairPipeline.js`,
+`client/src/components/generation/story/ImageHistoryModal.tsx`,
+`tests/unit/finding-provenance.test.ts`
+**Status:** ✅ active
+
+## The text-refine join has no deadline — it waits for the chain (2026-09-14)
+**Context:** Two facts collided. (1) `2beda5425` moved the text-refine join
+from AFTER the repair pipeline to the end of pure page generation, so the
+mid-loop book audit inside that pipeline would judge the FINAL shipped prose
+instead of superseded text (97% of pages are rewritten by the refiner). That
+ordering is correct and stays. (2) That commit's own latency argument was
+**wrong**, and this entry exists so nobody re-derives it from the commit
+message: it claimed "the refiner measures ~184s against a ~25-min image phase,
+so it has long finished by the new join point". **Pure page generation is ~55s**
+(Grok, 18 pages, parallel); the ~25 minutes is the REPAIR phase — precisely
+what the join was moved in front of. The refiner's headroom fell from ~1460s to
+~99s. Measured on staging: before the commit 5 of 37 non-trial stories lost
+refine rounds (13.5%); after it, **3 of 3 (100%)** — two shipped
+`text_refine_join_timeout` with ZERO rounds and the original text, one shipped
+`text_refine_join_partial` with 1 round of 3. Round 1 alone measures 294.8s on
+`job_1789348171785_9oxos7dwv`; full chains measure 400-600s, with 743/770/841/878s
+all inside the last month. `8b23eacbe` raised the budget to 600s + 10s/page +
+a 120s grace, which covers the 600s case and not the 740-880s ones.
+**Decision:** Remove the deadline (owner's call, chosen over scaling the budget
+to the measured chain). `joinTextRefinement` now calls
+`awaitTextRefineJoin(promise, () => partial, { warnAfterMs, onSlow })`, which
+**awaits** the chain: it is never truncated, and because the join still sits
+before the repair pipeline, the book audit and every stage below it still read
+the FINAL refined text. Both requirements hold at once — the wait is at the
+point of use rather than a timer cutting the chain short. The old budget
+(`computeTextRefineJoinTimeoutMs` → `computeTextRefineJoinWarnMs`, env
+`TEXT_REFINE_JOIN_TIMEOUT_MS` → `TEXT_REFINE_JOIN_WARN_MS`) survives only as
+the point at which a still-running chain logs `text_refine_join_slow` and keeps
+waiting; `text_refine_join_grace*` and the grace helpers are gone. Salvage
+stays for a chain that FAILS partway (`text_refine_join_partial`, and
+`text_refine_join_failed` at error when nothing landed — renamed from
+`text_refine_join_timeout`, which can no longer happen).
+**Rationale:** Nothing cancels the refine when the race is lost — the chain
+finishes and bills in full either way (`job_1789348171785_9oxos7dwv` billed
+$1.01 of `text_refine` AFTER its join gave up) — so the deadline never saved
+money; it discarded paid work and, with it, the whole text-quality gate
+including the text/picture MISMATCH check. On the unbounded-hang question: the
+wait cannot be infinite. Every model call in the chain is bounded by
+`textModels`' streaming ceiling (>=1500s) plus its 120s inactivity abort, each
+audit additionally by its own 900s hostage guard (`AUDIT_DEADLINE_MS`), and
+every step catches its own failure, so `refineStoryText` always settles. What
+remains is latency, and per the gates-are-guidelines rule that ships as a
+warning, never as a kill on a paid run. Trials still skip refinement entirely
+(no repair phase to hide the chain behind) — which matters MORE now, not less.
+**Touched:** `storyJobPipeline.js` (`joinTextRefinement` — the race, the grace
+and the timeout events replaced by the awaited join + `text_refine_join_slow`;
+the "~25 min image phase" comments corrected), `server/lib/textRefine.js`
+(`awaitTextRefineJoin`, `computeTextRefineJoinWarnMs`; `shouldGraceJoin` and
+`TEXT_REFINE_JOIN_GRACE_MS` removed), `tests/unit/text-refine-join.test.ts`,
+`tests/unit/book-audit-reads-shipped-book.test.ts`
+**Status:** ✅ active — supersedes the 2026-09-14 "one budget for every reading
+level, plus a bounded grace" entry above. Verify on the next long story that
+`text_refine_complete` appears with all rounds and that no
+`text_refine_join_partial` is logged.
