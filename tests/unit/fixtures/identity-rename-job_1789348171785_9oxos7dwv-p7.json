@@ -1,0 +1,228 @@
+{
+  "_source": "staging story job_1789348171785_9oxos7dwv, page 7, imageVersions[0] — pulled from stores.data, not hand-built.",
+  "_note": "`matches[].reference` and `fixableIssues[].character` are restored to the evaluator's OWN names (the stored evaluatorReference/evaluatorCharacter), i.e. exactly the input reconcileIdentity received. Finding PROSE is left as stored (already rewritten by the rename under test) and is deliberately not asserted on.",
+  "storyId": "job_1789348171785_9oxos7dwv",
+  "pageNumber": 7,
+  "storyText": "«Das Ei gehört niemandem», sagte Levin. «Aber unsere Mama hält zu Hause den Kachelofen warm. Wir müssen hin, bevor es dunkel wird.»\n\nJulian strich über die Schale. «Es heisst Ofeli», sagte er.\n\n«Ich trage Ofeli», sagte Max. «Levins Ofen ist am nächsten», sagte Kiaan.\n\nAlso stiegen sie die steilen Stufen hinunter. Julian wollte nicht getragen werden, darum gingen alle langsam. Levin blieb hinter ihm, denn er liess niemanden zurück.",
+  "sceneIntent": "The group walks away down the steep stone stairs, seen from behind. Julian leads slowly, carrying the egg, while Levin, Max, Kiaan, and the dog follow his pace.",
+  "imageSummary": "Seen from behind, Julian — the toddler in his yellow vest, white shirt, blue dungarees, and white sneakers — walks at the front on a lower step, both arms wrapped around the heavy red stone-like egg, Ofeli. Seen from behind, Levin, in his red hoodie, dark grey trousers, and brown boots, takes the steps carefully behind him. Seen from behind, Max, in his green pullover, orange corduroy trousers, and grey velcro-strap sneakers, follows at the same slow rhythm. Seen from behind, Kiaan, in his purple anorak, brown trousers, and dark brown leather ankle boots, follows close to Max, while the scruffy terrier mix dog pads along on the step beside Max. The wide shot, angled slightly downward from the top of the stairs, watches the friends depart toward the lower town.",
+  "declaredInteractions": [
+    {
+      "where": "walk down the stone stairs",
+      "action": "walking",
+      "object": "the stairs",
+      "priority": "normal",
+      "character": "Levin + Julian + Max + Kiaan",
+      "storyRelevant": false
+    }
+  ],
+  "matches": [
+    {
+      "figure": 1,
+      "body_bbox": [
+        0,
+        0.42,
+        0.29,
+        0.99
+      ],
+      "reference": "Julian",
+      "confidence": 0.9
+    },
+    {
+      "figure": 2,
+      "body_bbox": [
+        0.28,
+        0.36,
+        0.5,
+        0.86
+      ],
+      "reference": "Levin",
+      "confidence": 0.9
+    },
+    {
+      "figure": 3,
+      "body_bbox": [
+        0.46,
+        0.33,
+        0.67,
+        0.83
+      ],
+      "reference": "Max",
+      "confidence": 0.9
+    },
+    {
+      "figure": 4,
+      "body_bbox": [
+        0.62,
+        0.3,
+        0.83,
+        0.79
+      ],
+      "reference": "Kiaan",
+      "confidence": 0.9
+    },
+    {
+      "figure": 5,
+      "body_bbox": [
+        0.78,
+        0.55,
+        0.99,
+        0.95
+      ],
+      "reference": "Nia",
+      "confidence": 0.9
+    }
+  ],
+  "detectorFigures": [
+    {
+      "name": "Levin",
+      "bodyBox": [
+        0.3701171875,
+        0.306640625,
+        0.8544921875,
+        0.4697265625
+      ],
+      "faceBox": null
+    },
+    {
+      "name": "Max",
+      "bodyBox": [
+        0.431640625,
+        0.3263671875,
+        0.9052734375,
+        0.6376953125
+      ],
+      "faceBox": [
+        0.4365234375,
+        0.3263671875,
+        0.6865234375,
+        0.5388671875
+      ]
+    },
+    {
+      "name": "Kiaan",
+      "bodyBox": [
+        0.3671875,
+        0.5578125,
+        0.875,
+        0.7861328125
+      ],
+      "faceBox": [
+        0.3671875,
+        0.5578125,
+        0.6171875,
+        0.7703125
+      ]
+    },
+    {
+      "name": "Julian",
+      "bodyBox": [
+        0.3759765625,
+        0.1064453125,
+        0.90234375,
+        0.3259765625
+      ],
+      "faceBox": [
+        0.3759765625,
+        0.1134765625,
+        0.6259765625,
+        0.3259765625
+      ]
+    },
+    {
+      "name": "Nia",
+      "bodyBox": [
+        0.63,
+        0.6484375,
+        0.9794921875,
+        0.931640625
+      ],
+      "faceBox": [
+        0.63,
+        0.6587500000000001,
+        0.88,
+        0.87125
+      ]
+    }
+  ],
+  "fixableIssues": [
+    {
+      "fix": "Recolor pants to orange corduroy",
+      "type": "garment_colour",
+      "source": "three-stage",
+      "severity": "MAJOR",
+      "character": "Max",
+      "description": "Kiaan wears mustard-colored pants instead of orange corduroy trousers per clothing contract"
+    },
+    {
+      "fix": "Replace hoodie with waterproof purple anorak with front zip",
+      "type": "clothing",
+      "source": "three-stage",
+      "severity": "MAJOR",
+      "character": "Kiaan",
+      "description": "Kiaan wears purple hooded sweatshirt instead of purple anorak jacket per clothing contract"
+    },
+    {
+      "fix": "Adjust pose so both arms encircle the red egg",
+      "type": "action_interaction",
+      "source": "three-stage",
+      "severity": "MAJOR",
+      "character": "Julian",
+      "description": "Julian holds red egg with only left hand; prompt requires both arms wrapped around it"
+    },
+    {
+      "fix": "Add red egg in Kiaan's hands as per declared interaction",
+      "type": "action_interaction",
+      "source": "three-stage",
+      "severity": "CRITICAL",
+      "character": "Max",
+      "description": "Kiaan is declared to carry Ofeli but inventory shows hands empty"
+    },
+    {
+      "fix": "Invert stair progression direction to show descent, not ascent",
+      "type": "wrong_action",
+      "source": "three-stage",
+      "severity": "CRITICAL",
+      "character": "Scene",
+      "description": "Characters depicted walking UP stairs but prompt and story require walking DOWN"
+    },
+    {
+      "fix": "Remove or reassign figure 5; no such character in original prompt",
+      "type": "duplicate_identity",
+      "source": "three-stage",
+      "severity": "MAJOR",
+      "character": "Nia",
+      "description": "Unprompted character 'Nia' appears in matches[] and inventory"
+    }
+  ],
+  "storedRenameOutcome": {
+    "renames": [
+      {
+        "figure": 3,
+        "from": "Max",
+        "to": "Kiaan"
+      }
+    ],
+    "referencesAfterRename": [
+      "Julian",
+      "Levin",
+      "Kiaan",
+      "Kiaan",
+      "Nia"
+    ],
+    "relabelledFindings": [
+      {
+        "from": "Max",
+        "to": "Kiaan",
+        "severity": "MAJOR",
+        "description": "Kiaan wears mustard-colored pants instead of orange corduroy trousers per clothing contract"
+      },
+      {
+        "from": "Max",
+        "to": "Kiaan",
+        "severity": "CRITICAL",
+        "description": "Kiaan is declared to carry Ofeli but inventory shows hands empty"
+      }
+    ]
+  }
+}

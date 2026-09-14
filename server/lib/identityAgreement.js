@@ -103,6 +103,10 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
     pairedOn: evs.every(e => e.on === 'body') ? 'body' : 'face',
     compared,
     agreed: agreed.length,
+    // The names both sides already landed on the same figure. A rename may
+    // never target one of these: that name is taken, and handing it to a
+    // second figure fabricates a duplicate (see buildRenameMap).
+    agreedNames: agreed.slice(),
     conflicts,
     unpaired: unpaired.length > 0 ? unpaired : undefined,
     // The names the two sides disagree about. A per-character finding naming one
@@ -135,9 +139,22 @@ function describeIdentityAgreement(report, pageLabel = '') {
  * the same way twice over, and renaming would fabricate a duplicate. Those stay
  * flagged and uncorrected.
  *
+ * A name is equally taken when an AGREED match already holds it. The pairing
+ * above is greedy nearest-centre with no mutual exclusion, so two evaluator
+ * figures can both land on one detector figure: one agrees, the other becomes a
+ * conflict pointing at the name the first already owns. Applying that rename
+ * writes the same name onto two matches and erases the evaluator's other name
+ * from the page — and every finding about the erased character is then
+ * relabelled onto a character the spec never cast in that role. Measured on
+ * staging job_1789348171785_9oxos7dwv p7: one evaluator name was renamed onto a
+ * name an agreed match already held, the original name vanished from `matches[]`
+ * entirely, and its CRITICAL finding shipped attributed to the wrong child.
+ *
+ * @param {Array} conflicts
+ * @param {Array<string>} [agreedNames] names already assigned by agreeing matches
  * @returns {Map<string,string>|null} lowercased evaluator name → detector name
  */
-function buildRenameMap(conflicts) {
+function buildRenameMap(conflicts, agreedNames = []) {
   const map = new Map();
   for (const c of conflicts) {
     const from = String(c.evaluator).toLowerCase();
@@ -146,6 +163,14 @@ function buildRenameMap(conflicts) {
   }
   const targets = new Set([...map.values()].map(v => v.toLowerCase()));
   if (targets.size !== map.size) return null;                       // two names, one verdict
+
+  // A target already held by an agreeing match is taken. The only way that is
+  // still a clean permutation is if that holder is itself being renamed away in
+  // the same map — a true swap. Otherwise the rename would duplicate it.
+  for (const held of agreedNames) {
+    const lower = String(held).toLowerCase();
+    if (targets.has(lower) && !map.has(lower)) return null;         // target already taken
+  }
   return map;
 }
 
@@ -175,7 +200,7 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   const report = checkIdentityAgreement(evalLike?.matches, detFigures, opts);
   if (!report || report.conflicts.length === 0) return report;
 
-  const map = buildRenameMap(report.conflicts);
+  const map = buildRenameMap(report.conflicts, report.agreedNames || []);
   if (!map) {
     report.uncorrectable = true;   // not a clean swap — flag it, touch nothing
     report.renamed = 0;
