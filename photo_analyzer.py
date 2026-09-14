@@ -67,8 +67,15 @@ _boot_mark("flask+cv2+numpy+PIL")
 # Fix Windows encoding issues - force UTF-8 for stdout/stderr
 if sys.platform == 'win32':
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    # line_buffering=True is not cosmetic: a fresh TextIOWrapper is BLOCK
+    # buffered and discards `python -u`, so a spawned worker's [START]/[OK]/
+    # traceback lines sat in a 8KB buffer and never reached the parent's
+    # console. Diagnosing why a worker would not boot was impossible — the only
+    # visible symptom was the parent's 503.
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8',
+                                  errors='replace', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8',
+                                  errors='replace', line_buffering=True)
 
 # Suppress Flask development server warning
 cli = sys.modules.get('flask.cli')
@@ -3492,7 +3499,16 @@ def health_check():
             workers[role] = entry
         body["workers"] = workers
         body["workers_rss_mb"] = round(worker_rss, 1)
-        body["python_total_rss_mb"] = round(body.get("rss_mb", 0) + worker_rss, 1)
+        # `rss_mb` is `_rss_mb()`, which reads /proc/self/status and returns
+        # None off-Linux BY DESIGN (the same no-op that makes _boot_mark skip on
+        # local dev). So the key EXISTS holding None, and `.get(k, 0)` hands back
+        # that None rather than the default — `None + worker_rss` raised
+        # TypeError and every local GET /health 500'd.
+        # Not `or 0`: a total that silently omits the router is the exact
+        # understatement this block was added to remove. Unknown stays unknown.
+        router_rss = body.get("rss_mb")
+        body["python_total_rss_mb"] = (
+            None if router_rss is None else round(router_rss + worker_rss, 1))
     if request.args.get('probe') == 'sam' and ANALYZER_ROLE == 'parent':
         # SAM lives in the torch worker; loading it here would put 570MB into
         # the process that is supposed to stay at 53MB. Forward the probe.
@@ -5538,5 +5554,14 @@ if __name__ == '__main__':
         serve(app, listen=f'*:{port}', threads=_threads, channel_timeout=600)
     except ImportError:
         print("   waitress unavailable — falling back to Flask dev server")
-        # '::' accepts IPv6 and, via IPv4-mapped addresses, IPv4 too.
-        app.run(host='::', port=port, debug=False)
+        # '::' accepts IPv6 and, via IPv4-mapped addresses, IPv4 too — on Linux,
+        # where IPV6_V6ONLY defaults to 0. On WINDOWS it defaults to 1, so this
+        # bound `[::]:5001` and NOTHING on 127.0.0.1. ensure_worker's readiness
+        # probe is a hardcoded `http://127.0.0.1:{port}/health`, so a perfectly
+        # healthy face worker was unreachable: the poll never succeeded, the
+        # full WORKER_START_TIMEOUT_S elapsed and /analyze returned
+        # "face worker not ready within 120s". The waitress path above keeps the
+        # invariant (`listen='*:port'` binds both families); this fallback broke
+        # it. Bind the family the callers actually use.
+        app.run(host=('0.0.0.0' if sys.platform == 'win32' else '::'),
+                port=port, debug=False)

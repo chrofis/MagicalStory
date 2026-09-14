@@ -37779,3 +37779,62 @@ exemplar collapse — there is no longer a phrase in the instruction to copy.
 `server/lib/sceneMetadata.js`, `tests/unit/artifact-size.test.ts`
 
 **Status:** ✅ active
+
+## 2026-09-14 — An unknown RSS stays unknown, and the analyzer's dev-server fallback binds the family the parent probes
+
+**Context:** Two local-dev defects in `photo_analyzer.py`, both invisible on
+Railway, both found while testing infant face detection on Windows / Python
+3.14.
+
+1. `GET /health` returned **500 TypeError: unsupported operand type(s) for +:
+   'NoneType' and 'float'** at the `python_total_rss_mb` line. `_rss_mb()` reads
+   `/proc/self/status` and returns `None` off-Linux *by design* — the same
+   no-op that makes `_boot_mark` skip on local dev. So `rss_mb` was present
+   holding `None`, and `body.get("rss_mb", 0)` handed back that `None`: a
+   `.get(k, default)` only defaults on a **missing** key, never on a present
+   null.
+2. `POST /analyze` returned **503 `face worker not ready within 120s`**. The
+   worker was healthy the whole time. `waitress` is not installed locally, so
+   the fallback `app.run(host='::')` ran — and `IPV6_V6ONLY` defaults to `0` on
+   Linux but **`1` on Windows**, so the worker bound `[::]:5001` and nothing on
+   `127.0.0.1`, which is the literal address `ensure_worker`'s readiness probe
+   uses. Measured: `netstat` showed only `[::]:5001 LISTENING`; `curl [::1]`
+   returned the health body, `curl 127.0.0.1` returned connection refused.
+   Diagnosing it was blocked by a third defect — the Windows UTF-8 rewrap
+   `io.TextIOWrapper(...)` is **block** buffered and discards `python -u`, so
+   the spawned worker's own `[START]` / traceback lines never reached the
+   parent console and the only visible symptom was the parent's 503.
+
+**Decision:**
+- `python_total_rss_mb` is `None` when the router's own RSS is unknown — **not**
+  `or 0`. A total that silently omits the router is the exact understatement
+  that field was added to remove.
+- The dev-server fallback binds `0.0.0.0` on `win32` and `::` elsewhere. The
+  waitress path (`listen='*:port'`) already binds both families and is
+  unchanged; only the fallback violated the invariant.
+- Both `sys.stdout` / `sys.stderr` rewraps set `line_buffering=True`.
+- Regression test `tests/manual/test_health_rss_null.py` (no ML, no subprocess).
+
+**Rationale, and the finding that matters more than either fix:** the MTCNN
+import chain genuinely cannot load on this box — `tensorflow` is absent and
+`mtcnn_cv2` imports `imghdr`, removed from the stdlib in Python 3.13 — so local
+face detection runs the MediaPipe Tasks fallback. That is **not** true in
+production, and it was checked rather than inferred: the Dockerfile builds on
+`node:22` (Debian bookworm, `python3` 3.11, `imghdr` present) and installs
+`mtcnn-opencv`, and the prod analyzer service's own logs carry
+`[OK] MTCNN face detector available (OpenCV version)` alongside
+`[START] ... (role=face)`, `MediaPipe available: True` and live
+`[MTCNN] Detected N faces` lines. **Production runs the MTCNN primary; it has
+not been silently on the fallback.** The detector fallback chain itself is
+correct and degrades cleanly at import (`detect_all_faces` → Tasks API when
+`MTCNN_AVAILABLE` is false) — the 120-second hang was never the fallback chain,
+it was the bind family.
+
+Left deliberately unfixed: `mtcnn_cv2` on Python 3.14. Installing `tensorflow`
+to get the other MTCNN backend is a multi-GB dependency for a local-dev
+convenience, and the package needs replacing or patching upstream. Local dev
+runs the MediaPipe Tasks fallback, which is now clearly logged.
+
+**Touched:** `photo_analyzer.py` (health totals, dev-server fallback host,
+stream line buffering), `tests/manual/test_health_rss_null.py`
+**Status:** ✅ active
