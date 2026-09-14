@@ -38736,6 +38736,54 @@ for the owner to rule on.
 
 ---
 
+## A story can be marked as EVIDENCE, and automatic cleanup skips it — by owner intent, with a written reason (2026-09-14)
+
+**Context.** A dozen findings and a dozen entries in this file, all written in the week of
+2026-09-08, rest on a handful of staging stories. Two of them (`job_1789296188291_thezv15y1`,
+`job_1789337873076_qf2at21ui`) are owned by ANONYMOUS trial accounts, and the abandoned-
+anonymous sweep in `server/routes/trial.js` runs unattended every 6 hours, deleting every
+anonymous account older than 48 hours together with its `story_jobs`, `characters`, `files`
+and `stories` — and then pruning the stories' R2 objects. Those two stories had a hard
+48-hour life. The second deleter, `scripts/admin/purge-test-data.js`, removes staging
+stories older than **30 days** with `ownerFilter = true` and `KEEP_EVERY = 0`, i.e. all of
+them; it already exempted ordered, shared and Test-Lab-referenced stories, but nothing else.
+The daily DB housekeeping (`server/lib/dbHousekeeping.js`) deletes no rows at all — it
+offloads and vacuums — so it was never the threat it looked like.
+
+A cross-reference of every `job_` id cited in `docs/decisions.md` and `tasks/` against both
+databases found **six recent cited stories already gone from staging AND production**:
+`job_1788285785501_sbpfd0i8s`, `job_1788698812047_q5b1vuds7`, `job_1788724538469_n6ylqxq7w`,
+`job_1788727744192_gxf6gbywo`, `job_1788763045123_z8so79ngb`, `job_1788802404497_i1mm4yn6h`
+(plus 14 older ones). The conclusions drawn from those are now unfalsifiable. This is the
+failure the mechanism exists to stop repeating.
+
+**Decision.** `stories.evidence_reason` + `stories.evidence_marked_at` (migration
+`038_story_evidence.sql`, which also seeds the currently-cited rows). Every automatic
+deleter consults it: the trial sweep holds back the whole ACCOUNT, `purge-test-data.js`
+adds `evidence` to its protected-ids list, and orphan cleanup shares one predicate,
+`ORPHAN_STORIES_WHERE`. The trial sweep now SELECTs its candidates, splits them in JS
+(`selectAnonSweepTargets`) and **logs every hold-back with its reason** before deleting by
+id list. `scripts/admin/evidence-stories.js list|mark|unmark` is the human view.
+
+**Rationale.** A column over a hardcoded id list in a script: the deleters are SQL and live
+in four places, so the exemption belongs on the row where all of them see it; it survives
+every redeploy; and it is discoverable by anyone who runs `SELECT id, evidence_reason FROM
+stories`. A reason string rather than a boolean because the owner's standing cleanup rule is
+**delete by OWNER, not by artefact type** — an exemption must say who wants the row kept and
+why, or nobody can tell later whether it has gone stale. Protection is per ACCOUNT, not per
+story: keeping a story row while deleting its owner, characters and jobs leaves unreadable
+evidence and an orphan, which orphan cleanup would then delete anyway.
+
+**Touched:** `migrations/038_story_evidence.sql`, `server/lib/evidenceStories.js`,
+`server/routes/trial.js`, `server/routes/admin/database.js`,
+`scripts/admin/purge-test-data.js`, `scripts/admin/cleanup-orphaned-data.js`,
+`scripts/admin/evidence-stories.js`, `tests/unit/evidence-stories-cleanup.test.ts`.
+
+**Status:** ✅ active — staging only until deployed; the seed applies at boot on both envs
+and is a no-op on production, where none of these ids exist.
+
+---
+
 ## The iterate GENERATOR gets the page's beat; the JUDGE still must not (2026-09-14)
 
 **Context.** `iteratePageCore` rewrites a page's whole brief and regenerates the frame. It
@@ -38786,3 +38834,35 @@ haystack (`images.js`), so the scrub cannot undo a reinstatement the beat asked 
 `server/lib/promptBuilders.js` (`buildSceneDescriptionPrompt`), `prompts/scene-iteration.txt`,
 `prompts/scene-iteration-free.txt`, `tests/unit/iterateBeat.test.ts`.
 **Status:** ✅ active
+
+### MEASURED 2026-09-14: the cover water/air exception alone does NOT fix the underwater quay
+**Context:** Follow-up to the entry above. The back cover of
+`job_1789227389389_z18dmvnt6` was regenerated against the stored cover hint with
+the new exception in place (harness asserted 3/3 sections carry it before
+spending). **The defect reproduced exactly** — the family again stands dry on
+cobblestones with the lit gas lamp, underwater.
+
+**Why:** the fault is over-determined by the HINT, not by the composition rule.
+The stored hint reads `objects: ["LOC003", "ART009", "ART007", "ART001",
+"ART008"]` — open water with no floor, plus the quay lamp ("bolted to the stone
+paving; the lamp is lit"), plus the autumn leaf pile — and its character lines
+say "stands in the centre, facing viewer", "stands beside Liz", four times over.
+A rule that says "unless the scene is set in water, they swim or float" cannot
+win against a scene description that states everyone stands and names two land
+fixtures. The strict clause also leads and names "cobblestones" as a valid
+surface, which is what got drawn.
+
+**Verdict:** rule A (the exception) is necessary for consistency with pages but
+is NOT sufficient on its own. Rule B — the cover backdrop must be a LOC the cast
+can stand in, and its props must belong there — is the one that matters, and it
+acts when the Art Director authors the hint, so it cannot be tested without a
+fresh story generation. **Do not read the A entry above as validated.**
+
+**Open:** whether the cover scene builder should also stop writing "stands" into
+a water scene's character lines, and whether the cover plate prepares ground
+before the figures exist (`coverIterate` characterSpace, see the 2026-07-11
+SOLID-GROUND entry) — both untested.
+
+**Touched:** `tests/manual/redo-back-cover-water-rule.js` (the harness; one paid
+cover generation)
+**Status:** ✅ active (a measurement, not a behaviour change)
