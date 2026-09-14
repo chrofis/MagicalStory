@@ -37952,3 +37952,51 @@ would not generalise past the story it was tuned on.
 `tests/unit/vb-state-review.test.ts` (both the suppressed false positive and the still-firing true
 positive)
 **Status:**    ✅ active
+
+## Trial idea variety: the two arms differ by construction, not by being asked to (2026-09-14)
+**Context:**   Lab experiment **#1273** drew ten trial idea PAIRS on held-identical inputs and got
+ten of ten on the same premise. The prompt was 861 words in for 40 words out, of which
+`prompts/age-band-tries.txt` was 447 (57%) and not one word invited variety. Three mechanical
+causes, all measured: (a) the band file's worked-example menus were read as an answer key — 8 of 10
+ideas resolved with the phrasing of `age-band-tries.txt:15-16` verbatim; (b) the make-believe arm's
+only difference from the own-town arm was an appended sentence opening "Generate a DIFFERENT idea
+than the first one", a **dangling reference** — the two calls fire simultaneously in one
+`Promise.all`, so the model has never seen the first idea, and one sentence of framing cannot beat
+782 shared words that dictate the plot; (c) `prompts/trial-idea.txt` rendered `Story title: ` empty
+(`getTrialTitle` returns null for an untopic'd adventure) while still instructing "The idea must fit
+the title above" and "Do NOT repeat the title."
+**Decision:**  Four changes, no evaluator or scoring change (classification belongs to the prompt):
+1. **Three views of one band file.** `prompts/age-band-*.txt` tag their spans — `[[book]]` (book
+   craft and the example menus), `[[plot]]` (the band's plot mechanics), untagged (tone and safety).
+   `applyBandView()` slices; `buildAgeModeSection(input, { bandView })` serves `writer` (everything —
+   the default, so the writer is untouched), `premise` (drops `[[book]]`) and `tone` (drops both).
+   ONE file carries all three so no view can drift out of sync with the writer's.
+2. **The make-believe arm gets `tone`, the own-town arm gets `premise`.** The arms now differ in
+   plot licence, not in one appended sentence. The dangling "different than the first one" clause is
+   deleted. The arms stay parallel — `/try` latency is the point of that path.
+3. **The title line and its two rules are gated on a non-empty title.**
+4. **A rotated variety axis.** `nextIdeaVarietyAxis()` injects one line per arm naming the kind of
+   want and the sort of companion, rotated through two static coprime lists (7 × 4). Two draws
+   differ by construction. This follows the measured-good pattern from the beats 15-sample ruling
+   (`decisions.md` 2026-08, "oversupply + selection beats prohibition") — "choose a less obvious one"
+   adds no entropy. Archetypal wording only; ~20 tokens; no extra call.
+Assembly moved out of the SSE route into `buildTrialIdeaPrompts()`, which the `/try` route and the
+Lab's `trial_idea_variety` stage both call — the stage previously hand-copied it and could silently
+measure a prompt production does not send.
+**Rationale:** This implements the 2026-08-25 ruling that the two cards must differ in KIND
+(`decisions.md:19740`); it does not reverse it. `:14578` (premise not walkthrough) and `:33028`
+(name want/obstacle/cost concretely) are unaffected — the premise view keeps the plot mechanics that
+make a premise concrete and loses only the book-craft rules a 40-word premise cannot honour (per-turn
+feelings, food safety, life-event framing, ending tone). The challenge catalogue stays out of the
+trial path: the age-3 exclusion is an owner ruling (`decisions.md:26317`). `docs/SETTLED.md` carries
+no line on idea generation, so no reversal protocol applies.
+Measured: own-town arm 468 words (age 3) / 414 (age 5); make-believe arm 292 / 271 — down from 782
+shared. Band views at age 3: writer 446 words (unchanged), premise 240, tone 111.
+**Touched:** `prompts/age-band-{tries,routine,quest,fear-choice,journey}.txt` (scope tags; five
+sentence seams reworded so a removed menu leaves a whole sentence),
+`prompts/trial-idea.txt` (`{TITLE_LINE}`, `{TITLE_RULE}`, `{VARIETY_AXIS}`),
+`server/lib/promptBuilders.js` (`applyBandView`, `bandView` option, `nextIdeaVarietyAxis`,
+`buildTrialIdeaPrompts`), `server/routes/trial.js`, `server/lib/testlab.js`
+(`runTrialIdeaVarietyStage` rebuilds per draw so the rotation is exercised),
+`tests/unit/trial-idea-variety.test.ts`, `tests/unit/testlab-trial-variety-stages.test.ts`
+**Status:**    ✅ active
