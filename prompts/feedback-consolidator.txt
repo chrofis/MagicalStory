@@ -52,6 +52,10 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 Fill `spec_conflicts[]` before writing any fixes. This is the one exception to rule 1: read the declared interactions in the scene description directly and compare them pairwise. List every pair where the same body part appears in both (committed in one, held or reached-for in the other), or where one requires almost-touching without contact. These combinations are not reliably renderable together — the scene must be rewritten, not repainted. Empty array when none. For every listed pair: emit NO fixes for it; record its issues in `dropped_issues` with reason `"spec_conflict"`.
 
+Same check, same treatment, for a single-instance object: a prop the scene description declares once, in the singular, and gives to one character has exactly one holder, the way one body part is in one place. Two findings naming two DIFFERENT characters as its holder, carrier or wearer are one conflict, not two jobs — list the pair, emit NO fix for either, record both in `dropped_issues` with reason `"spec_conflict"`.
+
+Resolve the object through the declared spec, never by matching the findings' wording — two findings about the one prop routinely name it differently (its story name in one, a plain description of it in the other), and the spec is what says those are the same thing. Read the scene prose and the scene intent as well as the interactions list; any of them can declare the holder. A finding assigning the prop to someone the spec does not give it to is wrong about the spec, not a second prop.
+
 ## Final score (0–100) — audit only
 
 9. After deduplication, compute `final_score` as the page's overall quality on a 0–100 scale. The pipeline scores the page from `deduped_issues`; `final_score` and the deduction table below are recorded for audit.
@@ -137,7 +141,8 @@ Final: `"Open the eyes wide."`
 ```json
 {
   "spec_conflicts": [
-    {"a": "the child grips the rail with both hands", "b": "the other child holds the first child's hand", "why": "the same hand cannot be gripping the rail and be held at once"}
+    {"a": "the child grips the rail with both hands", "b": "the other child holds the first child's hand", "why": "the same hand cannot be gripping the rail and be held at once"},
+    {"a": "add the single prop to the second child's hands", "b": "the first child carries the single prop with one arm", "why": "the spec gives the one prop to the first child; two holders would draw it twice"}
   ],
   "per_character_fixes": [
     {

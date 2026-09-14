@@ -38317,3 +38317,41 @@ because that parser is also the SCENES/brief parser (briefs are not reader-visib
 Consolidating it into the parser is a fair later cleanup.
 **Touched files:** `server/lib/sceneMetadata.js`, `server/lib/beatsPipeline.js`,
 `server/lib/textRefine.js`, `tests/unit/page-text-trailing-separator.test.ts`
+
+## A single-instance object has one holder — two conflicting holder findings are a spec conflict, not two repair jobs (2026-09-14)
+**Context:**  Staging story `job_1789348171785_9oxos7dwv` page 7 shipped with TWO
+copies of the book's one plot prop. The v0 consolidated plan carried two
+`action_interaction` findings naming two DIFFERENT characters as the prop's holder
+(`[CRITICAL]` "declared to carry <prop> but hands empty" on one, `[MAJOR]` "holds
+<prop> with only left hand" on the other) and wrote a per-character fix for EACH.
+Round 2's inpaint instruction obeyed both verbatim — "Add red egg in this
+character's hands" AND "Adjust this character's pose so both arms encircle the red
+egg" — the render put the prop in two pairs of hands, the next eval returned a
+`[CRITICAL]` for exactly that, and it landed in `unrepairedCritical` and SHIPPED
+because `repairMaxPasses` was exhausted. `spec_conflicts` was `[]` in all three
+rounds. The declared spec was never ambiguous: the scene description's prose gives
+the prop to ONE character ("both arms wrapped around the <prop>") and the
+`sceneIntent` repeats it; the second finding simply contradicted the spec.
+**Decision:** Extend the consolidator's existing `## Spec check (required)` — the
+mechanism that already emits NO fixes for a listed pair and records both findings
+in `dropped_issues` with reason `"spec_conflict"` — to a third shape: a prop the
+scene description declares once, in the singular, and gives to one character has
+exactly one holder, so two findings naming two different characters as its holder,
+carrier or wearer are ONE conflict, not two jobs. The object is resolved through
+the DECLARED spec, never by matching the findings' wording, and the prompt says
+explicitly that the prose and the `sceneIntent` declare the holder as well as the
+`interactions` list.
+**Rationale:** A unique prop cannot be in two places at once any more than a body
+part can — the same class as the check's existing body-part shape, one case covered
+and the other not. Keying on the spec rather than the findings is not a style
+preference but a requirement of the evidence: the two real findings named the prop
+DIFFERENTLY (its story name in one, a plain description in the other), so a rule
+matching description wording would have caught nothing, and CLAUDE.md forbids
+working out what a finding means from its prose. The holder declaration is likewise
+NOT in `interactions[]` on this page (its one entry is "walking") — it is in the
+prose and the intent, which is why the deterministic `detectDeclaredSpecConflicts`
+body-part check in code could not have been extended to cover it as written.
+Prompt-side per owner decision; a code backstop was considered and left unbuilt.
+**Touched files:** `prompts/feedback-consolidator.txt` (spec-check section + a
+generic worked pair in the `spec_conflicts` output example),
+`tests/unit/single-instance-object-holder-conflict.test.ts`
