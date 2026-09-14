@@ -824,4 +824,5 @@ module.exports = {
   CLOTHING_CATEGORY_PATTERN,
   extractCharacterNamesFromScene,
   getExtractJsonFromText,
+  extractBalancedJsonObject,
 };

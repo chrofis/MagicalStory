@@ -33,7 +33,7 @@ const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForI
  *
  * @returns {Promise<{ map: Array<number|null>, missing: number[], unused: number[] }>}
  */
-async function identifySheetCells(buffer, cells, elements) {
+async function identifySheetCellsImpl(buffer, cells, elements) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
@@ -66,6 +66,103 @@ async function identifySheetCells(buffer, cells, elements) {
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   return parseCellIdentification(raw, elements.length, cells.length);
+}
+
+/**
+ * The identification call, with ONE retry.
+ *
+ * The call is cheap (flash-lite, one image) and a single bad reply used to cost
+ * every element in the batch its reference — measured on staging
+ * job_1789348171785_9oxos7dwv, where the reply was valid JSON followed by prose
+ * and the catch below returned an all-null map. The tolerant parse in
+ * `parseCellIdentification` covers the shapes we have SEEN; the retry covers the
+ * ones we have not (a truncated reply, a transient HTTP error). Once only —
+ * a model that answers unusably twice will not answer usably on the third try.
+ *
+ * @param {Object|null} genLog current generation logger
+ * @param {Object} [deps] test seam: { identify }
+ */
+async function identifySheetCellsWithRetry(buffer, cells, elements, genLog = null, deps = {}) {
+  const identifySheetCells = deps.identify || identifySheetCellsImpl;
+  try {
+    return await identifySheetCells(buffer, cells, elements);
+  } catch (err) {
+    log.warn(`⚠️ [REF-SHEET] Cell identification failed (${err.message}) — retrying once`);
+    genLog?.warn('vb_sheet_identification_retry', `Cell identification failed (${err.message}) — retrying once`);
+    const retried = await identifySheetCells(buffer, cells, elements);
+    log.info(`✓ [REF-SHEET] Cell identification succeeded on the retry`);
+    genLog?.info('vb_sheet_identification_retry_ok', 'Cell identification succeeded on the retry');
+    return retried;
+  }
+}
+
+/**
+ * At most this many solo re-renders per sheet batch.
+ *
+ * An element that ends the split with no cell is re-rendered on its own rather
+ * than shipped without a reference (it would otherwise be re-invented on every
+ * page — the central prop of job_1789348171785_9oxos7dwv drew as a mottled
+ * stone, a glossy red egg, a speckled egg and, on one page, two eggs). Each
+ * re-render is a paid image call, so the count is bounded: a pathological sheet
+ * (identification mapping nothing at all) must not fire one call per element.
+ * Three covers every real case seen — batches are at most four cells and the
+ * measured losses were one or two elements — while capping the worst case at
+ * roughly one extra sheet's worth of spend.
+ */
+const MAX_SOLO_REFERENCE_RERENDERS = 3;
+
+/**
+ * Re-render, solo, every element the split left without a reference.
+ *
+ * `renderSolo([element])` is the EXISTING one-element path (it drops the
+ * gridline language — see buildReferenceSheetPrompt's count===1 branch), passed
+ * in so this is testable without an image model.
+ *
+ * Mutates `references` in place and returns what happened.
+ *
+ * @param {Array<string|null>} references cell-indexed, nulls are the losses
+ * @param {Array<Object>} batch the requested elements, same order
+ * @param {Function} renderSolo (cells) => Promise<Array<string>>
+ * @param {Object} [opts] { genLog, cap }
+ * @returns {Promise<{rerendered:number, recovered:string[], stillMissing:string[], cappedOut:string[]}>}
+ */
+async function fillMissingReferencesSolo(references, batch, renderSolo, opts = {}) {
+  const genLog = opts.genLog || null;
+  const cap = Number.isInteger(opts.cap) ? opts.cap : MAX_SOLO_REFERENCE_RERENDERS;
+  const nameOf = (i) => batch[i]?.name || `element ${i + 1}`;
+  const missing = [];
+  for (let i = 0; i < batch.length; i++) if (!references[i]) missing.push(i);
+  const out = { rerendered: 0, recovered: [], stillMissing: [], cappedOut: [] };
+  if (missing.length === 0) return out;
+
+  for (const i of missing) {
+    if (out.rerendered >= cap) {
+      out.cappedOut.push(nameOf(i));
+      continue;
+    }
+    out.rerendered++;
+    log.warn(`⚠️ [REF-SHEET] "${nameOf(i)}" came out of the sheet with no reference — re-rendering it solo`);
+    genLog?.warn('vb_sheet_solo_rerender', 'No cell on the sheet held this element — re-rendering it on its own', nameOf(i));
+    try {
+      const cells = await renderSolo([batch[i]]);
+      const cell = Array.isArray(cells) ? cells[0] : null;
+      if (!cell) throw new Error('solo re-render returned no cell');
+      references[i] = cell;
+      out.recovered.push(nameOf(i));
+      log.info(`✓ [REF-SHEET] Solo re-render recovered a reference for "${nameOf(i)}"`);
+      genLog?.info('vb_sheet_solo_rerender_ok', 'Solo re-render produced a reference', nameOf(i));
+    } catch (err) {
+      out.stillMissing.push(nameOf(i));
+      log.error(`❌ [REF-SHEET] Solo re-render failed for "${nameOf(i)}" (${err.message}) — it ships with NO reference image`);
+      genLog?.warn('vb_sheet_no_reference', `Solo re-render failed (${err.message}) — no reference image for this element`, nameOf(i));
+    }
+  }
+
+  if (out.cappedOut.length > 0) {
+    log.error(`❌ [REF-SHEET] Solo re-render cap (${cap}) reached — no reference image for: ${out.cappedOut.join(', ')}`);
+    genLog?.warn('vb_sheet_solo_rerender_capped', `Solo re-render cap of ${cap} reached — these elements ship with no reference: ${out.cappedOut.join(', ')}`);
+  }
+  return out;
 }
 
 /**
@@ -147,7 +244,7 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
 
     if (Array.isArray(elements) && elements.length === count) {
       try {
-        const identified = await identifySheetCells(buffer, grid.cells, elements);
+        const identified = await identifySheetCellsWithRetry(buffer, grid.cells, elements, genLog);
         const crops = await cropCells(buffer, grid.cells);
         // A detected "cell" that itself splits into panels is a merge of
         // several drawn cells — cropping it hands one element a picture of
@@ -173,8 +270,10 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
         log.info(`[REF-SHEET] Cell mapping: ${elements.map((e, i) => `${e.name} → ${map[i] === null ? 'NONE' : cellLabel(map[i])}`).join(', ')}`);
         return map.map(idx => (idx === null ? null : crops[idx]));
       } catch (err) {
-        log.error(`❌ [REF-SHEET] Cell identification failed (${err.message}) — no reference images for this batch`);
-        genLog?.warn('vb_sheet_identification_failed', `Cell identification failed: ${err.message}`);
+        // Twice unusable. The batch has no map, but no element is abandoned
+        // here: every null is picked up by fillMissingReferencesSolo below.
+        log.error(`❌ [REF-SHEET] Cell identification failed twice (${err.message}) — this batch falls back to solo re-renders`);
+        genLog?.warn('vb_sheet_identification_failed', `Cell identification failed twice: ${err.message}`);
         return new Array(count).fill(null);
       }
     }
@@ -1060,6 +1159,16 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         if (reCells.length !== cells.length || reCells.some(c => !c)) throw new Error('re-rendered cell extraction failed');
         return reCells;
       };
+
+      // NEVER ship an element with no reference. A null here means the split
+      // could not give this element a cell (identification failed, or its cell
+      // held several panels and was rejected). Without a reference the image
+      // model re-invents the element on every page: the central prop of staging
+      // job_1789348171785_9oxos7dwv drew as a mottled stone, a glossy red egg,
+      // a speckled egg, and twice over on one page. Bounded — see
+      // MAX_SOLO_REFERENCE_RERENDERS.
+      await fillMissingReferencesSolo(references, batch, rerenderSolo, { genLog });
+
       const record = (element, verdict) => {
         cellGates.push({ id: element.id, name: element.name, ...verdict });
         recordElementCellGate(visualBible, element.id, verdict);
@@ -1543,6 +1652,9 @@ module.exports = {
   checkStateCellsConsistency,
   checkStateBatch,
   splitGridIntoReferences,
+  identifySheetCellsWithRetry,
+  fillMissingReferencesSolo,
+  MAX_SOLO_REFERENCE_RERENDERS,
   buildReferenceSheetPrompt,
   characterAgeCue,
   buildReferenceSheetBatches,

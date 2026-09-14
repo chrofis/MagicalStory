@@ -295,19 +295,30 @@ async function labelCells(buffer, cells) {
  * `element` is the 1-based position in the requested list. A label of null,
  * "none" or an unknown letter means the element was not found.
  *
+ * The reply is read TOLERANTLY: the model wraps the object in a ```json fence,
+ * writes a sentence in front of it, or — the measured case — appends prose
+ * AFTER valid JSON. The old greedy `/\{[\s\S]*\}/` span swallowed that trailing
+ * prose whenever it contained a brace and JSON.parse then threw
+ * "Unexpected non-whitespace character after JSON at position 94" (staging
+ * job_1789348171785_9oxos7dwv), which cost EVERY element of that batch its
+ * reference. `extractBalancedJsonObject` (outlineParser/shared — the repo's
+ * one brace-balanced extractor, reused rather than written a third time) stops
+ * at the JSON's own closing brace, so trailing prose is simply ignored.
+ *
  * @returns {{ map: Array<number|null>, missing: number[], unused: number[] }}
  *          map[i] = cell index for element i, or null when unmatched
  */
 function parseCellIdentification(text, elementCount, cellCount) {
+  const { extractBalancedJsonObject } = require('./outlineParser/shared');
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = (fenced ? fenced[1] : raw).trim();
-  const objMatch = body.match(/\{[\s\S]*\}/);
-  if (!objMatch) throw new Error('identification reply contained no JSON object');
+  const objText = extractBalancedJsonObject(body);
+  if (!objText) throw new Error('identification reply contained no JSON object');
 
   let parsed;
   try {
-    parsed = JSON.parse(objMatch[0]);
+    parsed = JSON.parse(objText);
   } catch (err) {
     throw new Error('identification reply is not valid JSON: ' + err.message);
   }

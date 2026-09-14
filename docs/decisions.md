@@ -36880,3 +36880,77 @@ expired grace, and it is what the tests assert — never the wording.
 **Status:** ✅ active — the next long story proves it: `text_refine_join_grace`
 in the generation log says the grace was entered, `…_grace_landed` /
 `…_grace_expired` says whether the round made it.
+
+## A reference-sheet element that ends up with no cell is re-rendered solo, and the identification reply is read tolerantly (2026-09-14)
+
+**Context:** In staging story `job_1789348171785_9oxos7dwv` the book's central
+prop — the egg the whole story is about — shipped with **no reference image at
+all**. Its bible entry carried no `referenceImageUrl`, its `cellGates` were
+empty, and not one page prompt carried the "The attached reference images
+include…" line for it. With nothing anchoring it, the image model re-invented
+it on every page: a dull mottled stone on p2, a smooth glossy red egg on p3,
+speckled on p5 and p7, darker on p16 — and on p7 it drew two of them.
+
+The chain: the sheet is requested as a single column for any element count
+except four, and image models routinely draw a square-ish grid instead —
+`vb_sheet_layout_mismatch` fired **five times across three stories** (9 cells
+drawn for 3 requested, 1 for 2, 4 for 2). A mismatch runs one
+`identifySheetCells` call to map the drawn cells onto the requested elements.
+That reply is parsed by `parseCellIdentification`, which threw
+`identification reply is not valid JSON: Unexpected non-whitespace character
+after JSON at position 94` — i.e. **valid JSON followed by prose**, the
+commonest reply shape there is. The old extraction took a greedy `{…}` span, so
+a brace anywhere in the trailing sentence swallowed it into the parse. The
+catch then did `return new Array(count).fill(null)`: **one unparseable reply
+cost every element in the batch its reference**, not just the unmappable one.
+There is a second, independent route to the same end —
+`rejectMultiPanelAssignments` drops a cell that itself splits into panels (it
+fired twice on the same story as `vb_sheet_cell_multi_element`), on the correct
+reasoning that no reference beats a wrong one. Either way the element is
+re-imagined page by page.
+
+**Decision:** Two changes, and the grid geometry is deliberately left alone.
+1. `parseCellIdentification` extracts the FIRST balanced JSON object instead of
+   a greedy span, so a fenced ```json block, leading prose and trailing prose
+   after valid JSON all parse the same. It reuses
+   `extractBalancedJsonObject` from `server/lib/outlineParser/shared.js` — the
+   repo's existing brace-balanced extractor, now exported — rather than adding
+   a third per-consumer JSON rule. If identification still fails,
+   `identifySheetCellsWithRetry` runs it once more before giving up
+   (`vb_sheet_identification_retry` / `…_retry_ok`); the call is flash-lite on
+   one image, trivially cheap against losing a whole batch's references.
+2. After identification and the multi-panel rejection, any element still
+   holding `null` gets ONE solo re-render through the existing one-element path
+   (`rerenderSolo` → `buildReferenceSheetPrompt` with `count === 1`, which drops
+   the gridline language) instead of shipping with nothing. Bounded by
+   `MAX_SOLO_REFERENCE_RERENDERS = 3` so a pathological sheet — identification
+   mapping nothing at all — cannot fire one paid image call per element.
+
+**Rationale:** The owner's call was to fix the RECOVERY, not the trigger: the
+requested `cols`/`rows` and the prompt's `GRID_SHAPE_PHRASE` are unchanged, so
+the layout mismatch that sends a batch down the identification path **still
+happens** exactly as often. What changes is what it costs. A tolerant parse
+handles the reply shape we measured; the retry handles the shapes we have not
+(a truncated reply, a transient error). And the solo re-render is the floor
+under both routes, including the multi-panel rejection, which stays as it is —
+dropping a three-object crop is right, shipping the element with nothing after
+it was not. Three is the cap because batches hold at most four cells and the
+measured losses were one or two elements, so it covers every real case while
+bounding the worst case at about one extra sheet's worth of spend. Everything
+is traceable in the next story's generation log: `vb_sheet_identification_retry`,
+`vb_sheet_solo_rerender` / `…_ok`, `vb_sheet_solo_rerender_capped`, and
+`vb_sheet_no_reference` at error level for an element that still ends with
+nothing — a real loss, logged as one.
+
+**Touched:**
+- `server/lib/sheetGrid.js` (`parseCellIdentification` — balanced extraction)
+- `server/lib/outlineParser/shared.js` (exports `extractBalancedJsonObject`)
+- `server/lib/referenceSheets.js` (`identifySheetCellsWithRetry`,
+  `fillMissingReferencesSolo`, `MAX_SOLO_REFERENCE_RERENDERS`, the call site in
+  `generateReferenceSheet`)
+- `tests/unit/reference-sheet-mismatch.test.ts`,
+  `tests/unit/sheet-grid-detection.test.ts`
+
+**Status:** ✅ active on staging — the next story with a
+`vb_sheet_layout_mismatch` proves it: no element in that batch should reach the
+pages without a `referenceImageUrl`.

@@ -114,3 +114,139 @@ describe('cell prompt requires the drawing to read as the named element', () => 
     expect(prompt).not.toMatch(/draw the thing it is compared to/i);
   });
 });
+
+// ── Staging job_1789348171785_9oxos7dwv (2026-09-14) ─────────────────────────
+// The book's central prop shipped with NO reference cell at all (no
+// referenceImageUrl, empty cellGates, no "The attached reference images
+// include…" line on any page prompt), so the image model re-invented it page by
+// page — a dull mottled stone, a glossy red egg, a speckled one, and two eggs
+// on one page. Cause: the identification reply was valid JSON followed by prose
+// ("Unexpected non-whitespace character after JSON at position 94") and the
+// catch returned an all-null map, costing EVERY element of the batch its
+// reference.
+const { parseCellIdentification } = require('../../server/lib/sheetGrid');
+const { fillMissingReferencesSolo, MAX_SOLO_REFERENCE_RERENDERS, identifySheetCellsWithRetry } = require('../../server/lib/referenceSheets');
+
+describe('identification reply is parsed tolerantly', () => {
+  const json = '{"assignments":[{"element":1,"label":"B"},{"element":2,"label":"A"}]}';
+  const expected = [1, 0];
+
+  it('parses a bare JSON object', () => {
+    expect(parseCellIdentification(json, 2, 2).map).toEqual(expected);
+  });
+
+  it('parses a ```json fenced block', () => {
+    expect(parseCellIdentification('```json\n' + json + '\n```', 2, 2).map).toEqual(expected);
+  });
+
+  it('parses JSON behind leading prose', () => {
+    expect(parseCellIdentification('Here is the mapping you asked for:\n' + json, 2, 2).map).toEqual(expected);
+  });
+
+  it('parses JSON followed by trailing prose (the measured failure)', () => {
+    const reply = json + '\n\nNote: cell C shows {nothing} that was requested.';
+    expect(parseCellIdentification(reply, 2, 2).map).toEqual(expected);
+  });
+
+  it('still refuses a reply with no JSON at all', () => {
+    expect(() => parseCellIdentification('I cannot tell which cell is which.', 2, 2)).toThrow();
+  });
+
+  it('still refuses malformed JSON', () => {
+    expect(() => parseCellIdentification('{"assignments": [{"element": 1, ', 2, 2)).toThrow();
+  });
+});
+
+describe('identification retries once', () => {
+  // The real wrapper, driven through its `identify` test seam — no model call
+  // is made anywhere in this suite.
+  const good = { map: [0, 1], missing: [], unused: [] };
+  const seam = (replies: any[]) => {
+    const calls = { n: 0 };
+    const identify = async () => {
+      const r = replies[calls.n++];
+      if (r instanceof Error) throw r;
+      return r;
+    };
+    return { calls, identify };
+  };
+
+  it('a first failure followed by a good reply yields the map', async () => {
+    const { calls, identify } = seam([new Error('identification reply is not valid JSON: x'), good]);
+    const out = await identifySheetCellsWithRetry(null, [], [], null, { identify });
+    expect(out).toEqual(good);
+    expect(calls.n).toBe(2);
+  });
+
+  it('a good first reply is not retried', async () => {
+    const { calls, identify } = seam([good, good]);
+    expect(await identifySheetCellsWithRetry(null, [], [], null, { identify })).toEqual(good);
+    expect(calls.n).toBe(1);
+  });
+
+  it('two failures give up after exactly two calls', async () => {
+    const { calls, identify } = seam([new Error('boom'), new Error('boom again')]);
+    await expect(identifySheetCellsWithRetry(null, [], [], null, { identify })).rejects.toThrow('boom again');
+    expect(calls.n).toBe(2);
+  });
+});
+
+describe('an element with no cell is re-rendered solo', () => {
+  const batch = [{ id: 'ART001', name: 'Egg' }, { id: 'ART002', name: 'Lamp' }, { id: 'ART003', name: 'Map' }, { id: 'ART004', name: 'Key' }];
+
+  it('re-renders the missing element and keeps the rest untouched', async () => {
+    const refs = ['cellA', null];
+    const seen: string[] = [];
+    const renderSolo = async (cells: any[]) => { seen.push(cells[0].name); return ['solo-' + cells[0].name]; };
+    const out = await fillMissingReferencesSolo(refs, batch.slice(0, 2), renderSolo, {});
+    expect(refs).toEqual(['cellA', 'solo-Lamp']);
+    expect(seen).toEqual(['Lamp']);
+    expect(out.rerendered).toBe(1);
+    expect(out.recovered).toEqual(['Lamp']);
+    expect(out.stillMissing).toEqual([]);
+    expect(out.cappedOut).toEqual([]);
+  });
+
+  it('does nothing when every element already has a reference', async () => {
+    const renderSolo = async () => { throw new Error('must not be called'); };
+    const out = await fillMissingReferencesSolo(['a', 'b'], batch.slice(0, 2), renderSolo, {});
+    expect(out.rerendered).toBe(0);
+  });
+
+  it('bounds the re-renders by the cap and names what was left out', async () => {
+    const refs = [null, null, null, null];
+    let calls = 0;
+    const renderSolo = async (cells: any[]) => { calls++; return ['solo-' + cells[0].name]; };
+    const out = await fillMissingReferencesSolo(refs, batch, renderSolo, { cap: 3 });
+    expect(calls).toBe(3);
+    expect(out.rerendered).toBe(3);
+    expect(out.cappedOut).toEqual(['Key']);
+    expect(refs[3]).toBeNull();
+  });
+
+  it('uses MAX_SOLO_REFERENCE_RERENDERS when no cap is given', async () => {
+    expect(MAX_SOLO_REFERENCE_RERENDERS).toBe(3);
+    const refs = [null, null, null, null];
+    let calls = 0;
+    const renderSolo = async (cells: any[]) => { calls++; return ['solo-' + cells[0].name]; };
+    await fillMissingReferencesSolo(refs, batch, renderSolo, {});
+    expect(calls).toBe(MAX_SOLO_REFERENCE_RERENDERS);
+  });
+
+  it('reports an element that still has nothing after its solo re-render', async () => {
+    const refs = [null];
+    const renderSolo = async () => { throw new Error('re-render returned no image'); };
+    const out = await fillMissingReferencesSolo(refs, [batch[0]], renderSolo, {});
+    expect(refs).toEqual([null]);
+    expect(out.rerendered).toBe(1);
+    expect(out.recovered).toEqual([]);
+    expect(out.stillMissing).toEqual(['Egg']);
+  });
+
+  it('reports an element whose solo re-render came back empty', async () => {
+    const refs = [null];
+    const renderSolo = async () => [null];
+    const out = await fillMissingReferencesSolo(refs, [batch[0]], renderSolo, {});
+    expect(out.stillMissing).toEqual(['Egg']);
+  });
+});
