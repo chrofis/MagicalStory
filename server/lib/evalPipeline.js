@@ -625,6 +625,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   const { computeLandmarkProtection, buildLandmarkComplianceBlock, filterProtectedRemovals } = require('./landmarkProtection');
   const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
+  // A dimension this judge could not look at is part of its RESULT, not only a
+  // log line (2026-09-14). Recording only — never a deduction. See notEvaluated.js.
+  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
 
   // No vision template here any more: Stage 1 is the shared blind inventory,
   // produced by the single call in evaluateImageQuality and handed in.
@@ -706,6 +709,13 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         log.debug(`[THREE-STAGE] ${pageLabel}quality figures unavailable: ${e.message}`);
       }
     }
+    if (qualityFiguresBlock === '(not available)') {
+      // The canonical "judge ran with an empty input": Stage 2 falls back to
+      // vision-only reasoning, so named-figure -> description pairing is never
+      // judged. Previously indistinguishable from "paired, no fault found".
+      notEvaluated.record('identity_attribution', 'quality_figures_unavailable',
+        'Stage 2 received no figures/matches - named-figure to description pairing was not judged');
+    }
 
     const complianceInput = fillTemplate(complianceTemplate, {
       ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
@@ -743,7 +753,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     if (sonnetResult.truncation?.suspected) {
       const reason = require('./textModels').describeTruncation(sonnetResult.truncation);
       log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 evalFailed: compliance reply ${reason}`);
-      return { evalFailed: true, evalError: `compliance reply ${reason}`, usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens } };
+      return { evalFailed: true, evalError: `compliance reply ${reason}`, notEvaluated: notEvaluated.list(), usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens } };
     }
     // Parse JSON from compliance response
     const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
@@ -822,6 +832,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   return {
     score: score100,
     verdict: complianceResult.verdict || 'UNKNOWN',
+    // Dimensions this compliance judge could NOT look at. Recording only: it
+    // never touches score100 above.
+    notEvaluated: notEvaluated.list(),
     issuesSummary,
     fixableIssues,
     visionInventory: visionText,
@@ -1387,6 +1400,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
   let qualityFiguresPromise = null;
   let qualityFiguresResolve = null;
   let p1Promise = null;
+  // NOT-EVALUATED RECORD (2026-09-14). Silence from a check that ran clean and
+  // silence from a check that could not run used to be the same signal; this
+  // makes the second one a field on the result. Recording only — no entry here
+  // is ever a deduction, a severity, or a repair trigger. See notEvaluated.js.
+  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
   try {
     // Guard against undefined/invalid imageData
     if (!imageData || typeof imageData !== 'string') {
@@ -1489,11 +1507,22 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // Covers included: the 'scene'-only gate hid exactly the cover case
         // where an empty contract let the judge strip a requested costume.
         log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
+        // The log line above existed and did not help: the eval went on to
+        // return a normal score with nothing saying clothing went unjudged.
+        notEvaluated.record('clothing', 'no_clothing_contract',
+          'No per-character outfit block could be built - clothing findings are suppressed (N-16)');
       }
-    } catch (err) { log.debug(`[EVAL] clothing contract block skipped: ${err.message}`); }
+    } catch (err) {
+      log.debug(`[EVAL] clothing contract block skipped: ${err.message}`);
+      notEvaluated.record('clothing', 'clothing_contract_build_failed', err.message);
+    }
 
     // Start semantic evaluation in parallel when we have a reference (page prose
     // or cover brief).
+    if (!runFidelity && (evaluationType === 'scene' || isCover)) {
+      notEvaluated.record('semantic_fidelity', 'no_fidelity_reference',
+        'Neither page prose nor a cover brief was supplied - semantic fidelity did not run');
+    }
     if (runFidelity) {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
       semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
@@ -1815,6 +1844,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`📊 [EVAL] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
       if (skippedCount > 0) {
         log.warn(`⚠️ [EVAL] ${skippedCount}/${referenceImages.length} reference photos unusable — figure-identity matching will be degraded${addedCount === 0 ? ' (NO references: matches[] will be empty)' : ''}`);
+        // Blind check #51 in the shape it actually shipped: the judge received
+        // fewer reference photos than the cast and graded identity anyway.
+        notEvaluated.record('identity', 'reference_photos_unusable',
+          `${skippedCount}/${referenceImages.length} reference photo(s) could not be attached - figure-identity matching is degraded`);
       }
       // References requested but NONE attached → the eval is identity-blind and
       // its score is not countable. On job_1786571353564 p4/p9 the recolour
@@ -2243,6 +2276,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       } catch (juryErr) {
         log.warn(`[EVAL] multi-judge merge skipped (${juryErr.message}) — using primary judge only`);
+        // The returned result still carries `agreement` fields as if the jury
+        // ran; without this entry a 1-judge run reads like a 3-judge consensus.
+        notEvaluated.record('judge_jury', 'jury_merge_failed', juryErr.message);
       }
 
       // STATS: record the (merged) buckets to eval_findings for per-style/genre
@@ -2580,6 +2616,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // - threeStageScore: Separate three-stage compliance score (0-100, null if not evaluated).
       // When writing to scene.qualityScore in DB, use evaluation.qualityScore (NOT evaluation.score).
       return {
+        // Dimensions that went UNJUDGED on this image, own + the compliance
+        // judge's. Never a deduction: `score` above is computed exactly as it
+        // was before this field existed (owner decision 2026-09-14 — scoring
+        // left as-is). `[]` means everything the check offers was judged.
+        notEvaluated: [...notEvaluated.list(), ...(threeStageResult?.notEvaluated || [])],
         score: finalScore,                    // Combined final score (visual − semantic)
         qualityScore: visualScore,            // Visual quality score AFTER three-stage merge
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
@@ -2682,6 +2723,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       };
 
       return {
+        // Dimensions that went UNJUDGED on this image, own + the compliance
+        // judge's. Never a deduction: `score` above is computed exactly as it
+        // was before this field existed (owner decision 2026-09-14 — scoring
+        // left as-is). `[]` means everything the check offers was judged.
+        notEvaluated: [...notEvaluated.list(), ...(threeStageResult?.notEvaluated || [])],
         score: finalScore,                    // Combined final score
         qualityScore: qualityScore,           // Visual quality score only
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)

@@ -3495,6 +3495,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // is answerable from the stored story instead of only from live logs.
       coherenceGate: v.evaluation?.coherenceGate || null,
       styleGate: v.evaluation?.styleGate || null,
+      // Dimensions the evaluator could NOT judge on THESE bytes (2026-09-14).
+      // Whitelisted for the same reason as entityIssues and styleGate: without
+      // this line the record exists only in memory and a stored story cannot
+      // answer "was clothing actually checked on this version".
+      // null = the evaluator never ran; [] = it ran and judged everything.
+      notEvaluated: v.evaluation?.notEvaluated ?? null,
       // The style repaint's own record — which anchor it aimed at, and the
       // comparative verdict the gate decided on. Same whitelist lesson as
       // rawOutput and styleGate above: without this line the field exists only
@@ -3630,6 +3636,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // repair budget was spent. Null (not []) when the page is clean, so a
       // consumer can tell "no criticals" from "never evaluated for this".
       unrepairedCritical: unrepairedCritical.length > 0 ? unrepairedCritical : null,
+      // Dimensions never judged on the version that SHIPS. Same null/[]
+      // contract as unrepairedCritical above: null = no evaluation at all.
+      notEvaluated: finalEval?.notEvaluated ?? null,
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticResult?.score ?? finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,
@@ -3749,7 +3758,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // `shippedDefective` travels with the result so the job status and the stored
   // story can say which pages are known-broken — a log line alone is what let
   // two pages ship at 0 and 5 unremarked (D7).
-  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, repairRounds, shippedDefective };
+  // UNJUDGED DIMENSIONS (2026-09-14). Rolled up per page so `finalChecksReport`
+  // can answer "which checks could not run, on which pages" without replaying
+  // the run's logs — the same reason shippedDefective travels with the result.
+  const notEvaluated = require('./notEvaluated').collectNotEvaluated(results);
+  if (notEvaluated) {
+    log.warn(`⚠️  [UNIFIED PIPELINE] ${notEvaluated.entryCount} dimension(s) went UNEVALUATED across ${notEvaluated.pages.length} page(s): ${notEvaluated.dimensions.join(', ')}`);
+  }
+
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, notEvaluated };
 }
 
 module.exports = {

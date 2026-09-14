@@ -4045,6 +4045,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // a further round to feed). See the repair loop's MID-LOOP BOOK AUDIT block.
     let pipelineBookAuditRounds = null;
     let pipelineRepairRounds = null;
+    // Dimensions that went UNJUDGED (2026-09-14) — rolled up from the picked
+    // version of every page. See server/lib/notEvaluated.js.
+    let pipelineNotEvaluated = null;
     // Pages that ship below the repair threshold or still carrying a CRITICAL
     // (D7): the run must say so somewhere a reader will find it.
     let pipelineShippedDefective = null;
@@ -6148,7 +6151,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dedication: inputData.dedication || '',
         };
 
-        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, repairRounds, shippedDefective } = await runUnifiedRepairPipeline(rawImages, {
+        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, notEvaluated: pipelineNotEvaluatedRollup } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
           usageTracker: (provider, usage, funcName, modelId) => {
@@ -6199,6 +6202,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineBookAuditRounds = (bookAuditRounds && bookAuditRounds.length) ? bookAuditRounds : null;
         pipelineRepairRounds = (repairRounds && repairRounds.length) ? repairRounds : null;
         pipelineShippedDefective = (shippedDefective && shippedDefective.length) ? shippedDefective : null;
+        pipelineNotEvaluated = pipelineNotEvaluatedRollup || null;
 
         // Map pipeline results to allImages format. Index rawImages by
         // pageNumber so per-page intermediates that the pipeline drops
@@ -6235,6 +6239,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // budget ran out. This whitelist is the single gate on what reaches
           // stories.data — without this line the marker exists only in logs.
           unrepairedCritical: img.unrepairedCritical || null,
+          // Per-page record of which dimensions were never judged on the
+          // shipped version (null = no evaluation ran at all).
+          notEvaluated: img.notEvaluated || null,
           qualityReasoning: img.qualityReasoning,
           thinkingText: img.thinkingText || null,
           wasRegenerated: img.wasRegenerated,
@@ -6616,6 +6623,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (pipelineShippedDefective) {
       finalChecksReport = finalChecksReport || {};
       finalChecksReport.shippedDefective = pipelineShippedDefective;
+    }
+
+    // UNJUDGED DIMENSIONS (2026-09-14). A check that could not run must say so
+    // in its result, not only in a log line — three checks shipped blind for
+    // months because "ran clean" and "could not run" looked identical. This is
+    // where an analyst reading stories.data finds which dimensions were never
+    // judged, on which pages. Recording only: it changes no score and no
+    // repair routing (owner decision the same day — scoring left as-is).
+    if (pipelineNotEvaluated) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.notEvaluated = pipelineNotEvaluated;
     }
 
     // Deterministic scene metadata ↔ scene design consistency findings (see

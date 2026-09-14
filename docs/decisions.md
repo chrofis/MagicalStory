@@ -37286,3 +37286,104 @@ score. The measured alternatives were priced and rejected for now:
 book), or the wasted repair spend becomes material at volume.
 **Touched:** nothing — decision recorded, no code changed.
 **Status:** ✅ active — as-is by measurement, not by default.
+
+---
+
+## 2026-09-14 — A check that could not run says so in its RESULT, not only in a log line
+
+**Context:** Three checks shipped BLIND and every one of them failed silently:
+
+- **#51** — the batch quality judge received `[]` reference photos and no
+  clothing contract. Dead since the February character-storage normalisation,
+  i.e. seven months.
+- **#61 / #65** — a reference sheet's cell-identification reply was destroyed by
+  a greedy regex, costing the whole batch its reference pictures.
+- **#75** — the head-row garment evaluator was handed the literal string
+  `{REQUESTED_OUTFIT}`; a rule written the day before could never fire.
+
+The boundary guard in `4161d0562` stops the third shape. None of them addressed
+the **generator** of all three: **silence from a check that ran clean and
+silence from a check that could not run are the same signal.** That is why #51
+survived seven months, and why a log reader cannot tell a clean page from an
+unjudged one.
+
+The canonical instance was already warning and it still did not help.
+`server/lib/evalPipeline.js` logs
+`👕 [EVAL] <page>: no clothing contract available — clothing findings suppressed (N-16)`
+and the evaluation then returns a perfectly normal score, with nothing in the
+RESULT and nothing in the stored story saying that dimension was never judged.
+
+A survey of `evalPipeline`, `evalJudges`, `sceneBriefCheck`, `referenceSheets`,
+`bookAudit`, `textRefine`, `sceneValidator`, `entityConsistency` and
+`coverIterate` found **73** sites where a check suppresses itself, swallows its
+own failure, or is handed a placeholder input (`'(not available)'`,
+`'(none declared)'`, `'No reference photo available.'`) and grades anyway.
+
+**Decision:** "I had nothing to check" becomes a first-class part of a check's
+result and is persisted.
+
+- `server/lib/notEvaluated.js` — `createNotEvaluatedRecorder({ pageContext })`
+  collects `{ dimension, reason, detail, pageContext }` entries, deduped by
+  `(dimension, reason)`. `dimension` is the thing that went unjudged
+  (`clothing`, `identity`, `identity_attribution`, `semantic_fidelity`,
+  `judge_jury`); `reason` is a machine-stable snake_case cause so a grep over
+  stored stories survives wording changes; `detail` carries the human sentence.
+  `collectNotEvaluated(pages)` rolls per-page records up for the stored report.
+- Every `record()` also emits ONE generation-log event at warn level,
+  `check_not_evaluated`, so a live run is greppable too.
+- `evaluateThreeStage` and `evaluateImageQuality` now return `notEvaluated: []`
+  alongside their existing fields — existing fields untouched, no consumer
+  breaks. `evaluateImageQuality` merges the compliance judge's entries into its
+  own.
+
+Wired (five sites, chosen because they reach a persisted result):
+clothing contract absent or failed to build; reference photos partially
+unattachable (blind check #51's own shape); semantic fidelity never launched for
+want of a reference; the multi-judge jury merge failing so a 1-judge run reads
+like a consensus; and the compliance judge receiving `'(not available)'` instead
+of figures/matches — the canonical "judge ran with an empty input".
+
+**Where a reader finds it in a stored story** (`stories.data`):
+
+- `sceneImages[].imageVersions[].notEvaluated` — per set of image bytes.
+- `sceneImages[].notEvaluated` — the version that actually ships.
+- `finalChecksReport.notEvaluated` — `{ recordedAt, entryCount, dimensions[],
+  pages[{pageNumber, entries[]}] }`, the one place that answers "which
+  dimensions were never judged, on which pages".
+
+`null` means no evaluation ran at all; `[]` means it ran and judged everything.
+
+**Rationale:** RECORDING ONLY, deliberately. The owner measured page-score
+stacking the same day and decided to leave scoring as-is (see
+"Page-score stacking measured and deliberately LEFT AS-IS", above). A
+`notEvaluated` entry is therefore never a deduction: it does not change
+`finalScore`, does not change a severity, and does not change which pages enter
+repair. The unit test asserts the score is byte-identical with and without the
+missing input — that assertion is what protects the scoring decision from a
+later well-meaning edit. Nothing added here throws either: a check with no input
+ships with a warning and never kills a paid run.
+
+Recording in the RESULT rather than only in a log is the same lesson as
+`labelRound`, `repairRounds` and `shippedDefective`: a field that exists only
+in memory cannot be read back from a finished story, and a log line alone is
+what let two pages ship at finalScore 0 and 5 unremarked (D7).
+
+The other ~68 surveyed sites are left as they are for now, by proportionality —
+this is a recording change, not a restructure of the eval pipeline. The survey
+list is the backlog for them. The sharpest remaining ones:
+`validateEmptyScene` returning `{ pass: true, issues: [] }` from its outer catch
+(fail-open); `runExtraJudges` filtering dropped judges out of the array with no
+marker of who was dropped, while `agreement` is then computed over the
+survivors; `evalJudges.parseFixableIssues` returning `[]` on unparseable text
+with no log at any level; `bookAudit` listing a failed chunk's pages in
+`pagesRead`; `textRefine`'s "rewrite damage is unchecked" branch with no
+`rounds` ledger entry; `entityConsistency` initialising a character at
+`overallScore: 10` before skipping its clothing category; and `coverIterate`
+passing an empty `figures[]` into `restampCover` so figure-avoidance has nothing
+to avoid.
+
+**Touched:** `server/lib/notEvaluated.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/repairPipeline.js`, `storyJobPipeline.js`,
+`tests/unit/batch-eval-whole-cast-refs.test.ts`.
+
+**Status:** ✅ active — recording only, scoring untouched by design.
