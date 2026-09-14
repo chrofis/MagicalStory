@@ -39218,10 +39218,12 @@ batch path. The one family of call sites that DOES hand the judge the sent promp
 has no page callers left after the 2026-08 pipeline unification — its three
 surviving callers are reference-sheet and Lab avatar renders, and the `'avatar'`
 branch returns before the quality eval runs. Stored evidence agrees: a sweep of
-60 recent staging stories' `fixableIssues` found `action_interaction` findings in
-quantity, but every one of them cites what "the prompt declares / requires /
-states" — i.e. D-16 against DECLARED INTERACTIONS. None has D-16b's signature of
-a held object named nowhere in the brief, reported against a required object.
+60 days of staging `fixableIssues` holds **599** `action_interaction` findings,
+184 of them phrased as a substitution ("instead of" / "rather than"), and every
+one reads against what "the prompt declares / requires" or "the interactions
+describe" — i.e. D-16 against DECLARED INTERACTIONS. Not one has D-16b's
+signature: an object named nowhere in the brief, in a hand, reported together
+with a required object left unhandled.
 
 **Decision.** REQUIRED OBJECTS becomes its own evaluator input (input 9,
 `{REQUIRED_OBJECTS}`), exactly as ART STYLE and the CLOTHING CONTRACT already
