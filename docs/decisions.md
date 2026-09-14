@@ -37240,3 +37240,49 @@ which pages the tries occupy, and the spans coincide.
 `buildStoryShapeSection`, `buildTrialStoryPrompt`, `buildUnifiedStoryPrompt`),
 `tests/unit/age-band.test.ts`
 **Status:** ✅ active
+
+## 2026-09-14 — Page-score stacking measured and deliberately LEFT AS-IS
+**Context:** Low page scores (9oxos7dwv p5 = 5, p15 = 8, p11 = 15) looked like
+the judge stacking MAJORs onto acceptable renders. Measured across all 55 pages
+of the three 2026-09-14 validation stories by reimplementing the scoring
+arithmetic — it **reproduced all 99 stored version scores exactly (0
+mismatches)**, so the following are the mechanism, not an estimate.
+- `finalScore = 100 − Σ charges`, **no floor**, capped at 100. `SEVERITY_POINTS`
+  = catastrophic 60 / critical 25 / major 15 / moderate 5 / minor 2, fully
+  additive. The only bounding is one charge per `deductionClassKey()` (bucket +
+  subject): page-scoped buckets charge once per page, the rest once per
+  (class, character). Entity findings sum separately, capped at 40.
+- **Stacking confirmed.** On the 29 pages below the redo gate (`scoreThreshold:
+  60`) the dominant finding is only **32%** of the damage; two thirds comes from
+  the charges behind it. Mean page score 55.3.
+- **Double-counting refuted.** Every version scored through the consolidated
+  path; the `[three-stage]` duplicates visible in a finding list are a display
+  artefact (`composeDeductions` filters that source). Entity-vs-other
+  near-duplicates: 0. The 7 near-identical charged pairs are one sentence billed
+  per child — per-subject billing working as designed.
+- **The amplifier is one opinion billed once per character.** The age /
+  proportion class the owner ruled out on the generation side ("age-band clamp
+  is fine") reappears judge-side as bare `character_identity/major`: 13 winning
+  charges, **195 points, 7.9% of all deductions**; on p8 the identical sentence
+  charged 45 points across three boys. No evaluator emits an `age` type, so no
+  code-side ceiling can target the class without a prompt change first.
+- **Repair consequence:** 44 attempts, 23 improved, **21 regressed**; 9 of 30
+  repaired pages shipped their ORIGINAL. p11 and p15 each burned two char-fix
+  calls, regressed both times, and shipped v0.
+**Decision:** **Leave the scoring as it is** (owner, 2026-09-14).
+**Rationale:** The version picker shipped the original on all 9 regression
+cases, so no wrong book went out — the cost of the current behaviour is wasted
+repair attempts, not damaged product, and the mechanism reproduces every stored
+score. The measured alternatives were priced and rejected for now:
+- harmonic decay (2nd charge ÷2, 3rd ÷3): mean 55.3 → 68.8, pages under the
+  gate 29 → 17; monotonic, pure arithmetic.
+- two worst classes per page: 29 → 17, mean 67.7; non-monotonic above two
+  findings, so six real defects read like two.
+- page-scoping the age class: measured WORSE (31 pages under the gate) — it
+  frees the per-character slot for whatever sat behind the age finding.
+- capping or zero-pointing the age class: 29 → 28 / 27; both need a prompt-side
+  `age` type before any code ceiling.
+**Revisit if:** a regressed version ever ships (the picker stops protecting the
+book), or the wasted repair spend becomes material at volume.
+**Touched:** nothing — decision recorded, no code changed.
+**Status:** ✅ active — as-is by measurement, not by default.
