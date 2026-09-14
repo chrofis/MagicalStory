@@ -3329,6 +3329,81 @@ function trimStateClause(delta, ctx = null) {
   return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
 }
 
+/**
+ * A Visual Bible OBJECT entity id (everything but CHR — the human cast).
+ * Accepts the three citation shapes a brief writes: "ANI001", "Funkli
+ * [ANI001]", { id: 'ANI001' }. Dotted facet handles ("ART001.2") keep their
+ * suffix; the caller bases them where it needs to.
+ */
+const VB_OBJECT_ID_RE = /^(?:ANI|ART|CLO|LOC|VEH)\d{1,4}(?:\.\d{1,3})?$/i;
+function vbObjectIdOf(citation) {
+  if (citation === null || citation === undefined) return null;
+  if (typeof citation === 'object') return vbObjectIdOf(citation.id);
+  const raw = String(citation).trim();
+  const bracketed = raw.match(/\[([A-Za-z]{3}\d{1,4}(?:\.\d{1,3})?)\]/);
+  const candidate = bracketed ? bracketed[1] : raw;
+  return VB_OBJECT_ID_RE.test(candidate) ? candidate.toUpperCase() : null;
+}
+
+/**
+ * THE PAGE'S VISUAL BIBLE OBJECT CITATIONS — the UNION of `objects[]` and the
+ * VB-object ids filed in `characters[]` (2026-09-14, story B
+ * job_1789343124794_z2c779f7i p17).
+ *
+ * An entity's citation is a citation wherever the brief filed it. A repair
+ * rewrite that reclassifies an animal from `objects[]` to `characters[]` used
+ * to empty the REQUIRED OBJECTS block of it — losing its `size` rider and its
+ * reference-cell claim silently. Only VB-id-shaped, non-CHR entries are taken
+ * from `characters[]`: a human cast member is a name (or a CHR id) and is not
+ * a VB object entity, so their existing path is untouched.
+ *
+ * Returns citation strings/records in `objects[]` order first, deduped.
+ */
+function collectVbObjectCitations(metadata) {
+  const out = [];
+  const seen = new Set();
+  const take = (citation, idOnly) => {
+    if (citation === null || citation === undefined || citation === '') return;
+    const id = vbObjectIdOf(citation);
+    if (idOnly && !id) return; // a human cast member — not a VB object entity
+    const key = id
+      || (typeof citation === 'string'
+        ? citation.trim().toLowerCase()
+        : String(citation?.id || citation?.name || '').toLowerCase());
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    // From characters[] push the bare ID: the downstream matcher takes strings.
+    out.push(idOnly ? id : citation);
+  };
+  for (const o of (Array.isArray(metadata?.objects) ? metadata.objects : [])) take(o, false);
+  for (const c of (Array.isArray(metadata?.characters) ? metadata.characters : [])) take(c, true);
+  for (const c of (Array.isArray(metadata?.fullData?.characters) ? metadata.fullData.characters : [])) take(c, true);
+  return out;
+}
+
+/** VB object ids the BEFORE metadata cited and the AFTER metadata does not. */
+function droppedVbCitations(beforeMeta, afterMeta) {
+  const idsOf = (m) => new Set(
+    collectVbObjectCitations(m).map(vbObjectIdOf).filter(Boolean).map(id => id.split('.')[0])
+  );
+  const after = idsOf(afterMeta);
+  return [...idsOf(beforeMeta)].filter(id => !after.has(id));
+}
+
+/**
+ * A repair rewrite that drops a VB id the ORIGINAL brief cited must SAY SO.
+ * LOG-ONLY: a gate is a guideline — the rewrite stands, the round is not
+ * failed. Story B p17 shipped with its two dragons uncited and nothing said.
+ */
+function warnDroppedVbCitations(pageNumber, beforeMeta, afterMeta, options = {}) {
+  const dropped = droppedVbCitations(beforeMeta, afterMeta);
+  if (dropped.length === 0) return dropped;
+  const warn = typeof options.warn === 'function' ? options.warn : ((m) => log.warn(m));
+  const what = options.what || 'repair rewrite';
+  warn(`⚠️ [VB-CITATION] Page ${pageNumber}: the ${what} dropped Visual Bible id(s) the original brief cited: ${dropped.join(', ')} — each loses its REQUIRED OBJECTS line and its reference-cell claim on this render. Log-only; the rewrite stands.`);
+  return dropped;
+}
+
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, visualBible = null, pageNumber = null, referencePhotos = null, options = {}) {
   // Build image generation prompt. The unified pipeline is the only generation
   // mode; legacy pictureBook / outlineAndText / sequential / language-variant
@@ -3627,6 +3702,25 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     log.info(`[RECEIVER] Page ${pageNumber}: placement sentence emitted — "${receiverPlacement}"`);
   }
 
+  // UNION OF objects[] AND characters[] (2026-09-14, story B p17). A Visual
+  // Bible entity citation is a citation wherever the brief filed it. The
+  // `iterate-round-1` repair on job_1789343124794_z2c779f7i p17 — commissioned
+  // for a hammer artefact, a facing error and stray leaves, with no scale
+  // issue anywhere in its commission — re-authored the page metadata and moved
+  // ANI001 ("Funkli") and ANI002 ("Mother Dragon") out of `objects[]` and into
+  // `characters[]`. This block walked `metadata.objects` only, so the shipped
+  // render lost both size riders ("about the size of a small house") AND the
+  // ANI reference cell claim, leaving only the prose adjective "a massive
+  // emerald green creature". Nothing logged it.
+  //
+  // The citation list is now the union. Reclassifying an entity between the
+  // two lists can no longer empty this block or drop its reference cell.
+  // Only VB-id-shaped, non-CHR citations are taken from `characters[]` — a
+  // human cast member is a NAME (or a CHR id) and keeps its existing path
+  // untouched. Nothing about WHAT is emitted changes: the line stays name-only
+  // (2026-09-02) and `size` still rides for animals (2026-09-11).
+  const vbObjectCitations = collectVbObjectCitations(metadata);
+
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
   // Supports lookup by name OR identifier (e.g., "CLO001", "ART002", etc.)
@@ -3635,7 +3729,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // and outputs them in JSON metadata. We use ONLY those elements instead of the entire bible.
   let requiredObjectsSection = '';
   let hasRequiredObjects = false;
-  if (metadata && metadata.objects && metadata.objects.length > 0 && visualBible) {
+  if (vbObjectCitations.length > 0 && visualBible) {
     const requiredObjects = [];
 
     // Helper function to match by name OR ID
@@ -3684,7 +3778,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // character's full description. The prose already carries them inline.
     // CHR ids that slip into metadata.objects are now filtered below and
     // silently skipped — the prose is the canonical source.
-    for (const objName of metadata.objects) {
+    // Dedupe by RESOLVED entity id: an id filed in both lists (or cited
+    // once by id and once by name) is one entity and gets one line.
+    const citedEntryIds = new Set();
+    const pushRequired = (rec) => {
+      const key = String(rec.id || rec.name || '').toUpperCase();
+      if (key && citedEntryIds.has(key)) return;
+      if (key) citedEntryIds.add(key);
+      requiredObjects.push(rec);
+    };
+    for (const objName of vbObjectCitations) {
       // Skip any character id in the objects list — the prose carries the
       // character's description (story-unified.txt instructs the model to
       // both name antagonists in the prose AND list their CHR id here; the
@@ -3732,7 +3835,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${state.id} ("${state.name}") is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
           state = null;
         }
-        requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state });
+        pushRequired({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state });
         continue;
       }
 
@@ -3740,7 +3843,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const animal = (visualBible.animals || []).find(a => matchesEntry(a, objName));
       if (animal) {
         const description = animal.extractedDescription || animal.description;
-        requiredObjects.push({ name: animal.name, id: animal.id, type: 'animal', description, entry: animal });
+        pushRequired({ name: animal.name, id: animal.id, type: 'animal', description, entry: animal });
         continue;
       }
 
@@ -3748,7 +3851,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const location = (visualBible.locations || []).find(l => matchesEntry(l, objName));
       if (location) {
         const description = location.extractedDescription || location.description;
-        requiredObjects.push({ name: location.name, id: location.id, type: 'location', description, entry: location });
+        pushRequired({ name: location.name, id: location.id, type: 'location', description, entry: location });
         continue;
       }
 
@@ -3756,7 +3859,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const vehicle = (visualBible.vehicles || []).find(v => matchesEntry(v, objName));
       if (vehicle) {
         const description = vehicle.extractedDescription || vehicle.description;
-        requiredObjects.push({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description, entry: vehicle });
+        pushRequired({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description, entry: vehicle });
         continue;
       }
 
@@ -3764,7 +3867,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const clothing = (visualBible.clothing || []).find(c => matchesEntry(c, objName));
       if (clothing) {
         const description = clothing.extractedDescription || clothing.description;
-        requiredObjects.push({ name: clothing.name, id: clothing.id, type: 'clothing', description, wornBy: clothing.wornBy || null, entry: clothing });
+        pushRequired({ name: clothing.name, id: clothing.id, type: 'clothing', description, wornBy: clothing.wornBy || null, entry: clothing });
       }
     }
 

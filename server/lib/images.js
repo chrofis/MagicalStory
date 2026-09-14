@@ -3859,6 +3859,27 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
+  // A REWRITE THAT DROPS A CITED VB ID MUST SAY SO (2026-09-14, story B
+  // job_1789343124794_z2c779f7i p17). The `iterate-round-1` rewrite there —
+  // commissioned for a hammer artefact, a facing error and stray leaves —
+  // silently stopped citing ANI001/ANI002, and the shipped v1 prompt lost both
+  // size riders and the ANI reference cell with nothing logged. The union
+  // resolution in promptBuilders (objects[] ∪ characters[]) makes the
+  // reclassification harmless; this says it out loud when a citation is gone
+  // outright. LOG-ONLY — a gate is a guideline: the rewrite stands, the round
+  // is not failed.
+  try {
+    const { warnDroppedVbCitations } = require('./storyHelpers');
+    warnDroppedVbCitations(
+      pageNumber,
+      savedScene.sceneMetadata || {},
+      newSceneMetadata || {},
+      { what: 'iterate rewrite' }
+    );
+  } catch (e) {
+    log.warn(`⚠️ [VB-CITATION] Page ${pageNumber}: citation-drop check could not run — ${e.message}`);
+  }
+
 // Resolve clothing. The stored pageClothing was set by the unified Sonnet
   // call at generation time and reflects the canonical per-page costume
   // decision — if it says costumed:mittelalterlich for this page, the Haiku

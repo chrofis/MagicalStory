@@ -38042,3 +38042,43 @@ figures. Not run.
 `tests/unit/built-prompt-values.test.ts` (both AD prompts carry the rule, worded
 identically; the rule is unconditional; no shrink path on the beats route)
 **Status:** ✅ active
+
+## A Visual Bible entity citation resolves from `objects[]` ∪ `characters[]` (2026-09-14)
+**Context:** Story B `job_1789343124794_z2c779f7i` p17. The v0 prompt, built
+from the Art Director's brief, carried three REQUIRED OBJECTS lines — the
+dragon egg, `ANI002` "Mother Dragon" *— about the size of a small house*,
+`ANI001` "Funkli" *— about the size of a school bag* — plus a reference-cell
+claim naming the egg and Mother Dragon. The v1 prompt, the image that SHIPPED,
+carried only the egg line and only the egg's reference image. Cause: the
+`iterate-round-1` repair — commissioned for a hammer artefact, a facing error
+and stray leaves, with no scale issue anywhere in its commission — re-authored
+the page metadata and moved both animals OUT of `objects[]` and INTO
+`characters[]`, leaving `objects[]` = `["LOC004","LOC003","ART003.3"]`. The
+REQUIRED OBJECTS builder walked `metadata.objects` only, so the paid render was
+generated with no size clause and no ANI reference cell, against the prose
+adjective "a massive emerald green creature" alone. Nothing logged it: a
+silent-loss class where reclassifying an entity between two metadata lists
+deletes a whole prompt channel.
+**Decision:** (1) The page's VB object citations are the UNION of `objects[]`
+and the VB-object ids filed in `characters[]`, resolved through one helper,
+`collectVbObjectCitations`, and deduped by resolved entity id so an entity in
+both lists emits one line. Only VB-id-shaped, non-CHR entries are taken from
+`characters[]` — a human cast member is a name (or a CHR id) and keeps its
+existing path untouched. (2) A rewrite that drops a VB id the ORIGINAL brief
+cited emits one warning naming the page and the dropped ids
+(`warnDroppedVbCitations`, wired into the iterate rewrite). LOG-ONLY: a gate is
+a guideline — the rewrite stands, the round is never failed, nothing is
+reverted.
+**Rationale:** The loss is structural, not a wording problem: no prompt rule
+can restore a channel the builder never walked. Widening WHERE an entity is
+found leaves WHAT is emitted untouched — the line stays name-only (2026-09-02,
+"Visual Bible element detail is Art-Director-mediated") and `size` still rides
+for animals (2026-09-11). Reverting a rewrite's classification was rejected:
+the rewrite may legitimately file an animal as cast, and a deterministic gate
+that kills a paid round is its own decision the owner has repeatedly declined.
+**Touched:** `server/lib/promptBuilders.js` (`vbObjectIdOf`,
+`collectVbObjectCitations`, `droppedVbCitations`, `warnDroppedVbCitations`, the
+REQUIRED OBJECTS loop + `pushRequired` dedupe), `server/lib/images.js`
+(`iteratePageCore`, after the anchored-object scrub),
+`tests/unit/vb-citation-union.test.ts`
+**Status:** ✅ active
