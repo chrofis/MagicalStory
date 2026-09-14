@@ -89,6 +89,18 @@ describe('parseTeachingGuideFile', () => {
     expect(total).toBe(189);
   });
 
+  it('every life-challenge guide is in the band register — no advice voice left', () => {
+    const guides = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
+    expect(guides.size).toBe(64);
+    for (const [id, guide] of guides) {
+      expect(guide.trim(), `[${id}] is empty`).not.toBe('');
+      expect(guide, `[${id}] still carries a Key messages: line`).not.toMatch(/Key messages:/);
+      expect(guide, `[${id}] still carries a Story guidance: block`).not.toMatch(/Story guidance:/);
+      const banner = guide.split('\n').find((l: string) => l.startsWith('#'));
+      expect(banner, `[${id}] has banner pollution`).toBeUndefined();
+    }
+  });
+
   it('life-challenge guides parse all 64 topics clean', () => {
     const guides = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
     expect(guides.size).toBe(64);

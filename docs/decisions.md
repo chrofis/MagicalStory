@@ -37680,3 +37680,102 @@ behind it.
 `storyJobPipeline.js` (`finalChecksReport.survivingCriticals`),
 `tests/unit/surviving-criticals.test.ts`
 **Status:** ✅ active
+
+---
+
+## 2026-09-14 — All 64 life-challenge guides moved to the age-band register; the advice voice is gone
+
+**Context:** `prompts/life-challenge-guides.txt` carried two registers at once.
+Five infant topics (`215a34d68`) were written as background for the writer —
+prose, bold lead-ins, no bullets. The other 59 were in an advice voice: a
+`Story guidance:` bullet list addressed to the reader, closed by a
+`Key messages:` line of morals. That line handed the writer the stated moral
+that `RULES OF THE TELLING` forbids at every age ("never bookkeeping, never a
+stated moral"), and that the simple bands (`routine` 0-1, `quest` 2, `tries` 3)
+forbid outright in their endings — the simple-band branch of
+`buildLifeSkillGuidelines` says "no tips, no strategies, no moral" and then
+appended a list of morals underneath it.
+
+**Decision:** All 59 converted to the register of the five: `**What the book
+is.**`, `**What happens.**`, `**The small thing that goes wrong.**`, `**What it
+is not.**`, `**Ending.**`, plus topic-specific lead-ins where a topic carries
+something the five headings have no home for. The substance is preserved —
+every situation, mechanic and owner-authored constraint in the old bullets is
+still in the prose (the realistic-preparation rule for vegetables, what counts
+as sharing and with whom, the hurt/danger test that separates telling from
+tattling). What was removed is the framing: the reader-facing tips and the
+morals. Register is uniform; reading age is not — a preteen topic is written at
+its own altitude.
+
+**Rationale:** A guide file is background, not a script. Two registers in one
+file meant the writer's instructions changed depending on which topic the user
+picked, and the advice half contradicted both the age bands and the telling
+rules. Converting rather than deleting keeps the therapeutic knowledge that
+makes these topics worth having; the one clause that legitimately carries the
+life-skill payload already lives in `buildTellingRulesSection`
+(`lifeSkillStrategy`, gated off for the simple bands), which is the right place
+for it — scoped, and applied once.
+
+**Touched:** `prompts/life-challenge-guides.txt` (59 sections rewritten, file
+header comment updated), `tests/unit/teaching-guide-parser.test.ts` (pins: 64
+topics parse, none empty, none banner-polluted, none contains `Key messages:`
+or `Story guidance:`)
+**Status:** ✅ active
+
+## Object size reaches the image as a relational anchor, and `foreground` no longer means "big" (2026-09-14)
+
+**Context:** A trial story drew a small held prop apple-sized on every page and
+larger than the child's head on the cover. Three separate causes, all measured:
+(a) `prompts/image-generation.txt` defined depth as size — "`foreground` is
+large and dominates the lower half" — which overrode the artifact `size` rider
+that WAS present on that story; composition beat physical size. (b) The artifact
+`size` field (added 2026-09-06, `793049e40`) was almost never emitted: staging
+9/193 artifacts (4.7%), prod 3/32 (9.4%), and on the FULL path specifically
+2/176 staging and 0/29 prod — because the two templates that author artifacts on
+that path, `story-unified-imagefirst.txt` and `scene-expansion-all.txt`, had no
+`size` field at all. Trial, whose template does have one, sat at 41% (7/17).
+(c) The trial path has no prose size anchor whatsoever — no Art Director, no
+rule 8g familiar-size calibration, no size rule in `story-trial.txt`.
+
+Two quality problems with the values that did get written: they collapsed onto
+the instruction's own exemplar (`"fits in one hand"` verbatim in 6 of 9 staging
+values), and some were metric ("body length approximately four metres"), which
+an image model cannot use. The effective ones were relational.
+
+**Decision:**
+1. `foreground` governs PLACEMENT and prominence, not physical size. The depth
+   bullet now says depth is distance from the camera, that a stated size always
+   wins over depth, and that an element with no stated size that is genuinely
+   large still dominates the foreground — so composition is not flattened on
+   pages where a large object should dominate.
+2. All four artifact-authoring templates carry `size`, with one shared
+   instruction that describes the FORM of the anchor (which body part it reaches
+   on a character beside it, or the part of a hand or arm it spans) and contains
+   no quoted exemplar to copy, forbids metric and imperial units, and states
+   English regardless of book language — matching the existing artifact
+   `name`/`description` English rule. A separate one-line rule makes the field
+   non-optional. `buildArtifactDescription()` now folds `size` into the artifact
+   description the way `buildAnimalDescription()` does, so it reaches the full
+   Visual Bible block and the cover's KEY STORY ELEMENTS, not only the
+   REQUIRED OBJECTS rider.
+3. The trial scene-hint `objects[]` schema gained an optional `size` slot, so
+   scale travels per object per page instead of depending on the writer
+   mentioning it in prose. `buildTextFromJson` renders it as a parenthetical.
+
+Classification was NOT touched: the existing `scale` finding type already fires
+where size reaches the prompt (60 findings in the sample). Detection was never
+the gap — supply was.
+
+**Rationale:** The size rider existed and worked; it lost to a composition rule
+that asserted foreground = large, and it was almost never populated on the path
+that generates most pages. Folding size through a builder mirrors the animal
+path that sits at 100% emission rather than inventing a second mechanism.
+Describing the anchor's form instead of showing an example is what stops the
+exemplar collapse — there is no longer a phrase in the instruction to copy.
+
+**Touched:** `prompts/image-generation.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/story-trial.txt`, `server/lib/visualBible.js`,
+`server/lib/sceneMetadata.js`, `tests/unit/artifact-size.test.ts`
+
+**Status:** ✅ active

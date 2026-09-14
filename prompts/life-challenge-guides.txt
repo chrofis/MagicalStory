@@ -10,12 +10,11 @@
 # BABY (Ages 0-2)
 # =============================================================================
 #
-# These five are written in the register of prompts/age-band-*.txt — what the
-# pages CONTAIN, not what the child should learn — and deliberately carry no
-# "Key messages:" line. The routine band (ages 0-1) forbids a lesson and forbids
-# a coda, so a line of morals here would hand the writer the one thing the band
-# tells it not to write. The other sections in this file are still in the older
-# advice voice; converting them is tracked separately in tasks/BACKLOG.md.
+# Every section here is written in the register of prompts/age-band-*.txt — what
+# the pages CONTAIN, not what the child should learn. None carries a line of
+# morals: the routine band forbids a lesson and forbids a coda, and the rules of
+# the telling forbid a stated moral at every age. The prose is background for the
+# writer, never material to deliver to the child.
 
 [bath-time]
 **What the book is.** An ordinary bath, from the water running to the towel. The
@@ -108,753 +107,1176 @@ traffic or crowds they manage themselves.
 
 **Ending.** Back through the same door, coat off, warm.
 
+
 # =============================================================================
 # TODDLER (Ages 2-4)
 # =============================================================================
 
 [potty-training]
-Help children feel positive and confident about using the potty/toilet.
-Story guidance:
-- Show that everyone learns to use the potty - it's a normal part of growing up
-- Celebrate small successes without making accidents feel shameful
-- Include the routine: feeling the need to go, getting to the potty, sitting, wiping, flushing, washing hands
-- Normalize that accidents happen and that's okay - just try again
-- Show pride in wearing "big kid" underwear
-- Avoid rushing - every child learns at their own pace
-- End with confidence: "I can do this!"
-Key messages: Growing up is exciting. Accidents are okay. Practice makes perfect.
+**What the book is.** Learning to use the potty. The potty itself, the underwear,
+the flush, the tap — the whole small apparatus of it, and a child who is getting
+the hang of it.
+
+**What happens.** The feeling that it is time, getting there, pulling clothes
+down, sitting, waiting, the wipe, the flush, the hands washed. Each step on the
+page, in that order.
+
+**The small thing that goes wrong.** An accident — the potty reached too late,
+wet clothes. Cleaned up plainly and without shame, and the next time it works.
+
+**What it is not.** Not a child talked round to it, and not a race. Children come
+to this at different times; nothing here is late.
+
+**Ending.** Dry, in the big underwear, and the day carries on.
 
 [washing-hands]
-Teach proper handwashing habits in a fun, engaging way.
-Story guidance:
-- When to wash: before eating, after bathroom, after playing outside, after touching pets
-- The steps: wet hands, add soap, scrub everywhere (palms, between fingers, under nails)
-- How long: sing "Happy Birthday" twice or the ABC song
-- Make bubbles fun - they're catching the germs!
-- Rinse well and dry with a clean towel
-- Show that clean hands keep us healthy and stop germs from spreading
-- Connect to not getting sick and not making others sick
-Key messages: Germs are invisible but real. Washing hands protects everyone.
+**What the book is.** Hands being washed, and the times of the day that call for
+it: before eating, after the toilet, after outside, after the animals.
+
+**What happens.** The tap, the water, the soap, the foam worked over palms,
+between fingers, under the nails, the rinse, the towel. A song long enough to
+scrub through belongs on the page.
+
+**What is invisible.** Germs are too small to see and they come off with the
+foam. Kept concrete — what is on the hands and what goes down the drain.
+
+**The small thing that goes wrong.** Hands wiped on clothes instead, or soap
+skipped in a hurry, and back to the sink.
+
+**What it is not.** Not a lecture on illness, and not dirt treated as disgrace.
+Hands get dirty from good days.
+
+**Ending.** Clean hands, dried, and straight to the thing they were washed for.
 
 [brushing-teeth]
-Make tooth brushing a positive daily habit.
-Story guidance:
-- Brush twice a day: morning and before bed
-- Show proper technique: small circles, all teeth, front and back
-- Brush for 2 minutes (a whole song!)
-- Use just a pea-sized amount of toothpaste
-- Don't forget to brush your tongue
-- The "sugar bugs" (cavity germs) don't like clean teeth
-- Visiting the dentist is a good thing - they help keep teeth strong
-- Show the reward: a bright, healthy smile
-Key messages: Strong teeth help us eat yummy food. Brushing keeps the sugar bugs away.
+**What the book is.** Teeth brushed morning and night. The brush, the pea of
+paste, the mirror, the cup, the two minutes.
+
+**What happens.** Small circles over every tooth, front and back, the tongue too,
+the spit, the rinse, the brush put away. The song that measures the two minutes
+runs under it.
+
+**The dentist.** A person who counts the teeth and says they are strong. Ordinary,
+quick, nothing to brace for.
+
+**The small thing that goes wrong.** Paste squeezed out too thick, the brush
+dropped, a back tooth missed and gone over again.
+
+**What it is not.** Not a battle at the bathroom door, and nothing frightening
+made of cavities.
+
+**Ending.** Clean teeth, bed or breakfast.
 
 [eating-vegetables]
-Encourage trying and enjoying vegetables.
-Story guidance:
-- Vegetables help us grow strong, see better, and fight sickness
-- Each color vegetable has different superpowers
-- It's okay not to like everything - taste buds change as we grow
-- The "try one bite" rule - you might be surprised!
-- Ways to make veggies fun: dipping, funny shapes, growing your own
-- Show characters enjoying vegetables without forcing
-- Avoid making it a battle - keep it positive and low-pressure
-- Vegetables must be prepared realistically: cooked, steamed, in a soup, stir-fried, as part of a meal, or with a dip — not eaten raw off the ground or bitten into like an apple (exception: carrots, cherry tomatoes, cucumber sticks are fine raw)
-Key messages: Vegetables are superfoods. Trying new things is brave. Taste buds grow up too.
+**What the book is.** Vegetables at a meal — on the plate, in the pan, in the
+soup — and a child getting as far as tasting them.
+
+**What happens.** A vegetable is prepared and comes to the table, it is looked at,
+a bite is taken, and the face says what it thought. Different vegetables across
+the pages, different colours, named plainly.
+
+**How vegetables appear.** Cooked, steamed, in a soup, in a stir-fry, part of a
+meal, or with a dip. Carrots, cherry tomatoes and cucumber sticks may be raw;
+nothing else is pulled from the ground and bitten into.
+
+**The small thing that goes wrong.** A taste is not liked, and that stands — one
+bite tried is the whole of what is asked. Tastes change with age and the book
+knows it.
+
+**What it is not.** Not a plate cleared under pressure, and not a contest at the
+table.
+
+**Ending.** The meal finishes, the table is left, the day carries on.
 
 [going-to-bed]
-Help establish a calm, positive bedtime routine.
-Story guidance:
-- Bedtime routine steps: bath, pajamas, brush teeth, story, goodnight
-- Sleep helps our bodies grow and our brains remember what we learned
-- The bedroom is safe and cozy
-- Address common fears: dark (nightlight is okay), monsters (not real)
-- Comfort objects (stuffed animals, blankets) are helpful friends
-- Staying in bed even when not sleepy yet
-- Dreams can be wonderful adventures
-Key messages: Sleep is good for us. Nighttime is peaceful. Tomorrow will be fun after good rest.
+**What the book is.** The last hour of a day, in order: bath, pyjamas, teeth,
+story, goodnight.
+
+**What happens.** Each step of the routine gets its page — the water, the buttons,
+the brush, the book, the light turned low, the door left as it is always left.
+
+**The room at night.** Safe and familiar. A night light is allowed. Whatever is
+taken to bed — a soft animal, a blanket — is there and is company.
+
+**The small thing that goes wrong.** Not sleepy yet, one more call from the bed,
+the dark noticed. Answered once, calmly, and settled.
+
+**What it is not.** Not monsters made real to be defeated, and not a child argued
+into bed.
+
+**Ending.** In bed, warm, the light low, sleep starting.
 
 [saying-goodbye]
-Help children cope with separation from parents/caregivers.
-Story guidance:
-- Parents always come back - show the reunion
-- It's okay to feel sad when saying goodbye
-- Give a "hug to keep" or special goodbye ritual
-- Fun things happen while parents are away
-- Caregivers (teachers, grandparents) keep us safe
-- Time passes and parents return
-- Being brave doesn't mean not feeling sad
-Key messages: Goodbye is not forever. Parents always come back. Feelings are okay.
+**What the book is.** Being left somewhere and being collected again. The whole
+arc, both ends of it on the page.
+
+**What happens.** The goodbye at the door — a hug, a wave, whatever the two of
+them always do — then the hours in between with the person who is looking after
+them, and then the coming back. The reunion is shown, not promised.
+
+**What the child feels.** Sad at the door, and the sadness is not argued with. It
+eases when something happens in the room, and it is gone by the time the door
+opens again.
+
+**What it is not.** Not a child who is fine straight away, and not bravery meaning
+a dry face.
+
+**Ending.** Collected, carried or walked out, home.
 
 [no-pacifier]
-Support the transition away from pacifiers.
-Story guidance:
-- Growing up means we don't need some things anymore
-- Acknowledge the comfort the pacifier provided
-- Creative goodbye: give to "babies who need it," pacifier fairy, special ceremony
-- Other ways to feel comforted: hugs, stuffed animals, deep breaths
-- Celebrate being a "big kid" without shaming
-- First days are hardest, then it gets easier
-- Show pride in the accomplishment
-Key messages: Growing up is exciting. We can find new ways to feel better. You are brave.
+**What the book is.** The last days of the dummy, and the days just after.
+
+**What happens.** The dummy is what it has always been — the thing held at bed
+and in the car. Then it is given away or put somewhere for good, in whatever
+small ceremony the family makes of it, and the nights after are got through with
+something else: a hug, a soft animal, a hand held.
+
+**The small thing that goes wrong.** A night when it is wanted and not there. Hard
+for a page, then met with the other comfort, and easier the night after.
+
+**What it is not.** Not shame at having had one, and not the dummy made babyish to
+be got rid of.
+
+**Ending.** Asleep without it.
 
 # =============================================================================
 # PRESCHOOL (Ages 4-6)
 # =============================================================================
 
 [cleaning-up]
-Encourage taking responsibility for putting toys away.
-Story guidance:
-- Everything has a home - toys are happier when they're in their spots
-- Cleaning up is part of playing - it's how we finish
-- The "clean up song" or making it a game
-- Start with small tasks, celebrate completion
-- Finding toys is easier when they're organized
-- Helping keeps our space nice for everyone
-- Show satisfaction in a clean room
-Key messages: Cleaning up is part of playing. A tidy space feels good. Helpers are appreciated.
+**What the book is.** The end of playing, when the room has to go back to how it
+was. Every toy has a place it belongs, and the book knows where.
+
+**What happens.** The scattered room, then the sorting — bricks to the box, books
+to the shelf, the small pieces hunted out from under things. Made into a game or
+sung through, taken in small pieces rather than all at once, and the room coming
+back.
+
+**The small thing that goes wrong.** More mess than expected, or a piece that will
+not be found until the last moment.
+
+**What it is not.** Not tidying as punishment, and not one child left with the
+whole floor.
+
+**Ending.** A room that can be walked across, and the next thing begun.
 
 [sitting-still]
-Help children learn to be calm and patient when needed.
-Story guidance:
-- Our bodies sometimes need to be still: story time, meals, class
-- It's hard but we can practice and get better
-- Tricks: take deep breaths, squeeze a stress ball, count silently
-- Wiggles can wait - we can move after
-- Show understanding that it's difficult
-- Short periods first, then longer
-- Praise effort, not perfection
-Key messages: Being still is a skill we can learn. It's okay to find it hard. Practice helps.
+**What the book is.** The times a body has to keep still — story time, a meal,
+sitting in a circle — and how long that is when you are small.
+
+**What happens.** The stillness is asked for, the wiggles arrive anyway, and
+something is done with them: a breath, hands folded, counting quietly, feet
+pressed to the floor. Short stretches at first, longer later.
+
+**What it costs.** Hard is shown as hard. The body wanting to move is on the page
+— the legs, the hands, the shifting.
+
+**The small thing that goes wrong.** The stillness breaks halfway, and is picked
+up again without a scene.
+
+**What it is not.** Not a child praised for being good, and not stillness held
+perfectly on the first try.
+
+**Ending.** The still part ends and the moving part starts — running, out, loose.
 
 [sharing]
-Teach the joy and importance of sharing with others.
-Story guidance:
-- What gets shared is something the main character wants to keep: a favourite toy, the last piece, their own turn. It is shared with another person — a friend, sibling or playmate — never an animal, and handing over something they never wanted is not sharing
-- Sharing makes playing more fun - more ideas, more laughter
-- Taking turns is a form of sharing (you'll get it back!)
-- It's okay to have some special things we don't share
-- How sharing makes others feel happy
-- The good feeling when we share
-- Friends like to play with generous people
-- Model asking before taking
-Key messages: Sharing is caring. Taking turns is fair. Sharing makes friendships stronger.
+**What the book is.** Something one child has and another wants. What gets shared
+is something the main character wanted to keep — a favourite toy, the last piece,
+their own turn — and it is shared with another person, a friend, a sibling, a
+playmate. Handing over something they never wanted is not sharing, and an animal
+is not who it is shared with.
+
+**What happens.** Both children want the one thing. It is asked for rather than
+taken. It goes across, or the turns are split, and the playing that follows is
+bigger than the playing before — two people, more ideas, more noise.
+
+**What stays private.** Some things are not shared, and that holds. A child may
+keep one thing back.
+
+**The small thing that goes wrong.** The thing is taken instead of asked for, or
+the sharing is regretted for a page before it turns.
+
+**What it is not.** Not generosity announced, and not a child told what sharing
+means.
+
+**Ending.** The two of them playing with it, or with what it turned into.
 
 [waiting-turn]
-Help children develop patience and fairness.
-Story guidance:
-- Everyone deserves a turn - waiting is fair
-- Your turn will come - it's worth the wait
-- Things to do while waiting: watch, cheer for others, take deep breaths
-- Cutting in line makes others feel bad
-- The joy of finally getting your turn
-- Patience is a superpower that gets stronger with practice
-- Connect to games, slides, classroom activities
-Key messages: Fair is taking turns. Your turn is coming. Waiting shows respect for others.
+**What the book is.** A queue, a slide, a game with one of something and several
+who want it. The waiting is the book.
+
+**What happens.** The turn is wanted now and it is not now. The wait is filled —
+watching the others, cheering whoever is on, counting, breathing — and then the
+turn comes and is worth it.
+
+**Pushing in.** What it does to the faces of the ones behind. Shown from where
+they stand, not explained.
+
+**The small thing that goes wrong.** The wait feels too long and nearly breaks.
+
+**What it is not.** Not patience praised as a virtue, and not a turn skipped as
+punishment.
+
+**Ending.** On the slide, in the game, up at last.
 
 [first-kindergarten]
-Prepare children for starting kindergarten.
-Story guidance:
-- New places can feel scary but become familiar
-- Teachers are there to help and keep you safe
-- You'll make new friends who like similar things
-- The fun activities: art, music, playground, stories, learning
-- It's okay to miss home - you'll see family at pickup time
-- Bring something special from home if allowed
-- Everyone else is new too - you're not alone
-Key messages: New adventures are exciting. Teachers and friends will help. Home is waiting after school.
+**What the book is.** The first days somewhere new — the room, the pegs, the
+teacher, the other children — a place that is strange on the first page and
+familiar by the last.
+
+**What happens.** Arriving, being shown where things go, and the shape of the day:
+painting, singing, the yard, a story, lunch. The others are new too, and it shows
+on their faces.
+
+**The teacher.** The person who knows where everything is and who to go to.
+Ordinary and available.
+
+**Missing home.** Real, and it comes and goes across the day. Pickup happens and
+is on the page.
+
+**What it is not.** Not a child promised it will be fine and then finding it is.
+The day itself does the work.
+
+**Ending.** Out of the door, collected, the room already less strange.
 
 [making-friends]
-Guide children in developing friendship skills.
-Story guidance:
-- How to approach someone new: smile, say hi, ask their name
-- Finding things in common: favorite colors, toys, games
-- Being a good friend: listening, sharing, being kind
-- It's okay if not everyone wants to be friends
-- Friendship takes time - it grows bigger with play
-- Different friends for different activities is okay
-- Standing up for friends when they need help
-Key messages: Everyone wants friends. Be the friend you want to have. Kindness attracts kindness.
+**What the book is.** Two children who did not know each other, and the hour in
+which they do.
+
+**What happens.** Standing near, saying hello, a name asked and given, and then
+the thing they turn out both to like — a colour, a game, an animal, a way of
+playing. The friendship gets bigger by being played in, not by being agreed to.
+
+**When it does not take.** Someone would rather not, and that is allowed to stand.
+Different friends for different things.
+
+**The small thing that goes wrong.** An opening that lands badly, and a second try
+that goes better.
+
+**What it is not.** Not a lesson in how to approach people, and not a child who
+had nobody and now has somebody.
+
+**Ending.** Mid-game with somebody new.
 
 [being-brave]
-Help children face fears and try new things.
-Story guidance:
-- Being brave doesn't mean not being scared
-- Being brave means doing things even when we're scared
-- Everyone is afraid of something - even grown-ups
-- We can do hard things (with deep breaths and support)
-- Small brave steps lead to big brave actions
-- It's okay to ask for help when scared
-- Celebrate courage, not just success
-Key messages: Brave means trying even when scared. Everyone feels afraid sometimes. You are braver than you think.
+**What the book is.** One thing that frightens the main character, and the moment
+they do it anyway. The fear is still there while they do it.
+
+**What happens.** The thing is in front of them and it is too much. A breath, a
+hand held, a smaller step first, and then the step itself. Someone else admits to
+being afraid of something too.
+
+**Asking for help.** Part of doing it, never the end of the attempt.
+
+**The small thing that goes wrong.** A first approach that stops short, and a
+second that does not.
+
+**What it is not.** Not fear talked away, and not a child who turns out not to
+have been frightened after all.
+
+**Ending.** On the other side of the thing, still slightly shaky.
 
 [new-sibling]
-Prepare children for a new baby in the family.
-Story guidance:
-- Parents' love doesn't divide - it multiplies
-- Being a big brother/sister is an important job
-- Babies cry and need lots of attention - it's not forever
-- Special time with parents still happens
-- Things older siblings can do: help, teach, protect
-- It's okay to feel jealous sometimes - talk about it
-- The baby will grow up to be a playmate
-Key messages: Love grows bigger for everyone. Being a big sibling is special. Your feelings matter too.
+**What the book is.** A baby arriving, and the household it arrives into. What
+changes, and what carries on the same.
+
+**What happens.** The baby comes home. It cries, it is fed, it is held, it takes a
+great deal of everyone's hands. The older child does what an older child can do —
+fetching, holding a bottle, singing, showing the baby a toy — and gets time with a
+parent that is theirs alone.
+
+**Jealousy.** It arrives, it is said aloud, and it is not corrected.
+
+**What it is not.** Not a child told that love multiplies, and not a baby who
+sleeps through the book to keep it easy.
+
+**Ending.** The two of them together, the house quiet for a moment.
 
 [tattling-vs-telling]
-Help children understand when to tell an adult and when to handle things themselves.
-Story guidance:
-- Telling is when someone is hurt, in danger, or being treated badly - ALWAYS tell an adult
-- Tattling is trying to get someone in trouble for small things
-- Ask yourself: "Is someone getting hurt or in danger?" If yes, tell. If no, try to solve it yourself
-- It's brave to speak up when something is really wrong
-- Nobody likes a tattletale, but everyone needs someone who speaks up about real problems
-- Show examples of both: "She took my crayon" (solve yourself) vs "He's hitting someone" (tell adult)
-- Sometimes it's hard to tell the difference - when in doubt, it's okay to ask an adult
-Key messages: Speak up when it matters. Try to solve small problems yourself. Keeping people safe is always right.
+**What the book is.** The line between fetching an adult and getting somebody into
+trouble, drawn through the situations of an ordinary day.
+
+**What happens.** Two kinds of thing happen. Someone is hurt, in danger or being
+treated badly — an adult is fetched, and that is right every time. Someone takes a
+crayon, or pushes in, or says something small and irritating — that one gets
+handled between the children.
+
+**The test.** Is somebody getting hurt or in danger. That question sorts them, and
+when it cannot be sorted an adult is asked anyway.
+
+**The small thing that goes wrong.** A small thing is reported and lands badly, or
+a real one is nearly kept quiet.
+
+**What it is not.** Not a child shamed as a tattletale, and not silence treated as
+loyalty.
+
+**Ending.** The real thing told, the small thing sorted out on the spot.
 
 [understanding-rules]
-Help children understand why parents set rules and boundaries.
-Story guidance:
-- Rules aren't to ruin your fun - they exist to keep you safe and healthy
-- Parents say "no" because they can see dangers you can't see yet
-- Some rules are about safety (don't touch the stove), some about health (brush your teeth), some about respect (don't interrupt)
-- When you understand WHY a rule exists, it's easier to follow
-- You can ask "why?" respectfully - understanding is good
-- As you grow and show responsibility, rules change and you get more freedom
-- Every family has different rules - that's okay
-- Show what happens when rules are ignored (natural consequences, not punishment)
-Key messages: Rules keep you safe. "Why?" is a great question. More responsibility means more freedom.
+**What the book is.** The rules of a household and what each one is for — safety at
+the stove, health at the toothbrush, respect at the table — and a child finding out
+why they exist.
+
+**What happens.** A rule is met and it is asked about. The answer is the reason
+behind it, given plainly. Sometimes the reason is a danger the child cannot see yet
+and an adult can.
+
+**Rules move.** As a child shows they can be trusted, a rule loosens and there is
+more they are allowed to do. Different households run different rules.
+
+**The small thing that goes wrong.** A rule is ignored and what it was guarding
+against happens — small, real, and not a punishment handed down.
+
+**What it is not.** Not a list of do-nots, and not a question treated as cheek.
+
+**Ending.** The rule understood, or changed, and the day going on.
 
 # =============================================================================
 # EARLY SCHOOL (Ages 6-9)
 # =============================================================================
 
 [first-school]
-Support the transition to "big kid" school.
-Story guidance:
-- Elementary/primary school is where we learn amazing things
-- Bigger school means more opportunities and friends
-- Finding your classroom, locker, cafeteria - it becomes easy
-- Teachers want to help you succeed
-- Making new friends while keeping old ones
-- School routines: homeroom, subjects, lunch, recess
-- Everyone feels nervous at first - you're not alone
-Key messages: School is an adventure in learning. Nervousness fades. You will find your place.
+**What the book is.** Moving up to the bigger school: a building with more rooms
+than the last one, more people in it, and a timetable instead of a day.
+
+**What happens.** Finding the classroom, the peg or the locker, the hall, the
+yard. The shape of a school day — lessons, break, lunch, home time — learned by
+going through it. Old friends kept and new ones met, which are not the same job.
+
+**What it feels like.** Nervous at the start of the week and less so by the end of
+it, and everyone else is nervous too whether they show it or not.
+
+**The teacher.** On the child's side, and can be asked.
+
+**What it is not.** Not school sold as an adventure, and not a first day that goes
+perfectly.
+
+**Ending.** The way out of the building known without asking.
 
 [homework]
-Develop positive homework habits and attitudes.
-Story guidance:
-- Homework helps our brains practice and remember
-- A routine helps: same time, same place, no distractions
-- Break big tasks into smaller pieces
-- Take breaks when frustrated - come back refreshed
-- Ask for help when stuck (parents, teachers, siblings)
-- The satisfaction of completing work
-- Balance: homework first, then play
-Key messages: Practice makes learning stick. A little effort each day adds up. Asking for help is smart.
+**What the book is.** Work brought home and got through: the table, the books, the
+time of day it always happens.
+
+**What happens.** The same place, the same hour, the distractions put out of
+reach. A big task cut into pieces and taken one at a time. A break when it stops
+going in, and back to it afterwards. Help asked for when something is stuck — from
+a parent, a teacher, an older sibling.
+
+**Practice.** Why the work exists is that the second time is easier than the first.
+Shown in the child's own hands, not stated.
+
+**The small thing that goes wrong.** A piece that will not come, and the
+frustration of it on the page before the break that fixes it.
+
+**What it is not.** Not homework as a virtue, and not a child who enjoys it.
+
+**Ending.** The books shut, and the rest of the evening.
 
 [reading-alone]
-Encourage independent reading skills and love of books.
-Story guidance:
-- Reading opens doors to any world you can imagine
-- Everyone learns to read at their own pace
-- Sound out words slowly - it gets faster
-- Picture books are great - no shame in any reading level
-- Reading every day, even just 10 minutes, builds skill
-- Find books about topics you love
-- The library is a treasure chest of free books
-Key messages: Reading is a superpower. Every reader started at the beginning. Books are friends.
+**What the book is.** A child reading by themselves. The sounding out, the
+sticking, the going faster, and the book that turns out to be worth it.
+
+**What happens.** Words worked out slowly, a page finished, then a chapter. A bit
+of reading every day, ten minutes at a time. A library, a shelf, a book found on a
+subject already loved.
+
+**Pace.** Every reader began at the beginning and they arrive at different times.
+No level of book is beneath anyone.
+
+**The small thing that goes wrong.** A word that will not come apart, and comes
+apart on the second go.
+
+**What it is not.** Not reading praised as a superpower, and not a child who
+suddenly can.
+
+**Ending.** Inside a book, still reading.
 
 [losing-game]
-Teach good sportsmanship and handling disappointment.
-Story guidance:
-- Everyone loses sometimes - even champions
-- Losing doesn't mean you're bad - it means you tried
-- How to lose gracefully: congratulate the winner, no tantrums
-- What we learn from losing: what to practice, how to improve
-- Having fun is more important than winning
-- Playing fair matters more than the outcome
-- Tomorrow is another chance
-Key messages: Losing is part of playing. Good sports are good people. We can always try again.
+**What the book is.** A game played properly and lost. Losing is where the book
+spends its time.
+
+**What happens.** The wanting to win, the playing, the losing — and then the
+minutes afterwards: the winner congratulated, the disappointment carried without
+throwing anything, the going over of what to practise next. Someone good at the
+game turns out to have lost plenty.
+
+**Fair play.** Matters more than the result, and is visible in how the game is
+played rather than said at the end.
+
+**The small thing that goes wrong.** The disappointment nearly spills, and is got
+hold of.
+
+**What it is not.** Not a rematch won on the last page to make it all right, and
+not losing treated as a lesson delivered.
+
+**Ending.** Still playing, or arranging to play again.
 
 [being-different]
-Celebrate uniqueness and teach acceptance.
-Story guidance:
-- Every person is unique - and that's what makes the world interesting
-- Differences might be: abilities, appearance, family, interests, culture
-- Different is not wrong - it's just different
-- We all have things that make us special
-- Being kind to everyone, even if they're different from us
-- Standing up for those who are treated unfairly
-- The best friends are sometimes the most unexpected
-Key messages: Different is beautiful. Everyone deserves kindness. Your uniqueness is your strength.
+**What the book is.** Someone who is not like the others in some plain way — how
+they move, how they look, where their family is from, what they are into, what
+they can and cannot do — and a group that has to make room.
+
+**What happens.** The difference is noticed. It is asked about, or it is not, or it
+is remarked on badly and that lands. Someone stands beside the one being treated
+unfairly. The friendship that forms is the unlikely one.
+
+**Everybody.** Each person in the book has something that is only theirs, the main
+character included.
+
+**The small thing that goes wrong.** An unkind word or an exclusion, met and
+answered.
+
+**What it is not.** Not difference celebrated in a speech, and not a child who
+exists in the book to be accepted.
+
+**Ending.** Together in the same game, the difference still there.
 
 [dealing-bully]
-Provide strategies for handling bullying situations.
-Story guidance:
-- Bullying is never okay and is never the victim's fault
-- What bullying looks like: mean words, excluding, physical hurting, spreading rumors
-- Strategies: walk away, use confident voice, find a trusted adult
-- Telling an adult is not tattling - it's getting help
-- Friends can stand together against bullies
-- Bullies often have their own problems - hurt people hurt people
-- You deserve to feel safe
-Key messages: Tell a trusted adult. You are not alone. Standing up (safely) is brave.
+**What the book is.** A child being bullied and the way out of it. Never the
+child's fault, at any point in the book.
+
+**What happens.** What bullying actually looks like — mean words, being shut out,
+being pushed or hit, a rumour travelling. Then what is done: walking away, a
+steady voice, friends standing together, and a trusted adult told. Telling an
+adult here is getting help, and the book treats it as such.
+
+**The bully.** Has something wrong in their own life. Explained enough to be a
+person, never enough to excuse it.
+
+**Safety.** Standing up happens in ways that do not put the child in danger.
+
+**What it is not.** Not a bully beaten by force, and not a child who solves this
+entirely alone.
+
+**Ending.** Safe, with the people who stood with them.
 
 [telling-truth]
-Reinforce honesty even when it's difficult.
-Story guidance:
-- Telling the truth, even when scared, is always the right choice
-- Lies grow bigger and harder to maintain
-- People trust those who tell the truth
-- Consequences for honesty are usually smaller than for lying
-- Being honest about mistakes shows courage
-- "I don't know" is better than making something up
-- Rebuilding trust after a lie takes time
-Key messages: Honesty is brave. Trust is earned through truth. Mistakes are forgivable, lies are harder.
+**What the book is.** A lie told and then undone. The truth comes out because the
+child says it.
+
+**What happens.** Something goes wrong and there is a version of it that would be
+easier. The lie is told, and then it needs another one to hold it up, and it grows
+heavier through the middle of the book. It is owned up to. What follows is smaller
+than what the lie was costing.
+
+**Trust.** Comes back slowly rather than all at once, and that slowness is shown.
+
+**Not knowing.** Saying so is allowed, and beats inventing an answer.
+
+**What it is not.** Not honesty rewarded with praise, and not a punishment scene.
+
+**Ending.** The thing said, the weight gone.
 
 [trying-new-things]
-Encourage openness to new experiences.
-Story guidance:
-- New things can feel scary but often become favorites
-- You never know if you like something until you try
-- The first time is usually the hardest
-- Growth happens outside our comfort zone
-- It's okay to try and not like it - at least you tried!
-- New skills take practice - don't give up too soon
-- Each new thing tried is a small victory
-Key messages: New can become favorite. Trying is succeeding. Your world grows with each try.
+**What the book is.** A first time at something — a food, a sport, a place, an
+instrument, a group — and what the first time is actually like.
+
+**What happens.** The not wanting to, the doing it anyway, and the clumsy first
+attempt. Some of it is liked and some of it is not, and both outcomes are allowed
+to stand. A new skill is bad before it is good.
+
+**The small thing that goes wrong.** It goes badly at the start, and the second
+attempt goes less badly.
+
+**What it is not.** Not a new thing that turns into a passion by the last page,
+and not trying framed as courage.
+
+**Ending.** Mid-try, or on the way to the next one.
 
 # =============================================================================
 # FAMILY CHANGES (All ages)
 # =============================================================================
 
 [moving-house]
-Help children cope with moving to a new home.
-Story guidance:
-- Change is hard but can lead to good things
-- Memories come with us - they live in our hearts
-- We can stay in touch with old friends (visits, calls, letters)
-- New home means new adventures, new friends
-- The new room can become special in time
-- It's okay to feel sad about leaving
-- Familiar items (toys, photos) make new places feel like home
-Key messages: Home is where family is. New places become familiar. Friendships can survive distance.
+**What the book is.** Leaving one home and arriving at another. Both ends of it —
+the boxes going out and the boxes coming in.
+
+**What happens.** The old room emptied, the goodbyes at the door and at school,
+the journey, the new room with nothing in it yet. Then the familiar things come
+out of the boxes — the toys, the photographs, the bedding — and the room starts to
+be theirs.
+
+**What comes along.** The people from before are reachable: visits, calls,
+letters, messages. The memories are not left in the old rooms.
+
+**Sadness.** On the page, more than once, and not argued out of.
+
+**What it is not.** Not a new place better than the old one, and not a child who
+settles in a day.
+
+**Ending.** In the new room at night, the familiar things in it.
 
 [going-vacation]
-Prepare children for travel and being away from home.
-Story guidance:
-- Vacations are adventures and special family time
-- What to expect: packing, traveling, new places
-- It's okay to miss home - that's normal
-- New experiences: foods, places, activities
-- Keeping a journal or taking photos to remember
-- Different places have different rules - be flexible
-- Coming home feels good too
-Key messages: New experiences are exciting. Memories are treasures. Adventure awaits!
+**What the book is.** Going away and coming back. Packing, travelling, being
+somewhere else, and the door of home at the end.
+
+**What happens.** The bag packed, the journey with its waiting, the arrival, and
+then the unfamiliar things — the food, the language, the beds, the rules of the
+place. Photographs taken or a notebook kept.
+
+**Missing home.** Happens on holiday too and is ordinary.
+
+**Flexibility.** Somewhere else does things differently, and the family bends to
+it rather than the other way.
+
+**The small thing that goes wrong.** Something left behind, a plan rained off, a
+journey longer than promised.
+
+**What it is not.** Not a holiday without a dull hour, and not the trip summed up
+at the end.
+
+**Ending.** Through the front door, own bed.
 
 [parents-splitting]
-Support children through parental separation/divorce.
-Story guidance:
-- This is NOT the child's fault - ever
-- Both parents still love the child completely
-- The child will be taken care of
-- Feelings of sadness, anger, confusion are all okay
-- Two homes can both feel like home
-- Parents' problems are adult problems - not for kids to fix
-- Things will feel normal again, just different normal
-Key messages: You are loved by both. This is not your fault. Your feelings are valid.
+**What the book is.** Parents separating, and the months around it. The child did
+not cause it — nothing in the book puts a foot near that.
+
+**What happens.** One household becomes two. The moving between them, the bags,
+the two bedrooms, the two sets of ordinary evenings. Both parents go on loving the
+child and both go on looking after them, shown in what they do.
+
+**Feelings.** Sad, angry, confused, and all of them at once. None of them is
+corrected.
+
+**Whose problem it is.** The adults', to sort out. The child does not carry it and
+does not mend it.
+
+**What it is not.** Not parents who get back together, and not a child who mediates
+between them.
+
+**Ending.** Settled in one of the two homes, an ordinary evening, different from
+before and steady.
 
 [visiting-doctor]
-Reduce anxiety about doctor and medical visits.
-Story guidance:
-- Doctors help keep us healthy and fix problems
-- What to expect: waiting room, check-up steps, sometimes shots
-- Shots hurt for a second but protect us from sickness
-- It's okay to feel nervous - tell the doctor
-- Doctors and nurses are kind helpers
-- Being honest with the doctor helps them help us
-- Reward yourself after for being brave
-Key messages: Doctors are helpers. A little discomfort keeps us healthy. Bravery is doing it even when nervous.
+**What the book is.** A trip to the doctor, start to finish. The waiting room, the
+call of the name, the room, the examination, and out again.
+
+**What happens.** The steps in order — height and weight, the cold stethoscope, the
+light in the ears, the mouth open — and sometimes an injection. The injection hurts
+for a moment and is over in a moment.
+
+**Being honest in the room.** Saying where it hurts and how much is what lets the
+doctor help. Saying you are nervous is allowed and is said aloud.
+
+**The people there.** Doctors and nurses are kind and they explain what they are
+about to do.
+
+**What it is not.** Not a visit with nothing uncomfortable in it, and not a bribe
+for good behaviour.
+
+**Ending.** Out of the surgery, the rest of the day.
 
 [staying-hospital]
-Prepare and comfort children facing hospitalization.
-Story guidance:
-- Hospitals are places where people get better
-- Family can visit, maybe even stay overnight
-- Doctors and nurses take care of you around the clock
-- It's okay to feel scared, sad, or bored
-- Bringing comfort items from home helps
-- Healing takes time - be patient with your body
-- You will go home when your body is ready
-Key messages: Hospitals help us heal. You are not alone. Your body knows how to get better.
+**What the book is.** A stay in hospital: the ward, the bed, the days and the
+nights of it, and going home at the end.
+
+**What happens.** Arriving, the bed and what is around it, the staff who come by
+through the day and through the night, the machines and what they are for. Family
+visit, and may stay over. Things from home are on the bed — a soft animal, a
+blanket, photographs.
+
+**The hours.** Frightening, sad and dull by turns, and dull is in there honestly.
+
+**Healing.** Takes the time it takes. Home happens when the body is ready, not
+when the child is brave enough.
+
+**What it is not.** Not a hospital made cheerful, and not a child who is fine
+throughout.
+
+**Ending.** Out of the doors, home, slower than before.
 
 [death-pet]
-Help children process grief over losing a pet.
-Story guidance:
-- Death means the body stopped working and can't be fixed
-- Feeling very sad is normal and okay
-- Crying is okay - as many times as needed
-- The pet is not in pain anymore
-- Ways to remember: photos, drawings, talking about happy memories
-- The love you shared is forever
-- Getting a new pet later doesn't mean forgetting
-Key messages: Grief means we loved deeply. Memories live forever. It's okay to be very sad.
+**What the book is.** A pet dying and the weeks afterwards. Death said plainly:
+the body stopped working and cannot be mended.
+
+**What happens.** The illness or the accident or the old age, the last day, and the
+absence afterwards — the empty basket, the lead on its hook, the bowl. Crying, more
+than once and on more than one page. Then the remembering: photographs, a drawing,
+the funny things the animal used to do, told to somebody.
+
+**Pain.** The animal is not in any now. Said once, plainly.
+
+**Another pet.** Might come later, and does not replace the one before.
+
+**What it is not.** Not a death turned into a departure or a journey, and not grief
+finished by the last page.
+
+**Ending.** The remembering, and an ordinary evening around it.
 
 [grandparent-sick]
-Support children when grandparents are seriously ill.
-Story guidance:
-- When older people get sick, sometimes it's very serious
-- Feeling scared and sad is completely normal
-- Ways to help: visit if possible, make cards, send love
-- Grown-ups will take care of medical things
-- It's okay to talk about feelings
-- Grandparents want to be remembered for happy times
-- Love doesn't stop, no matter what happens
-Key messages: Your love matters to them. Feelings are okay. Happy memories are treasures.
+**What the book is.** A grandparent seriously ill, and the family around the
+illness. The child is in the middle of it and is not told a story about it.
+
+**What happens.** The news, the change in the house, the visits — or the cards and
+drawings and messages when visits are not possible. Time with the grandparent that
+is about being there rather than about the illness: a hand held, a story asked for,
+the old photographs gone through.
+
+**Who handles what.** The medical decisions belong to the adults. The child's part
+is the love, and it reaches.
+
+**Feelings.** Frightened and sad, said out loud to somebody who listens.
+
+**What it is not.** Not a recovery promised, and not an illness explained away.
+
+**Ending.** With the grandparent, or with the family, in an ordinary moment.
 
 # =============================================================================
 # PRE-TEEN (Ages 9-12)
 # =============================================================================
 
 [money-saving]
-Teach basic money management and saving habits.
-Story guidance:
-- Money is earned through work and effort
-- Saving means setting aside money for later
-- The difference between needs and wants
-- Setting a goal makes saving easier (something specific to buy)
-- Piggy banks, jars, or kid savings accounts
-- The satisfaction of saving up and reaching the goal
-- Compound interest - money can grow! (basic concept)
-Key messages: Patience pays off. Every little bit adds up. Plan before you spend.
+**What the book is.** Money set aside over weeks for something specific. The
+waiting is the substance of it.
+
+**What happens.** Money comes in through work and effort — a job done, a task
+earned — and some of it goes into the jar, the tin or the account instead of being
+spent. The goal is named early and priced, so the distance to it is countable.
+Weeks pass. It is spent at the end on the thing it was for.
+
+**Needs and wants.** Sorted in the child's own head as the weeks go on, on real
+items in front of them.
+
+**Money that grows.** Left alone in an account, it adds a little to itself. Kept to
+the fact, not explained as a system.
+
+**The setback.** A week when the jar is raided for something small, and the goal
+moves further away by exactly that much.
+
+**What it is not.** Not thrift as a virtue, and not a windfall that skips the
+saving.
+
+**Ending.** The thing bought with money that took months, held.
 
 [spending-wisely]
-Teach thoughtful spending decisions.
-Story guidance:
-- Before buying, ask: Do I need it? Can I afford it? Is it worth it?
-- Comparing prices - the same thing can cost different amounts
-- Waiting before buying (the 24-hour rule for impulse purchases)
-- Quality vs. quantity - sometimes one good thing beats many cheap things
-- Advertising tries to make us want things we don't need
-- The difference between spending and wasting
-- Buyer's remorse - and how to avoid it
-Key messages: Think before you buy. Value comes in many forms. It's okay to say no to yourself.
+**What the book is.** A decision about spending, taken slowly enough to see it.
+
+**What happens.** Something is wanted in the moment. The three questions get asked
+— is it needed, is it affordable, is it worth it — and the buying waits a day. The
+same item is found at different prices in different places. Sometimes one good
+thing is better than several cheap ones; sometimes the cheap one is plenty.
+
+**Advertising.** Built to make the wanting happen. Seen for what it is doing, in
+an ordinary advert on an ordinary screen.
+
+**Regret.** Something bought in a hurry and not wanted a week later — the thing
+sitting unused is on the page.
+
+**What it is not.** Not spending treated as weakness, and not a child who never
+wants anything.
+
+**Ending.** A purchase made or declined on purpose, and the reasoning already
+behind them.
 
 [screen-time]
-Help establish healthy relationships with screens and devices.
-Story guidance:
-- Screens are tools - useful but need balance
-- Too much screen time can affect sleep, eyes, and mood
-- Other activities are important: outside play, reading, family time
-- Taking breaks helps our brains and bodies
-- Being present with people is more important than phones
-- Setting limits and sticking to them
-- Screen-free zones and times (meals, bedtime)
-Key messages: Balance is key. Real life is richer than screens. You control the device, not the other way around.
+**What the book is.** Devices in an ordinary week, and what the rest of the week
+gets. The screen is a tool and a pleasure, not a villain.
+
+**What happens.** Too long on it, and what that does — worse sleep, sore eyes, a
+shorter temper. Then the limits: times and places without screens, meals and
+bedtime among them, and breaks that are actually taken. What fills the hours
+instead — outside, a book, people in the room.
+
+**Being present.** A conversation had with the device down, next to one had with
+it up. The difference is visible rather than argued.
+
+**The pull.** Real. Stopping is hard and is shown to be hard.
+
+**What it is not.** Not a device thrown away, and not screens sold as harm.
+
+**Ending.** Somewhere with people, the phone elsewhere.
 
 [peer-pressure]
-Teach resistance to negative peer pressure.
-Story guidance:
-- Peer pressure is when friends try to get you to do something
-- It can be positive (study together) or negative (break rules)
-- True friends respect your choices
-- Ways to say no: "No thanks," blame parents, suggest alternatives
-- It's okay to be different from the crowd
-- Your choices have consequences - you live with them, not your friends
-- Finding friends who share your values
-Key messages: You decide who you are. Real friends respect you. It takes courage to stand alone.
+**What the book is.** A group pushing towards something, and one person deciding
+for themselves inside it.
+
+**What happens.** The pressure comes from people who matter to them, which is what
+makes it work. It can push either way — towards revising together or towards
+breaking something. The refusal is in ordinary words: no thanks, a parent blamed,
+a different plan offered instead.
+
+**Consequences.** Land on the one who acted, not on the ones who urged it. The
+group goes home.
+
+**Real friends.** Take the no and stay. The ones who do not are visible by the end.
+
+**What it is not.** Not a crowd that turns out to be wrong about everything, and
+not a child who is never tempted.
+
+**Ending.** Apart from the group or back inside it, either way by their own
+decision.
 
 [body-changes]
-Prepare children for puberty changes.
-Story guidance:
-- Bodies change as we grow up - it's completely normal
-- Everyone goes through it, just at different times
-- Changes might include: height, skin, body shape, feelings
-- These changes mean your body is healthy and working correctly
-- Having questions is normal - ask trusted adults
-- Taking care of changing bodies: hygiene, sleep, nutrition
-- Mood changes are part of it - be patient with yourself
-Key messages: Changes are normal. Everyone goes through this. Questions are good.
+**What the book is.** Puberty as an ordinary process: what changes, roughly when,
+and the fact that it is on a different clock for everybody.
+
+**What happens.** Height, skin, shape, voice, hair, sweat, moods. Each of them is a
+sign the body is working as it should. Some of it arrives early and some late, and
+being out of step with the year group is normal.
+
+**Taking care of a changing body.** Washing, sleep, food, clean clothes —
+practical, unembarrassed.
+
+**Questions.** Normal, and asked of an adult who can be trusted with them. Nobody
+is laughed at for not knowing.
+
+**Moods.** Part of the same process. Being short with people and then sorry about
+it is in here.
+
+**What it is not.** Not a biology lesson, and not a body treated as a problem.
+
+**Ending.** An ordinary day in a changing body.
 
 [responsibility]
-Build a sense of personal responsibility.
-Story guidance:
-- Responsibility means being trusted to do what you're supposed to
-- Start small: homework, chores, pet care
-- Being responsible leads to more privileges and trust
-- Owning mistakes instead of blaming others
-- Following through even when no one is watching
-- The satisfaction of being relied upon
-- Responsibility is a sign of growing up
-Key messages: Responsibility earns trust. Own your actions. Being relied on feels good.
+**What the book is.** Being trusted with something and the trust holding, across
+enough time for it to mean anything.
+
+**What happens.** Small things first — the homework, the chores, the animal fed —
+done without being chased. Something is done properly with nobody watching. A
+mistake is made and owned rather than handed to somebody else. The trust widens:
+more allowed, further, later.
+
+**What it feels like.** Being relied on, and the weight and the pleasure of that
+together.
+
+**The lapse.** One thing forgotten and the consequence following naturally.
+
+**What it is not.** Not responsibility rewarded with a speech, and not a child who
+never drops anything.
+
+**Ending.** Trusted with more than at the start.
 
 [managing-time]
-Develop time management skills.
-Story guidance:
-- We all have the same 24 hours - how we use them matters
-- Prioritizing: important/urgent things first
-- Making a schedule or to-do list helps
-- Breaking big tasks into smaller chunks
-- Avoiding procrastination (doing easy fun things first)
-- Balancing: school, activities, rest, fun
-- Time wasted is gone forever - use it well
-Key messages: Plan your time. Start early, avoid rush. Balance work and play.
+**What the book is.** A week with too much in it, taken in hand.
+
+**What happens.** Everything that has to fit — school, an activity, a job at home,
+friends, rest — laid out where it can be seen, on a list or a timetable. What is
+important and what is urgent are sorted, and the important thing goes first. A big
+piece of work is broken into sittings.
+
+**Putting things off.** The easy pleasant thing done first and the real thing at
+eleven at night. Shown as it happens.
+
+**Balance.** Rest and play are in the plan rather than what is left over.
+
+**What it is not.** Not efficiency admired, and not a schedule that survives the
+week intact.
+
+**Ending.** The work done in time, and an evening with nothing owed.
 
 [online-safety]
-Teach safe behavior on the internet.
-Story guidance:
-- Never share personal info: address, school, phone number, passwords
-- Not everyone online is who they say they are
-- If something feels wrong, tell a trusted adult
-- Cyberbullying hurts just like real bullying - tell someone
-- Think before posting: Would grandma approve?
-- Privacy settings are important
-- It's okay to log off when something makes you uncomfortable
-Key messages: Protect your information. Trust your gut feelings. Adults can help with online problems.
+**What the book is.** Being online and the judgement it takes. Address, school,
+telephone number and passwords stay private; that line does not move in the book.
+
+**What happens.** Somebody friendly turns out not to be who the profile says.
+Something is nearly posted that would be there for good — the test is whether it
+could be read aloud to family. Privacy settings are found and changed. Something
+makes the child uncomfortable and they log off, which is allowed at any moment.
+
+**Cyberbullying.** Hurts the same as in a corridor and is handled the same way: a
+trusted adult, told.
+
+**The feeling.** When something feels wrong online it usually is, and that is
+enough reason to stop and tell somebody.
+
+**What it is not.** Not the internet as a threat, and not a child who solves it
+without an adult.
+
+**Ending.** The device put down, an adult in the loop.
 
 [sibling-fighting]
-Help children learn to get along with their brothers and sisters.
-Story guidance:
-- Siblings sometimes argue - that's normal, but we can learn to handle it better
-- Show common triggers: sharing toys, personal space, feeling things are unfair
-- Teach conflict resolution: use words instead of hitting, take turns, compromise
-- Each sibling is different and special in their own way - no need to compare
-- Sometimes you need space - it's okay to take a break and cool down
-- Show empathy: how does your sibling feel when you say/do that?
-- Parents love all their children equally, even if attention isn't always 50/50
-- Highlight the positive side: siblings can be your best friends and allies
-- Working together as a team is more fun than fighting
-Key messages: Disagreements are normal. Use words, not hands. Your sibling can be your best friend.
+**What the book is.** Brothers and sisters at close quarters. They argue; that is
+ordinary, and the book is about handling it better rather than about stopping it.
+
+**What happens.** The usual triggers — a shared thing, a room, a turn, something
+that is not fair. Then the handling: words instead of hands, taking turns, meeting
+halfway, and going somewhere else to cool down when nothing else works. One of
+them stops long enough to see it from the other side.
+
+**Different, not compared.** Each sibling is good at their own things. Parental
+attention is not always even and it is not a measure of love.
+
+**Allies.** They are also each other's — shown in a moment where they take the same
+side against something outside.
+
+**What it is not.** Not a truce that holds forever, and not one sibling who is
+always in the wrong.
+
+**Ending.** The two of them at the same thing, on the same side.
 
 [being-active]
-Motivate children to be physically active and spend time outdoors instead of just sitting inside.
-Story guidance:
-- Show the contrast: feeling sluggish and bored indoors vs. energized and happy after being active
-- Physical activity isn't just organized sports - it's also playing, exploring, cycling, swimming, hiking
-- Getting outside means adventures: discovering nature, playing with friends, fresh air
-- Your body needs movement to stay strong and healthy, like a machine needs fuel
-- Start small: even a short walk or 10 minutes of play counts
-- Show that it gets easier and more fun the more you do it
-- Friends can make being active more fun - invite someone to join
-- Balance is key: some screen time is fine, but your body also needs to move
-- Feeling proud after accomplishing something physical (climbed a hill, learned to ride a bike)
-Key messages: Your body loves to move. Outdoor adventures are waiting for you. Start small - every step counts.
+**What the book is.** A body that has been sitting indoors and a body that has been
+moving, and the difference between how the two feel.
+
+**What happens.** The dull heavy afternoon inside, then out: playing, exploring, a
+bike, a swim, a hill, a walk. Not only organised sport — most of it is just moving.
+Ten minutes counts and is where it starts. Someone is asked along and it gets
+better for it.
+
+**It gets easier.** The second week is less hard than the first, visibly.
+
+**Balance.** Some sitting and some screens are fine. The body also needs the other
+thing.
+
+**Something done.** A hill climbed, a distance ridden, a stroke learned — the pride
+of it shown in the body, not stated.
+
+**What it is not.** Not exercise prescribed, and not a child turned into an
+athlete.
+
+**Ending.** Outside, out of breath, still going.
 
 [getting-dressed]
-Help toddlers feel proud about dressing themselves.
-Story guidance:
-- Show the steps: pick clothes, figure out front/back, arms in sleeves, legs in pants, shoes on feet
-- It's okay if it takes a while or things end up backwards - that's how you learn!
-- Let children make choices about what to wear (within reason)
-- Celebrate each small victory: "I did my buttons!"
-- Some things are tricky (zippers, laces, buttons) - keep practicing
-- Getting dressed by yourself is a big-kid skill to be proud of
-- Morning routines go smoother when you can dress yourself
-Key messages: You're learning a big-kid skill. Practice makes it easier. Be proud of what you can do.
+**What the book is.** A child dressing themselves in the morning, all of it their
+own doing.
+
+**What happens.** Clothes chosen — and the choice is genuinely theirs, within
+whatever the weather and the day allow — then the front worked out from the back,
+arms into sleeves, legs into trousers, shoes onto the right feet. The awkward
+fastenings last: buttons, zips, laces.
+
+**How long it takes.** Long. Things go on backwards. That is what learning it looks
+like and the book does not hurry past it.
+
+**The small thing that goes wrong.** A jumper on inside out or two shoes on the
+wrong feet, noticed and put right by the child.
+
+**What it is not.** Not an adult finishing the job, and not being dressed by
+somebody in a rush.
+
+**Ending.** Dressed, out of the door, done alone.
 
 [managing-emotions]
-Help children understand and manage big feelings like anger, frustration, and sadness.
-Story guidance:
-- All feelings are okay - there are no "bad" emotions. What matters is what we do with them
-- Help name the feeling: "I feel angry because..." - naming it helps tame it
-- Show physical signs: tight fists, hot face, tears, wanting to scream
-- Teach calming strategies: deep breaths, counting to 10, squeezing a pillow, going to a calm corner
-- It's never okay to hit, kick, or break things even when you're really upset
-- After calming down, talk about what happened and find solutions
-- Adults have big feelings too - everyone has to learn to manage them
-- Show the reward: feeling better after calming down, solving the problem together
-Key messages: All feelings are okay. You can learn to calm down. Big feelings don't last forever.
+**What the book is.** A big feeling — anger, frustration, sadness — from the moment
+it arrives to the moment it passes.
+
+**What happens.** The feeling shows in the body first: tight fists, a hot face,
+tears, the wanting to shout. It gets named out loud, which is where it starts to
+loosen. Then something is done with it — breathing, counting, a pillow squeezed,
+a quiet corner gone to. Afterwards, once it has passed, what happened is talked
+through and the actual problem gets dealt with.
+
+**Where the line is.** Hitting, kicking and breaking things stay out, however big
+the feeling is. That holds throughout.
+
+**Adults too.** Somebody grown up has a big feeling in this book and handles it in
+front of the child.
+
+**What it is not.** Not a feeling called bad, and not a child who is calm by
+choosing to be.
+
+**Ending.** Through it, sitting with somebody, the thing sorted out.
 
 [whining]
-Help children learn to express needs and frustrations without whining or constant complaining.
-Story guidance:
-- Show the difference between a whiny voice and a normal/polite voice
-- Adults want to help, but whining makes it hard to listen and understand
-- Teach the "try again" approach: "Can you say that in your regular voice?"
-- Sometimes the answer is still "no" even when you ask nicely - and that's okay
-- Show that using words clearly gets better results than whining
-- Acknowledge the frustration: it's okay to be disappointed, but express it differently
-- Practice phrases: "Can I please...", "I feel frustrated because..."
-Key messages: People listen better when you use your regular voice. You can express feelings without whining.
+**What the book is.** The same request in two voices — the whine and the ordinary
+voice — and what each one gets.
+
+**What happens.** The whine goes up, and it is hard to listen to and hard to make
+out. The request is asked for again in a normal voice, and this time it is heard.
+The plain words work better, and the book shows that rather than saying it.
+
+**When the answer is still no.** It sometimes is, however well it was asked. The
+disappointment that follows is real and allowed.
+
+**The frustration underneath.** Genuine. It gets said in words instead — what is
+wanted, and what is annoying about not having it.
+
+**What it is not.** Not a child mocked for whining, and not a polite request that
+always wins.
+
+**Ending.** Said plainly, answered plainly, whatever the answer was.
 
 [saying-sorry]
-Help children understand what a real apology means and why it matters.
-Story guidance:
-- Sorry isn't just a word - it means you understand you hurt someone
-- A real apology has parts: what I did, how it made you feel, what I'll do differently
-- You can't just say sorry and do the same thing again
-- Sometimes it's hard to apologize - that's normal, but it's important
-- Show how the other person feels before and after a genuine apology
-- Making mistakes is human - apologizing shows strength, not weakness
-- After saying sorry, try to make it right (fix what you broke, include who you left out)
-Key messages: A real sorry comes from the heart. Everyone makes mistakes. Apologizing takes courage.
+**What the book is.** An apology that is more than the word. Somebody was hurt and
+the one who did it has to work out what to say.
+
+**What happens.** The sorry that is only a word first, and it does not land. Then
+the real one, which has parts: what I did, what it did to you, what I will do
+instead. And then the making good — the broken thing mended or replaced, the one
+who was left out brought in.
+
+**The other face.** Before and after the apology. The difference between them is
+the point of the scene.
+
+**How hard it is.** Getting the words out is difficult, and that difficulty is on
+the page.
+
+**What it is not.** Not an apology ordered by an adult, and not the same thing done
+again the following week.
+
+**Ending.** The two of them back in each other's company.
 
 [picky-eating]
-Encourage children to be open to trying new and different foods.
-Story guidance:
-- It's okay not to like everything, but you should at least try before deciding
-- Our taste buds change as we grow - something yucky today might be yummy later
-- The "one bite rule": just try one bite of something new
-- Show the adventure side: foods from different countries, new flavors, fun textures
-- Eating the same 3 things gets boring - there's a whole world of food to discover
-- Cooking together can make new foods more exciting
-- No pressure: trying is what counts, not finishing the whole plate
-- Show other characters enjoying foods the main character hasn't tried yet
-Key messages: Be a food explorer. One bite is all it takes to try. Your taste buds grow with you.
+**What the book is.** A narrow eater and a wider table. One bite is the whole of
+what the book asks for.
+
+**What happens.** Something unfamiliar arrives — a dish from somewhere else, a new
+texture, a new smell. It is looked at, put off, and tried once. Sometimes it is
+liked and sometimes not, and not liking it is a real answer.
+
+**Tastes move.** What is unbearable this year is ordinary in two. Said once, and
+then shown by somebody older at the same table.
+
+**Cooking it.** A food helped with is easier to try. Hands in it, a pan, a knife
+with somebody.
+
+**The narrow list.** Eating the same three things is dull, and the dullness of it
+is felt rather than pointed out.
+
+**No pressure.** Trying counts. The plate does not have to be finished.
+
+**What it is not.** Not a plate cleared to win, and not a child talked into a
+liking.
+
+**Ending.** One thing tried that was not on the list before.
 
 [table-manners]
-Teach children age-appropriate table manners and eating etiquette.
-Story guidance:
-- Sit at the table during meals - no running around with food
-- Use your fork and spoon (or chopsticks) instead of just fingers
-- Chew with your mouth closed - nobody wants to see chewed-up food
-- Say please and thank you when asking for things at the table
-- Wait until everyone is served before starting (or follow family rules)
-- Don't play with your food - mealtime is for eating and talking together
-- Ask to be excused when you're done
-- Show that meals are a nice family time, not just about rules
-Key messages: Good manners show respect. Mealtimes are for family togetherness. Small habits make a big difference.
+**What the book is.** A family meal and the small rules that hold it together.
+
+**What happens.** Sitting down at the table and staying there, food off cutlery
+rather than fingers, a mouth closed while chewing. Please and thank you for what is
+passed. Waiting until everyone has theirs, or whatever the household's version of
+that is. Asking to leave when finished.
+
+**Why the table exists.** For eating and for talking to each other. The talking is
+in the book — it is what the manners are protecting.
+
+**The small thing that goes wrong.** Something spilled, a rule forgotten mid-story,
+picked up again without a scene.
+
+**What it is not.** Not manners drilled, and not a meal that is only rules.
+
+**Ending.** The table cleared, everyone still talking.
 
 [being-patient]
-Help children learn that not everything happens instantly and waiting is a skill.
-Story guidance:
-- Some things take time and can't be rushed: growing a plant, waiting for a birthday, baking a cake
-- Wanting everything RIGHT NOW is normal, but learning to wait is important
-- Teach waiting strategies: find something else to do, count, play a game
-- Show that good things often come to those who wait
-- The difference between needing something now (help when hurt) vs wanting something now (a toy)
-- Interrupting others because you can't wait is not fair to them
-- Delayed gratification: saving up for something special feels better than instant small rewards
-Key messages: Good things take time. You can learn to wait. Patience is a superpower.
+**What the book is.** Something that cannot be hurried, waited for from start to
+finish: a seed growing, a cake baking, a birthday coming, a thing saved up for.
+
+**What happens.** The wanting it now, which is ordinary and is not scolded. Then
+the wait, filled with something else — another task, a count, a game. The thing
+arrives in its own time and is better for the wait.
+
+**Two kinds of now.** Help when somebody is hurt is needed now. A toy is wanted
+now. The book keeps them apart.
+
+**Interrupting.** What it takes from the person who was speaking.
+
+**The small thing that goes wrong.** The waiting nearly breaks near the end, when
+it is almost over.
+
+**What it is not.** Not patience named as a strength, and not a wait shortened as a
+reward.
+
+**Ending.** The thing arriving, at its own hour.
 
 [jealousy]
-Help children understand and cope with feelings of jealousy and envy.
-Story guidance:
-- Jealousy is a normal feeling - even adults feel it sometimes
-- Name it: "I feel jealous because..." - understanding the feeling helps
-- Just because someone has something doesn't mean you have less
-- Everyone has different things - compare less, appreciate more
-- Jealousy of attention: parents/teachers giving attention to others doesn't mean they love you less
-- Wanting what others have vs being happy with what you have
-- Turn jealousy into motivation: "I'd like to learn that too" instead of "it's not fair"
-- Celebrate others' successes - being happy for friends feels good too
-Key messages: Jealousy is normal but doesn't have to control you. You have your own special things. Be happy for others.
+**What the book is.** Wanting what somebody else has, and the week that feeling
+takes to settle.
+
+**What happens.** Somebody has the thing, the skill, the attention. The feeling
+arrives and is named out loud — what it is and who it is about — which is where it
+stops growing. What they have does not subtract from what the jealous one has, and
+the book shows both sets of things.
+
+**Attention.** An adult giving time to somebody else is not love taken away. Shown
+in an ordinary evening.
+
+**Turning it.** Wanting to learn the thing, instead of resenting whoever can do it.
+The wanting becomes asking to be taught.
+
+**The other side.** Being glad for somebody, done on purpose, and how that feels.
+
+**What it is not.** Not jealousy called shameful, and not gratitude prescribed.
+
+**Ending.** Alongside the person who was envied, doing something.
 
 [not-giving-up]
-Help children develop perseverance and deal with frustration when things are hard.
-Story guidance:
-- Learning anything new is hard at first - walking, reading, riding a bike, all of it
-- The moment you want to quit is often right before you'd succeed
-- "I can't do it" should become "I can't do it YET"
-- Break big challenges into small steps - each step is progress
-- Failing isn't the end - it's information about what to try differently
-- Show famous examples: things that took many attempts before succeeding
-- Ask for help when stuck - that's not giving up, that's being smart
-- Celebrate effort and progress, not just the final result
-Key messages: Hard things get easier with practice. "Yet" is a powerful word. Every expert was once a beginner.
+**What the book is.** Something hard, attempted more times than is comfortable.
+Everything anyone can do — walking, reading, a bike, an instrument — was once at
+this stage.
+
+**What happens.** The first attempts fail. The failing is read as information: what
+to change next time, not that it is hopeless. The challenge is cut into steps small
+enough to make progress visible. Help is asked for at the point of being stuck, and
+that is part of continuing rather than the end of it.
+
+**The quitting point.** There is a page where stopping is the obvious thing, and it
+often sits just before the thing works. The book goes through that page.
+
+**Not yet.** The difference between cannot and cannot yet, in the child's own words.
+
+**Effort.** What gets noticed is the trying and the ground gained, not only the
+finish.
+
+**What it is not.** Not persistence rewarded with a trophy, and not a skill that
+arrives all at once.
+
+**Ending.** It works, or the next attempt is already starting.
 
 [being-left-out]
-Help children cope with social exclusion and feeling left out.
-Story guidance:
-- Being left out hurts - that feeling is real and valid
-- Sometimes it's not personal - groups form naturally and change over time
-- What to do: approach and ask to join, find other people to play with, tell an adult if it's deliberate
-- You don't need everyone to like you - a few good friends are enough
-- Being left out doesn't mean something is wrong with you
-- Remember how it feels so you include others when you can
-- Show the character finding new friends or activities when excluded
-- Adults can help if someone is being deliberately left out repeatedly
-Key messages: Being left out hurts, but it doesn't define you. You can find your people. Include others when you can.
+**What the book is.** Being outside a group that is having a good time. The hurt is
+real and the book does not talk it down.
+
+**What happens.** The group closes, on purpose or without noticing. Then what is
+done: asking to join, finding other people to be with, and telling an adult when it
+is deliberate and keeps happening. New friends or a different activity come out of
+it.
+
+**Not always personal.** Groups form and shift by themselves, and being outside one
+is not evidence of anything being wrong with the one outside.
+
+**How many.** A few good friends is enough. Everybody liking you is not the target.
+
+**The other way round.** Later in the book, somebody else is on the outside, and the
+one who knows how it feels does something about it.
+
+**What it is not.** Not a group won over, and not exclusion excused.
+
+**Ending.** With people who are glad they are there.
 
 [taking-care-belongings]
-Teach children to look after their things and be responsible with possessions.
-Story guidance:
-- Your things won't last if you don't take care of them
-- Put things back where they belong so you can find them later
-- School supplies, toys, clothes - they all need care
-- Losing things means going without or needing to replace them
-- Treat borrowed things even better than your own
-- A place for everything: backpack packed the night before, toys in their spot
-- Show the consequence of carelessness (lost favorite toy) and the reward of responsibility
-- Taking care of things shows you're growing up and can be trusted with more
-Key messages: Take care of what you have. Being organized saves time and tears. Responsibility earns trust.
+**What the book is.** Things looked after and things not looked after, and the
+difference a few weeks make.
+
+**What happens.** School kit, toys, clothes, a bike. Put back where they belong, so
+they are findable when they are needed. Something borrowed is treated better than
+their own. The bag packed the night before, and the morning that follows from it.
+
+**Losing things.** A favourite thing lost through carelessness, and it does not come
+back. Going without, or the cost of replacing it, is the consequence the book shows.
+
+**Trust.** Looking after things well means being lent and given more.
+
+**What it is not.** Not tidiness as character, and not a lost thing returned on the
+last page.
+
+**Ending.** The thing found where it was put, at the moment it is needed.
 
 [helping-at-home]
-Motivate children to contribute to household tasks and chores.
-Story guidance:
-- A family is a team - everyone helps to make the home nice
-- Age-appropriate chores: setting table, feeding pets, tidying room, putting clothes in hamper
-- Helping isn't punishment - it's being part of the family
-- Show pride in contributing: "I helped make dinner!" "I cleaned my room by myself!"
-- Doing chores without being asked is extra impressive
-- Working together as a family can be fun - put on music, race to finish, make it a game
-- The house is everyone's space - everyone helps keep it nice
-- Show that parents also do chores they don't always enjoy
-Key messages: Helping makes you a team player. Everyone does their part. Small jobs make a big difference.
+**What the book is.** A household run by everybody in it. The work of the house is
+visible, and the child has a real share of it.
+
+**What happens.** Jobs suited to their size — the table laid, the animal fed, the
+room done, the washing into the basket. Sometimes done unasked, which is noticed.
+The work is done together with music or a race in it, and it goes faster that way.
+
+**Not a punishment.** Chores are what being part of the household looks like. Adults
+do the ones they dislike too, in front of the child.
+
+**The house is everyone's.** The rooms that are shared are kept up by everybody who
+uses them.
+
+**What it is not.** Not chores traded for money or for praise, and not a helper
+thanked at length.
+
+**Ending.** The house in order, everyone sitting down in it.
 
 [dealing-disappointment]
-Help children cope when things don't go as planned or expected.
-Story guidance:
-- Disappointment is a normal feeling when expectations aren't met
-- Plans change, promises sometimes break, things don't always work out
-- It's okay to feel sad or frustrated - those feelings are valid
-- What happened can't be changed, but you can choose what to do next
-- Look for the silver lining or an alternative plan
-- Throwing a tantrum won't change the situation - but talking about it helps
-- Some disappointments lead to unexpected good things
-- Show the character processing disappointment and moving forward
-Key messages: Disappointment is part of life. Feel it, then move forward. New plans can be good too.
+**What the book is.** Something that did not happen. A plan changed, a promise
+broken, a thing that did not come off.
+
+**What happens.** The expectation, then the news. The sadness and the frustration of
+it, which are allowed to sit there for a while. What happened cannot be changed, and
+the choosing happens after that: an alternative found, a different plan made, the
+day salvaged into something else. Sometimes what comes instead turns out to be good,
+and sometimes it just passes.
+
+**The outburst.** It is there, and it changes nothing about the situation. Talking
+about it does more.
+
+**What it is not.** Not a disappointment reversed on the last page, and not a child
+who takes it well straight away.
+
+**Ending.** Doing the other thing, the day going on.
 
 [anxiety-worrying]
-Help children understand and manage worry and anxiety.
-Story guidance:
-- Worry is your brain trying to protect you, but sometimes it worries too much
-- The "worry monster" makes things seem scarier than they really are
-- Name your worries out loud - they often shrink when you say them
-- Ask: "Is this worry helping me or just making me feel bad?"
-- Calming techniques: deep breathing, visualization, talking to someone
-- Most things we worry about never actually happen
-- It's okay to ask for help when worry feels too big
-- Bedtime worries: write them down or tell them to a worry doll, then let them go for the night
-- Show the difference between useful caution and unnecessary anxiety
-Key messages: Worries aren't facts. You are braver than you think. Talking about worries makes them smaller.
+**What the book is.** A worry that is bigger than what it is about, and the week it
+takes to get it down to size.
+
+**What happens.** The worry works by making the thing seem larger and closer than it
+is. It gets said out loud to somebody, and it is smaller said than thought. The
+question gets asked of it: is this helping, or is it only making today worse.
+Breathing, picturing it going well, talking to somebody — used on the page, not
+listed.
+
+**At night.** The worries that arrive in bed get written down or told to something,
+and put aside until morning.
+
+**Useful and useless.** Caution that stops somebody walking into a road is doing its
+job. The worry about a thing that will not happen is not. The book keeps the two
+apart.
+
+**Too big.** A worry that will not go down is taken to an adult, and that is the
+right move rather than a last resort.
+
+**What it is not.** Not a worry argued away with facts, and not a child cured of
+worrying.
+
+**Ending.** Through the thing that was worried about, on the other side of it.
 
 [caring-for-pet]
-Teach children the responsibility that comes with having a pet.
-Story guidance:
-- A pet is a living creature that depends on you - not just a toy
-- Daily responsibilities: feeding, fresh water, cleaning, exercise, attention
-- Pets need love AND routine - they count on you every day, not just when it's fun
-- Different pets have different needs - learn what your pet requires
-- Walking the dog even when it's cold or raining - commitment matters
-- Recognizing when your pet is happy, scared, hungry, or sick
-- Vet visits are important - taking care of health is part of the job
-- The reward: unconditional love, a loyal companion, learning responsibility
-Key messages: Pets depend on you every day. Responsibility means doing it even when you don't feel like it. The love you give comes back to you.
+**What the book is.** An animal that depends on somebody, every day, for years. Not
+a toy, and the book is honest about what that means.
+
+**What happens.** The daily work: food, fresh water, the cage or the litter cleaned,
+exercise, company. The dog walked in the rain and in the cold, on the evening when
+nobody feels like it. Different animals need different things, and the needs get
+looked up and learned.
+
+**Reading the animal.** Happy, frightened, hungry, unwell — told from how it moves
+and sounds rather than from what it says.
+
+**The vet.** Part of the job, and it costs time and money.
+
+**What comes back.** The animal's company, and it is shown rather than promised.
+
+**What it is not.** Not a pet acquired in the last scene as a reward, and not an
+animal that looks after itself between the good bits.
+
+**Ending.** The animal fed and settled, and the child alongside it.
 
 [comparing-others]
-Help pre-teens stop constantly comparing themselves to peers and social media.
-Story guidance:
-- Everyone's highlight reel looks amazing - but nobody shows the hard parts
-- Social media shows filtered, edited, carefully chosen moments - not real life
-- Comparing your beginning to someone else's middle isn't fair to yourself
-- Everyone has strengths and struggles - you only see others' strengths
-- "They have more followers/better clothes/higher grades" - but you have your own gifts
-- Focus on your own progress: compare yourself to yesterday-you, not to others
-- Unfollowing or muting accounts that make you feel bad is okay and smart
-- Show that the person being envied also has insecurities and problems
-Key messages: Comparison steals joy. Your path is your own. Focus on growing, not measuring.
+**What the book is.** Measuring yourself against other people, in the corridor and
+on a screen, and what that measuring is actually made of.
+
+**What happens.** What is posted is chosen, filtered and cut from the good hours —
+the rest of the day is not in the picture. Comparison runs against other people's
+finished results and the child's own unfinished middle, which is not a fair
+measurement. Somebody who looks enviable turns out to have their own worries, and
+the book shows that from close up.
+
+**Their own progress.** Measured against themselves last month, which is a
+comparison that can be won.
+
+**Muting.** Unfollowing or muting whatever makes them feel worse is a sensible move,
+taken in the book without ceremony.
+
+**Strengths and struggles.** Everyone has both; only the strengths are on display.
+
+**What it is not.** Not social media condemned, and not a child who stops caring
+what anyone thinks.
+
+**Ending.** At their own thing, not looking sideways.
 
 [test-stress]
-Help children manage anxiety and pressure around tests, exams, and performance.
-Story guidance:
-- Some nervousness before a test is normal - it shows you care
-- Too much stress blocks your brain from remembering what you actually know
-- Preparation is the best anti-stress weapon: study in small chunks, not all at once
-- The night before: relax, get enough sleep, have everything ready
-- During the test: breathe, read carefully, skip hard questions and come back
-- A test score doesn't define who you are or how smart you are
-- Parents and teachers want you to do your best, not to be perfect
-- Show what happens when a character bombs a test - it's not the end of the world
-- Mistakes on tests show what to learn next, not that you're a failure
-Key messages: Prepare well, then trust yourself. One test doesn't define you. Mistakes show where to grow.
+**What the book is.** The days around an exam: the preparing, the night before, the
+room, and what comes after the mark.
+
+**What happens.** Some nerves before it, which is ordinary and a sign of caring.
+Too much of it, and the knowledge that is in there will not come out. The
+preparation is done in short sittings over days rather than in one night. The night
+before: things laid out, an early bed. In the room: breathing, reading the question
+properly, leaving the hard one and coming back to it.
+
+**The mark.** One test is one test. It measures a morning, not a person and not how
+clever they are.
+
+**A bad one.** Somebody in this book does badly at one, and life goes on around it.
+What it shows is what to learn next.
+
+**Adults.** Want their best, which is not the same as perfect, and say so.
+
+**What it is not.** Not an exam aced through calm, and not marks treated as a
+verdict.
+
+**Ending.** Out of the room, the afternoon their own.
