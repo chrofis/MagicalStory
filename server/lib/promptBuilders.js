@@ -5127,6 +5127,15 @@ function challengeCatalogueBands(inputData = {}) {
 // no thread/split rule, no secondary-moment quota, no entrance choreography.
 // The full block stays for the beats stage (and its reviewers/judges), where
 // page allocation belongs.
+// Nothing downstream checks that a described solution actually causes the
+// outcome: the trial path runs no review at all, and the beats reviewers grade
+// the skill, not the physics. So the rule rides in the shape section, which
+// every writer path now receives (2026-09-14).
+const CAUSAL_COHERENCE_RULE =
+  'Cause: what the main character does is what makes the outcome happen, and the step from the one to the other is visible. '
+  + 'An object brought into the solution does real mechanical work — it holds, lifts, reaches, blocks or carries. '
+  + 'Never a prop that is set down and plays no part in what follows.';
+
 function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
   const chars = inputData.characters || [];
@@ -5168,6 +5177,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       // page-moments. Calling both "events" put two contradicting numbers in
       // the same prompt (measured 2026-09-07, age-1 arc render).
       `Page budget: ${pages} pages, a different moment on each. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
+      CAUSAL_COHERENCE_RULE,
     ].filter(Boolean).join('\n');
   }
 
@@ -5185,21 +5195,28 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       `Search pattern: look in ${searchPages} places, one per page, each a new place with a new thing to see there. The same call or question is repeated word for word at every one of them.`,
       'Feelings: friendly throughout — no danger, no villain, nobody unkind. The last page is happy.',
       alongside,
+      CAUSAL_COHERENCE_RULE,
       'Ending: the thing is found, then home, a meal or sleep.',
     ].filter(Boolean).join('\n');
   }
 
   if (band === 'tries') {
-    const tryPages = Math.max(3, pages - 2);
+    // The span is named as PAGES, never as a bare number next to "the three
+    // tries" — "Opening 1, the three tries 4, ending 1" reads as a count of
+    // tries, and a book shipped four attempts against it (2026-09-14).
+    const triesSpan = pages >= 4
+      ? `page 1 opens, pages 2-${pages - 1} carry the three tries, page ${pages} ends`
+      : 'page 1 opens, the pages between carry all three tries, the last page ends';
     return [
       shapeHeader,
       '',
-      `Pages: ${pages}. Opening 1, the three tries ${tryPages}, ending 1.`,
+      `Pages: ${pages} — ${triesSpan}.`,
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
       `Main character: ${mainName} — the problem is theirs and the solving is theirs.`,
-      'Challenges: one, met three times — two tries fail, the third succeeds by the main character\'s own doing. Never luck, never a grown-up doing it for them.',
+      'Challenges: one, met three times — each try a different kind of attempt, the first two fail, the third succeeds because the main character notices something about the problem the earlier tries missed. Never luck, never a grown-up doing it for them.',
+      CAUSAL_COHERENCE_RULE,
       'Feelings: named plainly, one per turn of the story — sad, then helped, then happy.',
       alongside,
       'Ending: the problem is solved and somebody is glad.',
@@ -5266,6 +5283,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       `Build the story on ${challengeBudget} challenges.`,
       alongside,
       difficulty,
+      CAUSAL_COHERENCE_RULE,
     ].join('\n');
   }
 
@@ -5304,6 +5322,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
         ? ' Where the pages allow, give each later joiner an entrance picture of their own — a page of at most two characters where their trait shows; fold it into their moment or a challenge page rather than adding pages.'
         : ''),
     difficulty,
+    CAUSAL_COHERENCE_RULE,
   ].filter(Boolean).join('\n');
 }
 
@@ -7256,6 +7275,7 @@ ${adventureGuide}` : ''}`;
       // template on purpose: the band text says its rules "override any
       // instruction elsewhere", so it must be the last word on how hard the
       // coping/empowering demand above may push (2026-09-13).
+      STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
       AGE_MODE: buildAgeModeSection(inputData),
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
       MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
@@ -7443,6 +7463,11 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
       CATEGORY_GUIDELINES: categoryGuidelines,
+      // Lean (arc) variant: who carries the story, the challenge budget, the
+      // band's explicit arithmetic and the causal rule — no page budget,
+      // thread rule or entrance quota, which would fight the scene-count
+      // instructions this template already carries.
+      STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
       AGE_MODE: buildAgeModeSection(inputData),
       // Same resolver the full pipeline's Art Director uses. Trial has no Art
       // Director, so without this the creature tone never reaches a trial page.

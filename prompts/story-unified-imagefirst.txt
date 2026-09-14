@@ -95,6 +95,8 @@ Visual Bible entry with full description (build, hair, face, signature look, clo
 
 {CATEGORY_GUIDELINES}
 
+{STORY_SHAPE}
+
 {AGE_MODE}
 
 # TEXT LENGTH RULES

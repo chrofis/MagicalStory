@@ -156,8 +156,21 @@ describe('buildStoryShapeSection', () => {
   it('gives the tries band one challenge met three times', () => {
     const shape = shapeAt(3);
     expect(shape).toMatch(/Challenges: one, met three times/);
-    expect(shape).toMatch(/two tries fail, the third succeeds/);
+    // Each try is a different KIND of attempt and the third turns on a
+    // noticing — "more effort" licensed four variations of the same try.
+    expect(shape).toMatch(/each try a different kind of attempt/);
+    expect(shape).toMatch(/notices something about the problem the earlier tries missed/);
     expect(shape).not.toMatch(/major challenge/);
+    // The tries span is named as pages, never a bare number beside "the three
+    // tries" (which read as a count of tries).
+    expect(shape).not.toMatch(/the three tries \d/);
+    expect(shape).toMatch(/pages 2-\d+ carry the three tries/);
+  });
+
+  it('puts the causal-coherence rule on every band', () => {
+    for (const age of [1, 2, 3, 4, 8]) {
+      expect(shapeAt(age)).toMatch(/An object brought into the solution does real mechanical work/);
+    }
   });
 
   it('keeps the computed challenge budget for fear-choice and adds its resolution rule', () => {
