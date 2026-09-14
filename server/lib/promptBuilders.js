@@ -724,8 +724,17 @@ function buildEraGuard(era) {
  * Only meaningful when the caller ALSO attaches the landmark photo to the
  * generation call (the FRAMING section references "the reference photo").
  *
- * @param {{name?: string}|string|null} landmark - landmark object (any shape
- *        carrying `name`) or a bare name string. Null-safe.
+ * Two shapes of reference exist and they need different instructions. A close
+ * or exterior photo of one building HAS a silhouette to preserve. A `distant`
+ * or `view-from` photo shows a whole village or town — there is no single
+ * silhouette in it, and "never a tiny speck against a wide cityscape" has no
+ * coherent answer for a panorama. `photoType` (the indexer's own
+ * classification of the served slot, threaded through
+ * resolveLandmarkPhotoForLocation) picks the branch; anything else, including
+ * an unclassified photo, keeps the original block byte-for-byte.
+ *
+ * @param {{name?: string, photoType?: string}|string|null} landmark - landmark
+ *        object (any shape carrying `name`) or a bare name string. Null-safe.
  * @returns {string} the fidelity block, or '' when no named landmark.
  */
 function buildLandmarkFidelityBlock(landmark) {
@@ -733,6 +742,21 @@ function buildLandmarkFidelityBlock(landmark) {
     ? landmark.trim()
     : String(landmark?.name || '').trim();
   if (!name) return '';
+  const photoType = typeof landmark === 'string' ? null : (landmark?.photoType || null);
+  if (photoType === 'distant' || photoType === 'view-from') {
+    // ⚠️ DRAFT WORDING — NOT OWNER-APPROVED (2026-09-14). The plumbing above is
+    // the shipped part; this text is awaiting sign-off and must not reach
+    // master before it has it.
+    return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo is a WIDE VIEW: it shows this real place as a whole, not one building close up. The scene is set in this place.
+
+**IDENTITY (from the photo):** Take the character of the place — the shapes and pitch of its roofs, the materials and colours of walls and roofs, how densely the buildings stand, and the landscape around them: hills, water, trees, skyline. Someone who knows the place must recognise it from those, not from one façade. Do not pull a single structure out of the photo and make it the subject unless the scene description asks for it.
+
+**MEDIUM (never from the photo):** The photo supplies geometry and nothing else. Every surface is painted in the ART STYLE, with the same brushwork, edges, texture and palette as the rest of the page — no photographic detail, no lens depth of field, no camera grain.
+
+**CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the place into them. The scene may stand in a street or a yard of this place instead of looking at all of it from afar; the photo still governs what the buildings there are made of and look like.
+
+**EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space — never mounted on or overlapping the buildings.`;
+  }
   return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
 
 **IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it.

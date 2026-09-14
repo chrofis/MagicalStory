@@ -251,12 +251,23 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
       return null;
     }
     log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${decision.variantNumber})`);
+    // Carry the indexer's own classification of THIS photo (photo_type:
+    // exterior | distant | close | interior | view-from) and its description
+    // through to the prompt. pickVariantForView selects on `kind` and then
+    // every consumer dropped it, so buildLandmarkFidelityBlock had only a name
+    // to go on and told the model "preserve the silhouette… never a tiny speck
+    // against a wide cityscape" even when the reference was a village panorama,
+    // which has no silhouette to preserve. The loader can return a different
+    // slot than was requested, so read the kind off the slot actually served.
+    const served = (loc.photoVariants || []).find(v => v.variantNumber === variant.variantNumber);
     return {
       name: loc.name,
       photoData: variant.photoData,
       attribution: variant.attribution,
       source: 'swiss-variant',
       variantNumber: variant.variantNumber,
+      photoType: served?.kind || null,
+      photoDescription: served?.description || null,
     };
   }
 
