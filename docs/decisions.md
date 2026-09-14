@@ -38082,3 +38082,34 @@ REQUIRED OBJECTS loop + `pushRequired` dedupe), `server/lib/images.js`
 (`iteratePageCore`, after the anchored-object scrub),
 `tests/unit/vb-citation-union.test.ts`
 **Status:** ✅ active
+
+## VB contract audit: a numeric `age` satisfies the apparent-age rule (2026-09-14)
+**Context:** `prompts/scene-expansion-all.txt:131` mandates that every secondary-character
+entry carries `age` as a NUMBER of years (`8`, `34`), never prose. `auditVisualBibleContract`
+contradicted that contract twice over: `vbEntryProse` built the scanned text with
+`typeof entry[f] === 'string'`, so a compliant numeric `age` was dropped before matching, and
+`VB_AGE_INDICATOR` only matched digits followed by a `year`/`yr`/`aged` token, so a bare `34`
+would not have matched even if it had survived. An entry obeying the prompt EXACTLY was
+reported as "states no apparent age". Lab #1267 (CHR001 "Frau Brunner", no sex AND no apparent
+age) is the live instance: the sex half was a real Art Director miss, the age half was this
+false positive.
+**Decision:** Fix the bug, keep the finding WARN-only. `vbHasNumericAge()` accepts an `age`
+holding a plausible year count — finite, `> 0`, `<= 120` — as a statement of apparent age,
+numeric or a purely numeric string; the existing prose forms (`"8 years old"`, `"elderly"`,
+`"teenager"`) keep working for the other bible-emitting templates. `0`, negatives, out-of-range
+and non-numeric garbage still fail: an unset or defaulted field is exactly the omission the
+rule exists to catch. The finding is NOT routed into the scene review, its severity is
+unchanged, and it blocks nothing — that warn-only design is deliberate
+(`server/lib/outlineParser/unified.js:308-312`): classification belongs to the authoring
+prompt, and the warning is how we learn the prompt slipped.
+**Rationale:** Today's other findings were checks that stayed SILENT when they should have
+spoken. This one is the inversion — it spoke when it should have been silent, and that noise
+made its real half easy to dismiss. A check that fires on correct output trains the reader to
+ignore it, which costs more than the check earns. `name` stays excluded from the scanned prose
+(a title like "Mrs" or "Grandmother" must still not satisfy the sex rule), and the sex logic is
+untouched. `age` is the only contractually-numeric field among `VB_PROSE_FIELDS`; every other
+field in that list is authored as a string by all bible-emitting templates, so the
+`typeof === 'string'` filter drops nothing else, and only this one rule consumes `vbEntryProse`.
+**Touched:** `server/lib/outlineParser/shared.js` (`VB_AGE_YEARS_MAX`, `vbHasNumericAge`, the
+rule-1 condition), `tests/unit/vb-authoring-contract.test.ts`
+**Status:** ✅ active

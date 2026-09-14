@@ -711,6 +711,22 @@ const VB_AGE_INDICATOR = /\b(?:\d{1,3}\s*(?:-|\s)?(?:year|yr)s?(?:\s*-?\s*old)?|
 // not a statement of sex, and "Rossa"/"Mrs Baker" must not satisfy the rule.
 const VB_PROSE_FIELDS = ['description', 'age', 'build', 'face', 'hair', 'signatureLook', 'clothing', 'features', 'type', 'setting'];
 
+// The authoring prompt mandates `age` as a NUMBER of years ("8", "34"), never
+// prose — so the compliant form is exactly the one VB_AGE_INDICATOR cannot
+// match and vbEntryProse drops before matching. A plausible year count is a
+// statement of apparent age in its own right. 0 and anything non-finite or out
+// of human range is NOT: an unset, defaulted or garbage field is precisely the
+// omission this rule exists to catch.
+const VB_AGE_YEARS_MAX = 120;
+
+/** True when `age` holds a plausible number of years (numeric or a numeric string). */
+function vbHasNumericAge(entry) {
+  const raw = entry?.age;
+  if (typeof raw !== 'number' && !(typeof raw === 'string' && /^\s*\d{1,3}(?:\.\d+)?\s*$/.test(raw))) return false;
+  const years = Number(raw);
+  return Number.isFinite(years) && years > 0 && years <= VB_AGE_YEARS_MAX;
+}
+
 const VB_CATEGORIES = ['secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing'];
 
 /** Prose an entry actually authored, joined for indicator matching. */
@@ -765,7 +781,7 @@ function auditVisualBibleContract(visualBible, options = {}) {
     const prose = vbEntryProse(entry);
     const missing = [];
     if (!VB_SEX_INDICATOR.test(prose)) missing.push('sex');
-    if (!VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
+    if (!vbHasNumericAge(entry) && !VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
     if (missing.length) {
       findings.push({
         code: 'character-missing-sex-or-age',
@@ -809,6 +825,7 @@ module.exports = {
   CLOTHING_CATEGORIES,
   auditVisualBibleContract,
   vbEntryProse,
+  vbHasNumericAge,
   parseCharacterClothingBlock,
   cleanPageText,
   parsePatchSections,

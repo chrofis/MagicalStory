@@ -97,6 +97,51 @@ describe('auditVisualBibleContract — character sex and apparent age', () => {
     expect(found).toHaveLength(0);
   });
 
+  // The authoring prompt (prompts/scene-expansion-all.txt) mandates `age` as a
+  // NUMBER of years and a `build` opening with the sex. Before 2026-09-14 the
+  // check dropped every non-string field before matching AND its age regex
+  // needed a "years"/"aged" token, so an entry obeying the prompt EXACTLY was
+  // reported as stating no apparent age — a false positive on correct output.
+  it('accepts the contract the prompt mandates: numeric age + a sex-opening build', () => {
+    const found = auditVisualBibleContract({
+      secondaryCharacters: [
+        { id: 'CHR020', name: 'Frau Brunner', age: 34, build: 'a woman, broad-shouldered', hair: 'dark, pinned up', appearsInPages: [3] },
+        { id: 'CHR021', name: 'Nico', age: 8, build: 'a boy, slightly tall for his age', hair: 'brown, cropped', appearsInPages: [5] },
+      ],
+    });
+    expect(found).toHaveLength(0);
+  });
+
+  // True-positive control: the fix must not become a disable. No age field at
+  // all and no age word anywhere in the prose is still the omission.
+  it('still reports a genuine age omission when nothing states one', () => {
+    const found = auditVisualBibleContract({
+      secondaryCharacters: [{ id: 'CHR022', name: 'Frau Brunner', build: 'a woman, broad-shouldered', hair: 'dark, pinned up' }],
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toContain('no apparent age');
+    expect(found[0].message).not.toContain('no sex');
+  });
+
+  it('rejects age 0 and garbage ages — an unset or defaulted field is the omission', () => {
+    for (const age of [0, -5, 999, NaN, null, true, {}, [], '', 'unknown', 'N/A']) {
+      const found = auditVisualBibleContract({
+        secondaryCharacters: [{ id: 'CHR023', name: 'the keeper', age: age as any, build: 'a woman, sturdy' }],
+      });
+      expect(found, `age ${JSON.stringify(age)} must not satisfy the rule`).toHaveLength(1);
+      expect(found[0].message).toContain('no apparent age');
+    }
+  });
+
+  it('keeps accepting the prose age forms other templates still emit', () => {
+    for (const age of ['8 years old', 'elderly', 'a teenager', 'aged 40']) {
+      const found = auditVisualBibleContract({
+        secondaryCharacters: [{ id: 'CHR024', name: 'the keeper', age, build: 'a woman, sturdy' }],
+      });
+      expect(found, `age "${age}" should satisfy the rule`).toHaveLength(0);
+    }
+  });
+
   it('only audits secondary characters for sex and age, never props', () => {
     // A prop description mentioning neither must not be reported.
     const found = auditVisualBibleContract({
