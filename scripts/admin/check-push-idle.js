@@ -15,10 +15,17 @@
  * Invoked by .githooks/pre-push with git's ref lines on stdin. Bypass a block
  * with `git push --no-verify` when you know the run is expendable.
  *
- * Run BY HAND (a TTY, no refs on stdin) it is the status check CLAUDE.md points
- * at: it probes every environment it knows and reports each one. It used to
- * print nothing and exit 0, which reads as "all clear" — the opposite of what an
+ * Run BY HAND (no argv from git) it is the status check CLAUDE.md points at: it
+ * probes every environment it knows and reports each one. It used to print
+ * nothing and exit 0, which reads as "all clear" — the opposite of what an
  * unreachable or busy environment means.
+ *
+ * BOTH MODES REACH THE SAME VERDICT (2026-09-14). Whatever blocks a push also
+ * fails the status check: same probe, same renderVerdict, same `blocked` fold in
+ * evaluateTargets(), same exit code. A by-hand run over a busy environment exits
+ * 1 and says so on stdout. It previously exited 0 and warned on stderr, so
+ * `check-push-idle.js; echo EXIT=$?` reported a clean all-clear seconds before
+ * the hook refused the same push.
  */
 
 const ENVIRONMENTS = {
@@ -58,8 +65,16 @@ function parseRefs(raw) {
  *
  * A stopped container is genuinely idle — nothing can be running inside it — so
  * it must not block. Railway serves 502/503 from its edge for a stopped
- * deployment, and a dead host gives a connection/DNS error; both mean "down".
+ * deployment, and a host that refuses the connection has nothing listening;
+ * both are positive evidence that the deployment is down.
  * A timeout or any other 5xx is NOT proof of idleness, so those block.
+ *
+ * A DNS FAILURE IS NOT EVIDENCE (2026-09-14). ENOTFOUND / EAI_AGAIN mean the
+ * name never resolved — a flaky laptop resolver produces both, and the answer
+ * then says nothing whatsoever about what is running inside the container. They
+ * used to be classed with ECONNREFUSED as "down", so a local network hiccup
+ * printed a green "is idle" over a production generation in flight. Unknown is
+ * not idle: they block.
  */
 async function probe(base) {
   let res;
@@ -68,9 +83,9 @@ async function probe(base) {
   } catch (err) {
     // undici reports the real reason on `cause`, and for a multi-address host
     // (IPv4 + IPv6) aggregates the per-attempt errors into `cause.errors`.
-    const DOWN = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'];
+    const DEPLOYMENT_DOWN = ['ECONNREFUSED'];
     const codes = [err?.cause?.code, ...(err?.cause?.errors || []).map(e => e?.code)].filter(Boolean);
-    const down = codes.find(c => DOWN.includes(c));
+    const down = codes.find(c => DEPLOYMENT_DOWN.includes(c));
     if (down) {
       return { verdict: 'idle', reasons: [], detail: `container is down (${down}) — nothing can be running` };
     }
@@ -125,12 +140,16 @@ function renderVerdict(target, { verdict, reasons = [], detail }, { manual = fal
   }
 
   if (manual) {
+    // STDOUT, not stderr (2026-09-14). The ✓ lines go to stdout, so routing the
+    // bad news to stderr meant a stdout-only capture — an agent, a pipe, a log —
+    // saw nothing but green ticks for the environments that happened to be idle.
+    // One report, one stream.
     const lines = [];
     if (verdict === 'busy') {
-      lines.push(['warn', `✗ ${target.name} is BUSY — a push would kill:`]);
-      for (const r of reasons) lines.push(['warn', `  • ${r}`]);
+      lines.push(['log', `✗ ${target.name} is BUSY — a push would kill:`]);
+      for (const r of reasons) lines.push(['log', `  • ${r}`]);
     } else {
-      lines.push(['warn', `? ${target.name} — could not prove it is idle: ${detail}`]);
+      lines.push(['log', `? ${target.name} — could not prove it is idle: ${detail}`]);
     }
     return { blocked: true, lines };
   }
@@ -189,6 +208,35 @@ function isHookInvocation(argv = process.argv) {
   return Array.isArray(argv) && argv.length > 2;
 }
 
+/**
+ * THE VERDICT — one resolver, both readers.
+ *
+ * The hook and the by-hand status check are the same file, but they used to fold
+ * their per-environment results into an ANSWER differently: the hook returned
+ * exit 1 when anything blocked, the manual run returned exit 0 unconditionally.
+ * Same endpoint, same probe, same rendering — opposite verdicts on the channel
+ * that scripts and agents actually read. `node scripts/admin/check-push-idle.js;
+ * echo EXIT=$?` printed EXIT=0 with a Test Lab experiment running, and the hook
+ * refused the very next push (2026-09-13, twice).
+ *
+ * So the fold lives HERE and returns `blocked` to both callers, and main() turns
+ * that one flag into the exit code with no mode in the expression. Whatever
+ * blocks a push also fails the status check.
+ *
+ * @param probeFn injectable for tests — the only seam; the decision is not.
+ */
+async function evaluateTargets(targets, { manual = false } = {}, probeFn = probe) {
+  let blocked = false;
+  const lines = [];
+  for (const target of targets) {
+    const result = await probeFn(target.base);
+    const rendered = renderVerdict(target, result, { manual });
+    if (rendered.blocked) blocked = true;
+    lines.push(...rendered.lines);
+  }
+  return { blocked, lines };
+}
+
 async function main() {
   const hook = isHookInvocation();
   // A manual run never reads stdin: nothing will close it, and there is
@@ -201,17 +249,13 @@ async function main() {
 
   if (manual) console.log('Checking whether each environment is idle (a deploy restarts the container)…');
 
-  let blocked = false;
-  for (const target of targets) {
-    const result = await probe(target.base);
-    const { blocked: b, lines } = renderVerdict(target, result, { manual });
-    if (b) blocked = true;
-    for (const [stream, text] of lines) console[stream](text);
-  }
+  const { blocked, lines } = await evaluateTargets(targets, { manual });
+  for (const [stream, text] of lines) console[stream](text);
 
   // exitCode, not process.exit(): let stdio flush before the process ends.
-  // A manual status report never fails the process — it is a read, not a gate.
-  process.exitCode = (!manual && blocked) ? 1 : 0;
+  // NO `manual` TERM HERE — that is the divergence this file was fixed for.
+  // A status check that exits 0 over a busy environment is a false all-clear.
+  process.exitCode = blocked ? 1 : 0;
 }
 
 if (require.main === module) {
@@ -225,4 +269,6 @@ if (require.main === module) {
 
 // Exported for tests/manual/test-push-idle-gate.js — the verdict logic decides
 // whether every push in this repo is allowed, so it gets exercised directly.
-module.exports = { probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets, isHookInvocation};
+module.exports = {
+  probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets, isHookInvocation, evaluateTargets,
+};

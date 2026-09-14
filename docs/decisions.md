@@ -38113,3 +38113,39 @@ field in that list is authored as a string by all bible-emitting templates, so t
 **Touched:** `server/lib/outlineParser/shared.js` (`VB_AGE_YEARS_MAX`, `vbHasNumericAge`, the
 rule-1 condition), `tests/unit/vb-authoring-contract.test.ts`
 **Status:** ✅ active
+
+## The push gate's two readers reach ONE verdict, and never fail open (2026-09-14)
+**Context:** `scripts/admin/check-push-idle.js` is both gate 8 of `.githooks/pre-push` and
+the by-hand status check CLAUDE.md tells agents to trust. On 2026-09-13, twice, the by-hand
+run printed `✓ staging is idle` with `EXIT=0` and the hook refused the very next push with
+`✗ PUSH BLOCKED — staging is busy • testlab: 1 experiment(s) running`. Investigated: the two
+readers call the SAME URL with the SAME probe, the endpoint is uncached (Railway edge direct,
+no Cloudflare, no `cache-control`), and the server side (`/api/health/busy` →
+`busyReport()` in `server/lib/idleShutdown.js`) has one definition of busy. The divergence was
+in the FOLD, not the data: `process.exitCode = (!manual && blocked) ? 1 : 0` made a by-hand
+run exit 0 whatever it found, and manual mode wrote its busy/unknown lines to **stderr** while
+the `✓ idle` lines went to stdout — so a stdout-only capture, or anything reading `$?`, saw an
+all-clear over a busy environment. A second, independent fail-open sat in `probe()`:
+`ENOTFOUND` and `EAI_AGAIN` were classed with `ECONNREFUSED` as "container is down → idle",
+so a flaky local resolver reported a green tick over a production generation in flight.
+**Decision:** One shared resolver, `evaluateTargets()`, folds every per-environment
+`renderVerdict()` into a single `blocked` flag that both readers use; `main()` derives the exit
+code from that flag with **no mode in the expression**. Manual mode's busy/unknown lines move
+to stdout, alongside the ticks. DNS failures (`ENOTFOUND`, `EAI_AGAIN`) now return `unknown`,
+which blocks. Positive evidence of a stopped deployment still passes — Railway edge 502/503 and
+`ECONNREFUSED` mean the name resolved and nothing is running — because staging shuts itself
+down to save RAM and must stay pushable. `.githooks/pre-push` is unchanged: it was the reader
+that was already correct.
+**Rationale:** A safety gate that answers "idle" when it could not determine the answer is
+worse than one that errors — the hook exists because a push on 2026-08-05 killed a running Test
+Lab experiment, and on `master` the same mistake kills a user's paid, in-flight story. Matching
+the script to the hook by patching one branch would have left the same two-verdict shape, so
+the fold itself was extracted instead, with a wiring guard asserting the exit-code expression
+cannot regain a `manual` term and that every verdict blocks identically in both modes. Fixtures
+are the live response shape (`GET /api/health/busy` captured 2026-09-14) and the real `reasons`
+strings the server emits, not hand-built ones. NOTE: a by-hand check remains a point-in-time
+read — a run may start in the minute the hook's other seven gates take, and the hook rechecking
+at gate 8 is what makes that safe.
+**Touched:** `scripts/admin/check-push-idle.js` (`evaluateTargets`, `probe` DNS
+classification, manual-mode streams, exit code), `tests/unit/push-idle-gate-agreement.test.ts`
+**Status:** ✅ active
