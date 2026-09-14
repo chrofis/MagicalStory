@@ -36704,3 +36704,37 @@ authored marker on the state; not built.
 `server/lib/testlab.js`, `tests/unit/vb-state-review.test.ts`
 **Status:** ✅ active — situational (fires only on a stated object whose ranges
 disagree with the pages).
+
+## 2026-09-14 — A reviewer's bible correction carries the entry's COMPLETE states[], and may not lose a look
+**Context:** Test Lab #1264 exercised the change above on the beats of
+`job_1789343124794_z2c779f7i`. It worked: the Art Director again left the
+pages before the first change unclaimed (states began at the page the mud
+arrives, so the five pages citing the bare id fell back to `states[0]` =
+mud-smeared), the new `vb_state_no_base` finding fired, and the reviewer
+returned a corrected entry inserting an "unaltered" first state over exactly
+those pages. That is the repair the stored story never got.
+It also broke something. The entry's fourth look, "broken" (pages [17], the
+page the egg opens), was absent from the returned list, and
+`applyReviewBibleCorrections` replaced `states[]` wholesale — so the climax
+look was deleted and page 17's `ART001.3` citation came to mean "cracked".
+The prompt had told the reviewer to "carry ONLY the entries you corrected"
+and never that a carried entry's `states[]` must be complete, so omitting the
+untouched states was a reasonable reading.
+**Decision:**
+- `prompts/scene-review.txt`: for an entry the reviewer carries, `states[]` is
+  its COMPLETE list of looks — every state repeated, untouched ones included —
+  and a state left out is deleted.
+- `applyReviewBibleCorrections` refuses the whole entry's correction (the
+  authored bible stands) when it drops a state that carries pages, matched on
+  the state's name because the reviewer renumbers ids; and when it re-points a
+  dotted handle a brief already cites at a different look. Both are reported
+  through `beats_scene_review_bible_rejected`, never thrown.
+**Rationale:** The prompt makes the complete list the normal case; the
+validator makes the damaging case impossible rather than likely. Fail-safe in
+the direction the merge already chose — a rejected correction costs the repair,
+an accepted bad one costs a page its look. Regression fixture is the exact
+Lab #1264 bible and reviewer JSON.
+**Touched:** `prompts/scene-review.txt`, `server/lib/beatsPipeline.js`,
+`tests/unit/vb-state-review.test.ts`, `tasks/bugs.json`
+**Status:** ✅ active — the guard is situational; the prompt line applies to
+every review that corrects an entry.
